@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('delegations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('employee_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
+            $table->foreignId('employee_id');
+            $table->foreignId('project_id');
             $table->dateTime('start_time');
             $table->dateTime('end_time')->nullable();
             $table->enum('status', ['pending', 'active', 'completed', 'cancelled'])->default('pending');
