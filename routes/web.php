@@ -8,6 +8,7 @@ use App\Http\Controllers\TimeLogController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\AccommodationController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -56,6 +57,10 @@ Route::middleware('auth')->group(function () {
 
     // Resource routes for Vehicles
     Route::resource('vehicles', VehicleController::class);
+
+    // Resource routes for Reports
+    Route::resource('reports', ReportController::class);
+    Route::get('reports/{id}/download', [ReportController::class, 'download'])->name('reports.download');
 });
 
 require __DIR__.'/auth.php';
