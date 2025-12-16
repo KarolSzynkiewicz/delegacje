@@ -30,11 +30,7 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts
 # Configure Apache
 RUN a2enmod rewrite
 
-# Set permissions for storage and bootstrap/cache
-RUN chown -R www-data:www-data /var/www/html/storage \
-    /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage \
-    /var/www/html/bootstrap/cache
+# Set permissions for storage and bootstrap/cache (will be handled by docker-compose exec)
 
 # Expose port 80
 EXPOSE 80

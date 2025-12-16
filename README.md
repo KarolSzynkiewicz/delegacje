@@ -105,10 +105,13 @@ Ta metoda jest zalecana i najłatwiejsza do uruchomienia projektu na Twoim kompu
     # 1. Wygeneruj klucz aplikacji
     docker-compose exec app php artisan key:generate
 
-    # 2. Uruchom migracje i seedery (tworzy bazę danych i dodaje testowego użytkownika)
+    # 2. Ustaw uprawnienia dla katalogów storage i cache
+    docker-compose exec app chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+    # 3. Uruchom migracje i seedery (tworzy bazę danych i dodaje testowego użytkownika)
     docker-compose exec app php artisan migrate --seed
 
-    # 3. Zainstaluj i skompiluj zasoby front-end
+    # 4. Zainstaluj i skompiluj zasoby front-end
     docker-compose exec app npm install
     docker-compose exec app npm run build
     ```
