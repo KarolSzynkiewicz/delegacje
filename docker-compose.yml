@@ -1,7 +1,6 @@
 version: '3.8'
-
 services:
-    app:
+    laravel.test:
         build:
             context: .
             dockerfile: Dockerfile
@@ -11,26 +10,17 @@ services:
         volumes:
             - .:/var/www/html
         ports:
-            - "8000:80"
-        depends_on:
-            - db
+            - '8000:80'
         environment:
-            # Laravel Environment Variables
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
             APP_ENV: local
             APP_DEBUG: true
             APP_URL: http://localhost:8000
-            # Database Configuration (for MySQL/MariaDB if needed, but we use SQLite for simplicity)
             DB_CONNECTION: sqlite
-            # Since we use SQLite, we don't need DB_HOST, DB_DATABASE, etc.
-            # The SQLite file will be created in the volume mount.
+        networks:
+            - stocznia-network
 
-    db:
-        image: nouchka/sqlite3:latest
-        container_name: stocznia-db
-        volumes:
-            - ./database:/data
-        # This service is mainly for running sqlite commands if needed,
-        # but the app service will handle the database file directly.
-
-volumes:
-    db-data:
+networks:
+    stocznia-network:
+        driver: bridge

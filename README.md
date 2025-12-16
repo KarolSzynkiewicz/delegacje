@@ -72,37 +72,52 @@ Po uruchomieniu `php artisan migrate --seed`, możesz zalogować się testowym u
 | **Email** | `test@example.com` |
 | **Hasło** | `password123` |
 
-## 🐳 Uruchomienie Projektu (Docker)
+## 🐳 Uruchomienie Projektu (Docker Compose)
 
-Aby uruchomić projekt za pomocą Docker Compose (zalecane dla środowiska produkcyjnego/deweloperskiego):
+Ta metoda jest zalecana i najłatwiejsza do uruchomienia projektu na Twoim komputerze.
 
-1.  **Upewnij się, że masz zainstalowany Docker i Docker Compose.**
+**Wymagania:**
+*   Zainstalowany **Docker Desktop** (lub Docker i Docker Compose) na Twoim komputerze.
 
-2.  **Sklonuj repozytorium** (jeśli jeszcze tego nie zrobiłeś).
+**Instrukcja:**
 
-3.  **Skonfiguruj środowisko:**
+1.  **Sklonuj Repozytorium i Przejdź do Katalogu:**
+    ```bash
+    git clone https://github.com/KarolSzynkiewicz/delegacje.git
+    cd delegacje
+    ```
+
+2.  **Skopiuj plik środowiskowy:**
     ```bash
     cp .env.example .env
     ```
+    *(W pliku `.env` ustawiono domyślne wartości dla Docker, w tym `DB_CONNECTION=sqlite`)*
 
-4.  **Uruchom kontenery:**
+3.  **Uruchom Kontenery i Zbuduj Obraz:**
     ```bash
     docker-compose up --build -d
     ```
+    *(Użycie `--build` jest ważne przy pierwszym uruchomieniu lub po zmianach w `Dockerfile`)*
 
-5.  **Wygeneruj klucz aplikacji i uruchom migracje/seedery wewnątrz kontenera:**
+4.  **Wykonaj Konfigurację w Kontenerze (Jednorazowo):**
+    Po uruchomieniu kontenerów, musisz wykonać poniższe komendy, aby przygotować aplikację:
     ```bash
+    # 1. Wygeneruj klucz aplikacji
     docker-compose exec app php artisan key:generate
-    docker-compose exec app php artisan migrate --seed
-    ```
 
-6.  **Kompilacja zasobów front-end (opcjonalnie, jeśli wprowadzasz zmiany w CSS/JS):**
-    ```bash
+    # 2. Uruchom migracje i seedery (tworzy bazę danych i dodaje testowego użytkownika)
+    docker-compose exec app php artisan migrate --seed
+
+    # 3. Zainstaluj i skompiluj zasoby front-end
     docker-compose exec app npm install
     docker-compose exec app npm run build
     ```
 
-Aplikacja będzie dostępna pod adresem: `http://localhost:8000`
+5.  **Gotowe!** Aplikacja będzie dostępna pod adresem:
+    [http://localhost:8000](http://localhost:8000)
+
+**Wskazówka dla Docker Desktop:**
+Jeśli używasz Docker Desktop, po wykonaniu kroku 3, projekt powinien pojawić się w sekcji **"Projects"** i możesz go tam uruchomić/zatrzymać za pomocą przycisków. Konfigurację (krok 4) nadal musisz wykonać w terminalu.
 
 ---
 *Projekt stworzony przez **Manus AI**.*
