@@ -1,0 +1,14 @@
+# Docker-related files to add to .gitignore
+
+# Backup files
+*.backup
+*.original
+
+# Docker volumes
+sail-mysql/
+
+# Environment files (keep .env.example)
+.env
+
+# Sail helper script is committed, but you might want to ignore local modifications
+# sail
