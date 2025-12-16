@@ -42,6 +42,12 @@ echo ""
 # Start containers
 ./vendor/bin/sail up -d
 
+# Fix permissions for storage and bootstrap/cache (common WSL/Docker issue)
+echo ""
+echo "🔒 Fixing file permissions..."
+./vendor/bin/sail root-shell -c "chmod -R 777 storage bootstrap/cache"
+./vendor/bin/sail artisan storage:link
+
 echo ""
 echo "⏳ Waiting for MySQL to be ready..."
 sleep 10
