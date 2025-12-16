@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Role extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['name', 'description'];
+
+    /**
+     * Get all employees with this role.
+     */
+    public function employees()
+    {
+        return $this->hasMany(Employee::class);
+    }
+}
