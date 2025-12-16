@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: stocznia-app
+        container_name: stocznia-app
+        restart: unless-stopped
+        volumes:
+            - .:/var/www/html
+        ports:
+            - "8000:80"
+        depends_on:
+            - db
+        environment:
+            # Laravel Environment Variables
+            APP_ENV: local
+            APP_DEBUG: true
+            APP_URL: http://localhost:8000
+            # Database Configuration (for MySQL/MariaDB if needed, but we use SQLite for simplicity)
+            DB_CONNECTION: sqlite
+            # Since we use SQLite, we don't need DB_HOST, DB_DATABASE, etc.
+            # The SQLite file will be created in the volume mount.
+
+    db:
+        image: nouchka/sqlite3:latest
+        container_name: stocznia-db
+        volumes:
+            - ./database:/data
+        # This service is mainly for running sqlite commands if needed,
+        # but the app service will handle the database file directly.
+
+volumes:
+    db-data:
