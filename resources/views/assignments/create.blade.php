@@ -6,6 +6,7 @@
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                <div x-data="{ employeeId: '', startDate: '', endDate: '' }">
                 <form method="POST" action="{{ route('assignments.store') }}">
                     @csrf
 
@@ -27,7 +28,7 @@
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Pracownik</label>
-                        <select name="employee_id" required
+                        <select name="employee_id" x-model="employeeId" required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                             <option value="">Wybierz pracownika</option>
                             @foreach($employees as $employee)
@@ -59,7 +60,7 @@
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Rozpoczęcia</label>
-                        <input type="date" name="start_date" value="{{ old('start_date') }}" required
+                        <input type="date" name="start_date" x-model="startDate" value="{{ old('start_date') }}" required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                         @error('start_date')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>
@@ -68,7 +69,7 @@
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Zakończenia (opcjonalnie)</label>
-                        <input type="date" name="end_date" value="{{ old('end_date') }}"
+                        <input type="date" name="end_date" x-model="endDate" value="{{ old('end_date') }}"
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                         @error('end_date')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>
@@ -98,7 +99,13 @@
                         </button>
                         <a href="{{ route('assignments.index') }}" class="text-gray-600 hover:text-gray-900">Anuluj</a>
                     </div>
+                                    <livewire:employee-availability-checker 
+                        x-bind:employee-id="employeeId" 
+                        x-bind:start-date="startDate" 
+                        x-bind:end-date="endDate" 
+                    />
                 </form>
+            </div>
             </div>
         </div>
     </div>
