@@ -3,7 +3,8 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\DelegationController;
+use App\Http\Controllers\ProjectAssignmentController;
+use App\Http\Controllers\ProjectDemandController;
 use App\Http\Controllers\TimeLogController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\AccommodationController;
@@ -43,8 +44,17 @@ Route::middleware('auth')->group(function () {
     // Resource routes for Projects
     Route::resource('projects', ProjectController::class);
 
-    // Resource routes for Delegations
-    Route::resource('delegations', DelegationController::class);
+    // Resource routes for Project Demands
+    Route::resource('demands', ProjectDemandController::class);
+
+    // Resource routes for Project Assignments (replaces Delegations)
+    Route::resource('assignments', ProjectAssignmentController::class);
+    Route::get('assignments/project/{project}', [ProjectAssignmentController::class, 'byProject'])
+        ->name('assignments.by-project');
+    Route::get('assignments/employee/{employee}', [ProjectAssignmentController::class, 'byEmployee'])
+        ->name('assignments.by-employee');
+    Route::post('assignments/check-availability', [ProjectAssignmentController::class, 'checkAvailability'])
+        ->name('assignments.check-availability');
 
     // Resource routes for Time Logs
     Route::resource('time_logs', TimeLogController::class);

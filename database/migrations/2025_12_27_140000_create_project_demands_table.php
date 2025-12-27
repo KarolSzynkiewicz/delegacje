@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('delegations', function (Blueprint $table) {
+        Schema::create('project_demands', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('employee_id');
-            $table->foreignId('project_id');
-            $table->dateTime('start_time');
-            $table->dateTime('end_time')->nullable();
-            $table->enum('status', ['pending', 'active', 'completed', 'cancelled'])->default('pending');
+            $table->foreignId('project_id')->constrained()->onDelete('cascade');
+            $table->integer('required_workers_count')->default(0);
+            $table->date('start_date');
+            $table->date('end_date')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
         });
@@ -28,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('delegations');
+        Schema::dropIfExists('project_demands');
     }
 };

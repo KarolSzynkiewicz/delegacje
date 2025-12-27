@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TimeLog;
-use App\Models\Delegation;
+use App\Models\ProjectAssignment;
 use Illuminate\Http\Request;
 
 class TimeLogController extends Controller
@@ -13,7 +13,10 @@ class TimeLogController extends Controller
      */
     public function index()
     {
-        $timeLogs = TimeLog::with('delegation')->get();
+        $timeLogs = TimeLog::with('projectAssignment.employee', 'projectAssignment.project')
+            ->orderBy('start_time', 'desc')
+            ->paginate(20);
+        
         return view('time_logs.index', compact('timeLogs'));
     }
 
@@ -22,8 +25,11 @@ class TimeLogController extends Controller
      */
     public function create()
     {
-        $delegations = Delegation::where('status', '!=', 'cancelled')->get();
-        return view('time_logs.create', compact('delegations'));
+        $assignments = ProjectAssignment::with('employee', 'project', 'role')
+            ->whereIn('status', ['active', 'pending'])
+            ->get();
+        
+        return view('time_logs.create', compact('assignments'));
     }
 
     /**
@@ -32,16 +38,18 @@ class TimeLogController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'delegation_id' => 'required|exists:delegations,id',
-            'start_time' => 'required|date_time',
-            'end_time' => 'nullable|date_time|after_or_equal:start_time',
-            'hours_worked' => 'nullable|numeric|min:0',
+            'project_assignment_id' => 'required|exists:project_assignments,id',
+            'start_time' => 'required|date',
+            'end_time' => 'nullable|date|after_or_equal:start_time',
+            'hours_worked' => 'nullable|numeric|min:0|max:24',
             'notes' => 'nullable|string',
         ]);
 
         TimeLog::create($validated);
 
-        return redirect()->route('time_logs.index')->with('success', 'Zapis czasu pracy został dodany.');
+        return redirect()
+            ->route('time_logs.index')
+            ->with('success', 'Zapis czasu pracy został dodany.');
     }
 
     /**
@@ -49,7 +57,8 @@ class TimeLogController extends Controller
      */
     public function show(TimeLog $timeLog)
     {
-        $timeLog->load('delegation');
+        $timeLog->load('projectAssignment.employee', 'projectAssignment.project', 'projectAssignment.role');
+        
         return view('time_logs.show', compact('timeLog'));
     }
 
@@ -58,8 +67,11 @@ class TimeLogController extends Controller
      */
     public function edit(TimeLog $timeLog)
     {
-        $delegations = Delegation::where('status', '!=', 'cancelled')->get();
-        return view('time_logs.edit', compact('timeLog', 'delegations'));
+        $assignments = ProjectAssignment::with('employee', 'project', 'role')
+            ->whereIn('status', ['active', 'pending'])
+            ->get();
+        
+        return view('time_logs.edit', compact('timeLog', 'assignments'));
     }
 
     /**
@@ -68,16 +80,18 @@ class TimeLogController extends Controller
     public function update(Request $request, TimeLog $timeLog)
     {
         $validated = $request->validate([
-            'delegation_id' => 'required|exists:delegations,id',
-            'start_time' => 'required|date_time',
-            'end_time' => 'nullable|date_time|after_or_equal:start_time',
-            'hours_worked' => 'nullable|numeric|min:0',
+            'project_assignment_id' => 'required|exists:project_assignments,id',
+            'start_time' => 'required|date',
+            'end_time' => 'nullable|date|after_or_equal:start_time',
+            'hours_worked' => 'nullable|numeric|min:0|max:24',
             'notes' => 'nullable|string',
         ]);
 
         $timeLog->update($validated);
 
-        return redirect()->route('time_logs.index')->with('success', 'Zapis czasu pracy został zaktualizowany.');
+        return redirect()
+            ->route('time_logs.index')
+            ->with('success', 'Zapis czasu pracy został zaktualizowany.');
     }
 
     /**
@@ -87,6 +101,20 @@ class TimeLogController extends Controller
     {
         $timeLog->delete();
 
-        return redirect()->route('time_logs.index')->with('success', 'Zapis czasu pracy został usunięty.');
+        return redirect()
+            ->route('time_logs.index')
+            ->with('success', 'Zapis czasu pracy został usunięty.');
+    }
+
+    /**
+     * Display time logs for a specific project assignment.
+     */
+    public function byAssignment(ProjectAssignment $assignment)
+    {
+        $timeLogs = $assignment->timeLogs()
+            ->orderBy('start_time', 'desc')
+            ->get();
+        
+        return view('time_logs.by-assignment', compact('assignment', 'timeLogs'));
     }
 }

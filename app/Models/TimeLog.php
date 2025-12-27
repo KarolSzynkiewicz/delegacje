@@ -16,7 +16,7 @@ class TimeLog extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'delegation_id',
+        'project_assignment_id',
         'start_time',
         'end_time',
         'hours_worked',
@@ -31,13 +31,30 @@ class TimeLog extends Model
     protected $casts = [
         'start_time' => 'datetime',
         'end_time' => 'datetime',
+        'hours_worked' => 'decimal:2',
     ];
 
     /**
-     * Get the delegation for the time log.
+     * Get the project assignment for the time log.
      */
-    public function delegation(): BelongsTo
+    public function projectAssignment(): BelongsTo
     {
-        return $this->belongsTo(Delegation::class);
+        return $this->belongsTo(ProjectAssignment::class);
+    }
+
+    /**
+     * Get the employee through the project assignment.
+     */
+    public function employee(): BelongsTo
+    {
+        return $this->projectAssignment->employee();
+    }
+
+    /**
+     * Get the project through the project assignment.
+     */
+    public function project(): BelongsTo
+    {
+        return $this->projectAssignment->project();
     }
 }

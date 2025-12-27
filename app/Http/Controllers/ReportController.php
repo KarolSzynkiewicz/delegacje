@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Delegation;
+use App\Models\ProjectAssignment;
+use App\Models\Project;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
     /**
-     * Display a listing of delegation reports.
+     * Display a listing of assignment reports.
      */
     public function index()
     {
-        // TODO: Implement report listing logic
-        // This should display a list of available reports
+        // Display a list of available reports
         return view('reports.index');
     }
 
@@ -22,8 +23,10 @@ class ReportController extends Controller
      */
     public function create()
     {
-        // TODO: Implement report creation form
-        return view('reports.create');
+        $projects = Project::all();
+        $employees = Employee::all();
+        
+        return view('reports.create', compact('projects', 'employees'));
     }
 
     /**
@@ -31,17 +34,28 @@ class ReportController extends Controller
      */
     public function store(Request $request)
     {
-        // TODO: Implement report generation logic
-        // Validate input and generate report based on filters
         $validated = $request->validate([
-            'report_type' => 'required|string|in:delegation_summary,employee_hours,project_status',
+            'report_type' => 'required|string|in:assignment_summary,employee_hours,project_status,demand_fulfillment',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'format' => 'required|string|in:pdf,excel,html',
+            'project_id' => 'nullable|exists:projects,id',
+            'employee_id' => 'nullable|exists:employees,id',
         ]);
 
         // Generate report based on type
-        // return $this->generateReport($validated);
+        switch ($validated['report_type']) {
+            case 'assignment_summary':
+                return $this->generateAssignmentSummary($validated);
+            case 'employee_hours':
+                return $this->generateEmployeeHours($validated);
+            case 'project_status':
+                return $this->generateProjectStatus($validated);
+            case 'demand_fulfillment':
+                return $this->generateDemandFulfillment($validated);
+            default:
+                return back()->withErrors(['error' => 'Nieznany typ raportu.']);
+        }
     }
 
     /**
@@ -49,7 +63,6 @@ class ReportController extends Controller
      */
     public function show(string $id)
     {
-        // TODO: Implement report display logic
         return view('reports.show', ['reportId' => $id]);
     }
 
@@ -63,12 +76,28 @@ class ReportController extends Controller
     }
 
     /**
-     * Generate delegation summary report.
+     * Generate assignment summary report.
      */
-    private function generateDelegationSummary(array $filters)
+    private function generateAssignmentSummary(array $filters)
     {
-        // TODO: Implement delegation summary report generation
-        // Include: total delegations, duration, employees involved, projects
+        $query = ProjectAssignment::with('employee', 'project', 'role')
+            ->whereBetween('start_date', [$filters['start_date'], $filters['end_date']]);
+
+        if (isset($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (isset($filters['employee_id'])) {
+            $query->where('employee_id', $filters['employee_id']);
+        }
+
+        $assignments = $query->get();
+
+        // Return view with report data
+        return view('reports.assignment-summary', [
+            'assignments' => $assignments,
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -78,6 +107,7 @@ class ReportController extends Controller
     {
         // TODO: Implement employee hours report generation
         // Include: total hours per employee, overtime, attendance
+        // This would require TimeLog data aggregation
     }
 
     /**
@@ -85,7 +115,42 @@ class ReportController extends Controller
      */
     private function generateProjectStatus(array $filters)
     {
-        // TODO: Implement project status report generation
-        // Include: project progress, delegations per project, timeline
+        $query = Project::with(['assignments' => function ($q) use ($filters) {
+            $q->whereBetween('start_date', [$filters['start_date'], $filters['end_date']]);
+        }, 'demand']);
+
+        if (isset($filters['project_id'])) {
+            $query->where('id', $filters['project_id']);
+        }
+
+        $projects = $query->get();
+
+        return view('reports.project-status', [
+            'projects' => $projects,
+            'filters' => $filters,
+        ]);
+    }
+
+    /**
+     * Generate demand fulfillment report.
+     */
+    private function generateDemandFulfillment(array $filters)
+    {
+        // Compare project demands with actual assignments
+        $query = Project::with(['demand.demandRoles.role', 'assignments' => function ($q) use ($filters) {
+            $q->whereBetween('start_date', [$filters['start_date'], $filters['end_date']])
+              ->where('status', 'active');
+        }]);
+
+        if (isset($filters['project_id'])) {
+            $query->where('id', $filters['project_id']);
+        }
+
+        $projects = $query->get();
+
+        return view('reports.demand-fulfillment', [
+            'projects' => $projects,
+            'filters' => $filters,
+        ]);
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Delegation extends Model
+class ProjectDemand extends Model
 {
     use HasFactory;
 
@@ -17,11 +17,10 @@ class Delegation extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'employee_id',
         'project_id',
-        'start_time',
-        'end_time',
-        'status',
+        'required_workers_count',
+        'start_date',
+        'end_date',
         'notes',
     ];
 
@@ -31,20 +30,12 @@ class Delegation extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
+        'start_date' => 'date',
+        'end_date' => 'date',
     ];
 
     /**
-     * Get the employee (user) for the delegation.
-     */
-    public function employee(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'employee_id');
-    }
-
-    /**
-     * Get the project for the delegation.
+     * Get the project that owns the demand.
      */
     public function project(): BelongsTo
     {
@@ -52,10 +43,10 @@ class Delegation extends Model
     }
 
     /**
-     * Get the time logs for the delegation.
+     * Get the role requirements for this demand.
      */
-    public function timeLogs(): HasMany
+    public function demandRoles(): HasMany
     {
-        return $this->hasMany(TimeLog::class);
+        return $this->hasMany(ProjectDemandRole::class);
     }
 }
