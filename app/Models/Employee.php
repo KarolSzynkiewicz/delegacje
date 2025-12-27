@@ -68,11 +68,63 @@ class Employee extends Model
     }
 
     /**
-     * Get active assignments for this employee.
+     * Get all vehicle assignments for this employee.
+     */
+    public function vehicleAssignments(): HasMany
+    {
+        return $this->hasMany(VehicleAssignment::class);
+    }
+
+    /**
+     * Get the vehicles assigned to this employee (M:N relationship).
+     */
+    public function vehicles(): BelongsToMany
+    {
+        return $this->belongsToMany(Vehicle::class, 'vehicle_assignments')
+            ->withPivot('start_date', 'end_date', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get all accommodation assignments for this employee.
+     */
+    public function accommodationAssignments(): HasMany
+    {
+        return $this->hasMany(AccommodationAssignment::class);
+    }
+
+    /**
+     * Get the accommodations assigned to this employee (M:N relationship).
+     */
+    public function accommodations(): BelongsToMany
+    {
+        return $this->belongsToMany(Accommodation::class, 'accommodation_assignments')
+            ->withPivot('start_date', 'end_date', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get active project assignments for this employee.
      */
     public function activeAssignments(): HasMany
     {
         return $this->assignments()->where('status', 'active');
+    }
+
+    /**
+     * Get active vehicle assignment for this employee.
+     */
+    public function activeVehicleAssignment()
+    {
+        return $this->vehicleAssignments()->active()->first();
+    }
+
+    /**
+     * Get active accommodation assignment for this employee.
+     */
+    public function activeAccommodationAssignment()
+    {
+        return $this->accommodationAssignments()->active()->first();
     }
 
     /**

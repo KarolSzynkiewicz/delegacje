@@ -22,21 +22,9 @@ class Project extends Model
         'location_id',
         'name',
         'description',
-        'start_date',
-        'end_date',
         'status',
         'client_name',
         'budget',
-    ];
-
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
     ];
 
     /**

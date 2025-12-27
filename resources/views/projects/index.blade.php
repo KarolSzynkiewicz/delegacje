@@ -1,66 +1,53 @@
-@extends('layouts.app')
-
-@section('content')
-<div class="container">
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <h1>Projekty</h1>
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex justify-between items-center">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Projekty</h2>
+            <a href="{{ route('projects.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Dodaj Projekt</a>
         </div>
-        <div class="col-md-6 text-end">
-            <a href="{{ route('projects.create') }}" class="btn btn-primary">Dodaj Projekt</a>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            @if (session('success'))
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Klient</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse ($projects as $project)
+                            <tr>
+                                <td class="px-6 py-4">{{ $project->name }}</td>
+                                <td class="px-6 py-4">{{ $project->client_name ?? '-' }}</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                                        {{ ucfirst($project->status) }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <a href="{{ route('projects.show', $project) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
+                                    <a href="{{ route('projects.edit', $project) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
+                                    <a href="{{ route('demands.create', ['project_id' => $project->id]) }}" class="text-green-600 hover:text-green-900">Zapotrzebowanie</a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak projektów</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead class="table-dark">
-                <tr>
-                    <th>ID</th>
-                    <th>Nazwa</th>
-                    <th>Lokalizacja</th>
-                    <th>Data Rozpoczęcia</th>
-                    <th>Status</th>
-                    <th>Klient</th>
-                    <th>Akcje</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($projects as $project)
-                    <tr>
-                        <td>{{ $project->id }}</td>
-                        <td>{{ $project->name }}</td>
-                        <td>{{ $project->location->name ?? '-' }}</td>
-                        <td>{{ $project->start_date->format('Y-m-d') }}</td>
-                        <td>
-                            <span class="badge bg-{{ $project->status === 'active' ? 'success' : ($project->status === 'completed' ? 'info' : 'warning') }}">
-                                {{ ucfirst($project->status) }}
-                            </span>
-                        </td>
-                        <td>{{ $project->client_name ?? '-' }}</td>
-                        <td>
-                            <a href="{{ route('projects.show', $project) }}" class="btn btn-sm btn-info">Widok</a>
-                            <a href="{{ route('projects.edit', $project) }}" class="btn btn-sm btn-warning">Edytuj</a>
-                            <form action="{{ route('projects.destroy', $project) }}" method="POST" style="display:inline;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Czy na pewno?')">Usuń</button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="text-center">Brak projektów</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
-@endsection
+</x-app-layout>

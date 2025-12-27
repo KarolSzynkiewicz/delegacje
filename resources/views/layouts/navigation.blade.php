@@ -16,17 +16,20 @@
                         {{ __('Dashboard') }}
                     </x-nav-link>
                     @auth
+                        <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*') || request()->routeIs('demands.*')">
+                            {{ __('Projekty') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('assignments.index')" :active="request()->routeIs('assignments.*')">
+                            {{ __('Przypisania') }}
+                        </x-nav-link>
                         <x-nav-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
                             {{ __('Pracownicy') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*')">
-                            {{ __('Akomodacje') }}
-                        </x-nav-link>
-                        <x-nav-link :href="route('vehicles.index')" :active="request()->routeIs('vehicles.*')">
+                        <x-nav-link :href="route('vehicles.index')" :active="request()->routeIs('vehicles.*') || request()->routeIs('vehicle-assignments.*')">
                             {{ __('Pojazdy') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('delegations.index')" :active="request()->routeIs('delegations.*')">
-                            {{ __('Delegacje') }}
+                        <x-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*')">
+                            {{ __('Mieszkania') }}
                         </x-nav-link>
                     @endauth
                 </div>
@@ -34,6 +37,7 @@
 
             <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
+                @auth
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
@@ -49,7 +53,7 @@
 
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
+                            {{ __('Profil') }}
                         </x-dropdown-link>
 
                         <!-- Authentication -->
@@ -59,11 +63,12 @@
                             <x-dropdown-link :href="route('logout')"
                                     onclick="event.preventDefault();
                                                 this.closest('form').submit();">
-                                {{ __('Log Out') }}
+                                {{ __('Wyloguj') }}
                             </x-dropdown-link>
                         </form>
                     </x-slot>
                 </x-dropdown>
+                @endauth
             </div>
 
             <!-- Hamburger -->
@@ -85,22 +90,26 @@
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
             @auth
+                <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
+                    {{ __('Projekty') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('assignments.index')" :active="request()->routeIs('assignments.*')">
+                    {{ __('Przypisania') }}
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
                     {{ __('Pracownicy') }}
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*')">
-                    {{ __('Akomodacje') }}
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('vehicles.index')" :active="request()->routeIs('vehicles.*')">
                     {{ __('Pojazdy') }}
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('delegations.index')" :active="request()->routeIs('delegations.*')">
-                    {{ __('Delegacje') }}
+                <x-responsive-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*')">
+                    {{ __('Mieszkania') }}
                 </x-responsive-nav-link>
             @endauth
         </div>
 
         <!-- Responsive Settings Options -->
+        @auth
         <div class="pt-4 pb-1 border-t border-gray-200">
             <div class="px-4">
                 <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
@@ -109,7 +118,7 @@
 
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profile') }}
+                    {{ __('Profil') }}
                 </x-responsive-nav-link>
 
                 <!-- Authentication -->
@@ -119,10 +128,11 @@
                     <x-responsive-nav-link :href="route('logout')"
                             onclick="event.preventDefault();
                                         this.closest('form').submit();">
-                        {{ __('Log Out') }}
+                        {{ __('Wyloguj') }}
                     </x-responsive-nav-link>
                 </form>
             </div>
         </div>
+        @endauth
     </div>
 </nav>
