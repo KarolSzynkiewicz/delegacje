@@ -12,33 +12,32 @@ class AccommodationAssignmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Employee $employee)
     {
-        $assignments = AccommodationAssignment::with('employee', 'accommodation')
+        $assignments = $employee->accommodationAssignments()
+            ->with('accommodation')
             ->orderBy('start_date', 'desc')
             ->paginate(20);
         
-        return view('accommodation-assignments.index', compact('assignments'));
+        return view('accommodation-assignments.index', compact('employee', 'assignments'));
     }
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Employee $employee)
     {
-        $employees = Employee::with('role')->orderBy('last_name')->get();
         $accommodations = Accommodation::orderBy('name')->get();
         
-        return view('accommodation-assignments.create', compact('employees', 'accommodations'));
+        return view('accommodation-assignments.create', compact('employee', 'accommodations'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, Employee $employee)
     {
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
             'accommodation_id' => 'required|exists:accommodations,id',
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -55,38 +54,38 @@ class AccommodationAssignmentController extends Controller
                 ->withErrors(['accommodation_id' => 'Brak wolnych miejsc w tym mieszkaniu w wybranym okresie.']);
         }
 
-        $assignment = AccommodationAssignment::create($validated);
+        $assignment = $employee->accommodationAssignments()->create($validated);
 
         return redirect()
-            ->route('accommodation-assignments.index')
-            ->with('success', 'Przypisanie mieszkania zostało utworzone.');
+            ->route('employees.accommodations.index', $employee)
+            ->with('success', 'Mieszkanie zostało przypisane do pracownika.');
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(AccommodationAssignment $accommodationAssignment)
+    public function show(AccommodationAssignment $accommodation)
     {
-        $accommodationAssignment->load('employee', 'accommodation');
+        $accommodation->load('employee', 'accommodation');
         
-        return view('accommodation-assignments.show', compact('accommodationAssignment'));
+        return view('accommodation-assignments.show', compact('accommodation'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(AccommodationAssignment $accommodationAssignment)
+    public function edit(AccommodationAssignment $accommodation)
     {
-        $employees = Employee::with('role')->orderBy('last_name')->get();
+        $employees = Employee::orderBy('last_name')->get();
         $accommodations = Accommodation::orderBy('name')->get();
         
-        return view('accommodation-assignments.edit', compact('accommodationAssignment', 'employees', 'accommodations'));
+        return view('accommodation-assignments.edit', compact('accommodation', 'employees', 'accommodations'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, AccommodationAssignment $accommodationAssignment)
+    public function update(Request $request, AccommodationAssignment $accommodation)
     {
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -96,22 +95,23 @@ class AccommodationAssignmentController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $accommodationAssignment->update($validated);
+        $accommodation->update($validated);
 
         return redirect()
-            ->route('accommodation-assignments.index')
+            ->route('employees.accommodations.index', $accommodation->employee_id)
             ->with('success', 'Przypisanie mieszkania zostało zaktualizowane.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(AccommodationAssignment $accommodationAssignment)
+    public function destroy(AccommodationAssignment $accommodation)
     {
-        $accommodationAssignment->delete();
+        $employeeId = $accommodation->employee_id;
+        $accommodation->delete();
 
         return redirect()
-            ->route('accommodation-assignments.index')
+            ->route('employees.accommodations.index', $employeeId)
             ->with('success', 'Przypisanie mieszkania zostało usunięte.');
     }
 }

@@ -12,33 +12,32 @@ class VehicleAssignmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Employee $employee)
     {
-        $assignments = VehicleAssignment::with('employee', 'vehicle')
+        $assignments = $employee->vehicleAssignments()
+            ->with('vehicle')
             ->orderBy('start_date', 'desc')
             ->paginate(20);
         
-        return view('vehicle-assignments.index', compact('assignments'));
+        return view('vehicle-assignments.index', compact('employee', 'assignments'));
     }
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Employee $employee)
     {
-        $employees = Employee::with('role')->orderBy('last_name')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
         
-        return view('vehicle-assignments.create', compact('employees', 'vehicles'));
+        return view('vehicle-assignments.create', compact('employee', 'vehicles'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, Employee $employee)
     {
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
             'vehicle_id' => 'required|exists:vehicles,id',
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -55,38 +54,38 @@ class VehicleAssignmentController extends Controller
                 ->withErrors(['vehicle_id' => 'Pojazd jest już przypisany w tym okresie.']);
         }
 
-        $assignment = VehicleAssignment::create($validated);
+        $assignment = $employee->vehicleAssignments()->create($validated);
 
         return redirect()
-            ->route('vehicle-assignments.index')
-            ->with('success', 'Przypisanie pojazdu zostało utworzone.');
+            ->route('employees.vehicles.index', $employee)
+            ->with('success', 'Pojazd został przypisany do pracownika.');
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(VehicleAssignment $vehicleAssignment)
+    public function show(VehicleAssignment $vehicle)
     {
-        $vehicleAssignment->load('employee', 'vehicle');
+        $vehicle->load('employee', 'vehicle');
         
-        return view('vehicle-assignments.show', compact('vehicleAssignment'));
+        return view('vehicle-assignments.show', compact('vehicle'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(VehicleAssignment $vehicleAssignment)
+    public function edit(VehicleAssignment $vehicle)
     {
-        $employees = Employee::with('role')->orderBy('last_name')->get();
+        $employees = Employee::orderBy('last_name')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
         
-        return view('vehicle-assignments.edit', compact('vehicleAssignment', 'employees', 'vehicles'));
+        return view('vehicle-assignments.edit', compact('vehicle', 'employees', 'vehicles'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, VehicleAssignment $vehicleAssignment)
+    public function update(Request $request, VehicleAssignment $vehicle)
     {
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -96,22 +95,23 @@ class VehicleAssignmentController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $vehicleAssignment->update($validated);
+        $vehicle->update($validated);
 
         return redirect()
-            ->route('vehicle-assignments.index')
+            ->route('employees.vehicles.index', $vehicle->employee_id)
             ->with('success', 'Przypisanie pojazdu zostało zaktualizowane.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(VehicleAssignment $vehicleAssignment)
+    public function destroy(VehicleAssignment $vehicle)
     {
-        $vehicleAssignment->delete();
+        $employeeId = $vehicle->employee_id;
+        $vehicle->delete();
 
         return redirect()
-            ->route('vehicle-assignments.index')
+            ->route('employees.vehicles.index', $employeeId)
             ->with('success', 'Przypisanie pojazdu zostało usunięte.');
     }
 }

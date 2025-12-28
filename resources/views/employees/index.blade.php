@@ -14,7 +14,7 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Imię i Nazwisko</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rola</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zasoby</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
                         </tr>
                     </thead>
@@ -23,7 +23,10 @@
                             <tr>
                                 <td class="px-6 py-4">{{ $employee->full_name }}</td>
                                 <td class="px-6 py-4">{{ $employee->role->name ?? '-' }}</td>
-                                <td class="px-6 py-4">{{ $employee->email }}</td>
+                                <td class="px-6 py-4">
+                                    <a href="{{ route('employees.vehicles.index', $employee) }}" class="text-yellow-600 hover:text-yellow-900 mr-3">Pojazdy</a>
+                                    <a href="{{ route('employees.accommodations.index', $employee) }}" class="text-red-600 hover:text-red-900">Mieszkania</a>
+                                </td>
                                 <td class="px-6 py-4">
                                     <a href="{{ route('employees.show', $employee) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
                                     <a href="{{ route('employees.edit', $employee) }}" class="text-indigo-600 hover:text-indigo-900">Edytuj</a>

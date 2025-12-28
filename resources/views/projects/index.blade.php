@@ -36,8 +36,8 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <a href="{{ route('projects.show', $project) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                    <a href="{{ route('projects.edit', $project) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
-                                    <a href="{{ route('demands.create', ['project_id' => $project->id]) }}" class="text-green-600 hover:text-green-900">Zapotrzebowanie</a>
+                                    <a href="{{ route('projects.assignments.index', $project) }}" class="text-green-600 hover:text-green-900 mr-3">Pracownicy</a>
+                                    <a href="{{ route('projects.demands.index', $project) }}" class="text-purple-600 hover:text-purple-900">Zapotrzebowanie</a>
                                 </td>
                             </tr>
                         @empty

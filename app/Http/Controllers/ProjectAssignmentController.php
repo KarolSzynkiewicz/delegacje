@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProjectAssignment;
-use App\Models\Employee;
 use App\Models\Project;
+use App\Models\Employee;
 use App\Models\Role;
 use Illuminate\Http\Request;
 
@@ -13,47 +13,56 @@ class ProjectAssignmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Project $project)
     {
-        $assignments = ProjectAssignment::with('employee', 'project', 'role')
-            ->orderBy('start_date', 'desc')
+        $assignments = $project->assignments()
+            ->with("employee", "role")
+            ->orderBy("start_date", "desc")
             ->paginate(20);
         
-        return view('assignments.index', compact('assignments'));
+        return view("assignments.index", compact("project", "assignments"));
     }
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Project $project)
     {
-        $employees = Employee::with('role')->get();
-        $projects = Project::where('status', 'active')->get();
-        $roles = Role::all();
+        $employees = Employee::with("role")->orderBy("last_name")->get();
+        $roles = Role::orderBy("name")->get();
         
-        return view('assignments.create', compact('employees', 'projects', 'roles'));
+        return view("assignments.create", compact("project", "employees", "roles"));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, Project $project)
     {
         $validated = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'employee_id' => 'required|exists:employees,id',
-            'role_id' => 'required|exists:roles,id',
-            'start_date' => 'required|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'status' => 'required|in:pending,active,completed,cancelled',
-            'notes' => 'nullable|string',
+            "employee_id" => "required|exists:employees,id",
+            "role_id" => "required|exists:roles,id",
+            "start_date" => "required|date",
+            "end_date" => "nullable|date|after_or_equal:start_date",
+            "status" => "required|in:pending,active,completed,cancelled",
+            "notes" => "nullable|string",
         ]);
 
-        $assignment = ProjectAssignment::create($validated);
+        // Check employee availability
+        $employee = Employee::findOrFail($validated["employee_id"]);
+        $endDate = $validated["end_date"] ?? now()->addYears(10);
+        
+        if (!$employee->isAvailableInDateRange($validated["start_date"], $endDate)) {
+            return back()
+                ->withInput()
+                ->withErrors(["employee_id" => "Pracownik jest już przypisany do innego projektu w tym okresie."]);
+        }
+
+        $assignment = $project->assignments()->create($validated);
 
         return redirect()
-            ->route('assignments.show', $assignment)
-            ->with('success', 'Przypisanie pracownika do projektu zostało utworzone.');
+            ->route("projects.assignments.index", $project)
+            ->with("success", "Pracownik został przypisany do projektu.");
     }
 
     /**
@@ -61,9 +70,9 @@ class ProjectAssignmentController extends Controller
      */
     public function show(ProjectAssignment $assignment)
     {
-        $assignment->load('employee', 'project', 'role', 'timeLogs');
+        $assignment->load("employee", "project", "role");
         
-        return view('assignments.show', compact('assignment'));
+        return view("assignments.show", compact("assignment"));
     }
 
     /**
@@ -71,11 +80,11 @@ class ProjectAssignmentController extends Controller
      */
     public function edit(ProjectAssignment $assignment)
     {
-        $employees = Employee::with('role')->get();
-        $projects = Project::all();
-        $roles = Role::all();
+        $projects = Project::orderBy("name")->get();
+        $employees = Employee::with("role")->orderBy("last_name")->get();
+        $roles = Role::orderBy("name")->get();
         
-        return view('assignments.edit', compact('assignment', 'employees', 'projects', 'roles'));
+        return view("assignments.edit", compact("assignment", "projects", "employees", "roles"));
     }
 
     /**
@@ -84,20 +93,20 @@ class ProjectAssignmentController extends Controller
     public function update(Request $request, ProjectAssignment $assignment)
     {
         $validated = $request->validate([
-            'project_id' => 'required|exists:projects,id',
-            'employee_id' => 'required|exists:employees,id',
-            'role_id' => 'required|exists:roles,id',
-            'start_date' => 'required|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'status' => 'required|in:pending,active,completed,cancelled',
-            'notes' => 'nullable|string',
+            "project_id" => "required|exists:projects,id",
+            "employee_id" => "required|exists:employees,id",
+            "role_id" => "required|exists:roles,id",
+            "start_date" => "required|date",
+            "end_date" => "nullable|date|after_or_equal:start_date",
+            "status" => "required|in:pending,active,completed,cancelled",
+            "notes" => "nullable|string",
         ]);
 
         $assignment->update($validated);
 
         return redirect()
-            ->route('assignments.show', $assignment)
-            ->with('success', 'Przypisanie pracownika zostało zaktualizowane.');
+            ->route("projects.assignments.index", $assignment->project_id)
+            ->with("success", "Przypisanie zostało zaktualizowane.");
     }
 
     /**
@@ -105,59 +114,11 @@ class ProjectAssignmentController extends Controller
      */
     public function destroy(ProjectAssignment $assignment)
     {
+        $projectId = $assignment->project_id;
         $assignment->delete();
 
         return redirect()
-            ->route('assignments.index')
-            ->with('success', 'Przypisanie pracownika zostało usunięte.');
-    }
-
-    /**
-     * Display assignments for a specific project.
-     */
-    public function byProject(Project $project)
-    {
-        $assignments = $project->assignments()
-            ->with('employee', 'role')
-            ->orderBy('start_date', 'desc')
-            ->get();
-        
-        return view('assignments.by-project', compact('project', 'assignments'));
-    }
-
-    /**
-     * Display assignments for a specific employee.
-     */
-    public function byEmployee(Employee $employee)
-    {
-        $assignments = $employee->assignments()
-            ->with('project', 'role')
-            ->orderBy('start_date', 'desc')
-            ->get();
-        
-        return view('assignments.by-employee', compact('employee', 'assignments'));
-    }
-
-    /**
-     * Check employee availability in a date range.
-     */
-    public function checkAvailability(Request $request)
-    {
-        $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-        ]);
-
-        $employee = Employee::findOrFail($validated['employee_id']);
-        $isAvailable = $employee->isAvailableInDateRange(
-            $validated['start_date'],
-            $validated['end_date']
-        );
-
-        return response()->json([
-            'available' => $isAvailable,
-            'employee' => $employee->full_name,
-        ]);
+            ->route("projects.assignments.index", $projectId)
+            ->with("success", "Przypisanie zostało usunięte.");
     }
 }
