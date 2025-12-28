@@ -24,13 +24,12 @@ class VehicleAssignmentTest extends TestCase
         $employee = Employee::factory()->create();
         $vehicle = Vehicle::factory()->create();
 
-        $response = $this->actingAs($this->user)->post(route('vehicle-assignments.store'), [
-            'employee_id' => $employee->id,
+        $response = $this->actingAs($this->user)->post(route('employees.vehicles.store', $employee), [
             'vehicle_id' => $vehicle->id,
             'start_date' => now()->format('Y-m-d'),
         ]);
 
-        $response->assertRedirect(route('vehicle-assignments.index'));
+        $response->assertRedirect(route('employees.vehicles.index', $employee));
         $this->assertDatabaseHas('vehicle_assignments', [
             'employee_id' => $employee->id,
             'vehicle_id' => $vehicle->id,
@@ -52,8 +51,7 @@ class VehicleAssignmentTest extends TestCase
         ]);
 
         // Try to assign same vehicle to another employee in overlapping period
-        $response = $this->actingAs($this->user)->post(route('vehicle-assignments.store'), [
-            'employee_id' => $employee2->id,
+        $response = $this->actingAs($this->user)->post(route('employees.vehicles.store', $employee2), [
             'vehicle_id' => $vehicle->id,
             'start_date' => '2025-01-15',
             'end_date' => '2025-02-15',

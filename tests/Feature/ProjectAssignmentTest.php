@@ -20,21 +20,22 @@ class ProjectAssignmentTest extends TestCase
         $this->user = User::factory()->create();
     }
 
+
+
     public function test_can_create_project_assignment()
     {
         $employee = Employee::factory()->create();
         $project = Project::factory()->create();
         $role = Role::factory()->create();
 
-        $response = $this->actingAs($this->user)->post(route('assignments.store'), [
-            'project_id' => $project->id,
+        $response = $this->actingAs($this->user)->post(route('projects.assignments.store', $project), [
             'employee_id' => $employee->id,
             'role_id' => $role->id,
             'start_date' => now()->format('Y-m-d'),
             'status' => 'active',
         ]);
 
-        $response->assertRedirect(route('assignments.index'));
+        $response->assertRedirect(route('projects.assignments.index', $project));
         $this->assertDatabaseHas('project_assignments', [
             'project_id' => $project->id,
             'employee_id' => $employee->id,
@@ -59,8 +60,7 @@ class ProjectAssignmentTest extends TestCase
         ]);
 
         // Try to create overlapping assignment
-        $response = $this->actingAs($this->user)->post(route('assignments.store'), [
-            'project_id' => $project2->id,
+        $response = $this->actingAs($this->user)->post(route('projects.assignments.store', $project2), [
             'employee_id' => $employee->id,
             'role_id' => $role->id,
             'start_date' => '2025-01-15',

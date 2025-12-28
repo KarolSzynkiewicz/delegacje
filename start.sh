@@ -39,6 +39,17 @@ echo "🐳 Starting Docker containers..."
 echo "   This may take a few minutes on first run..."
 echo ""
 
+# Install composer dependencies if vendor doesn't exist (bootstrap for Sail)
+if [ ! -d "vendor" ]; then
+    echo "📦 Installing PHP dependencies via temporary container..."
+    docker run --rm \
+        -u "$(id -u):$(id -g)" \
+        -v "$(pwd):/var/www/html" \
+        -w /var/www/html \
+        laravelsail/php83-composer:latest \
+        composer install --ignore-platform-reqs
+fi
+
 # Start containers
 ./vendor/bin/sail up -d
 

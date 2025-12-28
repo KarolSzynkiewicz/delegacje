@@ -26,6 +26,7 @@
                                 <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
                                 <td class="px-6 py-4">
                                     <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
+                                    <a href="{{ route('vehicle-assignments.edit', $assignment) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
                                     <form action="{{ route('vehicle-assignments.destroy', $assignment) }}" method="POST" class="inline">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Czy na pewno?')">Usuń</button>

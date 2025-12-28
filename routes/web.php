@@ -36,19 +36,49 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('projects', ProjectController::class);
 
     Route::resource('projects.demands', ProjectDemandController::class)
-        ->shallow(); // index i store z kontekstem projektu, reszta płaska
+        ->shallow()
+        ->names([
+            'show' => 'demands.show',
+            'edit' => 'demands.edit',
+            'update' => 'demands.update',
+            'destroy' => 'demands.destroy',
+        ]);
 
     Route::resource('projects.assignments', ProjectAssignmentController::class)
-        ->shallow();
+        ->shallow()
+        ->names([
+            'show' => 'assignments.show',
+            'edit' => 'assignments.edit',
+            'update' => 'assignments.update',
+            'destroy' => 'assignments.destroy',
+        ]);
 
     // Employees + assignments
     Route::resource('employees', EmployeeController::class);
 
-    Route::resource('employees.vehicles', VehicleAssignmentController::class)
-        ->shallow();
+    Route::resource('employees.vehicle-assignments', VehicleAssignmentController::class)
+        ->shallow()
+        ->names([
+            'index' => 'employees.vehicles.index',
+            'create' => 'employees.vehicles.create',
+            'store' => 'employees.vehicles.store',
+            'show' => 'vehicle-assignments.show',
+            'edit' => 'vehicle-assignments.edit',
+            'update' => 'vehicle-assignments.update',
+            'destroy' => 'vehicle-assignments.destroy',
+        ]);
 
-    Route::resource('employees.accommodations', AccommodationAssignmentController::class)
-        ->shallow();
+    Route::resource('employees.accommodation-assignments', AccommodationAssignmentController::class)
+        ->shallow()
+        ->names([
+            'index' => 'employees.accommodations.index',
+            'create' => 'employees.accommodations.create',
+            'store' => 'employees.accommodations.store',
+            'show' => 'accommodation-assignments.show',
+            'edit' => 'accommodation-assignments.edit',
+            'update' => 'accommodation-assignments.update',
+            'destroy' => 'accommodation-assignments.destroy',
+        ]);
 
     // Vehicles, Accommodations (CRUD)
     Route::resource('vehicles', VehicleController::class);

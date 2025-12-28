@@ -11,6 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (config('database.default') === 'sqlite') {
+            Schema::dropIfExists('time_logs');
+            Schema::create('time_logs', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('project_assignment_id')->constrained()->onDelete('cascade');
+                $table->dateTime('start_time');
+                $table->dateTime('end_time')->nullable();
+                $table->decimal('hours_worked', 5, 2)->nullable();
+                $table->text('notes')->nullable();
+                $table->timestamps();
+            });
+            return;
+        }
+
         Schema::table('time_logs', function (Blueprint $table) {
             // Drop old foreign key and column if exists
             if (Schema::hasColumn('time_logs', 'delegation_id')) {
