@@ -50,6 +50,7 @@ class LocationController extends Controller
      */
     public function show(Location $location)
     {
+        $location->load('projects');
         return view('locations.show', compact('location'));
     }
 

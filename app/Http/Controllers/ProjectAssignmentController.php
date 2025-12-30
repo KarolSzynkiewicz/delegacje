@@ -11,6 +11,18 @@ use Illuminate\Http\Request;
 class ProjectAssignmentController extends Controller
 {
     /**
+     * Display all assignments (global view).
+     */
+    public function all()
+    {
+        $assignments = ProjectAssignment::with("employee", "project", "role")
+            ->orderBy("start_date", "desc")
+            ->paginate(20);
+        
+        return view("assignments.index", compact("assignments"));
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Project $project)

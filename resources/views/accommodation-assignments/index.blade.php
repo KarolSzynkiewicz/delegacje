@@ -2,9 +2,15 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Mieszkania pracownika: {{ $employee->full_name }}
+                @isset($employee)
+                    Mieszkania pracownika: {{ $employee->full_name }}
+                @else
+                    Wszystkie przypisania mieszkań
+                @endisset
             </h2>
-            <a href="{{ route('employees.accommodations.create', $employee) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Przypisz Mieszkanie</a>
+            @isset($employee)
+                <a href="{{ route('employees.accommodations.create', $employee) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Przypisz Mieszkanie</a>
+            @endisset
         </div>
     </x-slot>
 
@@ -14,6 +20,9 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
+                            @if(!isset($employee))
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pracownik</th>
+                            @endif
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mieszkanie</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Od - Do</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
@@ -22,6 +31,13 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         @forelse ($assignments as $assignment)
                             <tr>
+                                @if(!isset($employee))
+                                    <td class="px-6 py-4">
+                                        <a href="{{ route('employees.show', $assignment->employee) }}" class="text-blue-600 hover:text-blue-900">
+                                            {{ $assignment->employee->full_name }}
+                                        </a>
+                                    </td>
+                                @endif
                                 <td class="px-6 py-4">{{ $assignment->accommodation->name }} ({{ $assignment->accommodation->city }})</td>
                                 <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
                                 <td class="px-6 py-4">
@@ -35,7 +51,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">Brak przypisanych mieszkań</td>
+                                <td colspan="{{ isset($employee) ? 3 : 4 }}" class="px-6 py-4 text-center text-gray-500">Brak przypisanych mieszkań</td>
                             </tr>
                         @endforelse
                     </tbody>

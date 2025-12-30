@@ -10,7 +10,23 @@
                     @csrf
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Nazwa Projektu</label>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Lokalizacja <span class="text-red-500">*</span></label>
+                        <select name="location_id" required
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                            <option value="">Wybierz lokalizację</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}" {{ old('location_id') == $location->id ? 'selected' : '' }}>
+                                    {{ $location->name }} ({{ $location->address }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('location_id')
+                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Nazwa Projektu <span class="text-red-500">*</span></label>
                         <input type="text" name="name" value="{{ old('name') }}" required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                         @error('name')
@@ -31,14 +47,17 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Status</label>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Status <span class="text-red-500">*</span></label>
                         <select name="status" required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                            <option value="active">Aktywny</option>
-                            <option value="on_hold">Wstrzymany</option>
-                            <option value="completed">Zakończony</option>
-                            <option value="cancelled">Anulowany</option>
+                            <option value="active" {{ old('status', 'active') == 'active' ? 'selected' : '' }}>Aktywny</option>
+                            <option value="on_hold" {{ old('status') == 'on_hold' ? 'selected' : '' }}>Wstrzymany</option>
+                            <option value="completed" {{ old('status') == 'completed' ? 'selected' : '' }}>Zakończony</option>
+                            <option value="cancelled" {{ old('status') == 'cancelled' ? 'selected' : '' }}>Anulowany</option>
                         </select>
+                        @error('status')
+                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">

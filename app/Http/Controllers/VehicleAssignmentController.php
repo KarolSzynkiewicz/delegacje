@@ -10,6 +10,18 @@ use Illuminate\Http\Request;
 class VehicleAssignmentController extends Controller
 {
     /**
+     * Display all vehicle assignments (global view).
+     */
+    public function all()
+    {
+        $assignments = VehicleAssignment::with('employee', 'vehicle')
+            ->orderBy('start_date', 'desc')
+            ->paginate(20);
+        
+        return view('vehicle-assignments.index', compact('assignments'));
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Employee $employee)

@@ -29,6 +29,12 @@
                         <x-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*')">
                             {{ __('Mieszkania') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">
+                            {{ __('Lokalizacje') }}
+                        </x-nav-link>
+                        <x-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
+                            {{ __('Role') }}
+                        </x-nav-link>
                     @endauth
                 </div>
             </div>
@@ -100,6 +106,12 @@
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*')">
                     {{ __('Mieszkania') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">
+                    {{ __('Lokalizacje') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
+                    {{ __('Role') }}
                 </x-responsive-nav-link>
             @endauth
         </div>

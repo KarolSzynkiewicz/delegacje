@@ -10,6 +10,18 @@ use Illuminate\Http\Request;
 class AccommodationAssignmentController extends Controller
 {
     /**
+     * Display all accommodation assignments (global view).
+     */
+    public function all()
+    {
+        $assignments = AccommodationAssignment::with('employee', 'accommodation')
+            ->orderBy('start_date', 'desc')
+            ->paginate(20);
+        
+        return view('accommodation-assignments.index', compact('assignments'));
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Employee $employee)

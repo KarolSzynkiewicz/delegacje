@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectDemand extends Model
 {
@@ -18,9 +17,10 @@ class ProjectDemand extends Model
      */
     protected $fillable = [
         'project_id',
-        'required_workers_count',
-        'start_date',
-        'end_date',
+        'role_id',
+        'required_count',
+        'date_from',
+        'date_to',
         'notes',
     ];
 
@@ -30,8 +30,9 @@ class ProjectDemand extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'date_from' => 'date',
+        'date_to' => 'date',
+        'required_count' => 'integer',
     ];
 
     /**
@@ -43,10 +44,10 @@ class ProjectDemand extends Model
     }
 
     /**
-     * Get the role requirements for this demand.
+     * Get the role required for this demand.
      */
-    public function demandRoles(): HasMany
+    public function role(): BelongsTo
     {
-        return $this->hasMany(ProjectDemandRole::class);
+        return $this->belongsTo(Role::class);
     }
 }

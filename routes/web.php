@@ -9,6 +9,8 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\AccommodationController;
 use App\Http\Controllers\VehicleAssignmentController;
 use App\Http\Controllers\AccommodationAssignmentController;
+use App\Http\Controllers\LocationController;
+use App\Http\Controllers\RoleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,7 +23,7 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+//Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
@@ -52,6 +54,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'update' => 'assignments.update',
             'destroy' => 'assignments.destroy',
         ]);
+    
+    // Global route for all assignments (without project context)
+    Route::get('assignments', [ProjectAssignmentController::class, 'all'])
+        ->name('assignments.index');
 
     // Employees + assignments
     Route::resource('employees', EmployeeController::class);
@@ -79,10 +85,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'update' => 'accommodation-assignments.update',
             'destroy' => 'accommodation-assignments.destroy',
         ]);
+    
+    // Global routes for all vehicle and accommodation assignments
+    Route::get('vehicle-assignments', [VehicleAssignmentController::class, 'all'])
+        ->name('vehicle-assignments.index');
+    
+    Route::get('accommodation-assignments', [AccommodationAssignmentController::class, 'all'])
+        ->name('accommodation-assignments.index');
 
     // Vehicles, Accommodations (CRUD)
     Route::resource('vehicles', VehicleController::class);
     Route::resource('accommodations', AccommodationController::class);
-});
+
+    // Locations, Roles (CRUD)
+    Route::resource('locations', LocationController::class);
+    Route::resource('roles', RoleController::class);
+//});
 
 require __DIR__.'/auth.php';

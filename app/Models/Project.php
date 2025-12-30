@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Project extends Model
@@ -36,11 +35,11 @@ class Project extends Model
     }
 
     /**
-     * Get the demand for this project.
+     * Get the demands for this project.
      */
-    public function demand(): HasOne
+    public function demands(): HasMany
     {
-        return $this->hasOne(ProjectDemand::class);
+        return $this->hasMany(ProjectDemand::class);
     }
 
     /**

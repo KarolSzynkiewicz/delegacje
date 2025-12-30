@@ -2,9 +2,15 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Pracownicy w projekcie: {{ $project->name }}
+                @isset($project)
+                    Pracownicy w projekcie: {{ $project->name }}
+                @else
+                    Wszystkie przypisania
+                @endisset
             </h2>
-            <a href="{{ route('projects.assignments.create', $project) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Przypisz Pracownika</a>
+            @isset($project)
+                <a href="{{ route('projects.assignments.create', $project) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Przypisz Pracownika</a>
+            @endisset
         </div>
     </x-slot>
 
@@ -16,6 +22,9 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pracownik</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rola</th>
+                            @if(!isset($project))
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projekt</th>
+                            @endif
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Od - Do</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
@@ -26,6 +35,13 @@
                             <tr>
                                 <td class="px-6 py-4">{{ $assignment->employee->full_name }}</td>
                                 <td class="px-6 py-4">{{ $assignment->role->name }}</td>
+                                @if(!isset($project))
+                                    <td class="px-6 py-4">
+                                        <a href="{{ route('projects.show', $assignment->project) }}" class="text-blue-600 hover:text-blue-900">
+                                            {{ $assignment->project->name }}
+                                        </a>
+                                    </td>
+                                @endif
                                 <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
                                 <td class="px-6 py-4">
                                     <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
@@ -43,7 +59,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">Brak przypisanych pracowników</td>
+                                <td colspan="{{ isset($project) ? 5 : 6 }}" class="px-6 py-4 text-center text-gray-500">Brak przypisanych pracowników</td>
                             </tr>
                         @endforelse
                     </tbody>

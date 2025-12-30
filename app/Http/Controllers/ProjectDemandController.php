@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProjectDemand;
-use App\Models\ProjectDemandRole;
 use App\Models\Project;
 use App\Models\Role;
 use Illuminate\Http\Request;
@@ -17,7 +16,7 @@ class ProjectDemandController extends Controller
     public function index(Project $project)
     {
         $demands = $project->demands()
-            ->with("demandRoles.role")
+            ->with("role")
             ->orderBy("created_at", "desc")
             ->paginate(20);
         
@@ -39,28 +38,32 @@ class ProjectDemandController extends Controller
     public function store(Request $request, Project $project)
     {
         $validated = $request->validate([
-            "required_workers_count" => "required|integer|min:0",
-            "start_date" => "required|date",
-            "end_date" => "nullable|date|after_or_equal:start_date",
-            "notes" => "nullable|string",
-            "roles" => "required|array|min:1",
-            "roles.*.role_id" => "required|exists:roles,id",
-            "roles.*.required_count" => "required|integer|min:1",
+            "demands" => "required|array|min:1",
+            "demands.*.role_id" => "required|exists:roles,id",
+            "demands.*.required_count" => "required|integer|min:1",
+            "demands.*.date_from" => "required|date",
+            "demands.*.date_to" => "nullable|date",
+            "demands.*.notes" => "nullable|string",
         ]);
+
+        // Walidacja date_to >= date_from dla każdego zapotrzebowania
+        foreach ($validated["demands"] as $key => $demand) {
+            if (isset($demand["date_to"]) && $demand["date_to"] < $demand["date_from"]) {
+                return back()
+                    ->withInput()
+                    ->withErrors(["demands.{$key}.date_to" => "Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia."]);
+            }
+        }
 
         DB::beginTransaction();
         try {
-            $demand = $project->demands()->create([
-                "required_workers_count" => $validated["required_workers_count"],
-                "start_date" => $validated["start_date"],
-                "end_date" => $validated["end_date"],
-                "notes" => $validated["notes"],
-            ]);
-
-            foreach ($validated["roles"] as $roleData) {
-                $demand->demandRoles()->create([
-                    "role_id" => $roleData["role_id"],
-                    "required_count" => $roleData["required_count"],
+            foreach ($validated["demands"] as $demandData) {
+                $project->demands()->create([
+                    "role_id" => $demandData["role_id"],
+                    "required_count" => $demandData["required_count"],
+                    "date_from" => $demandData["date_from"],
+                    "date_to" => $demandData["date_to"] ?? null,
+                    "notes" => $demandData["notes"] ?? null,
                 ]);
             }
 
@@ -68,7 +71,7 @@ class ProjectDemandController extends Controller
 
             return redirect()
                 ->route("projects.demands.index", $project)
-                ->with("success", "Zapotrzebowanie projektu zostało utworzone.");
+                ->with("success", "Zapotrzebowania projektu zostały utworzone.");
         } catch (\Exception $e) {
             DB::rollBack();
             return back()
@@ -82,7 +85,7 @@ class ProjectDemandController extends Controller
      */
     public function show(ProjectDemand $demand)
     {
-        $demand->load("project", "demandRoles.role");
+        $demand->load("project", "role");
         return view("demands.show", compact("demand"));
     }
 
@@ -91,7 +94,7 @@ class ProjectDemandController extends Controller
      */
     public function edit(ProjectDemand $demand)
     {
-        $demand->load("demandRoles");
+        $demand->load("role");
         $roles = Role::all();
         return view("demands.edit", compact("demand", "roles"));
     }
@@ -102,43 +105,18 @@ class ProjectDemandController extends Controller
     public function update(Request $request, ProjectDemand $demand)
     {
         $validated = $request->validate([
-            "required_workers_count" => "required|integer|min:0",
-            "start_date" => "required|date",
-            "end_date" => "nullable|date|after_or_equal:start_date",
+            "role_id" => "required|exists:roles,id",
+            "required_count" => "required|integer|min:1",
+            "date_from" => "required|date",
+            "date_to" => "nullable|date|after_or_equal:date_from",
             "notes" => "nullable|string",
-            "roles" => "required|array|min:1",
-            "roles.*.role_id" => "required|exists:roles,id",
-            "roles.*.required_count" => "required|integer|min:1",
         ]);
 
-        DB::beginTransaction();
-        try {
-            $demand->update([
-                "required_workers_count" => $validated["required_workers_count"],
-                "start_date" => $validated["start_date"],
-                "end_date" => $validated["end_date"],
-                "notes" => $validated["notes"],
-            ]);
+        $demand->update($validated);
 
-            $demand->demandRoles()->delete();
-            foreach ($validated["roles"] as $roleData) {
-                $demand->demandRoles()->create([
-                    "role_id" => $roleData["role_id"],
-                    "required_count" => $roleData["required_count"],
-                ]);
-            }
-
-            DB::commit();
-
-            return redirect()
-                ->route("projects.demands.index", $demand->project_id)
-                ->with("success", "Zapotrzebowanie zostało zaktualizowane.");
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()
-                ->withInput()
-                ->withErrors(["error" => "Wystąpił błąd: " . $e->getMessage()]);
-        }
+        return redirect()
+            ->route("projects.demands.index", $demand->project_id)
+            ->with("success", "Zapotrzebowanie zostało zaktualizowane.");
     }
 
     /**

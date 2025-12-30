@@ -37,10 +37,10 @@ class Role extends Model
     }
 
     /**
-     * Get all demand roles with this role.
+     * Get all project demands with this role.
      */
-    public function demandRoles(): HasMany
+    public function projectDemands(): HasMany
     {
-        return $this->hasMany(ProjectDemandRole::class);
+        return $this->hasMany(ProjectDemand::class);
     }
 }
