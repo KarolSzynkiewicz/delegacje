@@ -4,14 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\Location;
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\UpdateProjectRequest;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class ProjectController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(): View
     {
         $projects = Project::with('location')->get();
         return view('projects.index', compact('projects'));
@@ -20,7 +23,7 @@ class ProjectController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): View
     {
         $locations = Location::all();
         return view('projects.create', compact('locations'));
@@ -29,18 +32,11 @@ class ProjectController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreProjectRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'location_id' => 'required|exists:locations,id',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'required|in:active,completed,on_hold,cancelled',
-            'client_name' => 'nullable|string|max:255',
-            'budget' => 'nullable|numeric|min:0',
-        ]);
-
-        Project::create($validated);
+        $this->authorize('create', Project::class);
+        
+        Project::create($request->validated());
 
         return redirect()->route('projects.index')->with('success', 'Projekt został dodany.');
     }
@@ -48,16 +44,16 @@ class ProjectController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Project $project)
+    public function show(Project $project): View
     {
-        $project->load('location', 'delegations');
+        $project->load('location', 'assignments');
         return view('projects.show', compact('project'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Project $project)
+    public function edit(Project $project): View
     {
         $locations = Location::all();
         return view('projects.edit', compact('project', 'locations'));
@@ -66,18 +62,11 @@ class ProjectController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Project $project)
+    public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $validated = $request->validate([
-            'location_id' => 'required|exists:locations,id',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'required|in:active,completed,on_hold,cancelled',
-            'client_name' => 'nullable|string|max:255',
-            'budget' => 'nullable|numeric|min:0',
-        ]);
-
-        $project->update($validated);
+        $this->authorize('update', $project);
+        
+        $project->update($request->validated());
 
         return redirect()->route('projects.index')->with('success', 'Projekt został zaktualizowany.');
     }
@@ -85,8 +74,10 @@ class ProjectController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Project $project)
+    public function destroy(Project $project): RedirectResponse
     {
+        $this->authorize('delete', $project);
+        
         $project->delete();
 
         return redirect()->route('projects.index')->with('success', 'Projekt został usunięty.');

@@ -11,6 +11,7 @@ use App\Http\Controllers\VehicleAssignmentController;
 use App\Http\Controllers\AccommodationAssignmentController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\WeeklyOverviewController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,10 +24,13 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-//Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    // Weekly Overview
+    Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])->name('weekly-overview.index');
 
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'edit'])->name('edit');
@@ -100,6 +104,6 @@ Route::get('/', function () {
     // Locations, Roles (CRUD)
     Route::resource('locations', LocationController::class);
     Route::resource('roles', RoleController::class);
-//});
+});
 
 require __DIR__.'/auth.php';

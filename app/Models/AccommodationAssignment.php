@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 
 class AccommodationAssignment extends Model
 {
@@ -52,7 +53,7 @@ class AccommodationAssignment extends Model
     /**
      * Scope a query to only include active assignments.
      */
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->where(function ($q) {
             $q->whereNull('end_date')
@@ -64,7 +65,7 @@ class AccommodationAssignment extends Model
     /**
      * Scope a query to only include assignments within a date range.
      */
-    public function scopeInDateRange($query, $startDate, $endDate)
+    public function scopeInDateRange(Builder $query, string $startDate, string $endDate): Builder
     {
         return $query->where(function ($q) use ($startDate, $endDate) {
             $q->whereBetween('start_date', [$startDate, $endDate])

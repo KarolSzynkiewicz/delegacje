@@ -16,6 +16,9 @@
                         {{ __('Dashboard') }}
                     </x-nav-link>
                     @auth
+                        <x-nav-link :href="route('weekly-overview.index')" :active="request()->routeIs('weekly-overview.*')">
+                            {{ __('Przegląd Tygodniowy') }}
+                        </x-nav-link>
                         <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*') || request()->routeIs('demands.*')">
                             {{ __('Projekty') }}
                         </x-nav-link>
@@ -94,6 +97,9 @@
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
             @auth
+                <x-responsive-nav-link :href="route('weekly-overview.index')" :active="request()->routeIs('weekly-overview.*')">
+                    {{ __('Przegląd Tygodniowy') }}
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
                     {{ __('Projekty') }}
                 </x-responsive-nav-link>

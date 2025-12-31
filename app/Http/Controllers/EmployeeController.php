@@ -4,14 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Role;
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\UpdateEmployeeRequest;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class EmployeeController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(): View
     {
         $employees = Employee::with('role')->paginate(10);
         return view('employees.index', compact('employees'));
@@ -20,7 +23,7 @@ class EmployeeController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): View
     {
         $roles = Role::all();
         return view('employees.create', compact('roles'));
@@ -29,30 +32,18 @@ class EmployeeController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreEmployeeRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:employees',
-            'phone' => 'nullable|string|max:20',
-            'role_id' => 'required|exists:roles,id',
-            'a1_valid_from' => 'nullable|date',
-            'a1_valid_to' => 'nullable|date',
-            'document_1' => 'nullable|string',
-            'document_2' => 'nullable|string',
-            'document_3' => 'nullable|string',
-            'notes' => 'nullable|string',
-        ]);
-
-        Employee::create($validated);
+        $this->authorize('create', Employee::class);
+        
+        Employee::create($request->validated());
         return redirect()->route('employees.index')->with('success', 'Pracownik został dodany.');
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Employee $employee)
+    public function show(Employee $employee): View
     {
         return view('employees.show', compact('employee'));
     }
@@ -60,7 +51,7 @@ class EmployeeController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Employee $employee)
+    public function edit(Employee $employee): View
     {
         $roles = Role::all();
         return view('employees.edit', compact('employee', 'roles'));
@@ -69,31 +60,21 @@ class EmployeeController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Employee $employee)
+    public function update(UpdateEmployeeRequest $request, Employee $employee): RedirectResponse
     {
-        $validated = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:employees,email,' . $employee->id,
-            'phone' => 'nullable|string|max:20',
-            'role_id' => 'required|exists:roles,id',
-            'a1_valid_from' => 'nullable|date',
-            'a1_valid_to' => 'nullable|date',
-            'document_1' => 'nullable|string',
-            'document_2' => 'nullable|string',
-            'document_3' => 'nullable|string',
-            'notes' => 'nullable|string',
-        ]);
-
-        $employee->update($validated);
+        $this->authorize('update', $employee);
+        
+        $employee->update($request->validated());
         return redirect()->route('employees.show', $employee)->with('success', 'Pracownik został zaktualizowany.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Employee $employee)
+    public function destroy(Employee $employee): RedirectResponse
     {
+        $this->authorize('delete', $employee);
+        
         $employee->delete();
         return redirect()->route('employees.index')->with('success', 'Pracownik został usunięty.');
     }

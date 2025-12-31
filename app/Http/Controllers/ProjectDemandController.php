@@ -26,10 +26,15 @@ class ProjectDemandController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Project $project)
+    public function create(Project $project, Request $request)
     {
         $roles = Role::all();
-        return view("demands.create", compact("project", "roles"));
+        
+        // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        
+        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo"));
     }
 
     /**
@@ -37,34 +42,52 @@ class ProjectDemandController extends Controller
      */
     public function store(Request $request, Project $project)
     {
+        // Walidacja wspólnych dat
         $validated = $request->validate([
-            "demands" => "required|array|min:1",
+            "date_from" => "required|date",
+            "date_to" => "nullable|date|after_or_equal:date_from",
+            "notes" => "nullable|string",
+            "demands" => "required|array",
             "demands.*.role_id" => "required|exists:roles,id",
-            "demands.*.required_count" => "required|integer|min:1",
-            "demands.*.date_from" => "required|date",
-            "demands.*.date_to" => "nullable|date",
-            "demands.*.notes" => "nullable|string",
+            "demands.*.required_count" => "required|integer|min:0",
+        ], [
+            "demands.required" => "Brak danych o rolach.",
+            "date_from.required" => "Data rozpoczęcia jest wymagana.",
+            "date_from.date" => "Data rozpoczęcia musi być poprawną datą.",
+            "date_to.after_or_equal" => "Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.",
         ]);
 
-        // Walidacja date_to >= date_from dla każdego zapotrzebowania
-        foreach ($validated["demands"] as $key => $demand) {
-            if (isset($demand["date_to"]) && $demand["date_to"] < $demand["date_from"]) {
-                return back()
-                    ->withInput()
-                    ->withErrors(["demands.{$key}.date_to" => "Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia."]);
+        // Filtruj tylko te role, które mają ilość > 0
+        $demandsToCreate = [];
+        foreach ($validated["demands"] as $roleId => $demandData) {
+            // Sprawdź czy dane są poprawne
+            if (!isset($demandData["role_id"]) || !isset($demandData["required_count"])) {
+                continue;
             }
+            
+            $requiredCount = (int) $demandData["required_count"];
+            if ($requiredCount > 0) {
+                $demandsToCreate[] = [
+                    "role_id" => (int) $demandData["role_id"],
+                    "required_count" => $requiredCount,
+                    "date_from" => $validated["date_from"],
+                    "date_to" => $validated["date_to"] ?? null,
+                    "notes" => $validated["notes"] ?? null,
+                ];
+            }
+        }
+
+        // Sprawdź czy jest przynajmniej jedno zapotrzebowanie
+        if (empty($demandsToCreate)) {
+            return back()
+                ->withInput()
+                ->withErrors(["demands" => "Musisz podać ilość większą od 0 dla przynajmniej jednej roli."]);
         }
 
         DB::beginTransaction();
         try {
-            foreach ($validated["demands"] as $demandData) {
-                $project->demands()->create([
-                    "role_id" => $demandData["role_id"],
-                    "required_count" => $demandData["required_count"],
-                    "date_from" => $demandData["date_from"],
-                    "date_to" => $demandData["date_to"] ?? null,
-                    "notes" => $demandData["notes"] ?? null,
-                ]);
+            foreach ($demandsToCreate as $demandData) {
+                $project->demands()->create($demandData);
             }
 
             DB::commit();

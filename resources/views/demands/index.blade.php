@@ -23,15 +23,13 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         @forelse ($demands as $demand)
                             <tr>
-                                <td class="px-6 py-4">{{ $demand->required_workers_count }}</td>
+                                <td class="px-6 py-4">{{ $demand->required_count }}</td>
                                 <td class="px-6 py-4">
-                                    @foreach($demand->demandRoles as $dr)
-                                        <span class="inline-block bg-gray-100 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2">
-                                            {{ $dr->role->name }}: {{ $dr->required_count }}
-                                        </span>
-                                    @endforeach
+                                    <span class="inline-block bg-gray-100 rounded-full px-3 py-1 text-sm font-semibold text-gray-700">
+                                        {{ $demand->role->name }}
+                                    </span>
                                 </td>
-                                <td class="px-6 py-4">{{ $demand->start_date->format('Y-m-d') }} - {{ $demand->end_date ? $demand->end_date->format('Y-m-d') : '...' }}</td>
+                                <td class="px-6 py-4">{{ $demand->date_from->format('Y-m-d') }} - {{ $demand->date_to ? $demand->date_to->format('Y-m-d') : '...' }}</td>
                                 <td class="px-6 py-4">
                                     <a href="{{ route('demands.show', $demand) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
                                     <a href="{{ route('demands.edit', $demand) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>

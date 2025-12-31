@@ -13,24 +13,24 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
-        Role::create([
-            'name' => 'Spawacz',
-            'description' => 'Pracownik zajmuj\u0105cy si\u0119 spawaniem'
-        ]);
+        Role::firstOrCreate(
+            ['name' => 'Spawacz'],
+            ['description' => 'Pracownik zajmujący się spawaniem']
+        );
 
-        Role::create([
-            'name' => 'Dekarz',
-            'description' => 'Pracownik zajmuj\u0105cy si\u0119 pracami dekarskimi'
-        ]);
+        Role::firstOrCreate(
+            ['name' => 'Dekarz'],
+            ['description' => 'Pracownik zajmujący się pracami dekarskimi']
+        );
 
-        Role::create([
-            'name' => 'Elektryk',
-            'description' => 'Pracownik zajmuj\u0105cy si\u0119 pracami elektrycznymi'
-        ]);
+        Role::firstOrCreate(
+            ['name' => 'Elektryk'],
+            ['description' => 'Pracownik zajmujący się pracami elektrycznymi']
+        );
 
-        Role::create([
-            'name' => 'Operator',
-            'description' => 'Operator urz\u0105dze\u0144 i maszyn'
-        ]);
+        Role::firstOrCreate(
+            ['name' => 'Operator'],
+            ['description' => 'Operator urządzeń i maszyn']
+        );
     }
 }
