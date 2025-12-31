@@ -28,7 +28,8 @@ class Employee extends Model
         'document_1',
         'document_2',
         'document_3',
-        'notes'
+        'notes',
+        'image_path'
     ];
 
     /**
@@ -133,6 +134,18 @@ class Employee extends Model
     public function getFullNameAttribute(): string
     {
         return $this->first_name . ' ' . $this->last_name;
+    }
+
+    /**
+     * Get the image URL for the employee.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image_path) {
+            return null;
+        }
+
+        return asset('storage/' . $this->image_path);
     }
 
     /**

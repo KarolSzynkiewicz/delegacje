@@ -8,6 +8,7 @@ use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 
 class EmployeeController extends Controller
 {
@@ -36,7 +37,17 @@ class EmployeeController extends Controller
     {
         $this->authorize('create', Employee::class);
         
-        Employee::create($request->validated());
+        $validated = $request->validated();
+        
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('employees', 'public');
+            $validated['image_path'] = $imagePath;
+        }
+        
+        unset($validated['image']);
+        
+        Employee::create($validated);
         return redirect()->route('employees.index')->with('success', 'Pracownik został dodany.');
     }
 
@@ -64,7 +75,22 @@ class EmployeeController extends Controller
     {
         $this->authorize('update', $employee);
         
-        $employee->update($request->validated());
+        $validated = $request->validated();
+        
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($employee->image_path && Storage::disk('public')->exists($employee->image_path)) {
+                Storage::disk('public')->delete($employee->image_path);
+            }
+            
+            $imagePath = $request->file('image')->store('employees', 'public');
+            $validated['image_path'] = $imagePath;
+        }
+        
+        unset($validated['image']);
+        
+        $employee->update($validated);
         return redirect()->route('employees.show', $employee)->with('success', 'Pracownik został zaktualizowany.');
     }
 

@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             AccommodationSeeder::class,
             VehicleSeeder::class,
             ProjectSeeder::class,
+            WeeklyOverviewSeeder::class,
         ]);
     }
 }

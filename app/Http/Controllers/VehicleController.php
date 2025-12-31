@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class VehicleController extends Controller
 {
@@ -37,7 +38,16 @@ class VehicleController extends Controller
             'technical_condition' => 'required|in:excellent,good,fair,poor',
             'inspection_valid_to' => 'nullable|date',
             'notes' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
+
+        unset($validated['image']);
+
+        // Add image_path if image was uploaded
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('vehicles', 'public');
+            $validated['image_path'] = $imagePath;
+        }
 
         Vehicle::create($validated);
         return redirect()->route('vehicles.index')->with('success', 'Pojazd został dodany.');
@@ -72,7 +82,20 @@ class VehicleController extends Controller
             'technical_condition' => 'required|in:excellent,good,fair,poor',
             'inspection_valid_to' => 'nullable|date',
             'notes' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
+
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($vehicle->image_path && Storage::disk('public')->exists($vehicle->image_path)) {
+                Storage::disk('public')->delete($vehicle->image_path);
+            }
+            
+            $imagePath = $request->file('image')->store('vehicles', 'public');
+            $validated['image_path'] = $imagePath;
+        }
+
+        unset($validated['image']);
 
         $vehicle->update($validated);
         return redirect()->route('vehicles.show', $vehicle)->with('success', 'Pojazd został zaktualizowany.');

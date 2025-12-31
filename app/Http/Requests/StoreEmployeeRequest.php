@@ -33,6 +33,7 @@ class StoreEmployeeRequest extends FormRequest
             'document_2' => ['nullable', 'string'],
             'document_3' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];
     }
 
@@ -52,6 +53,9 @@ class StoreEmployeeRequest extends FormRequest
             'role_id.required' => 'Rola jest wymagana.',
             'role_id.exists' => 'Wybrana rola nie istnieje.',
             'a1_valid_to.after_or_equal' => 'Data ważności do nie może być wcześniejsza niż data ważności od.',
+            'image.image' => 'Plik musi być obrazem (JPEG, PNG, JPG, GIF lub WEBP).',
+            'image.mimes' => 'Obraz musi być w formacie: JPEG, PNG, JPG, GIF lub WEBP.',
+            'image.max' => 'Rozmiar obrazu nie może przekraczać 2MB.',
         ];
     }
 }

@@ -8,6 +8,12 @@
 
             <div class="card">
                 <div class="card-body">
+                    @if($accommodation->image_path)
+                        <div class="mb-4 text-center">
+                            <img src="{{ $accommodation->image_url }}" alt="{{ $accommodation->name }}" class="img-fluid rounded" style="max-width: 500px; max-height: 400px; object-fit: cover;">
+                        </div>
+                    @endif
+
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <h5>Nazwa</h5>

@@ -16,7 +16,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('vehicles.update', $vehicle) }}" method="POST">
+            <form action="{{ route('vehicles.update', $vehicle) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
 
@@ -78,6 +78,23 @@
                     @error('notes') <span class="invalid-feedback">{{ $message }}</span> @enderror
                 </div>
 
+                <div class="mb-3">
+                    <label for="image" class="form-label">Zdjęcie</label>
+                    @if($vehicle->image_path)
+                        <div class="mb-2">
+                            <p class="text-muted">Aktualne zdjęcie:</p>
+                            <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->brand }} {{ $vehicle->model }}" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                        </div>
+                    @endif
+                    <input type="file" class="form-control @error('image') is-invalid @enderror" id="image" name="image" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp">
+                    <small class="form-text text-muted">Maksymalny rozmiar: 2MB. Dozwolone formaty: JPEG, PNG, JPG, GIF, WEBP. Zostaw puste, aby zachować obecne zdjęcie.</small>
+                    @error('image') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <div id="imagePreview" class="mt-3" style="display: none;">
+                        <p class="text-muted">Nowe zdjęcie:</p>
+                        <img id="previewImg" src="" alt="Podgląd" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Zaktualizuj Pojazd</button>
                     <a href="{{ route('vehicles.show', $vehicle) }}" class="btn btn-secondary">Anuluj</a>
@@ -86,4 +103,20 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('image').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('imagePreview').style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        } else {
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+    });
+</script>
 @endsection

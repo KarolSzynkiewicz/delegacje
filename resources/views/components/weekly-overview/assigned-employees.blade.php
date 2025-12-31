@@ -28,12 +28,35 @@
         <h5 class="font-semibold text-gray-800 mb-3">Przypisane osoby</h5>
         
         @foreach($assignedEmployees as $employeeData)
-            <div class="bg-gradient-to-br {{ $employeeData['is_partial'] ? 'from-yellow-50 to-amber-50 border-yellow-300' : 'from-white to-gray-50 border-gray-200' }} rounded-xl p-4 border-2 hover:shadow-lg transition-all">
+            <div class="bg-gradient-to-br {{ $employeeData['is_partial'] ? 'from-yellow-50 to-amber-50 border-yellow-300 border-l-4' : 'from-white to-gray-50 border-gray-200' }} rounded-xl p-4 border-2 hover:shadow-lg transition-all">
                 <div class="mb-3">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="font-bold text-gray-900 text-lg">{{ $employeeData['employee']->full_name }}</span>
-                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">{{ $employeeData['role']->name }}</span>
-                        <span class="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">({{ $employeeData['date_range'] }})</span>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <!-- Employee photo or initials -->
+                        @if($employeeData['employee']->image_path)
+                            <img src="{{ $employeeData['employee']->image_url }}" alt="{{ $employeeData['employee']->full_name }}" class="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-gray-300">
+                        @else
+                            <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-gray-300">
+                                <span class="text-orange-600 font-semibold text-xs">{{ substr($employeeData['employee']->first_name, 0, 1) }}{{ substr($employeeData['employee']->last_name, 0, 1) }}</span>
+                            </div>
+                        @endif
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-gray-900 text-base">{{ $employeeData['employee']->full_name }}</span>
+                                <span class="text-gray-600">–</span>
+                                <span class="text-gray-700 font-medium">{{ $employeeData['role']->name }}</span>
+                                @if($employeeData['is_partial'])
+                                    <span class="text-xs text-gray-500 bg-yellow-100 px-2 py-1 rounded-full">({{ $employeeData['date_range'] }})</span>
+                                @else
+                                    <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">(cały tydzień)</span>
+                                @endif
+                            </div>
+                        </div>
+                        <!-- Edit icon -->
+                        <button class="text-gray-400 hover:text-gray-600 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 

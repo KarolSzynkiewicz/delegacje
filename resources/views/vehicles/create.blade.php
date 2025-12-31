@@ -16,7 +16,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('vehicles.store') }}" method="POST">
+            <form action="{{ route('vehicles.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
 
                 <div class="mb-3">
@@ -77,6 +77,16 @@
                     @error('notes') <span class="invalid-feedback">{{ $message }}</span> @enderror
                 </div>
 
+                <div class="mb-3">
+                    <label for="image" class="form-label">Zdjęcie</label>
+                    <input type="file" class="form-control @error('image') is-invalid @enderror" id="image" name="image" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp">
+                    <small class="form-text text-muted">Maksymalny rozmiar: 2MB. Dozwolone formaty: JPEG, PNG, JPG, GIF, WEBP</small>
+                    @error('image') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <div id="imagePreview" class="mt-3" style="display: none;">
+                        <img id="previewImg" src="" alt="Podgląd" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Dodaj Pojazd</button>
                     <a href="{{ route('vehicles.index') }}" class="btn btn-secondary">Anuluj</a>
@@ -85,4 +95,20 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('image').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('imagePreview').style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        } else {
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+    });
+</script>
 @endsection

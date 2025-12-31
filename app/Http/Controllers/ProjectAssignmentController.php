@@ -38,12 +38,27 @@ class ProjectAssignmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Project $project)
+    public function create(Project $project, Request $request)
     {
-        $employees = Employee::with("role")->orderBy("last_name")->get();
+        // Get dates from query parameters if provided
+        $startDate = $request->query('date_from');
+        $endDate = $request->query('date_to');
+        
+        // Get all employees
+        $allEmployees = Employee::with("role")->orderBy("last_name")->get();
+        
+        // Filter employees by availability if dates are provided
+        if ($startDate && $endDate) {
+            $employees = $allEmployees->filter(function ($employee) use ($startDate, $endDate) {
+                return $employee->isAvailableInDateRange($startDate, $endDate);
+            })->values();
+        } else {
+            $employees = $allEmployees;
+        }
+        
         $roles = Role::orderBy("name")->get();
         
-        return view("assignments.create", compact("project", "employees", "roles"));
+        return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate"));
     }
 
     /**

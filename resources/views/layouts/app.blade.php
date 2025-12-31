@@ -30,7 +30,10 @@
 
             <!-- Page Content -->
             <main>
-                {{ $slot }}
+                @yield('content')
+                @isset($slot)
+                    {{ $slot }}
+                @endisset
             </main>
         </div>
         @livewireScripts

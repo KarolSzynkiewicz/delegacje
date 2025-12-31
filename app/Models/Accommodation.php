@@ -22,8 +22,21 @@ class Accommodation extends Model
         'city',
         'postal_code',
         'capacity',
-        'description'
+        'description',
+        'image_path'
     ];
+
+    /**
+     * Get the image URL for the accommodation.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image_path) {
+            return null;
+        }
+
+        return asset('storage/' . $this->image_path);
+    }
 
     /**
      * Get all assignments for this accommodation.

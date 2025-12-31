@@ -23,8 +23,21 @@ class Vehicle extends Model
         'capacity',
         'technical_condition',
         'inspection_valid_to',
-        'notes'
+        'notes',
+        'image_path'
     ];
+
+    /**
+     * Get the image URL for the vehicle.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image_path) {
+            return null;
+        }
+
+        return asset('storage/' . $this->image_path);
+    }
 
     /**
      * The attributes that should be cast.

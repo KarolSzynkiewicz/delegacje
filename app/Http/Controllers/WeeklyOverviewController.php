@@ -14,12 +14,20 @@ class WeeklyOverviewController extends Controller
     /**
      * Display the weekly overview.
      */
-    public function index(): View
+    public function index(\Illuminate\Http\Request $request): View
     {
-        $weeks = $this->weeklyOverviewService->getWeeks();
+        // Get start date from query parameter or use current week
+        $startDate = $request->query('start_date');
+        if ($startDate) {
+            $startDate = \Carbon\Carbon::parse($startDate)->startOfWeek();
+        } else {
+            $startDate = \Carbon\Carbon::now()->startOfWeek();
+        }
+        
+        $weeks = $this->weeklyOverviewService->getWeeks($startDate);
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
         
-        return view('weekly-overview.index', compact('weeks', 'projects'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate'));
     }
 }
 

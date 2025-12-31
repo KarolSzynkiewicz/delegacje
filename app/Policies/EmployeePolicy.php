@@ -29,7 +29,7 @@ class EmployeePolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isManager();
+        return true; // Wszyscy zalogowani użytkownicy mogą dodawać pracowników
     }
 
     /**
@@ -37,7 +37,7 @@ class EmployeePolicy
      */
     public function update(User $user, Employee $employee): bool
     {
-        return $user->isAdmin() || $user->isManager();
+        return true; // Wszyscy zalogowani użytkownicy mogą edytować pracowników
     }
 
     /**
