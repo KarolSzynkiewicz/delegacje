@@ -1,0 +1,129 @@
+<?php
+
+namespace App\Livewire;
+
+use App\Models\ProjectAssignment;
+use App\Models\Employee;
+use App\Models\Project;
+use App\Models\Role;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+class AssignmentsTable extends Component
+{
+    use WithPagination;
+
+    public $searchEmployee = '';
+    public $searchProject = '';
+    public $searchRole = '';
+    public $status = '';
+    public $dateFrom = '';
+    public $dateTo = '';
+
+    protected $queryString = [
+        'searchEmployee' => ['except' => ''],
+        'searchProject' => ['except' => ''],
+        'searchRole' => ['except' => ''],
+        'status' => ['except' => ''],
+        'dateFrom' => ['except' => ''],
+        'dateTo' => ['except' => ''],
+    ];
+
+    public function updatingSearchEmployee()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSearchProject()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSearchRole()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingDateFrom()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingDateTo()
+    {
+        $this->resetPage();
+    }
+
+    public function clearFilters()
+    {
+        $this->searchEmployee = '';
+        $this->searchProject = '';
+        $this->searchRole = '';
+        $this->status = '';
+        $this->dateFrom = '';
+        $this->dateTo = '';
+        $this->resetPage();
+    }
+
+    public function render()
+    {
+        $query = ProjectAssignment::with(['employee', 'project', 'role'])
+            ->orderBy('start_date', 'desc');
+
+        // Filter by employee
+        if ($this->searchEmployee) {
+            $query->whereHas('employee', function ($q) {
+                $q->where('first_name', 'like', '%' . $this->searchEmployee . '%')
+                  ->orWhere('last_name', 'like', '%' . $this->searchEmployee . '%');
+            });
+        }
+
+        // Filter by project
+        if ($this->searchProject) {
+            $query->whereHas('project', function ($q) {
+                $q->where('name', 'like', '%' . $this->searchProject . '%');
+            });
+        }
+
+        // Filter by role
+        if ($this->searchRole) {
+            $query->whereHas('role', function ($q) {
+                $q->where('name', 'like', '%' . $this->searchRole . '%');
+            });
+        }
+
+        // Filter by status
+        if ($this->status) {
+            $query->where('status', $this->status);
+        }
+
+        // Filter by date range
+        if ($this->dateFrom) {
+            $query->where('start_date', '>=', $this->dateFrom);
+        }
+        if ($this->dateTo) {
+            $query->where(function ($q) {
+                $q->where('end_date', '<=', $this->dateTo)
+                  ->orWhereNull('end_date');
+            });
+        }
+
+        $assignments = $query->paginate(20);
+
+        $employees = Employee::orderBy('last_name')->get();
+        $projects = Project::orderBy('name')->get();
+        $roles = Role::orderBy('name')->get();
+
+        return view('livewire.assignments-table', [
+            'assignments' => $assignments,
+            'employees' => $employees,
+            'projects' => $projects,
+            'roles' => $roles,
+        ]);
+    }
+}

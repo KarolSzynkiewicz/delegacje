@@ -22,32 +22,16 @@ class Employee extends Model
         'last_name',
         'email',
         'phone',
-        'role_id',
-        'a1_valid_from',
-        'a1_valid_to',
-        'document_1',
-        'document_2',
-        'document_3',
         'notes',
         'image_path'
     ];
 
     /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
+     * Get all roles associated with the employee.
      */
-    protected $casts = [
-        'a1_valid_from' => 'date',
-        'a1_valid_to' => 'date',
-    ];
-
-    /**
-     * Get the role associated with the employee.
-     */
-    public function role(): BelongsTo
+    public function roles(): BelongsToMany
     {
-        return $this->belongsTo(Role::class);
+        return $this->belongsToMany(Role::class, 'employee_role')->withTimestamps();
     }
 
     /**
@@ -146,6 +130,14 @@ class Employee extends Model
         }
 
         return asset('storage/' . $this->image_path);
+    }
+
+    /**
+     * Get all documents for this employee.
+     */
+    public function employeeDocuments(): HasMany
+    {
+        return $this->hasMany(EmployeeDocument::class);
     }
 
     /**

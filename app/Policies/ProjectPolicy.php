@@ -13,7 +13,7 @@ class ProjectPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą przeglądać projekty
+        return $user->hasPermission('projects.viewAny');
     }
 
     /**
@@ -21,7 +21,7 @@ class ProjectPolicy
      */
     public function view(User $user, Project $project): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą przeglądać projekty
+        return $user->hasPermission('projects.view');
     }
 
     /**
@@ -29,7 +29,7 @@ class ProjectPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isManager();
+        return $user->hasPermission('projects.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        return $user->isAdmin() || $user->isManager();
+        return $user->hasPermission('projects.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        return $user->isAdmin();
+        return $user->hasPermission('projects.delete');
     }
 
     /**

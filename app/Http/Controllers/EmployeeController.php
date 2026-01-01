@@ -17,7 +17,7 @@ class EmployeeController extends Controller
      */
     public function index(): View
     {
-        $employees = Employee::with('role')->paginate(10);
+        $employees = Employee::with('roles')->paginate(10);
         return view('employees.index', compact('employees'));
     }
 
@@ -47,7 +47,12 @@ class EmployeeController extends Controller
         
         unset($validated['image']);
         
-        Employee::create($validated);
+        $roles = $validated['roles'] ?? [];
+        unset($validated['roles']);
+        
+        $employee = Employee::create($validated);
+        $employee->roles()->attach($roles);
+        
         return redirect()->route('employees.index')->with('success', 'Pracownik został dodany.');
     }
 
@@ -56,6 +61,7 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee): View
     {
+        $employee->load(['roles', 'employeeDocuments.document']);
         return view('employees.show', compact('employee'));
     }
 
@@ -90,7 +96,12 @@ class EmployeeController extends Controller
         
         unset($validated['image']);
         
+        $roles = $validated['roles'] ?? [];
+        unset($validated['roles']);
+        
         $employee->update($validated);
+        $employee->roles()->sync($roles);
+        
         return redirect()->route('employees.show', $employee)->with('success', 'Pracownik został zaktualizowany.');
     }
 

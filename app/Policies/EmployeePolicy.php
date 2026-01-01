@@ -13,7 +13,7 @@ class EmployeePolicy
      */
     public function viewAny(User $user): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą przeglądać pracowników
+        return $user->hasPermission('employees.viewAny');
     }
 
     /**
@@ -21,7 +21,7 @@ class EmployeePolicy
      */
     public function view(User $user, Employee $employee): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą przeglądać pracowników
+        return $user->hasPermission('employees.view');
     }
 
     /**
@@ -29,7 +29,7 @@ class EmployeePolicy
      */
     public function create(User $user): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą dodawać pracowników
+        return $user->hasPermission('employees.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class EmployeePolicy
      */
     public function update(User $user, Employee $employee): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą edytować pracowników
+        return $user->hasPermission('employees.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class EmployeePolicy
      */
     public function delete(User $user, Employee $employee): bool
     {
-        return $user->isAdmin();
+        return $user->hasPermission('employees.delete');
     }
 
     /**

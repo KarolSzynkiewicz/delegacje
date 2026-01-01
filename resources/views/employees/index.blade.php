@@ -32,7 +32,15 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4">{{ $employee->full_name }}</td>
-                                <td class="px-6 py-4">{{ $employee->role->name ?? '-' }}</td>
+                                <td class="px-6 py-4">
+                                    @if($employee->roles->count() > 0)
+                                        @foreach($employee->roles as $role)
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-1">{{ $role->name }}</span>
+                                        @endforeach
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4">
                                     <a href="{{ route('employees.vehicles.index', $employee) }}" class="text-yellow-600 hover:text-yellow-900 mr-3">Pojazdy</a>
                                     <a href="{{ route('employees.accommodations.index', $employee) }}" class="text-red-600 hover:text-red-900">Mieszkania</a>

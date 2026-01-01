@@ -11,6 +11,9 @@ use App\Http\Controllers\VehicleAssignmentController;
 use App\Http\Controllers\AccommodationAssignmentController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserRoleController;
+use App\Http\Controllers\EmployeeDocumentController;
+use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\WeeklyOverviewController;
 use Illuminate\Support\Facades\Route;
 
@@ -63,8 +66,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('assignments', [ProjectAssignmentController::class, 'all'])
         ->name('assignments.index');
 
-    // Employees + assignments
+    // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);
+    Route::resource('employees.employee-documents', EmployeeDocumentController::class)->except(['index', 'show'])->parameters(['employee-documents' => 'employeeDocument']);
+    
+    // Employee Documents (dokumenty pracowników - globalna lista)
+    Route::get('employee-documents', [EmployeeDocumentController::class, 'index'])->name('employee-documents.index');
+    
+    // Documents (słownik dokumentów)
+    Route::resource('documents', \App\Http\Controllers\DocumentController::class);
 
     Route::resource('employees.vehicle-assignments', VehicleAssignmentController::class)
         ->shallow()
@@ -104,6 +114,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Locations, Roles (CRUD)
     Route::resource('locations', LocationController::class);
     Route::resource('roles', RoleController::class);
+    
+    // User Roles (RBAC)
+    Route::resource('user-roles', UserRoleController::class);
 });
 
 require __DIR__.'/auth.php';

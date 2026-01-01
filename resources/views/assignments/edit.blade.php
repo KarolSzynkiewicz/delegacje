@@ -28,7 +28,7 @@
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                             @foreach($employees as $employee)
                                 <option value="{{ $employee->id }}" {{ $assignment->employee_id == $employee->id ? 'selected' : '' }}>
-                                    {{ $employee->full_name }} ({{ $employee->role->name }})
+                                    {{ $employee->full_name }}@if($employee->roles->count() > 0) ({{ $employee->roles->pluck('name')->join(', ') }})@endif
                                 </option>
                             @endforeach
                         </select>

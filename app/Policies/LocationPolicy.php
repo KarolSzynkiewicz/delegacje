@@ -13,7 +13,7 @@ class LocationPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą przeglądać lokalizacje
+        return $user->hasPermission('locations.viewAny');
     }
 
     /**
@@ -21,7 +21,7 @@ class LocationPolicy
      */
     public function view(User $user, Location $location): bool
     {
-        return true; // Wszyscy zalogowani użytkownicy mogą przeglądać lokalizacje
+        return $user->hasPermission('locations.view');
     }
 
     /**
@@ -29,7 +29,7 @@ class LocationPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isManager();
+        return $user->hasPermission('locations.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class LocationPolicy
      */
     public function update(User $user, Location $location): bool
     {
-        return $user->isAdmin() || $user->isManager();
+        return $user->hasPermission('locations.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class LocationPolicy
      */
     public function delete(User $user, Location $location): bool
     {
-        return $user->isAdmin();
+        return $user->hasPermission('locations.delete');
     }
 
     /**

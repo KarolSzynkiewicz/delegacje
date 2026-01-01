@@ -90,6 +90,73 @@
                             </div>
                             <p class="text-sm text-indigo-700">Przypisania pracownik-pojazd</p>
                         </a>
+
+                        <!-- Przypisania Mieszkań -->
+                        <a href="{{ route('accommodation-assignments.index') }}" class="block p-6 bg-pink-50 border border-pink-200 rounded-lg hover:bg-pink-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-pink-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-pink-800">Przypisania Mieszkań</h4>
+                            </div>
+                            <p class="text-sm text-pink-700">Przypisania pracownik-mieszkanie</p>
+                        </a>
+
+                        <!-- Lokalizacje -->
+                        <a href="{{ route('locations.index') }}" class="block p-6 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-emerald-800">Lokalizacje</h4>
+                            </div>
+                            <p class="text-sm text-emerald-700">Zarządzaj lokalizacjami projektów</p>
+                        </a>
+
+                        <!-- Role -->
+                        <a href="{{ route('roles.index') }}" class="block p-6 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-amber-800">Role</h4>
+                            </div>
+                            <p class="text-sm text-amber-700">Zarządzaj rolami w projektach</p>
+                        </a>
+
+                        <!-- Role Użytkowników -->
+                        <a href="{{ route('user-roles.index') }}" class="block p-6 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-violet-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-violet-800">Role Użytkowników</h4>
+                            </div>
+                            <p class="text-sm text-violet-700">Zarządzaj rolami i uprawnieniami</p>
+                        </a>
+
+                        <!-- Wymagania formalne -->
+                        <a href="{{ route('documents.index') }}" class="block p-6 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-blue-800">Wymagania formalne</h4>
+                            </div>
+                            <p class="text-sm text-blue-700">Zarządzaj wymaganiami formalnymi</p>
+                        </a>
+
+                        <!-- Dokumenty Pracowników -->
+                        <a href="{{ route('employee-documents.index') }}" class="block p-6 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-orange-800">Dokumenty Pracowników</h4>
+                            </div>
+                            <p class="text-sm text-orange-700">Zarządzaj dokumentami pracowników</p>
+                        </a>
                     </div>
                 </div>
             </div>

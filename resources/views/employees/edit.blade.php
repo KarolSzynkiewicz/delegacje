@@ -45,49 +45,22 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="role_id" class="form-label">Rola *</label>
-                    <select class="form-select @error('role_id') is-invalid @enderror" id="role_id" name="role_id" required>
-                        <option value="">-- Wybierz Rolę --</option>
+                    <label class="form-label">Role *</label>
+                    <div class="border rounded p-3 @error('roles') border-danger @enderror">
                         @foreach ($roles as $role)
-                            <option value="{{ $role->id }}" {{ old('role_id', $employee->role_id) == $role->id ? 'selected' : '' }}>{{ $role->name }}</option>
+                            <div class="form-check">
+                                <input class="form-check-input @error('roles') is-invalid @enderror" type="checkbox" id="role_{{ $role->id }}" name="roles[]" value="{{ $role->id }}" {{ in_array($role->id, old('roles', $employee->roles->pluck('id')->toArray())) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="role_{{ $role->id }}">
+                                    {{ $role->name }}
+                                    @if($role->description)
+                                        <small class="text-muted d-block">({{ $role->description }})</small>
+                                    @endif
+                                </label>
+                            </div>
                         @endforeach
-                    </select>
-                    @error('role_id') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="a1_valid_from" class="form-label">Prawo Jazdy A1 Ważne Od</label>
-                            <input type="date" class="form-control @error('a1_valid_from') is-invalid @enderror" id="a1_valid_from" name="a1_valid_from" value="{{ old('a1_valid_from', $employee->a1_valid_from?->format('Y-m-d')) }}">
-                            @error('a1_valid_from') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="a1_valid_to" class="form-label">Prawo Jazdy A1 Ważne Do</label>
-                            <input type="date" class="form-control @error('a1_valid_to') is-invalid @enderror" id="a1_valid_to" name="a1_valid_to" value="{{ old('a1_valid_to', $employee->a1_valid_to?->format('Y-m-d')) }}">
-                            @error('a1_valid_to') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="document_1" class="form-label">Dokument 1</label>
-                    <input type="text" class="form-control @error('document_1') is-invalid @enderror" id="document_1" name="document_1" value="{{ old('document_1', $employee->document_1) }}" placeholder="np. Certyfikat, Licencja">
-                    @error('document_1') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="mb-3">
-                    <label for="document_2" class="form-label">Dokument 2</label>
-                    <input type="text" class="form-control @error('document_2') is-invalid @enderror" id="document_2" name="document_2" value="{{ old('document_2', $employee->document_2) }}" placeholder="np. Certyfikat, Licencja">
-                    @error('document_2') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="mb-3">
-                    <label for="document_3" class="form-label">Dokument 3</label>
-                    <input type="text" class="form-control @error('document_3') is-invalid @enderror" id="document_3" name="document_3" value="{{ old('document_3', $employee->document_3) }}" placeholder="np. Certyfikat, Licencja">
-                    @error('document_3') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    @error('roles') <span class="invalid-feedback d-block">{{ $message }}</span> @enderror
+                    <small class="form-text text-muted">Wybierz przynajmniej jedną rolę. Pracownik może mieć wiele ról jednocześnie.</small>
                 </div>
 
                 <div class="mb-3">

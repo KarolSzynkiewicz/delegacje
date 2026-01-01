@@ -45,7 +45,7 @@ class ProjectAssignmentController extends Controller
         $endDate = $request->query('date_to');
         
         // Get all employees
-        $allEmployees = Employee::with("role")->orderBy("last_name")->get();
+        $allEmployees = Employee::with("roles")->orderBy("last_name")->get();
         
         // Filter employees by availability if dates are provided
         if ($startDate && $endDate) {
@@ -108,7 +108,7 @@ class ProjectAssignmentController extends Controller
     public function edit(ProjectAssignment $assignment)
     {
         $projects = Project::orderBy("name")->get();
-        $employees = Employee::with("role")->orderBy("last_name")->get();
+        $employees = Employee::with("roles")->orderBy("last_name")->get();
         $roles = Role::orderBy("name")->get();
         
         return view("assignments.edit", compact("assignment", "projects", "employees", "roles"));

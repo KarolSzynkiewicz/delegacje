@@ -23,7 +23,7 @@
                             <option value="">Wybierz pracownika</option>
                             @foreach($employees as $employee)
                                 <option value="{{ $employee->id }}" {{ old('employee_id') == $employee->id ? 'selected' : '' }}>
-                                    {{ $employee->full_name }} ({{ $employee->role->name }})
+                                    {{ $employee->full_name }}@if($employee->roles->count() > 0) ({{ $employee->roles->pluck('name')->join(', ') }})@endif
                                 </option>
                             @endforeach
                         </select>
