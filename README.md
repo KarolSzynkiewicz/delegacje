@@ -228,13 +228,7 @@ delegacje/
 4. Push do brancha (`git push origin feature/AmazingFeature`)
 5. Otwórz Pull Request
 
----
-
-## 📄 Licencja
-
-Projekt stworzony przez **Manus AI** dla celów demonstracyjnych i edukacyjnych.
-
----
+--
 
 ## 🆘 Wsparcie
 
