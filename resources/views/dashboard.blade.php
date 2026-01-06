@@ -58,6 +58,17 @@
                             <p class="text-sm text-purple-700">Zarządzaj bazą pracowników</p>
                         </a>
 
+                        <!-- Rotacje Pracowników -->
+                        <a href="{{ route('rotations.index') }}" class="block p-6 bg-cyan-50 border border-cyan-200 rounded-lg hover:bg-cyan-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-cyan-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-cyan-800">Rotacje Pracowników</h4>
+                            </div>
+                            <p class="text-sm text-cyan-700">Zarządzaj rotacjami dostępności</p>
+                        </a>
+
                         <!-- Pojazdy -->
                         <a href="{{ route('vehicles.index') }}" class="block p-6 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition">
                             <div class="flex items-center mb-2">

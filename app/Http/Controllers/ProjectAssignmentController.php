@@ -6,6 +6,7 @@ use App\Models\ProjectAssignment;
 use App\Models\Project;
 use App\Models\Employee;
 use App\Models\Role;
+use App\Rules\EmployeeHasRole;
 use Illuminate\Http\Request;
 
 class ProjectAssignmentController extends Controller
@@ -44,16 +45,22 @@ class ProjectAssignmentController extends Controller
         $startDate = $request->query('date_from');
         $endDate = $request->query('date_to');
         
-        // Get all employees
-        $allEmployees = Employee::with("roles")->orderBy("last_name")->get();
+        // Get all employees with their availability status
+        $allEmployees = Employee::with(["roles", "employeeDocuments.document"])->orderBy("last_name")->get();
         
-        // Filter employees by availability if dates are provided
+        // If dates are provided, add availability status to each employee
         if ($startDate && $endDate) {
-            $employees = $allEmployees->filter(function ($employee) use ($startDate, $endDate) {
-                return $employee->isAvailableInDateRange($startDate, $endDate);
-            })->values();
+            $employees = $allEmployees->map(function ($employee) use ($startDate, $endDate) {
+                $status = $employee->getAvailabilityStatus($startDate, $endDate);
+                $employee->availability_status = $status;
+                return $employee;
+            });
         } else {
-            $employees = $allEmployees;
+            // If no dates, all employees are available
+            $employees = $allEmployees->map(function ($employee) {
+                $employee->availability_status = ['available' => true, 'reasons' => []];
+                return $employee;
+            });
         }
         
         $roles = Role::orderBy("name")->get();
@@ -68,7 +75,11 @@ class ProjectAssignmentController extends Controller
     {
         $validated = $request->validate([
             "employee_id" => "required|exists:employees,id",
-            "role_id" => "required|exists:roles,id",
+            "role_id" => [
+                "required",
+                "exists:roles,id",
+                new EmployeeHasRole($request->input('employee_id'))
+            ],
             "start_date" => "required|date",
             "end_date" => "nullable|date|after_or_equal:start_date",
             "status" => "required|in:pending,active,completed,cancelled",
@@ -79,6 +90,16 @@ class ProjectAssignmentController extends Controller
         $employee = Employee::findOrFail($validated["employee_id"]);
         $endDate = $validated["end_date"] ?? now()->addYears(10);
         
+        // Sprawdź czy pracownik ma aktywną rotację pokrywającą CAŁY okres przypisania
+        if (!$employee->hasActiveRotationInDateRange($validated["start_date"], $endDate)) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    "employee_id" => "Pracownik nie ma aktywnej rotacji pokrywającej cały okres przypisania (od {$validated['start_date']} do {$endDate}). Rotacja musi pokrywać cały okres przypisania."
+                ]);
+        }
+        
+        // Sprawdź czy pracownik nie ma konfliktujących przypisań
         if (!$employee->isAvailableInDateRange($validated["start_date"], $endDate)) {
             return back()
                 ->withInput()
@@ -119,21 +140,66 @@ class ProjectAssignmentController extends Controller
      */
     public function update(Request $request, ProjectAssignment $assignment)
     {
-        $validated = $request->validate([
-            "project_id" => "required|exists:projects,id",
-            "employee_id" => "required|exists:employees,id",
-            "role_id" => "required|exists:roles,id",
-            "start_date" => "required|date",
-            "end_date" => "nullable|date|after_or_equal:start_date",
-            "status" => "required|in:pending,active,completed,cancelled",
-            "notes" => "nullable|string",
-        ]);
+        try {
+            $validated = $request->validate([
+                "project_id" => "required|exists:projects,id",
+                "employee_id" => "required|exists:employees,id",
+                "role_id" => [
+                    "required",
+                    "exists:roles,id",
+                    new EmployeeHasRole($request->input('employee_id'))
+                ],
+                "start_date" => "required|date",
+                "end_date" => "nullable|date|after_or_equal:start_date",
+                "status" => "required|in:pending,active,completed,cancelled",
+                "notes" => "nullable|string",
+            ]);
 
-        $assignment->update($validated);
+            // Check employee availability
+            $employee = Employee::findOrFail($validated["employee_id"]);
+            $endDate = $validated["end_date"] ?? now()->addYears(10);
+            
+            // Sprawdź czy pracownik ma aktywną rotację pokrywającą CAŁY okres przypisania
+            if (!$employee->hasActiveRotationInDateRange($validated["start_date"], $endDate)) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        "employee_id" => "Pracownik nie ma aktywnej rotacji pokrywającej cały okres przypisania (od {$validated['start_date']} do {$endDate}). Rotacja musi pokrywać cały okres przypisania."
+                    ]);
+            }
+            
+            // Sprawdź czy pracownik nie ma konfliktujących przypisań (wykluczając aktualne przypisanie)
+            $hasConflictingAssignments = $employee->assignments()
+                ->where('status', 'active')
+                ->where('id', '!=', $assignment->id)
+                ->where(function ($query) use ($validated, $endDate) {
+                    $query->whereBetween('start_date', [$validated["start_date"], $endDate])
+                        ->orWhereBetween('end_date', [$validated["start_date"], $endDate])
+                        ->orWhere(function ($q) use ($validated, $endDate) {
+                            $q->where('start_date', '<=', $validated["start_date"])
+                              ->where('end_date', '>=', $endDate);
+                        });
+                })
+                ->exists();
+            
+            if ($hasConflictingAssignments) {
+                return back()
+                    ->withInput()
+                    ->withErrors(["employee_id" => "Pracownik jest już przypisany do innego projektu w tym okresie."]);
+            }
 
-        return redirect()
-            ->route("projects.assignments.index", $assignment->project_id)
-            ->with("success", "Przypisanie zostało zaktualizowane.");
+            $assignment->update($validated);
+
+            return redirect()
+                ->route("projects.assignments.index", $assignment->project_id)
+                ->with("success", "Przypisanie zostało zaktualizowane.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Przekieruj z powrotem do formularza edycji z błędami i danymi wejściowymi
+            return redirect()
+                ->route("assignments.edit", $assignment)
+                ->withErrors($e->errors())
+                ->withInput();
+        }
     }
 
     /**

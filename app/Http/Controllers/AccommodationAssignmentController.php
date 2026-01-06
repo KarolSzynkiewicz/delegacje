@@ -37,11 +37,15 @@ class AccommodationAssignmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Employee $employee)
+    public function create(Employee $employee, Request $request)
     {
         $accommodations = Accommodation::orderBy('name')->get();
         
-        return view('accommodation-assignments.create', compact('employee', 'accommodations'));
+        // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        
+        return view('accommodation-assignments.create', compact('employee', 'accommodations', 'dateFrom', 'dateTo'));
     }
 
     /**

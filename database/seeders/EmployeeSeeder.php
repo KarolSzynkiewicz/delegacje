@@ -15,115 +15,97 @@ class EmployeeSeeder extends Seeder
      */
     public function run(): void
     {
+        // Pobierz wszystkie role
         $spawaczRole = Role::where('name', 'Spawacz')->first();
-        $dekarzeRole = Role::where('name', 'Dekarz')->first();
-        $elektryk = Role::where('name', 'Elektryk')->first();
+        $dekarzRole = Role::where('name', 'Dekarz')->first();
+        $elektrykRole = Role::where('name', 'Elektryk')->first();
+        $operatorRole = Role::where('name', 'Operator')->first();
+        $piaskarzRole = Role::where('name', 'piaskarz')->first();
 
-        $jan = Employee::create([
-            'first_name' => 'Jan',
-            'last_name' => 'Kowalski',
-            'email' => 'jan.kowalski@example.com',
-            'phone' => '+48 123 456 789',
-            'role_id' => $spawaczRole->id,
-        ]);
+        // Lista polskich imion i nazwisk
+        $firstNames = [
+            'Jan', 'Piotr', 'Andrzej', 'Krzysztof', 'Tomasz', 'Marcin', 'Michał', 'Paweł', 'Jakub', 'Maciej',
+            'Adam', 'Łukasz', 'Marek', 'Grzegorz', 'Dariusz', 'Wojciech', 'Rafał', 'Robert', 'Kamil', 'Sebastian',
+            'Anna', 'Maria', 'Katarzyna', 'Magdalena', 'Agnieszka', 'Barbara', 'Ewa', 'Joanna', 'Natalia', 'Aleksandra',
+            'Karolina', 'Monika', 'Justyna', 'Paulina', 'Patrycja', 'Sylwia', 'Dominika', 'Weronika', 'Martyna', 'Julia'
+        ];
 
-        // Dokumenty dla Jana
-        EmployeeDocument::create([
-            'employee_id' => $jan->id,
-            'type' => 'Prawo jazdy A1',
-            'valid_from' => '2023-01-15',
-            'valid_to' => '2026-01-15',
-            'kind' => 'okresowy',
-        ]);
-        Document::create([
-            'employee_id' => $jan->id,
-            'type' => 'Certyfikat spawacza',
-            'valid_from' => '2023-01-01',
-            'valid_to' => null,
-            'kind' => 'bezokresowy',
-        ]);
-        Document::create([
-            'employee_id' => $jan->id,
-            'type' => 'Prawo jazdy kat. B',
-            'valid_from' => '2020-01-01',
-            'valid_to' => null,
-            'kind' => 'bezokresowy',
-        ]);
-        Document::create([
-            'employee_id' => $jan->id,
-            'type' => 'Ubezpieczenie',
-            'valid_from' => '2024-01-01',
-            'valid_to' => '2025-12-31',
-            'kind' => 'okresowy',
-        ]);
+        $lastNames = [
+            'Kowalski', 'Nowak', 'Wiśniewski', 'Wójcik', 'Kowalczyk', 'Kamiński', 'Lewandowski', 'Zieliński', 'Szymański', 'Woźniak',
+            'Dąbrowski', 'Kozłowski', 'Jankowski', 'Mazur', 'Kwiatkowski', 'Krawczyk', 'Piotrowski', 'Grabowski', 'Nowakowski', 'Pawłowski',
+            'Michalski', 'Nowicki', 'Adamczyk', 'Dudek', 'Zając', 'Wieczorek', 'Jabłoński', 'Król', 'Majewski', 'Olszewski',
+            'Jaworski', 'Wróbel', 'Malinowski', 'Pawlak', 'Witkowski', 'Walczak', 'Stepień', 'Górski', 'Rutkowski', 'Michalak'
+        ];
 
-        $piotr = Employee::create([
-            'first_name' => 'Piotr',
-            'last_name' => 'Nowak',
-            'email' => 'piotr.nowak@example.com',
-            'phone' => '+48 234 567 890',
-            'role_id' => $dekarzeRole->id,
-        ]);
+        $employees = [];
+        $counter = 1;
 
-        // Dokumenty dla Piotra
-        Document::create([
-            'employee_id' => $piotr->id,
-            'type' => 'Prawo jazdy A1',
-            'valid_from' => '2022-06-20',
-            'valid_to' => '2025-06-20',
-            'kind' => 'okresowy',
-        ]);
-        Document::create([
-            'employee_id' => $piotr->id,
-            'type' => 'Certyfikat dekarza',
-            'valid_from' => '2022-01-01',
-            'valid_to' => null,
-            'kind' => 'bezokresowy',
-        ]);
-        Document::create([
-            'employee_id' => $piotr->id,
-            'type' => 'Prawo jazdy kat. B',
-            'valid_from' => '2019-01-01',
-            'valid_to' => null,
-            'kind' => 'bezokresowy',
-        ]);
+        // Generuj około 50 pracowników
+        for ($i = 0; $i < 50; $i++) {
+            $firstName = $firstNames[array_rand($firstNames)];
+            $lastName = $lastNames[array_rand($lastNames)];
+            $email = strtolower($firstName . '.' . $lastName . $counter . '@example.com');
+            
+            // Sprawdź czy email już istnieje
+            while (Employee::where('email', $email)->exists()) {
+                $counter++;
+                $email = strtolower($firstName . '.' . $lastName . $counter . '@example.com');
+            }
 
-        $andrzej = Employee::create([
-            'first_name' => 'Andrzej',
-            'last_name' => 'Lewandowski',
-            'email' => 'andrzej.lewandowski@example.com',
-            'phone' => '+48 345 678 901',
-            'role_id' => $elektryk->id,
-        ]);
+            $phone = '+48 ' . rand(500, 999) . ' ' . rand(100, 999) . ' ' . rand(100, 999);
 
-        // Dokumenty dla Andrzeja
-        Document::create([
-            'employee_id' => $andrzej->id,
-            'type' => 'Prawo jazdy A1',
-            'valid_from' => '2024-03-10',
-            'valid_to' => '2027-03-10',
-            'kind' => 'okresowy',
-        ]);
-        Document::create([
-            'employee_id' => $andrzej->id,
-            'type' => 'Certyfikat elektryka',
-            'valid_from' => '2023-01-01',
-            'valid_to' => null,
-            'kind' => 'bezokresowy',
-        ]);
-        Document::create([
-            'employee_id' => $andrzej->id,
-            'type' => 'Prawo jazdy kat. B',
-            'valid_from' => '2021-01-01',
-            'valid_to' => null,
-            'kind' => 'bezokresowy',
-        ]);
-        Document::create([
-            'employee_id' => $andrzej->id,
-            'type' => 'Szkolenie BHP',
-            'valid_from' => '2024-01-01',
-            'valid_to' => '2025-12-31',
-            'kind' => 'okresowy',
-        ]);
+            $employee = Employee::create([
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'email' => $email,
+                'phone' => $phone,
+                'notes' => rand(0, 1) ? 'Pracownik doświadczony' : null,
+            ]);
+
+            // Przypisz losowe role (1-3 role na pracownika)
+            $availableRoles = [$spawaczRole, $dekarzRole, $elektrykRole, $operatorRole, $piaskarzRole];
+            $numRoles = rand(1, 3);
+            $selectedRoles = array_rand($availableRoles, $numRoles);
+            
+            if (!is_array($selectedRoles)) {
+                $selectedRoles = [$selectedRoles];
+            }
+
+            foreach ($selectedRoles as $roleIndex) {
+                if ($availableRoles[$roleIndex]) {
+                    $employee->roles()->attach($availableRoles[$roleIndex]->id);
+                }
+            }
+
+            $employees[] = $employee;
+            $counter++;
+        }
+
+        // Pobierz dostępne dokumenty
+        $documents = \App\Models\Document::all();
+        
+        if ($documents->count() > 0) {
+            // Dodaj przykładowe dokumenty dla kilku pracowników
+            foreach (array_slice($employees, 0, 15) as $employee) {
+                $numDocuments = rand(1, 3);
+                $selectedDocs = $documents->random(min($numDocuments, $documents->count()));
+                
+                if (!is_iterable($selectedDocs)) {
+                    $selectedDocs = [$selectedDocs];
+                }
+                
+                foreach ($selectedDocs as $document) {
+                    $isPeriodic = rand(0, 1);
+                    EmployeeDocument::create([
+                        'employee_id' => $employee->id,
+                        'document_id' => $document->id,
+                        'valid_from' => now()->subYears(rand(1, 3))->format('Y-m-d'),
+                        'valid_to' => $isPeriodic ? now()->addYears(rand(1, 3))->format('Y-m-d') : null,
+                        'kind' => $isPeriodic ? 'okresowy' : 'bezokresowy',
+                        'file_path' => null,
+                    ]);
+                }
+            }
+        }
     }
 }

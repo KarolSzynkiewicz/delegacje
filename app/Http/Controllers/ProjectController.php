@@ -16,8 +16,8 @@ class ProjectController extends Controller
      */
     public function index(): View
     {
-        $projects = Project::with('location')->get();
-        return view('projects.index', compact('projects'));
+        // Dane są pobierane przez komponent Livewire ProjectsTable
+        return view('projects.index');
     }
 
     /**

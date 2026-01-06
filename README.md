@@ -1,6 +1,6 @@
 # Stocznia - System Zarządzania Logistyką i Delegowaniem Pracowników
 
-**Stocznia** to aplikacja webowa stworzona w oparciu o framework **Laravel**, zaprojektowana do zarządzania kluczowymi aspektami logistyki i zasobów ludzkich w firmie delegującej pracowników.
+**Stocznia** to aplikacja webowa stworzona w oparciu o framework **Laravel**, zaprojektowana do zarządzania kluczowymi aspektami logistyki i zasobów ludzkich w firmie delegującej pracowników do projektów stoczniowych.
 
 ## 🚀 Funkcjonalności
 
@@ -9,14 +9,313 @@ Aplikacja oferuje następujące moduły:
 | Moduł | Opis | Kluczowe Dane |
 | :--- | :--- | :--- |
 | **Autentykacja** | Logowanie, rejestracja, resetowanie hasła (Laravel Breeze). | Użytkownicy, hasła. |
-| **Pracownicy** | Zarządzanie personelem delegowanym. | Imię, Nazwisko, Kontakt, Rola (Spawacz/Dekarz), Ważność A1, Dokumenty (1, 2, 3). |
+| **Pracownicy** | Zarządzanie personelem delegowanym z rotacjami, dokumentami i rolami. | Imię, Nazwisko, Kontakt, Rola (Spawacz/Dekarz/Elektryk), Dokumenty, Rotacje. |
+| **Rotacje** | Definiowanie dostępności pracowników w określonych okresach. | Pracownik, Data rozpoczęcia, Data zakończenia, Status (automatyczny). |
+| **Dokumenty** | Zarządzanie dokumentami pracowników (okresowe i bezokresowe). | Typ dokumentu, Data ważności, Status. |
 | **Akomodacje** | Zarządzanie dostępnymi mieszkaniami. | Nazwa, Adres, Pojemność (liczba osób). |
-| **Pojazdy** | Zarządzanie flotą pojazdów. | Numer Rejestracyjny, Pojemność, Stan Techniczny, Przegląd Ważny Do. |
+| **Pojazdy** | Zarządzanie flotą pojazdów. | Numer Rejestracyjny, Marka, Model, Pojemność, Stan Techniczny, Przegląd Ważny Do. |
 | **Lokalizacje** | Zarządzanie miejscami pracy (stoczniami). | Nazwa, Adres. |
-| **Projekty** | Tworzenie i zarządzanie projektami. | Nazwa, Opis. |
-| **Delegacje** | Przypisywanie pracowników do projektów i lokalizacji. | Pracownik, Projekt, Lokalizacja, Daty. |
+| **Projekty** | Tworzenie i zarządzanie projektami. | Nazwa, Opis, Lokalizacja. |
+| **Zapotrzebowanie** | Definiowanie zapotrzebowania na role w projektach w określonych okresach. | Projekt, Rola, Ilość, Okres (od-do). |
+| **Przypisania** | Przypisywanie pracowników do projektów z walidacją dostępności. | Pracownik, Projekt, Rola, Daty, Status. |
+| **Planer Tygodniowy** | Wizualny przegląd projektów, zapotrzebowania i przypisań w ujęciu tygodniowym. | Tygodniowy widok wszystkich projektów z podsumowaniem. |
 | **Zapisy Czasu Pracy** | Rejestrowanie czasu pracy. | Pracownik, Data, Godziny. |
 | **Raporty** | Generowanie raportów z delegacji (w rozwoju). | Typy raportów, eksport PDF/Excel. |
+
+---
+
+## 📋 Proces Przypisywania Pracownika - Perspektywa End Usera
+
+### 1. Przygotowanie Pracownika
+
+#### 1.1. Dodanie Pracownika
+- Przejdź do **Pracownicy** → **Dodaj Pracownika**
+- Wypełnij podstawowe dane: imię, nazwisko, email, telefon
+- Przypisz role (np. Spawacz, Dekarz, Elektryk) - pracownik może mieć wiele ról
+
+#### 1.2. Definiowanie Rotacji (Dostępności)
+- Przejdź do **Rotacje Pracowników** lub **Pracownicy** → [Pracownik] → **Rotacje**
+- Kliknij **Dodaj Rotację**
+- Ustaw datę rozpoczęcia i zakończenia - okres, w którym pracownik jest dostępny do pracy
+- Status jest automatycznie obliczany na podstawie dat:
+  - **Zaplanowana** - jeśli data rozpoczęcia jest w przyszłości
+  - **Aktywna** - jeśli okres obejmuje dzisiejszą datę
+  - **Zakończona** - jeśli data zakończenia jest w przeszłości
+  - **Anulowana** - tylko ręcznie (można anulować rotację)
+
+#### 1.3. Dodanie Dokumentów
+- Przejdź do **Pracownicy** → [Pracownik] → **Dokumenty**
+- Kliknij **Dodaj Dokument**
+- Wybierz typ dokumentu (np. Uprawnienia A1, Prawo jazdy)
+- Ustaw datę ważności:
+  - **Okresowy** - dokument z datą ważności (valid_from, valid_to)
+  - **Bezokresowy** - dokument bez daty wygaśnięcia (tylko valid_from)
+- System automatycznie sprawdza ważność dokumentów przy przypisywaniu do projektów
+
+### 2. Tworzenie Projektu i Zapotrzebowania
+
+#### 2.1. Utworzenie Projektu
+- Przejdź do **Projekty** → **Dodaj Projekt**
+- Wypełnij: nazwa, opis, lokalizacja, klient
+- Zapisz projekt
+
+#### 2.2. Definiowanie Zapotrzebowania
+- Przejdź do **Projekty** → [Projekt] → **Zapotrzebowanie** → **Dodaj Zapotrzebowanie**
+- Ustaw okres: data od i data do (może być otwarty - bez daty zakończenia)
+- Dla każdej roli określ ilość potrzebnych pracowników:
+  - Np. 5 Spawaczy, 3 Dekarzy, 2 Elektryków
+- System zapisze zapotrzebowanie dla każdej roli osobno
+
+**Alternatywnie z Planera Tygodniowego:**
+- Przejdź do **Planer Tygodniowy**
+- Wybierz tydzień
+- W kafle projektu kliknij **Edytuj** w sekcji "Zapotrzebowanie"
+- Ustaw zapotrzebowanie dla wybranego tygodnia
+
+### 3. Przypisywanie Pracownika do Projektu
+
+#### 3.1. Z Widoku Projektu
+- Przejdź do **Projekty** → [Projekt] → **Przypisania** → **Dodaj Przypisanie**
+- Wybierz pracownika z listy
+- Wybierz rolę (tylko role, które pracownik posiada)
+- Ustaw datę rozpoczęcia i zakończenia przypisania
+- Wybierz status (Oczekujące/Aktywne/Zakończone/Anulowane)
+
+**System automatycznie sprawdza:**
+- ✅ Czy pracownik ma aktywną rotację pokrywającą **cały okres** przypisania
+- ✅ Czy pracownik ma wszystkie wymagane dokumenty ważne w tym okresie
+- ✅ Czy pracownik nie jest już przypisany do innego projektu w tym samym czasie
+- ✅ Czy istnieje zapotrzebowanie dla danej roli w tym okresie
+
+Jeśli którykolwiek warunek nie jest spełniony, przypisanie zostanie zablokowane z odpowiednim komunikatem błędu.
+
+#### 3.2. Z Planera Tygodniowego
+- Przejdź do **Planer Tygodniowy**
+- Wybierz tydzień
+- W kafle projektu kliknij **Dodaj** w sekcji "Osoby w projekcie"
+- System automatycznie wypełni daty z wybranego tygodnia
+- Wybierz pracownika i rolę
+- System pokazuje dostępnych pracowników (niedostępni są wyszarzeni z opisem przyczyny)
+
+### 4. Przypisywanie Zasobów (Pojazdy, Mieszkania)
+
+#### 4.1. Przypisanie Pojazdu
+- Z widoku pracownika: **Pracownicy** → [Pracownik] → **Pojazdy** → **Przypisz Auto**
+- Z planera tygodniowego: W sekcji "Auta w projekcie" kliknij **Auto** przy pracowniku bez pojazdu
+- Wybierz pojazd z listy dostępnych
+- Ustaw daty przypisania (domyślnie wypełnione z planera)
+- System sprawdza dostępność pojazdu w danym okresie
+
+#### 4.2. Przypisanie Mieszkania
+- Z widoku pracownika: **Pracownicy** → [Pracownik] → **Mieszkania** → **Przypisz Dom**
+- Z planera tygodniowego: W sekcji "Domy w projekcie" kliknij **Dom** przy pracowniku bez mieszkania
+- Wybierz mieszkanie z listy dostępnych
+- System sprawdza pojemność mieszkania (czy nie przekroczono limitu osób)
+
+### 5. Planer Tygodniowy - Przegląd i Zarządzanie
+
+#### 5.1. Nawigacja
+- Przejdź do **Planer Tygodniowy**
+- Użyj przycisków **Poprzedni Tydzień** / **Następny Tydzień** do nawigacji
+- Widok pokazuje jeden tydzień na raz
+
+#### 5.2. Widok Projektu w Planerze
+Każdy projekt wyświetla się jako kafelek z następującymi sekcjami:
+
+**Zapotrzebowanie:**
+- Tabela z rolami, ilością potrzebnych i przypisanych pracowników
+- Wskaźnik braków (które role i ile osób brakuje)
+- Przycisk **Edytuj** do modyfikacji zapotrzebowania
+
+**Osoby w projekcie:**
+- Lista przypisanych pracowników z ich rolami
+- Zdjęcia pracowników (lub inicjały)
+- Przycisk **Dodaj** do przypisania nowych pracowników
+
+**Auta w projekcie:**
+- Lista przypisanych pojazdów z kierowcami
+- Sekcja "Bez auta" - lista pracowników bez pojazdu z przyciskami do przypisania
+- Status "Wszyscy mają przypisane auto" gdy wszystkie osoby mają pojazdy
+
+**Domy w projekcie:**
+- Lista przypisanych mieszkań z informacją o wykorzystaniu pojemności
+- Sekcja "Bez domu" - lista pracowników bez mieszkania z przyciskami do przypisania
+- Status "Wszyscy mają przypisany dom" gdy wszystkie osoby mają mieszkania
+
+---
+
+## 🏗️ Struktura Projektu - Sekcja dla Developera
+
+### Architektura Aplikacji
+
+```
+delegacje/
+├── app/
+│   ├── Http/
+│   │   └── Controllers/          # Kontrolery obsługujące requesty HTTP
+│   │       ├── ProjectAssignmentController.php    # Logika przypisań
+│   │       ├── ProjectDemandController.php        # Logika zapotrzebowania
+│   │       ├── RotationController.php             # Logika rotacji
+│   │       ├── WeeklyOverviewController.php       # Planer tygodniowy
+│   │       └── ...
+│   ├── Models/                   # Modele Eloquent (ORM)
+│   │   ├── Employee.php          # Główna logika dostępności pracownika
+│   │   ├── Project.php           # Logika projektów i zapotrzebowania
+│   │   ├── Rotation.php          # Logika rotacji (status automatyczny)
+│   │   ├── ProjectAssignment.php # Przypisania pracownik-projekt-rola
+│   │   ├── ProjectDemand.php     # Zapotrzebowanie na role w okresie
+│   │   └── ...
+│   ├── Rules/                    # Niestandardowe reguły walidacji
+│   │   ├── EmployeeHasRole.php   # Sprawdza czy pracownik ma daną rolę
+│   │   └── RotationDoesNotOverlap.php  # Sprawdza nakładanie rotacji
+│   ├── Services/                 # Logika biznesowa (warstwa serwisowa)
+│   │   ├── WeeklyOverviewService.php  # Agregacja danych dla planera
+│   │   ├── EmployeeService.php
+│   │   └── ProjectService.php
+│   └── Livewire/                 # Komponenty Livewire (reaktywne UI)
+│       ├── VehiclesTable.php     # Tabela pojazdów z filtrowaniem
+│       └── ...
+├── database/
+│   ├── migrations/               # Migracje bazy danych
+│   └── seeders/                  # Seedery (dane testowe)
+├── resources/
+│   ├── views/                    # Widoki Blade
+│   │   ├── components/          # Komponenty Blade (reusable)
+│   │   │   └── weekly-overview/ # Komponenty planera tygodniowego
+│   │   ├── assignments/         # Widoki przypisań
+│   │   ├── projects/            # Widoki projektów
+│   │   └── ...
+│   └── js/                       # JavaScript (Alpine.js)
+└── routes/
+    └── web.php                    # Definicje tras
+```
+
+### Gdzie Jest Trzymana Logika?
+
+#### 1. **Logika Dostępności Pracownika** (`app/Models/Employee.php`)
+
+**Kluczowe metody:**
+- `hasActiveRotationInDateRange($startDate, $endDate)` - Sprawdza czy pracownik ma rotację pokrywającą cały okres
+  - Sprawdza pojedynczą rotację lub ciąg rotacji bez przerw
+  - Implementacja: `hasContinuousRotationsCoveringRange()`
+- `hasAllDocumentsActiveInDateRange($startDate, $endDate)` - Sprawdza ważność dokumentów
+  - Dla dokumentów okresowych: `valid_from <= startDate && valid_to >= endDate`
+  - Dla bezokresowych: `valid_from <= endDate`
+- `isAvailableInDateRange($startDate, $endDate)` - Główna metoda sprawdzająca dostępność
+  - Sprawdza dokumenty, rotację i konfliktujące przypisania
+- `getAvailabilityStatus($startDate, $endDate)` - Zwraca szczegółowy status z przyczynami
+  - Zwraca: `['available' => bool, 'reasons' => []]`
+
+**Lokalizacja:** `app/Models/Employee.php` (linie ~150-350)
+
+#### 2. **Logika Rotacji** (`app/Models/Rotation.php`)
+
+**Automatyczne obliczanie statusu:**
+- `getStatusAttribute()` - Accessor obliczający status na podstawie dat
+  - `scheduled` - jeśli `start_date > today`
+  - `active` - jeśli `start_date <= today <= end_date`
+  - `completed` - jeśli `end_date < today`
+  - `cancelled` - tylko ręcznie (zapisane w bazie)
+
+**Scopes:**
+- `scopeActive()` - Filtruje aktywne rotacje (na podstawie dat)
+- `scopeScheduled()` - Filtruje zaplanowane rotacje
+- `scopeCompleted()` - Filtruje zakończone rotacje
+
+**Lokalizacja:** `app/Models/Rotation.php`
+
+#### 3. **Logika Walidacji Przypisań** (`app/Http/Controllers/ProjectAssignmentController.php`)
+
+**Metoda `store()` i `update()`:**
+1. Walidacja podstawowa (Form Request)
+2. Sprawdzenie rotacji: `$employee->hasActiveRotationInDateRange()`
+3. Sprawdzenie dostępności: `$employee->isAvailableInDateRange()`
+4. Sprawdzenie zapotrzebowania: `$project->hasDemandForRoleInDateRange()`
+5. Utworzenie przypisania
+
+**Lokalizacja:** `app/Http/Controllers/ProjectAssignmentController.php` (linie ~74-114)
+
+#### 4. **Logika Zapotrzebowania** (`app/Models/Project.php`)
+
+**Metoda `hasDemandForRoleInDateRange($roleId, $startDate, $endDate)`:**
+- Sprawdza czy istnieje `ProjectDemand` dla danej roli
+- Sprawdza nakładanie się okresów (demand overlaps with assignment period)
+- Uwzględnia demands bez daty zakończenia (`date_to = null`)
+
+**Lokalizacja:** `app/Models/Project.php` (dodana metoda)
+
+#### 5. **Logika Planera Tygodniowego** (`app/Services/WeeklyOverviewService.php`)
+
+**Główne metody:**
+- `getWeeks()` - Generuje dane tygodnia (jeden tydzień)
+- `getProjectsWithWeeklyData()` - Agreguje dane dla wszystkich projektów
+- `getProjectWeekData()` - Agreguje dane dla jednego projektu w tygodniu
+  - Pobiera zapotrzebowanie (`getDemandsForWeek()`)
+  - Pobiera przypisania (`getAssignmentsForWeek()`)
+  - Oblicza podsumowanie (`calculateRequirementsSummary()`)
+  - Pobiera pojazdy i mieszkania (`getVehiclesForWeek()`, `getAccommodationsForWeek()`)
+  - Pobiera szczegóły pracowników (`getAssignedEmployeesDetails()`)
+
+**Lokalizacja:** `app/Services/WeeklyOverviewService.php`
+
+#### 6. **Walidacja Nakładania Rotacji** (`app/Rules/RotationDoesNotOverlap.php`)
+
+**Logika:**
+- Sprawdza czy nowa rotacja nie nakłada się z istniejącymi
+- Wyklucza rotacje anulowane (`status != 'cancelled'`)
+- Sprawdza nakładanie się okresów (overlap detection)
+
+**Lokalizacja:** `app/Rules/RotationDoesNotOverlap.php`
+
+### Relacje Bazy Danych
+
+```
+Employee (Pracownik)
+  ├── belongsToMany Role (role pracownika)
+  ├── hasMany Rotation (rotacje dostępności)
+  ├── hasMany EmployeeDocument (dokumenty pracownika)
+  ├── hasMany ProjectAssignment (przypisania do projektów)
+  ├── hasMany VehicleAssignment (przypisania pojazdów)
+  └── hasMany AccommodationAssignment (przypisania mieszkań)
+
+Project (Projekt)
+  ├── hasMany ProjectDemand (zapotrzebowanie na role)
+  ├── hasMany ProjectAssignment (przypisania pracowników)
+  └── belongsTo Location (lokalizacja)
+
+ProjectDemand (Zapotrzebowanie)
+  ├── belongsTo Project
+  └── belongsTo Role (wymagana rola)
+
+ProjectAssignment (Przypisanie)
+  ├── belongsTo Project
+  ├── belongsTo Employee
+  └── belongsTo Role
+
+Rotation (Rotacja)
+  └── belongsTo Employee
+
+VehicleAssignment (Przypisanie Pojazdu)
+  ├── belongsTo Employee
+  └── belongsTo Vehicle
+
+AccommodationAssignment (Przypisanie Mieszkania)
+  ├── belongsTo Employee
+  └── belongsTo Accommodation
+```
+
+### Kluczowe Zależności i Technologie
+
+- **Laravel 11** - Framework PHP
+- **Laravel Breeze** - Autentykacja
+- **Livewire 3** - Reaktywne komponenty UI
+- **Alpine.js** - Lekki JavaScript framework
+- **Tailwind CSS** - Framework CSS
+- **MySQL** - Baza danych
+- **Laravel Sail** - Docker development environment
+- **Laravel Boost** - AI-assisted development tools
+
+---
 
 ## 🛠️ Wymagania
 
@@ -42,7 +341,6 @@ Aplikacja oferuje następujące moduły:
    ```bash
    git clone https://github.com/KarolSzynkiewicz/delegacje.git
    cd delegacje
-   git checkout feature/raporty
    ```
 
 2. **Skopiuj plik środowiskowy:**
@@ -107,7 +405,6 @@ Aplikacja oferuje następujące moduły:
    ```bash
    git clone https://github.com/KarolSzynkiewicz/delegacje.git
    cd delegacje
-   git checkout feature/raporty
    ```
 
 2. **Zainstaluj zależności PHP:**
@@ -206,7 +503,7 @@ php artisan test
 
 ```
 delegacje/
-├── app/                    # Logika aplikacji (Controllers, Models)
+├── app/                    # Logika aplikacji (Controllers, Models, Services, Rules)
 ├── database/               # Migracje, seedery, factory
 ├── resources/              # Widoki Blade, CSS, JS
 ├── routes/                 # Definicje tras

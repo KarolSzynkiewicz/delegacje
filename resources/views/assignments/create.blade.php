@@ -6,7 +6,30 @@
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <div x-data="{ employeeId: '', startDate: '{{ old('start_date', $startDate ?? '') }}', endDate: '{{ old('end_date', $endDate ?? '') }}' }">
+                <div x-data="{ 
+                    employeeId: '', 
+                    startDate: @js(old('start_date', $startDate ?? '')), 
+                    endDate: @js(old('end_date', $endDate ?? '')),
+                    showAvailabilityInfo() {
+                        const select = document.querySelector('select[name=\'employee_id\']');
+                        const selectedOption = select.options[select.selectedIndex];
+                        const infoDiv = document.getElementById('availability-info');
+                        const reasonsUl = document.getElementById('availability-reasons');
+                        
+                        if (selectedOption && selectedOption.dataset.available === '0') {
+                            const reasons = JSON.parse(selectedOption.dataset.reasons || '[]');
+                            reasonsUl.innerHTML = '';
+                            reasons.forEach(reason => {
+                                const li = document.createElement('li');
+                                li.textContent = reason;
+                                reasonsUl.appendChild(li);
+                            });
+                            infoDiv.style.display = 'block';
+                        } else {
+                            infoDiv.style.display = 'none';
+                        }
+                    }
+                }">
                 <form method="POST" action="{{ route('projects.assignments.store', $project) }}">
                     @csrf
 
@@ -18,18 +41,70 @@
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Pracownik</label>
-                        <select name="employee_id" x-model="employeeId" required
+                        <select name="employee_id" 
+                                x-model="employeeId" 
+                                @change="showAvailabilityInfo()"
+                                required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                             <option value="">Wybierz pracownika</option>
                             @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}" {{ old('employee_id') == $employee->id ? 'selected' : '' }}>
-                                    {{ $employee->full_name }}@if($employee->roles->count() > 0) ({{ $employee->roles->pluck('name')->join(', ') }})@endif
+                                @php
+                                    $isAvailable = $employee->availability_status['available'] ?? true;
+                                    $reasons = $employee->availability_status['reasons'] ?? [];
+                                @endphp
+                                @php
+                                    $optionText = $employee->full_name;
+                                    if ($employee->roles->count() > 0) {
+                                        $optionText .= ' (' . $employee->roles->pluck('name')->join(', ') . ')';
+                                    }
+                                    if (!$isAvailable && !empty($reasons)) {
+                                        // Skróć powody do krótkich komunikatów
+                                        $shortReasons = [];
+                                        foreach ($reasons as $reason) {
+                                            if (str_contains($reason, 'dokument')) {
+                                                $shortReasons[] = 'Brak dok';
+                                            } elseif (str_contains($reason, 'rotacji')) {
+                                                $shortReasons[] = 'Brak rotacji';
+                                            } elseif (str_contains($reason, 'przypisany') || str_contains($reason, 'projekcie')) {
+                                                $shortReasons[] = 'W innym projekcie';
+                                            } else {
+                                                $shortReasons[] = $reason;
+                                            }
+                                        }
+                                        $optionText .= ' - ' . implode(', ', $shortReasons);
+                                    }
+                                @endphp
+                                <option value="{{ $employee->id }}" 
+                                        {{ old('employee_id') == $employee->id ? 'selected' : '' }}
+                                        {{ !$isAvailable ? 'disabled' : '' }}
+                                        data-available="{{ $isAvailable ? '1' : '0' }}"
+                                        data-reasons="{{ json_encode($reasons) }}"
+                                        style="{{ !$isAvailable ? 'color: #9ca3af; background-color: #f3f4f6;' : '' }}">
+                                    {{ $optionText }}
                                 </option>
                             @endforeach
                         </select>
+                        <style>
+                            select[name="employee_id"] option:disabled {
+                                color: #9ca3af !important;
+                                background-color: #f3f4f6 !important;
+                                font-style: italic;
+                            }
+                        </style>
                         @error('employee_id')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>
                         @enderror
+                        
+                        <!-- Informacja o niedostępności -->
+                        @if($startDate && $endDate)
+                            <div id="availability-info" class="mt-2 text-sm" style="display: none;">
+                                <div class="bg-gray-100 border border-gray-300 rounded p-3">
+                                    <p class="font-semibold text-gray-700 mb-1">Pracownik niedostępny:</p>
+                                    <ul id="availability-reasons" class="list-disc list-inside text-gray-600">
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="mb-4">
@@ -50,7 +125,11 @@
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Rozpoczęcia</label>
-                        <input type="date" name="start_date" x-model="startDate" :value="startDate" required
+                        <input type="date" 
+                               name="start_date" 
+                               x-model="startDate"
+                               :value="startDate"
+                               required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                         @error('start_date')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>
@@ -59,7 +138,10 @@
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Zakończenia (opcjonalnie)</label>
-                        <input type="date" name="end_date" x-model="endDate" :value="endDate"
+                        <input type="date" 
+                               name="end_date" 
+                               x-model="endDate"
+                               :value="endDate"
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
                         @error('end_date')
                             <p class="text-red-500 text-xs italic">{{ $message }}</p>

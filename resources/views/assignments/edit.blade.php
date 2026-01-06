@@ -13,66 +13,84 @@
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Projekt</label>
                         <select name="project_id" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('project_id') border-red-500 @enderror">
                             @foreach($projects as $project)
-                                <option value="{{ $project->id }}" {{ $assignment->project_id == $project->id ? 'selected' : '' }}>
+                                <option value="{{ $project->id }}" {{ old('project_id', $assignment->project_id) == $project->id ? 'selected' : '' }}>
                                     {{ $project->name }}
                                 </option>
                             @endforeach
                         </select>
+                        @error('project_id')
+                            <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Pracownik</label>
                         <select name="employee_id" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('employee_id') border-red-500 @enderror">
                             @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}" {{ $assignment->employee_id == $employee->id ? 'selected' : '' }}>
+                                <option value="{{ $employee->id }}" {{ old('employee_id', $assignment->employee_id) == $employee->id ? 'selected' : '' }}>
                                     {{ $employee->full_name }}@if($employee->roles->count() > 0) ({{ $employee->roles->pluck('name')->join(', ') }})@endif
                                 </option>
                             @endforeach
                         </select>
+                        @error('employee_id')
+                            <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Rola w Projekcie</label>
                         <select name="role_id" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('role_id') border-red-500 @enderror">
                             @foreach($roles as $role)
-                                <option value="{{ $role->id }}" {{ $assignment->role_id == $role->id ? 'selected' : '' }}>
+                                <option value="{{ $role->id }}" {{ old('role_id', $assignment->role_id) == $role->id ? 'selected' : '' }}>
                                     {{ $role->name }}
                                 </option>
                             @endforeach
                         </select>
+                        @error('role_id')
+                            <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Rozpoczęcia</label>
-                        <input type="date" name="start_date" value="{{ $assignment->start_date->format('Y-m-d') }}" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                        <input type="date" name="start_date" value="{{ old('start_date', $assignment->start_date->format('Y-m-d')) }}" required
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('start_date') border-red-500 @enderror">
+                        @error('start_date')
+                            <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Zakończenia (opcjonalnie)</label>
-                        <input type="date" name="end_date" value="{{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '' }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                        <input type="date" name="end_date" value="{{ old('end_date', $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '') }}"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('end_date') border-red-500 @enderror">
+                        @error('end_date')
+                            <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Status</label>
                         <select name="status" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                            <option value="pending" {{ $assignment->status == 'pending' ? 'selected' : '' }}>Oczekujące</option>
-                            <option value="active" {{ $assignment->status == 'active' ? 'selected' : '' }}>Aktywne</option>
-                            <option value="completed" {{ $assignment->status == 'completed' ? 'selected' : '' }}>Zakończone</option>
-                            <option value="cancelled" {{ $assignment->status == 'cancelled' ? 'selected' : '' }}>Anulowane</option>
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('status') border-red-500 @enderror">
+                            <option value="pending" {{ old('status', $assignment->status) == 'pending' ? 'selected' : '' }}>Oczekujące</option>
+                            <option value="active" {{ old('status', $assignment->status) == 'active' ? 'selected' : '' }}>Aktywne</option>
+                            <option value="completed" {{ old('status', $assignment->status) == 'completed' ? 'selected' : '' }}>Zakończone</option>
+                            <option value="cancelled" {{ old('status', $assignment->status) == 'cancelled' ? 'selected' : '' }}>Anulowane</option>
                         </select>
+                        @error('status')
+                            <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Uwagi</label>
                         <textarea name="notes" rows="3"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ $assignment->notes }}</textarea>
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('notes', $assignment->notes) }}</textarea>
                     </div>
 
                     <div class="flex items-center justify-between">

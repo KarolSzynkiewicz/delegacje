@@ -21,6 +21,11 @@
                         Dokumenty ({{ $employee->employeeDocuments->count() }})
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="rotations-tab" data-bs-toggle="tab" data-bs-target="#rotations" type="button" role="tab">
+                        Rotacje ({{ $employee->rotations->count() }})
+                    </button>
+                </li>
             </ul>
 
             <div class="tab-content" id="employeeTabsContent">
@@ -156,6 +161,69 @@
                             </div>
                         @else
                             <p class="text-muted">Brak dokumentów</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+
+                <!-- Zakładka Rotacje -->
+                <div class="tab-pane fade" id="rotations" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Rotacje</h5>
+                            <a href="{{ route('employees.rotations.create', $employee) }}" class="btn btn-primary btn-sm">Dodaj Rotację</a>
+                        </div>
+                        @if($employee->rotations->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Data rozpoczęcia</th>
+                                            <th>Data zakończenia</th>
+                                            <th>Status</th>
+                                            <th>Notatki</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($employee->rotations->sortByDesc('start_date') as $rotation)
+                                            <tr>
+                                                <td>{{ $rotation->start_date->format('Y-m-d') }}</td>
+                                                <td>{{ $rotation->end_date->format('Y-m-d') }}</td>
+                                                <td>
+                                                    @php
+                                                        $status = $rotation->status;
+                                                    @endphp
+                                                    @if($status === 'active')
+                                                        <span class="badge bg-success">Aktywna</span>
+                                                    @elseif($status === 'scheduled')
+                                                        <span class="badge bg-primary">Zaplanowana</span>
+                                                    @elseif($status === 'completed')
+                                                        <span class="badge bg-info">Zakończona</span>
+                                                    @elseif($status === 'cancelled')
+                                                        <span class="badge bg-danger">Anulowana</span>
+                                                    @endif
+                                                </td>
+                                                <td>{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</td>
+                                                <td>
+                                                    <a href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" class="btn btn-sm btn-warning">Edytuj</a>
+                                                    <form action="{{ route('employees.rotations.destroy', [$employee, $rotation]) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć tę rotację?')">Usuń</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak rotacji dla tego pracownika.</p>
+                            <a href="{{ route('employees.rotations.create', $employee) }}" class="btn btn-primary">Dodaj pierwszą rotację</a>
                         @endif
                     </div>
                 </div>

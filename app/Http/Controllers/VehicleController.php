@@ -13,8 +13,8 @@ class VehicleController extends Controller
      */
     public function index()
     {
-        $vehicles = Vehicle::paginate(10);
-        return view('vehicles.index', compact('vehicles'));
+        // Dane są pobierane przez komponent Livewire VehiclesTable
+        return view('vehicles.index');
     }
 
     /**

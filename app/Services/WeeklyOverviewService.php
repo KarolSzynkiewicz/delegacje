@@ -13,31 +13,25 @@ use Illuminate\Support\Collection;
 class WeeklyOverviewService
 {
     /**
-     * Get weeks data for the overview (current week + 2 next weeks).
+     * Get weeks data for the overview (single week).
      */
     public function getWeeks(?Carbon $startDate = null): array
     {
-        $weeks = [];
         $startOfWeek = $startDate ?? Carbon::now()->startOfWeek();
+        $weekStart = $startOfWeek->copy()->startOfWeek();
+        $weekEnd = $weekStart->copy()->endOfWeek();
         
-        for ($i = 0; $i < 3; $i++) {
-            $weekStart = $startOfWeek->copy()->addWeeks($i);
-            $weekEnd = $weekStart->copy()->endOfWeek();
-            
-            // Get ISO week number (week number in year according to ISO 8601)
-            $isoWeekNumber = $weekStart->isoWeek();
-            
-            $weeks[] = [
-                'number' => $isoWeekNumber,
-                'start' => $weekStart,
-                'end' => $weekEnd,
-                'start_formatted' => $weekStart->format('d.m.Y'),
-                'end_formatted' => $weekEnd->format('d.m.Y'),
-                'label' => $weekStart->format('d.m') . ' – ' . $weekEnd->format('d.m.Y'),
-            ];
-        }
+        // Get ISO week number (week number in year according to ISO 8601)
+        $isoWeekNumber = $weekStart->isoWeek();
         
-        return $weeks;
+        return [[
+            'number' => $isoWeekNumber,
+            'start' => $weekStart,
+            'end' => $weekEnd,
+            'start_formatted' => $weekStart->format('d.m.Y'),
+            'end_formatted' => $weekEnd->format('d.m.Y'),
+            'label' => $weekStart->format('d.m') . ' – ' . $weekEnd->format('d.m.Y'),
+        ]];
     }
 
     /**

@@ -6,34 +6,37 @@
     </x-slot>
 
     <div class="py-12">
-        <div class="max-w-[92%] mx-auto px-4">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <!-- Nawigacja między tygodniami -->
             <div class="mb-6 flex justify-between items-center gap-4">
                 @php
-                    $prevWeekStart = $weeks[0]['start']->copy()->subWeeks(3)->startOfWeek();
-                    $prevWeekEnd = $prevWeekStart->copy()->addWeeks(2)->endOfWeek();
-                    $nextWeekStart = $weeks[2]['end']->copy()->addDay()->startOfWeek();
-                    $nextWeekEnd = $nextWeekStart->copy()->addWeeks(2)->endOfWeek();
+                    $currentWeek = $weeks[0];
+                    $prevWeekStart = $currentWeek['start']->copy()->subWeek()->startOfWeek();
+                    $nextWeekStart = $currentWeek['end']->copy()->addDay()->startOfWeek();
                 @endphp
                 
-                <!-- Przycisk poprzednie 3 tygodnie -->
-                <a href="{{ route('weekly-overview.index', ['start_date' => $prevWeekStart->format('Y-m-d')]) }}" class="inline-flex items-center gap-3 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 text-gray-700 hover:text-gray-900 font-bold text-lg px-6 py-3 rounded-xl transition-all shadow-md hover:shadow-lg border-2 border-gray-300 group">
-                    <svg class="w-5 h-5 transform group-hover:-translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Przycisk poprzedni tydzień -->
+                <a href="{{ route('weekly-overview.index', ['start_date' => $prevWeekStart->format('Y-m-d')]) }}" class="inline-flex items-center gap-2 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 text-gray-700 hover:text-gray-900 font-semibold px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg border-2 border-gray-300 group">
+                    <svg class="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
                     </svg>
-                    <div class="flex flex-col items-start">
-                        <span>Poprzednie 3 tygodnie</span>
-                        <span class="text-gray-600 text-sm font-normal">({{ $prevWeekStart->format('d.m') }} – {{ $prevWeekEnd->format('d.m.Y') }})</span>
-                    </div>
+                    <span>Poprzedni tydzień</span>
                 </a>
 
-                <!-- Przycisk następne 3 tygodnie -->
-                <a href="{{ route('weekly-overview.index', ['start_date' => $nextWeekStart->format('Y-m-d')]) }}" class="inline-flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 hover:text-blue-900 font-bold text-lg px-6 py-3 rounded-xl transition-all shadow-md hover:shadow-lg border-2 border-blue-300 group">
-                    <div class="flex flex-col items-end">
-                        <span>Następne 3 tygodnie</span>
-                        <span class="text-blue-600 text-sm font-normal">({{ $nextWeekStart->format('d.m') }} – {{ $nextWeekEnd->format('d.m.Y') }})</span>
-                    </div>
-                    <svg class="w-5 h-5 transform group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Aktualny tydzień -->
+                <div class="text-center">
+                    <h3 class="text-lg font-bold text-gray-800">
+                        Tydzień {{ $currentWeek['number'] }}
+                    </h3>
+                    <p class="text-sm text-gray-600">
+                        {{ $currentWeek['start']->format('d.m.Y') }} – {{ $currentWeek['end']->format('d.m.Y') }}
+                    </p>
+                </div>
+
+                <!-- Przycisk następny tydzień -->
+                <a href="{{ route('weekly-overview.index', ['start_date' => $nextWeekStart->format('Y-m-d')]) }}" class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-700 hover:text-blue-900 font-semibold px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg border-2 border-blue-300 group">
+                    <span>Następny tydzień</span>
+                    <svg class="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
                     </svg>
                 </a>
@@ -44,22 +47,18 @@
                 <div class="w-full">
                     <table class="w-full table-fixed">
                         <colgroup>
-                            <col style="width: 18%;">
-                            @foreach($weeks as $week)
-                                <col style="width: calc(82% / {{ count($weeks) }});">
-                            @endforeach
+                            <col style="width: 25%;">
+                            <col style="width: 75%;">
                         </colgroup>
                         <thead>
                             <tr>
-                                <th class="px-3 py-4 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-900 text-center font-bold text-base rounded-tl-2xl border-b-2 border-gray-300">
+                                <th class="px-4 py-4 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-900 text-center font-bold text-base rounded-tl-2xl border-b-2 border-gray-300">
                                     Projekt
                                 </th>
-                                @foreach($weeks as $index => $week)
-                                    <th class="px-3 py-4 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-900 text-center font-bold text-base border-b-2 border-gray-300 {{ $loop->last ? 'rounded-tr-2xl' : '' }}" style="vertical-align: middle;">
-                                        <div>Tydzień {{ $week['number'] }}</div>
-                                        <div class="text-xs font-normal text-gray-700 mt-1">{{ $week['label'] }}</div>
-                                    </th>
-                                @endforeach
+                                <th class="px-4 py-4 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-900 text-center font-bold text-base border-b-2 border-gray-300 rounded-tr-2xl" style="vertical-align: middle;">
+                                    <div>Tydzień {{ $weeks[0]['number'] }}</div>
+                                    <div class="text-xs font-normal text-gray-700 mt-1">{{ $weeks[0]['label'] }}</div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="bg-gray-50">
@@ -68,7 +67,7 @@
                                     $project = $projectData['project'];
                                 @endphp
                                 <tr class="hover:bg-gray-100 transition-colors">
-                                    <td class="px-3 py-4 bg-white border-2 border-gray-300 border-r-0 text-gray-900 font-bold text-base align-top shadow-sm rounded-l-2xl" style="vertical-align: top;">
+                                    <td class="px-4 py-4 bg-white border-2 border-gray-300 border-r-0 text-gray-900 font-bold text-base align-top shadow-sm rounded-l-2xl" style="vertical-align: top;">
                                         <div class="flex items-center">
                                             <div class="w-2 h-2 bg-blue-500 rounded-full mr-2 flex-shrink-0"></div>
                                             <span class="break-words">{{ $project->name }}</span>
@@ -79,18 +78,16 @@
                                             </div>
                                         @endif
                                     </td>
-                                    @foreach($projectData['weeks_data'] as $weekData)
-                                        <td class="px-2 py-3 border-2 border-gray-300 {{ $loop->first ? 'border-l-0' : '' }} {{ $loop->last ? 'border-r-2 rounded-r-2xl' : 'border-r-0' }}" style="vertical-align: top;">
-                                            <x-weekly-overview.project-week-tile 
-                                                :weekData="$weekData" 
-                                                :project="$project" 
-                                            />
-                                        </td>
-                                    @endforeach
+                                    <td class="px-4 py-3 border-2 border-gray-300 border-l-0 rounded-r-2xl" style="vertical-align: top;">
+                                        <x-weekly-overview.project-week-tile 
+                                            :weekData="$projectData['weeks_data'][0]" 
+                                            :project="$project" 
+                                        />
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ count($weeks) + 1 }}" class="px-6 py-12 text-center text-gray-500 text-lg">
+                                    <td colspan="2" class="px-6 py-12 text-center text-gray-500 text-lg">
                                         Brak projektów do wyświetlenia
                                     </td>
                                 </tr>

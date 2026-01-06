@@ -15,6 +15,7 @@ use App\Http\Controllers\UserRoleController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\WeeklyOverviewController;
+use App\Http\Controllers\RotationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -69,6 +70,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);
     Route::resource('employees.employee-documents', EmployeeDocumentController::class)->except(['index', 'show'])->parameters(['employee-documents' => 'employeeDocument']);
+    
+    // Rotations (global routes)
+    Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
+    Route::get('rotations/create', [RotationController::class, 'createGlobal'])->name('rotations.create');
+    Route::post('rotations', [RotationController::class, 'storeGlobal'])->name('rotations.store');
+    
+    // Rotations (nested under employees) - scoped for security
+    Route::resource('employees.rotations', RotationController::class)
+        ->except(['show'])
+        ->scoped()
+        ->parameters(['rotations' => 'rotation']);
     
     // Employee Documents (dokumenty pracowników - globalna lista)
     Route::get('employee-documents', [EmployeeDocumentController::class, 'index'])->name('employee-documents.index');

@@ -37,11 +37,15 @@ class VehicleAssignmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Employee $employee)
+    public function create(Employee $employee, Request $request)
     {
         $vehicles = Vehicle::orderBy('registration_number')->get();
         
-        return view('vehicle-assignments.create', compact('employee', 'vehicles'));
+        // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        
+        return view('vehicle-assignments.create', compact('employee', 'vehicles', 'dateFrom', 'dateTo'));
     }
 
     /**

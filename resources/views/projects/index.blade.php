@@ -14,40 +14,7 @@
                 </div>
             @endif
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Klient</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @forelse ($projects as $project)
-                            <tr>
-                                <td class="px-6 py-4">{{ $project->name }}</td>
-                                <td class="px-6 py-4">{{ $project->client_name ?? '-' }}</td>
-                                <td class="px-6 py-4">
-                                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                        {{ ucfirst($project->status) }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <a href="{{ route('projects.show', $project) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                    <a href="{{ route('projects.assignments.index', $project) }}" class="text-green-600 hover:text-green-900 mr-3">Pracownicy</a>
-                                    <a href="{{ route('projects.demands.index', $project) }}" class="text-purple-600 hover:text-purple-900">Zapotrzebowanie</a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak projektów</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+            <livewire:projects-table />
         </div>
     </div>
 </x-app-layout>

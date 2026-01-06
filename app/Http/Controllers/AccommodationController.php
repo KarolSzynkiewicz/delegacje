@@ -13,8 +13,8 @@ class AccommodationController extends Controller
      */
     public function index()
     {
-        $accommodations = Accommodation::paginate(10);
-        return view('accommodations.index', compact('accommodations'));
+        // Dane są pobierane przez komponent Livewire AccommodationsTable
+        return view('accommodations.index');
     }
 
     /**

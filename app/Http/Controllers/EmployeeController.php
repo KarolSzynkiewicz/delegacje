@@ -17,8 +17,8 @@ class EmployeeController extends Controller
      */
     public function index(): View
     {
-        $employees = Employee::with('roles')->paginate(10);
-        return view('employees.index', compact('employees'));
+        // Dane są pobierane przez komponent Livewire EmployeesTable
+        return view('employees.index');
     }
 
     /**
@@ -61,7 +61,7 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee): View
     {
-        $employee->load(['roles', 'employeeDocuments.document']);
+        $employee->load(['roles', 'employeeDocuments.document', 'rotations']);
         return view('employees.show', compact('employee'));
     }
 
