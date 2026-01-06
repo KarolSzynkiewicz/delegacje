@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\VehicleAssignment;
 use App\Models\Employee;
 use App\Models\Vehicle;
+use App\Services\VehicleAssignmentService;
 use App\Http\Requests\StoreVehicleAssignmentRequest;
 use App\Http\Requests\UpdateVehicleAssignmentRequest;
 use Illuminate\Http\Request;
 
 class VehicleAssignmentController extends Controller
 {
+    public function __construct(
+        protected VehicleAssignmentService $assignmentService
+    ) {}
     /**
      * Display all vehicle assignments (global view).
      */
@@ -57,17 +61,13 @@ class VehicleAssignmentController extends Controller
     {
         $validated = $request->validated();
 
-        // Check vehicle availability
-        $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
-        $endDate = $validated['end_date'] ?? now()->addYears(10);
-        
-        if (!$vehicle->isAvailableInDateRange($validated['start_date'], $endDate)) {
+        try {
+            $this->assignmentService->createAssignment($employee->id, $validated);
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
-                ->withErrors(['vehicle_id' => 'Pojazd jest już przypisany w tym okresie.']);
+                ->withErrors($e->errors());
         }
-
-        $assignment = $employee->vehicleAssignments()->create($validated);
 
         return redirect()
             ->route('employees.vehicles.index', $employee)

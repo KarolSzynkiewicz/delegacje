@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\EmployeeHasRole;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProjectAssignmentRequest extends FormRequest
@@ -25,17 +24,14 @@ class UpdateProjectAssignmentRequest extends FormRequest
         return [
             'project_id' => ['required', 'exists:projects,id'],
             'employee_id' => ['required', 'exists:employees,id'],
-            'role_id' => [
-                'required',
-                'exists:roles,id',
-                new EmployeeHasRole($this->input('employee_id'))
-            ],
+            'role_id' => ['required', 'exists:roles,id'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['required', 'in:pending,active,completed,cancelled'],
             'notes' => ['nullable', 'string'],
         ];
     }
+
 
     /**
      * Get custom messages for validator errors.

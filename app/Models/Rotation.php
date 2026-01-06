@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use App\Traits\HasDateRangeScope;
 
 class Rotation extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDateRangeScope;
 
     /**
      * The attributes that are mass assignable.
@@ -114,15 +115,35 @@ class Rotation extends Model
     /**
      * Scope a query to only include rotations within a date range.
      */
-    public function scopeInDateRange(Builder $query, string $startDate, string $endDate): Builder
-    {
-        return $query->where(function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('start_date', [$startDate, $endDate])
-              ->orWhereBetween('end_date', [$startDate, $endDate])
-              ->orWhere(function ($q2) use ($startDate, $endDate) {
-                  $q2->where('start_date', '<=', $startDate)
-                     ->where('end_date', '>=', $endDate);
-              });
-        });
+
+    /**
+     * Check if a rotation overlaps with existing rotations for an employee.
+     * Excludes cancelled rotations and optionally excludes a specific rotation (for updates).
+     */
+    public static function hasOverlappingRotations(
+        int $employeeId,
+        string $startDate,
+        string $endDate,
+        ?int $excludeRotationId = null
+    ): bool {
+        $query = static::where('employee_id', $employeeId)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '!=', 'cancelled');
+            })
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_date', [$startDate, $endDate])
+                    ->orWhereBetween('end_date', [$startDate, $endDate])
+                    ->orWhere(function ($q) use ($startDate, $endDate) {
+                        $q->where('start_date', '<=', $startDate)
+                          ->where('end_date', '>=', $endDate);
+                    });
+            });
+
+        if ($excludeRotationId) {
+            $query->where('id', '!=', $excludeRotationId);
+        }
+
+        return $query->exists();
     }
 }

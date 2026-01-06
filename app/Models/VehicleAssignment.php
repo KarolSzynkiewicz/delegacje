@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use App\Traits\HasDateRangeScope;
 
 class VehicleAssignment extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDateRangeScope;
 
     /**
      * The attributes that are mass assignable.
@@ -62,21 +63,4 @@ class VehicleAssignment extends Model
         ->where('start_date', '<=', now());
     }
 
-    /**
-     * Scope a query to only include assignments within a date range.
-     */
-    public function scopeInDateRange(Builder $query, string $startDate, string $endDate): Builder
-    {
-        return $query->where(function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('start_date', [$startDate, $endDate])
-              ->orWhereBetween('end_date', [$startDate, $endDate])
-              ->orWhere(function ($q2) use ($startDate, $endDate) {
-                  $q2->where('start_date', '<=', $startDate)
-                     ->where(function ($q3) use ($endDate) {
-                         $q3->where('end_date', '>=', $endDate)
-                            ->orWhereNull('end_date');
-                     });
-              });
-        });
-    }
 }

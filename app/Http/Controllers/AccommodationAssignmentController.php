@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
 use App\Models\Accommodation;
+use App\Services\AccommodationAssignmentService;
 use App\Http\Requests\StoreAccommodationAssignmentRequest;
 use App\Http\Requests\UpdateAccommodationAssignmentRequest;
 use Illuminate\Http\Request;
 
 class AccommodationAssignmentController extends Controller
 {
+    public function __construct(
+        protected AccommodationAssignmentService $assignmentService
+    ) {}
     /**
      * Display all accommodation assignments (global view).
      */
@@ -57,17 +61,13 @@ class AccommodationAssignmentController extends Controller
     {
         $validated = $request->validated();
 
-        // Check accommodation capacity
-        $accommodation = Accommodation::findOrFail($validated['accommodation_id']);
-        $endDate = $validated['end_date'] ?? now()->addYears(10);
-        
-        if (!$accommodation->hasAvailableSpace($validated['start_date'], $endDate)) {
+        try {
+            $this->assignmentService->createAssignment($employee->id, $validated);
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
-                ->withErrors(['accommodation_id' => 'Brak wolnych miejsc w tym mieszkaniu w wybranym okresie.']);
+                ->withErrors($e->errors());
         }
-
-        $assignment = $employee->accommodationAssignments()->create($validated);
 
         return redirect()
             ->route('employees.accommodations.index', $employee)

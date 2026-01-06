@@ -35,6 +35,14 @@ class Employee extends Model
     }
 
     /**
+     * Check if employee has a specific role.
+     */
+    public function hasRole(int $roleId): bool
+    {
+        return $this->roles()->where('roles.id', $roleId)->exists();
+    }
+
+    /**
      * Get all project assignments for this employee.
      */
     public function assignments(): HasMany

@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\RotationDoesNotOverlap;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateRotationRequest extends FormRequest
@@ -22,24 +21,14 @@ class UpdateRotationRequest extends FormRequest
      */
     public function rules(): array
     {
-        $employee = $this->route('employee');
-        $rotation = $this->route('rotation');
-        
-        $employeeId = $employee?->id;
-        $rotationId = $rotation?->id;
-
         return [
             'start_date' => ['required', 'date'],
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-                new RotationDoesNotOverlap($employeeId, $rotationId)
-            ],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', 'in:cancelled'],
             'notes' => ['nullable', 'string'],
         ];
     }
+
 
     /**
      * Get custom messages for validator errors.

@@ -17,6 +17,9 @@ class ProjectAssignmentService
         $employee = Employee::findOrFail($data['employee_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
 
+        // Validate employee has the required role
+        $this->validateEmployeeHasRole($employee, $data['role_id']);
+
         // Validate employee availability
         $this->validateEmployeeAvailability($employee, $data['start_date'], $endDate);
 
@@ -34,6 +37,9 @@ class ProjectAssignmentService
         $employee = Employee::findOrFail($data['employee_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
 
+        // Validate employee has the required role
+        $this->validateEmployeeHasRole($employee, $data['role_id']);
+
         // Validate employee availability (excluding current assignment)
         $this->validateEmployeeAvailability($employee, $data['start_date'], $endDate, $assignment->id);
 
@@ -42,6 +48,22 @@ class ProjectAssignmentService
         $this->validateProjectDemand($project, $data['role_id'], $data['start_date'], $endDate);
 
         return $assignment->update($data);
+    }
+
+    /**
+     * Validate that employee has the required role.
+     *
+     * @throws ValidationException
+     */
+    protected function validateEmployeeHasRole(Employee $employee, int $roleId): void
+    {
+        if (!$employee->hasRole($roleId)) {
+            $role = \App\Models\Role::find($roleId);
+            $roleName = $role ? $role->name : 'nieznana';
+            throw ValidationException::withMessages([
+                'role_id' => "Pracownik {$employee->full_name} nie posiada roli: {$roleName}. Nie można przypisać go do projektu z tą rolą."
+            ]);
+        }
     }
 
     /**

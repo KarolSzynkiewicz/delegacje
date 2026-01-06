@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
+use App\Services\ImageService;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class VehicleController extends Controller
 {
+    public function __construct(
+        protected ImageService $imageService
+    ) {}
     /**
      * Display a listing of the resource.
      */
@@ -36,10 +39,9 @@ class VehicleController extends Controller
 
         unset($validated['image']);
 
-        // Add image_path if image was uploaded
+        // Handle image upload
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('vehicles', 'public');
-            $validated['image_path'] = $imagePath;
+            $validated['image_path'] = $this->imageService->storeImage($request->file('image'), 'vehicles');
         }
 
         Vehicle::create($validated);
@@ -69,14 +71,13 @@ class VehicleController extends Controller
     {
         $validated = $request->validated();
 
+        // Handle image upload
         if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($vehicle->image_path && Storage::disk('public')->exists($vehicle->image_path)) {
-                Storage::disk('public')->delete($vehicle->image_path);
-            }
-            
-            $imagePath = $request->file('image')->store('vehicles', 'public');
-            $validated['image_path'] = $imagePath;
+            $validated['image_path'] = $this->imageService->handleImageUpload(
+                $request->file('image'),
+                'vehicles',
+                $vehicle->image_path
+            );
         }
 
         unset($validated['image']);

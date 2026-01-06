@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Rotation;
+use App\Services\RotationService;
 use App\Http\Requests\StoreRotationRequest;
 use App\Http\Requests\UpdateRotationRequest;
 use Illuminate\Http\Request;
@@ -12,6 +13,9 @@ use Illuminate\Http\RedirectResponse;
 
 class RotationController extends Controller
 {
+    public function __construct(
+        protected RotationService $rotationService
+    ) {}
     /**
      * Display all rotations (global view).
      */
@@ -180,8 +184,13 @@ class RotationController extends Controller
             unset($validated['status']);
         }
 
-        $employee = Employee::findOrFail($validated['employee_id']);
-        $employee->rotations()->create($validated);
+        try {
+            $this->rotationService->createRotation($validated['employee_id'], $validated);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->withErrors($e->errors());
+        }
 
         return redirect()
             ->route('rotations.index')
@@ -200,7 +209,13 @@ class RotationController extends Controller
             unset($validated['status']);
         }
 
-        $employee->rotations()->create($validated);
+        try {
+            $this->rotationService->createRotation($employee->id, $validated);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->withErrors($e->errors());
+        }
 
         return redirect()
             ->route('employees.rotations.index', $employee)
@@ -228,7 +243,13 @@ class RotationController extends Controller
             $validated['status'] = null;
         }
 
-        $rotation->update($validated);
+        try {
+            $this->rotationService->updateRotation($rotation, $validated);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->withErrors($e->errors());
+        }
 
         return redirect()
             ->route('employees.rotations.index', $employee)

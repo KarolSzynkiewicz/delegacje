@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\RotationDoesNotOverlap;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRotationRequest extends FormRequest
@@ -22,17 +21,10 @@ class StoreRotationRequest extends FormRequest
      */
     public function rules(): array
     {
-        $employeeId = $this->route('employee')?->id ?? $this->input('employee_id');
-
         return [
             'employee_id' => ['sometimes', 'required', 'exists:employees,id'],
             'start_date' => ['required', 'date'],
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-                new RotationDoesNotOverlap($employeeId)
-            ],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'status' => ['nullable', 'in:cancelled'],
             'notes' => ['nullable', 'string'],
         ];

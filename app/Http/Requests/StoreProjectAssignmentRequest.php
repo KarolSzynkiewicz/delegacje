@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\EmployeeHasRole;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreProjectAssignmentRequest extends FormRequest
@@ -24,17 +23,14 @@ class StoreProjectAssignmentRequest extends FormRequest
     {
         return [
             'employee_id' => ['required', 'exists:employees,id'],
-            'role_id' => [
-                'required',
-                'exists:roles,id',
-                new EmployeeHasRole($this->input('employee_id'))
-            ],
+            'role_id' => ['required', 'exists:roles,id'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['required', 'in:pending,active,completed,cancelled'],
             'notes' => ['nullable', 'string'],
         ];
     }
+
 
     /**
      * Get custom messages for validator errors.

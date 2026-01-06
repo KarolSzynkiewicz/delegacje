@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Accommodation;
+use App\Services\ImageService;
+use App\Http\Requests\StoreAccommodationRequest;
+use App\Http\Requests\UpdateAccommodationRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class AccommodationController extends Controller
 {
+    public function __construct(
+        protected ImageService $imageService
+    ) {}
     /**
      * Display a listing of the resource.
      */
@@ -28,24 +33,15 @@ class AccommodationController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreAccommodationRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string|max:255',
-            'city' => 'nullable|string|max:255',
-            'postal_code' => 'nullable|string|max:10',
-            'capacity' => 'required|integer|min:1',
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-        ]);
+        $validated = $request->validated();
 
         unset($validated['image']);
 
-        // Add image_path if image was uploaded
+        // Handle image upload
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('accommodations', 'public');
-            $validated['image_path'] = $imagePath;
+            $validated['image_path'] = $this->imageService->storeImage($request->file('image'), 'accommodations');
         }
 
         Accommodation::create($validated);
@@ -71,26 +67,17 @@ class AccommodationController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Accommodation $accommodation)
+    public function update(UpdateAccommodationRequest $request, Accommodation $accommodation)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string|max:255',
-            'city' => 'nullable|string|max:255',
-            'postal_code' => 'nullable|string|max:10',
-            'capacity' => 'required|integer|min:1',
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-        ]);
+        $validated = $request->validated();
 
+        // Handle image upload
         if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($accommodation->image_path && Storage::disk('public')->exists($accommodation->image_path)) {
-                Storage::disk('public')->delete($accommodation->image_path);
-            }
-            
-            $imagePath = $request->file('image')->store('accommodations', 'public');
-            $validated['image_path'] = $imagePath;
+            $validated['image_path'] = $this->imageService->handleImageUpload(
+                $request->file('image'),
+                'accommodations',
+                $accommodation->image_path
+            );
         }
 
         unset($validated['image']);
