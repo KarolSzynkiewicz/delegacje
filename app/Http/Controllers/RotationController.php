@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Rotation;
-use App\Rules\RotationDoesNotOverlap;
+use App\Http\Requests\StoreRotationRequest;
+use App\Http\Requests\UpdateRotationRequest;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -170,20 +171,9 @@ class RotationController extends Controller
     /**
      * Store a newly created resource in storage (global - with employee_id).
      */
-    public function storeGlobal(Request $request): RedirectResponse
+    public function storeGlobal(StoreRotationRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'start_date' => 'required|date',
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-                new RotationDoesNotOverlap($request->input('employee_id'))
-            ],
-            'status' => 'nullable|in:cancelled', // Tylko cancelled można ustawić ręcznie
-            'notes' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         // Status jest automatyczny - nie zapisujemy go (chyba że cancelled)
         if (!isset($validated['status']) || $validated['status'] !== 'cancelled') {
@@ -201,19 +191,9 @@ class RotationController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Employee $employee): RedirectResponse
+    public function store(StoreRotationRequest $request, Employee $employee): RedirectResponse
     {
-        $validated = $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-                new RotationDoesNotOverlap($employee->id)
-            ],
-            'status' => 'nullable|in:cancelled', // Tylko cancelled można ustawić ręcznie
-            'notes' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         // Status jest automatyczny - nie zapisujemy go (chyba że cancelled)
         if (!isset($validated['status']) || $validated['status'] !== 'cancelled') {
@@ -238,19 +218,9 @@ class RotationController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Employee $employee, Rotation $rotation): RedirectResponse
+    public function update(UpdateRotationRequest $request, Employee $employee, Rotation $rotation): RedirectResponse
     {
-        $validated = $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-                new RotationDoesNotOverlap($employee->id, $rotation->id)
-            ],
-            'status' => 'nullable|in:cancelled', // Tylko cancelled można ustawić ręcznie
-            'notes' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         // Status jest automatyczny - nie zapisujemy go (chyba że cancelled)
         // Jeśli nie ma statusu cancelled, ustawiamy null (będzie obliczony automatycznie)

@@ -96,7 +96,7 @@
                                 @endif
                             </button>
                         </th>
-                        <th class="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marka i Model</th>
+                        <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marka i Model</th>
                         <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stan</th>
                         <th class="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pojemność</th>
                         <th class="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -117,22 +117,10 @@
                             </td>
                             <td class="px-4 md:px-6 py-4">
                                 <div class="text-sm font-medium text-gray-900">{{ $vehicle->registration_number }}</div>
-                                <div class="md:hidden text-xs text-gray-500 mt-1">
-                                    @if($vehicle->brand || $vehicle->model)
-                                        {{ trim(($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '')) }}
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </div>
+                                <div class="md:hidden text-xs text-gray-500 mt-1">{{ ($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '') }}</div>
                             </td>
                             <td class="hidden md:table-cell px-6 py-4">
-                                <div class="text-sm text-gray-900">
-                                    @if($vehicle->brand || $vehicle->model)
-                                        {{ trim(($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '')) }}
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </div>
+                                <div class="text-sm text-gray-900">{{ ($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '') }}</div>
                             </td>
                             <td class="px-4 md:px-6 py-4">
                                 @php

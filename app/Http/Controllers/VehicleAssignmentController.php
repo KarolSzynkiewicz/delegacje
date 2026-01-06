@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\VehicleAssignment;
 use App\Models\Employee;
 use App\Models\Vehicle;
+use App\Http\Requests\StoreVehicleAssignmentRequest;
+use App\Http\Requests\UpdateVehicleAssignmentRequest;
 use Illuminate\Http\Request;
 
 class VehicleAssignmentController extends Controller
@@ -51,14 +53,9 @@ class VehicleAssignmentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Employee $employee)
+    public function store(StoreVehicleAssignmentRequest $request, Employee $employee)
     {
-        $validated = $request->validate([
-            'vehicle_id' => 'required|exists:vehicles,id',
-            'start_date' => 'required|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'notes' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         // Check vehicle availability
         $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
@@ -101,17 +98,9 @@ class VehicleAssignmentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, VehicleAssignment $vehicle)
+    public function update(UpdateVehicleAssignmentRequest $request, VehicleAssignment $vehicle)
     {
-        $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'vehicle_id' => 'required|exists:vehicles,id',
-            'start_date' => 'required|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'notes' => 'nullable|string',
-        ]);
-
-        $vehicle->update($validated);
+        $vehicle->update($request->validated());
 
         return redirect()
             ->route('employees.vehicles.index', $vehicle->employee_id)

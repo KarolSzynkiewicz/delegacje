@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
+use App\Http\Requests\StoreVehicleRequest;
+use App\Http\Requests\UpdateVehicleRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -28,18 +30,9 @@ class VehicleController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreVehicleRequest $request)
     {
-        $validated = $request->validate([
-            'registration_number' => 'required|string|unique:vehicles',
-            'brand' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'capacity' => 'nullable|integer|min:1',
-            'technical_condition' => 'required|in:excellent,good,fair,poor',
-            'inspection_valid_to' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-        ]);
+        $validated = $request->validated();
 
         unset($validated['image']);
 
@@ -72,18 +65,9 @@ class VehicleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Vehicle $vehicle)
+    public function update(UpdateVehicleRequest $request, Vehicle $vehicle)
     {
-        $validated = $request->validate([
-            'registration_number' => 'required|string|unique:vehicles,registration_number,' . $vehicle->id,
-            'brand' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'capacity' => 'nullable|integer|min:1',
-            'technical_condition' => 'required|in:excellent,good,fair,poor',
-            'inspection_valid_to' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-        ]);
+        $validated = $request->validated();
 
         if ($request->hasFile('image')) {
             // Delete old image if exists

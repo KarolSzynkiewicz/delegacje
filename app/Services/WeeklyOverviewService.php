@@ -212,26 +212,30 @@ class WeeklyOverviewService
             return collect();
         }
         
-        // For each unique accommodation, count ALL employees assigned in this week (not just from this project)
-        return $accommodationIds->map(function ($accommodationId) use ($weekStart, $weekEnd) {
-            $accommodation = \App\Models\Accommodation::find($accommodationId);
-            
-            // Count ALL accommodation assignments for this accommodation in this week
-            $totalEmployeeCount = AccommodationAssignment::where('accommodation_id', $accommodationId)
-                ->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->where(function ($q) use ($weekStart, $weekEnd) {
-                        $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                          ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                          ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                              $q2->where('start_date', '<=', $weekStart)
-                                 ->where(function ($q3) use ($weekEnd) {
-                                     $q3->where('end_date', '>=', $weekEnd)
-                                        ->orWhereNull('end_date');
-                                 });
-                          });
-                    });
-                })
-                ->count();
+        // Eager load all accommodations and their assignments for this week
+        $accommodations = \App\Models\Accommodation::whereIn('id', $accommodationIds)->get();
+        
+        // Get all accommodation assignments for these accommodations in this week (single query)
+        $allAccommodationAssignments = AccommodationAssignment::whereIn('accommodation_id', $accommodationIds)
+            ->where(function ($query) use ($weekStart, $weekEnd) {
+                $query->where(function ($q) use ($weekStart, $weekEnd) {
+                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
+                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
+                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
+                          $q2->where('start_date', '<=', $weekStart)
+                             ->where(function ($q3) use ($weekEnd) {
+                                 $q3->where('end_date', '>=', $weekEnd)
+                                    ->orWhereNull('end_date');
+                             });
+                      });
+                });
+            })
+            ->get()
+            ->groupBy('accommodation_id');
+        
+        // Map accommodations with their counts
+        return $accommodations->map(function ($accommodation) use ($allAccommodationAssignments) {
+            $totalEmployeeCount = $allAccommodationAssignments->get($accommodation->id)?->count() ?? 0;
             
             return [
                 'accommodation' => $accommodation,
@@ -279,49 +283,38 @@ class WeeklyOverviewService
             return collect();
         }
         
-        // For each unique vehicle, count ALL employees assigned in this week (not just from this project)
-        return $vehicleIds->map(function ($vehicleId) use ($weekStart, $weekEnd) {
-            $vehicle = \App\Models\Vehicle::find($vehicleId);
-            
-            // Count ALL vehicle assignments for this vehicle in this week
-            $totalEmployeeCount = VehicleAssignment::where('vehicle_id', $vehicleId)
-                ->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->where(function ($q) use ($weekStart, $weekEnd) {
-                        $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                          ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                          ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                              $q2->where('start_date', '<=', $weekStart)
-                                 ->where(function ($q3) use ($weekEnd) {
-                                     $q3->where('end_date', '>=', $weekEnd)
-                                        ->orWhereNull('end_date');
-                                 });
-                          });
-                    });
-                })
-                ->count();
-            
-            // Get driver (first employee assigned to this vehicle in this week)
-            $driverAssignment = VehicleAssignment::where('vehicle_id', $vehicleId)
-                ->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->where(function ($q) use ($weekStart, $weekEnd) {
-                        $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                          ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                          ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                              $q2->where('start_date', '<=', $weekStart)
-                                 ->where(function ($q3) use ($weekEnd) {
-                                     $q3->where('end_date', '>=', $weekEnd)
-                                        ->orWhereNull('end_date');
-                                 });
-                          });
-                    });
-                })
-                ->with('employee')
-                ->first();
+        // Eager load all vehicles and their assignments for this week
+        $vehicles = \App\Models\Vehicle::whereIn('id', $vehicleIds)->get();
+        
+        // Get all vehicle assignments for these vehicles in this week (single query with eager loading)
+        $allVehicleAssignments = VehicleAssignment::whereIn('vehicle_id', $vehicleIds)
+            ->where(function ($query) use ($weekStart, $weekEnd) {
+                $query->where(function ($q) use ($weekStart, $weekEnd) {
+                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
+                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
+                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
+                          $q2->where('start_date', '<=', $weekStart)
+                             ->where(function ($q3) use ($weekEnd) {
+                                 $q3->where('end_date', '>=', $weekEnd)
+                                    ->orWhereNull('end_date');
+                             });
+                      });
+                });
+            })
+            ->with('employee')
+            ->get()
+            ->groupBy('vehicle_id');
+        
+        // Map vehicles with their counts and drivers
+        return $vehicles->map(function ($vehicle) use ($allVehicleAssignments) {
+            $assignments = $allVehicleAssignments->get($vehicle->id) ?? collect();
+            $totalEmployeeCount = $assignments->count();
+            $driverAssignment = $assignments->first();
             
             return [
                 'vehicle' => $vehicle,
                 'driver' => $driverAssignment?->employee,
-                'vehicle_name' => "{$vehicle->brand} {$vehicle->model} {$vehicle->registration_number}",
+                'vehicle_name' => trim("{$vehicle->brand} {$vehicle->model} {$vehicle->registration_number}"),
                 'employee_count' => $totalEmployeeCount,
                 'capacity' => $vehicle->capacity,
                 'usage' => "{$totalEmployeeCount}/{$vehicle->capacity}",
@@ -337,44 +330,58 @@ class WeeklyOverviewService
      */
     protected function getAssignedEmployeesDetails(Collection $assignments, Carbon $weekStart, Carbon $weekEnd): Collection
     {
-        return $assignments->map(function ($assignment) use ($weekStart, $weekEnd) {
+        if ($assignments->isEmpty()) {
+            return collect();
+        }
+        
+        // Get all employee IDs
+        $employeeIds = $assignments->pluck('employee_id')->unique();
+        
+        // Eager load all accommodation assignments for these employees in this week (single query)
+        $accommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
+            ->where(function ($query) use ($weekStart, $weekEnd) {
+                $query->where(function ($q) use ($weekStart, $weekEnd) {
+                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
+                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
+                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
+                          $q2->where('start_date', '<=', $weekStart)
+                             ->where(function ($q3) use ($weekEnd) {
+                                 $q3->where('end_date', '>=', $weekEnd)
+                                    ->orWhereNull('end_date');
+                             });
+                      });
+                });
+            })
+            ->with('accommodation')
+            ->get()
+            ->groupBy('employee_id');
+        
+        // Eager load all vehicle assignments for these employees in this week (single query)
+        $vehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
+            ->where(function ($query) use ($weekStart, $weekEnd) {
+                $query->where(function ($q) use ($weekStart, $weekEnd) {
+                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
+                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
+                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
+                          $q2->where('start_date', '<=', $weekStart)
+                             ->where(function ($q3) use ($weekEnd) {
+                                 $q3->where('end_date', '>=', $weekEnd)
+                                    ->orWhereNull('end_date');
+                             });
+                      });
+                });
+            })
+            ->with('vehicle')
+            ->get()
+            ->groupBy('employee_id');
+        
+        // Map assignments with their details
+        return $assignments->map(function ($assignment) use ($accommodationAssignments, $vehicleAssignments, $weekStart, $weekEnd) {
             $employee = $assignment->employee;
             
-            // Get accommodation for this employee in this week
-            $accommodationAssignment = AccommodationAssignment::where('employee_id', $employee->id)
-                ->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->where(function ($q) use ($weekStart, $weekEnd) {
-                        $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                          ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                          ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                              $q2->where('start_date', '<=', $weekStart)
-                                 ->where(function ($q3) use ($weekEnd) {
-                                     $q3->where('end_date', '>=', $weekEnd)
-                                        ->orWhereNull('end_date');
-                                 });
-                          });
-                    });
-                })
-                ->with('accommodation')
-                ->first();
-            
-            // Get vehicle for this employee in this week
-            $vehicleAssignment = VehicleAssignment::where('employee_id', $employee->id)
-                ->where(function ($query) use ($weekStart, $weekEnd) {
-                    $query->where(function ($q) use ($weekStart, $weekEnd) {
-                        $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                          ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                          ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                              $q2->where('start_date', '<=', $weekStart)
-                                 ->where(function ($q3) use ($weekEnd) {
-                                     $q3->where('end_date', '>=', $weekEnd)
-                                        ->orWhereNull('end_date');
-                                 });
-                          });
-                    });
-                })
-                ->with('vehicle')
-                ->first();
+            // Get accommodation and vehicle from pre-loaded collections
+            $accommodationAssignment = $accommodationAssignments->get($employee->id)?->first();
+            $vehicleAssignment = $vehicleAssignments->get($employee->id)?->first();
             
             // Check if assignment is partial (not full week)
             $isPartial = $assignment->start_date->gt($weekStart) || 

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
 use App\Models\Accommodation;
+use App\Http\Requests\StoreAccommodationAssignmentRequest;
+use App\Http\Requests\UpdateAccommodationAssignmentRequest;
 use Illuminate\Http\Request;
 
 class AccommodationAssignmentController extends Controller
@@ -51,14 +53,9 @@ class AccommodationAssignmentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Employee $employee)
+    public function store(StoreAccommodationAssignmentRequest $request, Employee $employee)
     {
-        $validated = $request->validate([
-            'accommodation_id' => 'required|exists:accommodations,id',
-            'start_date' => 'required|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'notes' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         // Check accommodation capacity
         $accommodation = Accommodation::findOrFail($validated['accommodation_id']);
@@ -101,17 +98,9 @@ class AccommodationAssignmentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, AccommodationAssignment $accommodation)
+    public function update(UpdateAccommodationAssignmentRequest $request, AccommodationAssignment $accommodation)
     {
-        $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'accommodation_id' => 'required|exists:accommodations,id',
-            'start_date' => 'required|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'notes' => 'nullable|string',
-        ]);
-
-        $accommodation->update($validated);
+        $accommodation->update($request->validated());
 
         return redirect()
             ->route('employees.accommodations.index', $accommodation->employee_id)

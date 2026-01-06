@@ -15,3 +15,4 @@ yarn-error.log
 /.vscode
 .DS_Store
 database/database.sqlite
+GEMINI.md

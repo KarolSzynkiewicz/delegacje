@@ -5,11 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\ProjectDemand;
 use App\Models\Project;
 use App\Models\Role;
+use App\Services\ProjectDemandService;
+use App\Http\Requests\StoreProjectDemandRequest;
+use App\Http\Requests\UpdateProjectDemandRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ProjectDemandController extends Controller
 {
+    public function __construct(
+        protected ProjectDemandService $demandService
+    ) {}
     /**
      * Display a listing of the resource.
      */
@@ -40,66 +45,18 @@ class ProjectDemandController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Project $project)
+    public function store(StoreProjectDemandRequest $request, Project $project)
     {
-        // Walidacja wspólnych dat
-        $validated = $request->validate([
-            "date_from" => "required|date",
-            "date_to" => "nullable|date|after_or_equal:date_from",
-            "notes" => "nullable|string",
-            "demands" => "required|array",
-            "demands.*.role_id" => "required|exists:roles,id",
-            "demands.*.required_count" => "required|integer|min:0",
-        ], [
-            "demands.required" => "Brak danych o rolach.",
-            "date_from.required" => "Data rozpoczęcia jest wymagana.",
-            "date_from.date" => "Data rozpoczęcia musi być poprawną datą.",
-            "date_to.after_or_equal" => "Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.",
-        ]);
-
-        // Filtruj tylko te role, które mają ilość > 0
-        $demandsToCreate = [];
-        foreach ($validated["demands"] as $roleId => $demandData) {
-            // Sprawdź czy dane są poprawne
-            if (!isset($demandData["role_id"]) || !isset($demandData["required_count"])) {
-                continue;
-            }
-            
-            $requiredCount = (int) $demandData["required_count"];
-            if ($requiredCount > 0) {
-                $demandsToCreate[] = [
-                    "role_id" => (int) $demandData["role_id"],
-                    "required_count" => $requiredCount,
-                    "date_from" => $validated["date_from"],
-                    "date_to" => $validated["date_to"] ?? null,
-                    "notes" => $validated["notes"] ?? null,
-                ];
-            }
-        }
-
-        // Sprawdź czy jest przynajmniej jedno zapotrzebowanie
-        if (empty($demandsToCreate)) {
-            return back()
-                ->withInput()
-                ->withErrors(["demands" => "Musisz podać ilość większą od 0 dla przynajmniej jednej roli."]);
-        }
-
-        DB::beginTransaction();
         try {
-            foreach ($demandsToCreate as $demandData) {
-                $project->demands()->create($demandData);
-            }
-
-            DB::commit();
+            $this->demandService->createDemands($project, $request->validated());
 
             return redirect()
                 ->route("projects.demands.index", $project)
                 ->with("success", "Zapotrzebowania projektu zostały utworzone.");
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
-                ->withErrors(["error" => "Wystąpił błąd: " . $e->getMessage()]);
+                ->withErrors($e->errors());
         }
     }
 
@@ -125,17 +82,9 @@ class ProjectDemandController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, ProjectDemand $demand)
+    public function update(UpdateProjectDemandRequest $request, ProjectDemand $demand)
     {
-        $validated = $request->validate([
-            "role_id" => "required|exists:roles,id",
-            "required_count" => "required|integer|min:1",
-            "date_from" => "required|date",
-            "date_to" => "nullable|date|after_or_equal:date_from",
-            "notes" => "nullable|string",
-        ]);
-
-        $demand->update($validated);
+        $demand->update($request->validated());
 
         return redirect()
             ->route("projects.demands.index", $demand->project_id)

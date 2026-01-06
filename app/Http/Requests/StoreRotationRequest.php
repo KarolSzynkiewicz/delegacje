@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Rules\RotationDoesNotOverlap;
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreRotationRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        $employeeId = $this->route('employee')?->id ?? $this->input('employee_id');
+
+        return [
+            'employee_id' => ['sometimes', 'required', 'exists:employees,id'],
+            'start_date' => ['required', 'date'],
+            'end_date' => [
+                'required',
+                'date',
+                'after_or_equal:start_date',
+                new RotationDoesNotOverlap($employeeId)
+            ],
+            'status' => ['nullable', 'in:cancelled'],
+            'notes' => ['nullable', 'string'],
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'employee_id.required' => 'Pracownik jest wymagany.',
+            'employee_id.exists' => 'Wybrany pracownik nie istnieje.',
+            'start_date.required' => 'Data rozpoczęcia jest wymagana.',
+            'start_date.date' => 'Data rozpoczęcia musi być poprawną datą.',
+            'end_date.required' => 'Data zakończenia jest wymagana.',
+            'end_date.date' => 'Data zakończenia musi być poprawną datą.',
+            'end_date.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
+            'status.in' => 'Status może być tylko "cancelled".',
+        ];
+    }
+}

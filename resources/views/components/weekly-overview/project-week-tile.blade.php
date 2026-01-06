@@ -242,10 +242,6 @@
                             </div>
                         @endif
                     </div>
-                @elseif($weekData['assigned_employees']->isNotEmpty())
-                    <div class="text-center py-2 text-gray-500 text-[10px] mb-2">
-                        Brak przypisanych aut
-                    </div>
                 @endif
                 
                 <!-- Bez auta -->
@@ -344,10 +340,6 @@
                                 </div>
                             </div>
                         @endforeach
-                    </div>
-                @elseif($weekData['assigned_employees']->isNotEmpty())
-                    <div class="text-center py-2 text-gray-500 text-[10px] mb-2">
-                        Brak przypisanych domów
                     </div>
                 @endif
                 

@@ -76,4 +76,29 @@ class Project extends Model
     {
         return $query->where('status', 'active');
     }
+
+    /**
+     * Check if there is a demand for a specific role in a date range.
+     */
+    public function hasDemandForRoleInDateRange(int $roleId, string $startDate, string $endDate): bool
+    {
+        return $this->demands()
+            ->where('role_id', $roleId)
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->where(function ($q) use ($startDate, $endDate) {
+                    // Demand overlaps with assignment period
+                    $q->whereBetween('date_from', [$startDate, $endDate])
+                      ->orWhereBetween('date_to', [$startDate, $endDate])
+                      ->orWhere(function ($q2) use ($startDate, $endDate) {
+                          // Demand covers the entire assignment period
+                          $q2->where('date_from', '<=', $startDate)
+                             ->where(function ($q3) use ($endDate) {
+                                 $q3->where('date_to', '>=', $endDate)
+                                    ->orWhereNull('date_to');
+                             });
+                      });
+                });
+            })
+            ->exists();
+    }
 }
