@@ -110,10 +110,15 @@ class PermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(
-                ['name' => $permission['slug'], 'guard_name' => 'web'],
-                ['name' => $permission['slug'], 'guard_name' => 'web']
-            );
+            // Use DB directly to avoid model validation issues with old columns
+            if (!\DB::table('permissions')->where('name', $permission['slug'])->where('guard_name', 'web')->exists()) {
+                \DB::table('permissions')->insert([
+                    'name' => $permission['slug'],
+                    'guard_name' => 'web',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
     }
 }

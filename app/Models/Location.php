@@ -24,6 +24,11 @@ class Location extends Model
         'phone',
         'email',
         'description',
+        'is_base',
+    ];
+
+    protected $casts = [
+        'is_base' => 'boolean',
     ];
 
     /**
@@ -32,5 +37,28 @@ class Location extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    /**
+     * Get the base location (singleton pattern).
+     * 
+     * @return Location
+     */
+    public static function getBase(): Location
+    {
+        return static::base()->first() ?? static::create([
+            'name' => 'Baza',
+            'address' => 'Siedziba główna',
+            'city' => 'Warszawa',
+            'is_base' => true,
+        ]);
+    }
+
+    /**
+     * Scope a query to only include base locations.
+     */
+    public function scopeBase($query)
+    {
+        return $query->where('is_base', true);
     }
 }

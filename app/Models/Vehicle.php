@@ -24,7 +24,8 @@ class Vehicle extends Model
         'technical_condition',
         'inspection_valid_to',
         'notes',
-        'image_path'
+        'image_path',
+        'current_location_id',
     ];
 
     /**
@@ -92,5 +93,27 @@ class Vehicle extends Model
                     });
             })
             ->exists();
+    }
+
+    /**
+     * Get the current location of this vehicle.
+     * 
+     * Delegates to LocationTrackingService for business logic.
+     * 
+     * @return \App\Models\Location|null
+     */
+    public function getCurrentLocation(): ?Location
+    {
+        return app(\App\Services\LocationTrackingService::class)->forVehicle($this);
+    }
+
+    /**
+     * Get the current location relationship.
+     * 
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function currentLocation()
+    {
+        return $this->belongsTo(Location::class, 'current_location_id');
     }
 }

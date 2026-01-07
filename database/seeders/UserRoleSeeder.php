@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 
 class UserRoleSeeder extends Seeder
 {
@@ -14,22 +15,54 @@ class UserRoleSeeder extends Seeder
     public function run(): void
     {
         // Administrator - ma wszystkie uprawnienia
-        $admin = Role::firstOrCreate(
-            ['name' => 'administrator', 'guard_name' => 'web'],
-            ['name' => 'administrator', 'guard_name' => 'web']
-        );
+        // Use DB directly to avoid model validation issues with old columns
+        $adminId = \DB::table('user_roles')->where('name', 'administrator')->where('guard_name', 'web')->value('id');
+        if (!$adminId) {
+            $adminData = [
+                'name' => 'administrator',
+                'guard_name' => 'web',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            // Add slug if column exists (old structure)
+            if (Schema::hasColumn('user_roles', 'slug')) {
+                $adminData['slug'] = 'administrator';
+            }
+            $adminId = \DB::table('user_roles')->insertGetId($adminData);
+        }
+        $admin = Role::find($adminId);
 
         // Kierownik - może wszystko oprócz usuwania i zarządzania rolami
-        $manager = Role::firstOrCreate(
-            ['name' => 'kierownik', 'guard_name' => 'web'],
-            ['name' => 'kierownik', 'guard_name' => 'web']
-        );
+        $managerId = \DB::table('user_roles')->where('name', 'kierownik')->where('guard_name', 'web')->value('id');
+        if (!$managerId) {
+            $managerData = [
+                'name' => 'kierownik',
+                'guard_name' => 'web',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            if (Schema::hasColumn('user_roles', 'slug')) {
+                $managerData['slug'] = 'kierownik';
+            }
+            $managerId = \DB::table('user_roles')->insertGetId($managerData);
+        }
+        $manager = Role::find($managerId);
 
         // Pracownik biurowy - tylko przeglądanie
-        $officeWorker = Role::firstOrCreate(
-            ['name' => 'pracownik-biurowy', 'guard_name' => 'web'],
-            ['name' => 'pracownik-biurowy', 'guard_name' => 'web']
-        );
+        $officeWorkerId = \DB::table('user_roles')->where('name', 'pracownik-biurowy')->where('guard_name', 'web')->value('id');
+        if (!$officeWorkerId) {
+            $officeWorkerData = [
+                'name' => 'pracownik-biurowy',
+                'guard_name' => 'web',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            if (Schema::hasColumn('user_roles', 'slug')) {
+                $officeWorkerData['slug'] = 'pracownik-biurowy';
+            }
+            $officeWorkerId = \DB::table('user_roles')->insertGetId($officeWorkerData);
+        }
+        $officeWorker = Role::find($officeWorkerId);
 
         // Przypisanie uprawnień dla Kierownika
         $managerPermissions = Permission::whereIn('name', [

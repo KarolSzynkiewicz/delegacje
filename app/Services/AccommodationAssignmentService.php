@@ -25,6 +25,7 @@ class AccommodationAssignmentService
             'accommodation_id' => $data['accommodation_id'],
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'] ?? null,
+            'status' => $data['status'] ?? \App\Enums\AssignmentStatus::ACTIVE,
             'notes' => $data['notes'] ?? null,
         ]);
     }

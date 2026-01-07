@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -49,6 +50,36 @@ return new class extends Migration
                 $table->unique(['name', 'guard_name']);
             }
             });
+        } else {
+            // Table exists - check if it has old structure (slug column) and remove it
+            if (Schema::hasColumn($tableNames['roles'], 'slug') && !Schema::hasColumn($tableNames['roles'], 'guard_name')) {
+                // Old structure without guard_name - drop and recreate
+                Schema::dropIfExists($tableNames['roles']);
+                Schema::create($tableNames['roles'], static function (Blueprint $table) use ($teams, $columnNames) {
+                    $table->bigIncrements('id');
+                    if ($teams || config('permission.testing')) {
+                        $table->unsignedBigInteger($columnNames['team_foreign_key'])->nullable();
+                        $table->index($columnNames['team_foreign_key'], 'roles_team_foreign_key_index');
+                    }
+                    $table->string('name');
+                    $table->string('guard_name');
+                    $table->timestamps();
+                    if ($teams || config('permission.testing')) {
+                        $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);
+                    } else {
+                        $table->unique(['name', 'guard_name']);
+                    }
+                });
+            } elseif (Schema::hasColumn($tableNames['roles'], 'slug') && Schema::hasColumn($tableNames['roles'], 'guard_name')) {
+                // Mixed structure - slug will be ignored, but we should remove it if possible
+                // For SQLite, we can't easily drop columns, so we'll leave it
+                // For other databases, drop slug
+                if (DB::getDriverName() !== 'sqlite') {
+                    Schema::table($tableNames['roles'], function (Blueprint $table) {
+                        $table->dropColumn('slug');
+                    });
+                }
+            }
         }
 
         if (!Schema::hasTable($tableNames['model_has_permissions'])) {

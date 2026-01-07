@@ -8,10 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use App\Traits\HasDateRangeScope;
+use App\Traits\HasAssignmentLifecycle;
+use App\Contracts\AssignmentContract;
+use App\Models\Employee;
+use App\Enums\AssignmentStatus;
+use Carbon\Carbon;
 
-class ProjectAssignment extends Model
+class ProjectAssignment extends Model implements AssignmentContract
 {
-    use HasFactory, HasDateRangeScope;
+    use HasFactory, HasDateRangeScope, HasAssignmentLifecycle;
 
     /**
      * The attributes that are mass assignable.
@@ -25,6 +30,8 @@ class ProjectAssignment extends Model
         'start_date',
         'end_date',
         'status', 
+        'actual_start_date',
+        'actual_end_date',
         'notes',
     ];
 
@@ -36,6 +43,9 @@ class ProjectAssignment extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'actual_start_date' => 'date',
+        'actual_end_date' => 'date',
+        'status' => AssignmentStatus::class,
     ];
 
     /**
@@ -71,11 +81,35 @@ class ProjectAssignment extends Model
     }
 
     /**
-     * Scope a query to only include active assignments.
+     * Implementation of AssignmentContract::getEmployee()
      */
-    public function scopeActive(Builder $query): Builder
+    public function getEmployee(): Employee
     {
-        return $query->where('status', 'active');
+        return $this->employee;
+    }
+
+    /**
+     * Implementation of AssignmentContract::getStatus()
+     */
+    public function getStatus(): AssignmentStatus
+    {
+        return $this->status ?? AssignmentStatus::ACTIVE;
+    }
+
+    /**
+     * Implementation of AssignmentContract::getStartDate()
+     */
+    public function getStartDate(): Carbon
+    {
+        return $this->start_date;
+    }
+
+    /**
+     * Implementation of AssignmentContract::getEndDate()
+     */
+    public function getEndDate(): ?Carbon
+    {
+        return $this->end_date;
     }
 
 }

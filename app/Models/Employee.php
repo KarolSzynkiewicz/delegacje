@@ -141,6 +141,18 @@ class Employee extends Model
     }
 
     /**
+     * Get the current location of this employee.
+     * 
+     * Delegates to LocationTrackingService for business logic.
+     * 
+     * @return \App\Models\Location|null
+     */
+    public function getCurrentLocation(): ?Location
+    {
+        return app(\App\Services\LocationTrackingService::class)->forEmployee($this);
+    }
+
+    /**
      * Get all documents for this employee.
      */
     public function employeeDocuments(): HasMany

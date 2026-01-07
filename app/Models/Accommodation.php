@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -23,7 +24,8 @@ class Accommodation extends Model
         'postal_code',
         'capacity',
         'description',
-        'image_path'
+        'image_path',
+        'location_id',
     ];
 
     /**
@@ -36,6 +38,14 @@ class Accommodation extends Model
         }
 
         return asset('storage/' . $this->image_path);
+    }
+
+    /**
+     * Get the location for this accommodation.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     /**
