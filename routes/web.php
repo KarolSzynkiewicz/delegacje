@@ -12,6 +12,7 @@ use App\Http\Controllers\AccommodationAssignmentController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserRoleController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\WeeklyOverviewController;
@@ -28,7 +29,7 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
@@ -129,6 +130,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // User Roles (RBAC)
     Route::resource('user-roles', UserRoleController::class);
+    Route::post('user-roles/{userRole}/permissions', [UserRoleController::class, 'updatePermissions'])->name('user-roles.permissions.update');
+    
+    // Users Management
+    Route::resource('users', UserController::class);
+});
+
+// Route for users without roles (must be outside role.required middleware)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/no-role', function () {
+        return view('no-role');
+    })->name('no-role');
 });
 
 require __DIR__.'/auth.php';

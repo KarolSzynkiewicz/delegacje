@@ -22,7 +22,20 @@ class EmployeeFactory extends Factory
             'last_name' => fake()->lastName(),
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->phoneNumber(),
-            'role_id' => Role::factory(),
+            // Role są teraz w tabeli pivot employee_role, nie w employees
         ];
+    }
+
+    /**
+     * Configure the model factory to attach roles.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function ($employee) {
+            // Attach a random role if roles exist
+            if (Role::count() > 0) {
+                $employee->roles()->attach(Role::inRandomOrder()->first());
+            }
+        });
     }
 }

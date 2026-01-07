@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 
 class RegisteredUserController extends Controller
 {
@@ -41,6 +42,15 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
+
+        // Assign default role: if this is the first user, make them admin, otherwise NO ROLE (user sees nothing)
+        if (User::count() === 1) {
+            $adminRole = Role::where('name', 'administrator')->first();
+            if ($adminRole) {
+                $user->assignRole($adminRole);
+            }
+        }
+        // Nowy użytkownik NIE dostaje żadnej roli - musi być przypisany przez admina
 
         event(new Registered($user));
 

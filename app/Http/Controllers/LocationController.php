@@ -15,6 +15,7 @@ class LocationController extends Controller
      */
     public function index(): View
     {
+        $this->authorize('viewAny', Location::class);
         $locations = Location::all();
         return view('locations.index', compact('locations'));
     }
@@ -24,6 +25,7 @@ class LocationController extends Controller
      */
     public function create(): View
     {
+        $this->authorize('create', Location::class);
         return view('locations.create');
     }
 
@@ -44,6 +46,7 @@ class LocationController extends Controller
      */
     public function show(Location $location): View
     {
+        $this->authorize('view', $location);
         $location->load('projects');
         return view('locations.show', compact('location'));
     }
@@ -53,6 +56,7 @@ class LocationController extends Controller
      */
     public function edit(Location $location): View
     {
+        $this->authorize('update', $location);
         return view('locations.edit', compact('location'));
     }
 

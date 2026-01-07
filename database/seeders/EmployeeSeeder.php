@@ -7,6 +7,8 @@ use Illuminate\Database\Seeder;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\EmployeeDocument;
+use App\Models\Rotation;
+use Carbon\Carbon;
 
 class EmployeeSeeder extends Seeder
 {
@@ -40,8 +42,8 @@ class EmployeeSeeder extends Seeder
         $employees = [];
         $counter = 1;
 
-        // Generuj około 50 pracowników
-        for ($i = 0; $i < 50; $i++) {
+        // Generuj około 80 pracowników
+        for ($i = 0; $i < 80; $i++) {
             $firstName = $firstNames[array_rand($firstNames)];
             $lastName = $lastNames[array_rand($lastNames)];
             $email = strtolower($firstName . '.' . $lastName . $counter . '@example.com');
@@ -76,6 +78,22 @@ class EmployeeSeeder extends Seeder
                     $employee->roles()->attach($availableRoles[$roleIndex]->id);
                 }
             }
+
+            // Utwórz rotację dla pracownika (następne 3 miesiące)
+            $rotationStart = Carbon::now()->startOfWeek()->subWeeks(1);
+            $rotationEnd = Carbon::now()->addMonths(3);
+            
+            Rotation::firstOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'start_date' => $rotationStart->format('Y-m-d'),
+                    'end_date' => $rotationEnd->format('Y-m-d'),
+                ],
+                [
+                    'status' => 'active',
+                    'notes' => 'Rotacja automatyczna z seedera',
+                ]
+            );
 
             $employees[] = $employee;
             $counter++;

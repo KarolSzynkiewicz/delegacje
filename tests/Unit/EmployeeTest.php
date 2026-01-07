@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\ProjectAssignment;
+use App\Models\Rotation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,6 +29,13 @@ class EmployeeTest extends TestCase
         $employee = Employee::factory()->create();
         $project = Project::factory()->create();
         $role = Role::factory()->create();
+        
+        // Create rotation for employee (required for availability check)
+        Rotation::create([
+            'employee_id' => $employee->id,
+            'start_date' => '2024-12-01',
+            'end_date' => '2025-12-31',
+        ]);
 
         // No assignments - should be available
         $this->assertTrue($employee->isAvailableInDateRange('2025-01-01', '2025-01-31'));

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\UserRole;
-use App\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -16,9 +16,9 @@ class UserRoleController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', UserRole::class);
+        $this->authorize('viewAny', Role::class);
         
-        $userRoles = UserRole::with('permissions')->orderBy('name')->get();
+        $userRoles = Role::with('permissions')->orderBy('name')->get();
         return view('user-roles.index', compact('userRoles'));
     }
 
@@ -27,9 +27,9 @@ class UserRoleController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', UserRole::class);
+        $this->authorize('create', Role::class);
         
-        $permissions = Permission::orderBy('model')->orderBy('action')->get()->groupBy('model');
+        $permissions = Permission::orderBy('name')->get();
         return view('user-roles.create', compact('permissions'));
     }
 
@@ -38,25 +38,22 @@ class UserRoleController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', UserRole::class);
+        $this->authorize('create', Role::class);
         
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name',
-            'description' => 'nullable|string',
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
         ]);
 
-        $slug = Str::slug($validated['name']);
-        
-        $userRole = UserRole::create([
+        $role = Role::create([
             'name' => $validated['name'],
-            'slug' => $slug,
-            'description' => $validated['description'] ?? null,
+            'guard_name' => 'web',
         ]);
 
         if (isset($validated['permissions'])) {
-            $userRole->permissions()->sync($validated['permissions']);
+            $permissions = Permission::whereIn('id', $validated['permissions'])->get();
+            $role->syncPermissions($permissions);
         }
 
         return redirect()->route('user-roles.index')->with('success', 'Rola została utworzona.');
@@ -65,24 +62,23 @@ class UserRoleController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(UserRole $userRole): View
+    public function show(Role $userRole): View
     {
         $this->authorize('view', $userRole);
         
         $userRole->load(['permissions', 'users']);
-        $permissions = Permission::orderBy('model')->orderBy('action')->get()->groupBy('model');
         
-        return view('user-roles.show', compact('userRole', 'permissions'));
+        return view('user-roles.show', compact('userRole'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(UserRole $userRole): View
+    public function edit(Role $userRole): View
     {
         $this->authorize('update', $userRole);
         
-        $permissions = Permission::orderBy('model')->orderBy('action')->get()->groupBy('model');
+        $permissions = Permission::orderBy('name')->get();
         $userRole->load('permissions');
         
         return view('user-roles.edit', compact('userRole', 'permissions'));
@@ -91,29 +87,25 @@ class UserRoleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, UserRole $userRole): RedirectResponse
+    public function update(Request $request, Role $userRole): RedirectResponse
     {
         $this->authorize('update', $userRole);
         
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name,' . $userRole->id,
-            'description' => 'nullable|string',
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
         ]);
 
-        $slug = Str::slug($validated['name']);
-        
         $userRole->update([
             'name' => $validated['name'],
-            'slug' => $slug,
-            'description' => $validated['description'] ?? null,
         ]);
 
         if (isset($validated['permissions'])) {
-            $userRole->permissions()->sync($validated['permissions']);
+            $permissions = Permission::whereIn('id', $validated['permissions'])->get();
+            $userRole->syncPermissions($permissions);
         } else {
-            $userRole->permissions()->detach();
+            $userRole->syncPermissions([]);
         }
 
         return redirect()->route('user-roles.show', $userRole)->with('success', 'Rola została zaktualizowana.');
@@ -122,7 +114,7 @@ class UserRoleController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(UserRole $userRole): RedirectResponse
+    public function destroy(Role $userRole): RedirectResponse
     {
         $this->authorize('delete', $userRole);
         
@@ -132,9 +124,41 @@ class UserRoleController extends Controller
                 ->with('error', 'Nie można usunąć roli, która jest przypisana do użytkowników.');
         }
 
-        $userRole->permissions()->detach();
         $userRole->delete();
 
         return redirect()->route('user-roles.index')->with('success', 'Rola została usunięta.');
+    }
+
+    /**
+     * Update permissions for a role via AJAX.
+     */
+    public function updatePermissions(Request $request, Role $userRole): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('update', $userRole);
+
+        // Administrator nie może mieć zmienianych uprawnień
+        if ($userRole->name === 'administrator') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nie można zmieniać uprawnień dla roli administrator.'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'exists:permissions,id',
+        ]);
+
+        $permissions = isset($validated['permissions']) 
+            ? Permission::whereIn('id', $validated['permissions'])->get()
+            : collect();
+
+        $userRole->syncPermissions($permissions);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Uprawnienia zostały zaktualizowane.',
+            'count' => $permissions->count()
+        ]);
     }
 }

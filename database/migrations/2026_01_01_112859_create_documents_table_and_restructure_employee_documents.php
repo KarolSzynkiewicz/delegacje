@@ -16,10 +16,39 @@ return new class extends Migration
         if (!Schema::hasTable('documents')) {
             Schema::create('documents', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('document_type_id')->constrained('document_types')->onDelete('restrict');
+                // Sprawdź czy document_types istnieje przed utworzeniem klucza obcego
+                if (Schema::hasTable('document_types')) {
+                    $table->unsignedBigInteger('document_type_id')->nullable();
+                } else {
+                    $table->unsignedBigInteger('document_type_id')->nullable();
+                }
                 $table->text('notes')->nullable(); // ogólne notatki o dokumencie
                 $table->timestamps();
             });
+            
+            // Dodaj klucz obcy osobno tylko jeśli document_types istnieje i klucz nie istnieje
+            if (Schema::hasTable('document_types') && Schema::hasColumn('documents', 'document_type_id')) {
+                if (DB::getDriverName() !== 'sqlite') {
+                    // Sprawdź czy klucz obcy już istnieje
+                    $fkExists = DB::selectOne("
+                        SELECT CONSTRAINT_NAME 
+                        FROM information_schema.KEY_COLUMN_USAGE 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'documents' 
+                        AND COLUMN_NAME = 'document_type_id' 
+                        AND REFERENCED_TABLE_NAME = 'document_types'
+                    ");
+                    
+                    if (!$fkExists) {
+                        // Dodaj klucz obcy tylko jeśli nie istnieje
+                        try {
+                            DB::statement("ALTER TABLE documents ADD CONSTRAINT documents_document_type_id_foreign FOREIGN KEY (document_type_id) REFERENCES document_types(id) ON DELETE RESTRICT");
+                        } catch (\Exception $e) {
+                            // Klucz obcy może już istnieć z inną nazwą - ignoruj
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Przenieś dane z employee_documents do documents (tylko jeśli documents jest pusta)
@@ -142,7 +171,10 @@ return new class extends Migration
         // 3. Usuń document_id z employee_documents
         if (Schema::hasColumn('employee_documents', 'document_id')) {
             Schema::table('employee_documents', function (Blueprint $table) {
-                $table->dropForeign(['document_id']);
+                // SQLite doesn't support dropping foreign keys
+                if (DB::getDriverName() !== 'sqlite') {
+                    $table->dropForeign(['document_id']);
+                }
                 $table->dropColumn('document_id');
             });
         }

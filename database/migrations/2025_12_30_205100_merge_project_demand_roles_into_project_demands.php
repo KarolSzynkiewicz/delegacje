@@ -93,7 +93,10 @@ return new class extends Migration
                 'end_date' => DB::raw('date_to'),
             ]);
             
-            $table->dropForeign(['role_id']);
+            // SQLite doesn't support dropping foreign keys
+            if (DB::getDriverName() !== 'sqlite') {
+                $table->dropForeign(['role_id']);
+            }
             $table->dropColumn(['role_id', 'required_count', 'date_from', 'date_to']);
         });
     }

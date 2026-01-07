@@ -20,6 +20,7 @@ class ProjectSeeder extends Seeder
             return;
         }
 
+        // Tylko 5 projektów dla demonstracji
         $projects = [
             [
                 'location_id' => $locations->random()->id,
@@ -49,7 +50,7 @@ class ProjectSeeder extends Seeder
                 'location_id' => $locations->random()->id,
                 'name' => 'Modernizacja platformy wiertniczej',
                 'description' => 'Modernizacja systemów bezpieczeństwa i wydajności platformy wiertniczej. Wymiana urządzeń kontrolnych i systemów alarmowych.',
-                'status' => 'on_hold',
+                'status' => 'active',
                 'client_name' => 'PKN Orlen',
                 'budget' => 45000000.00,
             ],
@@ -60,46 +61,6 @@ class ProjectSeeder extends Seeder
                 'status' => 'active',
                 'client_name' => 'Przedsiębiorstwo Rybackie "Bałtyk"',
                 'budget' => 850000.00,
-            ],
-            [
-                'location_id' => $locations->random()->id,
-                'name' => 'Budowa statku badawczego Ocean Explorer',
-                'description' => 'Budowa specjalistycznego statku badawczego dla instytutu oceanograficznego. Wyposażenie w zaawansowane laboratoria i sprzęt badawczy.',
-                'status' => 'active',
-                'client_name' => 'Instytut Oceanografii PAN',
-                'budget' => 35000000.00,
-            ],
-            [
-                'location_id' => $locations->random()->id,
-                'name' => 'Konserwacja jednostki straży przybrzeżnej',
-                'description' => 'Rutynowa konserwacja i przegląd jednostki straży przybrzeżnej. Sprawdzenie wszystkich systemów i naprawa drobnych usterek.',
-                'status' => 'completed',
-                'client_name' => 'Straż Graniczna',
-                'budget' => 450000.00,
-            ],
-            [
-                'location_id' => $locations->random()->id,
-                'name' => 'Budowa promu pasażersko-samochodowego',
-                'description' => 'Budowa nowego promu dla połączenia polsko-szwedzkiego. Pojemność: 200 samochodów i 800 pasażerów.',
-                'status' => 'active',
-                'client_name' => 'Stena Line',
-                'budget' => 95000000.00,
-            ],
-            [
-                'location_id' => $locations->random()->id,
-                'name' => 'Remont jachtu żaglowego klasy regatowej',
-                'description' => 'Kompleksowy remont jachtu regatowego. Wymiana olinowania, remont kadłuba oraz optymalizacja wyposażenia.',
-                'status' => 'active',
-                'client_name' => 'Yacht Club Gdańsk',
-                'budget' => 1200000.00,
-            ],
-            [
-                'location_id' => $locations->random()->id,
-                'name' => 'Modernizacja doku pływającego',
-                'description' => 'Modernizacja systemów doku pływającego. Wymiana pomp, naprawa konstrukcji oraz instalacja nowych systemów bezpieczeństwa.',
-                'status' => 'on_hold',
-                'client_name' => 'Port Gdańsk',
-                'budget' => 8500000.00,
             ],
         ];
 

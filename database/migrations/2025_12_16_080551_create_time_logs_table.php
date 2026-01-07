@@ -11,14 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('time_logs')) {
+            return;
+        }
+        
         Schema::create('time_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('delegation_id')->constrained('delegations')->onDelete('cascade');
+            $table->unsignedBigInteger('project_assignment_id')->nullable();
             $table->dateTime('start_time');
             $table->dateTime('end_time')->nullable();
             $table->decimal('hours_worked', 5, 2)->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
+            
+            // Foreign key will be added in update_time_logs_table migration after project_assignments table exists
         });
     }
 

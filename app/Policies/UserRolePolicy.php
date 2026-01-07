@@ -3,7 +3,7 @@
 namespace App\Policies;
 
 use App\Models\User;
-use App\Models\UserRole;
+use Spatie\Permission\Models\Role;
 use Illuminate\Auth\Access\Response;
 
 class UserRolePolicy
@@ -13,18 +13,15 @@ class UserRolePolicy
      */
     public function viewAny(User $user): bool
     {
-        // Tymczasowo pozwól wszystkim zalogowanym użytkownikom przeglądać role
-        // Po przypisaniu ról użytkownikom, zmień na: return $user->hasPermission('user-roles.viewAny');
-        return true;
+        return $user->hasPermission('user-roles.viewAny');
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, UserRole $userRole): bool
+    public function view(User $user, Role $role): bool
     {
-        // Tymczasowo pozwól wszystkim zalogowanym użytkownikom przeglądać role
-        return true;
+        return $user->hasPermission('user-roles.view');
     }
 
     /**
@@ -32,41 +29,38 @@ class UserRolePolicy
      */
     public function create(User $user): bool
     {
-        // Tymczasowo tylko admin może tworzyć role
         return $user->isAdmin() || $user->hasPermission('user-roles.create');
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, UserRole $userRole): bool
+    public function update(User $user, Role $role): bool
     {
-        // Tymczasowo tylko admin może edytować role
         return $user->isAdmin() || $user->hasPermission('user-roles.update');
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, UserRole $userRole): bool
+    public function delete(User $user, Role $role): bool
     {
-        // Tymczasowo tylko admin może usuwać role
         return $user->isAdmin() || $user->hasPermission('user-roles.delete');
     }
 
     /**
      * Determine whether the user can restore the model.
      */
-    public function restore(User $user, UserRole $userRole): bool
+    public function restore(User $user, Role $role): bool
     {
-        //
+        return $user->isAdmin() || $user->hasPermission('user-roles.restore');
     }
 
     /**
      * Determine whether the user can permanently delete the model.
      */
-    public function forceDelete(User $user, UserRole $userRole): bool
+    public function forceDelete(User $user, Role $role): bool
     {
-        //
+        return $user->isAdmin() || $user->hasPermission('user-roles.forceDelete');
     }
 }

@@ -80,7 +80,10 @@ return new class extends Migration
         // 5. Usuń document_id z employee_documents
         if (Schema::hasColumn('employee_documents', 'document_id')) {
             Schema::table('employee_documents', function (Blueprint $table) {
-                $table->dropForeign(['document_id']);
+                // SQLite doesn't support dropping foreign keys
+                if (DB::getDriverName() !== 'sqlite') {
+                    $table->dropForeign(['document_id']);
+                }
                 $table->dropColumn('document_id');
             });
         }

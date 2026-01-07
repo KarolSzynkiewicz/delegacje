@@ -25,8 +25,6 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slug</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opis</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uprawnienia</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Użytkownicy</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
@@ -36,12 +34,16 @@
                         @forelse ($userRoles as $userRole)
                             <tr>
                                 <td class="px-6 py-4 font-medium">{{ $userRole->name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $userRole->slug }}</td>
-                                <td class="px-6 py-4">{{ $userRole->description ?? '-' }}</td>
                                 <td class="px-6 py-4">
-                                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                        {{ $userRole->permissions->count() }} uprawnień
-                                    </span>
+                                    @if($userRole->name === 'administrator')
+                                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800" title="Administrator ma wszystkie uprawnienia przez logikę biznesową">
+                                            Wszystkie ({{ \Spatie\Permission\Models\Permission::count() }})
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                            {{ $userRole->permissions->count() }} uprawnień
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
@@ -49,8 +51,8 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <a href="{{ route('user-roles.show', $userRole) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                    <a href="{{ route('user-roles.edit', $userRole) }}" class="text-yellow-600 hover:text-yellow-900 mr-3">Edytuj</a>
+                                    <a href="{{ route('user-roles.show', $userRole->name) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
+                                    <a href="{{ route('user-roles.edit', $userRole->name) }}" class="text-yellow-600 hover:text-yellow-900 mr-3">Edytuj</a>
                                     <form action="{{ route('user-roles.destroy', $userRole) }}" method="POST" class="inline">
                                         @csrf
                                         @method('DELETE')
@@ -60,7 +62,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">Brak ról</td>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak ról</td>
                             </tr>
                         @endforelse
                     </tbody>

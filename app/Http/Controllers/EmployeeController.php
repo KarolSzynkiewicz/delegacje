@@ -20,6 +20,7 @@ class EmployeeController extends Controller
      */
     public function index(): View
     {
+        $this->authorize('viewAny', Employee::class);
         // Dane są pobierane przez komponent Livewire EmployeesTable
         return view('employees.index');
     }
@@ -29,6 +30,7 @@ class EmployeeController extends Controller
      */
     public function create(): View
     {
+        $this->authorize('create', Employee::class);
         $roles = Role::all();
         return view('employees.create', compact('roles'));
     }
@@ -63,6 +65,7 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee): View
     {
+        $this->authorize('view', $employee);
         $employee->load(['roles', 'employeeDocuments.document', 'rotations']);
         return view('employees.show', compact('employee'));
     }
@@ -72,6 +75,7 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
+        $this->authorize('update', $employee);
         $roles = Role::all();
         return view('employees.edit', compact('employee', 'roles'));
     }

@@ -16,6 +16,7 @@ class ProjectController extends Controller
      */
     public function index(): View
     {
+        $this->authorize('viewAny', Project::class);
         // Dane są pobierane przez komponent Livewire ProjectsTable
         return view('projects.index');
     }
@@ -25,6 +26,7 @@ class ProjectController extends Controller
      */
     public function create(): View
     {
+        $this->authorize('create', Project::class);
         $locations = Location::all();
         return view('projects.create', compact('locations'));
     }
@@ -46,6 +48,7 @@ class ProjectController extends Controller
      */
     public function show(Project $project): View
     {
+        $this->authorize('view', $project);
         $project->load('location', 'assignments');
         return view('projects.show', compact('project'));
     }
@@ -55,6 +58,7 @@ class ProjectController extends Controller
      */
     public function edit(Project $project): View
     {
+        $this->authorize('update', $project);
         $locations = Location::all();
         return view('projects.edit', compact('project', 'locations'));
     }

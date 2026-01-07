@@ -20,12 +20,6 @@
                             @enderror
                         </div>
 
-                        <div class="mb-6">
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Opis</label>
-                            <textarea name="description" rows="3"
-                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ old('description', $userRole->description) }}</textarea>
-                        </div>
-
                         <div class="mb-8">
                             <label class="block text-gray-700 text-sm font-bold mb-4">Uprawnienia</label>
                             
@@ -33,21 +27,14 @@
                                 @php
                                     $selectedPermissions = old('permissions', $userRole->permissions->pluck('id')->toArray());
                                 @endphp
-                                <div class="space-y-6">
-                                    @foreach($permissions as $model => $modelPermissions)
-                                        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                                            <h4 class="font-semibold text-gray-800 mb-4 text-base capitalize border-b border-gray-200 pb-2">{{ str_replace('-', ' ', $model) }}</h4>
-                                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                                                @foreach($modelPermissions as $permission)
-                                                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors">
-                                                        <input type="checkbox" name="permissions[]" value="{{ $permission->id }}"
-                                                            {{ in_array($permission->id, $selectedPermissions) ? 'checked' : '' }}
-                                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2">
-                                                        <span class="text-sm text-gray-700">{{ $permission->action }}</span>
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                        </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    @foreach($permissions as $permission)
+                                        <label class="flex items-center space-x-2 cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors">
+                                            <input type="checkbox" name="permissions[]" value="{{ $permission->id }}"
+                                                {{ in_array($permission->id, $selectedPermissions) ? 'checked' : '' }}
+                                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2">
+                                            <span class="text-sm text-gray-700">{{ $permission->name }}</span>
+                                        </label>
                                     @endforeach
                                 </div>
                             </div>

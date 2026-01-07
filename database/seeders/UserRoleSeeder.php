@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
-use App\Models\UserRole;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
 
 class UserRoleSeeder extends Seeder
@@ -14,34 +14,25 @@ class UserRoleSeeder extends Seeder
     public function run(): void
     {
         // Administrator - ma wszystkie uprawnienia
-        $admin = UserRole::firstOrCreate(
-            ['slug' => 'administrator'],
-            [
-                'name' => 'Administrator',
-                'description' => 'Pełny dostęp do wszystkich funkcji systemu',
-            ]
+        $admin = Role::firstOrCreate(
+            ['name' => 'administrator', 'guard_name' => 'web'],
+            ['name' => 'administrator', 'guard_name' => 'web']
         );
 
         // Kierownik - może wszystko oprócz usuwania i zarządzania rolami
-        $manager = UserRole::firstOrCreate(
-            ['slug' => 'kierownik'],
-            [
-                'name' => 'Kierownik',
-                'description' => 'Może przeglądać, tworzyć i edytować większość zasobów',
-            ]
+        $manager = Role::firstOrCreate(
+            ['name' => 'kierownik', 'guard_name' => 'web'],
+            ['name' => 'kierownik', 'guard_name' => 'web']
         );
 
         // Pracownik biurowy - tylko przeglądanie
-        $officeWorker = UserRole::firstOrCreate(
-            ['slug' => 'pracownik-biurowy'],
-            [
-                'name' => 'Pracownik biurowy',
-                'description' => 'Może tylko przeglądać zasoby',
-            ]
+        $officeWorker = Role::firstOrCreate(
+            ['name' => 'pracownik-biurowy', 'guard_name' => 'web'],
+            ['name' => 'pracownik-biurowy', 'guard_name' => 'web']
         );
 
         // Przypisanie uprawnień dla Kierownika
-        $managerPermissions = Permission::whereIn('slug', [
+        $managerPermissions = Permission::whereIn('name', [
             'projects.viewAny', 'projects.view', 'projects.create', 'projects.update',
             'employees.viewAny', 'employees.view', 'employees.create', 'employees.update',
             'vehicles.viewAny', 'vehicles.view', 'vehicles.create', 'vehicles.update',
@@ -54,12 +45,12 @@ class UserRoleSeeder extends Seeder
             'demands.viewAny', 'demands.view', 'demands.create', 'demands.update',
             'reports.viewAny', 'reports.view', 'reports.create', 'reports.update',
             'weekly-overview.view',
-        ])->pluck('id');
+        ])->get();
 
-        $manager->permissions()->sync($managerPermissions);
+        $manager->syncPermissions($managerPermissions);
 
         // Przypisanie uprawnień dla Pracownika biurowego
-        $officeWorkerPermissions = Permission::whereIn('slug', [
+        $officeWorkerPermissions = Permission::whereIn('name', [
             'projects.viewAny', 'projects.view',
             'employees.viewAny', 'employees.view',
             'vehicles.viewAny', 'vehicles.view',
@@ -72,9 +63,9 @@ class UserRoleSeeder extends Seeder
             'demands.viewAny', 'demands.view',
             'reports.viewAny', 'reports.view',
             'weekly-overview.view',
-        ])->pluck('id');
+        ])->get();
 
-        $officeWorker->permissions()->sync($officeWorkerPermissions);
+        $officeWorker->syncPermissions($officeWorkerPermissions);
 
         // Administrator ma wszystkie uprawnienia (nie przypisujemy, bo w User modelu admin zawsze ma dostęp)
     }

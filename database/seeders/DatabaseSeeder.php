@@ -22,7 +22,8 @@ class DatabaseSeeder extends Seeder
             AccommodationSeeder::class,
             VehicleSeeder::class,
             ProjectSeeder::class,
-            WeeklyOverviewSeeder::class,
+            // Przypisania (project_assignments, vehicle_assignments, accommodation_assignments) 
+            // są tworzone ręcznie przez użytkownika w UI z pełną walidacją biznesową
         ]);
     }
 }

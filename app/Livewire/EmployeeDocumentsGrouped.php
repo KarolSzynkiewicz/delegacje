@@ -57,7 +57,13 @@ class EmployeeDocumentsGrouped extends Component
             });
         }
         
-        $employees = $employeesQuery->orderBy('last_name')->orderBy('first_name')->get();
+        // Eager load employeeDocuments with document relationship to avoid N+1 queries
+        $employees = $employeesQuery
+            ->with(['employeeDocuments.document'])
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+        
         $documents = Document::orderBy('name')->get();
         
         // Filtruj dokumenty jeśli wybrano
@@ -71,13 +77,17 @@ class EmployeeDocumentsGrouped extends Component
         $groupedData = [];
         
         foreach ($employees as $employee) {
-            $employeeDocuments = $employee->employeeDocuments()
-                ->with('document')
-                ->when($this->filterDocument, function($q) {
-                    $q->where('document_id', $this->filterDocument);
-                })
-                ->get()
-                ->keyBy('document_id');
+            // Użyj już załadowanych relacji zamiast wykonywać nowe zapytania
+            $employeeDocuments = $employee->employeeDocuments;
+            
+            // Filtruj po dokumencie jeśli wybrano
+            if ($this->filterDocument) {
+                $employeeDocuments = $employeeDocuments->filter(function($doc) {
+                    return $doc->document_id == $this->filterDocument;
+                });
+            }
+            
+            $employeeDocuments = $employeeDocuments->keyBy('document_id');
             
             $documentsStatus = [];
             foreach ($documents as $document) {

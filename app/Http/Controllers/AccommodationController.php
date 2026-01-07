@@ -18,6 +18,7 @@ class AccommodationController extends Controller
      */
     public function index()
     {
+        $this->authorize('viewAny', Accommodation::class);
         // Dane są pobierane przez komponent Livewire AccommodationsTable
         return view('accommodations.index');
     }
@@ -27,6 +28,7 @@ class AccommodationController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Accommodation::class);
         return view('accommodations.create');
     }
 
@@ -35,6 +37,7 @@ class AccommodationController extends Controller
      */
     public function store(StoreAccommodationRequest $request)
     {
+        $this->authorize('create', Accommodation::class);
         $validated = $request->validated();
 
         unset($validated['image']);
@@ -53,6 +56,7 @@ class AccommodationController extends Controller
      */
     public function show(Accommodation $accommodation)
     {
+        $this->authorize('view', $accommodation);
         return view('accommodations.show', compact('accommodation'));
     }
 
@@ -61,6 +65,7 @@ class AccommodationController extends Controller
      */
     public function edit(Accommodation $accommodation)
     {
+        $this->authorize('update', $accommodation);
         return view('accommodations.edit', compact('accommodation'));
     }
 
@@ -69,6 +74,7 @@ class AccommodationController extends Controller
      */
     public function update(UpdateAccommodationRequest $request, Accommodation $accommodation)
     {
+        $this->authorize('update', $accommodation);
         $validated = $request->validated();
 
         // Handle image upload
@@ -91,6 +97,7 @@ class AccommodationController extends Controller
      */
     public function destroy(Accommodation $accommodation)
     {
+        $this->authorize('delete', $accommodation);
         $accommodation->delete();
         return redirect()->route('accommodations.index')->with('success', 'Akomodacja została usunięta.');
     }

@@ -18,7 +18,8 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Location::class => \App\Policies\LocationPolicy::class,
         \App\Models\Vehicle::class => \App\Policies\VehiclePolicy::class,
         \App\Models\Accommodation::class => \App\Policies\AccommodationPolicy::class,
-        \App\Models\UserRole::class => \App\Policies\UserRolePolicy::class,
+        \Spatie\Permission\Models\Role::class => \App\Policies\UserRolePolicy::class,
+        \App\Models\User::class => \App\Policies\UserPolicy::class,
     ];
 
     /**

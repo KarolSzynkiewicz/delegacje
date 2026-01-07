@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
+use Spatie\Permission\Models\Permission;
 use Illuminate\Database\Seeder;
 
 class PermissionSeeder extends Seeder
@@ -100,12 +100,19 @@ class PermissionSeeder extends Seeder
             ['name' => 'Edycja ról użytkowników', 'slug' => 'user-roles.update', 'model' => 'user-roles', 'action' => 'update', 'description' => 'Może edytować role użytkowników'],
             ['name' => 'Usuwanie ról użytkowników', 'slug' => 'user-roles.delete', 'model' => 'user-roles', 'action' => 'delete', 'description' => 'Może usuwać role użytkowników'],
 
+            // Users Management (zarządzanie użytkownikami)
+            ['name' => 'Przeglądanie użytkowników', 'slug' => 'users.viewAny', 'model' => 'users', 'action' => 'viewAny', 'description' => 'Może przeglądać listę użytkowników'],
+            ['name' => 'Szczegóły użytkownika', 'slug' => 'users.view', 'model' => 'users', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły użytkownika'],
+            ['name' => 'Tworzenie użytkowników', 'slug' => 'users.create', 'model' => 'users', 'action' => 'create', 'description' => 'Może tworzyć nowych użytkowników'],
+            ['name' => 'Edycja użytkowników', 'slug' => 'users.update', 'model' => 'users', 'action' => 'update', 'description' => 'Może edytować użytkowników'],
+            ['name' => 'Usuwanie użytkowników', 'slug' => 'users.delete', 'model' => 'users', 'action' => 'delete', 'description' => 'Może usuwać użytkowników'],
+
         ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(
-                ['slug' => $permission['slug']],
-                $permission
+                ['name' => $permission['slug'], 'guard_name' => 'web'],
+                ['name' => $permission['slug'], 'guard_name' => 'web']
             );
         }
     }

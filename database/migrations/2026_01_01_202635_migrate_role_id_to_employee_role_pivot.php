@@ -12,17 +12,46 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Migrate existing role_id data to pivot table
-        DB::statement("
-            INSERT INTO employee_role (employee_id, role_id, created_at, updated_at)
-            SELECT id, role_id, NOW(), NOW()
-            FROM employees
-            WHERE role_id IS NOT NULL
-        ");
+        // Sprawdź czy tabela employees istnieje i ma kolumnę role_id
+        if (!Schema::hasTable('employees') || !Schema::hasColumn('employees', 'role_id')) {
+            return; // Tabela nie istnieje lub kolumna już nie istnieje, nic nie rób
+        }
+        
+        // Sprawdź czy tabela employee_role istnieje
+        if (!Schema::hasTable('employee_role')) {
+            return; // Tabela pivot nie istnieje, nic nie rób
+        }
+        
+        // Migrate existing role_id data to pivot table (tylko jeśli są dane do migracji)
+        $employeesWithRole = DB::table('employees')->whereNotNull('role_id')->count();
+        if ($employeesWithRole > 0) {
+            $now = DB::getDriverName() === 'sqlite' ? "datetime('now')" : 'NOW()';
+            try {
+                DB::statement("
+                    INSERT INTO employee_role (employee_id, role_id, created_at, updated_at)
+                    SELECT id, role_id, {$now}, {$now}
+                    FROM employees
+                    WHERE role_id IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM employee_role er 
+                        WHERE er.employee_id = employees.id AND er.role_id = employees.role_id
+                    )
+                ");
+            } catch (\Exception $e) {
+                // Może być problem z duplikatami - ignoruj
+            }
+        }
 
         // Remove role_id column from employees table
         Schema::table('employees', function (Blueprint $table) {
-            $table->dropForeign(['role_id']);
+            // SQLite doesn't support dropping foreign keys
+            if (DB::getDriverName() !== 'sqlite') {
+                try {
+                    $table->dropForeign(['role_id']);
+                } catch (\Exception $e) {
+                    // Foreign key może nie istnieć
+                }
+            }
             $table->dropColumn('role_id');
         });
     }

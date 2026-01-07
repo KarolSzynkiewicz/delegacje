@@ -86,6 +86,33 @@
                                 </x-dropdown-link>
                             </x-slot>
                         </x-dropdown>
+                        
+                        <!-- Administracja Dropdown -->
+                        @canany(['users.viewAny', 'user-roles.viewAny'])
+                        <x-dropdown align="left" width="56">
+                            <x-slot name="trigger">
+                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('user-roles.*') ? 'text-gray-900' : '' }}">
+                                    {{ __('Administracja') }}
+                                    <svg class="ms-1 -me-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </x-slot>
+
+                            <x-slot name="content">
+                                @can('users.viewAny')
+                                <x-dropdown-link :href="route('users.index')" :active="request()->routeIs('users.*')">
+                                    {{ __('Użytkownicy') }}
+                                </x-dropdown-link>
+                                @endcan
+                                @can('user-roles.viewAny')
+                                <x-dropdown-link :href="route('user-roles.index')" :active="request()->routeIs('user-roles.*')">
+                                    {{ __('Role użytkowników') }}
+                                </x-dropdown-link>
+                                @endcan
+                            </x-slot>
+                        </x-dropdown>
+                        @endcanany
                     @endauth
                 </div>
             </div>
@@ -197,6 +224,24 @@
                         {{ __('Zapotrzebowania projektów') }}
                     </x-responsive-nav-link>
                 </div>
+                
+                @canany(['users.viewAny', 'user-roles.viewAny'])
+                <div class="border-t border-gray-200 pt-2 mt-2">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {{ __('Administracja') }}
+                    </div>
+                    @can('users.viewAny')
+                    <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
+                        {{ __('Użytkownicy') }}
+                    </x-responsive-nav-link>
+                    @endcan
+                    @can('user-roles.viewAny')
+                    <x-responsive-nav-link :href="route('user-roles.index')" :active="request()->routeIs('user-roles.*')">
+                        {{ __('Role użytkowników') }}
+                    </x-responsive-nav-link>
+                    @endcan
+                </div>
+                @endcanany
             @endauth
         </div>
 

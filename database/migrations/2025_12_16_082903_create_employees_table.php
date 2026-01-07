@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('last_name');
             $table->string('email')->unique();
             $table->string('phone')->nullable();
-            $table->foreignId('role_id')->constrained('roles')->onDelete('cascade');
+            // role_id removed - roles are now managed via employee_role pivot table
             $table->date('a1_valid_from')->nullable(); // Prawo jazdy A1 ważne od
             $table->date('a1_valid_to')->nullable(); // Prawo jazdy A1 ważne do
             $table->string('document_1')->nullable(); // Dokument 1

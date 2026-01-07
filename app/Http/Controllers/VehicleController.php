@@ -18,6 +18,7 @@ class VehicleController extends Controller
      */
     public function index()
     {
+        $this->authorize('viewAny', Vehicle::class);
         // Dane są pobierane przez komponent Livewire VehiclesTable
         return view('vehicles.index');
     }
@@ -27,6 +28,7 @@ class VehicleController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Vehicle::class);
         return view('vehicles.create');
     }
 
@@ -35,6 +37,7 @@ class VehicleController extends Controller
      */
     public function store(StoreVehicleRequest $request)
     {
+        $this->authorize('create', Vehicle::class);
         $validated = $request->validated();
 
         unset($validated['image']);
@@ -53,6 +56,7 @@ class VehicleController extends Controller
      */
     public function show(Vehicle $vehicle)
     {
+        $this->authorize('view', $vehicle);
         return view('vehicles.show', compact('vehicle'));
     }
 
@@ -61,6 +65,7 @@ class VehicleController extends Controller
      */
     public function edit(Vehicle $vehicle)
     {
+        $this->authorize('update', $vehicle);
         return view('vehicles.edit', compact('vehicle'));
     }
 
@@ -69,6 +74,7 @@ class VehicleController extends Controller
      */
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle)
     {
+        $this->authorize('update', $vehicle);
         $validated = $request->validated();
 
         // Handle image upload
@@ -91,6 +97,7 @@ class VehicleController extends Controller
      */
     public function destroy(Vehicle $vehicle)
     {
+        $this->authorize('delete', $vehicle);
         $vehicle->delete();
         return redirect()->route('vehicles.index')->with('success', 'Pojazd został usunięty.');
     }
