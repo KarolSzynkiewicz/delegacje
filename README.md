@@ -9,16 +9,210 @@ Aplikacja oferuje następujące moduły:
 | Moduł | Opis | Kluczowe Dane |
 | :--- | :--- | :--- |
 | **Autentykacja** | Logowanie, rejestracja, resetowanie hasła (Laravel Breeze). | Użytkownicy, hasła. |
-| **Pracownicy** | Zarządzanie personelem delegowanym. | Imię, Nazwisko, Kontakt, Rola (Spawacz/Dekarz), Ważność A1, Dokumenty (1, 2, 3). |
+| **Pracownicy** | Zarządzanie personelem delegowanym. | Imię, Nazwisko, Kontakt, Rola (Spawacz/Dekarz), Dokumenty. |
+| **Rotacje** | Definiowanie okresów dostępności pracowników. | Data rozpoczęcia, Data zakończenia, Status (automatyczny). |
 | **Akomodacje** | Zarządzanie dostępnymi mieszkaniami. | Nazwa, Adres, Pojemność (liczba osób). |
-| **Pojazdy** | Zarządzanie flotą pojazdów. | Numer Rejestracyjny, Pojemność, Stan Techniczny, Przegląd Ważny Do. |
-| **Lokalizacje** | Zarządzanie miejscami pracy (stoczniami). | Nazwa, Adres. |
-| **Projekty** | Tworzenie i zarządzanie projektami. | Nazwa, Opis. |
-| **Delegacje** | Przypisywanie pracowników do projektów i lokalizacji. | Pracownik, Projekt, Lokalizacja, Daty. |
-| **Zapisy Czasu Pracy** | Rejestrowanie czasu pracy. | Pracownik, Data, Godziny. |
+| **Pojazdy** | Zarządzanie flotą pojazdów. | Numer Rejestracyjny, Marka, Model, Stan Techniczny, Przegląd. |
+| **Lokalizacje** | Zarządzanie miejscami pracy (stoczniami). | Nazwa, Adres, Dane kontaktowe. |
+| **Projekty** | Tworzenie i zarządzanie projektami. | Nazwa, Opis, Zapotrzebowanie na role. |
+| **Przypisania** | Przypisywanie pracowników do projektów z walidacją dostępności. | Pracownik, Projekt, Rola, Daty, Status. |
+| **Widok Tygodniowy** | Tygodniowy przegląd wszystkich projektów, pracowników i zasobów. | Projekty, Pracownicy, Pojazdy, Mieszkania, Zapotrzebowanie. |
 | **Raporty** | Generowanie raportów z delegacji (w rozwoju). | Typy raportów, eksport PDF/Excel. |
 
-## 🛠️ Wymagania
+---
+
+## 👤 Instrukcje dla Użytkownika
+
+### Logowanie
+
+1. Otwórz aplikację w przeglądarce (domyślnie: `http://localhost`)
+2. Kliknij **"Logowanie"** w prawym górnym rogu
+3. Wprowadź dane logowania:
+   - **Email:** `test@example.com`
+   - **Hasło:** `password123`
+4. Kliknij **"Zaloguj się"**
+
+### Dashboard
+
+Po zalogowaniu zobaczysz **Dashboard** z dostępem do wszystkich modułów systemu:
+
+- **Przegląd Tygodniowy** - główny widok do zarządzania tygodniowymi przydziałami
+- **Projekty** - zarządzanie projektami i zapotrzebowaniem
+- **Pracownicy** - baza pracowników
+- **Rotacje Pracowników** - zarządzanie dostępnością pracowników
+- **Pojazdy** - flota pojazdów
+- **Mieszkania** - akomodacje
+- I inne...
+
+---
+
+## 📋 Podstawowy Workflow - Jak Przypisać Pracownika do Projektu
+
+### Krok 1: Utwórz Projekt
+
+1. Z Dashboard kliknij **"Projekty"**
+2. Kliknij **"Dodaj Projekt"** (przycisk w prawym górnym rogu)
+3. Wypełnij formularz:
+   - **Nazwa projektu** (np. "Remont Stoczni Gdańskiej")
+   - **Opis** (opcjonalnie)
+4. Kliknij **"Zapisz"**
+
+### Krok 2: Zdefiniuj Zapotrzebowanie na Role
+
+1. W widoku projektu kliknij **"Zapotrzebowanie"** lub **"Dodaj Zapotrzebowanie"**
+2. Wypełnij formularz:
+   - **Data od** i **Data do** (okres zapotrzebowania)
+   - Dla każdej roli podaj **Ilość potrzebnych osób** (np. 2 spawaczy, 1 dekarza)
+   - **Uwagi** (opcjonalnie)
+3. Kliknij **"Zapisz"**
+
+### Krok 3: Dodaj Rotację dla Pracownika
+
+**Rotacja określa okres, w którym pracownik jest dostępny do pracy.**
+
+1. Z Dashboard kliknij **"Rotacje Pracowników"**
+2. Kliknij **"Dodaj Rotację"**
+3. Wybierz **Pracownika** z listy
+4. Wprowadź:
+   - **Data rozpoczęcia** (od kiedy pracownik jest dostępny)
+   - **Data zakończenia** (do kiedy pracownik jest dostępny)
+   - **Uwagi** (opcjonalnie)
+5. Kliknij **"Zapisz"**
+   - Status rotacji jest automatyczny: **Zaplanowana** (przyszłość), **Aktywna** (obecnie), **Zakończona** (przeszłość)
+   - Możesz ręcznie ustawić status **Anulowana**
+
+**Alternatywnie:** Możesz dodać rotację bezpośrednio z profilu pracownika:
+1. Kliknij **"Pracownicy"** → wybierz pracownika
+2. Przejdź do zakładki **"Rotacje"**
+3. Kliknij **"Dodaj Rotację"**
+
+### Krok 4: Dodaj Dokumenty Pracownika
+
+**System sprawdza ważność dokumentów przed przypisaniem do projektu.**
+
+1. Z Dashboard kliknij **"Pracownicy"**
+2. Wybierz pracownika
+3. Przejdź do zakładki **"Dokumenty"**
+4. Kliknij **"Dodaj Dokument"**
+5. Wybierz **Typ dokumentu** (np. "Uprawnienia spawacza")
+6. Wypełnij:
+   - **Rodzaj:** Okresowy lub Bezokresowy
+   - **Data ważności od** (i **Data ważności do** dla okresowych)
+7. Kliknij **"Zapisz"**
+
+### Krok 5: Przypisz Pracownika do Projektu
+
+1. Z Dashboard kliknij **"Projekty"** → wybierz projekt
+2. Kliknij **"Przypisania"** lub **"Dodaj Przypisanie"**
+3. Wypełnij formularz:
+   - **Pracownik** - wybierz z listy (niedostępni są wyszarzeni z powodem)
+   - **Rola w Projekcie** - musi być zgodna z rolami pracownika
+   - **Data rozpoczęcia** i **Data zakończenia**
+   - **Status** (domyślnie: Aktywne)
+4. Kliknij **"Zapisz"**
+
+**System automatycznie sprawdza:**
+- ✅ Czy pracownik ma rotację pokrywającą cały okres przypisania
+- ✅ Czy pracownik ma wszystkie wymagane dokumenty ważne w tym okresie
+- ✅ Czy pracownik nie jest już przypisany do innego projektu w tym czasie
+- ✅ Czy projekt ma zapotrzebowanie na tę rolę w danym okresie
+
+Jeśli któryś warunek nie jest spełniony, zobaczysz komunikat błędu z dokładnym powodem.
+
+### Krok 6: Przypisz Pojazd i Mieszkanie (Opcjonalnie)
+
+**Z widoku tygodniowego:**
+
+1. Z Dashboard kliknij **"Przegląd Tygodniowy"**
+2. Wybierz tydzień (użyj przycisków "Poprzedni Tydzień" / "Następny Tydzień")
+3. W karcie projektu znajdź sekcję **"Auta w projekcie"** lub **"Domy w projekcie"**
+4. Dla pracowników bez auta/mieszkania kliknij przycisk **"Auto"** lub **"Dom"**
+5. Wybierz pojazd/mieszkanie i daty
+6. Kliknij **"Zapisz"**
+
+**Alternatywnie z profilu pracownika:**
+
+1. Kliknij **"Pracownicy"** → wybierz pracownika
+2. Przejdź do zakładki **"Pojazdy"** lub **"Mieszkania"**
+3. Kliknij **"Dodaj Przypisanie"**
+
+---
+
+## 📅 Przegląd Tygodniowy - Główny Widok Zarządzania
+
+**Przegląd Tygodniowy** to najważniejszy widok do zarządzania przydziałami:
+
+### Jak używać:
+
+1. Z Dashboard kliknij **"Przegląd Tygodniowy"**
+2. Użyj przycisków **"Poprzedni Tydzień"** / **"Następny Tydzień"** do nawigacji
+3. Dla każdego projektu zobaczysz:
+   - **Zapotrzebowanie** - tabela z rolami, ilością potrzebnych i przypisanych osób
+   - **Osoby w projekcie** - lista przypisanych pracowników z rolami
+   - **Auta w projekcie** - przypisane pojazdy i pracownicy bez auta
+   - **Domy w projekcie** - przypisane mieszkania i pracownicy bez domu
+
+### Szybkie akcje:
+
+- **Edytuj zapotrzebowanie** - kliknij przycisk "Edytuj" w sekcji zapotrzebowania
+- **Dodaj pracownika** - kliknij "Dodaj" w sekcji osób
+- **Przypisz auto/dom** - kliknij przycisk "Auto" lub "Dom" przy pracowniku bez przypisania
+
+---
+
+## 🔍 Filtrowanie i Wyszukiwanie
+
+### Rotacje Pracowników
+
+1. Kliknij **"Rotacje Pracowników"**
+2. Użyj filtrów:
+   - **Pracownik** - wybierz konkretnego pracownika
+   - **Status** - Zaplanowana, Aktywna, Zakończona, Anulowana
+   - **Data rozpoczęcia** - zakres dat
+   - **Data zakończenia** - zakres dat
+3. Kliknij **"Filtruj"** lub **"Wyczyść filtry"**
+
+### Pracownicy
+
+1. Kliknij **"Pracownicy"**
+2. Użyj pola wyszukiwania do filtrowania po imieniu, nazwisku lub emailu
+3. Sortuj klikając nagłówki kolumn
+
+### Pojazdy i Mieszkania
+
+- Podobnie jak pracownicy - użyj wyszukiwania i sortowania
+
+---
+
+## ⚠️ Ważne Informacje
+
+### Walidacja Przypisań
+
+System **automatycznie blokuje** przypisania, jeśli:
+- Pracownik nie ma rotacji pokrywającej cały okres przypisania
+- Pracownik nie ma wszystkich wymaganych dokumentów ważnych w tym okresie
+- Pracownik jest już przypisany do innego projektu w tym czasie
+- Projekt nie ma zapotrzebowania na daną rolę w tym okresie
+
+### Statusy Rotacji
+
+- **Zaplanowana** - rotacja zaczyna się w przyszłości
+- **Aktywna** - rotacja trwa obecnie
+- **Zakończona** - rotacja już się zakończyła
+- **Anulowana** - rotacja została ręcznie anulowana
+
+Status jest **automatycznie obliczany** na podstawie dat - nie musisz go ustawiać ręcznie (oprócz "Anulowana").
+
+### Dokumenty
+
+- **Okresowe** - mają datę ważności od-do
+- **Bezokresowe** - ważne od daty wydania bez końca
+
+System sprawdza ważność dokumentów przed przypisaniem pracownika do projektu.
+
+---
+
+## 🛠️ Wymagania Techniczne
 
 ### Dla Docker (Zalecane)
 *   Docker Desktop (Windows/Mac) lub Docker Engine (Linux)
@@ -32,11 +226,9 @@ Aplikacja oferuje następujące moduły:
 
 ---
 
-## 🐳 Uruchomienie z Docker (Zalecane)
+## 🐳 Instalacja i Uruchomienie
 
-**Laravel Sail** zapewnia proste i spójne środowisko Docker dla aplikacji Laravel.
-
-### Szybki Start
+### Szybki Start z Docker (Zalecane)
 
 1. **Sklonuj repozytorium:**
    ```bash
@@ -51,29 +243,24 @@ Aplikacja oferuje następujące moduły:
 
 3. **Uruchom kontenery Docker:**
    ```bash
-   ./sail up -d
-   ```
-   
-   Lub jeśli `sail` nie działa:
-   ```bash
    ./vendor/bin/sail up -d
    ```
 
 4. **Zainstaluj zależności (tylko przy pierwszym uruchomieniu):**
    ```bash
-   ./sail composer install
-   ./sail npm install
-   ./sail npm run build
+   ./vendor/bin/sail composer install
+   ./vendor/bin/sail npm install
+   ./vendor/bin/sail npm run build
    ```
 
 5. **Wygeneruj klucz aplikacji:**
    ```bash
-   ./sail artisan key:generate
+   ./vendor/bin/sail artisan key:generate
    ```
 
 6. **Uruchom migracje i seedery:**
    ```bash
-   ./sail artisan migrate --seed
+   ./vendor/bin/sail artisan migrate --seed
    ```
 
 7. **Otwórz aplikację w przeglądarce:**
@@ -84,17 +271,15 @@ Aplikacja oferuje następujące moduły:
 ### Przydatne Komendy Sail
 
 ```bash
-./sail up -d              # Uruchom kontenery w tle
-./sail down               # Zatrzymaj kontenery
-./sail artisan ...        # Uruchom komendy Artisan
-./sail composer ...       # Uruchom komendy Composer
-./sail npm ...            # Uruchom komendy NPM
-./sail mysql              # Dostęp do MySQL CLI
-./sail shell              # Dostęp do bash w kontenerze
-./sail logs               # Zobacz logi kontenerów
+./vendor/bin/sail up -d              # Uruchom kontenery w tle
+./vendor/bin/sail down               # Zatrzymaj kontenery
+./vendor/bin/sail artisan ...        # Uruchom komendy Artisan
+./vendor/bin/sail composer ...       # Uruchom komendy Composer
+./vendor/bin/sail npm ...            # Uruchom komendy NPM
+./vendor/bin/sail mysql              # Dostęp do MySQL CLI
+./vendor/bin/sail shell              # Dostęp do bash w kontenerze
+./vendor/bin/sail logs               # Zobacz logi kontenerów
 ```
-
-**📖 Pełna dokumentacja Docker:** Zobacz [DOCKER_SETUP.md](DOCKER_SETUP.md)
 
 ---
 
@@ -129,7 +314,7 @@ Aplikacja oferuje następujące moduły:
    ```bash
    touch database/database.sqlite
    ```
-
+   
    **Dla MySQL:**
    ```env
    DB_CONNECTION=mysql
@@ -190,7 +375,7 @@ Moduł raportowania jest w fazie rozwoju.
 
 ```bash
 # Z Docker
-./sail artisan test
+./vendor/bin/sail artisan test
 
 # Lokalnie
 php artisan test
@@ -202,17 +387,39 @@ php artisan test
 
 ```
 delegacje/
-├── app/                    # Logika aplikacji (Controllers, Models)
-├── database/               # Migracje, seedery, factory
-├── resources/              # Widoki Blade, CSS, JS
-├── routes/                 # Definicje tras
-├── public/                 # Publiczne pliki (index.php, assets)
-├── vendor/                 # Zależności Composer
-├── docker-compose.yml      # Konfiguracja Docker Sail
-├── .env.example            # Przykładowy plik środowiskowy
-├── sail                    # Skrypt pomocniczy Sail
-└── README.md               # Ten plik
+├── app/                    # Logika aplikacji (Controllers, Models, Services)
+│   ├── Http/
+│   │   ├── Controllers/   # Kontrolery
+│   │   └── Requests/      # Form Requests (walidacja danych wejściowych)
+│   ├── Models/            # Modele Eloquent
+│   ├── Services/          # Logika biznesowa i walidacja
+│   └── Traits/            # Traity (wspólne funkcjonalności)
+├── database/              # Migracje, seedery, factory
+├── resources/             # Widoki Blade, CSS, JS
+├── routes/                # Definicje tras
+├── public/                # Publiczne pliki (index.php, assets)
+├── vendor/                # Zależności Composer
+├── docker-compose.yml     # Konfiguracja Docker Sail
+├── .env.example           # Przykładowy plik środowiskowy
+└── README.md             # Ten plik
 ```
+
+---
+
+## 🏗️ Architektura i Best Practices
+
+### Warstwy Aplikacji
+
+1. **Form Requests** - Walidacja danych wejściowych (required, date, exists, etc.)
+2. **Services** - Cała logika biznesowa i walidacja (role, availability, overlaps, etc.)
+3. **Models** - Metody pomocnicze (hasRole, isAvailable, etc.) - sprawdzanie stanu
+4. **Controllers** - Orkiestracja, wywołanie serwisów, zwracanie odpowiedzi
+
+### Zasady
+
+- **DRY (Don't Repeat Yourself)** - Logika biznesowa w serwisach, nie duplikowana
+- **Single Responsibility** - Każda klasa ma jedną odpowiedzialność
+- **Separation of Concerns** - Form Requests dla walidacji, Services dla logiki, Controllers dla orkiestracji
 
 ---
 
@@ -235,8 +442,8 @@ Projekt stworzony przez **Manus AI** dla celów demonstracyjnych i edukacyjnych.
 ## 🆘 Wsparcie
 
 Jeśli napotkasz problemy:
-1. Sprawdź dokumentację Docker dla problemów z Docker
-2. Sprawdź dokumentację modułu raportów dla informacji o module raportów
+1. Sprawdź sekcję **Instrukcje dla Użytkownika** powyżej
+2. Sprawdź dokumentację Docker dla problemów z Docker
 3. Otwórz Issue na GitHub
 
 ---
