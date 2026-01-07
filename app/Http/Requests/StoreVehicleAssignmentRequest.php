@@ -23,6 +23,7 @@ class StoreVehicleAssignmentRequest extends FormRequest
     {
         return [
             'vehicle_id' => ['required', 'exists:vehicles,id'],
+            'position' => ['required', 'in:driver,passenger'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
@@ -39,6 +40,8 @@ class StoreVehicleAssignmentRequest extends FormRequest
         return [
             'vehicle_id.required' => 'Pojazd jest wymagany.',
             'vehicle_id.exists' => 'Wybrany pojazd nie istnieje.',
+            'position.required' => 'Rola w pojeździe jest wymagana.',
+            'position.in' => 'Rola musi być kierowcą lub pasażerem.',
             'start_date.required' => 'Data rozpoczęcia jest wymagana.',
             'start_date.date' => 'Data rozpoczęcia musi być poprawną datą.',
             'end_date.date' => 'Data zakończenia musi być poprawną datą.',

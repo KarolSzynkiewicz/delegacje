@@ -147,7 +147,7 @@
                                 @endif
                                 <div class="flex-1 min-w-0">
                                     <div class="text-xs">
-                                        <span class="font-semibold text-gray-900">{{ $employeeData['employee']->full_name }}</span>
+                                        <a href="{{ route('employees.show', $employeeData['employee']) }}" class="font-semibold text-gray-900 hover:underline">{{ $employeeData['employee']->full_name }}</a>
                                         <span class="text-gray-500 text-[10px]"> – {{ $employeeData['role']->name }}</span>
                                     </div>
                                 </div>
@@ -211,29 +211,67 @@
                 @if($weekData['vehicles']->isNotEmpty())
                     <div class="space-y-1.5 max-h-32 overflow-y-auto mb-2">
                         @foreach($weekData['vehicles']->take(8) as $vehicleData)
-                            <div class="p-1.5 bg-gradient-to-r from-gray-50 to-white rounded border border-gray-200 flex items-center gap-2">
-                                <!-- Vehicle image or icon -->
-                                @if($vehicleData['vehicle']->image_path)
-                                    <img src="{{ $vehicleData['vehicle']->image_url }}" 
-                                         alt="{{ $vehicleData['vehicle_name'] }}" 
-                                         class="w-8 h-8 rounded object-cover flex-shrink-0 border border-gray-300"
-                                         onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2306b6d4\'%3E%3Cpath d=\'M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2\'/%3E%3C/svg%3E';">
-                                @else
-                                    <div class="w-8 h-8 bg-cyan-100 rounded flex items-center justify-center flex-shrink-0 border border-gray-300">
-                                        <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
-                                        </svg>
-                                    </div>
-                                @endif
-                                <div class="flex-1 min-w-0 text-xs">
-                                    <div class="font-semibold text-gray-900 truncate">{{ $vehicleData['vehicle_name'] }}</div>
-                                    <div class="text-[10px] text-gray-600 mt-0.5">
-                                        {{ $vehicleData['usage'] }}
-                                        @if($vehicleData['driver'])
-                                            <span class="text-green-600"> • {{ $vehicleData['driver']->full_name }}</span>
-                                        @endif
+                            <div class="p-1.5 bg-gradient-to-r from-gray-50 to-white rounded border border-gray-200">
+                                <!-- Wrapper na auto, ikonkę, ilość i kierowcę -->
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <!-- Vehicle image or icon -->
+                                    @if($vehicleData['vehicle']->image_path)
+                                        <img src="{{ $vehicleData['vehicle']->image_url }}" 
+                                             alt="{{ $vehicleData['vehicle_name'] }}" 
+                                             class="w-8 h-8 rounded object-cover flex-shrink-0 border border-gray-300"
+                                             onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2306b6d4\'%3E%3Cpath d=\'M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2\'/%3E%3C/svg%3E';">
+                                    @else
+                                        <div class="w-8 h-8 bg-cyan-100 rounded flex items-center justify-center flex-shrink-0 border border-gray-300">
+                                            <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
+                                            </svg>
+                                        </div>
+                                    @endif
+                                    <div class="flex-1 min-w-0 text-xs">
+                                        <a href="{{ route('vehicles.show', $vehicleData['vehicle']) }}" class="font-semibold text-gray-900 truncate hover:underline block">{{ $vehicleData['vehicle_name'] }}</a>
+                                        <div class="text-[10px] text-gray-600 mt-0.5">
+                                            {{ $vehicleData['usage'] }}
+                                            @if($vehicleData['driver'])
+                                                <span class="text-green-600"> • <a href="{{ route('employees.show', $vehicleData['driver']) }}" class="hover:underline">{{ $vehicleData['driver']->full_name }}</a></span>
+                                            @else
+                                                <span class="text-red-600"> • Brak kierowcy</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
+                                
+                                {{-- Dropdown z listą osób w aucie - poniżej --}}
+                                @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
+                                    <details class="mt-1.5 group">
+                                        <summary class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 underline">
+                                            <span>Kto jest w tym aucie? ({{ $vehicleData['assignments']->count() }})</span>
+                                            <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </summary>
+                                        <ul class="mt-1 space-y-0.5 pl-2 border-l-2 border-gray-200">
+                                            @foreach($vehicleData['assignments'] as $assignment)
+                                                @php
+                                                    $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                                    $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                                    $isDriver = $positionValue === 'driver';
+                                                @endphp
+                                                <li>
+                                                    <a href="{{ route('employees.show', $assignment->employee) }}" 
+                                                       class="text-[10px] {{ $isDriver ? 'text-green-600 font-semibold' : 'text-blue-600' }} hover:underline flex items-center gap-1">
+                                                        @if($isDriver)
+                                                            🚗 
+                                                        @endif
+                                                        {{ $assignment->employee->full_name }}
+                                                        @if($isDriver)
+                                                            <span class="text-[9px] bg-green-100 text-green-800 px-1 py-0.5 rounded">Kierowca</span>
+                                                        @endif
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </details>
+                                @endif
                             </div>
                         @endforeach
                         @if($weekData['vehicles']->count() > 8)
@@ -264,7 +302,7 @@
                                         </div>
                                     @endif
                                     <div class="flex-1 min-w-0 text-xs">
-                                        <div class="font-semibold text-gray-900 truncate">{{ $employeeData['employee']->full_name }}</div>
+                                        <a href="{{ route('employees.show', $employeeData['employee']) }}" class="font-semibold text-gray-900 truncate hover:underline block">{{ $employeeData['employee']->full_name }}</a>
                                         <div class="text-[10px] text-gray-500">{{ $employeeData['role']->name }}</div>
                                     </div>
                                     @php
@@ -335,8 +373,29 @@
                                     </div>
                                 @endif
                                 <div class="flex-1 min-w-0 text-xs">
-                                    <div class="font-semibold text-gray-900 truncate">{{ $accommodation->name }}</div>
+                                    <a href="{{ route('accommodations.show', $accommodation) }}" class="font-semibold text-gray-900 truncate hover:underline block">{{ $accommodation->name }}</a>
                                     <div class="text-[10px] text-gray-600 mt-0.5">{{ $accommodationData['usage'] }}</div>
+                                    {{-- Dropdown z listą osób w domu --}}
+                                    @if(isset($accommodationData['assignments']) && $accommodationData['assignments']->count() > 0)
+                                        <details class="mt-1.5 group">
+                                            <summary class="cursor-pointer text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 underline">
+                                                <span>Kto jest w tym domu? ({{ $accommodationData['assignments']->count() }})</span>
+                                                <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </summary>
+                                            <ul class="mt-1 space-y-0.5 pl-2 border-l-2 border-gray-200">
+                                                @foreach($accommodationData['assignments'] as $assignment)
+                                                    <li>
+                                                        <a href="{{ route('employees.show', $assignment->employee) }}" 
+                                                           class="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                                                            🏠 {{ $assignment->employee->full_name }}
+                                                        </a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </details>
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
@@ -363,7 +422,7 @@
                                         </div>
                                     @endif
                                     <div class="flex-1 min-w-0 text-xs">
-                                        <div class="font-semibold text-gray-900 truncate">{{ $employeeData['employee']->full_name }}</div>
+                                        <a href="{{ route('employees.show', $employeeData['employee']) }}" class="font-semibold text-gray-900 truncate hover:underline block">{{ $employeeData['employee']->full_name }}</a>
                                         <div class="text-[10px] text-gray-500">{{ $employeeData['role']->name }}</div>
                                     </div>
                                     @php

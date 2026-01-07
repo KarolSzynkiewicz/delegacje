@@ -68,16 +68,23 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
+                                            @php
+                                                $existingDemand = $existingDemands[$role->id] ?? null;
+                                                $currentValue = $existingDemand ? $existingDemand->required_count : 0;
+                                            @endphp
                                             <input 
                                                 type="number" 
                                                 name="demands[{{ $role->id }}][required_count]" 
                                                 min="0" 
-                                                value="0" 
+                                                value="{{ old("demands.{$role->id}.required_count", $currentValue) }}" 
                                                 step="1"
                                                 class="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 demand-count-input"
                                                 data-role-id="{{ $role->id }}"
                                             >
                                             <input type="hidden" name="demands[{{ $role->id }}][role_id]" value="{{ $role->id }}">
+                                            @if($existingDemand)
+                                                <p class="text-xs text-gray-500 mt-1">Istniejące: {{ $existingDemand->required_count }}</p>
+                                            @endif
                                         </td>
                                     </tr>
                                     @endforeach

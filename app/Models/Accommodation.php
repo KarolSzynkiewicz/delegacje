@@ -77,11 +77,16 @@ class Accommodation extends Model
     /**
      * Get available capacity at a given date range.
      */
-    public function getAvailableCapacity($startDate, $endDate): int
+    public function getAvailableCapacity($startDate, $endDate, ?int $excludeAssignmentId = null): int
     {
-        $occupiedCount = $this->assignments()
-            ->inDateRange($startDate, $endDate)
-            ->count();
+        $query = $this->assignments()
+            ->inDateRange($startDate, $endDate);
+        
+        if ($excludeAssignmentId) {
+            $query->where('id', '!=', $excludeAssignmentId);
+        }
+        
+        $occupiedCount = $query->count();
 
         return max(0, $this->capacity - $occupiedCount);
     }
@@ -89,8 +94,8 @@ class Accommodation extends Model
     /**
      * Check if accommodation has available space in a given date range.
      */
-    public function hasAvailableSpace($startDate, $endDate): bool
+    public function hasAvailableSpace($startDate, $endDate, ?int $excludeAssignmentId = null): bool
     {
-        return $this->getAvailableCapacity($startDate, $endDate) > 0;
+        return $this->getAvailableCapacity($startDate, $endDate, $excludeAssignmentId) > 0;
     }
 }

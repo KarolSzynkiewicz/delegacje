@@ -2,22 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TimeLogService;
 use App\Models\TimeLog;
 use App\Models\ProjectAssignment;
 use Illuminate\Http\Request;
 
 class TimeLogController extends Controller
 {
+    protected $timeLogService;
+
+    public function __construct(TimeLogService $timeLogService)
+    {
+        $this->timeLogService = $timeLogService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        $this->authorize('viewAny', TimeLog::class);
+
         $timeLogs = TimeLog::with('projectAssignment.employee', 'projectAssignment.project')
             ->orderBy('start_time', 'desc')
             ->paginate(20);
         
-        return view('time_logs.index', compact('timeLogs'));
+        return view('time-logs.index', compact('timeLogs'));
     }
 
     /**
@@ -25,11 +35,13 @@ class TimeLogController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', TimeLog::class);
+
         $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->whereIn('status', ['active', 'pending'])
             ->get();
         
-        return view('time_logs.create', compact('assignments'));
+        return view('time-logs.create', compact('assignments'));
     }
 
     /**
@@ -39,17 +51,24 @@ class TimeLogController extends Controller
     {
         $validated = $request->validate([
             'project_assignment_id' => 'required|exists:project_assignments,id',
-            'start_time' => 'required|date',
-            'end_time' => 'nullable|date|after_or_equal:start_time',
-            'hours_worked' => 'nullable|numeric|min:0|max:24',
+            'work_date' => 'required|date',
+            'hours_worked' => 'required|numeric|min:0|max:24',
             'notes' => 'nullable|string',
         ]);
 
-        TimeLog::create($validated);
+        try {
+            $assignment = ProjectAssignment::findOrFail($validated['project_assignment_id']);
+            $this->timeLogService->createTimeLog($assignment, $validated);
 
-        return redirect()
-            ->route('time_logs.index')
-            ->with('success', 'Zapis czasu pracy został dodany.');
+            return redirect()
+                ->route('time-logs.index')
+                ->with('success', 'Zapis czasu pracy został dodany.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->back()
+                ->withErrors($e->errors())
+                ->withInput();
+        }
     }
 
     /**
@@ -57,9 +76,11 @@ class TimeLogController extends Controller
      */
     public function show(TimeLog $timeLog)
     {
+        $this->authorize('view', $timeLog);
+
         $timeLog->load('projectAssignment.employee', 'projectAssignment.project', 'projectAssignment.role');
         
-        return view('time_logs.show', compact('timeLog'));
+        return view('time-logs.show', compact('timeLog'));
     }
 
     /**
@@ -67,11 +88,13 @@ class TimeLogController extends Controller
      */
     public function edit(TimeLog $timeLog)
     {
+        $this->authorize('update', $timeLog);
+
         $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->whereIn('status', ['active', 'pending'])
             ->get();
         
-        return view('time_logs.edit', compact('timeLog', 'assignments'));
+        return view('time-logs.edit', compact('timeLog', 'assignments'));
     }
 
     /**
@@ -79,19 +102,26 @@ class TimeLogController extends Controller
      */
     public function update(Request $request, TimeLog $timeLog)
     {
+        $this->authorize('update', $timeLog);
+
         $validated = $request->validate([
-            'project_assignment_id' => 'required|exists:project_assignments,id',
-            'start_time' => 'required|date',
-            'end_time' => 'nullable|date|after_or_equal:start_time',
-            'hours_worked' => 'nullable|numeric|min:0|max:24',
+            'work_date' => 'required|date',
+            'hours_worked' => 'required|numeric|min:0|max:24',
             'notes' => 'nullable|string',
         ]);
 
-        $timeLog->update($validated);
+        try {
+            $this->timeLogService->updateTimeLog($timeLog, $validated);
 
-        return redirect()
-            ->route('time_logs.index')
-            ->with('success', 'Zapis czasu pracy został zaktualizowany.');
+            return redirect()
+                ->route('time-logs.index')
+                ->with('success', 'Zapis czasu pracy został zaktualizowany.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->back()
+                ->withErrors($e->errors())
+                ->withInput();
+        }
     }
 
     /**
@@ -99,10 +129,12 @@ class TimeLogController extends Controller
      */
     public function destroy(TimeLog $timeLog)
     {
+        $this->authorize('delete', $timeLog);
+
         $timeLog->delete();
 
         return redirect()
-            ->route('time_logs.index')
+            ->route('time-logs.index')
             ->with('success', 'Zapis czasu pracy został usunięty.');
     }
 
@@ -111,10 +143,12 @@ class TimeLogController extends Controller
      */
     public function byAssignment(ProjectAssignment $assignment)
     {
+        $this->authorize('viewAny', TimeLog::class);
+
         $timeLogs = $assignment->timeLogs()
             ->orderBy('start_time', 'desc')
             ->get();
         
-        return view('time_logs.by-assignment', compact('assignment', 'timeLogs'));
+        return view('time-logs.by-assignment', compact('assignment', 'timeLogs'));
     }
 }

@@ -27,6 +27,16 @@
                         <p class="text-gray-900">{{ $location->city }}</p>
                     </div>
                     @endif
+                    <div>
+                        <h3 class="font-bold text-gray-700 mb-2">Baza</h3>
+                        @if($location->is_base)
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Tak - Lokalizacja jest bazą
+                            </span>
+                        @else
+                            <span class="text-gray-500">Nie</span>
+                        @endif
+                    </div>
                     @if($location->postal_code)
                     <div>
                         <h3 class="font-bold text-gray-700 mb-2">Kod pocztowy</h3>

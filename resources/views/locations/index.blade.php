@@ -21,6 +21,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Adres</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Miasto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baza</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kontakt</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
                         </tr>
@@ -31,6 +32,15 @@
                                 <td class="px-6 py-4 font-medium">{{ $location->name }}</td>
                                 <td class="px-6 py-4">{{ $location->address }}</td>
                                 <td class="px-6 py-4">{{ $location->city ?? '-' }}</td>
+                                <td class="px-6 py-4">
+                                    @if($location->is_base)
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            Baza
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4">
                                     @if($location->contact_person)
                                         <div>{{ $location->contact_person }}</div>
@@ -56,7 +66,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">Brak lokalizacji</td>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">Brak lokalizacji</td>
                             </tr>
                         @endforelse
                     </tbody>

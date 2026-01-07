@@ -57,7 +57,12 @@ class VehicleController extends Controller
     public function show(Vehicle $vehicle)
     {
         $this->authorize('view', $vehicle);
-        return view('vehicles.show', compact('vehicle'));
+        $assignments = $vehicle->assignments()
+            ->with(['employee'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+        
+        return view('vehicles.show', compact('vehicle', 'assignments'));
     }
 
     /**

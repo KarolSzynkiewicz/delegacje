@@ -67,7 +67,14 @@ class EmployeeController extends Controller
     {
         $this->authorize('view', $employee);
         $employee->load(['roles', 'employeeDocuments.document', 'rotations']);
-        return view('employees.show', compact('employee'));
+        
+        // Get project assignments ordered by start_date descending (newest first)
+        $projectAssignments = $employee->assignments()
+            ->with(['project', 'role'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+        
+        return view('employees.show', compact('employee', 'projectAssignments'));
     }
 
     /**

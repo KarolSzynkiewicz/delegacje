@@ -77,43 +77,49 @@ class VehicleAssignmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(VehicleAssignment $vehicle)
+    public function show(VehicleAssignment $vehicleAssignment)
     {
-        $vehicle->load('employee', 'vehicle');
+        $vehicleAssignment->load('employee', 'vehicle');
         
-        return view('vehicle-assignments.show', compact('vehicle'));
+        return view('vehicle-assignments.show', compact('vehicleAssignment'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(VehicleAssignment $vehicle)
+    public function edit(VehicleAssignment $vehicleAssignment)
     {
         $employees = Employee::orderBy('last_name')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
         
-        return view('vehicle-assignments.edit', compact('vehicle', 'employees', 'vehicles'));
+        return view('vehicle-assignments.edit', compact('vehicleAssignment', 'employees', 'vehicles'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateVehicleAssignmentRequest $request, VehicleAssignment $vehicle)
+    public function update(UpdateVehicleAssignmentRequest $request, VehicleAssignment $vehicleAssignment)
     {
-        $vehicle->update($request->validated());
+        try {
+            $this->assignmentService->updateAssignment($vehicleAssignment, $request->validated());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->withErrors($e->errors());
+        }
 
         return redirect()
-            ->route('employees.vehicles.index', $vehicle->employee_id)
+            ->route('employees.vehicles.index', $vehicleAssignment->employee_id)
             ->with('success', 'Przypisanie pojazdu zostało zaktualizowane.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(VehicleAssignment $vehicle)
+    public function destroy(VehicleAssignment $vehicleAssignment)
     {
-        $employeeId = $vehicle->employee_id;
-        $vehicle->delete();
+        $employeeId = $vehicleAssignment->employee_id;
+        $vehicleAssignment->delete();
 
         return redirect()
             ->route('employees.vehicles.index', $employeeId)

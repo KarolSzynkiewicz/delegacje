@@ -11,14 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('role_permissions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_role_id')->constrained('user_roles')->onDelete('cascade');
-            $table->foreignId('permission_id')->constrained('permissions')->onDelete('cascade');
-            $table->timestamps();
-            
-            $table->unique(['user_role_id', 'permission_id']);
-        });
+        // This table is replaced by Spatie's role_has_permissions
+        // Only create if it doesn't exist and Spatie table doesn't exist
+        if (!Schema::hasTable('role_permissions') && !Schema::hasTable('role_has_permissions')) {
+            Schema::create('role_permissions', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_role_id')->constrained('user_roles')->onDelete('cascade');
+                $table->foreignId('permission_id')->constrained('permissions')->onDelete('cascade');
+                $table->timestamps();
+                
+                $table->unique(['user_role_id', 'permission_id']);
+            });
+        }
     }
 
     /**

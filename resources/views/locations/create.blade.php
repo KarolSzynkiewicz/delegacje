@@ -66,6 +66,15 @@
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('description') }}</textarea>
                     </div>
 
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_base" value="1" {{ old('is_base') ? 'checked' : '' }}
+                                class="form-checkbox h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700 text-sm font-bold">Lokalizacja jest bazą</span>
+                        </label>
+                        <p class="text-gray-500 text-xs mt-1">Zaznacz, jeśli ta lokalizacja jest siedzibą główną firmy</p>
+                    </div>
+
                     <div class="flex items-center justify-between">
                         <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                             Zapisz

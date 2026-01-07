@@ -55,6 +55,11 @@ class RouteServiceProvider extends ServiceProvider
             return $role;
         });
 
+        // Route model binding for LogisticsEvent (return_trip)
+        Route::bind('return_trip', function ($value) {
+            return \App\Models\LogisticsEvent::findOrFail($value);
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

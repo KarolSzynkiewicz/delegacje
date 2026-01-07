@@ -139,4 +139,22 @@ trait HasAssignmentLifecycle
     {
         return $query->where('status', AssignmentStatus::CANCELLED);
     }
+
+    /**
+     * Scope a query to only include assignments active at a specific date.
+     * 
+     * An assignment is active at a date if:
+     * - status is ACTIVE
+     * - start_date <= date
+     * - end_date is null OR end_date >= date
+     */
+    public function scopeActiveAtDate(Builder $query, Carbon $date): Builder
+    {
+        return $query->active()
+            ->where('start_date', '<=', $date)
+            ->where(function ($q) use ($date) {
+                $q->whereNull('end_date')
+                  ->orWhere('end_date', '>=', $date);
+            });
+    }
 }

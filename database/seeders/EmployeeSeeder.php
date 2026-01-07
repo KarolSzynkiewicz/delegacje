@@ -99,31 +99,7 @@ class EmployeeSeeder extends Seeder
             $counter++;
         }
 
-        // Pobierz dostępne dokumenty
-        $documents = \App\Models\Document::all();
-        
-        if ($documents->count() > 0) {
-            // Dodaj przykładowe dokumenty dla kilku pracowników
-            foreach (array_slice($employees, 0, 15) as $employee) {
-                $numDocuments = rand(1, 3);
-                $selectedDocs = $documents->random(min($numDocuments, $documents->count()));
-                
-                if (!is_iterable($selectedDocs)) {
-                    $selectedDocs = [$selectedDocs];
-                }
-                
-                foreach ($selectedDocs as $document) {
-                    $isPeriodic = rand(0, 1);
-                    EmployeeDocument::create([
-                        'employee_id' => $employee->id,
-                        'document_id' => $document->id,
-                        'valid_from' => now()->subYears(rand(1, 3))->format('Y-m-d'),
-                        'valid_to' => $isPeriodic ? now()->addYears(rand(1, 3))->format('Y-m-d') : null,
-                        'kind' => $isPeriodic ? 'okresowy' : 'bezokresowy',
-                        'file_path' => null,
-                    ]);
-                }
-            }
-        }
+        // Dokumenty pracowników są teraz tworzone przez EmployeeDocumentSeeder
+        // aby uniknąć duplikacji i zapewnić lepszą kontrolę nad procesem
     }
 }

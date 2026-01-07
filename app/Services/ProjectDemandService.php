@@ -17,8 +17,10 @@ class ProjectDemandService
      */
     public function createDemands(Project $project, array $validated): array
     {
-        // Filter only roles with required_count > 0
-        $demandsToCreate = [];
+        // Przetwórz wszystkie role (również te z required_count = 0, aby je usunąć)
+        $demandsToProcess = [];
+        $demandsToDelete = [];
+        
         foreach ($validated["demands"] as $roleId => $demandData) {
             // Check if data is correct
             if (!isset($demandData["role_id"]) || !isset($demandData["required_count"])) {
@@ -26,30 +28,69 @@ class ProjectDemandService
             }
             
             $requiredCount = (int) $demandData["required_count"];
+            
             if ($requiredCount > 0) {
-                $demandsToCreate[] = [
+                // Zapotrzebowanie do utworzenia/aktualizacji
+                $demandsToProcess[] = [
                     "role_id" => (int) $demandData["role_id"],
                     "required_count" => $requiredCount,
                     "date_from" => $validated["date_from"],
                     "date_to" => $validated["date_to"] ?? null,
                     "notes" => $validated["notes"] ?? null,
                 ];
+            } else {
+                // Zapotrzebowanie do usunięcia (required_count = 0)
+                $demandsToDelete[] = (int) $demandData["role_id"];
             }
         }
 
-        // Check if there is at least one demand
-        if (empty($demandsToCreate)) {
+        // Check if there is at least one demand to create/update
+        if (empty($demandsToProcess) && empty($demandsToDelete)) {
             throw ValidationException::withMessages([
-                "demands" => "Musisz podać ilość większą od 0 dla przynajmniej jednej roli."
+                "demands" => "Musisz podać ilość większą od 0 dla przynajmniej jednej roli lub ustawić 0 aby usunąć istniejące."
             ]);
         }
 
-        // Create demands in transaction
+        // Create, update or delete demands in transaction
         DB::beginTransaction();
         try {
+            // Usuń zapotrzebowania z required_count = 0
+            if (!empty($demandsToDelete)) {
+                $project->demands()
+                    ->whereIn('role_id', $demandsToDelete)
+                    ->where('date_from', '<=', $validated['date_to'] ?? $validated['date_from'])
+                    ->where(function ($q) use ($validated) {
+                        $q->whereNull('date_to')
+                          ->orWhere('date_to', '>=', $validated['date_from']);
+                    })
+                    ->delete();
+            }
+
             $createdDemands = [];
-            foreach ($demandsToCreate as $demandData) {
-                $createdDemands[] = $project->demands()->create($demandData);
+            foreach ($demandsToProcess as $demandData) {
+                // Sprawdź czy zapotrzebowanie już istnieje dla tej roli w tym okresie
+                $existingDemand = $project->demands()
+                    ->where('role_id', $demandData['role_id'])
+                    ->where('date_from', '<=', $validated['date_to'] ?? $validated['date_from'])
+                    ->where(function ($q) use ($validated) {
+                        $q->whereNull('date_to')
+                          ->orWhere('date_to', '>=', $validated['date_from']);
+                    })
+                    ->first();
+
+                if ($existingDemand) {
+                    // Aktualizuj istniejące zapotrzebowanie
+                    $existingDemand->update([
+                        'required_count' => $demandData['required_count'],
+                        'date_from' => $demandData['date_from'],
+                        'date_to' => $demandData['date_to'],
+                        'notes' => $demandData['notes'],
+                    ]);
+                    $createdDemands[] = $existingDemand;
+                } else {
+                    // Utwórz nowe zapotrzebowanie
+                    $createdDemands[] = $project->demands()->create($demandData);
+                }
             }
 
             DB::commit();

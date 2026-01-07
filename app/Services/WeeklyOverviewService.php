@@ -235,7 +235,8 @@ class WeeklyOverviewService
         
         // Map accommodations with their counts
         return $accommodations->map(function ($accommodation) use ($allAccommodationAssignments) {
-            $totalEmployeeCount = $allAccommodationAssignments->get($accommodation->id)?->count() ?? 0;
+            $assignments = $allAccommodationAssignments->get($accommodation->id) ?? collect();
+            $totalEmployeeCount = $assignments->count();
             
             return [
                 'accommodation' => $accommodation,
@@ -245,6 +246,7 @@ class WeeklyOverviewService
                 'usage_percentage' => $accommodation->capacity > 0 
                     ? round(($totalEmployeeCount / $accommodation->capacity) * 100, 0) 
                     : 0,
+                'assignments' => $assignments->values(),
             ];
         })->values();
     }
@@ -309,7 +311,15 @@ class WeeklyOverviewService
         return $vehicles->map(function ($vehicle) use ($allVehicleAssignments) {
             $assignments = $allVehicleAssignments->get($vehicle->id) ?? collect();
             $totalEmployeeCount = $assignments->count();
-            $driverAssignment = $assignments->first();
+            
+            // Find driver assignment (position = 'driver')
+            $driverAssignment = $assignments->first(function ($assignment) {
+                $position = $assignment->position;
+                if ($position instanceof \App\Enums\VehiclePosition) {
+                    return $position === \App\Enums\VehiclePosition::DRIVER;
+                }
+                return $position === 'driver' || $position === \App\Enums\VehiclePosition::DRIVER->value;
+            });
             
             return [
                 'vehicle' => $vehicle,
@@ -321,6 +331,14 @@ class WeeklyOverviewService
                 'usage_percentage' => $vehicle->capacity > 0 
                     ? round(($totalEmployeeCount / $vehicle->capacity) * 100, 0) 
                     : 0,
+                'assignments' => $assignments->sortBy(function ($assignment) {
+                    // Sort: drivers first, then passengers
+                    $position = $assignment->position;
+                    if ($position instanceof \App\Enums\VehiclePosition) {
+                        return $position === \App\Enums\VehiclePosition::DRIVER ? 0 : 1;
+                    }
+                    return ($position === 'driver' || $position === \App\Enums\VehiclePosition::DRIVER->value) ? 0 : 1;
+                })->values(),
             ];
         })->values();
     }

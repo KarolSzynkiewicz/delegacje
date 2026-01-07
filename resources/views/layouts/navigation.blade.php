@@ -84,6 +84,44 @@
                                 <x-dropdown-link :href="route('projects.index')" :active="request()->routeIs('projects.*') && request()->routeIs('*.demands.*')">
                                     {{ __('Zapotrzebowania projektów') }}
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('return-trips.index')" :active="request()->routeIs('return-trips.*')">
+                                    {{ __('Zjazdy') }}
+                                </x-dropdown-link>
+                            </x-slot>
+                        </x-dropdown>
+                        
+                        <!-- Logistyka Dropdown -->
+                        <x-dropdown align="left" width="56">
+                            <x-slot name="trigger">
+                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') || request()->routeIs('transport-costs.*') || request()->routeIs('time-logs.*') ? 'text-gray-900' : '' }}">
+                                    {{ __('Logistyka') }}
+                                    <svg class="ms-1 -me-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </x-slot>
+
+                            <x-slot name="content">
+                                @can('viewAny', \App\Models\Equipment::class)
+                                    <x-dropdown-link :href="route('equipment.index')" :active="request()->routeIs('equipment.*')">
+                                        {{ __('Sprzęt') }}
+                                    </x-dropdown-link>
+                                @endcan
+                                @can('viewAny', \App\Models\EquipmentIssue::class)
+                                    <x-dropdown-link :href="route('equipment-issues.index')" :active="request()->routeIs('equipment-issues.*')">
+                                        {{ __('Wydania sprzętu') }}
+                                    </x-dropdown-link>
+                                @endcan
+                                @can('viewAny', \App\Models\TransportCost::class)
+                                    <x-dropdown-link :href="route('transport-costs.index')" :active="request()->routeIs('transport-costs.*')">
+                                        {{ __('Koszty transportu') }}
+                                    </x-dropdown-link>
+                                @endcan
+                                @can('viewAny', \App\Models\TimeLog::class)
+                                    <x-dropdown-link :href="route('time-logs.index')" :active="request()->routeIs('time-logs.*')">
+                                        {{ __('Ewidencja godzin') }}
+                                    </x-dropdown-link>
+                                @endcan
                             </x-slot>
                         </x-dropdown>
                         
@@ -223,7 +261,40 @@
                     <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*') && request()->routeIs('*.demands.*')">
                         {{ __('Zapotrzebowania projektów') }}
                     </x-responsive-nav-link>
+                    @can('viewAny', \App\Models\LogisticsEvent::class)
+                    <x-responsive-nav-link :href="route('return-trips.index')" :active="request()->routeIs('return-trips.*')">
+                        {{ __('Zjazdy') }}
+                    </x-responsive-nav-link>
+                    @endcan
                 </div>
+                
+                @if(auth()->check() && (auth()->user()->can('viewAny', \App\Models\Equipment::class) || auth()->user()->can('viewAny', \App\Models\EquipmentIssue::class) || auth()->user()->can('viewAny', \App\Models\TransportCost::class) || auth()->user()->can('viewAny', \App\Models\TimeLog::class)))
+                <div class="border-t border-gray-200 pt-2 mt-2">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {{ __('Logistyka') }}
+                    </div>
+                    @can('viewAny', \App\Models\Equipment::class)
+                    <x-responsive-nav-link :href="route('equipment.index')" :active="request()->routeIs('equipment.*')">
+                        {{ __('Sprzęt') }}
+                    </x-responsive-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Models\EquipmentIssue::class)
+                    <x-responsive-nav-link :href="route('equipment-issues.index')" :active="request()->routeIs('equipment-issues.*')">
+                        {{ __('Wydania sprzętu') }}
+                    </x-responsive-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Models\TransportCost::class)
+                    <x-responsive-nav-link :href="route('transport-costs.index')" :active="request()->routeIs('transport-costs.*')">
+                        {{ __('Koszty transportu') }}
+                    </x-responsive-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Models\TimeLog::class)
+                    <x-responsive-nav-link :href="route('time-logs.index')" :active="request()->routeIs('time-logs.*')">
+                        {{ __('Ewidencja godzin') }}
+                    </x-responsive-nav-link>
+                    @endcan
+                </div>
+                @endif
                 
                 @canany(['users.viewAny', 'user-roles.viewAny'])
                 <div class="border-t border-gray-200 pt-2 mt-2">

@@ -107,6 +107,41 @@ class PermissionSeeder extends Seeder
             ['name' => 'Edycja użytkowników', 'slug' => 'users.update', 'model' => 'users', 'action' => 'update', 'description' => 'Może edytować użytkowników'],
             ['name' => 'Usuwanie użytkowników', 'slug' => 'users.delete', 'model' => 'users', 'action' => 'delete', 'description' => 'Może usuwać użytkowników'],
 
+            // Logistics Events (Zjazdy/Wyjazdy)
+            ['name' => 'Przeglądanie zdarzeń logistycznych', 'slug' => 'logistics-events.viewAny', 'model' => 'logistics-events', 'action' => 'viewAny', 'description' => 'Może przeglądać listę zdarzeń logistycznych'],
+            ['name' => 'Szczegóły zdarzenia logistycznego', 'slug' => 'logistics-events.view', 'model' => 'logistics-events', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły zdarzenia logistycznego'],
+            ['name' => 'Tworzenie zdarzeń logistycznych', 'slug' => 'logistics-events.create', 'model' => 'logistics-events', 'action' => 'create', 'description' => 'Może tworzyć nowe zdarzenia logistyczne'],
+            ['name' => 'Edycja zdarzeń logistycznych', 'slug' => 'logistics-events.update', 'model' => 'logistics-events', 'action' => 'update', 'description' => 'Może edytować zdarzenia logistyczne'],
+            ['name' => 'Usuwanie zdarzeń logistycznych', 'slug' => 'logistics-events.delete', 'model' => 'logistics-events', 'action' => 'delete', 'description' => 'Może usuwać zdarzenia logistyczne'],
+
+            // Equipment
+            ['name' => 'Przeglądanie sprzętu', 'slug' => 'equipment.viewAny', 'model' => 'equipment', 'action' => 'viewAny', 'description' => 'Może przeglądać listę sprzętu'],
+            ['name' => 'Szczegóły sprzętu', 'slug' => 'equipment.view', 'model' => 'equipment', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły sprzętu'],
+            ['name' => 'Tworzenie sprzętu', 'slug' => 'equipment.create', 'model' => 'equipment', 'action' => 'create', 'description' => 'Może tworzyć nowy sprzęt'],
+            ['name' => 'Edycja sprzętu', 'slug' => 'equipment.update', 'model' => 'equipment', 'action' => 'update', 'description' => 'Może edytować sprzęt'],
+            ['name' => 'Usuwanie sprzętu', 'slug' => 'equipment.delete', 'model' => 'equipment', 'action' => 'delete', 'description' => 'Może usuwać sprzęt'],
+
+            // Equipment Issues
+            ['name' => 'Przeglądanie wydań sprzętu', 'slug' => 'equipment-issues.viewAny', 'model' => 'equipment-issues', 'action' => 'viewAny', 'description' => 'Może przeglądać listę wydań sprzętu'],
+            ['name' => 'Szczegóły wydania sprzętu', 'slug' => 'equipment-issues.view', 'model' => 'equipment-issues', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły wydania sprzętu'],
+            ['name' => 'Tworzenie wydań sprzętu', 'slug' => 'equipment-issues.create', 'model' => 'equipment-issues', 'action' => 'create', 'description' => 'Może tworzyć nowe wydania sprzętu'],
+            ['name' => 'Edycja wydań sprzętu', 'slug' => 'equipment-issues.update', 'model' => 'equipment-issues', 'action' => 'update', 'description' => 'Może edytować wydania sprzętu'],
+            ['name' => 'Usuwanie wydań sprzętu', 'slug' => 'equipment-issues.delete', 'model' => 'equipment-issues', 'action' => 'delete', 'description' => 'Może usuwać wydania sprzętu'],
+
+            // Transport Costs
+            ['name' => 'Przeglądanie kosztów transportu', 'slug' => 'transport-costs.viewAny', 'model' => 'transport-costs', 'action' => 'viewAny', 'description' => 'Może przeglądać listę kosztów transportu'],
+            ['name' => 'Szczegóły kosztu transportu', 'slug' => 'transport-costs.view', 'model' => 'transport-costs', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły kosztu transportu'],
+            ['name' => 'Tworzenie kosztów transportu', 'slug' => 'transport-costs.create', 'model' => 'transport-costs', 'action' => 'create', 'description' => 'Może tworzyć nowe koszty transportu'],
+            ['name' => 'Edycja kosztów transportu', 'slug' => 'transport-costs.update', 'model' => 'transport-costs', 'action' => 'update', 'description' => 'Może edytować koszty transportu'],
+            ['name' => 'Usuwanie kosztów transportu', 'slug' => 'transport-costs.delete', 'model' => 'transport-costs', 'action' => 'delete', 'description' => 'Może usuwać koszty transportu'],
+
+            // Time Logs
+            ['name' => 'Przeglądanie ewidencji godzin', 'slug' => 'time-logs.viewAny', 'model' => 'time-logs', 'action' => 'viewAny', 'description' => 'Może przeglądać listę ewidencji godzin'],
+            ['name' => 'Szczegóły ewidencji godzin', 'slug' => 'time-logs.view', 'model' => 'time-logs', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły ewidencji godzin'],
+            ['name' => 'Tworzenie ewidencji godzin', 'slug' => 'time-logs.create', 'model' => 'time-logs', 'action' => 'create', 'description' => 'Może tworzyć nowe wpisy ewidencji godzin'],
+            ['name' => 'Edycja ewidencji godzin', 'slug' => 'time-logs.update', 'model' => 'time-logs', 'action' => 'update', 'description' => 'Może edytować wpisy ewidencji godzin'],
+            ['name' => 'Usuwanie ewidencji godzin', 'slug' => 'time-logs.delete', 'model' => 'time-logs', 'action' => 'delete', 'description' => 'Może usuwać wpisy ewidencji godzin'],
+
         ];
 
         foreach ($permissions as $permission) {

@@ -77,10 +77,17 @@
                         <label class="block text-gray-700 text-sm font-bold mb-2">Status</label>
                         <select name="status" required
                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 @error('status') border-red-500 @enderror">
-                            <option value="pending" {{ old('status', $assignment->status) == 'pending' ? 'selected' : '' }}>Oczekujące</option>
-                            <option value="active" {{ old('status', $assignment->status) == 'active' ? 'selected' : '' }}>Aktywne</option>
-                            <option value="completed" {{ old('status', $assignment->status) == 'completed' ? 'selected' : '' }}>Zakończone</option>
-                            <option value="cancelled" {{ old('status', $assignment->status) == 'cancelled' ? 'selected' : '' }}>Anulowane</option>
+                            @php
+                                $currentStatus = $assignment->status instanceof \App\Enums\AssignmentStatus 
+                                    ? $assignment->status->value 
+                                    : ($assignment->status ?? 'active');
+                                $oldStatus = old('status', $currentStatus);
+                            @endphp
+                            <option value="active" {{ $oldStatus == 'active' ? 'selected' : '' }}>Aktywny</option>
+                            <option value="in_transit" {{ $oldStatus == 'in_transit' ? 'selected' : '' }}>W transporcie</option>
+                            <option value="at_base" {{ $oldStatus == 'at_base' ? 'selected' : '' }}>W bazie</option>
+                            <option value="completed" {{ $oldStatus == 'completed' ? 'selected' : '' }}>Zakończony</option>
+                            <option value="cancelled" {{ $oldStatus == 'cancelled' ? 'selected' : '' }}>Anulowany</option>
                         </select>
                         @error('status')
                             <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>

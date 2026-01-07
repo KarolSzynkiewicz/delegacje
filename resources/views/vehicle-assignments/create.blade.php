@@ -32,6 +32,19 @@
                     </div>
 
                     <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Rola w pojeździe <span class="text-red-500">*</span></label>
+                        <select name="position" required
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                            <option value="passenger" {{ old('position', 'passenger') == 'passenger' ? 'selected' : '' }}>Pasażer</option>
+                            <option value="driver" {{ old('position') == 'driver' ? 'selected' : '' }}>Kierowca</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Uwaga: W jednym pojeździe może być tylko jeden kierowca w danym okresie</p>
+                        @error('position')
+                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mb-4">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Data Rozpoczęcia</label>
                         <input type="date" 
                                name="start_date" 

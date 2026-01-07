@@ -21,7 +21,23 @@
                     </div>
                     <div>
                         <dt class="font-semibold">Status:</dt>
-                        <dd>{{ ucfirst($assignment->status) }}</dd>
+                        <dd>
+                            @php
+                                $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
+                                $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
+                                $statusLabel = $status instanceof \App\Enums\AssignmentStatus ? $status->label() : ucfirst($status);
+                            @endphp
+                            <span class="px-2 py-1 text-xs rounded-full 
+                                @if($statusValue === 'active') bg-green-100 text-green-800
+                                @elseif($statusValue === 'completed') bg-blue-100 text-blue-800
+                                @elseif($statusValue === 'cancelled') bg-red-100 text-red-800
+                                @elseif($statusValue === 'in_transit') bg-yellow-100 text-yellow-800
+                                @elseif($statusValue === 'at_base') bg-gray-100 text-gray-800
+                                @else bg-gray-100 text-gray-800
+                                @endif">
+                                {{ $statusLabel }}
+                            </span>
+                        </dd>
                     </div>
                     <div>
                         <dt class="font-semibold">Data Rozpoczęcia:</dt>

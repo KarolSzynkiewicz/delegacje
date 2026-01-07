@@ -23,7 +23,7 @@ class UpdateProjectDemandRequest extends FormRequest
     {
         return [
             'role_id' => ['required', 'exists:roles,id'],
-            'required_count' => ['required', 'integer', 'min:1'],
+            'required_count' => ['required', 'integer', 'min:0'],
             'date_from' => ['required', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'notes' => ['nullable', 'string'],
@@ -42,7 +42,7 @@ class UpdateProjectDemandRequest extends FormRequest
             'role_id.exists' => 'Wybrana rola nie istnieje.',
             'required_count.required' => 'Ilość jest wymagana.',
             'required_count.integer' => 'Ilość musi być liczbą całkowitą.',
-            'required_count.min' => 'Ilość musi być większa od 0.',
+            'required_count.min' => 'Ilość nie może być ujemna. Ustaw 0 aby usunąć zapotrzebowanie.',
             'date_from.required' => 'Data rozpoczęcia jest wymagana.',
             'date_from.date' => 'Data rozpoczęcia musi być poprawną datą.',
             'date_to.date' => 'Data zakończenia musi być poprawną datą.',

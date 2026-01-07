@@ -23,6 +23,7 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pojazd</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rola</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Od - Do</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
                             </tr>
@@ -31,6 +32,19 @@
                             @forelse ($assignments as $assignment)
                                 <tr>
                                     <td class="px-6 py-4">{{ $assignment->vehicle->registration_number }} ({{ $assignment->vehicle->brand }})</td>
+                                    <td class="px-6 py-4">
+                                        @php
+                                            $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                            $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                            $positionLabel = $position instanceof \App\Enums\VehiclePosition ? $position->label() : ucfirst($position);
+                                        @endphp
+                                        <span class="px-2 py-1 text-xs rounded-full 
+                                            @if($positionValue === 'driver') bg-blue-100 text-blue-800
+                                            @else bg-gray-100 text-gray-800
+                                            @endif">
+                                            {{ $positionLabel }}
+                                        </span>
+                                    </td>
                                     <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
                                     <td class="px-6 py-4">
                                         <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
@@ -43,7 +57,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">Brak przypisanych pojazdów</td>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak przypisanych pojazdów</td>
                                 </tr>
                             @endforelse
                         </tbody>

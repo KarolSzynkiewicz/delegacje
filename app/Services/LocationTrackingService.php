@@ -136,7 +136,7 @@ class LocationTrackingService
         }
 
         // Priority 3: ProjectAssignment with status ACTIVE
-        $projectAssignment = $employee->projectAssignments()
+        $projectAssignment = $employee->assignments()
             ->where('status', AssignmentStatus::ACTIVE)
             ->where('start_date', '<=', now())
             ->where(function ($q) {

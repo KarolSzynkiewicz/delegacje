@@ -134,6 +134,22 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     
     // Users Management
     Route::resource('users', UserController::class);
+    
+    // Return Trips (Zjazdy)
+    Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class);
+    
+    // Equipment
+    Route::resource('equipment', \App\Http\Controllers\EquipmentController::class);
+    Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
+    Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])->name('equipment-issues.return');
+    Route::post('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'return'])->name('equipment-issues.return.store');
+    
+    // Transport Costs
+    Route::resource('transport-costs', \App\Http\Controllers\TransportCostController::class);
+    
+    // Time Logs
+    Route::resource('time-logs', \App\Http\Controllers\TimeLogController::class);
+    Route::get('assignments/{assignment}/time-logs', [\App\Http\Controllers\TimeLogController::class, 'byAssignment'])->name('assignments.time-logs');
 });
 
 // Route for users without roles (must be outside role.required middleware)

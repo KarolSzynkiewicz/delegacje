@@ -11,6 +11,7 @@ use App\Traits\HasAssignmentLifecycle;
 use App\Contracts\AssignmentContract;
 use App\Models\Employee;
 use App\Enums\AssignmentStatus;
+use App\Enums\VehiclePosition;
 use Carbon\Carbon;
 
 class VehicleAssignment extends Model implements AssignmentContract
@@ -25,6 +26,7 @@ class VehicleAssignment extends Model implements AssignmentContract
     protected $fillable = [
         'employee_id',
         'vehicle_id',
+        'position',
         'start_date',
         'end_date',
         'status',
@@ -44,6 +46,7 @@ class VehicleAssignment extends Model implements AssignmentContract
         'actual_start_date' => 'date',
         'actual_end_date' => 'date',
         'status' => AssignmentStatus::class,
+        'position' => VehiclePosition::class,
     ];
 
     /**
@@ -83,7 +86,7 @@ class VehicleAssignment extends Model implements AssignmentContract
      */
     public function getStartDate(): Carbon
     {
-        return $this->start_date;
+        return $this->start_date ?? Carbon::now();
     }
 
     /**

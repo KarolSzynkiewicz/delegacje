@@ -57,7 +57,12 @@ class AccommodationController extends Controller
     public function show(Accommodation $accommodation)
     {
         $this->authorize('view', $accommodation);
-        return view('accommodations.show', compact('accommodation'));
+        $assignments = $accommodation->assignments()
+            ->with(['employee'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+        
+        return view('accommodations.show', compact('accommodation', 'assignments'));
     }
 
     /**

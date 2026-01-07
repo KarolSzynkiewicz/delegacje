@@ -39,12 +39,39 @@
                             </div>
                         @endif
                         <div class="flex-1 min-w-0">
-                            <h5 class="font-semibold text-gray-800 text-base truncate">{{ $accommodation->name }}</h5>
+                            <a href="{{ route('accommodations.show', $accommodation) }}" class="hover:underline">
+                                <h5 class="font-semibold text-gray-800 text-base truncate">{{ $accommodation->name }}</h5>
+                            </a>
                         </div>
                         <div class="text-right flex-shrink-0">
                             <span class="text-sm font-bold text-gray-700">{{ $accommodationData['usage'] }}</span>
                         </div>
                     </div>
+                    
+                    {{-- Dropdown z listą osób w domu --}}
+                    @if(isset($accommodationData['assignments']) && $accommodationData['assignments']->count() > 0)
+                        <div class="mb-3">
+                            <details class="group">
+                                <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-800 font-medium flex items-center gap-1">
+                                    <span>Kto jest w tym domu? ({{ $accommodationData['assignments']->count() }})</span>
+                                    <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </summary>
+                                <ul class="mt-2 space-y-1 pl-4 border-l-2 border-gray-200">
+                                    @foreach($accommodationData['assignments'] as $assignment)
+                                        <li>
+                                            <a href="{{ route('employees.show', $assignment->employee) }}" 
+                                               class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                                                🏠 {{ $assignment->employee->full_name }}
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        </div>
+                    @endif
+                    
                     <!-- Progress bar -->
                     <div class="relative w-full h-4 bg-gray-200 rounded-full overflow-hidden">
                         <div 

@@ -39,7 +39,21 @@ class ProjectDemandController extends Controller
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         
-        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo"));
+        // Pobierz istniejące zapotrzebowania dla tego projektu w tym okresie (jeśli daty są podane)
+        $existingDemands = collect();
+        if ($dateFrom && $dateTo) {
+            $existingDemands = $project->demands()
+                ->where('date_from', '<=', $dateTo)
+                ->where(function ($q) use ($dateFrom) {
+                    $q->whereNull('date_to')
+                      ->orWhere('date_to', '>=', $dateFrom);
+                })
+                ->with('role')
+                ->get()
+                ->keyBy('role_id');
+        }
+        
+        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo", "existingDemands"));
     }
 
     /**
@@ -84,7 +98,19 @@ class ProjectDemandController extends Controller
      */
     public function update(UpdateProjectDemandRequest $request, ProjectDemand $demand)
     {
-        $demand->update($request->validated());
+        $validated = $request->validated();
+        
+        // Jeśli required_count = 0, usuń zapotrzebowanie
+        if ($validated['required_count'] == 0) {
+            $projectId = $demand->project_id;
+            $demand->delete();
+            
+            return redirect()
+                ->route("projects.demands.index", $projectId)
+                ->with("success", "Zapotrzebowanie zostało usunięte (ilość ustawiona na 0).");
+        }
+        
+        $demand->update($validated);
 
         return redirect()
             ->route("projects.demands.index", $demand->project_id)

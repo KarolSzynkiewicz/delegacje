@@ -179,6 +179,71 @@
                             </div>
                             <p class="text-sm text-orange-700">Zarządzaj dokumentami pracowników</p>
                         </a>
+
+                        <!-- Zjazdy -->
+                        @can('viewAny', \App\Models\LogisticsEvent::class)
+                        <a href="{{ route('return-trips.index') }}" class="block p-6 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-slate-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-slate-800">Zjazdy</h4>
+                            </div>
+                            <p class="text-sm text-slate-700">Zarządzaj zjazdami pracowników do bazy</p>
+                        </a>
+                        @endcan
+
+                        <!-- Sprzęt -->
+                        @can('viewAny', \App\Models\Equipment::class)
+                        <a href="{{ route('equipment.index') }}" class="block p-6 bg-lime-50 border border-lime-200 rounded-lg hover:bg-lime-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-lime-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-lime-800">Sprzęt</h4>
+                            </div>
+                            <p class="text-sm text-lime-700">Zarządzaj sprzętem i magazynem</p>
+                        </a>
+                        @endcan
+
+                        <!-- Wydania Sprzętu -->
+                        @can('viewAny', \App\Models\EquipmentIssue::class)
+                        <a href="{{ route('equipment-issues.index') }}" class="block p-6 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-emerald-800">Wydania Sprzętu</h4>
+                            </div>
+                            <p class="text-sm text-emerald-700">Wydania i zwroty sprzętu</p>
+                        </a>
+                        @endcan
+
+                        <!-- Koszty Transportu -->
+                        @can('viewAny', \App\Models\TransportCost::class)
+                        <a href="{{ route('transport-costs.index') }}" class="block p-6 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-rose-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-rose-800">Koszty Transportu</h4>
+                            </div>
+                            <p class="text-sm text-rose-700">Ewidencja kosztów transportu</p>
+                        </a>
+                        @endcan
+
+                        <!-- Ewidencja Godzin -->
+                        @can('viewAny', \App\Models\TimeLog::class)
+                        <a href="{{ route('time-logs.index') }}" class="block p-6 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-6 h-6 text-teal-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <h4 class="text-lg font-semibold text-teal-800">Ewidencja Godzin</h4>
+                            </div>
+                            <p class="text-sm text-teal-700">Rejestracja rzeczywistych godzin pracy</p>
+                        </a>
+                        @endcan
                     </div>
                 </div>
             </div>

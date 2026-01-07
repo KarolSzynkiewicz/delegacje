@@ -36,8 +36,20 @@
                                     <td class="px-6 py-4">{{ $assignment->role->name }}</td>
                                     <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
                                     <td class="px-6 py-4">
-                                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                            {{ ucfirst($assignment->status) }}
+                                        @php
+                                            $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
+                                            $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
+                                            $statusLabel = $status instanceof \App\Enums\AssignmentStatus ? $status->label() : ucfirst($status);
+                                        @endphp
+                                        <span class="px-2 py-1 text-xs rounded-full 
+                                            @if($statusValue === 'active') bg-green-100 text-green-800
+                                            @elseif($statusValue === 'completed') bg-blue-100 text-blue-800
+                                            @elseif($statusValue === 'cancelled') bg-red-100 text-red-800
+                                            @elseif($statusValue === 'in_transit') bg-yellow-100 text-yellow-800
+                                            @elseif($statusValue === 'at_base') bg-gray-100 text-gray-800
+                                            @else bg-gray-100 text-gray-800
+                                            @endif">
+                                            {{ $statusLabel }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">

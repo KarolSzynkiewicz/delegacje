@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\ProjectAssignment;
+use App\Models\VehicleAssignment;
+use App\Models\AccommodationAssignment;
+use App\Models\Employee;
+use App\Contracts\AssignmentContract;
+use App\Enums\AssignmentStatus;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+
+/**
+ * Service for querying assignments.
+ * 
+ * Centralizes common assignment queries to avoid duplication.
+ * Follows DRY principle.
+ */
+class AssignmentQueryService
+{
+    /**
+     * Get all active assignments for employees at a specific date.
+     * 
+     * Returns Collection of AssignmentContract implementations.
+     * 
+     * @param array $employeeIds
+     * @param Carbon $date
+     * @return Collection<AssignmentContract>
+     */
+    public function getActiveAssignmentsForEmployees(array $employeeIds, Carbon $date): Collection
+    {
+        $assignments = collect();
+
+        // Get project assignments
+        $projectAssignments = ProjectAssignment::whereIn('employee_id', $employeeIds)
+            ->activeAtDate($date)
+            ->get();
+
+        $assignments = $assignments->merge($projectAssignments);
+
+        // Get accommodation assignments
+        $accommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
+            ->activeAtDate($date)
+            ->get();
+
+        $assignments = $assignments->merge($accommodationAssignments);
+
+        return $assignments;
+    }
+
+    /**
+     * Check if employee has any active assignment at a specific date.
+     * 
+     * @param int $employeeId
+     * @param Carbon $date
+     * @return bool
+     */
+    public function hasActiveAssignment(int $employeeId, Carbon $date): bool
+    {
+        return ProjectAssignment::where('employee_id', $employeeId)
+                ->activeAtDate($date)
+                ->exists() ||
+            AccommodationAssignment::where('employee_id', $employeeId)
+                ->activeAtDate($date)
+                ->exists();
+    }
+
+    /**
+     * Get employees with active assignments at a specific date.
+     * 
+     * @param Carbon $date
+     * @return Collection<Employee>
+     */
+    public function getEmployeesWithActiveAssignments(Carbon $date): Collection
+    {
+        return Employee::whereHas('assignments', function ($query) use ($date) {
+                $query->activeAtDate($date);
+            })
+            ->orWhereHas('accommodationAssignments', function ($query) use ($date) {
+                $query->activeAtDate($date);
+            })
+            ->with(['assignments' => function ($query) use ($date) {
+                $query->activeAtDate($date);
+            }])
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+    }
+
+    /**
+     * Get active vehicle assignment for employee at a specific date.
+     * 
+     * @param int $employeeId
+     * @param Carbon $date
+     * @return VehicleAssignment|null
+     */
+    public function getActiveVehicleAssignment(int $employeeId, Carbon $date): ?VehicleAssignment
+    {
+        return VehicleAssignment::where('employee_id', $employeeId)
+            ->activeAtDate($date)
+            ->first();
+    }
+}

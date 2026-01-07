@@ -30,6 +30,7 @@ class StoreLocationRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string'],
+            'is_base' => ['nullable', 'boolean'],
         ];
     }
 

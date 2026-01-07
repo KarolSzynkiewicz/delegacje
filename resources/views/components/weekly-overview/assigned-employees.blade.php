@@ -41,7 +41,7 @@
                         @endif
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="font-bold text-gray-900 text-base">{{ $employeeData['employee']->full_name }}</span>
+                                <a href="{{ route('employees.show', $employeeData['employee']) }}" class="font-bold text-gray-900 text-base hover:underline">{{ $employeeData['employee']->full_name }}</a>
                                 <span class="text-gray-600">–</span>
                                 <span class="text-gray-700 font-medium">{{ $employeeData['role']->name }}</span>
                                 @if($employeeData['is_partial'])
@@ -66,7 +66,8 @@
                             <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                             </svg>
-                            <span class="font-medium">dom:</span> {{ $employeeData['accommodation']->name }}
+                            <span class="font-medium">dom:</span> 
+                            <a href="{{ route('accommodations.show', $employeeData['accommodation']) }}" class="hover:underline">{{ $employeeData['accommodation']->name }}</a>
                         </div>
                     @endif
                     @if($employeeData['vehicle'])
@@ -74,7 +75,8 @@
                             <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
                             </svg>
-                            <span class="font-medium">auto:</span> {{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }} {{ $employeeData['vehicle']->registration_number }}
+                            <span class="font-medium">auto:</span> 
+                            <a href="{{ route('vehicles.show', $employeeData['vehicle']) }}" class="hover:underline">{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }} {{ $employeeData['vehicle']->registration_number }}</a>
                         </div>
                     @endif
                 </div>

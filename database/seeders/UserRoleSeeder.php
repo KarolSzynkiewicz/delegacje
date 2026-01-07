@@ -78,6 +78,12 @@ class UserRoleSeeder extends Seeder
             'demands.viewAny', 'demands.view', 'demands.create', 'demands.update',
             'reports.viewAny', 'reports.view', 'reports.create', 'reports.update',
             'weekly-overview.view',
+            // Nowe funkcjonalności
+            'logistics-events.viewAny', 'logistics-events.view', 'logistics-events.create', 'logistics-events.update',
+            'equipment.viewAny', 'equipment.view', 'equipment.create', 'equipment.update',
+            'equipment-issues.viewAny', 'equipment-issues.view', 'equipment-issues.create', 'equipment-issues.update',
+            'transport-costs.viewAny', 'transport-costs.view', 'transport-costs.create', 'transport-costs.update',
+            'time-logs.viewAny', 'time-logs.view', 'time-logs.create', 'time-logs.update',
         ])->get();
 
         $manager->syncPermissions($managerPermissions);
@@ -96,6 +102,12 @@ class UserRoleSeeder extends Seeder
             'demands.viewAny', 'demands.view',
             'reports.viewAny', 'reports.view',
             'weekly-overview.view',
+            // Nowe funkcjonalności - tylko przeglądanie
+            'logistics-events.viewAny', 'logistics-events.view',
+            'equipment.viewAny', 'equipment.view',
+            'equipment-issues.viewAny', 'equipment-issues.view',
+            'transport-costs.viewAny', 'transport-costs.view',
+            'time-logs.viewAny', 'time-logs.view',
         ])->get();
 
         $officeWorker->syncPermissions($officeWorkerPermissions);

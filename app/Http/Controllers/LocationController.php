@@ -36,7 +36,10 @@ class LocationController extends Controller
     {
         $this->authorize('create', Location::class);
         
-        Location::create($request->validated());
+        $data = $request->validated();
+        $data['is_base'] = $request->has('is_base') && $request->input('is_base') == '1';
+        
+        Location::create($data);
 
         return redirect()->route('locations.index')->with('success', 'Lokalizacja została dodana.');
     }
@@ -67,7 +70,10 @@ class LocationController extends Controller
     {
         $this->authorize('update', $location);
         
-        $location->update($request->validated());
+        $data = $request->validated();
+        $data['is_base'] = $request->has('is_base') && $request->input('is_base') == '1';
+        
+        $location->update($data);
 
         return redirect()->route('locations.index')->with('success', 'Lokalizacja została zaktualizowana.');
     }

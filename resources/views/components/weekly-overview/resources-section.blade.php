@@ -39,10 +39,17 @@
                             </div>
                         @endif
                         <div class="flex-1 min-w-0">
-                            <h5 class="font-semibold text-gray-800 text-base truncate">{{ $vehicleData['vehicle_name'] }}</h5>
+                            <a href="{{ route('vehicles.show', $vehicle) }}" class="hover:underline">
+                                <h5 class="font-semibold text-gray-800 text-base truncate">{{ $vehicleData['vehicle_name'] }}</h5>
+                            </a>
                             @if($vehicleData['driver'])
                                 <p class="text-sm text-green-600 font-semibold mt-1">
-                                    <span class="text-gray-600">kierowca:</span> {{ $vehicleData['driver']->full_name }}
+                                    <span class="text-gray-600">kierowca:</span> 
+                                    <a href="{{ route('employees.show', $vehicleData['driver']) }}" class="hover:underline">{{ $vehicleData['driver']->full_name }}</a>
+                                </p>
+                            @else
+                                <p class="text-sm text-red-600 font-semibold mt-1">
+                                    Brak kierowcy
                                 </p>
                             @endif
                         </div>
@@ -50,6 +57,42 @@
                             <span class="text-sm font-bold text-gray-700">{{ $vehicleData['usage'] }}</span>
                         </div>
                     </div>
+                    
+                    {{-- Dropdown z listą osób w aucie --}}
+                    @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
+                        <div class="mb-3">
+                            <details class="group">
+                                <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-800 font-medium flex items-center gap-1">
+                                    <span>Kto jest w tym aucie? ({{ $vehicleData['assignments']->count() }})</span>
+                                    <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </summary>
+                                <ul class="mt-2 space-y-1 pl-4 border-l-2 border-gray-200">
+                                    @foreach($vehicleData['assignments'] as $assignment)
+                                        @php
+                                            $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                            $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                            $isDriver = $positionValue === 'driver';
+                                        @endphp
+                                        <li>
+                                            <a href="{{ route('employees.show', $assignment->employee) }}" 
+                                               class="text-sm {{ $isDriver ? 'text-green-600 font-semibold' : 'text-blue-600' }} hover:underline flex items-center gap-1">
+                                                @if($isDriver)
+                                                    🚗 
+                                                @endif
+                                                {{ $assignment->employee->full_name }}
+                                                @if($isDriver)
+                                                    <span class="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">Kierowca</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        </div>
+                    @endif
+                    
                     <!-- Progress bar -->
                     <div class="relative w-full h-4 bg-gray-200 rounded-full overflow-hidden">
                         <div 

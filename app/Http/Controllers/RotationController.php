@@ -237,10 +237,26 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Status jest automatyczny - nie zapisujemy go (chyba że cancelled)
-        // Jeśli nie ma statusu cancelled, ustawiamy null (będzie obliczony automatycznie)
-        if (!isset($validated['status']) || $validated['status'] !== 'cancelled') {
-            $validated['status'] = null;
+        // Obsługa statusu:
+        // - Jeśli status jest 'cancelled' w request, ustawiamy 'cancelled'
+        // - Jeśli status jest pusty/null, a w bazie jest 'cancelled', ustawiamy 'active' (odanulowanie)
+        // - W przeciwnym razie nie aktualizujemy statusu (usuwamy z tablicy)
+        if (isset($validated['status']) && $validated['status'] === 'cancelled') {
+            // Ustawiamy cancelled
+            $validated['status'] = 'cancelled';
+        } elseif (empty($validated['status']) || !isset($validated['status'])) {
+            // Jeśli status jest pusty, sprawdź czy rotacja była anulowana
+            $currentStatus = $rotation->getAttributes()['status'] ?? null;
+            if ($currentStatus === 'cancelled') {
+                // Odanulowanie - ustawiamy na 'active' (wartość domyślna)
+                $validated['status'] = 'active';
+            } else {
+                // Nie aktualizujemy statusu - zostanie obliczony automatycznie
+                unset($validated['status']);
+            }
+        } else {
+            // Status nie jest 'cancelled' i nie jest pusty - nie aktualizujemy
+            unset($validated['status']);
         }
 
         try {

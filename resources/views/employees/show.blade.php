@@ -26,6 +26,11 @@
                         Rotacje ({{ $employee->rotations->count() }})
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button" role="tab">
+                        Przypisania do projektów ({{ $projectAssignments->count() }})
+                    </button>
+                </li>
             </ul>
 
             <div class="tab-content" id="employeeTabsContent">
@@ -224,6 +229,74 @@
                         @else
                             <p class="text-muted">Brak rotacji dla tego pracownika.</p>
                             <a href="{{ route('employees.rotations.create', $employee) }}" class="btn btn-primary">Dodaj pierwszą rotację</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+
+                <!-- Zakładka Przypisania do projektów -->
+                <div class="tab-pane fade" id="assignments" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>Przypisania do projektów</h5>
+                        @if($projectAssignments->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Projekt</th>
+                                            <th>Rola</th>
+                                            <th>Okres</th>
+                                            <th>Status</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($projectAssignments as $assignment)
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ route('projects.show', $assignment->project) }}" class="text-primary">
+                                                        {{ $assignment->project->name }}
+                                                    </a>
+                                                </td>
+                                                <td>{{ $assignment->role->name }}</td>
+                                                <td>
+                                                    {{ $assignment->start_date->format('Y-m-d') }}
+                                                    @if($assignment->end_date)
+                                                        - {{ $assignment->end_date->format('Y-m-d') }}
+                                                    @else
+                                                        - ...
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @php
+                                                        $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
+                                                        $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
+                                                        $statusLabel = $status instanceof \App\Enums\AssignmentStatus ? $status->label() : ucfirst($status);
+                                                    @endphp
+                                                    <span class="badge 
+                                                        @if($statusValue === 'active') bg-success
+                                                        @elseif($statusValue === 'completed') bg-info
+                                                        @elseif($statusValue === 'cancelled') bg-danger
+                                                        @elseif($statusValue === 'in_transit') bg-warning
+                                                        @elseif($statusValue === 'at_base') bg-secondary
+                                                        @else bg-secondary
+                                                        @endif">
+                                                        {{ $statusLabel }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <a href="{{ route('assignments.show', $assignment) }}" class="btn btn-sm btn-info">Szczegóły</a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak przypisań do projektów dla tego pracownika.</p>
                         @endif
                     </div>
                 </div>

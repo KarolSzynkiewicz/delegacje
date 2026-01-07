@@ -16,17 +16,28 @@ use App\Models\ProjectDemand;
 use App\Models\Rotation;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class ViewTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
         parent::setUp();
+        
+        // Run seeders to set up roles and permissions
+        $this->artisan('db:seed', ['--class' => 'PermissionSeeder']);
+        $this->artisan('db:seed', ['--class' => 'UserRoleSeeder']);
+        
         $this->user = User::factory()->create();
+        
+        // Assign administrator role to user for tests
+        $adminRole = \Spatie\Permission\Models\Role::where('name', 'administrator')->first();
+        if ($adminRole) {
+            $this->user->assignRole($adminRole);
+        }
     }
 
     /**

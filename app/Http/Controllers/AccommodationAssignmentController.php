@@ -77,43 +77,49 @@ class AccommodationAssignmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(AccommodationAssignment $accommodation)
+    public function show(AccommodationAssignment $accommodationAssignment)
     {
-        $accommodation->load('employee', 'accommodation');
+        $accommodationAssignment->load('employee', 'accommodation');
         
-        return view('accommodation-assignments.show', compact('accommodation'));
+        return view('accommodation-assignments.show', compact('accommodationAssignment'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(AccommodationAssignment $accommodation)
+    public function edit(AccommodationAssignment $accommodationAssignment)
     {
         $employees = Employee::orderBy('last_name')->get();
         $accommodations = Accommodation::orderBy('name')->get();
         
-        return view('accommodation-assignments.edit', compact('accommodation', 'employees', 'accommodations'));
+        return view('accommodation-assignments.edit', compact('accommodationAssignment', 'employees', 'accommodations'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAccommodationAssignmentRequest $request, AccommodationAssignment $accommodation)
+    public function update(UpdateAccommodationAssignmentRequest $request, AccommodationAssignment $accommodationAssignment)
     {
-        $accommodation->update($request->validated());
+        try {
+            $this->assignmentService->updateAssignment($accommodationAssignment, $request->validated());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->withErrors($e->errors());
+        }
 
         return redirect()
-            ->route('employees.accommodations.index', $accommodation->employee_id)
+            ->route('employees.accommodations.index', $accommodationAssignment->employee_id)
             ->with('success', 'Przypisanie mieszkania zostało zaktualizowane.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(AccommodationAssignment $accommodation)
+    public function destroy(AccommodationAssignment $accommodationAssignment)
     {
-        $employeeId = $accommodation->employee_id;
-        $accommodation->delete();
+        $employeeId = $accommodationAssignment->employee_id;
+        $accommodationAssignment->delete();
 
         return redirect()
             ->route('employees.accommodations.index', $employeeId)
