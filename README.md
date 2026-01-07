@@ -435,7 +435,7 @@ delegacje/
 
 ## 📄 Licencja
 
-Projekt stworzony przez **Manus AI** dla celów demonstracyjnych i edukacyjnych.
+Projekt stworzony dla celów demonstracyjnych i edukacyjnych.
 
 ---
 
