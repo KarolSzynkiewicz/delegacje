@@ -131,10 +131,18 @@
                                                 </td>
                                                 <td>
                                                     @if($employeeData['rotation'] ?? null)
-                                                        @if($employeeData['rotation']['days_left'] >= 0)
-                                                            <span class="text-primary fw-semibold">{{ $employeeData['rotation']['days_left'] }}</span>
+                                                        @php
+                                                            $rotationId = $employeeData['rotation']['id'] ?? null;
+                                                            $daysLeft = $employeeData['rotation']['days_left'] ?? 0;
+                                                            $employee = $employeeData['employee'];
+                                                        @endphp
+                                                        @if($rotationId)
+                                                            <a href="{{ route('employees.rotations.show', ['employee' => $employee->id, 'rotation' => $rotationId]) }}" 
+                                                               class="text-decoration-none {{ $daysLeft >= 0 ? 'text-primary' : 'text-danger' }} fw-semibold">
+                                                                {{ $daysLeft }}
+                                                            </a>
                                                         @else
-                                                            <span class="text-danger fw-semibold">{{ abs($employeeData['rotation']['days_left']) }}</span>
+                                                            <span class="{{ $daysLeft >= 0 ? 'text-primary' : 'text-danger' }} fw-semibold">{{ $daysLeft }}</span>
                                                         @endif
                                                     @else
                                                         <span class="text-muted fst-italic">Brak rotacji</span>
@@ -214,9 +222,9 @@
                                             <p class="card-text small text-muted mb-2">
                                                 {{ $vehicleData['usage'] }}
                                                 @if($vehicleData['driver'])
-                                                    <br><span class="text-success"><i class="bi bi-person-check"></i> <a href="{{ route('employees.show', $vehicleData['driver']) }}" class="text-success text-decoration-none">{{ $vehicleData['driver']->full_name }}</a></span>
+                                                    <br><span class="text-success fw-semibold"><i class="bi bi-car-front-fill"></i> <a href="{{ route('employees.show', $vehicleData['driver']) }}" class="text-success text-decoration-none">{{ $vehicleData['driver']->full_name }}</a></span>
                                                 @else
-                                                    <br><span class="text-danger"><i class="bi bi-exclamation-circle"></i> Brak kierowcy</span>
+                                                    <br><span class="text-danger fw-semibold"><i class="bi bi-car-front-fill"></i> Brak kierowcy</span>
                                                 @endif
                                             </p>
                                             @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
@@ -321,11 +329,6 @@
                                 @foreach($weekData['accommodations'] as $accommodationData)
                                     @php
                                         $accommodation = $accommodationData['accommodation'];
-                                        $employeeCount = $accommodationData['employee_count'];
-                                        $capacity = $accommodationData['capacity'];
-                                        $usagePercentage = $accommodationData['usage_percentage'];
-                                        $isOverfilled = $employeeCount > $capacity;
-                                        $isFull = $employeeCount == $capacity;
                                     @endphp
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="card shadow-sm h-100">
@@ -349,14 +352,6 @@
                                                 </h6>
                                                 <p class="card-text small text-muted mb-2">
                                                     {{ $accommodationData['usage'] }}
-                                                    <br>
-                                                    @if($isOverfilled)
-                                                        <span class="badge bg-danger">Przepełnione</span>
-                                                    @elseif($isFull)
-                                                        <span class="badge bg-warning">Pełne</span>
-                                                    @else
-                                                        <span class="badge bg-success">Wolne miejsca</span>
-                                                    @endif
                                                 </p>
                                                 @if(isset($accommodationData['assignments']) && $accommodationData['assignments']->count() > 0)
                                                     <div class="mt-auto" wire:ignore.self>

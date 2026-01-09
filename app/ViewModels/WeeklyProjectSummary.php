@@ -149,4 +149,52 @@ class WeeklyProjectSummary
     {
         return $this->weekData;
     }
+
+    /**
+     * Get accommodations that are over capacity.
+     */
+    public function getOvercrowdedAccommodations(): Collection
+    {
+        if (!isset($this->weekData['accommodations'])) {
+            return collect();
+        }
+
+        return collect($this->weekData['accommodations'])->filter(function($accommodationData) {
+            return isset($accommodationData['employee_count']) 
+                && isset($accommodationData['capacity'])
+                && $accommodationData['employee_count'] > $accommodationData['capacity'];
+        });
+    }
+
+    /**
+     * Get vehicles that are over capacity.
+     */
+    public function getOvercrowdedVehicles(): Collection
+    {
+        if (!isset($this->weekData['vehicles'])) {
+            return collect();
+        }
+
+        return collect($this->weekData['vehicles'])->filter(function($vehicleData) {
+            return isset($vehicleData['employee_count']) 
+                && isset($vehicleData['capacity'])
+                && $vehicleData['employee_count'] > $vehicleData['capacity'];
+        });
+    }
+
+    /**
+     * Check if any accommodation is overcrowded.
+     */
+    public function hasOvercrowdedAccommodations(): bool
+    {
+        return $this->getOvercrowdedAccommodations()->isNotEmpty();
+    }
+
+    /**
+     * Check if any vehicle is overcrowded.
+     */
+    public function hasOvercrowdedVehicles(): bool
+    {
+        return $this->getOvercrowdedVehicles()->isNotEmpty();
+    }
 }

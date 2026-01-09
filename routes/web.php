@@ -44,7 +44,7 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     });
 
     // Projects + nested demands + assignments
-    Route::resource('projects', ProjectController::class);
+    Route::resource('projects', controller: ProjectController::class);
 
     Route::resource('projects.demands', ProjectDemandController::class)
         ->shallow()
@@ -83,7 +83,6 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     
     // Rotations (nested under employees) - scoped for security
     Route::resource('employees.rotations', RotationController::class)
-        ->except(['show'])
         ->scoped()
         ->parameters(['rotations' => 'rotation']);
     

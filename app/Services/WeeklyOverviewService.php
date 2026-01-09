@@ -435,11 +435,17 @@ class WeeklyOverviewService
             ->groupBy('employee_id');
         
         // Eager load rotations for all employees
+        // Pobierz wszystkie rotacje, które przecinają się z tygodniem (nawet jeśli już się skończyły)
+        // Rotacja przecina się z tygodniem, jeśli: start_date <= weekEnd AND end_date >= weekStart
         $employeeIds = $assignments->pluck('employee_id')->unique();
         $rotations = \App\Models\Rotation::whereIn('employee_id', $employeeIds)
-            ->where(function ($q) use ($weekEnd) {
-                $q->where('end_date', '>=', $weekEnd)
-                  ->orWhereNull('end_date');
+            ->where(function ($q) use ($weekStart, $weekEnd) {
+                $q->where(function ($query) use ($weekStart, $weekEnd) {
+                    // Rotacja przecina się z tygodniem
+                    $query->whereDate('start_date', '<=', $weekEnd->toDateString())
+                          ->whereDate('end_date', '>=', $weekStart->toDateString());
+                })
+                ->orWhereNull('end_date'); // Rotacje bez daty zakończenia
             })
             ->where(function ($q) {
                 $q->whereNull('status')
@@ -485,6 +491,7 @@ class WeeklyOverviewService
             if ($activeRotation) {
                 $daysLeft = now()->diffInDays($activeRotation->end_date, false);
                 $rotationInfo = [
+                    'id' => $activeRotation->id,
                     'end_date' => $activeRotation->end_date,
                     'days_left' => $daysLeft,
                 ];

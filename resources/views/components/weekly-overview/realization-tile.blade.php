@@ -45,9 +45,11 @@
                 @endif
                 {{-- Nadmiary --}}
                 @if(!empty($excessRoles))
-                    <div class="small text-danger">
+                    <div class="small text-danger fw-semibold">
                         @foreach($excessRoles as $roleDetail)
-                            <div>Za dużo {{ Str::lower($roleDetail['role']->name) }}: +{{ $roleDetail['excess'] }}</div>
+                            <div>
+                                <i class="bi bi-exclamation-triangle"></i> Za dużo {{ Str::lower($roleDetail['role']->name) }}: +{{ $roleDetail['excess'] }}
+                            </div>
                         @endforeach
                     </div>
                 @endif

@@ -21,72 +21,7 @@ class RotationController extends Controller
      */
     public function all(Request $request): View
     {
-        $query = Rotation::with('employee');
-
-        // Filtrowanie po pracowniku
-        if ($request->filled('employee_id')) {
-            $query->where('employee_id', $request->employee_id);
-        }
-
-        // Filtrowanie po statusie (na podstawie dat)
-        if ($request->filled('status')) {
-            $today = now()->toDateString();
-            switch ($request->status) {
-                case 'scheduled':
-                    $query->whereDate('start_date', '>', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
-                    break;
-                case 'active':
-                    $query->whereDate('start_date', '<=', $today)
-                        ->whereDate('end_date', '>=', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
-                    break;
-                case 'completed':
-                    $query->whereDate('end_date', '<', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
-                    break;
-                case 'cancelled':
-                    $query->where('status', 'cancelled');
-                    break;
-            }
-        }
-
-        // Filtrowanie po dacie rozpoczęcia (od)
-        if ($request->filled('start_date_from')) {
-            $query->whereDate('start_date', '>=', $request->start_date_from);
-        }
-
-        // Filtrowanie po dacie rozpoczęcia (do)
-        if ($request->filled('start_date_to')) {
-            $query->whereDate('start_date', '<=', $request->start_date_to);
-        }
-
-        // Filtrowanie po dacie zakończenia (od)
-        if ($request->filled('end_date_from')) {
-            $query->whereDate('end_date', '>=', $request->end_date_from);
-        }
-
-        // Filtrowanie po dacie zakończenia (do)
-        if ($request->filled('end_date_to')) {
-            $query->whereDate('end_date', '<=', $request->end_date_to);
-        }
-
-        $rotations = $query->orderBy('start_date', 'desc')
-            ->paginate(20)
-            ->withQueryString(); // Zachowaj parametry w URL przy paginacji
-
-        $employees = \App\Models\Employee::orderBy('last_name')->orderBy('first_name')->get();
-        
-        return view('rotations.index', compact('rotations', 'employees'));
+        return view('rotations.index');
     }
 
     /**
@@ -220,6 +155,15 @@ class RotationController extends Controller
         return redirect()
             ->route('employees.rotations.index', $employee)
             ->with('success', 'Rotacja została utworzona.');
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(Employee $employee, Rotation $rotation): View
+    {
+        $rotation->load('employee');
+        return view('employees.rotations.show', compact('employee', 'rotation'));
     }
 
     /**
