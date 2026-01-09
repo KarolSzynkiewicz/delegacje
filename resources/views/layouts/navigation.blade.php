@@ -1,346 +1,223 @@
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
-    <!-- Primary Navigation Menu -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-            <div class="flex">
-                <!-- Logo -->
-                <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
-                    </a>
-                </div>
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+    <div class="container-fluid">
+        <!-- Logo -->
+        <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
+            <x-application-logo class="d-block" style="height: 2rem; width: auto;" />
+        </a>
 
-                <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
-                    </x-nav-link>
-                    @auth
-                        <x-nav-link :href="route('weekly-overview.index')" :active="request()->routeIs('weekly-overview.*')">
-                            {{ __('Przegląd Tygodniowy') }}
-                        </x-nav-link>
-                        
-                        <!-- Zasoby Dropdown -->
-                        <x-dropdown align="left" width="56">
-                            <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('projects.*') || request()->routeIs('employees.*') || request()->routeIs('vehicles.*') || request()->routeIs('accommodations.*') || request()->routeIs('demands.*') ? 'text-gray-900' : '' }}">
-                                    {{ __('Zasoby') }}
-                                    <svg class="ms-1 -me-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </x-slot>
+        <!-- Toggle button for mobile -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
 
-                            <x-slot name="content">
-                                <x-dropdown-link :href="route('projects.index')" :active="request()->routeIs('projects.*') || request()->routeIs('demands.*')">
-                                    {{ __('Projekty') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
-                                    {{ __('Pracownicy') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('vehicles.index')" :active="request()->routeIs('vehicles.*') || request()->routeIs('vehicle-assignments.*')">
-                                    {{ __('Pojazdy') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*')">
-                                    {{ __('Mieszkania') }}
-                                </x-dropdown-link>
-                            </x-slot>
-                        </x-dropdown>
-                        
-                        <x-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')">
-                            {{ __('Wymagania formalne') }}
-                        </x-nav-link>
-                        <x-nav-link :href="route('employee-documents.index')" :active="request()->routeIs('employee-documents.*') || request()->routeIs('employees.*employee-documents.*')">
-                            {{ __('Dokumenty pracowników') }}
-                        </x-nav-link>
-                        <x-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">
-                            {{ __('Lokalizacje') }}
-                        </x-nav-link>
-                        <x-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
-                            {{ __('Role') }}
-                        </x-nav-link>
-                        
-                        <!-- Historia Przypisań Dropdown -->
-                        <x-dropdown align="left" width="56">
-                            <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('assignments.*') || request()->routeIs('vehicle-assignments.*') || request()->routeIs('accommodation-assignments.*') || request()->routeIs('demands.*') ? 'text-gray-900' : '' }}">
-                                    {{ __('Historia przypisań') }}
-                                    <svg class="ms-1 -me-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </x-slot>
-
-                            <x-slot name="content">
-                                <x-dropdown-link :href="route('assignments.index')" :active="request()->routeIs('assignments.*')">
-                                    {{ __('Przypisania pracowników') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('vehicle-assignments.index')" :active="request()->routeIs('vehicle-assignments.*')">
-                                    {{ __('Przypisania pojazdów') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('accommodation-assignments.index')" :active="request()->routeIs('accommodation-assignments.*')">
-                                    {{ __('Przypisania mieszkań') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('projects.index')" :active="request()->routeIs('projects.*') && request()->routeIs('*.demands.*')">
-                                    {{ __('Zapotrzebowania projektów') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('return-trips.index')" :active="request()->routeIs('return-trips.*')">
-                                    {{ __('Zjazdy') }}
-                                </x-dropdown-link>
-                            </x-slot>
-                        </x-dropdown>
-                        
-                        <!-- Logistyka Dropdown -->
-                        <x-dropdown align="left" width="56">
-                            <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') || request()->routeIs('transport-costs.*') || request()->routeIs('time-logs.*') ? 'text-gray-900' : '' }}">
-                                    {{ __('Logistyka') }}
-                                    <svg class="ms-1 -me-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </x-slot>
-
-                            <x-slot name="content">
-                                @can('viewAny', \App\Models\Equipment::class)
-                                    <x-dropdown-link :href="route('equipment.index')" :active="request()->routeIs('equipment.*')">
-                                        {{ __('Sprzęt') }}
-                                    </x-dropdown-link>
-                                @endcan
-                                @can('viewAny', \App\Models\EquipmentIssue::class)
-                                    <x-dropdown-link :href="route('equipment-issues.index')" :active="request()->routeIs('equipment-issues.*')">
-                                        {{ __('Wydania sprzętu') }}
-                                    </x-dropdown-link>
-                                @endcan
-                                @can('viewAny', \App\Models\TransportCost::class)
-                                    <x-dropdown-link :href="route('transport-costs.index')" :active="request()->routeIs('transport-costs.*')">
-                                        {{ __('Koszty transportu') }}
-                                    </x-dropdown-link>
-                                @endcan
-                                @can('viewAny', \App\Models\TimeLog::class)
-                                    <x-dropdown-link :href="route('time-logs.index')" :active="request()->routeIs('time-logs.*')">
-                                        {{ __('Ewidencja godzin') }}
-                                    </x-dropdown-link>
-                                @endcan
-                            </x-slot>
-                        </x-dropdown>
-                        
-                        <!-- Administracja Dropdown -->
-                        @canany(['users.viewAny', 'user-roles.viewAny'])
-                        <x-dropdown align="left" width="56">
-                            <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition ease-in-out duration-150 {{ request()->routeIs('users.*') || request()->routeIs('user-roles.*') ? 'text-gray-900' : '' }}">
-                                    {{ __('Administracja') }}
-                                    <svg class="ms-1 -me-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </x-slot>
-
-                            <x-slot name="content">
-                                @can('users.viewAny')
-                                <x-dropdown-link :href="route('users.index')" :active="request()->routeIs('users.*')">
-                                    {{ __('Użytkownicy') }}
-                                </x-dropdown-link>
-                                @endcan
-                                @can('user-roles.viewAny')
-                                <x-dropdown-link :href="route('user-roles.index')" :active="request()->routeIs('user-roles.*')">
-                                    {{ __('Role użytkowników') }}
-                                </x-dropdown-link>
-                                @endcan
-                            </x-slot>
-                        </x-dropdown>
-                        @endcanany
-                    @endauth
-                </div>
-            </div>
-
-            <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+        <!-- Navigation content -->
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
                 @auth
-                <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                            <div>{{ Auth::user()->name }}</div>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('weekly-overview.*') ? 'active' : '' }}" href="{{ route('weekly-overview.index') }}">
+                            <i class="bi bi-calendar-week"></i> Przegląd Tygodniowy
+                        </a>
+                    </li>
 
-                            <div class="ms-1">
-                                <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </button>
-                    </x-slot>
+                    <!-- Zasoby Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('projects.*') || request()->routeIs('employees.*') || request()->routeIs('vehicles.*') || request()->routeIs('accommodations.*') ? 'active' : '' }}" href="#" id="zasobyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-boxes"></i> Zasoby
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="zasobyDropdown">
+                            <li><a class="dropdown-item {{ request()->routeIs('projects.*') ? 'active' : '' }}" href="{{ route('projects.index') }}"><i class="bi bi-folder"></i> Projekty</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> Pracownicy</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('vehicles.*') || request()->routeIs('vehicle-assignments.*') ? 'active' : '' }}" href="{{ route('vehicles.index') }}"><i class="bi bi-car-front"></i> Pojazdy</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*') ? 'active' : '' }}" href="{{ route('accommodations.index') }}"><i class="bi bi-house"></i> Mieszkania</a></li>
+                        </ul>
+                    </li>
 
-                    <x-slot name="content">
-                        <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profil') }}
-                        </x-dropdown-link>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('documents.*') ? 'active' : '' }}" href="{{ route('documents.index') }}">
+                            <i class="bi bi-file-earmark-text"></i> Wymagania formalne
+                        </a>
+                    </li>
 
-                        <!-- Authentication -->
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('employee-documents.*') || request()->routeIs('employees.*employee-documents.*') ? 'active' : '' }}" href="{{ route('employee-documents.index') }}">
+                            <i class="bi bi-file-earmark-medical"></i> Dokumenty pracowników
+                        </a>
+                    </li>
 
-                            <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault();
-                                                this.closest('form').submit();">
-                                {{ __('Wyloguj') }}
-                            </x-dropdown-link>
-                        </form>
-                    </x-slot>
-                </x-dropdown>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('locations.*') ? 'active' : '' }}" href="{{ route('locations.index') }}">
+                            <i class="bi bi-geo-alt"></i> Lokalizacje
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}" href="{{ route('roles.index') }}">
+                            <i class="bi bi-person-badge"></i> Role pracowników
+                        </a>
+                    </li>
+
+                    <!-- Historia Przypisań Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('assignments.*') || request()->routeIs('vehicle-assignments.*') || request()->routeIs('accommodation-assignments.*') || request()->routeIs('demands.*') || request()->routeIs('return-trips.*') ? 'active' : '' }}" href="#" id="historiaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-clock-history"></i> Historia przypisań
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="historiaDropdown">
+                            <li><a class="dropdown-item {{ request()->routeIs('project-assignments.*') || request()->routeIs('assignments.*') ? 'active' : '' }}" href="{{ route('project-assignments.index') }}"><i class="bi bi-person-check"></i> Przypisania pracowników</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('vehicle-assignments.*') ? 'active' : '' }}" href="{{ route('vehicle-assignments.index') }}"><i class="bi bi-car-front-fill"></i> Przypisania pojazdów</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('accommodation-assignments.*') ? 'active' : '' }}" href="{{ route('accommodation-assignments.index') }}"><i class="bi bi-house-fill"></i> Przypisania mieszkań</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('project-demands.*') || request()->routeIs('demands.*') ? 'active' : '' }}" href="{{ route('project-demands.index') }}"><i class="bi bi-clipboard-data"></i> Zapotrzebowania projektów</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('return-trips.*') ? 'active' : '' }}" href="{{ route('return-trips.index') }}"><i class="bi bi-arrow-left-right"></i> Zjazdy</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Logistyka Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') || request()->routeIs('transport-costs.*') || request()->routeIs('time-logs.*') ? 'active' : '' }}" href="#" id="logistykaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-truck"></i> Logistyka
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="logistykaDropdown">
+                            @can('viewAny', \App\Models\Equipment::class)
+                                <li><a class="dropdown-item {{ request()->routeIs('equipment.*') ? 'active' : '' }}" href="{{ route('equipment.index') }}"><i class="bi bi-tools"></i> Sprzęt</a></li>
+                            @endcan
+                            @can('viewAny', \App\Models\EquipmentIssue::class)
+                                <li><a class="dropdown-item {{ request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="{{ route('equipment-issues.index') }}"><i class="bi bi-box-arrow-up"></i> Wydania sprzętu</a></li>
+                            @endcan
+                            @can('viewAny', \App\Models\TransportCost::class)
+                                <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-currency-dollar"></i> Koszty transportu</a></li>
+                            @endcan
+                            @can('viewAny', \App\Models\TimeLog::class)
+                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.*') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Ewidencja godzin</a></li>
+                            @endcan
+                        </ul>
+                    </li>
+
+                    <!-- Administracja Dropdown -->
+                    @canany(['users.viewAny', 'user-roles.viewAny'])
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('users.*') || request()->routeIs('user-roles.*') ? 'active' : '' }}" href="#" id="administracjaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-shield-lock"></i> Administracja
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="administracjaDropdown">
+                            @can('users.viewAny')
+                                <li><a class="dropdown-item {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i class="bi bi-person-gear"></i> Użytkownicy</a></li>
+                            @endcan
+                            @can('user-roles.viewAny')
+                                <li><a class="dropdown-item {{ request()->routeIs('user-roles.*') ? 'active' : '' }}" href="{{ route('user-roles.index') }}"><i class="bi bi-shield-check"></i> Role użytkowników</a></li>
+                            @endcan
+                        </ul>
+                    </li>
+                    @endcanany
                 @endauth
-            </div>
+            </ul>
 
-            <!-- Hamburger -->
-            <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
-                    <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
+            <!-- Right side: Dark mode toggle and user menu -->
+            <ul class="navbar-nav">
+                @auth
+                    <!-- Dark Mode Toggle -->
+                    <li class="nav-item">
+                        <button class="btn btn-link nav-link" type="button" id="theme-toggle" aria-label="Toggle dark mode">
+                            <i class="bi bi-moon-stars" id="theme-icon"></i>
+                        </button>
+                    </li>
+
+                    <!-- User Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @if(Auth::user()->image_path)
+                                <img src="{{ Auth::user()->image_url }}" alt="{{ Auth::user()->name }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                            @else
+                                <div class="bg-primary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                    <span class="text-primary fw-semibold small">{{ Auth::user()->initials }}</span>
+                                </div>
+                            @endif
+                            <span>{{ Auth::user()->name }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ route('profile.edit') }}"><i class="bi bi-person"></i> Profil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-box-arrow-right"></i> Wyloguj
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                @endauth
+            </ul>
         </div>
-    </div>
-
-    <!-- Responsive Navigation Menu -->
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
-        <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
-            </x-responsive-nav-link>
-            @auth
-                <x-responsive-nav-link :href="route('weekly-overview.index')" :active="request()->routeIs('weekly-overview.*')">
-                    {{ __('Przegląd Tygodniowy') }}
-                </x-responsive-nav-link>
-                
-                <div class="border-t border-gray-200 pt-2 mt-2">
-                    <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        {{ __('Zasoby') }}
-                    </div>
-                    <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*') || request()->routeIs('demands.*')">
-                        {{ __('Projekty') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('employees.index')" :active="request()->routeIs('employees.*')">
-                        {{ __('Pracownicy') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('vehicles.index')" :active="request()->routeIs('vehicles.*') || request()->routeIs('vehicle-assignments.*')">
-                        {{ __('Pojazdy') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('accommodations.index')" :active="request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*')">
-                        {{ __('Mieszkania') }}
-                    </x-responsive-nav-link>
-                </div>
-                
-                <x-responsive-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')">
-                    {{ __('Wymagania formalne') }}
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('employee-documents.index')" :active="request()->routeIs('employee-documents.*') || request()->routeIs('employees.*employee-documents.*')">
-                    {{ __('Dokumenty pracowników') }}
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('locations.index')" :active="request()->routeIs('locations.*')">
-                    {{ __('Lokalizacje') }}
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
-                    {{ __('Role') }}
-                </x-responsive-nav-link>
-                
-                <div class="border-t border-gray-200 pt-2 mt-2">
-                    <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        {{ __('Historia przypisań') }}
-                    </div>
-                    <x-responsive-nav-link :href="route('assignments.index')" :active="request()->routeIs('assignments.*')">
-                        {{ __('Przypisania pracowników') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('vehicle-assignments.index')" :active="request()->routeIs('vehicle-assignments.*')">
-                        {{ __('Przypisania pojazdów') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('accommodation-assignments.index')" :active="request()->routeIs('accommodation-assignments.*')">
-                        {{ __('Przypisania mieszkań') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*') && request()->routeIs('*.demands.*')">
-                        {{ __('Zapotrzebowania projektów') }}
-                    </x-responsive-nav-link>
-                    @can('viewAny', \App\Models\LogisticsEvent::class)
-                    <x-responsive-nav-link :href="route('return-trips.index')" :active="request()->routeIs('return-trips.*')">
-                        {{ __('Zjazdy') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                </div>
-                
-                @if(auth()->check() && (auth()->user()->can('viewAny', \App\Models\Equipment::class) || auth()->user()->can('viewAny', \App\Models\EquipmentIssue::class) || auth()->user()->can('viewAny', \App\Models\TransportCost::class) || auth()->user()->can('viewAny', \App\Models\TimeLog::class)))
-                <div class="border-t border-gray-200 pt-2 mt-2">
-                    <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        {{ __('Logistyka') }}
-                    </div>
-                    @can('viewAny', \App\Models\Equipment::class)
-                    <x-responsive-nav-link :href="route('equipment.index')" :active="request()->routeIs('equipment.*')">
-                        {{ __('Sprzęt') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                    @can('viewAny', \App\Models\EquipmentIssue::class)
-                    <x-responsive-nav-link :href="route('equipment-issues.index')" :active="request()->routeIs('equipment-issues.*')">
-                        {{ __('Wydania sprzętu') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                    @can('viewAny', \App\Models\TransportCost::class)
-                    <x-responsive-nav-link :href="route('transport-costs.index')" :active="request()->routeIs('transport-costs.*')">
-                        {{ __('Koszty transportu') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                    @can('viewAny', \App\Models\TimeLog::class)
-                    <x-responsive-nav-link :href="route('time-logs.index')" :active="request()->routeIs('time-logs.*')">
-                        {{ __('Ewidencja godzin') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                </div>
-                @endif
-                
-                @canany(['users.viewAny', 'user-roles.viewAny'])
-                <div class="border-t border-gray-200 pt-2 mt-2">
-                    <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        {{ __('Administracja') }}
-                    </div>
-                    @can('users.viewAny')
-                    <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
-                        {{ __('Użytkownicy') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                    @can('user-roles.viewAny')
-                    <x-responsive-nav-link :href="route('user-roles.index')" :active="request()->routeIs('user-roles.*')">
-                        {{ __('Role użytkowników') }}
-                    </x-responsive-nav-link>
-                    @endcan
-                </div>
-                @endcanany
-            @endauth
-        </div>
-
-        <!-- Responsive Settings Options -->
-        @auth
-        <div class="pt-4 pb-1 border-t border-gray-200">
-            <div class="px-4">
-                <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
-                <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
-            </div>
-
-            <div class="mt-3 space-y-1">
-                <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profil') }}
-                </x-responsive-nav-link>
-
-                <!-- Authentication -->
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-
-                    <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault();
-                                        this.closest('form').submit();">
-                        {{ __('Wyloguj') }}
-                    </x-responsive-nav-link>
-                </form>
-            </div>
-        </div>
-        @endauth
     </div>
 </nav>
+
+<script>
+(function() {
+    'use strict';
+    
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const htmlElement = document.documentElement;
+    
+    // Get saved theme or default to light
+    const getStoredTheme = () => localStorage.getItem('theme');
+    const setStoredTheme = theme => localStorage.setItem('theme', theme);
+    
+    // Get preferred theme
+    const getPreferredTheme = () => {
+        const stored = getStoredTheme();
+        if (stored) {
+            return stored;
+        }
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+    
+    // Set theme
+    const setTheme = theme => {
+        htmlElement.setAttribute('data-bs-theme', theme);
+        setStoredTheme(theme);
+        updateIcon(theme);
+    };
+    
+    // Update icon
+    const updateIcon = theme => {
+        if (themeIcon) {
+            themeIcon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
+        }
+    };
+    
+    // Set initial theme
+    setTheme(getPreferredTheme());
+    
+    // Listen for changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        const stored = getStoredTheme();
+        if (!stored) {
+            setTheme(getPreferredTheme());
+        }
+    });
+    
+    // Toggle on click
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = htmlElement.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        });
+    }
+})();
+</script>
+
+<style>
+    /* Ensure dropdowns appear above page content */
+    .dropdown-menu {
+        z-index: 1050 !important;
+    }
+    
+    /* Navigation z-index */
+    .navbar {
+        z-index: 1000;
+        position: relative;
+    }
+</style>

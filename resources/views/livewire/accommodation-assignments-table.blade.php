@@ -1,94 +1,112 @@
 <div>
-    <div class="bg-white shadow-sm sm:rounded-lg p-6 mb-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-800">Filtry</h3>
-            <button wire:click="clearFilters" class="text-sm text-gray-600 hover:text-gray-900">
-                Wyczyść filtry
-            </button>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Pracownik -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Pracownik</label>
-                <input type="text" wire:model.live.debounce.300ms="searchEmployee" 
-                    placeholder="Szukaj pracownika..."
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="fs-5 fw-semibold text-dark mb-0">Filtry</h3>
+                <button wire:click="clearFilters" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                </button>
             </div>
+            
+            <div class="row g-3">
+                <!-- Pracownik -->
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Pracownik</label>
+                    <input type="text" wire:model.live.debounce.300ms="searchEmployee" 
+                        placeholder="Szukaj pracownika..."
+                        class="form-control form-control-sm">
+                </div>
 
-            <!-- Mieszkanie -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Mieszkanie</label>
-                <input type="text" wire:model.live.debounce.300ms="searchAccommodation" 
-                    placeholder="Nazwa, adres..."
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-            </div>
+                <!-- Mieszkanie -->
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Mieszkanie</label>
+                    <input type="text" wire:model.live.debounce.300ms="searchAccommodation" 
+                        placeholder="Nazwa, adres..."
+                        class="form-control form-control-sm">
+                </div>
 
-            <!-- Data od -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Data od</label>
-                <input type="date" wire:model.live="dateFrom" 
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-            </div>
+                <!-- Data od -->
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Data od</label>
+                    <input type="date" wire:model.live="dateFrom" class="form-control form-control-sm">
+                </div>
 
-            <!-- Data do -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Data do</label>
-                <input type="date" wire:model.live="dateTo" 
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <!-- Data do -->
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Data do</label>
+                    <input type="date" wire:model.live="dateTo" class="form-control form-control-sm">
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-        <div class="p-6">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pracownik</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mieszkanie</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Od - Do</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    @forelse ($assignments as $assignment)
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a href="{{ route('employees.show', $assignment->employee) }}" class="text-blue-600 hover:text-blue-900">
-                                    {{ $assignment->employee->full_name }}
-                                </a>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a href="{{ route('accommodations.show', $assignment->accommodation) }}" class="text-blue-600 hover:text-blue-900">
-                                    {{ $assignment->accommodation->name }}
-                                </a>
-                                <span class="text-gray-500 text-sm block">{{ $assignment->accommodation->address }}</span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                {{ $assignment->start_date->format('Y-m-d') }} - 
-                                {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                <a href="{{ route('accommodation-assignments.edit', $assignment) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
-                                <form action="{{ route('accommodation-assignments.destroy', $assignment) }}" method="POST" class="inline">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Czy na pewno?')">Usuń</button>
-                                </form>
-                            </td>
+                            <th class="text-start">Pracownik</th>
+                            <th class="text-start">Mieszkanie</th>
+                            <th class="text-start">Od - Do</th>
+                            <th class="text-start">Akcje</th>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak przypisań mieszkań</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-            
-            <div class="mt-4">
-                {{ $assignments->links() }}
+                    </thead>
+                    <tbody>
+                        @forelse ($assignments as $assignment)
+                            <tr>
+                                <td>
+                                    <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
+                                        {{ $assignment->employee->full_name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <a href="{{ route('accommodations.show', $assignment->accommodation) }}" class="text-primary text-decoration-none">
+                                        {{ $assignment->accommodation->name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ $assignment->start_date->format('Y-m-d') }} - 
+                                        {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="btn btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{{ route('accommodation-assignments.edit', $assignment) }}" class="btn btn-outline-secondary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form action="{{ route('accommodation-assignments.destroy', $assignment) }}" method="POST" class="d-inline">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Czy na pewno?')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="bi bi-house-x"></i>
+                                        <p class="text-muted small fw-medium mb-0">Brak przypisań mieszkań</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
+            
+            @if($assignments->hasPages())
+                <div class="mt-3">
+                    {{ $assignments->links() }}
+                </div>
+            @endif
         </div>
     </div>
 </div>

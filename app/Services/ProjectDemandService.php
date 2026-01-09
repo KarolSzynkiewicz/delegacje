@@ -69,26 +69,44 @@ class ProjectDemandService
             $createdDemands = [];
             foreach ($demandsToProcess as $demandData) {
                 // Sprawdź czy zapotrzebowanie już istnieje dla tej roli w tym okresie
+                // Użyj dokładnego dopasowania dat, aby uniknąć duplikatów
                 $existingDemand = $project->demands()
                     ->where('role_id', $demandData['role_id'])
-                    ->where('date_from', '<=', $validated['date_to'] ?? $validated['date_from'])
-                    ->where(function ($q) use ($validated) {
-                        $q->whereNull('date_to')
-                          ->orWhere('date_to', '>=', $validated['date_from']);
+                    ->where('date_from', $demandData['date_from'])
+                    ->where(function ($q) use ($demandData) {
+                        if ($demandData['date_to']) {
+                            $q->where('date_to', $demandData['date_to']);
+                        } else {
+                            $q->whereNull('date_to');
+                        }
                     })
                     ->first();
 
                 if ($existingDemand) {
                     // Aktualizuj istniejące zapotrzebowanie
-                    $existingDemand->update([
+                    \Log::info('Updating existing demand via createDemands', [
+                        'existing_demand_id' => $existingDemand->id,
+                        'old_count' => $existingDemand->required_count,
+                        'new_count' => $demandData['required_count'],
+                        'demand_data' => $demandData
+                    ]);
+                    
+                    $updated = $existingDemand->update([
                         'required_count' => $demandData['required_count'],
                         'date_from' => $demandData['date_from'],
                         'date_to' => $demandData['date_to'],
                         'notes' => $demandData['notes'],
                     ]);
+                    
+                    \Log::info('Update result', [
+                        'updated' => $updated,
+                        'demand_after' => $existingDemand->fresh()->toArray()
+                    ]);
+                    
                     $createdDemands[] = $existingDemand;
                 } else {
                     // Utwórz nowe zapotrzebowanie
+                    \Log::info('Creating new demand', ['demand_data' => $demandData]);
                     $createdDemands[] = $project->demands()->create($demandData);
                 }
             }

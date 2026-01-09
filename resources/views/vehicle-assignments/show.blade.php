@@ -1,55 +1,67 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Szczegóły Przypisania Pojazdu</h2>
-    </x-slot>
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom">
+                        <h2 class="h4 fw-semibold text-dark mb-0">Szczegóły Przypisania Pojazdu</h2>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Pracownik:</dt>
+                                <dd>
+                                    <a href="{{ route('employees.show', $vehicleAssignment->employee) }}" class="text-primary text-decoration-none">
+                                        {{ $vehicleAssignment->employee->full_name }}
+                                    </a>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Pojazd:</dt>
+                                <dd>
+                                    <a href="{{ route('vehicles.show', $vehicleAssignment->vehicle) }}" class="text-primary text-decoration-none">
+                                        {{ $vehicleAssignment->vehicle->registration_number }} - {{ $vehicleAssignment->vehicle->brand }} {{ $vehicleAssignment->vehicle->model }}
+                                    </a>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Rola w pojeździe:</dt>
+                                <dd>
+                                    @php
+                                        $position = $vehicleAssignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                        $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                        $positionLabel = $position instanceof \App\Enums\VehiclePosition ? $position->label() : ucfirst($position);
+                                        $isDriver = $positionValue === 'driver';
+                                    @endphp
+                                    <span class="badge {{ $isDriver ? 'bg-success' : 'bg-secondary' }}">
+                                        {{ $positionLabel }}
+                                    </span>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Data Rozpoczęcia:</dt>
+                                <dd>{{ $vehicleAssignment->start_date->format('Y-m-d') }}</dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Data Zakończenia:</dt>
+                                <dd>{{ $vehicleAssignment->end_date ? $vehicleAssignment->end_date->format('Y-m-d') : 'Bieżące' }}</dd>
+                            </div>
+                            @if($vehicleAssignment->notes)
+                            <div class="col-12 mb-3">
+                                <dt class="fw-semibold mb-1">Uwagi:</dt>
+                                <dd>{{ $vehicleAssignment->notes }}</dd>
+                            </div>
+                            @endif
+                        </dl>
 
-    <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <dt class="font-semibold">Pracownik:</dt>
-                        <dd>{{ $vehicleAssignment->employee->full_name }}</dd>
+                        <div class="mt-4 pt-3 border-top">
+                            <a href="{{ route('vehicle-assignments.edit', $vehicleAssignment) }}" class="btn btn-primary me-2">
+                                <i class="bi bi-pencil me-1"></i> Edytuj
+                            </a>
+                            <a href="{{ route('employees.vehicles.index', $vehicleAssignment->employee_id) }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i> Powrót
+                            </a>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="font-semibold">Pojazd:</dt>
-                        <dd>{{ $vehicleAssignment->vehicle->registration_number }} - {{ $vehicleAssignment->vehicle->brand }} {{ $vehicleAssignment->vehicle->model }}</dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Rola w pojeździe:</dt>
-                        <dd>
-                            @php
-                                $position = $vehicleAssignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
-                                $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
-                                $positionLabel = $position instanceof \App\Enums\VehiclePosition ? $position->label() : ucfirst($position);
-                            @endphp
-                            <span class="px-2 py-1 text-xs rounded-full 
-                                @if($positionValue === 'driver') bg-blue-100 text-blue-800
-                                @else bg-gray-100 text-gray-800
-                                @endif">
-                                {{ $positionLabel }}
-                            </span>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Data Rozpoczęcia:</dt>
-                        <dd>{{ $vehicleAssignment->start_date->format('Y-m-d') }}</dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Data Zakończenia:</dt>
-                        <dd>{{ $vehicleAssignment->end_date ? $vehicleAssignment->end_date->format('Y-m-d') : 'Bieżące' }}</dd>
-                    </div>
-                    @if($vehicleAssignment->notes)
-                    <div class="md:col-span-2">
-                        <dt class="font-semibold">Uwagi:</dt>
-                        <dd>{{ $vehicleAssignment->notes }}</dd>
-                    </div>
-                    @endif
-                </dl>
-
-                <div class="mt-6">
-                    <a href="{{ route('vehicle-assignments.edit', $vehicleAssignment) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">Edytuj</a>
-                    <a href="{{ route('employees.vehicles.index', $vehicleAssignment->employee_id) }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Powrót</a>
                 </div>
             </div>
         </div>

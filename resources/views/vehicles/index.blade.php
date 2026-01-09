@@ -1,14 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Pojazdy</h2>
-            <a href="{{ route('vehicles.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Dodaj Pojazd</a>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Pojazdy</h2>
+            <a href="{{ route('vehicles.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Dodaj Pojazd
+            </a>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <livewire:vehicles-table />
-        </div>
-    </div>
+    <livewire:vehicles-table />
 </x-app-layout>

@@ -1,7 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Bootstrap is loaded via CDN in layouts/app.blade.php */
+/* Custom styles for the application */
 
 [x-cloak] {
     display: none !important;
 }
+
+/* Z-index dla Livewire loading overlays */
+.z-3 {
+    z-index: 3;
+}
+
+/* Additional custom styles can be added here */

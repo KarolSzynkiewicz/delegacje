@@ -1,78 +1,80 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Dodaj Nowy Projekt</h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <form method="POST" action="{{ route('projects.store') }}">
-                    @csrf
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Lokalizacja <span class="text-red-500">*</span></label>
-                        <select name="location_id" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                            <option value="">Wybierz lokalizację</option>
-                            @foreach($locations as $location)
-                                <option value="{{ $location->id }}" {{ old('location_id') == $location->id ? 'selected' : '' }}>
-                                    {{ $location->name }} ({{ $location->address }})
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('location_id')
-                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
-                        @enderror
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom">
+                        <h2 class="h4 fw-semibold text-dark mb-0">Dodaj Nowy Projekt</h2>
                     </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ route('projects.store') }}">
+                            @csrf
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Nazwa Projektu <span class="text-red-500">*</span></label>
-                        <input type="text" name="name" value="{{ old('name') }}" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        @error('name')
-                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
-                        @enderror
-                    </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Lokalizacja <span class="text-danger">*</span></label>
+                                <select name="location_id" required
+                                    class="form-select @error('location_id') is-invalid @enderror">
+                                    <option value="">Wybierz lokalizację</option>
+                                    @foreach($locations as $location)
+                                        <option value="{{ $location->id }}" {{ old('location_id') == $location->id ? 'selected' : '' }}>
+                                            {{ $location->name }} ({{ $location->address }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('location_id')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Klient</label>
-                        <input type="text" name="client_name" value="{{ old('client_name') }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                    </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Nazwa Projektu <span class="text-danger">*</span></label>
+                                <input type="text" name="name" value="{{ old('name') }}" required
+                                    class="form-control @error('name') is-invalid @enderror">
+                                @error('name')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Opis</label>
-                        <textarea name="description" rows="4"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('description') }}</textarea>
-                    </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Klient</label>
+                                <input type="text" name="client_name" value="{{ old('client_name') }}"
+                                    class="form-control">
+                            </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Status <span class="text-red-500">*</span></label>
-                        <select name="status" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                            <option value="active" {{ old('status', 'active') == 'active' ? 'selected' : '' }}>Aktywny</option>
-                            <option value="on_hold" {{ old('status') == 'on_hold' ? 'selected' : '' }}>Wstrzymany</option>
-                            <option value="completed" {{ old('status') == 'completed' ? 'selected' : '' }}>Zakończony</option>
-                            <option value="cancelled" {{ old('status') == 'cancelled' ? 'selected' : '' }}>Anulowany</option>
-                        </select>
-                        @error('status')
-                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
-                        @enderror
-                    </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Opis</label>
+                                <textarea name="description" rows="4"
+                                    class="form-control">{{ old('description') }}</textarea>
+                            </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Budżet (PLN)</label>
-                        <input type="number" step="0.01" name="budget" value="{{ old('budget') }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                    </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                                <select name="status" required
+                                    class="form-select @error('status') is-invalid @enderror">
+                                    <option value="active" {{ old('status', 'active') == 'active' ? 'selected' : '' }}>Aktywny</option>
+                                    <option value="on_hold" {{ old('status') == 'on_hold' ? 'selected' : '' }}>Wstrzymany</option>
+                                    <option value="completed" {{ old('status') == 'completed' ? 'selected' : '' }}>Zakończony</option>
+                                    <option value="cancelled" {{ old('status') == 'cancelled' ? 'selected' : '' }}>Anulowany</option>
+                                </select>
+                                @error('status')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-                    <div class="flex items-center justify-between">
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                            Zapisz
-                        </button>
-                        <a href="{{ route('projects.index') }}" class="text-gray-600 hover:text-gray-900">Anuluj</a>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Budżet (PLN)</label>
+                                <input type="number" step="0.01" name="budget" value="{{ old('budget') }}"
+                                    class="form-control">
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save me-1"></i> Zapisz
+                                </button>
+                                <a href="{{ route('projects.index') }}" class="btn btn-link text-decoration-none">Anuluj</a>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>

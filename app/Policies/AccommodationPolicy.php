@@ -14,7 +14,7 @@ class AccommodationPolicy
     public function viewAny(User $user): bool
     {
         return $user->hasPermission('accommodations.viewAny');
-    }
+    }   
 
     /**
      * Determine whether the user can view the model.
@@ -53,7 +53,7 @@ class AccommodationPolicy
      */
     public function restore(User $user, Accommodation $accommodation): bool
     {
-        //
+        return $user->hasPermission('accommodations.restore');
     }
 
     /**
@@ -61,6 +61,6 @@ class AccommodationPolicy
      */
     public function forceDelete(User $user, Accommodation $accommodation): bool
     {
-        //
+        return $user->hasPermission('accommodations.forceDelete');
     }
 }

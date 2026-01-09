@@ -54,6 +54,10 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
             'update' => 'demands.update',
             'destroy' => 'demands.destroy',
         ]);
+    
+    // Global route for all demands (without project context)
+    Route::get('project-demands', [ProjectDemandController::class, 'all'])
+        ->name('project-demands.index');
 
     Route::resource('projects.assignments', ProjectAssignmentController::class)
         ->shallow()
@@ -65,8 +69,8 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
         ]);
     
     // Global route for all assignments (without project context)
-    Route::get('assignments', [ProjectAssignmentController::class, 'all'])
-        ->name('assignments.index');
+    Route::get('project-assignments', [ProjectAssignmentController::class, 'all'])
+        ->name('project-assignments.index');
 
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);

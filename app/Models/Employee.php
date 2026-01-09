@@ -327,11 +327,73 @@ class Employee extends Model
     {
         $reasons = [];
         $available = true;
+        $missingDocuments = [];
 
-        // 1. Sprawdź dokumenty
+        // 1. Sprawdź dokumenty - szczegółowo
+        // Upewnij się, że relacja jest załadowana
+        if (!$this->relationLoaded('employeeDocuments')) {
+            $this->load('employeeDocuments.document');
+        }
+        
         if (!$this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
             $available = false;
-            $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
+            $allDocuments = \App\Models\Document::all();
+            
+            foreach ($allDocuments as $document) {
+                $employeeDoc = $this->employeeDocuments->where('document_id', $document->id)->first();
+                
+                if (!$employeeDoc) {
+                    $missingDocuments[] = [
+                        'document_id' => $document->id,
+                        'document_name' => $document->name,
+                        'problem' => 'Brak dokumentu',
+                        'kind' => null,
+                        'valid_from' => null,
+                        'valid_to' => null,
+                    ];
+                    continue;
+                }
+                
+                // Sprawdź czy dokument jest aktywny w całym zakresie
+                $isValid = false;
+                $problem = '';
+                
+                if ($employeeDoc->kind === 'bezokresowy') {
+                    if ($employeeDoc->valid_from > $endDate) {
+                        $isValid = false;
+                        $problem = "Dokument zaczyna się za późno ({$employeeDoc->valid_from->format('Y-m-d')} > {$endDate})";
+                    } else {
+                        $isValid = true;
+                    }
+                } else {
+                    // Dokument okresowy
+                    if ($employeeDoc->valid_from > $startDate) {
+                        $isValid = false;
+                        $problem = "Dokument zaczyna się za późno ({$employeeDoc->valid_from->format('Y-m-d')} > {$startDate})";
+                    } elseif ($employeeDoc->valid_to && $employeeDoc->valid_to < $endDate) {
+                        $isValid = false;
+                        $problem = "Dokument kończy się za wcześnie ({$employeeDoc->valid_to->format('Y-m-d')} < {$endDate})";
+                    } else {
+                        $isValid = true;
+                    }
+                }
+                
+                if (!$isValid) {
+                    $missingDocuments[] = [
+                        'document_id' => $document->id,
+                        'document_name' => $document->name,
+                        'problem' => $problem,
+                        'kind' => $employeeDoc->kind,
+                        'valid_from' => $employeeDoc->valid_from->format('Y-m-d'),
+                        'valid_to' => $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null,
+                        'employee_document_id' => $employeeDoc->id,
+                    ];
+                }
+            }
+            
+            if (!empty($missingDocuments)) {
+                $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
+            }
         }
 
         // 2. Sprawdź rotację
@@ -361,6 +423,7 @@ class Employee extends Model
         return [
             'available' => $available,
             'reasons' => $reasons,
+            'missing_documents' => $missingDocuments,
         ];
     }
 

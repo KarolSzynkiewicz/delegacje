@@ -74,7 +74,19 @@ class EmployeeController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
         
-        return view('employees.show', compact('employee', 'projectAssignments'));
+        // Get vehicle assignments ordered by start_date descending
+        $vehicleAssignments = $employee->vehicleAssignments()
+            ->with(['vehicle'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+        
+        // Get accommodation assignments ordered by start_date descending
+        $accommodationAssignments = $employee->accommodationAssignments()
+            ->with(['accommodation'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+        
+        return view('employees.show', compact('employee', 'projectAssignments', 'vehicleAssignments', 'accommodationAssignments'));
     }
 
     /**

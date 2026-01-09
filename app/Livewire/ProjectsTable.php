@@ -68,10 +68,13 @@ class ProjectsTable extends Component
 
         // Filtrowanie po nazwie/kliencie
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('client_name', 'like', '%' . $this->search . '%');
-            });
+            $searchTerm = trim($this->search);
+            if (strlen($searchTerm) >= 2) { // Minimum 2 znaki dla wyszukiwania
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('client_name', 'like', '%' . $searchTerm . '%');
+                });
+            }
         }
 
         // Filtrowanie po statusie
@@ -87,8 +90,13 @@ class ProjectsTable extends Component
         // Sortowanie
         $query->orderBy($this->sortField, $this->sortDirection);
 
-        $projects = $query->paginate(10);
-        $locations = Location::orderBy('name')->get();
+        $projects = $query->paginate(15);
+        
+        // Cache locations - zmieniają się rzadko
+        $locations = cache()->remember('locations_list', 3600, function () {
+            return Location::orderBy('name')->get();
+        });
+        
         $statuses = ['active', 'completed', 'cancelled', 'pending'];
 
         return view('livewire.projects-table', [

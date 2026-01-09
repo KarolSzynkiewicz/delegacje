@@ -56,7 +56,7 @@ class VehicleAssignmentsTable extends Component
     public function render()
     {
         $query = VehicleAssignment::with(['employee', 'vehicle'])
-            ->orderBy('start_date', 'desc');
+            ->orderBy('start_date', 'asc');
 
         // Filter by employee
         if ($this->searchEmployee) {

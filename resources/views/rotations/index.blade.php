@@ -1,34 +1,35 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
                 Wszystkie Rotacje Pracowników
             </h2>
-            <a href="{{ route('rotations.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Dodaj Rotację
+            <a href="{{ route('rotations.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Dodaj Rotację
             </a>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
+    <div class="py-4">
+        <div class="container-xxl">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
                     @if(session('success'))
-                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                            {{ session('success') }}
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     @endif
 
                     <!-- Formularz filtrowania -->
-                    <div class="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <form method="GET" action="{{ route('rotations.index') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="mb-4 bg-light rounded p-3 border">
+                        <form method="GET" action="{{ route('rotations.index') }}" class="row g-3">
                             <!-- Filtrowanie po pracowniku -->
-                            <div>
-                                <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1">
+                            <div class="col-md-3">
+                                <label for="employee_id" class="form-label small fw-semibold">
                                     Pracownik
                                 </label>
-                                <select name="employee_id" id="employee_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <select name="employee_id" id="employee_id" class="form-select form-select-sm">
                                     <option value="">Wszyscy</option>
                                     @foreach($employees as $employee)
                                         <option value="{{ $employee->id }}" {{ request('employee_id') == $employee->id ? 'selected' : '' }}>
@@ -39,11 +40,11 @@
                             </div>
 
                             <!-- Filtrowanie po statusie -->
-                            <div>
-                                <label for="status" class="block text-sm font-medium text-gray-700 mb-1">
+                            <div class="col-md-3">
+                                <label for="status" class="form-label small fw-semibold">
                                     Status
                                 </label>
-                                <select name="status" id="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <select name="status" id="status" class="form-select form-select-sm">
                                     <option value="">Wszystkie</option>
                                     <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>Zaplanowana</option>
                                     <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktywna</option>
@@ -53,44 +54,44 @@
                             </div>
 
                             <!-- Filtrowanie po dacie rozpoczęcia (od) -->
-                            <div>
-                                <label for="start_date_from" class="block text-sm font-medium text-gray-700 mb-1">
+                            <div class="col-md-3">
+                                <label for="start_date_from" class="form-label small fw-semibold">
                                     Data rozpoczęcia od
                                 </label>
-                                <input type="date" name="start_date_from" id="start_date_from" value="{{ request('start_date_from') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <input type="date" name="start_date_from" id="start_date_from" value="{{ request('start_date_from') }}" class="form-control form-control-sm">
                             </div>
 
                             <!-- Filtrowanie po dacie rozpoczęcia (do) -->
-                            <div>
-                                <label for="start_date_to" class="block text-sm font-medium text-gray-700 mb-1">
+                            <div class="col-md-3">
+                                <label for="start_date_to" class="form-label small fw-semibold">
                                     Data rozpoczęcia do
                                 </label>
-                                <input type="date" name="start_date_to" id="start_date_to" value="{{ request('start_date_to') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <input type="date" name="start_date_to" id="start_date_to" value="{{ request('start_date_to') }}" class="form-control form-control-sm">
                             </div>
 
                             <!-- Filtrowanie po dacie zakończenia (od) -->
-                            <div>
-                                <label for="end_date_from" class="block text-sm font-medium text-gray-700 mb-1">
+                            <div class="col-md-3">
+                                <label for="end_date_from" class="form-label small fw-semibold">
                                     Data zakończenia od
                                 </label>
-                                <input type="date" name="end_date_from" id="end_date_from" value="{{ request('end_date_from') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <input type="date" name="end_date_from" id="end_date_from" value="{{ request('end_date_from') }}" class="form-control form-control-sm">
                             </div>
 
                             <!-- Filtrowanie po dacie zakończenia (do) -->
-                            <div>
-                                <label for="end_date_to" class="block text-sm font-medium text-gray-700 mb-1">
+                            <div class="col-md-3">
+                                <label for="end_date_to" class="form-label small fw-semibold">
                                     Data zakończenia do
                                 </label>
-                                <input type="date" name="end_date_to" id="end_date_to" value="{{ request('end_date_to') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <input type="date" name="end_date_to" id="end_date_to" value="{{ request('end_date_to') }}" class="form-control form-control-sm">
                             </div>
 
                             <!-- Przyciski -->
-                            <div class="flex items-end gap-2">
-                                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                    Filtruj
+                            <div class="col-md-6 d-flex align-items-end gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-funnel"></i> Filtruj
                                 </button>
-                                <a href="{{ route('rotations.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                                    Wyczyść
+                                <a href="{{ route('rotations.index') }}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-x-circle"></i> Wyczyść
                                 </a>
                             </div>
                         </form>
@@ -98,7 +99,8 @@
 
                     <!-- Informacja o liczbie wyników -->
                     @if(request()->hasAny(['employee_id', 'status', 'start_date_from', 'start_date_to', 'end_date_from', 'end_date_to']))
-                        <div class="mb-4 text-sm text-gray-600">
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
                             Znaleziono <strong>{{ $rotations->total() }}</strong> rotacji
                             @if(request('employee_id'))
                                 dla pracownika: <strong>{{ $employees->find(request('employee_id'))?->full_name }}</strong>
@@ -107,85 +109,72 @@
                     @endif
 
                     @if($rotations->count() > 0)
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Pracownik
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Data rozpoczęcia
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Data zakończenia
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Notatki
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Akcje
-                                        </th>
+                                        <th class="text-start">Pracownik</th>
+                                        <th class="text-start">Data rozpoczęcia</th>
+                                        <th class="text-start">Data zakończenia</th>
+                                        <th class="text-start">Status</th>
+                                        <th class="text-start">Notatki</th>
+                                        <th class="text-start">Akcje</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
+                                <tbody>
                                     @foreach($rotations as $rotation)
                                         <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                                            <td>
                                                 <a href="{{ route('employees.show', $rotation->employee) }}" 
-                                                   class="text-blue-600 hover:text-blue-900 font-medium">
+                                                   class="text-primary text-decoration-none fw-medium">
                                                     {{ $rotation->employee->full_name }}
                                                 </a>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $rotation->start_date->format('Y-m-d') }}
+                                            <td>
+                                                <small class="text-muted">{{ $rotation->start_date->format('Y-m-d') }}</small>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $rotation->end_date->format('Y-m-d') }}
+                                            <td>
+                                                <small class="text-muted">{{ $rotation->end_date->format('Y-m-d') }}</small>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                                            <td>
                                                 @php
                                                     $status = $rotation->status;
+                                                    $badgeClass = match($status) {
+                                                        'active' => 'bg-success',
+                                                        'scheduled' => 'bg-primary',
+                                                        'completed' => 'bg-secondary',
+                                                        'cancelled' => 'bg-danger',
+                                                        default => 'bg-secondary'
+                                                    };
                                                 @endphp
-                                                @if($status === 'active')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                                        Aktywna
-                                                    </span>
-                                                @elseif($status === 'scheduled')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                                        Zaplanowana
-                                                    </span>
-                                                @elseif($status === 'completed')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                                        Zakończona
-                                                    </span>
-                                                @elseif($status === 'cancelled')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                                                        Anulowana
-                                                    </span>
-                                                @endif
+                                                <span class="badge {{ $badgeClass }}">
+                                                    @if($status === 'active') Aktywna
+                                                    @elseif($status === 'scheduled') Zaplanowana
+                                                    @elseif($status === 'completed') Zakończona
+                                                    @elseif($status === 'cancelled') Anulowana
+                                                    @endif
+                                                </span>
                                             </td>
-                                            <td class="px-6 py-4 text-sm text-gray-500">
-                                                {{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}
+                                            <td>
+                                                <small class="text-muted">{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</small>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <a href="{{ route('employees.rotations.edit', [$rotation->employee, $rotation]) }}" 
-                                                   class="text-indigo-600 hover:text-indigo-900 mr-3">
-                                                    Edytuj
-                                                </a>
-                                                <form action="{{ route('employees.rotations.destroy', [$rotation->employee, $rotation]) }}" 
-                                                      method="POST" class="inline">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" 
-                                                            class="text-red-600 hover:text-red-900"
-                                                            onclick="return confirm('Czy na pewno chcesz usunąć tę rotację?')">
-                                                        Usuń
-                                                    </button>
-                                                </form>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{{ route('employees.rotations.edit', [$rotation->employee, $rotation]) }}" 
+                                                       class="btn btn-outline-secondary">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <form action="{{ route('employees.rotations.destroy', [$rotation->employee, $rotation]) }}" 
+                                                          method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" 
+                                                                class="btn btn-outline-danger"
+                                                                onclick="return confirm('Czy na pewno chcesz usunąć tę rotację?')">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -193,15 +182,17 @@
                             </table>
                         </div>
 
-                        <div class="mt-4">
-                            {{ $rotations->links() }}
-                        </div>
+                        @if($rotations->hasPages())
+                            <div class="mt-3">
+                                {{ $rotations->links() }}
+                            </div>
+                        @endif
                     @else
-                        <div class="text-center py-8">
-                            <p class="text-gray-500 mb-4">Brak rotacji w systemie.</p>
-                            <a href="{{ route('rotations.create') }}" 
-                               class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                Dodaj pierwszą rotację
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                            <p class="text-muted mb-3">Brak rotacji w systemie.</p>
+                            <a href="{{ route('rotations.create') }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Dodaj pierwszą rotację
                             </a>
                         </div>
                     @endif

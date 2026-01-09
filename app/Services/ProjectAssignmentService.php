@@ -20,6 +20,9 @@ class ProjectAssignmentService
         // Validate employee has the required role
         $this->validateEmployeeHasRole($employee, $data['role_id']);
 
+        // Validate employee has all documents
+        $this->validateEmployeeDocuments($employee, $data['start_date'], $endDate);
+
         // Validate employee availability
         $this->validateEmployeeAvailability($employee, $data['start_date'], $endDate);
 
@@ -39,6 +42,9 @@ class ProjectAssignmentService
 
         // Validate employee has the required role
         $this->validateEmployeeHasRole($employee, $data['role_id']);
+
+        // Validate employee has all documents
+        $this->validateEmployeeDocuments($employee, $data['start_date'], $endDate);
 
         // Validate employee availability (excluding current assignment)
         $this->validateEmployeeAvailability($employee, $data['start_date'], $endDate, $assignment->id);
@@ -62,6 +68,48 @@ class ProjectAssignmentService
             $roleName = $role ? $role->name : 'nieznana';
             throw ValidationException::withMessages([
                 'role_id' => "Pracownik {$employee->full_name} nie posiada roli: {$roleName}. Nie można przypisać go do projektu z tą rolą."
+            ]);
+        }
+    }
+
+    /**
+     * Validate that employee has all required documents active in date range.
+     *
+     * @throws ValidationException
+     */
+    protected function validateEmployeeDocuments(Employee $employee, string $startDate, string $endDate): void
+    {
+        if (!$employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
+            // Znajdź brakujące dokumenty dla lepszego komunikatu
+            $allDocuments = \App\Models\Document::all();
+            $missingDocuments = [];
+            
+            foreach ($allDocuments as $document) {
+                $hasActiveDocument = $employee->employeeDocuments()
+                    ->where('document_id', $document->id)
+                    ->where(function ($q) use ($startDate, $endDate) {
+                        $q->where(function ($q2) use ($startDate, $endDate) {
+                            $q2->where('kind', 'bezokresowy')
+                               ->where('valid_from', '<=', $endDate);
+                        })->orWhere(function ($q2) use ($startDate, $endDate) {
+                            $q2->where('kind', 'okresowy')
+                               ->where('valid_from', '<=', $startDate)
+                               ->where(function ($q3) use ($endDate) {
+                                   $q3->whereNull('valid_to')
+                                      ->orWhere('valid_to', '>=', $endDate);
+                               });
+                        });
+                    })
+                    ->exists();
+                
+                if (!$hasActiveDocument) {
+                    $missingDocuments[] = $document->name;
+                }
+            }
+            
+            $missingList = implode(', ', $missingDocuments);
+            throw ValidationException::withMessages([
+                'employee_id' => "Pracownik {$employee->full_name} nie ma wszystkich wymaganych dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje: {$missingList}."
             ]);
         }
     }
@@ -145,6 +193,10 @@ class ProjectAssignmentService
         if ($startDate && $endDate) {
             return $employees->map(function ($employee) use ($startDate, $endDate) {
                 $status = $employee->getAvailabilityStatus($startDate, $endDate);
+                // Upewnij się, że missing_documents jest zawsze tablicą
+                if (!isset($status['missing_documents'])) {
+                    $status['missing_documents'] = [];
+                }
                 $employee->availability_status = $status;
                 return $employee;
             });
@@ -152,7 +204,11 @@ class ProjectAssignmentService
 
         // If no dates, all employees are available
         return $employees->map(function ($employee) {
-            $employee->availability_status = ['available' => true, 'reasons' => []];
+            $employee->availability_status = [
+                'available' => true, 
+                'reasons' => [],
+                'missing_documents' => []
+            ];
             return $employee;
         });
     }

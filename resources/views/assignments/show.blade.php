@@ -1,63 +1,79 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Szczegóły Przypisania</h2>
-    </x-slot>
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom">
+                        <h2 class="h4 fw-semibold text-dark mb-0">Szczegóły Przypisania</h2>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Pracownik:</dt>
+                                <dd>
+                                    <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
+                                        {{ $assignment->employee->full_name }}
+                                    </a>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Projekt:</dt>
+                                <dd>
+                                    <a href="{{ route('projects.show', $assignment->project) }}" class="text-primary text-decoration-none">
+                                        {{ $assignment->project->name }}
+                                    </a>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Rola:</dt>
+                                <dd>
+                                    <span class="badge bg-secondary">{{ $assignment->role->name }}</span>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Status:</dt>
+                                <dd>
+                                    @php
+                                        $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
+                                        $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
+                                        $statusLabel = $status instanceof \App\Enums\AssignmentStatus ? $status->label() : ucfirst($status);
+                                        
+                                        $badgeClass = match($statusValue) {
+                                            'active' => 'bg-success',
+                                            'completed' => 'bg-primary',
+                                            'cancelled' => 'bg-danger',
+                                            'in_transit' => 'bg-warning',
+                                            'at_base' => 'bg-secondary',
+                                            default => 'bg-secondary'
+                                        };
+                                    @endphp
+                                    <span class="badge {{ $badgeClass }}">{{ $statusLabel }}</span>
+                                </dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Data Rozpoczęcia:</dt>
+                                <dd>{{ $assignment->start_date->format('Y-m-d') }}</dd>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <dt class="fw-semibold mb-1">Data Zakończenia:</dt>
+                                <dd>{{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : 'Bieżące' }}</dd>
+                            </div>
+                            @if($assignment->notes)
+                            <div class="col-12 mb-3">
+                                <dt class="fw-semibold mb-1">Uwagi:</dt>
+                                <dd>{{ $assignment->notes }}</dd>
+                            </div>
+                            @endif
+                        </dl>
 
-    <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <dt class="font-semibold">Pracownik:</dt>
-                        <dd>{{ $assignment->employee->full_name }}</dd>
+                        <div class="mt-4 pt-3 border-top">
+                            <a href="{{ route('assignments.edit', $assignment) }}" class="btn btn-primary me-2">
+                                <i class="bi bi-pencil me-1"></i> Edytuj
+                            </a>
+                            <a href="{{ route('project-assignments.index') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i> Powrót
+                            </a>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="font-semibold">Projekt:</dt>
-                        <dd>{{ $assignment->project->name }}</dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Rola:</dt>
-                        <dd>{{ $assignment->role->name }}</dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Status:</dt>
-                        <dd>
-                            @php
-                                $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
-                                $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
-                                $statusLabel = $status instanceof \App\Enums\AssignmentStatus ? $status->label() : ucfirst($status);
-                            @endphp
-                            <span class="px-2 py-1 text-xs rounded-full 
-                                @if($statusValue === 'active') bg-green-100 text-green-800
-                                @elseif($statusValue === 'completed') bg-blue-100 text-blue-800
-                                @elseif($statusValue === 'cancelled') bg-red-100 text-red-800
-                                @elseif($statusValue === 'in_transit') bg-yellow-100 text-yellow-800
-                                @elseif($statusValue === 'at_base') bg-gray-100 text-gray-800
-                                @else bg-gray-100 text-gray-800
-                                @endif">
-                                {{ $statusLabel }}
-                            </span>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Data Rozpoczęcia:</dt>
-                        <dd>{{ $assignment->start_date->format('Y-m-d') }}</dd>
-                    </div>
-                    <div>
-                        <dt class="font-semibold">Data Zakończenia:</dt>
-                        <dd>{{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : 'Bieżące' }}</dd>
-                    </div>
-                    @if($assignment->notes)
-                    <div class="md:col-span-2">
-                        <dt class="font-semibold">Uwagi:</dt>
-                        <dd>{{ $assignment->notes }}</dd>
-                    </div>
-                    @endif
-                </dl>
-
-                <div class="mt-6">
-                    <a href="{{ route('assignments.edit', $assignment) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">Edytuj</a>
-                    <a href="{{ route('assignments.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Powrót</a>
                 </div>
             </div>
         </div>

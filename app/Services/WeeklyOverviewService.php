@@ -153,9 +153,9 @@ class WeeklyOverviewService
     protected function calculateRequirementsSummary(Collection $demands, Collection $assignments): array
     {
         $totalNeeded = 0;
-        $totalAssigned = $assignments->count();
         $roleDetails = [];
         
+        // Przetwórz zapotrzebowania
         foreach ($demands as $roleId => $demandData) {
             $needed = $demandData['required_count'];
             $assigned = $assignments->where('role_id', $roleId)->count();
@@ -167,13 +167,54 @@ class WeeklyOverviewService
                 'needed' => $needed,
                 'assigned' => $assigned,
                 'missing' => max(0, $needed - $assigned),
+                'excess' => max(0, $assigned - $needed),
             ];
+        }
+        
+        // Znajdź przypisania do ról, które nie mają zapotrzebowania
+        $demandRoleIds = $demands->keys()->toArray();
+        $assignmentsWithoutDemand = $assignments->filter(function($assignment) use ($demandRoleIds) {
+            return !in_array($assignment->role_id, $demandRoleIds);
+        });
+        
+        // Dodaj role bez zapotrzebowania jako nadmiar
+        $excessRoles = [];
+        foreach ($assignmentsWithoutDemand->groupBy('role_id') as $roleId => $roleAssignments) {
+            $role = $roleAssignments->first()->role;
+            $excessRoles[] = [
+                'role' => $role,
+                'needed' => 0,
+                'assigned' => $roleAssignments->count(),
+                'missing' => 0,
+                'excess' => $roleAssignments->count(),
+            ];
+        }
+        
+        $roleDetails = array_merge($roleDetails, $excessRoles);
+        
+        // Oblicz całkowite wartości - tylko dla ról z zapotrzebowaniem
+        $totalAssignedForNeededRoles = 0;
+        foreach ($demands as $roleId => $demandData) {
+            $totalAssignedForNeededRoles += $assignments->where('role_id', $roleId)->count();
+        }
+        
+        $totalMissing = max(0, $totalNeeded - $totalAssignedForNeededRoles);
+        $totalExcess = $assignmentsWithoutDemand->count();
+        
+        // Dodaj nadmiar z ról które mają zapotrzebowanie ale za dużo przypisanych
+        foreach ($demands as $roleId => $demandData) {
+            $needed = $demandData['required_count'];
+            $assigned = $assignments->where('role_id', $roleId)->count();
+            if ($assigned > $needed) {
+                $totalExcess += ($assigned - $needed);
+            }
         }
         
         return [
             'total_needed' => $totalNeeded,
-            'total_assigned' => $totalAssigned,
-            'total_missing' => max(0, $totalNeeded - $totalAssigned),
+            'total_assigned' => $totalAssignedForNeededRoles, // Tylko przypisani do ról z zapotrzebowaniem
+            'total_missing' => $totalMissing,
+            'total_excess' => $totalExcess,
             'role_details' => $roleDetails,
         ];
     }
@@ -393,8 +434,23 @@ class WeeklyOverviewService
             ->get()
             ->groupBy('employee_id');
         
+        // Eager load rotations for all employees
+        $employeeIds = $assignments->pluck('employee_id')->unique();
+        $rotations = \App\Models\Rotation::whereIn('employee_id', $employeeIds)
+            ->where(function ($q) use ($weekEnd) {
+                $q->where('end_date', '>=', $weekEnd)
+                  ->orWhereNull('end_date');
+            })
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '!=', 'cancelled');
+            })
+            ->orderBy('end_date', 'asc')
+            ->get()
+            ->groupBy('employee_id');
+        
         // Map assignments with their details
-        return $assignments->map(function ($assignment) use ($accommodationAssignments, $vehicleAssignments, $weekStart, $weekEnd) {
+        return $assignments->map(function ($assignment) use ($accommodationAssignments, $vehicleAssignments, $weekStart, $weekEnd, $rotations) {
             $employee = $assignment->employee;
             
             // Get accommodation and vehicle from pre-loaded collections
@@ -402,11 +458,50 @@ class WeeklyOverviewService
             $vehicleAssignment = $vehicleAssignments->get($employee->id)?->first();
             
             // Check if assignment is partial (not full week)
-            $isPartial = $assignment->start_date->gt($weekStart) || 
-                        ($assignment->end_date && $assignment->end_date->lt($weekEnd));
+            // Assignment is partial if it doesn't cover the entire week
+            // It must start on or before weekStart AND end on or after weekEnd
+            $coversFullWeek = $assignment->start_date->lte($weekStart) && 
+                            ($assignment->end_date === null || $assignment->end_date->gte($weekEnd));
+            $isPartial = !$coversFullWeek;
+            
+            // Debug: log if needed
+            // \Log::info('Assignment partial check', [
+            //     'employee_id' => $employee->id,
+            //     'start_date' => $assignment->start_date->format('Y-m-d'),
+            //     'end_date' => $assignment->end_date?->format('Y-m-d'),
+            //     'week_start' => $weekStart->format('Y-m-d'),
+            //     'week_end' => $weekEnd->format('Y-m-d'),
+            //     'is_partial' => $isPartial
+            // ]);
             
             $assignmentStart = max($assignment->start_date, $weekStart);
             $assignmentEnd = min($assignment->end_date ?? $weekEnd, $weekEnd);
+            
+            // Get rotation info
+            $employeeRotations = $rotations->get($employee->id);
+            $activeRotation = $employeeRotations?->first();
+            $rotationInfo = null;
+            
+            if ($activeRotation) {
+                $daysLeft = now()->diffInDays($activeRotation->end_date, false);
+                $rotationInfo = [
+                    'end_date' => $activeRotation->end_date,
+                    'days_left' => $daysLeft,
+                ];
+            }
+            
+            // Format date range - show days of week if partial
+            $dateRangeText = 'cały tydzień';
+            if ($isPartial) {
+                $startDay = $assignmentStart->format('N'); // 1-7 (Monday-Sunday)
+                $endDay = $assignmentEnd->format('N');
+                $dayNames = ['', 'pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nie'];
+                if ($startDay == $endDay) {
+                    $dateRangeText = $dayNames[$startDay];
+                } else {
+                    $dateRangeText = $dayNames[$startDay] . '-' . $dayNames[$endDay];
+                }
+            }
             
             return [
                 'assignment' => $assignment,
@@ -415,9 +510,8 @@ class WeeklyOverviewService
                 'accommodation' => $accommodationAssignment?->accommodation,
                 'vehicle' => $vehicleAssignment?->vehicle,
                 'is_partial' => $isPartial,
-                'date_range' => $isPartial ? 
-                    $assignmentStart->format('d.m') . '–' . $assignmentEnd->format('d.m') : 
-                    'cały tydzień',
+                'date_range' => $dateRangeText,
+                'rotation' => $rotationInfo,
             ];
         });
     }

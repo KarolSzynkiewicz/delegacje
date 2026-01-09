@@ -31,6 +31,16 @@
                         Przypisania do projektów ({{ $projectAssignments->count() }})
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="vehicle-assignments-tab" data-bs-toggle="tab" data-bs-target="#vehicle-assignments" type="button" role="tab">
+                        Przypisania do aut ({{ $vehicleAssignments->count() }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="accommodation-assignments-tab" data-bs-toggle="tab" data-bs-target="#accommodation-assignments" type="button" role="tab">
+                        Przypisania do domów ({{ $accommodationAssignments->count() }})
+                    </button>
+                </li>
             </ul>
 
             <div class="tab-content" id="employeeTabsContent">
@@ -297,6 +307,133 @@
                             </div>
                         @else
                             <p class="text-muted">Brak przypisań do projektów dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+
+                <!-- Zakładka Przypisania do aut -->
+                <div class="tab-pane fade" id="vehicle-assignments" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Przypisania do aut</h5>
+                            <a href="{{ route('employees.vehicles.create', $employee) }}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-plus-circle"></i> Dodaj przypisanie
+                            </a>
+                        </div>
+                        @if($vehicleAssignments->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Pojazd</th>
+                                            <th>Rola</th>
+                                            <th>Okres</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($vehicleAssignments as $assignment)
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ route('vehicles.show', $assignment->vehicle) }}" class="text-primary">
+                                                        {{ $assignment->vehicle->registration_number }}
+                                                        @if($assignment->vehicle->brand)
+                                                            ({{ $assignment->vehicle->brand }}{{ $assignment->vehicle->model ? ' ' . $assignment->vehicle->model : '' }})
+                                                        @endif
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    @php
+                                                        $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                                        $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                                        $isDriver = $positionValue === 'driver';
+                                                    @endphp
+                                                    <x-badge type="{{ $isDriver ? 'success' : 'secondary' }}">
+                                                        {{ $isDriver ? 'Kierowca' : 'Pasażer' }}
+                                                    </x-badge>
+                                                </td>
+                                                <td>
+                                                    {{ $assignment->start_date->format('Y-m-d') }}
+                                                    @if($assignment->end_date)
+                                                        - {{ $assignment->end_date->format('Y-m-d') }}
+                                                    @else
+                                                        - ...
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="btn btn-sm btn-info">Szczegóły</a>
+                                                    <a href="{{ route('vehicle-assignments.edit', $assignment) }}" class="btn btn-sm btn-warning">Edytuj</a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak przypisań do aut dla tego pracownika.</p>
+                            <a href="{{ route('employees.vehicles.create', $employee) }}" class="btn btn-primary">Dodaj pierwsze przypisanie</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+
+                <!-- Zakładka Przypisania do domów -->
+                <div class="tab-pane fade" id="accommodation-assignments" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Przypisania do domów</h5>
+                            <a href="{{ route('employees.accommodations.create', $employee) }}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-plus-circle"></i> Dodaj przypisanie
+                            </a>
+                        </div>
+                        @if($accommodationAssignments->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Mieszkanie</th>
+                                            <th>Okres</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($accommodationAssignments as $assignment)
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ route('accommodations.show', $assignment->accommodation) }}" class="text-primary">
+                                                        {{ $assignment->accommodation->name }}
+                                                        @if($assignment->accommodation->city)
+                                                            ({{ $assignment->accommodation->city }})
+                                                        @endif
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    {{ $assignment->start_date->format('Y-m-d') }}
+                                                    @if($assignment->end_date)
+                                                        - {{ $assignment->end_date->format('Y-m-d') }}
+                                                    @else
+                                                        - ...
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="btn btn-sm btn-info">Szczegóły</a>
+                                                    <a href="{{ route('accommodation-assignments.edit', $assignment) }}" class="btn btn-sm btn-warning">Edytuj</a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak przypisań do domów dla tego pracownika.</p>
+                            <a href="{{ route('employees.accommodations.create', $employee) }}" class="btn btn-primary">Dodaj pierwsze przypisanie</a>
                         @endif
                     </div>
                 </div>

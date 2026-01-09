@@ -1,29 +1,112 @@
-<div class="mt-4 p-4 border rounded-lg {{ $isAvailable === null ? 'bg-gray-50' : ($isAvailable ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') }}">
-    <h4 class="font-semibold mb-2">Status Dostępności</h4>
-    
-    @if($isAvailable === null)
-        <p class="text-sm text-gray-600">Wybierz pracownika i datę rozpoczęcia, aby sprawdzić dostępność.</p>
-    @elseif($isAvailable)
-        <div class="flex items-center text-green-700">
-            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-            </svg>
-            <span>Pracownik jest dostępny w wybranym terminie.</span>
+<div>
+    @if($employeeId && $startDate)
+        <div class="card border-0 shadow-sm mb-3 {{ $isAvailable === null ? 'bg-light' : ($isAvailable ? 'border-success' : 'border-danger') }}">
+            <div class="card-body">
+                <h5 class="card-title fw-semibold mb-3">Status Dostępności</h5>
+                
+                @if($isAvailable === null)
+                    <p class="small text-muted mb-0">
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        Sprawdzanie dostępności...
+                    </p>
+                @elseif($isAvailable)
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>Pracownik jest dostępny</strong> w wybranym terminie.
+                    </div>
+                @else
+                    <div class="alert alert-danger mb-3">
+                        <i class="bi bi-x-circle me-2"></i>
+                        <strong>Pracownik niedostępny!</strong>
+                    </div>
+                    
+                    @if($availabilityStatus && !empty($availabilityStatus['reasons']))
+                        <div class="mb-3">
+                            <h6 class="small fw-semibold mb-2">Powody:</h6>
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach($availabilityStatus['reasons'] as $reason)
+                                    <li class="mb-1">
+                                        <i class="bi bi-dash text-danger me-2"></i>{{ $reason }}
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                    
+                    @if(!empty($missingDocuments))
+                        <div class="alert alert-warning mb-3">
+                            <h6 class="alert-heading small fw-semibold mb-2">
+                                Problemy z dokumentami ({{ count($missingDocuments) }}):
+                            </h6>
+                            <div class="list-group list-group-flush">
+                                @foreach($missingDocuments as $doc)
+                                    <div class="list-group-item bg-transparent border-bottom px-0 py-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <span class="fw-semibold text-dark">{{ $doc['document_name'] ?? 'Nieznany dokument' }}</span>
+                                                <div class="small text-muted mt-1">
+                                                    <span>{{ $doc['problem'] ?? 'Brak dokumentu' }}</span>
+                                                    @if(isset($doc['valid_from']) || isset($doc['valid_to']))
+                                                        <span class="ms-2">
+                                                            @if(isset($doc['valid_from']))
+                                                                Od: {{ $doc['valid_from'] }}
+                                                            @endif
+                                                            @if(isset($doc['valid_to']))
+                                                                Do: {{ $doc['valid_to'] }}
+                                                            @endif
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            @if(isset($doc['employee_id']))
+                                                <a href="{{ route('employees.employee-documents.index', $doc['employee_id']) }}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i> Edytuj
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                    
+                    @if($availabilityStatus && isset($availabilityStatus['rotation_conflicts']) && !empty($availabilityStatus['rotation_conflicts']))
+                        <div class="alert alert-info mb-3">
+                            <h6 class="alert-heading small fw-semibold mb-2">Konflikty z rotacjami:</h6>
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach($availabilityStatus['rotation_conflicts'] as $conflict)
+                                    <li class="mb-1">
+                                        <i class="bi bi-calendar-x me-2"></i>{{ $conflict }}
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                    
+                    @if($availabilityStatus && isset($availabilityStatus['assignment_conflicts']) && !empty($availabilityStatus['assignment_conflicts']))
+                        <div class="alert alert-warning mb-0">
+                            <h6 class="alert-heading small fw-semibold mb-2">Konflikty z przypisaniami:</h6>
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach($availabilityStatus['assignment_conflicts'] as $conflict)
+                                    <li class="mb-1">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>{{ $conflict }}
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                @endif
+            </div>
         </div>
     @else
-        <div class="text-red-700">
-            <div class="flex items-center mb-2">
-                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                </svg>
-                <span class="font-bold">Konflikt terminów!</span>
+        <div class="card border-0 shadow-sm bg-light">
+            <div class="card-body">
+                <p class="small text-muted mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Wybierz pracownika i daty, aby sprawdzić dostępność.
+                </p>
             </div>
-            <p class="text-sm mb-2">Pracownik ma już przypisania w tym okresie:</p>
-            <ul class="text-xs list-disc list-inside">
-                @foreach($conflicts as $conflict)
-                    <li>{{ $conflict->project->name }} ({{ $conflict->start_date->format('Y-m-d') }} - {{ $conflict->end_date ? $conflict->end_date->format('Y-m-d') : '...' }})</li>
-                @endforeach
-            </ul>
         </div>
     @endif
 </div>

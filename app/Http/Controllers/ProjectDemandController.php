@@ -15,6 +15,22 @@ class ProjectDemandController extends Controller
     public function __construct(
         protected ProjectDemandService $demandService
     ) {}
+    
+    /**
+     * Display all demands (global view).
+     */
+    public function all()
+    {
+        // Pobierz wszystkie zapotrzebowania z required_count > 0, pogrupowane po projektach
+        $demands = ProjectDemand::with("project", "role")
+            ->where('required_count', '>', 0)
+            ->orderBy("date_from", "asc")
+            ->get()
+            ->groupBy('project_id');
+        
+        return view("demands.all", compact("demands"));
+    }
+    
     /**
      * Display a listing of the resource.
      */
@@ -100,6 +116,13 @@ class ProjectDemandController extends Controller
     {
         $validated = $request->validated();
         
+        // Log dla debugowania
+        \Log::info('Updating demand', [
+            'demand_id' => $demand->id,
+            'validated' => $validated,
+            'current_demand' => $demand->toArray()
+        ]);
+        
         // Jeśli required_count = 0, usuń zapotrzebowanie
         if ($validated['required_count'] == 0) {
             $projectId = $demand->project_id;
@@ -110,7 +133,13 @@ class ProjectDemandController extends Controller
                 ->with("success", "Zapotrzebowanie zostało usunięte (ilość ustawiona na 0).");
         }
         
-        $demand->update($validated);
+        // Sprawdź czy zapotrzebowanie zostało zaktualizowane
+        $updated = $demand->update($validated);
+        
+        \Log::info('Demand update result', [
+            'updated' => $updated,
+            'demand_after' => $demand->fresh()->toArray()
+        ]);
 
         return redirect()
             ->route("projects.demands.index", $demand->project_id)
