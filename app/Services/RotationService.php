@@ -3,17 +3,21 @@
 namespace App\Services;
 
 use App\Models\Rotation;
-use App\Models\Employee;
+use App\Repositories\Contracts\EmployeeRepositoryInterface;
 use Illuminate\Validation\ValidationException;
 
 class RotationService
 {
+    public function __construct(
+        protected EmployeeRepositoryInterface $employeeRepository
+    ) {}
+
     /**
      * Create a new rotation with business logic validation.
      */
     public function createRotation(int $employeeId, array $data): Rotation
     {
-        $employee = Employee::findOrFail($employeeId);
+        $employee = $this->employeeRepository->findOrFail($employeeId);
         
         $this->validateNoOverlappingRotations(
             $employeeId,

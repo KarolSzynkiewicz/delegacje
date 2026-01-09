@@ -220,7 +220,7 @@
                                                 @endif
                                             </p>
                                             @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
-                                                <div class="mt-auto">
+                                                <div class="mt-auto" wire:ignore.self>
                                                     <button class="btn btn-sm btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#vehicle-{{ $vehicleData['vehicle']->id }}-assignments" aria-expanded="false">
                                                         <i class="bi bi-people"></i> Osoby ({{ $vehicleData['assignments']->count() }})
                                                     </button>
@@ -359,7 +359,7 @@
                                                     @endif
                                                 </p>
                                                 @if(isset($accommodationData['assignments']) && $accommodationData['assignments']->count() > 0)
-                                                    <div class="mt-auto">
+                                                    <div class="mt-auto" wire:ignore.self>
                                                         <button class="btn btn-sm btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#accommodation-{{ $accommodation->id }}-assignments" aria-expanded="false">
                                                             <i class="bi bi-people"></i> Osoby ({{ $accommodationData['assignments']->count() }})
                                                         </button>
@@ -464,9 +464,3 @@
         </div>
     </div>
 @endif
-
-<style>
-    .object-fit-cover {
-        object-fit: cover;
-    }
-</style>

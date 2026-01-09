@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ProjectAssignment;
 use App\Models\Project;
 use App\Models\Role;
+use App\Models\Employee;
 use App\Services\ProjectAssignmentService;
 use App\Http\Requests\StoreProjectAssignmentRequest;
 use App\Http\Requests\UpdateProjectAssignmentRequest;

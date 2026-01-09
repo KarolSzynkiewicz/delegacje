@@ -5,16 +5,20 @@ namespace App\Services;
 use App\Models\ProjectAssignment;
 use App\Models\Project;
 use App\Models\Employee;
+use App\Repositories\Contracts\EmployeeRepositoryInterface;
 use Illuminate\Validation\ValidationException;
 
 class ProjectAssignmentService
 {
+    public function __construct(
+        protected EmployeeRepositoryInterface $employeeRepository
+    ) {}
     /**
      * Create a new project assignment with business logic validation.
      */
     public function createAssignment(Project $project, array $data): ProjectAssignment
     {
-        $employee = Employee::findOrFail($data['employee_id']);
+        $employee = $this->employeeRepository->findOrFail($data['employee_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
 
         // Validate employee has the required role
@@ -37,7 +41,7 @@ class ProjectAssignmentService
      */
     public function updateAssignment(ProjectAssignment $assignment, array $data): bool
     {
-        $employee = Employee::findOrFail($data['employee_id']);
+        $employee = $this->employeeRepository->findOrFail($data['employee_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
 
         // Validate employee has the required role
@@ -186,9 +190,8 @@ class ProjectAssignmentService
      */
     public function getEmployeesWithAvailabilityStatus(?string $startDate = null, ?string $endDate = null): \Illuminate\Support\Collection
     {
-        $employees = Employee::with(['roles', 'employeeDocuments.document'])
-            ->orderBy('last_name')
-            ->get();
+        $employees = $this->employeeRepository->withRolesAndDocuments()
+            ->sortBy('last_name');
 
         if ($startDate && $endDate) {
             return $employees->map(function ($employee) use ($startDate, $endDate) {

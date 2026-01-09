@@ -9,14 +9,8 @@
         <div class="container-xxl">
             <!-- Nawigacja między tygodniami -->
             <div class="mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
-                @php
-                    $currentWeek = $weeks[0];
-                    $prevWeekStart = $currentWeek['start']->copy()->subWeek()->startOfWeek();
-                    $nextWeekStart = $currentWeek['end']->copy()->addDay()->startOfWeek();
-                @endphp
-                
                 <!-- Przycisk poprzedni tydzień -->
-                <a href="{{ route('weekly-overview.index', ['start_date' => $prevWeekStart->format('Y-m-d')]) }}" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+                <a href="{{ $navigation['prevUrl'] }}" class="btn btn-outline-secondary d-flex align-items-center gap-2">
                     <i class="bi bi-chevron-left"></i>
                     <span>Poprzedni tydzień</span>
                 </a>
@@ -24,15 +18,15 @@
                 <!-- Aktualny tydzień -->
                 <div class="text-center">
                     <h3 class="fs-5 fw-bold text-dark mb-0">
-                        Tydzień {{ $currentWeek['number'] }}
+                        Tydzień {{ $navigation['current']['number'] }}
                     </h3>
                     <p class="small text-muted mb-0">
-                        {{ $currentWeek['start']->format('d.m.Y') }} – {{ $currentWeek['end']->format('d.m.Y') }}
+                        {{ $navigation['current']['start']->format('d.m.Y') }} – {{ $navigation['current']['end']->format('d.m.Y') }}
                     </p>
                 </div>
 
                 <!-- Przycisk następny tydzień -->
-                <a href="{{ route('weekly-overview.index', ['start_date' => $nextWeekStart->format('Y-m-d')]) }}" class="btn btn-primary d-flex align-items-center gap-2">
+                <a href="{{ $navigation['nextUrl'] }}" class="btn btn-primary d-flex align-items-center gap-2">
                     <span>Następny tydzień</span>
                     <i class="bi bi-chevron-right"></i>
                 </a>
@@ -75,149 +69,17 @@
                                         @endif
                                         
                                         @php
-                                            $weekData = $projectData['weeks_data'][0] ?? null;
-                                            if ($weekData && isset($weekData['assigned_employees'])) {
-                                                $employeesWithoutVehicle = $weekData['assigned_employees']->filter(function($employeeData) {
-                                                    return empty($employeeData['vehicle']);
-                                                });
-                                                $employeesWithoutAccommodation = $weekData['assigned_employees']->filter(function($employeeData) {
-                                                    return empty($employeeData['accommodation']);
-                                                });
-                                                $allHaveVehicle = $weekData['assigned_employees']->isNotEmpty() && $employeesWithoutVehicle->isEmpty();
-                                                $allHaveAccommodation = $weekData['assigned_employees']->isNotEmpty() && $employeesWithoutAccommodation->isEmpty();
-                                                
-                                                // Missing and excess roles
-                                                $missingRoles = [];
-                                                $excessRoles = [];
-                                                if (!empty($weekData['requirements_summary']['role_details'])) {
-                                                    $missingRoles = array_filter($weekData['requirements_summary']['role_details'], function($roleDetail) {
-                                                        return isset($roleDetail['missing']) && $roleDetail['missing'] > 0;
-                                                    });
-                                                    $excessRoles = array_filter($weekData['requirements_summary']['role_details'], function($roleDetail) {
-                                                        return isset($roleDetail['excess']) && $roleDetail['excess'] > 0;
-                                                    });
-                                                }
-                                            } else {
-                                                $allHaveVehicle = false;
-                                                $allHaveAccommodation = false;
-                                                $missingRoles = [];
-                                                $excessRoles = [];
-                                            }
+                                            $summary = $projectData['summary'] ?? null;
                                         @endphp
                                         
                                         {{-- Kafelek: Realizacja --}}
-                                        @if($weekData && $weekData['has_data'])
-                                            @php
-                                                $totalNeeded = $weekData['requirements_summary']['total_needed'] ?? 0;
-                                                $totalAssigned = $weekData['requirements_summary']['total_assigned'] ?? 0;
-                                                $totalMissing = $weekData['requirements_summary']['total_missing'] ?? 0;
-                                                $percentage = $totalNeeded > 0 ? round(($totalAssigned / $totalNeeded) * 100) : 0;
-                                                
-                                                // Kolory dla progress bar
-                                                if ($percentage == 100) {
-                                                    $progressClass = 'bg-success';
-                                                } elseif ($percentage >= 70) {
-                                                    $progressClass = 'bg-warning';
-                                                } else {
-                                                    $progressClass = 'bg-danger';
-                                                }
-                                                
-                                                $textClass = $percentage == 100 ? 'text-success' : ($percentage >= 70 ? 'text-warning' : 'text-danger');
-                                            @endphp
-                                            <div class="bg-info bg-opacity-10 rounded p-2 border border-info mb-2">
-                                                <h5 class="small fw-bold text-dark mb-2">Realizacja</h5>
-                                                
-                                                {{-- Progress bar z liczbą --}}
-                                                <div class="mb-2">
-                                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                                        <span class="small fw-bold text-dark">{{ $totalAssigned }}/{{ $totalNeeded }}</span>
-                                                        <span class="small fw-semibold {{ $textClass }}">
-                                                            {{ $percentage }}%
-                                                        </span>
-                                                    </div>
-                                                    <div class="progress" style="height: 8px;">
-                                                        <div class="progress-bar {{ $progressClass }}" role="progressbar" style="width: {{ $percentage }}%" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                                    </div>
-                                                </div>
-                                                
-                                                {{-- Informacje tekstowe --}}
-                                                <div>
-                                                    @php
-                                                        $totalExcess = $weekData['requirements_summary']['total_excess'] ?? 0;
-                                                        $hasIssues = $totalMissing > 0 || $totalExcess > 0;
-                                                    @endphp
-                                                    @if(!$hasIssues)
-                                                        <div class="small text-success fw-semibold">
-                                                            <i class="bi bi-check-circle"></i> Wszystko OK – pełny skład
-                                                        </div>
-                                                    @else
-                                                        {{-- Braki --}}
-                                                        @if(!empty($missingRoles))
-                                                            <div class="small text-warning mb-1">
-                                                                @foreach($missingRoles as $roleDetail)
-                                                                    <div>Za mało {{ Str::lower($roleDetail['role']->name) }}: {{ $roleDetail['missing'] }}</div>
-                                                                @endforeach
-                                                            </div>
-                                                        @endif
-                                                        {{-- Nadmiary --}}
-                                                        @if(!empty($excessRoles))
-                                                            <div class="small text-danger">
-                                                                @foreach($excessRoles as $roleDetail)
-                                                                    <div>Za dużo {{ Str::lower($roleDetail['role']->name) }}: +{{ $roleDetail['excess'] }}</div>
-                                                                @endforeach
-                                                            </div>
-                                                        @endif
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endif
+                                        <x-weekly-overview.realization-tile :summary="$summary" />
                                         
                                         {{-- Kafelek: Domy --}}
-                                        @if($weekData && $weekData['assigned_employees']->isNotEmpty())
-                                            <div class="bg-success bg-opacity-10 rounded p-2 border border-success mb-2">
-                                                <h5 class="small fw-bold text-dark mb-1">Domy</h5>
-                                                @if($allHaveAccommodation)
-                                                    <div class="small text-success fw-semibold">
-                                                        <i class="bi bi-check-circle"></i> Wszyscy mają dom
-                                                    </div>
-                                                @else
-                                                    <div class="small text-warning">
-                                                        Brakuje {{ $employeesWithoutAccommodation->count() }} {{ $employeesWithoutAccommodation->count() == 1 ? 'domu' : 'domów' }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        @endif
+                                        <x-weekly-overview.housing-tile :summary="$summary" />
                                         
                                         {{-- Kafelek: Auta --}}
-                                        @if($weekData && $weekData['assigned_employees']->isNotEmpty())
-                                            <div class="bg-primary bg-opacity-10 rounded p-2 border border-primary mb-2">
-                                                <h5 class="small fw-bold text-dark mb-1">Auta</h5>
-                                                @if($allHaveVehicle)
-                                                    <div class="small text-success fw-semibold">
-                                                        <i class="bi bi-check-circle"></i> Wszyscy mają auto
-                                                    </div>
-                                                @else
-                                                    <div class="small text-warning fw-medium mb-1">
-                                                        {{ $employeesWithoutVehicle->count() }} {{ $employeesWithoutVehicle->count() == 1 ? 'osobie brakuje auta' : 'osobom brakuje auta' }}
-                                                    </div>
-                                                    <div>
-                                                        @foreach($employeesWithoutVehicle as $employeeData)
-                                                            <div class="d-flex justify-content-between align-items-center small mb-1">
-                                                                <span class="text-dark">
-                                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="text-primary text-decoration-none">
-                                                                        {{ $employeeData['employee']->full_name }}
-                                                                    </a>
-                                                                </span>
-                                                                <a href="{{ route('employees.vehicles.create', ['employee' => $employeeData['employee'], 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" 
-                                                                   class="btn btn-sm btn-primary">
-                                                                    <i class="bi bi-plus"></i> Przypisz auto
-                                                                </a>
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        @endif
+                                        <x-weekly-overview.vehicles-tile :summary="$summary" />
                                     </td>
                                     <td class="bg-white align-top">
                                         <x-weekly-overview.project-week-tile 
@@ -263,13 +125,3 @@
         </div>
     </div>
 </x-app-layout>
-
-<style>
-    .border-end-2 {
-        border-right-width: 2px !important;
-    }
-    
-    .border-bottom-2 {
-        border-bottom-width: 2px !important;
-    }
-</style>

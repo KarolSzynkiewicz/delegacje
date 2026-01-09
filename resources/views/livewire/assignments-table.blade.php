@@ -46,6 +46,7 @@
     @endphp
 
     @foreach($groupedAssignments as $projectId => $projectAssignments)
+        <div wire:key="project-group-{{ $projectId }}">
         @php
             $project = $projectAssignments->first()->project;
         @endphp
@@ -71,7 +72,7 @@
                         </thead>
                         <tbody>
                             @foreach($projectAssignments->sortBy('start_date') as $assignment)
-                                <tr>
+                                <tr wire:key="assignment-{{ $assignment->id }}">
                                     <td>
                                         <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
                                             {{ $assignment->employee->full_name }}
@@ -118,6 +119,7 @@
                     </table>
                 </div>
             </div>
+        </div>
         </div>
     @endforeach
 

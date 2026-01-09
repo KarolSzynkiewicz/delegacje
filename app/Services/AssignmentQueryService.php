@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
-use App\Models\Employee;
+use App\Repositories\Contracts\EmployeeRepositoryInterface;
 use App\Contracts\AssignmentContract;
 use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
@@ -19,6 +19,9 @@ use Illuminate\Support\Collection;
  */
 class AssignmentQueryService
 {
+    public function __construct(
+        protected EmployeeRepositoryInterface $employeeRepository
+    ) {}
     /**
      * Get all active assignments for employees at a specific date.
      * 
@@ -74,18 +77,7 @@ class AssignmentQueryService
      */
     public function getEmployeesWithActiveAssignments(Carbon $date): Collection
     {
-        return Employee::whereHas('assignments', function ($query) use ($date) {
-                $query->activeAtDate($date);
-            })
-            ->orWhereHas('accommodationAssignments', function ($query) use ($date) {
-                $query->activeAtDate($date);
-            })
-            ->with(['assignments' => function ($query) use ($date) {
-                $query->activeAtDate($date);
-            }])
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get();
+        return $this->employeeRepository->withActiveProjectOrAccommodationAssignmentsAt($date);
     }
 
     /**

@@ -10,4 +10,15 @@
     z-index: 3;
 }
 
-/* Additional custom styles can be added here */
+/* Weekly overview styles */
+.border-end-2 {
+    border-right-width: 2px !important;
+}
+
+.border-bottom-2 {
+    border-bottom-width: 2px !important;
+}
+
+.object-fit-cover {
+    object-fit: cover;
+}

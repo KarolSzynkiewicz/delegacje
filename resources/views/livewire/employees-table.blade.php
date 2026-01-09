@@ -35,11 +35,6 @@
                             placeholder="Imię, nazwisko lub email..."
                             class="form-control form-control-sm ps-5">
                         <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                        @if($search)
-                            <div wire:loading class="position-absolute top-50 end-0 translate-middle-y me-3">
-                                <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
-                            </div>
-                        @endif
                     </div>
                 </div>
 
@@ -60,17 +55,7 @@
     </div>
 
     <!-- Tabela -->
-    <div class="card shadow-sm border-0 position-relative">
-        <!-- Wskaźnik ładowania -->
-        <div wire:loading.delay class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-90 d-flex align-items-center justify-content-center rounded z-3">
-            <div class="text-center">
-                <div class="spinner-border text-primary mb-2" role="status">
-                    <span class="visually-hidden">Ładowanie...</span>
-                </div>
-                <div class="small text-muted fw-medium">Ładowanie...</div>
-            </div>
-        </div>
-
+    <div class="card shadow-sm border-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">

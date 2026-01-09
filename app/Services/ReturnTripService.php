@@ -6,7 +6,7 @@ use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\Vehicle;
 use App\Models\Location;
-use App\Models\Employee;
+use App\Repositories\Contracts\EmployeeRepositoryInterface;
 use App\Contracts\AssignmentContract;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
@@ -29,7 +29,8 @@ use Carbon\Carbon;
 class ReturnTripService
 {
     public function __construct(
-        protected AssignmentQueryService $assignmentQueryService
+        protected AssignmentQueryService $assignmentQueryService,
+        protected EmployeeRepositoryInterface $employeeRepository
     ) {}
 
     /**
@@ -84,7 +85,7 @@ class ReturnTripService
 
             // Process each employee's assignments
             foreach ($employeeIds as $employeeId) {
-                $employee = Employee::findOrFail($employeeId);
+                $employee = $this->employeeRepository->findOrFail($employeeId);
                 $employeeAssignments = $assignments->filter(function ($assignment) use ($employeeId) {
                     return $assignment->getEmployee()->id === $employeeId;
                 });
@@ -163,7 +164,7 @@ class ReturnTripService
         $employeesWithoutAssignments = [];
 
         foreach ($employeeIds as $employeeId) {
-            $employee = Employee::findOrFail($employeeId);
+            $employee = $this->employeeRepository->findOrFail($employeeId);
             
             if (!$this->assignmentQueryService->hasActiveAssignment($employeeId, $date)) {
                 $employeesWithoutAssignments[] = $employee->full_name;
@@ -189,7 +190,7 @@ class ReturnTripService
             return null;
         }
 
-        $employee = Employee::find($employeeIds[0]);
+        $employee = $this->employeeRepository->find($employeeIds[0]);
         if (!$employee) {
             return null;
         }
