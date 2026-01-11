@@ -33,21 +33,25 @@
                         </div>
                     @endif
                     
-                    @if(!empty($missingDocuments))
+                    @php
+                        // Filtruj tylko wymagane dokumenty
+                        $requiredMissingDocuments = array_filter($missingDocuments ?? [], function($doc) {
+                            return isset($doc['is_required']) && $doc['is_required'] === true;
+                        });
+                    @endphp
+                    @if(!empty($requiredMissingDocuments))
                         <div class="alert alert-warning mb-3">
                             <h6 class="alert-heading small fw-semibold mb-2">
-                                Problemy z wymaganymi dokumentami ({{ count($missingDocuments) }}):
+                                Problemy z wymaganymi dokumentami ({{ count($requiredMissingDocuments) }}):
                             </h6>
                             <div class="list-group list-group-flush">
-                                @foreach($missingDocuments as $doc)
+                                @foreach($requiredMissingDocuments as $doc)
                                     <div class="list-group-item bg-transparent border-bottom px-0 py-2">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div class="flex-grow-1">
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <span class="fw-semibold text-dark">{{ $doc['document_name'] ?? 'Nieznany dokument' }}</span>
-                                                    @if(isset($doc['is_required']) && $doc['is_required'])
-                                                        <span class="badge bg-danger">Wymagane</span>
-                                                    @endif
+                                                    <span class="badge bg-danger">Wymagane</span>
                                                 </div>
                                                 <div class="small text-muted mt-1">
                                                     <span>{{ $doc['problem'] ?? 'Brak dokumentu' }}</span>

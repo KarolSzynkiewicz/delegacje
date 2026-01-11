@@ -47,16 +47,36 @@
                                     @php
                                         $isAvailable = $employee->availability_status['available'] ?? true;
                                         $reasons = $employee->availability_status['reasons'] ?? [];
+                                        $missingDocuments = $employee->availability_status['missing_documents'] ?? [];
+                                        
+                                        // Sprawdź czy problem jest z wymaganymi dokumentami
+                                        $hasRequiredDocIssue = false;
+                                        foreach ($reasons as $reason) {
+                                            if (str_contains($reason, 'wymaganych dokumentów')) {
+                                                $hasRequiredDocIssue = true;
+                                                break;
+                                            }
+                                        }
+                                        // Jeśli nie ma powodu o wymaganych dokumentach, ale są missing_documents, sprawdź czy są wymagane
+                                        if (!$hasRequiredDocIssue && !empty($missingDocuments)) {
+                                            foreach ($missingDocuments as $doc) {
+                                                if (isset($doc['is_required']) && $doc['is_required']) {
+                                                    $hasRequiredDocIssue = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
                                     @endphp
                                     @php
                                         $optionText = $employee->full_name;
                                         if ($employee->roles->count() > 0) {
                                             $optionText .= ' (' . $employee->roles->pluck('name')->join(', ') . ')';
                                         }
+                                        // Pokaż powody tylko jeśli są problemy z wymaganymi dokumentami lub innymi ważnymi powodami
                                         if (!$isAvailable && !empty($reasons)) {
                                             $shortReasons = [];
                                             foreach ($reasons as $reason) {
-                                                if (str_contains($reason, 'wymaganych dokumentów') || str_contains($reason, 'dokument')) {
+                                                if (str_contains($reason, 'wymaganych dokumentów')) {
                                                     $shortReasons[] = 'Brak wymaganych dok';
                                                 } elseif (str_contains($reason, 'rotacji')) {
                                                     $shortReasons[] = 'Brak rotacji';
@@ -71,7 +91,7 @@
                                     @endphp
                                     <option value="{{ $employee->id }}" 
                                             {{ old('employee_id') == $employee->id ? 'selected' : '' }}
-                                            style="{{ !$isAvailable ? 'color: #dc2626; font-weight: bold;' : '' }}">
+                                            style="{{ $hasRequiredDocIssue ? 'color: #dc2626; font-weight: bold;' : '' }}">
                                         {{ $optionText }}
                                     </option>
                                 @endforeach

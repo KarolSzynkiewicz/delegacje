@@ -104,6 +104,11 @@
                                             <tr class="{{ !$docStatus['hasDocument'] ? 'table-secondary' : '' }}">
                                                 <td>
                                                     <strong>{{ $docStatus['document']->name }}</strong>
+                                                    @if($docStatus['document']->is_required ?? false)
+                                                        <span class="badge bg-danger ms-2">Wymagany</span>
+                                                    @else
+                                                        <span class="badge bg-secondary ms-2">Niewymagany</span>
+                                                    @endif
                                                     @if($docStatus['document']->description)
                                                         <br><small class="text-muted">{{ $docStatus['document']->description }}</small>
                                                     @endif

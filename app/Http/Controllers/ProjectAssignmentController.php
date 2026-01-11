@@ -101,10 +101,17 @@ class ProjectAssignmentController extends Controller
     public function edit(ProjectAssignment $assignment)
     {
         $projects = Project::orderBy("name")->get();
-        $employees = Employee::with("roles")->orderBy("last_name")->get();
+        
+        // Pobierz daty z przypisania do sprawdzenia dostępności
+        $startDate = $assignment->start_date->format('Y-m-d');
+        $endDate = $assignment->end_date ? $assignment->end_date->format('Y-m-d') : $startDate;
+        
+        // Sprawdź dostępność pracowników dla dat przypisania
+        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate);
+        
         $roles = Role::orderBy("name")->get();
         
-        return view("assignments.edit", compact("assignment", "projects", "employees", "roles"));
+        return view("assignments.edit", compact("assignment", "projects", "employees", "roles", "startDate", "endDate"));
     }
 
     /**

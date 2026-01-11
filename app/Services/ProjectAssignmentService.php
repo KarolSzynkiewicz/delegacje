@@ -83,16 +83,25 @@ class ProjectAssignmentService
      */
     protected function validateEmployeeDocuments(Employee $employee, string $startDate, string $endDate): void
     {
+        // Sprawdź czy kolumna is_required istnieje
+        $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
+        
+        // Jeśli kolumna nie istnieje, nie ma wymaganych dokumentów - nie blokuj
+        if (!$hasIsRequiredColumn) {
+            return;
+        }
+        
+        // Sprawdź czy są wymagane dokumenty
+        $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
+        
+        // Jeśli nie ma żadnych wymaganych dokumentów, nie blokuj przypisania
+        if ($requiredDocuments->isEmpty()) {
+            return; // Nie ma wymaganych dokumentów - wszystko OK
+        }
+        
+        // Sprawdź czy pracownik ma wszystkie wymagane dokumenty
         if (!$employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
-            // Sprawdź czy kolumna is_required istnieje
-            $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
-            
-            // Znajdź brakujące wymagane dokumenty dla lepszego komunikatu
-            if ($hasIsRequiredColumn) {
-                $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
-            } else {
-                $requiredDocuments = \App\Models\Document::all();
-            }
+            // Znajdź brakujące wymagane dokumenty
             $missingDocuments = [];
             
             foreach ($requiredDocuments as $document) {
@@ -118,10 +127,13 @@ class ProjectAssignmentService
                 }
             }
             
+            // Jeśli nie ma brakujących wymaganych dokumentów, nie blokuj
+            if (empty($missingDocuments)) {
+                return;
+            }
+            
             $missingList = implode(', ', $missingDocuments);
-            $message = $hasIsRequiredColumn 
-                ? "Pracownik {$employee->full_name} nie ma wszystkich wymaganych dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje wymaganych dokumentów: {$missingList}."
-                : "Pracownik {$employee->full_name} nie ma wszystkich dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje: {$missingList}.";
+            $message = "Pracownik {$employee->full_name} nie ma wszystkich wymaganych dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje wymaganych dokumentów: {$missingList}.";
             
             throw ValidationException::withMessages([
                 'employee_id' => $message
