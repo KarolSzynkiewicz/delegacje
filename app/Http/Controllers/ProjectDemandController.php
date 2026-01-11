@@ -55,6 +55,15 @@ class ProjectDemandController extends Controller
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         
+        // Sprawdź czy daty są w przeszłości
+        $isDateInPast = false;
+        if ($dateFrom) {
+            $isDateInPast = \Carbon\Carbon::parse($dateFrom)->startOfDay()->isPast();
+        }
+        if ($dateTo && !$isDateInPast) {
+            $isDateInPast = \Carbon\Carbon::parse($dateTo)->startOfDay()->isPast();
+        }
+        
         // Pobierz istniejące zapotrzebowania dla tego projektu w tym okresie (jeśli daty są podane)
         $existingDemands = collect();
         if ($dateFrom && $dateTo) {
@@ -69,7 +78,7 @@ class ProjectDemandController extends Controller
                 ->keyBy('role_id');
         }
         
-        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo", "existingDemands"));
+        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo", "existingDemands", "isDateInPast"));
     }
 
     /**
@@ -106,7 +115,14 @@ class ProjectDemandController extends Controller
     {
         $demand->load("role");
         $roles = Role::all();
-        return view("demands.edit", compact("demand", "roles"));
+        
+        // Sprawdź czy data jest w przeszłości
+        $isDateInPast = $demand->date_from->startOfDay()->isPast();
+        if ($demand->date_to && !$isDateInPast) {
+            $isDateInPast = $demand->date_to->startOfDay()->isPast();
+        }
+        
+        return view("demands.edit", compact("demand", "roles", "isDateInPast"));
     }
 
     /**

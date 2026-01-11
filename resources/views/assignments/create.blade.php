@@ -6,8 +6,28 @@
                         <h2 class="h4 fw-semibold text-dark mb-0">Dodaj Przypisanie Pracownika do Projektu</h2>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('projects.assignments.store', $project) }}">
+                        <form method="POST" action="{{ route('projects.assignments.store', $project) }}" id="assignment-form">
                             @csrf
+
+                            @if(isset($isDateInPast) && $isDateInPast)
+                            <div class="alert alert-warning mb-4" id="past-date-warning" role="alert">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                                    <div class="flex-grow-1">
+                                        <h5 class="alert-heading mb-2">Uwaga: Data w przeszłości</h5>
+                                        <p class="mb-2">
+                                            Próbujesz dodać przypisanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
+                                        </p>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="confirm-past-date">
+                                            <label class="form-check-label" for="confirm-past-date">
+                                                Tak, chcę dodać przypisanie dla dat w przeszłości
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endif
 
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Projekt</label>
@@ -36,8 +56,8 @@
                                         if (!$isAvailable && !empty($reasons)) {
                                             $shortReasons = [];
                                             foreach ($reasons as $reason) {
-                                                if (str_contains($reason, 'dokument')) {
-                                                    $shortReasons[] = 'Brak dok';
+                                                if (str_contains($reason, 'wymaganych dokumentów') || str_contains($reason, 'dokument')) {
+                                                    $shortReasons[] = 'Brak wymaganych dok';
                                                 } elseif (str_contains($reason, 'rotacji')) {
                                                     $shortReasons[] = 'Brak rotacji';
                                                 } elseif (str_contains($reason, 'przypisany') || str_contains($reason, 'projekcie')) {
@@ -190,7 +210,95 @@
         // Aktualizuj przy załadowaniu strony, jeśli są wartości domyślne
         document.addEventListener('DOMContentLoaded', function() {
             const startInput = document.getElementById('start-date-input');
+            const endInput = document.getElementById('end-date-input');
             const employeeSelect = document.getElementById('employee-select');
+            const form = document.getElementById('assignment-form');
+            let pastDateWarning = null;
+            
+            function checkDates() {
+                const startDate = startInput.value;
+                const endDate = endInput.value;
+                const today = new Date().toISOString().split('T')[0];
+                
+                const isStartDatePast = startDate && startDate < today;
+                const isEndDatePast = endDate && endDate < today;
+                const isPast = isStartDatePast || isEndDatePast;
+
+                // Sprawdź czy już istnieje warning z PHP
+                const existingWarning = document.getElementById('past-date-warning');
+                
+                // Usuń dynamiczny warning jeśli jest
+                if (pastDateWarning) {
+                    pastDateWarning.remove();
+                    pastDateWarning = null;
+                }
+
+                // Jeśli data jest w przeszłości i nie ma już ostrzeżenia z PHP, dodaj dynamiczny warning
+                if (isPast && !existingWarning) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'alert alert-warning mb-4';
+                    warningDiv.id = 'past-date-warning-dynamic';
+                    warningDiv.setAttribute('role', 'alert');
+                    warningDiv.innerHTML = `
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                            <div class="flex-grow-1">
+                                <h5 class="alert-heading mb-2">Uwaga: Data w przeszłości</h5>
+                                <p class="mb-2">
+                                    Próbujesz dodać przypisanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
+                                </p>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="confirm-past-date-dynamic">
+                                    <label class="form-check-label" for="confirm-past-date-dynamic">
+                                        Tak, chcę dodać przypisanie dla dat w przeszłości
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Wstaw warning przed projektem
+                    const projectDiv = document.querySelector('.card-body > .mb-3');
+                    if (projectDiv) {
+                        projectDiv.parentNode.insertBefore(warningDiv, projectDiv);
+                    } else {
+                        form.insertBefore(warningDiv, form.firstChild);
+                    }
+                    pastDateWarning = warningDiv;
+                }
+            }
+
+            // Sprawdzaj daty przy zmianie
+            if (startInput) {
+                startInput.addEventListener('change', checkDates);
+                startInput.addEventListener('input', checkDates);
+            }
+            if (endInput) {
+                endInput.addEventListener('change', checkDates);
+                endInput.addEventListener('input', checkDates);
+            }
+
+            // Blokuj submit jeśli data w przeszłości i nie potwierdzono
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const confirmCheckbox = document.getElementById('confirm-past-date');
+                    const confirmCheckboxDynamic = document.getElementById('confirm-past-date-dynamic');
+                    const isConfirmed = (confirmCheckbox && confirmCheckbox.checked) || (confirmCheckboxDynamic && confirmCheckboxDynamic.checked);
+                    
+                    const startDate = startInput.value;
+                    const endDate = endInput.value;
+                    const today = new Date().toISOString().split('T')[0];
+                    const isStartDatePast = startDate && startDate < today;
+                    const isEndDatePast = endDate && endDate < today;
+                    const isPast = isStartDatePast || isEndDatePast;
+                    
+                    if (isPast && !isConfirmed) {
+                        e.preventDefault();
+                        alert('Musisz potwierdzić, że chcesz dodać przypisanie dla dat w przeszłości.');
+                        return false;
+                    }
+                });
+            }
             
             if (startInput && startInput.value) {
                 // Opóźnij, aby upewnić się, że Livewire jest gotowy
@@ -201,6 +309,9 @@
             if (employeeSelect) {
                 employeeSelect.addEventListener('change', updateLivewireComponent);
             }
+
+            // Sprawdź daty przy załadowaniu strony
+            checkDates();
         });
     </script>
 </x-app-layout>

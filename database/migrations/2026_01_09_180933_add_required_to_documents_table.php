@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('documents', function (Blueprint $table) {
-            //
+            $table->boolean('is_required')->default(false)->after('is_periodic');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('documents', function (Blueprint $table) {
-            //
+            $table->dropColumn('is_required');
         });
     }
 };

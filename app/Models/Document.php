@@ -14,10 +14,12 @@ class Document extends Model
         'name',
         'description',
         'is_periodic',
+        'is_required',
     ];
 
     protected $casts = [
         'is_periodic' => 'boolean',
+        'is_required' => 'boolean',
     ];
 
     /**

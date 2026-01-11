@@ -36,14 +36,19 @@
                     @if(!empty($missingDocuments))
                         <div class="alert alert-warning mb-3">
                             <h6 class="alert-heading small fw-semibold mb-2">
-                                Problemy z dokumentami ({{ count($missingDocuments) }}):
+                                Problemy z wymaganymi dokumentami ({{ count($missingDocuments) }}):
                             </h6>
                             <div class="list-group list-group-flush">
                                 @foreach($missingDocuments as $doc)
                                     <div class="list-group-item bg-transparent border-bottom px-0 py-2">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div class="flex-grow-1">
-                                                <span class="fw-semibold text-dark">{{ $doc['document_name'] ?? 'Nieznany dokument' }}</span>
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <span class="fw-semibold text-dark">{{ $doc['document_name'] ?? 'Nieznany dokument' }}</span>
+                                                    @if(isset($doc['is_required']) && $doc['is_required'])
+                                                        <span class="badge bg-danger">Wymagane</span>
+                                                    @endif
+                                                </div>
                                                 <div class="small text-muted mt-1">
                                                     <span>{{ $doc['problem'] ?? 'Brak dokumentu' }}</span>
                                                     @if(isset($doc['valid_from']) || isset($doc['valid_to']))

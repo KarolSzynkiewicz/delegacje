@@ -49,10 +49,19 @@ class ProjectAssignmentController extends Controller
         $startDate = $request->query('date_from');
         $endDate = $request->query('date_to');
         
+        // Sprawdź czy daty są w przeszłości
+        $isDateInPast = false;
+        if ($startDate) {
+            $isDateInPast = \Carbon\Carbon::parse($startDate)->startOfDay()->isPast();
+        }
+        if ($endDate && !$isDateInPast) {
+            $isDateInPast = \Carbon\Carbon::parse($endDate)->startOfDay()->isPast();
+        }
+        
         $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate);
         $roles = Role::orderBy("name")->get();
         
-        return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate"));
+        return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate", "isDateInPast"));
     }
 
     /**

@@ -289,56 +289,6 @@
                             </div>
                         @endif
                     @endif
-                    
-                    <!-- Bez auta -->
-                    @php
-                        $employeesWithoutVehicle = $weekData['assigned_employees']->filter(function($employeeData) {
-                            // Show only if employee doesn't have vehicle in ANY day of the week
-                            return !($employeeData['has_vehicle_in_week'] ?? false);
-                        });
-                    @endphp
-                    @if($employeesWithoutVehicle->isNotEmpty())
-                        <div class="alert alert-danger mb-0">
-                            <h6 class="alert-heading small fw-bold mb-2">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                Bez auta ({{ $employeesWithoutVehicle->count() }})
-                            </h6>
-                            <div class="row g-2">
-                                @foreach($employeesWithoutVehicle as $employeeData)
-                                    <div class="col-md-6">
-                                        <div class="d-flex align-items-center gap-2 p-2 bg-danger bg-opacity-10 rounded border border-danger">
-                                            @if($employeeData['employee']->image_path)
-                                                <img src="{{ $employeeData['employee']->image_url }}" alt="{{ $employeeData['employee']->full_name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                                            @else
-                                                <div class="bg-warning bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                                    <span class="text-warning fw-semibold small">{{ substr($employeeData['employee']->first_name, 0, 1) }}{{ substr($employeeData['employee']->last_name, 0, 1) }}</span>
-                                                </div>
-                                            @endif
-                                            <div class="flex-grow-1">
-                                                <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-dark text-decoration-none d-block">{{ $employeeData['employee']->full_name }}</a>
-                                                <span class="badge bg-secondary small">{{ $employeeData['role']->name }}</span>
-                                            </div>
-                                            @php
-                                                $employee = $employeeData['employee'];
-                                                $url = route('employees.vehicles.create', $employee->id);
-                                                if (isset($weekData['week']) && isset($weekData['week']['start']) && isset($weekData['week']['end'])) {
-                                                    $url .= '?date_from=' . $weekData['week']['start']->format('Y-m-d') . '&date_to=' . $weekData['week']['end']->format('Y-m-d');
-                                                }
-                                            @endphp
-                                            <a href="{{ $url }}" class="btn btn-sm btn-primary">
-                                                <i class="bi bi-plus"></i>
-                                                Auto
-                                            </a>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @elseif($weekData['vehicles']->isEmpty() && $weekData['assigned_employees']->isEmpty())
-                        <div class="text-center py-4 text-muted small">
-                            Brak aut
-                        </div>
-                    @endif
                 </div>
 
                 <!-- Domy -->

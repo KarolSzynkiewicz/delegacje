@@ -283,15 +283,23 @@ class Employee extends Model
      */
     public function hasAllDocumentsActiveInDateRange($startDate, $endDate): bool
     {
-        // Pobierz wszystkie typy dokumentów
-        $allDocumentTypes = \App\Models\Document::pluck('id');
+        // Sprawdź czy kolumna is_required istnieje w tabeli documents
+        $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
         
-        if ($allDocumentTypes->isEmpty()) {
-            return true; // Jeśli nie ma żadnych typów dokumentów, uznajemy że dokumenty są OK
+        // Pobierz tylko wymagane dokumenty (is_required = true) lub wszystkie jeśli kolumna nie istnieje
+        if ($hasIsRequiredColumn) {
+            $requiredDocuments = \App\Models\Document::where('is_required', true)->pluck('id');
+        } else {
+            // Fallback: jeśli kolumna nie istnieje, sprawdź wszystkie dokumenty (stara logika)
+            $requiredDocuments = \App\Models\Document::pluck('id');
+        }
+        
+        if ($requiredDocuments->isEmpty()) {
+            return true; // Jeśli nie ma żadnych wymaganych dokumentów, uznajemy że dokumenty są OK
         }
 
-        // Dla każdego typu dokumentu sprawdź czy pracownik ma aktywny dokument w okresie
-        foreach ($allDocumentTypes as $documentTypeId) {
+        // Dla każdego wymaganego dokumentu sprawdź czy pracownik ma aktywny dokument w okresie
+        foreach ($requiredDocuments as $documentTypeId) {
             $hasActiveDocument = $this->employeeDocuments()
                 ->where('document_id', $documentTypeId)
                 ->where(function ($q) use ($startDate, $endDate) {
@@ -337,9 +345,17 @@ class Employee extends Model
         
         if (!$this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
             $available = false;
-            $allDocuments = \App\Models\Document::all();
+            // Sprawdź czy kolumna is_required istnieje
+            $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
             
-            foreach ($allDocuments as $document) {
+            // Sprawdź tylko wymagane dokumenty lub wszystkie jeśli kolumna nie istnieje
+            if ($hasIsRequiredColumn) {
+                $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
+            } else {
+                $requiredDocuments = \App\Models\Document::all();
+            }
+            
+            foreach ($requiredDocuments as $document) {
                 $employeeDoc = $this->employeeDocuments->where('document_id', $document->id)->first();
                 
                 if (!$employeeDoc) {
@@ -350,6 +366,7 @@ class Employee extends Model
                         'kind' => null,
                         'valid_from' => null,
                         'valid_to' => null,
+                        'is_required' => $hasIsRequiredColumn ? $document->is_required : true,
                     ];
                     continue;
                 }
@@ -387,12 +404,18 @@ class Employee extends Model
                         'valid_from' => $employeeDoc->valid_from->format('Y-m-d'),
                         'valid_to' => $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null,
                         'employee_document_id' => $employeeDoc->id,
+                        'is_required' => $hasIsRequiredColumn ? $document->is_required : true,
                     ];
                 }
             }
             
             if (!empty($missingDocuments)) {
-                $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
+                // Sprawdź czy kolumna is_required istnieje, aby dostosować komunikat
+                if ($hasIsRequiredColumn) {
+                    $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
+                } else {
+                    $reasons[] = 'Brak wszystkich dokumentów aktywnych w tym okresie';
+                }
             }
         }
 

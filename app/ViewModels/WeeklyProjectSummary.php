@@ -80,7 +80,12 @@ class WeeklyProjectSummary
 
     public function getTotalAssigned(): int
     {
-        return $this->weekData['requirements_summary']['total_assigned'] ?? 0;
+        // Use total_assigned_max if total_assigned is null (variable assignments)
+        $totalAssigned = $this->weekData['requirements_summary']['total_assigned'] ?? null;
+        if ($totalAssigned === null) {
+            return $this->weekData['requirements_summary']['total_assigned_max'] ?? 0;
+        }
+        return $totalAssigned;
     }
 
     public function getTotalMissing(): int

@@ -33,6 +33,7 @@
                                 <th>Nazwa</th>
                                 <th>Opis</th>
                                 <th>Okresowy</th>
+                                <th>Wymagane</th>
                                 <th>Liczba przypisań</th>
                                 <th>Akcje</th>
                             </tr>
@@ -43,6 +44,13 @@
                                     <td>{{ $document->name }}</td>
                                     <td>{{ $document->description ?? '-' }}</td>
                                     <td>{{ $document->is_periodic ? 'Tak' : 'Nie' }}</td>
+                                    <td>
+                                        @if($document->is_required)
+                                            <span class="badge bg-danger">Tak</span>
+                                        @else
+                                            <span class="badge bg-secondary">Nie</span>
+                                        @endif
+                                    </td>
                                     <td>{{ $document->employee_documents_count }}</td>
                                     <td>
                                         <a href="{{ route('documents.show', $document) }}" class="btn btn-sm btn-info">Szczegóły</a>
@@ -56,7 +64,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center">Brak dokumentów</td>
+                                    <td colspan="6" class="text-center">Brak dokumentów</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -38,10 +38,12 @@ class DocumentController extends Controller
             'name' => 'required|string|max:255|unique:documents,name',
             'description' => 'nullable|string',
             'is_periodic' => 'required|in:0,1',
+            'is_required' => 'nullable|in:0,1',
         ]);
         
         // Konwertuj string na boolean
         $validated['is_periodic'] = (bool) $validated['is_periodic'];
+        $validated['is_required'] = isset($validated['is_required']) ? (bool) $validated['is_required'] : false;
 
         Document::create($validated);
 
@@ -76,10 +78,12 @@ class DocumentController extends Controller
             'name' => 'required|string|max:255|unique:documents,name,' . $document->id,
             'description' => 'nullable|string',
             'is_periodic' => 'required|in:0,1',
+            'is_required' => 'nullable|in:0,1',
         ]);
         
         // Konwertuj string na boolean
         $validated['is_periodic'] = (bool) $validated['is_periodic'];
+        $validated['is_required'] = isset($validated['is_required']) ? (bool) $validated['is_required'] : false;
 
         $document->update($validated);
 

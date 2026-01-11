@@ -84,11 +84,18 @@ class ProjectAssignmentService
     protected function validateEmployeeDocuments(Employee $employee, string $startDate, string $endDate): void
     {
         if (!$employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
-            // Znajdź brakujące dokumenty dla lepszego komunikatu
-            $allDocuments = \App\Models\Document::all();
+            // Sprawdź czy kolumna is_required istnieje
+            $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
+            
+            // Znajdź brakujące wymagane dokumenty dla lepszego komunikatu
+            if ($hasIsRequiredColumn) {
+                $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
+            } else {
+                $requiredDocuments = \App\Models\Document::all();
+            }
             $missingDocuments = [];
             
-            foreach ($allDocuments as $document) {
+            foreach ($requiredDocuments as $document) {
                 $hasActiveDocument = $employee->employeeDocuments()
                     ->where('document_id', $document->id)
                     ->where(function ($q) use ($startDate, $endDate) {
@@ -112,8 +119,12 @@ class ProjectAssignmentService
             }
             
             $missingList = implode(', ', $missingDocuments);
+            $message = $hasIsRequiredColumn 
+                ? "Pracownik {$employee->full_name} nie ma wszystkich wymaganych dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje wymaganych dokumentów: {$missingList}."
+                : "Pracownik {$employee->full_name} nie ma wszystkich dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje: {$missingList}.";
+            
             throw ValidationException::withMessages([
-                'employee_id' => "Pracownik {$employee->full_name} nie ma wszystkich wymaganych dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje: {$missingList}."
+                'employee_id' => $message
             ]);
         }
     }

@@ -42,6 +42,17 @@
                     <small class="form-text text-muted">Czy dokument ma datę ważności do?</small>
                 </div>
 
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input @error('is_required') is-invalid @enderror" type="checkbox" id="is_required" name="is_required" value="1" {{ old('is_required') ? 'checked' : '' }}>
+                        <label class="form-check-label" for="is_required">
+                            Dokument wymagany
+                        </label>
+                        @error('is_required') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                        <small class="form-text text-muted d-block">Zaznacz, jeśli dokument jest wymagany dla wszystkich pracowników</small>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Dodaj Dokument</button>
                     <a href="{{ route('documents.index') }}" class="btn btn-secondary">Anuluj</a>
