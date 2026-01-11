@@ -1,60 +1,76 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Ewidencja Godzin
-            </h2>
-            <a href="{{ route('time-logs.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Dodaj Wpis
-            </a>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Ewidencja Godzin</h2>
+            <div class="d-flex gap-2">
+                <a href="{{ route('time-logs.monthly-grid') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-calendar-month"></i> Widok Miesięczny
+                </a>
+                <a href="{{ route('time-logs.create') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Dodaj Wpis
+                </a>
+            </div>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pracownik</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projekt</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Godziny</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($timeLogs as $timeLog)
-                                <tr>
-                                    <td class="px-6 py-4">{{ $timeLog->start_time->format('Y-m-d') }}</td>
-                                    <td class="px-6 py-4">{{ $timeLog->projectAssignment->employee->full_name }}</td>
-                                    <td class="px-6 py-4">{{ $timeLog->projectAssignment->project->name }}</td>
-                                    <td class="px-6 py-4 font-semibold">{{ number_format($timeLog->hours_worked, 2) }}h</td>
-                                    <td class="px-6 py-4">
-                                        <a href="{{ route('time-logs.show', $timeLog) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                        <a href="{{ route('time-logs.edit', $timeLog) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
-                                        @can('delete', $timeLog)
-                                        <form action="{{ route('time-logs.destroy', $timeLog) }}" method="POST" class="inline">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Czy na pewno?')">Usuń</button>
-                                        </form>
-                                        @endcan
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
-                                        Brak wpisów
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+    <div class="py-4">
+        <div class="container-xxl">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    @if($timeLogs->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start">Data</th>
+                                        <th class="text-start">Pracownik</th>
+                                        <th class="text-start">Projekt</th>
+                                        <th class="text-start">Godziny</th>
+                                        <th class="text-start">Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($timeLogs as $timeLog)
+                                        <tr>
+                                            <td>{{ $timeLog->start_time->format('Y-m-d') }}</td>
+                                            <td>{{ $timeLog->projectAssignment->employee->full_name }}</td>
+                                            <td>{{ $timeLog->projectAssignment->project->name }}</td>
+                                            <td class="fw-semibold">{{ number_format($timeLog->hours_worked, 2) }}h</td>
+                                            <td>
+                                                @can('delete', $timeLog)
+                                                    <x-action-buttons
+                                                        viewRoute="{{ route('time-logs.show', $timeLog) }}"
+                                                        editRoute="{{ route('time-logs.edit', $timeLog) }}"
+                                                        deleteRoute="{{ route('time-logs.destroy', $timeLog) }}"
+                                                        deleteMessage="Czy na pewno chcesz usunąć ten wpis?"
+                                                    />
+                                                @else
+                                                    <x-action-buttons
+                                                        viewRoute="{{ route('time-logs.show', $timeLog) }}"
+                                                        editRoute="{{ route('time-logs.edit', $timeLog) }}"
+                                                    />
+                                                @endcan
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div class="mt-4">
-                        {{ $timeLogs->links() }}
-                    </div>
+                        @if($timeLogs->hasPages())
+                            <div class="mt-3">
+                                {{ $timeLogs->links() }}
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                            <p class="text-muted mb-3">Brak wpisów w systemie.</p>
+                            <a href="{{ route('time-logs.create') }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Dodaj pierwszy wpis
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

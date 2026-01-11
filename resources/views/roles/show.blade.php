@@ -1,92 +1,103 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Rola: {{ $role->name }}</h2>
-            <div>
-                <a href="{{ route('roles.edit', $role) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded mr-2">Edytuj</a>
-                <a href="{{ route('roles.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Powrót</a>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Rola: {{ $role->name }}</h2>
+            <div class="d-flex gap-2">
+                <x-edit-button href="{{ route('roles.edit', $role) }}" />
+                <a href="{{ route('roles.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Powrót
+                </a>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <h3 class="font-bold text-gray-700 mb-2">Nazwa</h3>
-                        <p class="text-gray-900">{{ $role->name }}</p>
+    <div class="py-4">
+        <div class="container-xxl">
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <h5 class="fw-bold text-dark mb-2">Nazwa</h5>
+                            <p class="text-dark">{{ $role->name }}</p>
+                        </div>
+                        @if($role->description)
+                        <div class="col-12">
+                            <h5 class="fw-bold text-dark mb-2">Opis</h5>
+                            <p class="text-dark">{{ $role->description }}</p>
+                        </div>
+                        @endif
                     </div>
-                    @if($role->description)
-                    <div class="col-span-2">
-                        <h3 class="font-bold text-gray-700 mb-2">Opis</h3>
-                        <p class="text-gray-900">{{ $role->description }}</p>
-                    </div>
-                    @endif
                 </div>
             </div>
 
             @if($role->employees->count() > 0)
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
-                <h3 class="font-bold text-gray-700 mb-4">Pracownicy z tą rolą ({{ $role->employees->count() }})</h3>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Imię i Nazwisko</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefon</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @foreach($role->employees as $employee)
-                            <tr>
-                                <td class="px-6 py-4">
-                                    <a href="{{ route('employees.show', $employee) }}" class="text-blue-600 hover:text-blue-900">
-                                        {{ $employee->first_name }} {{ $employee->last_name }}
-                                    </a>
-                                </td>
-                                <td class="px-6 py-4">{{ $employee->email }}</td>
-                                <td class="px-6 py-4">{{ $employee->phone ?? '-' }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                    <h5 class="fw-bold text-dark mb-4">Pracownicy z tą rolą ({{ $role->employees->count() }})</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-start">Imię i Nazwisko</th>
+                                    <th class="text-start">Email</th>
+                                    <th class="text-start">Telefon</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($role->employees as $employee)
+                                    <tr>
+                                        <td>
+                                            <a href="{{ route('employees.show', $employee) }}" class="text-decoration-none">
+                                                {{ $employee->full_name }}
+                                            </a>
+                                        </td>
+                                        <td>{{ $employee->email }}</td>
+                                        <td>{{ $employee->phone ?? '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             @endif
 
             @if($role->projectDemands->count() > 0)
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
-                <h3 class="font-bold text-gray-700 mb-4">Zapotrzebowania na tę rolę ({{ $role->projectDemands->count() }})</h3>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projekt</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Liczba osób</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Okres</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @foreach($role->projectDemands as $demand)
-                            <tr>
-                                <td class="px-6 py-4">
-                                    <a href="{{ route('projects.show', $demand->project) }}" class="text-blue-600 hover:text-blue-900">
-                                        {{ $demand->project->name }}
-                                    </a>
-                                </td>
-                                <td class="px-6 py-4">{{ $demand->required_count }}</td>
-                                <td class="px-6 py-4">
-                                    {{ $demand->date_from->format('Y-m-d') }}
-                                    @if($demand->date_to)
-                                        - {{ $demand->date_to->format('Y-m-d') }}
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="fw-bold text-dark mb-4">Zapotrzebowania na tę rolę ({{ $role->projectDemands->count() }})</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-start">Projekt</th>
+                                    <th class="text-start">Liczba osób</th>
+                                    <th class="text-start">Okres</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($role->projectDemands as $demand)
+                                    <tr>
+                                        <td>
+                                            <a href="{{ route('projects.show', $demand->project) }}" class="text-decoration-none">
+                                                {{ $demand->project->name }}
+                                            </a>
+                                        </td>
+                                        <td>{{ $demand->required_count }}</td>
+                                        <td>
+                                            {{ $demand->date_from->format('Y-m-d') }}
+                                            @if($demand->date_to)
+                                                - {{ $demand->date_to->format('Y-m-d') }}
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             @endif
         </div>
     </div>
 </x-app-layout>
-

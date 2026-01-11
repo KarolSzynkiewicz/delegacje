@@ -1,66 +1,77 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Wydania Sprzętu
-            </h2>
-            <a href="{{ route('equipment-issues.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Wydaj Sprzęt
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Wydania Sprzętu</h2>
+            <a href="{{ route('equipment-issues.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Wydaj Sprzęt
             </a>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sprzęt</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pracownik</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ilość</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data wydania</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($issues as $issue)
-                                <tr>
-                                    <td class="px-6 py-4">{{ $issue->equipment->name }}</td>
-                                    <td class="px-6 py-4">{{ $issue->employee->full_name }}</td>
-                                    <td class="px-6 py-4">{{ $issue->quantity_issued }} {{ $issue->equipment->unit }}</td>
-                                    <td class="px-6 py-4">{{ $issue->issue_date->format('Y-m-d') }}</td>
-                                    <td class="px-6 py-4">
-                                        <span class="px-2 py-1 text-xs rounded-full 
-                                            @if($issue->status === 'issued') bg-blue-100 text-blue-800
-                                            @elseif($issue->status === 'returned') bg-green-100 text-green-800
-                                            @else bg-gray-100 text-gray-800
-                                            @endif">
-                                            {{ ucfirst($issue->status) }}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="{{ route('equipment-issues.show', $issue) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                        @if($issue->status === 'issued')
-                                            <a href="{{ route('equipment-issues.return', $issue) }}" class="text-green-600 hover:text-green-900">Zwróć</a>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                        Brak wydań
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+    <div class="py-4">
+        <div class="container-xxl">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    @if($issues->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start">Sprzęt</th>
+                                        <th class="text-start">Pracownik</th>
+                                        <th class="text-start">Ilość</th>
+                                        <th class="text-start">Data wydania</th>
+                                        <th class="text-start">Status</th>
+                                        <th class="text-start">Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($issues as $issue)
+                                        <tr>
+                                            <td>{{ $issue->equipment->name }}</td>
+                                            <td>{{ $issue->employee->full_name }}</td>
+                                            <td>{{ $issue->quantity_issued }} {{ $issue->equipment->unit }}</td>
+                                            <td>{{ $issue->issue_date->format('Y-m-d') }}</td>
+                                            <td>
+                                                @php
+                                                    $badgeClass = match($issue->status) {
+                                                        'issued' => 'bg-primary',
+                                                        'returned' => 'bg-success',
+                                                        default => 'bg-secondary'
+                                                    };
+                                                @endphp
+                                                <span class="badge {{ $badgeClass }}">{{ ucfirst($issue->status) }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <x-view-button href="{{ route('equipment-issues.show', $issue) }}" />
+                                                    @if($issue->status === 'issued')
+                                                        <a href="{{ route('equipment-issues.return', $issue) }}" class="btn btn-outline-success btn-sm" title="Zwróć">
+                                                            <i class="bi bi-arrow-return-left"></i>
+                                                        </a>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div class="mt-4">
-                        {{ $issues->links() }}
-                    </div>
+                        @if($issues->hasPages())
+                            <div class="mt-3">
+                                {{ $issues->links() }}
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                            <p class="text-muted mb-3">Brak wydań w systemie.</p>
+                            <a href="{{ route('equipment-issues.create') }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Wydaj pierwszy sprzęt
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

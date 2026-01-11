@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
                 @isset($employee)
                     Pojazdy pracownika: {{ $employee->full_name }}
                 @else
@@ -9,61 +9,76 @@
                 @endisset
             </h2>
             @isset($employee)
-                <a href="{{ route('employees.vehicles.create', $employee) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Przypisz Pojazd</a>
+                <a href="{{ route('employees.vehicles.create', $employee) }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Przypisz Pojazd
+                </a>
             @endisset
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-4">
+        <div class="container-xxl">
             @isset($employee)
                 {{-- Widok dla konkretnego pracownika - bez Livewire --}}
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pojazd</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rola</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Od - Do</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($assignments as $assignment)
-                                <tr>
-                                    <td class="px-6 py-4">{{ $assignment->vehicle->registration_number }} ({{ $assignment->vehicle->brand }})</td>
-                                    <td class="px-6 py-4">
-                                        @php
-                                            $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
-                                            $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
-                                            $positionLabel = $position instanceof \App\Enums\VehiclePosition ? $position->label() : ucfirst($position);
-                                        @endphp
-                                        <span class="px-2 py-1 text-xs rounded-full 
-                                            @if($positionValue === 'driver') bg-blue-100 text-blue-800
-                                            @else bg-gray-100 text-gray-800
-                                            @endif">
-                                            {{ $positionLabel }}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
-                                    <td class="px-6 py-4">
-                                        <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                        <a href="{{ route('vehicle-assignments.edit', $assignment) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
-                                        <form action="{{ route('vehicle-assignments.destroy', $assignment) }}" method="POST" class="inline">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Czy na pewno?')">Usuń</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">Brak przypisanych pojazdów</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    <div class="mt-4">
-                        {{ $assignments->links() }}
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        @if($assignments->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-start">Pojazd</th>
+                                            <th class="text-start">Rola</th>
+                                            <th class="text-start">Od - Do</th>
+                                            <th class="text-start">Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($assignments as $assignment)
+                                            <tr>
+                                                <td>{{ $assignment->vehicle->registration_number }} ({{ $assignment->vehicle->brand }})</td>
+                                                <td>
+                                                    @php
+                                                        $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                                        $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                                        $positionLabel = $position instanceof \App\Enums\VehiclePosition ? $position->label() : ucfirst($position);
+                                                    @endphp
+                                                    @if($positionValue === 'driver')
+                                                        <span class="badge bg-primary">{{ $positionLabel }}</span>
+                                                    @else
+                                                        <span class="badge bg-secondary">{{ $positionLabel }}</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">
+                                                        {{ $assignment->start_date->format('Y-m-d') }} - 
+                                                        {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    <x-action-buttons
+                                                        viewRoute="{{ route('vehicle-assignments.show', $assignment) }}"
+                                                        editRoute="{{ route('vehicle-assignments.edit', $assignment) }}"
+                                                        deleteRoute="{{ route('vehicle-assignments.destroy', $assignment) }}"
+                                                        deleteMessage="Czy na pewno chcesz usunąć to przypisanie pojazdu?"
+                                                    />
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if($assignments->hasPages())
+                                <div class="mt-3">
+                                    {{ $assignments->links() }}
+                                </div>
+                            @endif
+                        @else
+                            <div class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                                <p class="text-muted mb-3">Brak przypisanych pojazdów.</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             @else

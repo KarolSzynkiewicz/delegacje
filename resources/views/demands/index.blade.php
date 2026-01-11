@@ -48,21 +48,12 @@
                                     </small>
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ route('demands.show', $demand) }}" class="btn btn-outline-primary" title="Zobacz">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        <a href="{{ route('demands.edit', $demand) }}" class="btn btn-outline-secondary" title="Edytuj">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <form action="{{ route('demands.destroy', $demand) }}" method="POST" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz usunąć to zapotrzebowanie?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-outline-danger" title="Usuń">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
+                                    <x-action-buttons
+                                        viewRoute="{{ route('demands.show', $demand) }}"
+                                        editRoute="{{ route('demands.edit', $demand) }}"
+                                        deleteRoute="{{ route('demands.destroy', $demand) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć to zapotrzebowanie?"
+                                    />
                                 </td>
                             </tr>
                         @empty

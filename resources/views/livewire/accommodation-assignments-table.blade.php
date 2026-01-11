@@ -72,20 +72,12 @@
                                     </small>
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="btn btn-outline-primary">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        <a href="{{ route('accommodation-assignments.edit', $assignment) }}" class="btn btn-outline-secondary">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <form action="{{ route('accommodation-assignments.destroy', $assignment) }}" method="POST" class="d-inline">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Czy na pewno?')">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
+                                    <x-action-buttons
+                                        viewRoute="{{ route('accommodation-assignments.show', $assignment) }}"
+                                        editRoute="{{ route('accommodation-assignments.edit', $assignment) }}"
+                                        deleteRoute="{{ route('accommodation-assignments.destroy', $assignment) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć to przypisanie mieszkania?"
+                                    />
                                 </td>
                             </tr>
                         @empty

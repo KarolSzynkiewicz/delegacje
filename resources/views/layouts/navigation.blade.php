@@ -87,7 +87,8 @@
                                 <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-currency-dollar"></i> Koszty transportu</a></li>
                             @endcan
                             @can('viewAny', \App\Models\TimeLog::class)
-                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.*') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Ewidencja godzin</a></li>
+                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.monthly-grid') ? 'active' : '' }}" href="{{ route('time-logs.monthly-grid') }}"><i class="bi bi-calendar-month"></i> Ewidencja godzin (grid)</a></li>
+                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.index') && !request()->routeIs('time-logs.monthly-grid') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Lista wpisów</a></li>
                             @endcan
                         </ul>
                     </li>

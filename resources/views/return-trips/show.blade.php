@@ -1,84 +1,120 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Szczegóły Zjazdu
-            </h2>
-            <a href="{{ route('return-trips.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                Powrót
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Szczegóły Zjazdu</h2>
+            <a href="{{ route('return-trips.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Powrót
             </a>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold mb-4">Informacje podstawowe</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-sm text-gray-500">Data zjazdu</p>
-                            <p class="font-semibold">{{ $returnTrip->event_date->format('Y-m-d H:i') }}</p>
+    <div class="py-4">
+        <div class="container-xxl">
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>{{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold text-dark mb-0">Informacje podstawowe</h5>
+                        <div class="d-flex gap-2">
+                            @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
+                                <a href="{{ route('return-trips.edit', $returnTrip) }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Edytuj
+                                </a>
+                                <form method="POST" action="{{ route('return-trips.cancel', $returnTrip) }}" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz anulować ten zjazd?');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                        <i class="bi bi-x-circle"></i> Anuluj Zjazd
+                                    </button>
+                                </form>
+                            @endif
                         </div>
-                        <div>
-                            <p class="text-sm text-gray-500">Status</p>
-                            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                {{ $returnTrip->status->label() }}
-                            </span>
+                    </div>
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted small mb-1">Data zjazdu</h6>
+                            <p class="fw-semibold">{{ $returnTrip->event_date->format('Y-m-d H:i') }}</p>
                         </div>
-                        <div>
-                            <p class="text-sm text-gray-500">Pojazd</p>
-                            <p class="font-semibold">
+                        <div class="col-md-6">
+                            <h6 class="text-muted small mb-1">Status</h6>
+                            @php
+                                $badgeClass = match($returnTrip->status->value) {
+                                    'planned' => 'bg-primary',
+                                    'in_progress' => 'bg-info',
+                                    'completed' => 'bg-success',
+                                    'cancelled' => 'bg-danger',
+                                    default => 'bg-secondary'
+                                };
+                            @endphp
+                            <span class="badge {{ $badgeClass }}">{{ $returnTrip->status->label() }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted small mb-1">Pojazd</h6>
+                            <p class="fw-semibold">
                                 {{ $returnTrip->vehicle ? $returnTrip->vehicle->registration_number . ' - ' . $returnTrip->vehicle->brand . ' ' . $returnTrip->vehicle->model : '-' }}
                             </p>
                         </div>
-                        <div>
-                            <p class="text-sm text-gray-500">Z</p>
-                            <p class="font-semibold">{{ $returnTrip->fromLocation->name }}</p>
+                        <div class="col-md-6">
+                            <h6 class="text-muted small mb-1">Z</h6>
+                            <p class="fw-semibold">{{ $returnTrip->fromLocation->name }}</p>
                         </div>
-                        <div>
-                            <p class="text-sm text-gray-500">Do</p>
-                            <p class="font-semibold">{{ $returnTrip->toLocation->name }}</p>
+                        <div class="col-md-6">
+                            <h6 class="text-muted small mb-1">Do</h6>
+                            <p class="fw-semibold">{{ $returnTrip->toLocation->name }}</p>
                         </div>
                         @if($returnTrip->notes)
-                        <div class="col-span-2">
-                            <p class="text-sm text-gray-500">Notatki</p>
+                        <div class="col-12">
+                            <h6 class="text-muted small mb-1">Notatki</h6>
                             <p>{{ $returnTrip->notes }}</p>
                         </div>
                         @endif
                     </div>
-                </div>
 
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold mb-4">Uczestnicy ({{ $returnTrip->participants->count() }})</h3>
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pracownik</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Przypisanie</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @foreach($returnTrip->participants as $participant)
-                                <tr>
-                                    <td class="px-6 py-4">{{ $participant->employee->full_name }}</td>
-                                    <td class="px-6 py-4">
-                                        @if($participant->assignment)
-                                            {{ class_basename($participant->assignment) }} #{{ $participant->assignment_id }}
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                            {{ ucfirst($participant->status) }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                    <div class="border-top pt-4">
+                        <h5 class="fw-bold text-dark mb-4">Uczestnicy ({{ $returnTrip->participants->count() }})</h5>
+                        @if($returnTrip->participants->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-start">Pracownik</th>
+                                            <th class="text-start">Przypisanie</th>
+                                            <th class="text-start">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($returnTrip->participants as $participant)
+                                            <tr>
+                                                <td>{{ $participant->employee->full_name }}</td>
+                                                <td>
+                                                    @if($participant->assignment)
+                                                        {{ class_basename($participant->assignment) }} #{{ $participant->assignment_id }}
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ ucfirst($participant->status) }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak uczestników</p>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>

@@ -36,6 +36,8 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
 
     // Weekly Overview
     Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])->name('weekly-overview.index');
+    Route::get('/weekly-overview/planner2', [WeeklyOverviewController::class, 'planner2'])->name('weekly-overview.planner2');
+    Route::get('/weekly-overview/planner3', [WeeklyOverviewController::class, 'planner3'])->name('weekly-overview.planner3');
 
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'edit'])->name('edit');
@@ -139,7 +141,10 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::resource('users', UserController::class);
     
     // Return Trips (Zjazdy)
-    Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class);
+    Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])->name('return-trips.prepare-form');
+    Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])->name('return-trips.prepare');
+    Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])->name('return-trips.cancel');
+    Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
     
     // Equipment
     Route::resource('equipment', \App\Http\Controllers\EquipmentController::class);
@@ -151,6 +156,8 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::resource('transport-costs', \App\Http\Controllers\TransportCostController::class);
     
     // Time Logs
+    Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])->name('time-logs.monthly-grid');
+    Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])->name('time-logs.bulk-update');
     Route::resource('time-logs', \App\Http\Controllers\TimeLogController::class);
     Route::get('assignments/{assignment}/time-logs', [\App\Http\Controllers\TimeLogController::class, 'byAssignment'])->name('assignments.time-logs');
 });

@@ -37,6 +37,7 @@ class VehicleAssignmentService
             'end_date' => $data['end_date'] ?? null,
             'status' => $data['status'] ?? \App\Enums\AssignmentStatus::ACTIVE,
             'notes' => $data['notes'] ?? null,
+            'is_return_trip' => false, // Always false for manual assignments
         ]);
     }
 
@@ -63,6 +64,9 @@ class VehicleAssignmentService
 
         // Ensure position is converted to enum value for database
         $data['position'] = $position;
+        
+        // Always keep is_return_trip as false for manual updates (only zjazd sets it to true)
+        $data['is_return_trip'] = false;
 
         $assignment->update($data);
 

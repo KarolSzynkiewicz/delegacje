@@ -35,7 +35,8 @@ class WeeklyProjectSummary
         }
 
         return $this->weekData['assigned_employees']->filter(function($employeeData) {
-            return empty($employeeData['vehicle']);
+            // Only show as "without vehicle" if they don't have vehicle in ANY day of the week
+            return !($employeeData['has_vehicle_in_week'] ?? false);
         });
     }
 

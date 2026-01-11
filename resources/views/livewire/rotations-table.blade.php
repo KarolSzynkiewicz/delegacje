@@ -138,30 +138,12 @@
                                         <small class="text-muted">{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</small>
                                     </td>
                                     <td>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <a href="{{ route('employees.rotations.show', [$rotation->employee, $rotation]) }}" 
-                                               class="btn btn-outline-primary"
-                                               title="Zobacz">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="{{ route('employees.rotations.edit', [$rotation->employee, $rotation]) }}" 
-                                               class="btn btn-outline-secondary"
-                                               title="Edytuj">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <form action="{{ route('employees.rotations.destroy', [$rotation->employee, $rotation]) }}" 
-                                                  method="POST" 
-                                                  class="d-inline"
-                                                  onsubmit="return confirm('Czy na pewno chcesz usunąć tę rotację?')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" 
-                                                        class="btn btn-outline-danger"
-                                                        title="Usuń">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
+                                        <x-action-buttons
+                                            viewRoute="{{ route('employees.rotations.show', [$rotation->employee, $rotation]) }}"
+                                            editRoute="{{ route('employees.rotations.edit', [$rotation->employee, $rotation]) }}"
+                                            deleteRoute="{{ route('employees.rotations.destroy', [$rotation->employee, $rotation]) }}"
+                                            deleteMessage="Czy na pewno chcesz usunąć tę rotację?"
+                                        />
                                     </td>
                                 </tr>
                             @endforeach

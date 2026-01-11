@@ -1,70 +1,81 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Sprzęt
-            </h2>
-            <a href="{{ route('equipment.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Dodaj Sprzęt
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Sprzęt</h2>
+            <a href="{{ route('equipment.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Dodaj Sprzęt
             </a>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nazwa</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kategoria</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">W magazynie</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dostępne</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min. ilość</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($equipment as $item)
-                                <tr>
-                                    <td class="px-6 py-4 font-medium">{{ $item->name }}</td>
-                                    <td class="px-6 py-4">{{ $item->category ?? '-' }}</td>
-                                    <td class="px-6 py-4">{{ $item->quantity_in_stock }} {{ $item->unit }}</td>
-                                    <td class="px-6 py-4">{{ $item->available_quantity }} {{ $item->unit }}</td>
-                                    <td class="px-6 py-4">{{ $item->min_quantity }} {{ $item->unit }}</td>
-                                    <td class="px-6 py-4">
-                                        @if($item->isLowStock())
-                                            <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Niski stan</span>
-                                        @else
-                                            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">OK</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="{{ route('equipment.show', $item) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                        <a href="{{ route('equipment.edit', $item) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
-                                        @can('delete', $item)
-                                        <form action="{{ route('equipment.destroy', $item) }}" method="POST" class="inline">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Czy na pewno?')">Usuń</button>
-                                        </form>
-                                        @endcan
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
-                                        Brak sprzętu
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+    <div class="py-4">
+        <div class="container-xxl">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    @if($equipment->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start">Nazwa</th>
+                                        <th class="text-start">Kategoria</th>
+                                        <th class="text-start">W magazynie</th>
+                                        <th class="text-start">Dostępne</th>
+                                        <th class="text-start">Min. ilość</th>
+                                        <th class="text-start">Status</th>
+                                        <th class="text-start">Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($equipment as $item)
+                                        <tr>
+                                            <td class="fw-medium">{{ $item->name }}</td>
+                                            <td>{{ $item->category ?? '-' }}</td>
+                                            <td>{{ $item->quantity_in_stock }} {{ $item->unit }}</td>
+                                            <td>{{ $item->available_quantity }} {{ $item->unit }}</td>
+                                            <td>{{ $item->min_quantity }} {{ $item->unit }}</td>
+                                            <td>
+                                                @if($item->isLowStock())
+                                                    <span class="badge bg-danger">Niski stan</span>
+                                                @else
+                                                    <span class="badge bg-success">OK</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @can('delete', $item)
+                                                    <x-action-buttons
+                                                        viewRoute="{{ route('equipment.show', $item) }}"
+                                                        editRoute="{{ route('equipment.edit', $item) }}"
+                                                        deleteRoute="{{ route('equipment.destroy', $item) }}"
+                                                        deleteMessage="Czy na pewno chcesz usunąć ten sprzęt?"
+                                                    />
+                                                @else
+                                                    <x-action-buttons
+                                                        viewRoute="{{ route('equipment.show', $item) }}"
+                                                        editRoute="{{ route('equipment.edit', $item) }}"
+                                                    />
+                                                @endcan
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div class="mt-4">
-                        {{ $equipment->links() }}
-                    </div>
+                        @if($equipment->hasPages())
+                            <div class="mt-3">
+                                {{ $equipment->links() }}
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                            <p class="text-muted mb-3">Brak sprzętu w systemie.</p>
+                            <a href="{{ route('equipment.create') }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Dodaj pierwszy sprzęt
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

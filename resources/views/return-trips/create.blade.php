@@ -18,13 +18,13 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('return-trips.store') }}">
+                <form method="POST" action="{{ route('return-trips.prepare-form') }}">
                     @csrf
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Pojazd *</label>
-                        <select name="vehicle_id" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                            <option value="">Wybierz pojazd</option>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Pojazd powrotny</label>
+                        <select name="vehicle_id" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                            <option value="">Brak pojazdu (opcjonalne)</option>
                             @foreach($vehicles as $vehicle)
                                 <option value="{{ $vehicle->id }}" {{ old('vehicle_id') == $vehicle->id ? 'selected' : '' }}>
                                     {{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}
@@ -65,7 +65,7 @@
                             Anuluj
                         </a>
                         <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                            Utwórz Zjazd
+                            Przygotuj Zjazd
                         </button>
                     </div>
                 </form>

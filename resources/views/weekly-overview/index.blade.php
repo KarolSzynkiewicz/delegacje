@@ -70,7 +70,17 @@
                                         
                                         @php
                                             $summary = $projectData['summary'] ?? null;
+                                            $weekStart = $weeks[0]['start']->format('Y-m-d');
                                         @endphp
+                                        
+                                        {{-- Link do szczegółów --}}
+                                        <div class="mb-3">
+                                            <a href="{{ route('weekly-overview.planner2', ['start_date' => $weekStart, 'project_id' => $project->id]) }}" 
+                                               class="btn btn-sm btn-outline-primary w-100">
+                                                <i class="bi bi-calendar-week"></i>
+                                                Zobacz szczegóły
+                                            </a>
+                                        </div>
                                         
                                         {{-- Kafelek: Realizacja --}}
                                         <x-weekly-overview.realization-tile :summary="$summary" />
@@ -82,6 +92,17 @@
                                         <x-weekly-overview.vehicles-tile :summary="$summary" />
                                     </td>
                                     <td class="bg-white align-top">
+                                        @php
+                                            $weekStart = $weeks[0]['start']->format('Y-m-d');
+                                            $planner2Url = route('weekly-overview.planner2', ['start_date' => $weekStart, 'project_id' => $project->id]);
+                                        @endphp
+                                        <div class="alert alert-info alert-sm mb-3 d-flex align-items-start gap-2 py-2 px-3">
+                                            <i class="bi bi-info-circle small mt-1"></i>
+                                            <div class="flex-grow-1 small">
+                                                <strong>Widok tygodniowy upraszcza przypisania.</strong> Szczegóły mogą się różnić w poszczególnych dniach. 
+                                                W <a href="{{ $planner2Url }}" class="alert-link">widoku dziennym</a> widać dokładne przypisania dla każdego dnia.
+                                            </div>
+                                        </div>
                                         <x-weekly-overview.project-week-tile 
                                             :weekData="$projectData['weeks_data'][0]" 
                                             :project="$project" 

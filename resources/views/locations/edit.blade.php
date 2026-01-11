@@ -1,90 +1,86 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Edytuj Lokalizację</h2>
+        <h2 class="fw-semibold fs-4 text-dark mb-0">Edytuj Lokalizację</h2>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <form method="POST" action="{{ route('locations.update', $location) }}">
-                    @csrf
-                    @method('PUT')
+    <div class="py-4">
+        <div class="container-xxl">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <form method="POST" action="{{ route('locations.update', $location) }}">
+                        @csrf
+                        @method('PUT')
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Nazwa <span class="text-red-500">*</span></label>
-                        <input type="text" name="name" value="{{ old('name', $location->name) }}" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        @error('name')
-                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
-                        @enderror
-                    </div>
+                        <div class="mb-3">
+                            <x-input-label for="name" value="Nazwa" />
+                            <span class="text-danger">*</span>
+                            <x-text-input id="name" name="name" type="text" class="mt-1" :value="old('name', $location->name)" required />
+                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Adres <span class="text-red-500">*</span></label>
-                        <input type="text" name="address" value="{{ old('address', $location->address) }}" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                        @error('address')
-                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
-                        @enderror
-                    </div>
+                        <div class="mb-3">
+                            <x-input-label for="address" value="Adres" />
+                            <span class="text-danger">*</span>
+                            <x-text-input id="address" name="address" type="text" class="mt-1" :value="old('address', $location->address)" required />
+                            <x-input-error :messages="$errors->get('address')" class="mt-2" />
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Miasto</label>
-                        <input type="text" name="city" value="{{ old('city', $location->city) }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                    </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <x-input-label for="city" value="Miasto" />
+                                <x-text-input id="city" name="city" type="text" class="mt-1" :value="old('city', $location->city)" />
+                            </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Kod pocztowy</label>
-                        <input type="text" name="postal_code" value="{{ old('postal_code', $location->postal_code) }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                    </div>
+                            <div class="col-md-6 mb-3">
+                                <x-input-label for="postal_code" value="Kod pocztowy" />
+                                <x-text-input id="postal_code" name="postal_code" type="text" class="mt-1" :value="old('postal_code', $location->postal_code)" />
+                            </div>
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Osoba kontaktowa</label>
-                        <input type="text" name="contact_person" value="{{ old('contact_person', $location->contact_person) }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                    </div>
+                        <div class="mb-3">
+                            <x-input-label for="contact_person" value="Osoba kontaktowa" />
+                            <x-text-input id="contact_person" name="contact_person" type="text" class="mt-1" :value="old('contact_person', $location->contact_person)" />
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Telefon</label>
-                        <input type="text" name="phone" value="{{ old('phone', $location->phone) }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                    </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <x-input-label for="phone" value="Telefon" />
+                                <x-text-input id="phone" name="phone" type="text" class="mt-1" :value="old('phone', $location->phone)" />
+                            </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
-                        <input type="email" name="email" value="{{ old('email', $location->email) }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                        @error('email')
-                            <p class="text-red-500 text-xs italic">{{ $message }}</p>
-                        @enderror
-                    </div>
+                            <div class="col-md-6 mb-3">
+                                <x-input-label for="email" value="Email" />
+                                <x-text-input id="email" name="email" type="email" class="mt-1" :value="old('email', $location->email)" />
+                                <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                            </div>
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Opis</label>
-                        <textarea name="description" rows="4"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('description', $location->description) }}</textarea>
-                    </div>
+                        <div class="mb-3">
+                            <x-input-label for="description" value="Opis" />
+                            <textarea id="description" name="description" rows="4" class="form-control mt-1">{{ old('description', $location->description) }}</textarea>
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="flex items-center">
-                            <input type="checkbox" name="is_base" value="1" {{ old('is_base', $location->is_base) ? 'checked' : '' }}
-                                class="form-checkbox h-5 w-5 text-blue-600">
-                            <span class="ml-2 text-gray-700 text-sm font-bold">Lokalizacja jest bazą</span>
-                        </label>
-                        <p class="text-gray-500 text-xs mt-1">Zaznacz, jeśli ta lokalizacja jest siedzibą główną firmy</p>
-                    </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_base" value="1" id="is_base" {{ old('is_base', $location->is_base) ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold" for="is_base">
+                                    Lokalizacja jest bazą
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-1">Zaznacz, jeśli ta lokalizacja jest siedzibą główną firmy</small>
+                        </div>
 
-                    <div class="flex items-center justify-between">
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                            Zapisz
-                        </button>
-                        <a href="{{ route('locations.index') }}" class="text-gray-600 hover:text-gray-900">Anuluj</a>
-                    </div>
-                </form>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <x-primary-button>
+                                <i class="bi bi-check-circle me-1"></i> Zapisz
+                            </x-primary-button>
+                            <a href="{{ route('locations.index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i> Anuluj
+                            </a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </x-app-layout>
-

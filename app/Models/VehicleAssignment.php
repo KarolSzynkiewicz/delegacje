@@ -33,6 +33,7 @@ class VehicleAssignment extends Model implements AssignmentContract
         'actual_start_date',
         'actual_end_date',
         'notes',
+        'is_return_trip',
     ];
 
     /**
@@ -47,6 +48,7 @@ class VehicleAssignment extends Model implements AssignmentContract
         'actual_end_date' => 'date',
         'status' => AssignmentStatus::class,
         'position' => VehiclePosition::class,
+        'is_return_trip' => 'boolean',
     ];
 
     /**

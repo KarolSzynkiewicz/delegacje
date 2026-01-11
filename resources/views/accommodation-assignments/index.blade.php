@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
                 @isset($employee)
                     Mieszkania pracownika: {{ $employee->full_name }}
                 @else
@@ -9,47 +9,63 @@
                 @endisset
             </h2>
             @isset($employee)
-                <a href="{{ route('employees.accommodations.create', $employee) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Przypisz Mieszkanie</a>
+                <a href="{{ route('employees.accommodations.create', $employee) }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Przypisz Mieszkanie
+                </a>
             @endisset
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-4">
+        <div class="container-xxl">
             @isset($employee)
                 {{-- Widok dla konkretnego pracownika - bez Livewire --}}
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mieszkanie</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Od - Do</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($assignments as $assignment)
-                                <tr>
-                                    <td class="px-6 py-4">{{ $assignment->accommodation->name }} ({{ $assignment->accommodation->city }})</td>
-                                    <td class="px-6 py-4">{{ $assignment->start_date->format('Y-m-d') }} - {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}</td>
-                                    <td class="px-6 py-4">
-                                        <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-blue-600 hover:text-blue-900 mr-3">Zobacz</a>
-                                        <a href="{{ route('accommodation-assignments.edit', $assignment) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edytuj</a>
-                                        <form action="{{ route('accommodation-assignments.destroy', $assignment) }}" method="POST" class="inline">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Czy na pewno?')">Usuń</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">Brak przypisanych mieszkań</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    <div class="mt-4">
-                        {{ $assignments->links() }}
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        @if($assignments->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-start">Mieszkanie</th>
+                                            <th class="text-start">Od - Do</th>
+                                            <th class="text-start">Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($assignments as $assignment)
+                                            <tr>
+                                                <td>{{ $assignment->accommodation->name }} ({{ $assignment->accommodation->city }})</td>
+                                                <td>
+                                                    <small class="text-muted">
+                                                        {{ $assignment->start_date->format('Y-m-d') }} - 
+                                                        {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    <x-action-buttons
+                                                        viewRoute="{{ route('accommodation-assignments.show', $assignment) }}"
+                                                        editRoute="{{ route('accommodation-assignments.edit', $assignment) }}"
+                                                        deleteRoute="{{ route('accommodation-assignments.destroy', $assignment) }}"
+                                                        deleteMessage="Czy na pewno chcesz usunąć to przypisanie mieszkania?"
+                                                    />
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if($assignments->hasPages())
+                                <div class="mt-3">
+                                    {{ $assignments->links() }}
+                                </div>
+                            @endif
+                        @else
+                            <div class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                                <p class="text-muted mb-3">Brak przypisanych mieszkań.</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             @else

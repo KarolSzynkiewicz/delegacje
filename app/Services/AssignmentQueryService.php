@@ -26,6 +26,7 @@ class AssignmentQueryService
      * Get all active assignments for employees at a specific date.
      * 
      * Returns Collection of AssignmentContract implementations.
+     * Includes: ProjectAssignment, AccommodationAssignment, VehicleAssignment
      * 
      * @param array $employeeIds
      * @param Carbon $date
@@ -48,6 +49,13 @@ class AssignmentQueryService
             ->get();
 
         $assignments = $assignments->merge($accommodationAssignments);
+
+        // Get vehicle assignments
+        $vehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
+            ->activeAtDate($date)
+            ->get();
+
+        $assignments = $assignments->merge($vehicleAssignments);
 
         return $assignments;
     }

@@ -31,8 +31,11 @@
                                         @php
                                             $needed = $roleDetail['needed'];
                                             $assigned = $roleDetail['assigned'];
-                                            $isComplete = $assigned >= $needed;
-                                            $isPartial = $assigned > 0 && $assigned < $needed;
+                                            $assignedMin = $roleDetail['assigned_min'] ?? $assigned;
+                                            $assignedMax = $roleDetail['assigned_max'] ?? $assigned;
+                                            $isStable = $roleDetail['is_stable'] ?? true;
+                                            $isComplete = $isStable && $assigned !== null && $assigned >= $needed;
+                                            $isPartial = $isStable && $assigned !== null && $assigned > 0 && $assigned < $needed;
                                         @endphp
                                         <tr>
                                             <td class="small text-dark">{{ Str::lower($roleDetail['role']->name) }}</td>
@@ -40,14 +43,16 @@
                                                 {{ $needed }}
                                             </td>
                                             <td class="text-center small fw-semibold text-primary">
-                                                {{ $assigned }}
+                                                {{ $assignedMax }}
                                             </td>
                                         </tr>
                                     @endforeach
                                     <tr class="table-secondary fw-bold">
                                         <td class="small text-dark">łącznie</td>
                                         <td class="text-center small text-dark">{{ $weekData['requirements_summary']['total_needed'] }}</td>
-                                        <td class="text-center small text-dark">{{ $weekData['requirements_summary']['total_assigned'] }}</td>
+                                        <td class="text-center small text-dark">
+                                            {{ $weekData['requirements_summary']['total_assigned_max'] ?? 0 }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -111,7 +116,11 @@
                                                     <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-dark text-decoration-none">{{ $employeeData['employee']->full_name }}</a>
                                                 </td>
                                                 <td>
-                                                    @if(isset($employeeData['assignment']))
+                                                    @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
+                                                        <span class="badge bg-warning" title="Rola zmienia się w trakcie tygodnia">
+                                                            <i class="bi bi-arrow-left-right"></i> Zmienna
+                                                        </span>
+                                                    @elseif(isset($employeeData['assignment']))
                                                         <a href="{{ route('assignments.show', $employeeData['assignment']) }}" class="text-decoration-none">
                                                             <span class="badge bg-primary">{{ $employeeData['role']->name ?? '-' }}</span>
                                                         </a>
@@ -227,6 +236,20 @@
                                                     <br><span class="text-danger fw-semibold"><i class="bi bi-car-front-fill"></i> Brak kierowcy</span>
                                                 @endif
                                             </p>
+                                            @if(isset($vehicleData['return_trip']) && $vehicleData['return_trip'] && isset($vehicleData['return_trip_assignments']) && $vehicleData['return_trip_assignments']->isNotEmpty())
+                                                <div class="alert alert-info alert-sm mb-2 py-1 px-2">
+                                                    <i class="bi bi-arrow-down-circle"></i>
+                                                    <strong>Zjazd:</strong> {{ $vehicleData['return_trip']->event_date->format('d.m.Y') }}
+                                                    <br>
+                                                    <small>
+                                                        @foreach($vehicleData['return_trip_assignments'] as $returnAssignment)
+                                                            <a href="{{ route('vehicle-assignments.show', $returnAssignment) }}" class="text-decoration-none text-info">
+                                                                {{ $returnAssignment->employee->full_name }}
+                                                            </a>@if(!$loop->last), @endif
+                                                        @endforeach
+                                                    </small>
+                                                </div>
+                                            @endif
                                             @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
                                                 <div class="mt-auto" wire:ignore.self>
                                                     <button class="btn btn-sm btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#vehicle-{{ $vehicleData['vehicle']->id }}-assignments" aria-expanded="false">
@@ -270,7 +293,8 @@
                     <!-- Bez auta -->
                     @php
                         $employeesWithoutVehicle = $weekData['assigned_employees']->filter(function($employeeData) {
-                            return empty($employeeData['vehicle']);
+                            // Show only if employee doesn't have vehicle in ANY day of the week
+                            return !($employeeData['has_vehicle_in_week'] ?? false);
                         });
                     @endphp
                     @if($employeesWithoutVehicle->isNotEmpty())
