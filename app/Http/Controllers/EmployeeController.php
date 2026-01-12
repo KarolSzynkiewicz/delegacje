@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Role;
-use App\Services\ImageService;
+use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use Illuminate\View\View;
@@ -12,9 +12,7 @@ use Illuminate\Http\RedirectResponse;
 
 class EmployeeController extends Controller
 {
-    public function __construct(
-        protected ImageService $imageService
-    ) {}
+    use HandlesImageUpload;
     /**
      * Display a listing of the resource.
      */
@@ -42,14 +40,7 @@ class EmployeeController extends Controller
     {
         $this->authorize('create', Employee::class);
         
-        $validated = $request->validated();
-        
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $this->imageService->storeImage($request->file('image'), 'employees');
-        }
-        
-        unset($validated['image']);
+        $validated = $this->processImageUpload($request->validated(), $request, 'employees');
         
         $roles = $validated['roles'] ?? [];
         unset($validated['roles']);
@@ -106,18 +97,7 @@ class EmployeeController extends Controller
     {
         $this->authorize('update', $employee);
         
-        $validated = $request->validated();
-        
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $this->imageService->handleImageUpload(
-                $request->file('image'),
-                'employees',
-                $employee->image_path
-            );
-        }
-        
-        unset($validated['image']);
+        $validated = $this->processImageUpload($request->validated(), $request, 'employees', $employee->image_path);
         
         $roles = $validated['roles'] ?? [];
         unset($validated['roles']);

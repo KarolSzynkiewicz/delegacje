@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Services\ReportService;
 use App\Http\Requests\StoreReportRequest;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class ReportController extends Controller
 {
@@ -16,7 +18,7 @@ class ReportController extends Controller
     /**
      * Display a listing of assignment reports.
      */
-    public function index()
+    public function index(): View
     {
         // Display a list of available reports
         return view('reports.index');
@@ -25,7 +27,7 @@ class ReportController extends Controller
     /**
      * Show the form for creating a new report.
      */
-    public function create()
+    public function create(): View
     {
         // Use orderBy for better UX and limit if needed for large datasets
         $projects = Project::orderBy('name')->get();
@@ -37,7 +39,7 @@ class ReportController extends Controller
     /**
      * Store a newly created report in storage.
      */
-    public function store(StoreReportRequest $request)
+    public function store(StoreReportRequest $request): View|RedirectResponse
     {
         $validated = $request->validated();
 
@@ -75,7 +77,7 @@ class ReportController extends Controller
     /**
      * Display the specified report.
      */
-    public function show(string $id)
+    public function show(string $id): View
     {
         return view('reports.show', ['reportId' => $id]);
     }
@@ -83,7 +85,7 @@ class ReportController extends Controller
     /**
      * Download the specified report.
      */
-    public function download(string $id)
+    public function download(string $id): void
     {
         // TODO: Implement report download logic
         // Support multiple formats: PDF, Excel, CSV

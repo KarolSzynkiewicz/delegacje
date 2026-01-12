@@ -10,6 +10,8 @@ use App\Services\ProjectAssignmentService;
 use App\Http\Requests\StoreProjectAssignmentRequest;
 use App\Http\Requests\UpdateProjectAssignmentRequest;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class ProjectAssignmentController extends Controller
 {
@@ -19,7 +21,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Display all assignments (global view).
      */
-    public function all()
+    public function all(): View
     {
         $assignments = ProjectAssignment::with("employee", "project", "role")
             ->orderBy("start_date", "desc")
@@ -31,7 +33,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Project $project)
+    public function index(Project $project): View
     {
         $assignments = $project->assignments()
             ->with("employee", "role")
@@ -44,7 +46,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Project $project, Request $request)
+    public function create(Project $project, Request $request): View
     {
         $startDate = $request->query('date_from');
         $endDate = $request->query('date_to');
@@ -67,7 +69,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreProjectAssignmentRequest $request, Project $project)
+    public function store(StoreProjectAssignmentRequest $request, Project $project): RedirectResponse
     {
         try {
             $assignment = $this->assignmentService->createAssignment(
@@ -88,7 +90,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(ProjectAssignment $assignment)
+    public function show(ProjectAssignment $assignment): View
     {
         $assignment->load("employee", "project", "role");
         
@@ -98,7 +100,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(ProjectAssignment $assignment)
+    public function edit(ProjectAssignment $assignment): View
     {
         $projects = Project::orderBy("name")->get();
         
@@ -117,7 +119,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateProjectAssignmentRequest $request, ProjectAssignment $assignment)
+    public function update(UpdateProjectAssignmentRequest $request, ProjectAssignment $assignment): RedirectResponse
     {
         try {
             $this->assignmentService->updateAssignment(
@@ -139,7 +141,7 @@ class ProjectAssignmentController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(ProjectAssignment $assignment)
+    public function destroy(ProjectAssignment $assignment): RedirectResponse
     {
         // Sprawdź czy są zaksiegowane godziny dla tego przypisania
         $hasTimeLogs = \App\Models\TimeLog::where('project_assignment_id', $assignment->id)->exists();

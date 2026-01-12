@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\TimeLog;
 use App\Models\ProjectAssignment;
+use App\Models\Project;
+use App\Enums\AssignmentStatus;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
@@ -157,5 +159,231 @@ class TimeLogService
                 'work_date' => 'Data pracy nie może być późniejsza niż data zakończenia przypisania (' . $endDate->format('Y-m-d') . ').'
             ]);
         }
+    }
+
+    /**
+     * Get monthly grid data for time logs editing.
+     * 
+     * @param string $month Format: Y-m (e.g., '2025-01')
+     * @return array
+     */
+    public function getMonthlyGridData(string $month): array
+    {
+        $currentDate = Carbon::parse($month . '-01');
+        $monthStart = $currentDate->copy()->startOfMonth();
+        $monthEnd = $currentDate->copy()->endOfMonth();
+        $daysInMonth = $monthStart->daysInMonth;
+
+        // Navigation
+        $prevMonth = $currentDate->copy()->subMonth()->format('Y-m');
+        $nextMonth = $currentDate->copy()->addMonth()->format('Y-m');
+
+        // Get all projects with their assignments
+        $projects = Project::with([
+            'assignments.employee',
+            'assignments.role',
+            'assignments.timeLogs' => function($query) use ($monthStart, $monthEnd) {
+                $query->whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()]);
+            }
+        ])
+        ->whereHas('assignments', function($query) use ($monthStart, $monthEnd) {
+            $query->where(function($q) use ($monthStart, $monthEnd) {
+                $q->where('start_date', '<=', $monthEnd)
+                  ->where(function($q2) use ($monthStart) {
+                      $q2->whereNull('end_date')
+                         ->orWhere('end_date', '>=', $monthStart);
+                  });
+            })
+            ->whereIn('status', [AssignmentStatus::ACTIVE, AssignmentStatus::IN_TRANSIT, AssignmentStatus::AT_BASE]);
+        })
+        ->orderBy('name')
+        ->get();
+        
+        // Get all time logs for this month (even if assignment was deleted)
+        $allTimeLogs = TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()])
+            ->with(['projectAssignment.project', 'projectAssignment.employee'])
+            ->get();
+        
+        // Create map of time logs by project_id, employee_id and day
+        $timeLogsByProjectEmployee = [];
+        foreach ($allTimeLogs as $timeLog) {
+            if ($timeLog->projectAssignment) {
+                $projectId = $timeLog->projectAssignment->project_id;
+                $employeeId = $timeLog->projectAssignment->employee_id;
+                $assignmentId = $timeLog->project_assignment_id;
+                $day = Carbon::parse($timeLog->start_time)->day;
+                
+                $key = $projectId . '_' . $employeeId;
+                if (!isset($timeLogsByProjectEmployee[$key])) {
+                    $timeLogsByProjectEmployee[$key] = [];
+                }
+                $timeLogsByProjectEmployee[$key][$day] = [
+                    'hours' => $timeLog->hours_worked,
+                    'time_log_id' => $timeLog->id,
+                    'assignment_id' => $assignmentId,
+                ];
+            }
+        }
+
+        // Prepare data structure for view
+        $projectsData = [];
+        foreach ($projects as $project) {
+            $assignmentsData = [];
+            
+            // Group assignments by employee
+            $employeesMap = [];
+            foreach ($project->assignments as $assignment) {
+                if (!in_array($assignment->status, [AssignmentStatus::ACTIVE, AssignmentStatus::IN_TRANSIT, AssignmentStatus::AT_BASE])) {
+                    continue;
+                }
+                
+                $employeeId = $assignment->employee_id;
+                if (!isset($employeesMap[$employeeId])) {
+                    $employeesMap[$employeeId] = [
+                        'employee' => $assignment->employee,
+                        'assignments' => [],
+                    ];
+                }
+                $employeesMap[$employeeId]['assignments'][] = $assignment;
+            }
+
+            // Convert to array and prepare time logs data
+            foreach ($employeesMap as $employeeId => $data) {
+                $timeLogsMap = [];
+                
+                // Get time logs for this employee in this project
+                $key = $project->id . '_' . $employeeId;
+                if (isset($timeLogsByProjectEmployee[$key])) {
+                    foreach ($timeLogsByProjectEmployee[$key] as $day => $timeLogData) {
+                        $timeLogsMap[$day] = $timeLogData;
+                    }
+                }
+
+                // Check which days are within assignment period
+                $daysInAssignment = [];
+                foreach ($data['assignments'] as $assignment) {
+                    $assignmentStart = Carbon::parse($assignment->start_date);
+                    $assignmentEnd = $assignment->end_date ? Carbon::parse($assignment->end_date) : $monthEnd;
+                    
+                    for ($day = 1; $day <= $daysInMonth; $day++) {
+                        $checkDate = $monthStart->copy()->addDays($day - 1);
+                        if ($checkDate->between($assignmentStart, $assignmentEnd)) {
+                            $daysInAssignment[$day] = true;
+                        }
+                    }
+                }
+
+                $assignmentsData[] = [
+                    'employee' => $data['employee'],
+                    'assignments' => $data['assignments'],
+                    'timeLogs' => $timeLogsMap,
+                    'daysInAssignment' => $daysInAssignment,
+                ];
+            }
+
+            if (!empty($assignmentsData)) {
+                $projectsData[] = [
+                    'project' => $project,
+                    'assignments' => $assignmentsData,
+                ];
+            }
+        }
+
+        // Generate days array
+        $days = [];
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $date = $monthStart->copy()->addDays($day - 1);
+            $days[] = [
+                'number' => $day,
+                'date' => $date,
+                'isWeekend' => $date->isWeekend(),
+            ];
+        }
+
+        return [
+            'projectsData' => $projectsData,
+            'days' => $days,
+            'currentDate' => $currentDate,
+            'prevMonth' => $prevMonth,
+            'nextMonth' => $nextMonth,
+            'monthStart' => $monthStart,
+            'monthEnd' => $monthEnd,
+        ];
+    }
+
+    /**
+     * Bulk update time logs.
+     * 
+     * @param array $entries [
+     *   [
+     *     'assignment_id' => int,
+     *     'date' => string (Y-m-d),
+     *     'hours' => float|null
+     *   ],
+     *   ...
+     * ]
+     * @return array ['created' => int, 'updated' => int, 'deleted' => int, 'errors' => array]
+     */
+    public function bulkUpdateTimeLogs(array $entries): array
+    {
+        $results = [
+            'created' => 0,
+            'updated' => 0,
+            'deleted' => 0,
+            'errors' => [],
+        ];
+
+        foreach ($entries as $index => $entry) {
+            try {
+                $assignmentId = (int)$entry['assignment_id'];
+                $assignment = ProjectAssignment::findOrFail($assignmentId);
+                $date = Carbon::parse($entry['date']);
+                $hours = isset($entry['hours']) && $entry['hours'] !== '' && $entry['hours'] !== null ? (float)$entry['hours'] : 0;
+
+                // Find existing time log
+                $timeLog = TimeLog::where('project_assignment_id', $assignment->id)
+                    ->whereDate('start_time', $date)
+                    ->first();
+
+                if ($hours > 0) {
+                    if ($timeLog) {
+                        // Update existing
+                        $this->updateTimeLog($timeLog, [
+                            'work_date' => $date->format('Y-m-d'),
+                            'hours_worked' => $hours,
+                        ]);
+                        $results['updated']++;
+                    } else {
+                        // Create new
+                        $this->createTimeLog($assignment, [
+                            'work_date' => $date->format('Y-m-d'),
+                            'hours_worked' => $hours,
+                        ]);
+                        $results['created']++;
+                    }
+                } else {
+                    // Delete if hours is 0 or empty
+                    if ($timeLog) {
+                        $timeLog->delete();
+                        $results['deleted']++;
+                    }
+                }
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $errorMsg = implode(', ', array_merge(...array_values($e->errors())));
+                $results['errors'][] = [
+                    'assignment_id' => $entry['assignment_id'] ?? null,
+                    'date' => $entry['date'] ?? null,
+                    'message' => $errorMsg,
+                ];
+            } catch (\Exception $e) {
+                $results['errors'][] = [
+                    'assignment_id' => $entry['assignment_id'] ?? null,
+                    'date' => $entry['date'] ?? null,
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
     }
 }

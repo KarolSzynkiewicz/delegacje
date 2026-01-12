@@ -93,6 +93,7 @@
                                             <th class="text-start small fw-bold">Imię i nazwisko</th>
                                             <th class="text-start small fw-bold">Rola w projekcie</th>
                                             <th class="text-center small fw-bold">Pokrycie</th>
+                                            <th class="text-start small fw-bold">Auto</th>
                                             <th class="text-start small fw-bold">Do rotacji</th>
                                         </tr>
                                     </thead>
@@ -133,6 +134,30 @@
                                                     <span class="fw-semibold">
                                                         {{ $dateRange }}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    @if($employeeData['has_vehicle_in_week'] ?? false)
+                                                        @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
+                                                            <a href="{{ route('vehicle-assignments.show', $employeeData['vehicle_assignment']) }}" class="text-decoration-none">
+                                                                <x-ui.badge variant="success" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
+                                                                    <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
+                                                                </x-ui.badge>
+                                                            </a>
+                                                        @else
+                                                            <x-ui.badge variant="success">
+                                                                <i class="bi bi-car-front"></i> Tak
+                                                            </x-ui.badge>
+                                                        @endif
+                                                    @else
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            <x-ui.badge variant="danger" title="Brak przypisanego auta">
+                                                                <i class="bi bi-x-circle"></i> Brak
+                                                            </x-ui.badge>
+                                                            <a href="{{ route('employees.vehicles.create', ['employee' => $employeeData['employee']->id, 'start_date' => $weekData['week']['start']->format('Y-m-d')]) }}" class="btn btn-sm btn-outline-primary p-0 px-1" style="font-size: 0.7rem;" title="Przypisz auto">
+                                                                <i class="bi bi-plus"></i>
+                                                            </a>
+                                                        </div>
+                                                    @endif
                                                 </td>
                                                 <td>
                                                     @if($employeeData['rotation'] ?? null)

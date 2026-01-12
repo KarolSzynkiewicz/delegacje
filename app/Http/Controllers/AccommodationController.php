@@ -3,20 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Accommodation;
-use App\Services\ImageService;
+use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreAccommodationRequest;
 use App\Http\Requests\UpdateAccommodationRequest;
-use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class AccommodationController extends Controller
 {
-    public function __construct(
-        protected ImageService $imageService
-    ) {}
+    use HandlesImageUpload;
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(): View
     {
         $this->authorize('viewAny', Accommodation::class);
         // Dane są pobierane przez komponent Livewire AccommodationsTable
@@ -26,7 +25,7 @@ class AccommodationController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): View
     {
         $this->authorize('create', Accommodation::class);
         return view('accommodations.create');
@@ -35,26 +34,20 @@ class AccommodationController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreAccommodationRequest $request)
+    public function store(StoreAccommodationRequest $request): RedirectResponse
     {
         $this->authorize('create', Accommodation::class);
-        $validated = $request->validated();
-
-        unset($validated['image']);
-
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $this->imageService->storeImage($request->file('image'), 'accommodations');
-        }
-
+        
+        $validated = $this->processImageUpload($request->validated(), $request, 'accommodations');
         Accommodation::create($validated);
+        
         return redirect()->route('accommodations.index')->with('success', 'Akomodacja została dodana.');
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Accommodation $accommodation)
+    public function show(Accommodation $accommodation): View
     {
         $this->authorize('view', $accommodation);
         $assignments = $accommodation->assignments()
@@ -68,7 +61,7 @@ class AccommodationController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Accommodation $accommodation)
+    public function edit(Accommodation $accommodation): View
     {
         $this->authorize('update', $accommodation);
         return view('accommodations.edit', compact('accommodation'));
@@ -77,30 +70,20 @@ class AccommodationController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateAccommodationRequest $request, Accommodation $accommodation)
+    public function update(UpdateAccommodationRequest $request, Accommodation $accommodation): RedirectResponse
     {
         $this->authorize('update', $accommodation);
-        $validated = $request->validated();
-
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $this->imageService->handleImageUpload(
-                $request->file('image'),
-                'accommodations',
-                $accommodation->image_path
-            );
-        }
-
-        unset($validated['image']);
-
+        
+        $validated = $this->processImageUpload($request->validated(), $request, 'accommodations', $accommodation->image_path);
         $accommodation->update($validated);
+        
         return redirect()->route('accommodations.show', $accommodation)->with('success', 'Akomodacja została zaktualizowana.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Accommodation $accommodation)
+    public function destroy(Accommodation $accommodation): RedirectResponse
     {
         $this->authorize('delete', $accommodation);
         $accommodation->delete();

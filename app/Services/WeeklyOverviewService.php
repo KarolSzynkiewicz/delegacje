@@ -302,7 +302,7 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Find accommodation assignments for these employees in this week
-        $accommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
+        $accommodationAssignments = AccommodationAssignment::active()->whereIn('employee_id', $employeeIds)
             ->where(function ($query) use ($weekStart, $weekEnd) {
                 $query->where(function ($q) use ($weekStart, $weekEnd) {
                     $q->whereBetween('start_date', [$weekStart, $weekEnd])
@@ -375,7 +375,7 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Find vehicle assignments for these employees in this week
-        $vehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
+        $vehicleAssignments = VehicleAssignment::active()->whereIn('employee_id', $employeeIds)
             ->where(function ($query) use ($weekStart, $weekEnd) {
                 $query->where(function ($q) use ($weekStart, $weekEnd) {
                     $q->whereBetween('start_date', [$weekStart, $weekEnd])
@@ -497,7 +497,7 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Eager load all accommodation assignments for these employees in this week (single query)
-        $accommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
+        $accommodationAssignments = AccommodationAssignment::active()->whereIn('employee_id', $employeeIds)
             ->where(function ($query) use ($weekStart, $weekEnd) {
                 $query->where(function ($q) use ($weekStart, $weekEnd) {
                     $q->whereBetween('start_date', [$weekStart, $weekEnd])
@@ -516,7 +516,7 @@ class WeeklyOverviewService
             ->groupBy('employee_id');
         
         // Eager load all vehicle assignments for these employees in this week (single query)
-        $vehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
+        $vehicleAssignments = VehicleAssignment::active()->whereIn('employee_id', $employeeIds)
             ->where(function ($query) use ($weekStart, $weekEnd) {
                 $query->where(function ($q) use ($weekStart, $weekEnd) {
                     $q->whereBetween('start_date', [$weekStart, $weekEnd])
@@ -587,61 +587,40 @@ class WeeklyOverviewService
             // Get accommodation and vehicle from pre-loaded collections
             $accommodationAssignment = $accommodationAssignments->get($employee->id)?->first();
             
-            // Check if employee has ANY vehicle assignment in this week (at least one day)
+            // Check if employee has vehicle for all assigned days in this week
             $employeeVehicleAssignments = $vehicleAssignments->get($employee->id) ?? collect();
-            $hasVehicleAnyDay = false;
             $days = $this->getDaysInWeek($weekStart, $weekEnd);
             
+            $hasVehicleAllDays = true;
+            $anyDayAssigned = false;
+            $firstVehicleAssignment = null;
+
             foreach ($days as $day) {
-                $hasVehicleOnDay = $employeeVehicleAssignments->contains(function ($assignment) use ($day) {
-                    return !$assignment->is_return_trip &&
-                           $assignment->start_date->lte($day) &&
-                           ($assignment->end_date === null || $assignment->end_date->gte($day));
-                });
-                if ($hasVehicleOnDay) {
-                    $hasVehicleAnyDay = true;
-                    break;
-                }
-            }
-            
-            // Get vehicle assignment for display (first one found)
-            $vehicleAssignment = $hasVehicleAnyDay ? $employeeVehicleAssignments->first() : null;
-            
-            // Check if employee is returning in this week
-            $returnTrip = $returnTripsByEmployee->get($employee->id);
-            
-            // If employee is returning, check if they have vehicle after return date
-            if ($returnTrip && $vehicleAssignment) {
-                // Check if vehicle assignment ends on or before return date
-                if ($vehicleAssignment->end_date && $vehicleAssignment->end_date->lte($returnTrip->event_date)) {
-                    // Vehicle assignment ends on or before return date - employee will be without vehicle after return
-                    // But if it's the return trip assignment itself, keep it
-                    if ($vehicleAssignment->notes !== 'Zjazd do bazy') {
-                        // Only set to null if they don't have vehicle in ANY day
-                        $hasVehicleAfterReturn = false;
-                        foreach ($days as $day) {
-                            if ($day->gt($returnTrip->event_date)) {
-                                $hasVehicleOnDay = $employeeVehicleAssignments->contains(function ($assignment) use ($day) {
-                                    return !$assignment->is_return_trip &&
-                                           $assignment->start_date->lte($day) &&
-                                           ($assignment->end_date === null || $assignment->end_date->gte($day));
-                                });
-                                if ($hasVehicleOnDay) {
-                                    $hasVehicleAfterReturn = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!$hasVehicleAfterReturn) {
-                            $vehicleAssignment = null;
-                            $hasVehicleAnyDay = false;
-                        }
+                $isAssignedOnDay = $assignment->start_date->lte($day) && 
+                                  ($assignment->end_date === null || $assignment->end_date->gte($day));
+                
+                if ($isAssignedOnDay) {
+                    $anyDayAssigned = true;
+                    $dayVehicleAssignment = $employeeVehicleAssignments->first(function ($vAssignment) use ($day) {
+                        return !$vAssignment->is_return_trip &&
+                               $vAssignment->start_date->lte($day) &&
+                               ($vAssignment->end_date === null || $vAssignment->end_date->gte($day));
+                    });
+                    
+                    if (!$dayVehicleAssignment) {
+                        $hasVehicleAllDays = false;
+                    } elseif (!$firstVehicleAssignment) {
+                        $firstVehicleAssignment = $dayVehicleAssignment;
                     }
                 }
             }
             
-            // Store flag for "bez auta" check
-            $hasVehicleInWeek = $hasVehicleAnyDay;
+            // has_vehicle_in_week should be true only if they have it for ALL assigned days
+            $hasVehicleInWeek = $anyDayAssigned && $hasVehicleAllDays;
+            $hasVehicleAnyDay = $anyDayAssigned && $firstVehicleAssignment !== null;
+            
+            // Get vehicle assignment for display (first one found)
+            $vehicleAssignment = $firstVehicleAssignment;
             
             // Check if assignment is partial (not full week)
             // Assignment is partial if it doesn't cover the entire week
@@ -697,6 +676,7 @@ class WeeklyOverviewService
                 'role_stable' => $isRoleStable,
                 'accommodation' => $accommodationAssignment?->accommodation,
                 'vehicle' => $vehicleAssignment?->vehicle,
+                'vehicle_assignment' => $vehicleAssignment,
                 'has_vehicle_in_week' => $hasVehicleInWeek,
                 'is_partial' => $isPartial,
                 'date_range' => $dateRangeText,

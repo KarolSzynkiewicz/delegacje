@@ -3,20 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
-use App\Services\ImageService;
+use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
-use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class VehicleController extends Controller
 {
-    public function __construct(
-        protected ImageService $imageService
-    ) {}
+    use HandlesImageUpload;
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(): View
     {
         $this->authorize('viewAny', Vehicle::class);
         // Dane są pobierane przez komponent Livewire VehiclesTable
@@ -26,7 +25,7 @@ class VehicleController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): View
     {
         $this->authorize('create', Vehicle::class);
         return view('vehicles.create');
@@ -35,26 +34,20 @@ class VehicleController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreVehicleRequest $request)
+    public function store(StoreVehicleRequest $request): RedirectResponse
     {
         $this->authorize('create', Vehicle::class);
-        $validated = $request->validated();
-
-        unset($validated['image']);
-
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $this->imageService->storeImage($request->file('image'), 'vehicles');
-        }
-
+        
+        $validated = $this->processImageUpload($request->validated(), $request, 'vehicles');
         Vehicle::create($validated);
+        
         return redirect()->route('vehicles.index')->with('success', 'Pojazd został dodany.');
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Vehicle $vehicle)
+    public function show(Vehicle $vehicle): View
     {
         $this->authorize('view', $vehicle);
         $assignments = $vehicle->assignments()
@@ -68,7 +61,7 @@ class VehicleController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Vehicle $vehicle)
+    public function edit(Vehicle $vehicle): View
     {
         $this->authorize('update', $vehicle);
         return view('vehicles.edit', compact('vehicle'));
@@ -77,30 +70,20 @@ class VehicleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateVehicleRequest $request, Vehicle $vehicle)
+    public function update(UpdateVehicleRequest $request, Vehicle $vehicle): RedirectResponse
     {
         $this->authorize('update', $vehicle);
-        $validated = $request->validated();
-
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $this->imageService->handleImageUpload(
-                $request->file('image'),
-                'vehicles',
-                $vehicle->image_path
-            );
-        }
-
-        unset($validated['image']);
-
+        
+        $validated = $this->processImageUpload($request->validated(), $request, 'vehicles', $vehicle->image_path);
         $vehicle->update($validated);
+        
         return redirect()->route('vehicles.show', $vehicle)->with('success', 'Pojazd został zaktualizowany.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Vehicle $vehicle)
+    public function destroy(Vehicle $vehicle): RedirectResponse
     {
         $this->authorize('delete', $vehicle);
         $vehicle->delete();
