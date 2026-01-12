@@ -3,9 +3,9 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3 class="fs-5 fw-semibold text-dark mb-0">Filtry</h3>
-                <button wire:click="clearFilters" class="btn btn-outline-secondary btn-sm">
+                <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
                     <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                </button>
+                </x-ui.button>
             </div>
             
             <div class="row g-3">
@@ -60,8 +60,8 @@
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+                    <table class="table align-middle mb-0">
+                        <thead>
                             <tr>
                                 <th class="text-start">Pracownik</th>
                                 <th class="text-start">Rola</th>
@@ -79,7 +79,7 @@
                                         </a>
                                     </td>
                                     <td>
-                                        <x-badge type="secondary">{{ $assignment->role->name }}</x-badge>
+                                        <x-ui.badge variant="info">{{ $assignment->role->name }}</x-ui.badge>
                                     </td>
                                     <td>
                                         <small class="text-muted">
@@ -95,7 +95,17 @@
                                             
                                             $colorType = \App\Services\StatusColorService::getAssignmentStatusColor($status);
                                         @endphp
-                                        <x-badge type="{{ $colorType }}">{{ $statusLabel }}</x-badge>
+                                        @php
+                                            $badgeVariant = match($colorType) {
+                                                'success' => 'success',
+                                                'danger' => 'danger',
+                                                'warning' => 'warning',
+                                                'info' => 'info',
+                                                'secondary' => 'info',
+                                                default => 'info'
+                                            };
+                                        @endphp
+                                        <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
                                     </td>
                                     <td>
                                         <x-action-buttons

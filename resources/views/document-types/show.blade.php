@@ -7,8 +7,8 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1>Typ Dokumentu: {{ $documentType->name }}</h1>
                 <div>
-                    <a href="{{ route('document-types.edit', $documentType) }}" class="btn btn-warning me-2">Edytuj</a>
-                    <a href="{{ route('document-types.index') }}" class="btn btn-secondary">Wróć do listy</a>
+                    <x-ui.button variant="warning" href="{{ route('document-types.edit', $documentType) }}" class="me-2">Edytuj</x-ui.button>
+                    <x-ui.button variant="ghost" href="{{ route('document-types.index') }}">Wróć do listy</x-ui.button>
                 </div>
             </div>
 
@@ -25,7 +25,7 @@
                 </div>
                 <div class="card-body">
                     @if($documentType->employeeDocuments->count() > 0)
-                        <table class="table table-striped">
+                        <table class="table">
                             <thead>
                                 <tr>
                                     <th>Pracownik</th>

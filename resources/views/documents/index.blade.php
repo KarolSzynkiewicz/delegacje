@@ -1,83 +1,82 @@
-@extends('layouts.app')
-
-@section('content')
-<div class="container">
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1>Wymagania formalne</h1>
-                <a href="{{ route('documents.create') }}" class="btn btn-primary">Dodaj Dokument</a>
-            </div>
+<x-app-layout>
+    <x-slot name="header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 mb-0">Wymagania formalne</h2>
+            <x-ui.button variant="primary" href="{{ route('documents.create') }}">
+                <i class="bi bi-plus-circle"></i> Dodaj Dokument
+            </x-ui.button>
         </div>
-    </div>
+    </x-slot>
 
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-body">
-                    @if (session('success'))
-                        <div class="alert alert-success">
-                            {{ session('success') }}
-                        </div>
-                    @endif
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
 
-                    @if (session('error'))
-                        <div class="alert alert-danger">
-                            {{ session('error') }}
-                        </div>
-                    @endif
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>{{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
 
-                    <table class="table table-striped">
-                        <thead>
+    <x-ui.card>
+        @if($documents->count() > 0)
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="text-start">Nazwa</th>
+                            <th class="text-start">Opis</th>
+                            <th class="text-start">Okresowy</th>
+                            <th class="text-start">Wymagane</th>
+                            <th class="text-start">Liczba przypisań</th>
+                            <th class="text-end">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($documents as $document)
                             <tr>
-                                <th>Nazwa</th>
-                                <th>Opis</th>
-                                <th>Okresowy</th>
-                                <th>Wymagane</th>
-                                <th>Liczba przypisań</th>
-                                <th>Akcje</th>
+                                <td class="fw-medium">{{ $document->name }}</td>
+                                <td>{{ $document->description ?? '-' }}</td>
+                                <td>{{ $document->is_periodic ? 'Tak' : 'Nie' }}</td>
+                                <td>
+                                    @if($document->is_required)
+                                        <x-ui.badge variant="danger">Tak</x-ui.badge>
+                                    @else
+                                        <x-ui.badge variant="info">Nie</x-ui.badge>
+                                    @endif
+                                </td>
+                                <td>{{ $document->employee_documents_count }}</td>
+                                <td class="text-end">
+                                    <x-action-buttons
+                                        viewRoute="{{ route('documents.show', $document) }}"
+                                        editRoute="{{ route('documents.edit', $document) }}"
+                                        deleteRoute="{{ route('documents.destroy', $document) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć ten dokument?"
+                                    />
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($documents as $document)
-                                <tr>
-                                    <td>{{ $document->name }}</td>
-                                    <td>{{ $document->description ?? '-' }}</td>
-                                    <td>{{ $document->is_periodic ? 'Tak' : 'Nie' }}</td>
-                                    <td>
-                                        @if($document->is_required)
-                                            <span class="badge bg-danger">Tak</span>
-                                        @else
-                                            <span class="badge bg-secondary">Nie</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $document->employee_documents_count }}</td>
-                                    <td>
-                                        <a href="{{ route('documents.show', $document) }}" class="btn btn-sm btn-info">Szczegóły</a>
-                                        <a href="{{ route('documents.edit', $document) }}" class="btn btn-sm btn-warning">Edytuj</a>
-                                        <form action="{{ route('documents.destroy', $document) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć ten dokument?')">Usuń</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="text-center">Brak dokumentów</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-
-                    @if($documents->hasPages())
-                        <div class="mt-4">
-                            {{ $documents->links() }}
-                        </div>
-                    @endif
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-        </div>
-    </div>
-</div>
-@endsection
+
+            @if($documents->hasPages())
+                <div class="mt-3">
+                    {{ $documents->links() }}
+                </div>
+            @endif
+        @else
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                <p class="text-muted mb-3">Brak dokumentów w systemie.</p>
+                <x-ui.button variant="primary" href="{{ route('documents.create') }}">
+                    <i class="bi bi-plus-circle"></i> Dodaj pierwszy dokument
+                </x-ui.button>
+            </div>
+        @endif
+    </x-ui.card>
+</x-app-layout>

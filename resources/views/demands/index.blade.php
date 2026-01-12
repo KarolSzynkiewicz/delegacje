@@ -4,9 +4,9 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">
                 Zapotrzebowanie projektu: {{ $project->name }}
             </h2>
-            <a href="{{ route('projects.demands.create', $project) }}" class="btn btn-primary">
+            <x-ui.button variant="primary" href="{{ route('projects.demands.create', $project) }}">
                 <i class="bi bi-plus-circle"></i> Dodaj Zapotrzebowanie
-            </a>
+            </x-ui.button>
         </div>
     </x-slot>
 
@@ -19,8 +19,8 @@
     <div class="card shadow-sm border-0">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
+                <table class="table align-middle">
+                    <thead>
                         <tr>
                             <th class="text-start">Rola</th>
                             <th class="text-start">Liczba osób</th>

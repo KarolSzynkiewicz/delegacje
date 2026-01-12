@@ -27,9 +27,9 @@
                             <x-primary-button>
                                 <i class="bi bi-check-circle me-1"></i> Zapisz
                             </x-primary-button>
-                            <a href="{{ route('roles.index') }}" class="btn btn-outline-secondary">
+                            <x-ui.button variant="ghost" href="{{ route('roles.index') }}">
                                 <i class="bi bi-x-circle me-1"></i> Anuluj
-                            </a>
+                            </x-ui.button>
                         </div>
                     </form>
                 </div>

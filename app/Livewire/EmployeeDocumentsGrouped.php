@@ -62,7 +62,7 @@ class EmployeeDocumentsGrouped extends Component
             ->with(['employeeDocuments.document'])
             ->orderBy('last_name')
             ->orderBy('first_name')
-            ->get();
+            ->paginate(20);
         
         $documents = Document::orderBy('name')->get();
         
@@ -129,6 +129,7 @@ class EmployeeDocumentsGrouped extends Component
         return view('livewire.employee-documents-grouped', [
             'groupedData' => $groupedData,
             'allDocuments' => Document::orderBy('name')->get(),
+            'employees' => $employees,
         ]);
     }
     

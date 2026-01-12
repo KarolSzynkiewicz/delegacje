@@ -2,23 +2,50 @@
 
 @if($summary && $summary->hasAssignedEmployees())
 @php
+    $allHaveVehicle = $summary->allHaveVehicle();
+    $employeesWithoutVehicle = $summary->getEmployeesWithoutVehicle();
     $overcrowdedVehicles = $summary->getOvercrowdedVehicles();
 @endphp
 
-<div class="bg-primary bg-opacity-10 rounded p-2 border border-primary mb-2">
-    <h5 class="small fw-bold text-dark mb-1">Auta</h5>
-    <div class="small text-success fw-semibold mb-1">
-        <i class="bi bi-check-circle"></i> Wszyscy mają auto
-    </div>
-    @if($overcrowdedVehicles->isNotEmpty())
-        <div class="small text-danger fw-semibold">
-            <i class="bi bi-exclamation-triangle"></i> Przepełnione:
+<x-ui.card label="Auta">
+    @if($allHaveVehicle)
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle-fill text-success fs-3"></i>
+            <div>
+                <div class="fw-bold text-success">Status OK</div>
+                <div class="text-muted small">Wszyscy mają auto</div>
+            </div>
+        </div>
+        @if($overcrowdedVehicles->isNotEmpty())
             @foreach($overcrowdedVehicles as $vehicleData)
-                <div class="ms-2">
-                    {{ $vehicleData['vehicle_name'] }} ({{ $vehicleData['usage'] }})
+                <div class="alert alert-danger mt-2">
+                    <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                    <div>
+                        <div class="fw-bold text-danger">Alert Logistyczny</div>
+                        <div class="text-muted small">{{ $vehicleData['vehicle_name'] }} jest przepełnione ({{ $vehicleData['usage'] }})</div>
+                    </div>
                 </div>
             @endforeach
+        @endif
+    @else
+        <div class="alert alert-danger">
+            <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+            <div>
+                <div class="fw-bold text-danger">Alert Logistyczny</div>
+                <div class="text-muted small">Brakuje {{ $employeesWithoutVehicle->count() }} {{ $employeesWithoutVehicle->count() == 1 ? 'auta' : 'aut' }}</div>
+            </div>
         </div>
+        @if($overcrowdedVehicles->isNotEmpty())
+            @foreach($overcrowdedVehicles as $vehicleData)
+                <div class="alert alert-danger mt-2">
+                    <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                    <div>
+                        <div class="fw-bold text-danger">Alert Logistyczny</div>
+                        <div class="text-muted small">{{ $vehicleData['vehicle_name'] }} jest przepełnione ({{ $vehicleData['usage'] }})</div>
+                    </div>
+                </div>
+            @endforeach
+        @endif
     @endif
-</div>
+</x-ui.card>
 @endif

@@ -6,25 +6,17 @@
     'size' => 'sm', // sm, null, lg
 ])
 
-@php
-    $sizeClass = $size === 'sm' ? 'btn-sm' : ($size === 'lg' ? 'btn-lg' : '');
-@endphp
-
-<div class="btn-group btn-group-{{ $size }}" role="group">
+<div class="btn-group" role="group">
     @if($viewRoute)
-        <a href="{{ $viewRoute }}" 
-           class="btn btn-outline-primary {{ $sizeClass }}" 
-           title="Zobacz">
+        <x-ui.button variant="ghost" href="{{ $viewRoute }}" title="Zobacz">
             <i class="bi bi-eye"></i>
-        </a>
+        </x-ui.button>
     @endif
     
     @if($editRoute)
-        <a href="{{ $editRoute }}" 
-           class="btn btn-outline-secondary {{ $sizeClass }}" 
-           title="Edytuj">
+        <x-ui.button variant="ghost" href="{{ $editRoute }}" title="Edytuj">
             <i class="bi bi-pencil"></i>
-        </a>
+        </x-ui.button>
     @endif
     
     @if($deleteRoute)
@@ -34,11 +26,9 @@
               onsubmit="return confirm('{{ $deleteMessage }}')">
             @csrf
             @method('DELETE')
-            <button type="submit" 
-                    class="btn btn-outline-danger {{ $sizeClass }}"
-                    title="Usuń">
+            <x-ui.button variant="danger" type="submit" title="Usuń">
                 <i class="bi bi-trash"></i>
-            </button>
+            </x-ui.button>
         </form>
     @endif
 </div>

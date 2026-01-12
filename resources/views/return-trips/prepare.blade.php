@@ -37,7 +37,7 @@
                             <p class="text-muted">Brak przypisań do skrócenia.</p>
                         @else
                             <div class="table-responsive">
-                                <table class="table table-sm table-bordered">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Osoba</th>
@@ -121,27 +121,28 @@
                             @endif
                             
                             <div class="mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="accept_consequences" id="accept_consequences" value="1" required>
-                                    <label class="form-check-label" for="accept_consequences">
-                                        <strong>Akceptuję konsekwencje zjazdu</strong> - rozumiem, że przypisania zostaną skrócone zgodnie z powyższym podsumowaniem
-                                    </label>
-                                </div>
+                                <x-ui.input 
+                                    type="checkbox" 
+                                    name="accept_consequences" 
+                                    id="accept_consequences"
+                                    label="<strong>Akceptuję konsekwencje zjazdu</strong> - rozumiem, że przypisania zostaną skrócone zgodnie z powyższym podsumowaniem"
+                                    required
+                                />
                             </div>
 
                             <div class="d-flex gap-2">
                                 @if(isset($isEditMode) && $isEditMode && isset($returnTripId))
-                                    <a href="{{ route('return-trips.edit', $returnTripId) }}" class="btn btn-outline-secondary">
+                                    <x-ui.button variant="ghost" href="{{ route('return-trips.edit', $returnTripId) }}">
                                         <i class="bi bi-arrow-left"></i> Wróć do edycji
-                                    </a>
+                                    </x-ui.button>
                                 @else
-                                    <a href="{{ route('return-trips.create') }}" class="btn btn-outline-secondary">
+                                    <x-ui.button variant="ghost" href="{{ route('return-trips.create') }}">
                                         <i class="bi bi-arrow-left"></i> Wróć do formularza
-                                    </a>
+                                    </x-ui.button>
                                 @endif
-                                <button type="submit" class="btn btn-success">
+                                <x-ui.button variant="success" type="submit">
                                     <i class="bi bi-check-circle"></i> Zatwierdź Zjazd
-                                </button>
+                                </x-ui.button>
                             </div>
                         </form>
                     @else
@@ -150,13 +151,13 @@
                             <p class="mb-0">Istnieją konflikty, które uniemożliwiają wykonanie zjazdu. Proszę je rozwiązać przed kontynuowaniem.</p>
                         </div>
                         @if(isset($isEditMode) && $isEditMode && isset($returnTripId))
-                            <a href="{{ route('return-trips.edit', $returnTripId) }}" class="btn btn-outline-secondary">
+                            <x-ui.button variant="ghost" href="{{ route('return-trips.edit', $returnTripId) }}">
                                 <i class="bi bi-arrow-left"></i> Wróć do edycji
-                            </a>
+                            </x-ui.button>
                         @else
-                            <a href="{{ route('return-trips.create') }}" class="btn btn-outline-secondary">
+                            <x-ui.button variant="ghost" href="{{ route('return-trips.create') }}">
                                 <i class="bi bi-arrow-left"></i> Wróć do formularza
-                            </a>
+                            </x-ui.button>
                         @endif
                     @endif
                 </div>

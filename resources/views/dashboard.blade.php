@@ -289,18 +289,3 @@
         </div>
     </div>
 </x-app-layout>
-
-<style>
-    .hover-shadow {
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .hover-shadow:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-    }
-    
-    .text-purple {
-        color: #6f42c1 !important;
-    }
-</style>

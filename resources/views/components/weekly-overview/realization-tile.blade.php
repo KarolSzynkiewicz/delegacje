@@ -12,49 +12,48 @@
     $hasIssues = $summary->hasIssues();
 @endphp
 
-<div class="bg-info bg-opacity-10 rounded p-2 border border-info mb-2">
-        <h5 class="small fw-bold text-dark mb-2">Realizacja</h5>
-        
-        {{-- Progress bar z liczbą --}}
-        <div class="mb-2">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="small fw-bold text-dark">{{ $totalAssigned }}/{{ $totalNeeded }}</span>
-                <span class="small fw-semibold {{ $textClass }}">
-                    {{ $percentage }}%
-                </span>
-            </div>
-            <div class="progress" style="height: 8px;">
-                <div class="progress-bar {{ $progressClass }}" role="progressbar" style="width: {{ $percentage }}%" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-        </div>
-        
-        {{-- Informacje tekstowe --}}
-        <div>
-            @if(!$hasIssues)
-                <div class="small text-success fw-semibold">
-                    <i class="bi bi-check-circle"></i> Wszystko OK – pełny skład
+<x-ui.card>
+    <span class="card-label">Realizacja</span>
+    <div class="stat-value">{{ $totalAssigned }}/{{ $totalNeeded }}</div>
+    <x-ui.progress value="{{ $percentage }}" max="100" />
+    
+    {{-- Informacje tekstowe --}}
+    <div class="mt-3">
+        @if(!$hasIssues)
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle-fill text-success fs-3"></i>
+                <div>
+                    <div class="fw-bold text-success">Status OK</div>
+                    <div class="text-muted small">Wszystko OK – pełny skład</div>
                 </div>
-            @else
-                {{-- Braki --}}
-                @if(!empty($missingRoles))
-                    <div class="small text-warning mb-1">
-                        @foreach($missingRoles as $roleDetail)
-                            <div>Za mało {{ Str::lower($roleDetail['role']->name) }}: {{ $roleDetail['missing'] }}</div>
-                        @endforeach
+            </div>
+        @else
+            {{-- Braki --}}
+            @if(!empty($missingRoles))
+                @foreach($missingRoles as $roleDetail)
+                    <div class="alert alert-danger mb-2">
+                        <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                        <div>
+                            <div class="fw-bold text-danger">Alert Logistyczny</div>
+                            <div class="text-muted small">Za mało {{ Str::lower($roleDetail['role']->name) }}: {{ $roleDetail['missing'] }}</div>
+                        </div>
                     </div>
-                @endif
-                {{-- Nadmiary --}}
-                @if(!empty($excessRoles))
-                    <div class="small text-danger fw-semibold">
-                        @foreach($excessRoles as $roleDetail)
-                            <div>
-                                <i class="bi bi-exclamation-triangle"></i> Za dużo {{ Str::lower($roleDetail['role']->name) }}: +{{ $roleDetail['excess'] }}
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
+                @endforeach
             @endif
-        </div>
+            {{-- Nadmiary --}}
+            @if(!empty($excessRoles))
+                @foreach($excessRoles as $roleDetail)
+                    <div class="alert alert-danger mb-2">
+                        <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                        <div>
+                            <div class="fw-bold text-danger">Alert Logistyczny</div>
+                            <div class="text-muted small">Za dużo {{ Str::lower($roleDetail['role']->name) }}: +{{ $roleDetail['excess'] }}</div>
+                        </div>
+                    </div>
+                @endforeach
+            @endif
+        @endif
     </div>
+</x-ui.card>
 </div>
 @endif

@@ -4,9 +4,9 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">{{ $equipment->name }}</h2>
             <div class="d-flex gap-2">
                 <x-edit-button href="{{ route('equipment.edit', $equipment) }}" />
-                <a href="{{ route('equipment.index') }}" class="btn btn-outline-secondary btn-sm">
+                <x-ui.button variant="ghost" href="{{ route('equipment.index') }}" class="btn-sm">
                     <i class="bi bi-arrow-left"></i> Powrót
-                </a>
+                </x-ui.button>
             </div>
         </div>
     </x-slot>
@@ -66,8 +66,8 @@
                     <h5 class="fw-bold text-dark mb-4">Wymagania dla ról</h5>
                     @if($equipment->requirements->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
+                            <table class="table align-middle">
+                                <thead>
                                     <tr>
                                         <th class="text-start">Rola</th>
                                         <th class="text-start">Wymagana ilość</th>
@@ -102,8 +102,8 @@
                     <h5 class="fw-bold text-dark mb-4">Ostatnie wydania</h5>
                     @if($equipment->issues->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
+                            <table class="table align-middle">
+                                <thead>
                                     <tr>
                                         <th class="text-start">Pracownik</th>
                                         <th class="text-start">Ilość</th>

@@ -1,21 +1,55 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Planer Tygodnia 2</h2>
             <div class="d-flex gap-2 align-items-center">
-                <a href="{{ $navigation['prevUrl'] }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-chevron-left"></i> Poprzedni tydzień
-                </a>
-                <span class="fw-semibold">{{ $navigation['current']['label'] }}</span>
-                <a href="{{ $navigation['nextUrl'] }}" class="btn btn-outline-secondary btn-sm">
-                    Następny tydzień <i class="bi bi-chevron-right"></i>
-                </a>
+                @if($projectId)
+                    <x-ui.button variant="ghost" href="{{ route('weekly-overview.planner2', ['start_date' => $startDate->format('Y-m-d')]) }}" class="btn-sm">
+                        <i class="bi bi-x-circle"></i> Wyczyść filtry
+                    </x-ui.button>
+                @endif
+            </div>
+            <div class="flex-grow-1 text-center">
+                <h2 class="fw-semibold fs-4 mb-0">Planer Tygodnia 2</h2>
+            </div>
+            <div class="d-flex align-items-center">
+                <select id="project-search" class="form-select form-select-sm" style="width: 200px;" onchange="(function() { const baseUrl = '{{ route('weekly-overview.planner2') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
+                    <option value="">Wszystkie projekty</option>
+                    @foreach($allProjects as $project)
+                        <option value="{{ $project->id }}" {{ $projectId && $projectId == $project->id ? 'selected' : '' }}>
+                            {{ $project->name }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
         </div>
     </x-slot>
 
     <div class="py-4">
         <div class="container-xxl">
+            <!-- Nawigacja między tygodniami -->
+            <div class="mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <!-- Przycisk poprzedni tydzień -->
+                <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}">
+                    <i class="bi bi-chevron-left"></i>
+                    <span>Poprzedni tydzień</span>
+                </x-ui.button>
+
+                <!-- Aktualny tydzień -->
+                <div class="text-center">
+                    <h3 class="fs-5 fw-bold mb-0">
+                        Tydzień {{ $navigation['current']['number'] }}
+                    </h3>
+                    <p class="small text-muted mb-0">
+                        {{ $navigation['current']['start']->format('d.m.Y') }} – {{ $navigation['current']['end']->format('d.m.Y') }}
+                    </p>
+                </div>
+
+                <!-- Przycisk następny tydzień -->
+                <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}">
+                    <span>Następny tydzień</span>
+                    <i class="bi bi-chevron-right"></i>
+                </x-ui.button>
+            </div>
             @forelse($projectsWithCalendar as $projectData)
                 @php
                     $project = $projectData['project'];
@@ -27,22 +61,21 @@
                     $employees = is_array($calendar['employees'] ?? []) ? collect($calendar['employees'] ?? []) : ($calendar['employees'] ?? collect());
                 @endphp
                 @if($calendar)
-                    <div class="card shadow-sm border-0 mb-4">
-                        <div class="card-body">
-                            <div class="row">
-                                <!-- Lewa kolumna: Projekt -->
-                                <div class="col-md-3 border-end">
-                                    <h4 class="fw-bold text-dark mb-3">
-                                        <a href="{{ route('projects.show', $project) }}" class="text-decoration-none text-dark">
-                                            {{ $project->name }}
-                                        </a>
-                                    </h4>
-                                    
-                                    @if($project->location)
-                                        <p class="text-muted small mb-3">
-                                            <i class="bi bi-geo-alt"></i> {{ $project->location->name }}
-                                        </p>
-                                    @endif
+                    <x-ui.card class="mb-4">
+                        <div class="row">
+                            <!-- Lewa kolumna: Projekt -->
+                            <div class="col-md-3 border-end">
+                                <h4 class="fw-bold mb-3">
+                                    <a href="{{ route('projects.show', $project) }}" class="text-decoration-none">
+                                        {{ $project->name }}
+                                    </a>
+                                </h4>
+                                
+                                @if($project->location)
+                                    <p class="text-muted small mb-3">
+                                        <i class="bi bi-geo-alt"></i> {{ $project->location->name }}
+                                    </p>
+                                @endif
                                     
                                     @if($weekData)
                                         @php
@@ -58,13 +91,13 @@
                                         <div class="mb-3">
                                             @if(!$hasDemands || $totalNeeded == 0)
                                                 <div class="mb-2">
-                                                    <a href="{{ $demandCreateUrl }}" class="btn btn-sm btn-outline-primary">
+                                                    <x-ui.button variant="ghost" href="{{ $demandCreateUrl }}" class="btn-sm">
                                                         <i class="bi bi-plus-circle"></i> Dodaj zapotrzebowanie
-                                                    </a>
+                                                    </x-ui.button>
                                                 </div>
                                             @else
                                                 <h6 class="fw-semibold small mb-2">
-                                                    <a href="{{ $demandCreateUrl }}" class="text-decoration-none text-dark">
+                                                    <a href="{{ $demandCreateUrl }}" class="text-decoration-none">
                                                         Zapotrzebowanie
                                                     </a>
                                                 </h6>
@@ -173,8 +206,8 @@
                                     
                                     <!-- Tabela zapotrzebowania i pracowników -->
                                     <div class="table-responsive">
-                                        <table class="table table-bordered table-sm mb-0">
-                                            <thead class="table-light">
+                                        <table class="table">
+                                            <thead>
                                                 <tr>
                                                     <th class="text-start" style="width: 200px;">Pracownik</th>
                                                     @foreach($calendar['days'] as $day)
@@ -193,9 +226,9 @@
                                                             $firstDemand = $roleDemands[$role->id] ?? null;
                                                         @endphp
                                                         <tr>
-                                                            <td class="bg-light align-middle fw-semibold">
+                                                            <td class="align-middle fw-semibold">
                                                                 @if($firstDemand)
-                                                                    <a href="{{ route('demands.edit', $firstDemand) }}" class="text-decoration-none text-dark">
+                                                                    <a href="{{ route('demands.edit', $firstDemand) }}" class="text-decoration-none">
                                                                         {{ $role->name }}
                                                                     </a>
                                                                 @else
@@ -209,12 +242,12 @@
                                                                     $required = $dayDemand['required'] ?? 0;
                                                                     $assigned = $dayDemand['assigned'] ?? 0;
                                                                 @endphp
-                                                                <td class="text-center align-middle bg-light">
+                                                                <td class="text-center align-middle">
                                                                     @if($required > 0 || $assigned > 0)
                                                                         <div class="small">
                                                                             <span class="text-primary fw-semibold">{{ $assigned }}</span>
                                                                             <span class="text-muted">/</span>
-                                                                            <span class="text-dark">{{ $required }}</span>
+                                                                            <span>{{ $required }}</span>
                                                                         </div>
                                                                     @else
                                                                         <span class="text-muted">-</span>
@@ -223,8 +256,8 @@
                                                             @endforeach
                                                         </tr>
                                                     @endforeach
-                                                    <tr class="table-secondary">
-                                                        <td class="fw-bold">Razem</td>
+                                                    <tr class="fw-bold">
+                                                        <td>Razem</td>
                                                         @foreach($calendar['days'] as $day)
                                                             @php
                                                                 $dayKey = $day['date']->format('Y-m-d');
@@ -242,7 +275,7 @@
                                                                 <div class="small fw-semibold">
                                                                     <span class="text-primary">{{ $dayTotalAssigned }}</span>
                                                                     <span class="text-muted">/</span>
-                                                                    <span class="text-dark">{{ $dayTotalRequired }}</span>
+                                                                    <span>{{ $dayTotalRequired }}</span>
                                                                 </div>
                                                             </td>
                                                         @endforeach
@@ -257,7 +290,7 @@
                                                 @else
                                                     @foreach($employees as $employeeData)
                                                     <tr>
-                                                        <td class="bg-light align-middle">
+                                                        <td class="align-middle">
                                                             <div class="d-flex align-items-center gap-2">
                                                                 @if($employeeData['employee']->image_path)
                                                                     <img src="{{ $employeeData['employee']->image_url }}" 
@@ -275,7 +308,7 @@
                                                                 <div>
                                                                     <div class="fw-semibold">
                                                                         <a href="{{ route('employees.show', $employeeData['employee']) }}" 
-                                                                           class="text-decoration-none text-dark">
+                                                                           class="text-decoration-none">
                                                                             {{ $employeeData['employee']->full_name }}
                                                                         </a>
                                                                     </div>
@@ -290,7 +323,7 @@
                                                                 $hasVehicle = ($dayData['vehicle'] ?? null) !== null;
                                                             @endphp
                                                             <td class="text-center align-middle p-2" 
-                                                                style="min-height: 80px; {{ !$hasAnyAssignment ? 'background-color: #f8f9fa;' : 'background-color: #e7f3ff;' }}">
+                                                                style="min-height: 80px;">
                                                                 @if($hasAnyAssignment)
                                                                     <div class="d-flex flex-column gap-1 small">
                                                                         <!-- Projekt - zawsze pokazuj jeśli jest jakiekolwiek przypisanie -->
@@ -434,16 +467,15 @@
                                         </table>
                                     </div>
                                 </div>
-                            </div>
                         </div>
-                    </div>
+                    </x-ui.card>
                 @endif
             @empty
-                <div class="card shadow-sm border-0">
-                    <div class="card-body text-center py-5">
+                <x-ui.card>
+                    <div class="text-center py-5">
                         <p class="text-muted">Brak projektów z przypisaniami w tym tygodniu.</p>
                     </div>
-                </div>
+                </x-ui.card>
             @endforelse
         </div>
     </div>

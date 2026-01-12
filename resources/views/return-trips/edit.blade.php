@@ -63,12 +63,12 @@
                         </div>
 
                         <div class="d-flex gap-2">
-                            <a href="{{ route('return-trips.show', $returnTrip) }}" class="btn btn-outline-secondary">
+                            <x-ui.button variant="ghost" href="{{ route('return-trips.show', $returnTrip) }}">
                                 <i class="bi bi-arrow-left"></i> Anuluj
-                            </a>
-                            <button type="submit" class="btn btn-primary">
+                            </x-ui.button>
+                            <x-ui.button variant="primary" type="submit">
                                 <i class="bi bi-check-circle"></i> Przygotuj Zmiany
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
                 </div>

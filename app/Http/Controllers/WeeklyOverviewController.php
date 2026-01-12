@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Project;
 use App\Services\WeeklyOverviewService;
 use App\Services\WeeklyStabilityService;
 use App\ViewModels\WeeklyProjectSummary;
@@ -22,15 +23,21 @@ class WeeklyOverviewController extends Controller
     public function index(Request $request): View
     {
         $startDate = $this->parseStartDate($request);
+        $projectId = $request->query('project_id') ? (int) $request->query('project_id') : null;
+        
         $weeks = $this->weeklyOverviewService->getWeeks($startDate);
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
+        $projects = $this->filterProjectsById($projects, $projectId);
         
         // Create ViewModels for each project
         $projects = $this->enrichProjectsWithSummary($projects);
         
-        $navigation = $this->buildNavigation('weekly-overview.index', $weeks[0]);
+        $navigation = $this->buildNavigation('weekly-overview.index', $weeks[0], $projectId);
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation'));
+        // Get all projects for the search dropdown
+        $allProjects = Project::orderBy('name')->get();
+        
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects'));
     }
 
     /**
@@ -39,7 +46,7 @@ class WeeklyOverviewController extends Controller
     public function planner2(Request $request): View
     {
         $startDate = $this->parseStartDate($request);
-        $projectId = $request->query('project_id');
+        $projectId = $request->query('project_id') ? (int) $request->query('project_id') : null;
         
         $weeks = $this->weeklyOverviewService->getWeeks($startDate);
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
@@ -49,7 +56,10 @@ class WeeklyOverviewController extends Controller
         
         $navigation = $this->buildNavigation('weekly-overview.planner2', $weeks[0], $projectId);
         
-        return view('weekly-overview.planner2', compact('weeks', 'projectsWithCalendar', 'startDate', 'navigation', 'projectId'));
+        // Get all projects for the search dropdown
+        $allProjects = Project::orderBy('name')->get();
+        
+        return view('weekly-overview.planner2', compact('weeks', 'projectsWithCalendar', 'startDate', 'navigation', 'projectId', 'allProjects'));
     }
 
     /**

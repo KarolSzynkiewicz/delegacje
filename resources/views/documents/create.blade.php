@@ -1,64 +1,85 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot name="header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 mb-0">Dodaj Dokument</h2>
+            <x-ui.button variant="ghost" href="{{ route('documents.index') }}">
+                <i class="bi bi-arrow-left"></i> Powrót
+            </x-ui.button>
+        </div>
+    </x-slot>
 
-@section('content')
-<div class="container">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <h1>Dodaj Dokument</h1>
-
-            @if ($errors->any())
-                <div class="alert alert-danger">
-                    <ul>
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <form action="{{ route('documents.store') }}" method="POST">
-                @csrf
-
-                <div class="mb-3">
-                    <label for="name" class="form-label">Nazwa dokumentu *</label>
-                    <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name') }}" required placeholder="np. Prawo jazdy, Licencja, Dowód osobisty">
-                    @error('name') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="mb-3">
-                    <label for="description" class="form-label">Opis</label>
-                    <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description" rows="3">{{ old('description') }}</textarea>
-                    @error('description') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                </div>
-
-                <div class="mb-3">
-                    <label for="is_periodic" class="form-label">Dokument okresowy *</label>
-                    <select class="form-select @error('is_periodic') is-invalid @enderror" id="is_periodic" name="is_periodic" required>
-                        <option value="">-- Wybierz --</option>
-                        <option value="1" {{ old('is_periodic', '1') == '1' ? 'selected' : '' }}>Tak</option>
-                        <option value="0" {{ old('is_periodic') == '0' ? 'selected' : '' }}>Nie</option>
-                    </select>
-                    @error('is_periodic') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                    <small class="form-text text-muted">Czy dokument ma datę ważności do?</small>
-                </div>
-
-                <div class="mb-3">
-                    <div class="form-check">
-                        <input class="form-check-input @error('is_required') is-invalid @enderror" type="checkbox" id="is_required" name="is_required" value="1" {{ old('is_required') ? 'checked' : '' }}>
-                        <label class="form-check-label" for="is_required">
-                            Dokument wymagany
-                        </label>
-                        @error('is_required') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                        <small class="form-text text-muted d-block">Zaznacz, jeśli dokument jest wymagany dla wszystkich pracowników</small>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Dodaj Nowy Dokument">
+                @if ($errors->any())
+                    <div class="alert alert-danger mb-4" role="alert">
+                        <h5 class="alert-heading mb-2">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>Wystąpiły błędy:
+                        </h5>
+                        <ul class="mb-0">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
                     </div>
-                </div>
+                @endif
 
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Dodaj Dokument</button>
-                    <a href="{{ route('documents.index') }}" class="btn btn-secondary">Anuluj</a>
-                </div>
-            </form>
+                <form action="{{ route('documents.store') }}" method="POST">
+                    @csrf
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="name" 
+                            label="Nazwa dokumentu"
+                            value="{{ old('name') }}"
+                            placeholder="np. Prawo jazdy, Licencja, Dowód osobisty"
+                            required="true"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="textarea" 
+                            name="description" 
+                            label="Opis"
+                            value="{{ old('description') }}"
+                            rows="3"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="is_periodic" 
+                            label="Dokument okresowy"
+                            required="true"
+                        >
+                            <option value="">-- Wybierz --</option>
+                            <option value="1" {{ old('is_periodic', '1') == '1' ? 'selected' : '' }}>Tak</option>
+                            <option value="0" {{ old('is_periodic') == '0' ? 'selected' : '' }}>Nie</option>
+                        </x-ui.input>
+                        <small class="form-text text-muted">Czy dokument ma datę ważności do?</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <x-ui.input 
+                            type="checkbox" 
+                            name="is_required" 
+                            label="Dokument wymagany"
+                            checked="{{ old('is_required') ? true : false }}"
+                        />
+                        <small class="form-text text-muted d-block mt-1">Zaznacz, jeśli dokument jest wymagany dla wszystkich pracowników</small>
+                    </div>
+
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                        <x-ui.button variant="ghost" href="{{ route('documents.index') }}">Anuluj</x-ui.button>
+                        <x-ui.button variant="primary" type="submit">
+                            <i class="bi bi-save me-1"></i> Dodaj Dokument
+                        </x-ui.button>
+                    </div>
+                </form>
+            </x-ui.card>
         </div>
     </div>
-</div>
-@endsection
+</x-app-layout>

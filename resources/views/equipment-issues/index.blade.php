@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="fw-semibold fs-4 text-dark mb-0">Wydania Sprzętu</h2>
-            <a href="{{ route('equipment-issues.create') }}" class="btn btn-primary">
+            <x-ui.button variant="primary" href="{{ route('equipment-issues.create') }}">
                 <i class="bi bi-plus-circle"></i> Wydaj Sprzęt
-            </a>
+            </x-ui.button>
         </div>
     </x-slot>
 
@@ -14,8 +14,8 @@
                 <div class="card-body">
                     @if($issues->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
+                            <table class="table align-middle">
+                                <thead>
                                     <tr>
                                         <th class="text-start">Sprzęt</th>
                                         <th class="text-start">Pracownik</th>
@@ -46,9 +46,9 @@
                                                 <div class="btn-group btn-group-sm" role="group">
                                                     <x-view-button href="{{ route('equipment-issues.show', $issue) }}" />
                                                     @if($issue->status === 'issued')
-                                                        <a href="{{ route('equipment-issues.return', $issue) }}" class="btn btn-outline-success btn-sm" title="Zwróć">
+                                                        <x-ui.button variant="success" href="{{ route('equipment-issues.return', $issue) }}" class="btn-sm" title="Zwróć">
                                                             <i class="bi bi-arrow-return-left"></i>
-                                                        </a>
+                                                        </x-ui.button>
                                                     @endif
                                                 </div>
                                             </td>

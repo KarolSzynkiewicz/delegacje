@@ -211,14 +211,14 @@ class ProjectAssignmentService
     /**
      * Get employees with availability status for assignment creation.
      */
-    public function getEmployeesWithAvailabilityStatus(?string $startDate = null, ?string $endDate = null): \Illuminate\Support\Collection
+    public function getEmployeesWithAvailabilityStatus(?string $startDate = null, ?string $endDate = null, ?int $excludeAssignmentId = null): \Illuminate\Support\Collection
     {
         $employees = $this->employeeRepository->withRolesAndDocuments()
             ->sortBy('last_name');
 
         if ($startDate && $endDate) {
-            return $employees->map(function ($employee) use ($startDate, $endDate) {
-                $status = $employee->getAvailabilityStatus($startDate, $endDate);
+            return $employees->map(function ($employee) use ($startDate, $endDate, $excludeAssignmentId) {
+                $status = $employee->getAvailabilityStatus($startDate, $endDate, $excludeAssignmentId);
                 // Upewnij się, że missing_documents jest zawsze tablicą
                 if (!isset($status['missing_documents'])) {
                     $status['missing_documents'] = [];

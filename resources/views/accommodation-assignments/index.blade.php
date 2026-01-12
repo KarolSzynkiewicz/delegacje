@@ -9,9 +9,9 @@
                 @endisset
             </h2>
             @isset($employee)
-                <a href="{{ route('employees.accommodations.create', $employee) }}" class="btn btn-primary">
+                <x-ui.button variant="primary" href="{{ route('employees.accommodations.create', $employee) }}">
                     <i class="bi bi-plus-circle"></i> Przypisz Mieszkanie
-                </a>
+                </x-ui.button>
             @endisset
         </div>
     </x-slot>
@@ -24,8 +24,8 @@
                     <div class="card-body">
                         @if($assignments->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle">
-                                    <thead class="table-light">
+                                <table class="table align-middle">
+                                    <thead>
                                         <tr>
                                             <th class="text-start">Mieszkanie</th>
                                             <th class="text-start">Od - Do</th>

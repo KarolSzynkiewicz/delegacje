@@ -26,8 +26,8 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+                    <table class="table align-middle mb-0">
+                        <thead>
                             <tr>
                                 <th class="text-start">Rola</th>
                                 <th class="text-start">Liczba osób</th>
@@ -55,19 +55,19 @@
                                         </small>
                                     </td>
                                     <td>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <a href="{{ route('demands.show', $demand) }}" class="btn btn-outline-primary" title="Zobacz">
+                                        <div class="d-flex gap-1">
+                                            <x-ui.button variant="ghost" href="{{ route('demands.show', $demand) }}" class="btn-sm" title="Zobacz">
                                                 <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="{{ route('demands.edit', $demand) }}" class="btn btn-outline-secondary" title="Edytuj">
+                                            </x-ui.button>
+                                            <x-ui.button variant="warning" href="{{ route('demands.edit', $demand) }}" class="btn-sm" title="Edytuj">
                                                 <i class="bi bi-pencil"></i>
-                                            </a>
+                                            </x-ui.button>
                                             <form action="{{ route('demands.destroy', $demand) }}" method="POST" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz usunąć to zapotrzebowanie?');">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="btn btn-outline-danger" title="Usuń">
+                                                <x-ui.button variant="danger" type="submit" class="btn-sm" title="Usuń">
                                                     <i class="bi bi-trash"></i>
-                                                </button>
+                                                </x-ui.button>
                                             </form>
                                         </div>
                                     </td>

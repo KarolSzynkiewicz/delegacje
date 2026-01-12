@@ -18,8 +18,8 @@
                     <!-- Tabelka zapotrzebowania -->
                     @if(!empty($stability['requirements_summary']['role_details']))
                         <div class="mb-2 table-responsive">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead class="table-light">
+                            <table class="table mb-0">
+                                <thead>
                                     <tr>
                                         <th class="text-start small fw-bold text-dark">Rola</th>
                                         <th class="text-center small fw-bold text-dark">Potrzebnych</th>
@@ -85,8 +85,8 @@
                         </h4>
                         @if($stability['assigned_employees']->isNotEmpty())
                             <div class="table-responsive">
-                                <table class="table table-sm table-bordered mb-2">
-                                    <thead class="table-light">
+                                <table class="table mb-2">
+                                    <thead>
                                         <tr>
                                             <th class="text-start small fw-bold text-dark">Zdjęcie</th>
                                             <th class="text-start small fw-bold text-dark">Imię i nazwisko</th>
@@ -178,11 +178,10 @@
                 <i class="bi bi-file-earmark-text text-muted" style="font-size: 4rem;"></i>
             </div>
             <p class="text-muted fs-5 fw-medium mb-4">Brak prac w tym tygodniu</p>
-            <a href="{{ route('projects.demands.create', ['project' => $project->id, 'date_from' => $weekStart->format('Y-m-d'), 'date_to' => $weekEnd->format('Y-m-d')]) }}" 
-               class="btn btn-success">
+            <x-ui.button variant="success" href="{{ route('projects.demands.create', ['project' => $project->id, 'date_from' => $weekStart->format('Y-m-d'), 'date_to' => $weekEnd->format('Y-m-d')]) }}">
                 <i class="bi bi-plus"></i>
                 Dodaj zapotrzebowanie
-            </a>
+            </x-ui.button>
         </div>
     </div>
 @endif

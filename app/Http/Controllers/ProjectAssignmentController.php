@@ -106,8 +106,8 @@ class ProjectAssignmentController extends Controller
         $startDate = $assignment->start_date->format('Y-m-d');
         $endDate = $assignment->end_date ? $assignment->end_date->format('Y-m-d') : $startDate;
         
-        // Sprawdź dostępność pracowników dla dat przypisania
-        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate);
+        // Sprawdź dostępność pracowników dla dat przypisania (wykluczając aktualnie edytowane przypisanie)
+        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate, $assignment->id);
         
         $roles = Role::orderBy("name")->get();
         
@@ -141,6 +141,15 @@ class ProjectAssignmentController extends Controller
      */
     public function destroy(ProjectAssignment $assignment)
     {
+        // Sprawdź czy są zaksiegowane godziny dla tego przypisania
+        $hasTimeLogs = \App\Models\TimeLog::where('project_assignment_id', $assignment->id)->exists();
+        
+        if ($hasTimeLogs) {
+            return redirect()
+                ->route("projects.assignments.index", $assignment->project_id)
+                ->with("error", "Nie można usunąć przypisania, ponieważ są już zaksiegowane godziny pracy dla tego przypisania. Najpierw usuń lub edytuj wpisy czasu pracy.");
+        }
+        
         $projectId = $assignment->project_id;
         $assignment->delete();
 

@@ -1,191 +1,163 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Rotacje pracownika: {{ $employee->full_name }}
-            </h2>
-            <a href="{{ route('employees.rotations.create', $employee) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Dodaj Rotację
-            </a>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Rotacje pracownika: {{ $employee->full_name }}</h1>
+            <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}">
+                <i class="bi bi-plus-circle me-1"></i> Dodaj Rotację
+            </x-ui.button>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="mb-4">
-                <a href="{{ route('employees.index') }}" class="text-blue-600 hover:text-blue-900">
-                    ← Wróć do listy pracowników
-                </a>
-            </div>
+    <div class="mb-3">
+        <a href="{{ route('employees.index') }}" class="text-decoration-none">
+            <i class="bi bi-arrow-left me-1"></i> Wróć do listy pracowników
+        </a>
+    </div>
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    @if(session('success'))
-                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                            {{ session('success') }}
-                        </div>
-                    @endif
+    @if(session('success'))
+        <x-ui.alert variant="success" title="Sukces" class="mb-4">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
 
-                    <!-- Formularz filtrowania -->
-                    <div class="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <form method="GET" action="{{ route('employees.rotations.index', $employee) }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <!-- Filtrowanie po statusie -->
-                            <div>
-                                <label for="status" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Status
-                                </label>
-                                <select name="status" id="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="">Wszystkie</option>
-                                    <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>Zaplanowana</option>
-                                    <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktywna</option>
-                                    <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Zakończona</option>
-                                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Anulowana</option>
-                                </select>
-                            </div>
+    <!-- Formularz filtrowania -->
+    <x-ui.card class="mb-4">
+        <form method="GET" action="{{ route('employees.rotations.index', $employee) }}">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <x-ui.input 
+                        type="select" 
+                        name="status" 
+                        label="Status"
+                    >
+                        <option value="">Wszystkie</option>
+                        <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>Zaplanowana</option>
+                        <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktywna</option>
+                        <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Zakończona</option>
+                        <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Anulowana</option>
+                    </x-ui.input>
+                </div>
 
-                            <!-- Filtrowanie po dacie rozpoczęcia (od) -->
-                            <div>
-                                <label for="start_date_from" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Data rozpoczęcia od
-                                </label>
-                                <input type="date" name="start_date_from" id="start_date_from" value="{{ request('start_date_from') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
+                <div class="col-md-3">
+                    <x-ui.input 
+                        type="date" 
+                        name="start_date_from" 
+                        label="Data rozpoczęcia od"
+                        value="{{ request('start_date_from') }}"
+                    />
+                </div>
 
-                            <!-- Filtrowanie po dacie rozpoczęcia (do) -->
-                            <div>
-                                <label for="start_date_to" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Data rozpoczęcia do
-                                </label>
-                                <input type="date" name="start_date_to" id="start_date_to" value="{{ request('start_date_to') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
+                <div class="col-md-3">
+                    <x-ui.input 
+                        type="date" 
+                        name="start_date_to" 
+                        label="Data rozpoczęcia do"
+                        value="{{ request('start_date_to') }}"
+                    />
+                </div>
 
-                            <!-- Filtrowanie po dacie zakończenia (od) -->
-                            <div>
-                                <label for="end_date_from" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Data zakończenia od
-                                </label>
-                                <input type="date" name="end_date_from" id="end_date_from" value="{{ request('end_date_from') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
+                <div class="col-md-3">
+                    <x-ui.input 
+                        type="date" 
+                        name="end_date_from" 
+                        label="Data zakończenia od"
+                        value="{{ request('end_date_from') }}"
+                    />
+                </div>
 
-                            <!-- Filtrowanie po dacie zakończenia (do) -->
-                            <div>
-                                <label for="end_date_to" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Data zakończenia do
-                                </label>
-                                <input type="date" name="end_date_to" id="end_date_to" value="{{ request('end_date_to') }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
+                <div class="col-md-3">
+                    <x-ui.input 
+                        type="date" 
+                        name="end_date_to" 
+                        label="Data zakończenia do"
+                        value="{{ request('end_date_to') }}"
+                    />
+                </div>
 
-                            <!-- Przyciski -->
-                            <div class="flex items-end gap-2">
-                                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                    Filtruj
-                                </button>
-                                <a href="{{ route('employees.rotations.index', $employee) }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                                    Wyczyść
-                                </a>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Informacja o liczbie wyników -->
-                    @if(request()->hasAny(['status', 'start_date_from', 'start_date_to', 'end_date_from', 'end_date_to']))
-                        <div class="mb-4 text-sm text-gray-600">
-                            Znaleziono <strong>{{ $rotations->total() }}</strong> rotacji
-                        </div>
-                    @endif
-
-                    @if($rotations->count() > 0)
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Data rozpoczęcia
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Data zakończenia
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Notatki
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Akcje
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($rotations as $rotation)
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $rotation->start_date->format('Y-m-d') }}
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $rotation->end_date->format('Y-m-d') }}
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                @php
-                                                    $status = $rotation->status;
-                                                @endphp
-                                                @if($status === 'active')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                                        Aktywna
-                                                    </span>
-                                                @elseif($status === 'scheduled')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                                        Zaplanowana
-                                                    </span>
-                                                @elseif($status === 'completed')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                                        Zakończona
-                                                    </span>
-                                                @elseif($status === 'cancelled')
-                                                    <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                                                        Anulowana
-                                                    </span>
-                                                @endif
-                                            </td>
-                                            <td class="px-6 py-4 text-sm text-gray-500">
-                                                {{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <a href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" 
-                                                   class="text-indigo-600 hover:text-indigo-900 mr-3">
-                                                    Edytuj
-                                                </a>
-                                                <form action="{{ route('employees.rotations.destroy', [$employee, $rotation]) }}" 
-                                                      method="POST" class="inline">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" 
-                                                            class="text-red-600 hover:text-red-900"
-                                                            onclick="return confirm('Czy na pewno chcesz usunąć tę rotację?')">
-                                                        Usuń
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="mt-4">
-                            {{ $rotations->links() }}
-                        </div>
-                    @else
-                        <div class="text-center py-8">
-                            <p class="text-gray-500 mb-4">Brak rotacji dla tego pracownika.</p>
-                            <a href="{{ route('employees.rotations.create', $employee) }}" 
-                               class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                                Dodaj pierwszą rotację
-                            </a>
-                        </div>
-                    @endif
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <x-ui.button variant="primary" type="submit">
+                        <i class="bi bi-funnel me-1"></i> Filtruj
+                    </x-ui.button>
+                    <x-ui.button variant="ghost" href="{{ route('employees.rotations.index', $employee) }}">
+                        Wyczyść
+                    </x-ui.button>
                 </div>
             </div>
+        </form>
+    </x-ui.card>
+
+    <!-- Informacja o liczbie wyników -->
+    @if(request()->hasAny(['status', 'start_date_from', 'start_date_to', 'end_date_from', 'end_date_to']))
+        <div class="mb-4 text-muted">
+            Znaleziono <strong>{{ $rotations->total() }}</strong> rotacji
         </div>
-    </div>
+    @endif
+
+    @if($rotations->count() > 0)
+        <x-ui.card>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data rozpoczęcia</th>
+                            <th>Data zakończenia</th>
+                            <th>Status</th>
+                            <th>Notatki</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($rotations as $rotation)
+                            <tr>
+                                <td>{{ $rotation->start_date->format('Y-m-d') }}</td>
+                                <td>{{ $rotation->end_date->format('Y-m-d') }}</td>
+                                <td>
+                                    @php
+                                        $status = $rotation->status;
+                                    @endphp
+                                    @if($status === 'active')
+                                        <x-ui.badge variant="success">Aktywna</x-ui.badge>
+                                    @elseif($status === 'scheduled')
+                                        <x-ui.badge variant="info">Zaplanowana</x-ui.badge>
+                                    @elseif($status === 'completed')
+                                        <x-ui.badge variant="info">Zakończona</x-ui.badge>
+                                    @elseif($status === 'cancelled')
+                                        <x-ui.badge variant="danger">Anulowana</x-ui.badge>
+                                    @endif
+                                </td>
+                                <td>{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <x-ui.button variant="warning" href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" class="btn-sm">
+                                            Edytuj
+                                        </x-ui.button>
+                                        <form action="{{ route('employees.rotations.destroy', [$employee, $rotation]) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <x-ui.button variant="danger" type="submit" class="btn-sm" onclick="return confirm('Czy na pewno chcesz usunąć tę rotację?')">
+                                                Usuń
+                                            </x-ui.button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4">
+                {{ $rotations->links() }}
+            </div>
+        </x-ui.card>
+    @else
+        <x-ui.card>
+            <div class="text-center py-5">
+                <p class="text-muted mb-4">Brak rotacji dla tego pracownika.</p>
+                <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}">
+                    <i class="bi bi-plus-circle me-1"></i> Dodaj pierwszą rotację
+                </x-ui.button>
+            </div>
+        </x-ui.card>
+    @endif
 </x-app-layout>

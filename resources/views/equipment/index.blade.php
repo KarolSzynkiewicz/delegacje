@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="fw-semibold fs-4 text-dark mb-0">Sprzęt</h2>
-            <a href="{{ route('equipment.create') }}" class="btn btn-primary">
+            <x-ui.button variant="primary" href="{{ route('equipment.create') }}">
                 <i class="bi bi-plus-circle"></i> Dodaj Sprzęt
-            </a>
+            </x-ui.button>
         </div>
     </x-slot>
 
@@ -14,8 +14,8 @@
                 <div class="card-body">
                     @if($equipment->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
+                            <table class="table align-middle">
+                                <thead>
                                     <tr>
                                         <th class="text-start">Nazwa</th>
                                         <th class="text-start">Kategoria</th>
@@ -71,9 +71,9 @@
                         <div class="text-center py-5">
                             <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
                             <p class="text-muted mb-3">Brak sprzętu w systemie.</p>
-                            <a href="{{ route('equipment.create') }}" class="btn btn-primary">
+                            <x-ui.button variant="primary" href="{{ route('equipment.create') }}">
                                 <i class="bi bi-plus-circle"></i> Dodaj pierwszy sprzęt
-                            </a>
+                            </x-ui.button>
                         </div>
                     @endif
                 </div>

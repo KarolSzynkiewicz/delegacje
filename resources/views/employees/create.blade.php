@@ -20,36 +20,58 @@
                 @csrf
 
                 <div class="mb-3">
-                    <label for="first_name" class="form-label">Imię *</label>
-                    <input type="text" class="form-control @error('first_name') is-invalid @enderror" id="first_name" name="first_name" value="{{ old('first_name') }}" required>
-                    @error('first_name') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="text" 
+                        name="first_name" 
+                        label="Imię"
+                        value="{{ old('first_name') }}"
+                        required="true"
+                    />
                 </div>
 
                 <div class="mb-3">
-                    <label for="last_name" class="form-label">Nazwisko *</label>
-                    <input type="text" class="form-control @error('last_name') is-invalid @enderror" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
-                    @error('last_name') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="text" 
+                        name="last_name" 
+                        label="Nazwisko"
+                        value="{{ old('last_name') }}"
+                        required="true"
+                    />
                 </div>
 
                 <div class="mb-3">
-                    <label for="email" class="form-label">Email *</label>
-                    <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email') }}" required>
-                    @error('email') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="email" 
+                        name="email" 
+                        label="Email"
+                        value="{{ old('email') }}"
+                        required="true"
+                    />
                 </div>
 
                 <div class="mb-3">
-                    <label for="phone" class="form-label">Telefon</label>
-                    <input type="text" class="form-control @error('phone') is-invalid @enderror" id="phone" name="phone" value="{{ old('phone') }}">
-                    @error('phone') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="text" 
+                        name="phone" 
+                        label="Telefon"
+                        value="{{ old('phone') }}"
+                    />
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Role *</label>
                     <div class="border rounded p-3 @error('roles') border-danger @enderror">
                         @foreach ($roles as $role)
-                            <div class="form-check">
-                                <input class="form-check-input @error('roles') is-invalid @enderror" type="checkbox" id="role_{{ $role->id }}" name="roles[]" value="{{ $role->id }}" {{ in_array($role->id, old('roles', [])) ? 'checked' : '' }}>
-                                <label class="form-check-label" for="role_{{ $role->id }}">
+                            <div class="form-check @error('roles') is-invalid @enderror">
+                                <input 
+                                    type="checkbox" 
+                                    id="role_{{ $role->id }}" 
+                                    name="roles[]" 
+                                    value="{{ $role->id }}"
+                                    {{ in_array($role->id, old('roles', [])) ? 'checked' : '' }}
+                                    class="@error('roles') is-invalid @enderror"
+                                />
+                                <label for="role_{{ $role->id }}">
                                     {{ $role->name }}
                                     @if($role->description)
                                         <small class="text-muted d-block">({{ $role->description }})</small>
@@ -63,24 +85,31 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="notes" class="form-label">Notatki</label>
-                    <textarea class="form-control @error('notes') is-invalid @enderror" id="notes" name="notes" rows="4">{{ old('notes') }}</textarea>
-                    @error('notes') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="textarea" 
+                        name="notes" 
+                        label="Notatki"
+                        value="{{ old('notes') }}"
+                        rows="4"
+                    />
                 </div>
 
                 <div class="mb-3">
-                    <label for="image" class="form-label">Zdjęcie</label>
-                    <input type="file" class="form-control @error('image') is-invalid @enderror" id="image" name="image" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp">
+                    <x-ui.input 
+                        type="file" 
+                        name="image" 
+                        label="Zdjęcie"
+                        accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                    />
                     <small class="form-text text-muted">Maksymalny rozmiar: 2MB. Dozwolone formaty: JPEG, PNG, JPG, GIF, WEBP</small>
-                    @error('image') <span class="invalid-feedback">{{ $message }}</span> @enderror
                     <div id="imagePreview" class="mt-3" style="display: none;">
-                        <img id="previewImg" src="" alt="Podgląd" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                        <img id="previewImg" src="" alt="Podgląd" class="img-thumbnail">
                     </div>
                 </div>
 
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Dodaj Pracownika</button>
-                    <a href="{{ route('employees.index') }}" class="btn btn-secondary">Anuluj</a>
+                    <x-ui.button variant="primary" type="submit">Dodaj Pracownika</x-ui.button>
+                    <x-ui.button variant="ghost" href="{{ route('employees.index') }}">Anuluj</x-ui.button>
                 </div>
             </form>
         </div>

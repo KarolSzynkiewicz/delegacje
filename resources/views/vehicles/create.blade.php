@@ -20,24 +20,37 @@
                 @csrf
 
                 <div class="mb-3">
-                    <label for="registration_number" class="form-label">Numer Rejestracyjny *</label>
-                    <input type="text" class="form-control @error('registration_number') is-invalid @enderror" id="registration_number" name="registration_number" value="{{ old('registration_number') }}" placeholder="np. WA 12345" required>
-                    @error('registration_number') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="text" 
+                        name="registration_number" 
+                        label="Numer Rejestracyjny"
+                        value="{{ old('registration_number') }}"
+                        placeholder="np. WA 12345"
+                        required="true"
+                    />
                 </div>
 
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="brand" class="form-label">Marka</label>
-                            <input type="text" class="form-control @error('brand') is-invalid @enderror" id="brand" name="brand" value="{{ old('brand') }}" placeholder="np. Volkswagen">
-                            @error('brand') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                            <x-ui.input 
+                                type="text" 
+                                name="brand" 
+                                label="Marka"
+                                value="{{ old('brand') }}"
+                                placeholder="np. Volkswagen"
+                            />
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="model" class="form-label">Model</label>
-                            <input type="text" class="form-control @error('model') is-invalid @enderror" id="model" name="model" value="{{ old('model') }}" placeholder="np. Transporter">
-                            @error('model') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                            <x-ui.input 
+                                type="text" 
+                                name="model" 
+                                label="Model"
+                                value="{{ old('model') }}"
+                                placeholder="np. Transporter"
+                            />
                         </div>
                     </div>
                 </div>
@@ -45,51 +58,68 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="capacity" class="form-label">Pojemność (liczba osób)</label>
-                            <input type="number" class="form-control @error('capacity') is-invalid @enderror" id="capacity" name="capacity" value="{{ old('capacity') }}" min="1">
-                            @error('capacity') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                            <x-ui.input 
+                                type="number" 
+                                name="capacity" 
+                                label="Pojemność (liczba osób)"
+                                value="{{ old('capacity') }}"
+                                min="1"
+                            />
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="technical_condition" class="form-label">Stan Techniczny *</label>
-                            <select class="form-select @error('technical_condition') is-invalid @enderror" id="technical_condition" name="technical_condition" required>
+                            <x-ui.input 
+                                type="select" 
+                                name="technical_condition" 
+                                label="Stan Techniczny"
+                                required="true"
+                            >
                                 <option value="">-- Wybierz Stan --</option>
                                 <option value="excellent" {{ old('technical_condition') == 'excellent' ? 'selected' : '' }}>Doskonały</option>
                                 <option value="good" {{ old('technical_condition') == 'good' ? 'selected' : '' }}>Dobry</option>
                                 <option value="fair" {{ old('technical_condition') == 'fair' ? 'selected' : '' }}>Zadowalający</option>
                                 <option value="poor" {{ old('technical_condition') == 'poor' ? 'selected' : '' }}>Słaby</option>
-                            </select>
-                            @error('technical_condition') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                            </x-ui.input>
                         </div>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label for="inspection_valid_to" class="form-label">Przegląd Ważny Do</label>
-                    <input type="date" class="form-control @error('inspection_valid_to') is-invalid @enderror" id="inspection_valid_to" name="inspection_valid_to" value="{{ old('inspection_valid_to') }}">
-                    @error('inspection_valid_to') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="date" 
+                        name="inspection_valid_to" 
+                        label="Przegląd Ważny Do"
+                        value="{{ old('inspection_valid_to') }}"
+                    />
                 </div>
 
                 <div class="mb-3">
-                    <label for="notes" class="form-label">Notatki</label>
-                    <textarea class="form-control @error('notes') is-invalid @enderror" id="notes" name="notes" rows="4">{{ old('notes') }}</textarea>
-                    @error('notes') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                    <x-ui.input 
+                        type="textarea" 
+                        name="notes" 
+                        label="Notatki"
+                        value="{{ old('notes') }}"
+                        rows="4"
+                    />
                 </div>
 
                 <div class="mb-3">
-                    <label for="image" class="form-label">Zdjęcie</label>
-                    <input type="file" class="form-control @error('image') is-invalid @enderror" id="image" name="image" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp">
+                    <x-ui.input 
+                        type="file" 
+                        name="image" 
+                        label="Zdjęcie"
+                        accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                    />
                     <small class="form-text text-muted">Maksymalny rozmiar: 2MB. Dozwolone formaty: JPEG, PNG, JPG, GIF, WEBP</small>
-                    @error('image') <span class="invalid-feedback">{{ $message }}</span> @enderror
                     <div id="imagePreview" class="mt-3" style="display: none;">
-                        <img id="previewImg" src="" alt="Podgląd" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                        <img id="previewImg" src="" alt="Podgląd" class="img-thumbnail">
                     </div>
                 </div>
 
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Dodaj Pojazd</button>
-                    <a href="{{ route('vehicles.index') }}" class="btn btn-secondary">Anuluj</a>
+                    <x-ui.button variant="primary" type="submit">Dodaj Pojazd</x-ui.button>
+                    <x-ui.button variant="ghost" href="{{ route('vehicles.index') }}">Anuluj</x-ui.button>
                 </div>
             </form>
         </div>

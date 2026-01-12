@@ -60,12 +60,14 @@
                         </div>
 
                         <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="is_base" value="1" id="is_base" {{ old('is_base') ? 'checked' : '' }}>
-                                <label class="form-check-label fw-semibold" for="is_base">
-                                    Lokalizacja jest bazą
-                                </label>
-                            </div>
+                            <x-ui.input 
+                                type="checkbox" 
+                                name="is_base" 
+                                id="is_base"
+                                value="1"
+                                label="<strong>Lokalizacja jest bazą</strong>"
+                                :value="old('is_base') ? true : false"
+                            />
                             <small class="text-muted d-block mt-1">Zaznacz, jeśli ta lokalizacja jest siedzibą główną firmy</small>
                         </div>
 

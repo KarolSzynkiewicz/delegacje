@@ -3,12 +3,12 @@
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="fw-semibold fs-4 text-dark mb-0">Ewidencja Godzin</h2>
             <div class="d-flex gap-2">
-                <a href="{{ route('time-logs.monthly-grid') }}" class="btn btn-outline-primary">
+                <x-ui.button variant="ghost" href="{{ route('time-logs.monthly-grid') }}">
                     <i class="bi bi-calendar-month"></i> Widok Miesięczny
-                </a>
-                <a href="{{ route('time-logs.create') }}" class="btn btn-primary">
+                </x-ui.button>
+                <x-ui.button variant="primary" href="{{ route('time-logs.create') }}">
                     <i class="bi bi-plus-circle"></i> Dodaj Wpis
-                </a>
+                </x-ui.button>
             </div>
         </div>
     </x-slot>
@@ -19,8 +19,8 @@
                 <div class="card-body">
                     @if($timeLogs->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
+                            <table class="table align-middle">
+                                <thead>
                                     <tr>
                                         <th class="text-start">Data</th>
                                         <th class="text-start">Pracownik</th>
@@ -66,9 +66,9 @@
                         <div class="text-center py-5">
                             <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
                             <p class="text-muted mb-3">Brak wpisów w systemie.</p>
-                            <a href="{{ route('time-logs.create') }}" class="btn btn-primary">
+                            <x-ui.button variant="primary" href="{{ route('time-logs.create') }}">
                                 <i class="bi bi-plus-circle"></i> Dodaj pierwszy wpis
-                            </a>
+                            </x-ui.button>
                         </div>
                     @endif
                 </div>

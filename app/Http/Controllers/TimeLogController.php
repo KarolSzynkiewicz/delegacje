@@ -196,6 +196,33 @@ class TimeLogController extends Controller
         })
         ->orderBy('name')
         ->get();
+        
+        // Pobierz wszystkie time logs dla tego miesiąca (nawet jeśli przypisanie zostało usunięte)
+        $allTimeLogs = \App\Models\TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()])
+            ->with(['projectAssignment.project', 'projectAssignment.employee'])
+            ->get();
+        
+        // Stwórz mapę time logs po project_id, employee_id i dniu
+        // Używamy project_id i employee_id, bo assignment może nie istnieć
+        $timeLogsByProjectEmployee = [];
+        foreach ($allTimeLogs as $timeLog) {
+            if ($timeLog->projectAssignment) {
+                $projectId = $timeLog->projectAssignment->project_id;
+                $employeeId = $timeLog->projectAssignment->employee_id;
+                $assignmentId = $timeLog->project_assignment_id;
+                $day = Carbon::parse($timeLog->start_time)->day;
+                
+                $key = $projectId . '_' . $employeeId;
+                if (!isset($timeLogsByProjectEmployee[$key])) {
+                    $timeLogsByProjectEmployee[$key] = [];
+                }
+                $timeLogsByProjectEmployee[$key][$day] = [
+                    'hours' => $timeLog->hours_worked,
+                    'time_log_id' => $timeLog->id,
+                    'assignment_id' => $assignmentId,
+                ];
+            }
+        }
 
         // Prepare data structure for view
         $projectsData = [];
@@ -222,14 +249,12 @@ class TimeLogController extends Controller
             // Convert to array and prepare time logs data
             foreach ($employeesMap as $employeeId => $data) {
                 $timeLogsMap = [];
-                foreach ($data['assignments'] as $assignment) {
-                    foreach ($assignment->timeLogs as $timeLog) {
-                        $day = Carbon::parse($timeLog->start_time)->day;
-                        $timeLogsMap[$day] = [
-                            'hours' => $timeLog->hours_worked,
-                            'time_log_id' => $timeLog->id,
-                            'assignment_id' => $assignment->id,
-                        ];
+                
+                // Pobierz time logs dla tego pracownika w tym projekcie (nawet jeśli przypisanie zostało usunięte)
+                $key = $project->id . '_' . $employeeId;
+                if (isset($timeLogsByProjectEmployee[$key])) {
+                    foreach ($timeLogsByProjectEmployee[$key] as $day => $timeLogData) {
+                        $timeLogsMap[$day] = $timeLogData;
                     }
                 }
 

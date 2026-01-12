@@ -1,8 +1,8 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-light">
     <div class="container-fluid">
         <!-- Logo -->
         <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
-            <x-application-logo class="d-block" style="height: 2rem; width: auto;" />
+            <x-application-logo class="d-block navbar-logo" />
         </a>
 
         <!-- Toggle button for mobile -->
@@ -109,26 +109,25 @@
                         </ul>
                     </li>
                     @endcanany
+
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->is('utest') ? 'active' : '' }}" href="{{ url('/utest') }}">
+                            <i class="bi bi-palette"></i> UI Test
+                        </a>
+                    </li>
                 @endauth
             </ul>
 
-            <!-- Right side: Dark mode toggle and user menu -->
+            <!-- Right side: User menu -->
             <ul class="navbar-nav">
                 @auth
-                    <!-- Dark Mode Toggle -->
-                    <li class="nav-item">
-                        <button class="btn btn-link nav-link" type="button" id="theme-toggle" aria-label="Toggle dark mode">
-                            <i class="bi bi-moon-stars" id="theme-icon"></i>
-                        </button>
-                    </li>
-
                     <!-- User Dropdown -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             @if(Auth::user()->image_path)
-                                <img src="{{ Auth::user()->image_url }}" alt="{{ Auth::user()->name }}" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                                <img src="{{ Auth::user()->image_url }}" alt="{{ Auth::user()->name }}" class="rounded-circle me-2 user-avatar">
                             @else
-                                <div class="bg-primary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                <div class="bg-primary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center me-2 user-avatar-placeholder">
                                     <span class="text-primary fw-semibold small">{{ Auth::user()->initials }}</span>
                                 </div>
                             @endif
@@ -152,73 +151,3 @@
         </div>
     </div>
 </nav>
-
-<script>
-(function() {
-    'use strict';
-    
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeIcon = document.getElementById('theme-icon');
-    const htmlElement = document.documentElement;
-    
-    // Get saved theme or default to light
-    const getStoredTheme = () => localStorage.getItem('theme');
-    const setStoredTheme = theme => localStorage.setItem('theme', theme);
-    
-    // Get preferred theme
-    const getPreferredTheme = () => {
-        const stored = getStoredTheme();
-        if (stored) {
-            return stored;
-        }
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    };
-    
-    // Set theme
-    const setTheme = theme => {
-        htmlElement.setAttribute('data-bs-theme', theme);
-        setStoredTheme(theme);
-        updateIcon(theme);
-    };
-    
-    // Update icon
-    const updateIcon = theme => {
-        if (themeIcon) {
-            themeIcon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
-        }
-    };
-    
-    // Set initial theme
-    setTheme(getPreferredTheme());
-    
-    // Listen for changes
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        const stored = getStoredTheme();
-        if (!stored) {
-            setTheme(getPreferredTheme());
-        }
-    });
-    
-    // Toggle on click
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = htmlElement.getAttribute('data-bs-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            setTheme(newTheme);
-        });
-    }
-})();
-</script>
-
-<style>
-    /* Ensure dropdowns appear above page content */
-    .dropdown-menu {
-        z-index: 1050 !important;
-    }
-    
-    /* Navigation z-index */
-    .navbar {
-        z-index: 1000;
-        position: relative;
-    }
-</style>

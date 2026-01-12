@@ -48,9 +48,16 @@
                     <label class="form-label">Role *</label>
                     <div class="border rounded p-3 @error('roles') border-danger @enderror">
                         @foreach ($roles as $role)
-                            <div class="form-check">
-                                <input class="form-check-input @error('roles') is-invalid @enderror" type="checkbox" id="role_{{ $role->id }}" name="roles[]" value="{{ $role->id }}" {{ in_array($role->id, old('roles', $employee->roles->pluck('id')->toArray())) ? 'checked' : '' }}>
-                                <label class="form-check-label" for="role_{{ $role->id }}">
+                            <div class="form-check @error('roles') is-invalid @enderror">
+                                <input 
+                                    type="checkbox" 
+                                    id="role_{{ $role->id }}" 
+                                    name="roles[]" 
+                                    value="{{ $role->id }}"
+                                    {{ in_array($role->id, old('roles', $employee->roles->pluck('id')->toArray())) ? 'checked' : '' }}
+                                    class="@error('roles') is-invalid @enderror"
+                                />
+                                <label for="role_{{ $role->id }}">
                                     {{ $role->name }}
                                     @if($role->description)
                                         <small class="text-muted d-block">({{ $role->description }})</small>

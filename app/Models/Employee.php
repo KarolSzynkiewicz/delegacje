@@ -332,7 +332,7 @@ class Employee extends Model
      * Get availability status with reasons for a given date range.
      * Returns array with 'available' boolean and 'reasons' array.
      */
-    public function getAvailabilityStatus($startDate, $endDate): array
+    public function getAvailabilityStatus($startDate, $endDate, ?int $excludeAssignmentId = null): array
     {
         $reasons = [];
         $available = true;
@@ -437,8 +437,8 @@ class Employee extends Model
             $reasons[] = 'Brak rotacji pokrywającej cały okres';
         }
 
-        // 3. Sprawdź konfliktujące przypisania
-        $hasConflictingAssignments = $this->assignments()
+        // 3. Sprawdź konfliktujące przypisania (wykluczając aktualnie edytowane przypisanie)
+        $query = $this->assignments()
             ->where('status', 'active')
             ->where(function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('start_date', [$startDate, $endDate])
@@ -447,8 +447,13 @@ class Employee extends Model
                         $q->where('start_date', '<=', $startDate)
                           ->where('end_date', '>=', $endDate);
                     });
-            })
-            ->exists();
+            });
+        
+        if ($excludeAssignmentId) {
+            $query->where('id', '!=', $excludeAssignmentId);
+        }
+        
+        $hasConflictingAssignments = $query->exists();
 
         if ($hasConflictingAssignments) {
             $available = false;
@@ -466,7 +471,7 @@ class Employee extends Model
      * Check if employee is available in a given date range.
      * Updated: Now checks both rotations AND assignments.
      */
-    public function isAvailableInDateRange($startDate, $endDate): bool
+    public function isAvailableInDateRange($startDate, $endDate, ?int $excludeAssignmentId = null): bool
     {
         // 1. Sprawdź czy pracownik ma wszystkie wymagane dokumenty aktywne
         if (!$this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
@@ -478,8 +483,8 @@ class Employee extends Model
             return false; // Brak rotacji = pracownik nie może pracować
         }
 
-        // 3. Sprawdź czy nie ma konfliktujących przypisań
-        $hasConflictingAssignments = $this->assignments()
+        // 3. Sprawdź czy nie ma konfliktujących przypisań (wykluczając aktualnie edytowane przypisanie)
+        $query = $this->assignments()
             ->where('status', 'active')
             ->where(function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('start_date', [$startDate, $endDate])
@@ -488,8 +493,13 @@ class Employee extends Model
                         $q->where('start_date', '<=', $startDate)
                           ->where('end_date', '>=', $endDate);
                     });
-            })
-            ->exists();
+            });
+        
+        if ($excludeAssignmentId) {
+            $query->where('id', '!=', $excludeAssignmentId);
+        }
+        
+        $hasConflictingAssignments = $query->exists();
 
         return !$hasConflictingAssignments;
     }

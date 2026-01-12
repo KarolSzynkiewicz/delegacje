@@ -16,6 +16,13 @@
 - ✅ `accommodations/index.blade.php` - Bootstrap header i layout
 - ✅ `assignments/index.blade.php` - Bootstrap table i layout
 - ✅ `rotations/index.blade.php` - Bootstrap filters i table
+- ✅ `documents/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `locations/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `roles/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `users/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `user-roles/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `equipment/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `time-logs/index.blade.php` - Bootstrap z <x-app-layout>
 
 ### Komponenty Livewire (tabele)
 - ✅ `livewire/projects-table.blade.php` - Bootstrap z filtrami
@@ -44,14 +51,21 @@
 - ✅ `vehicles/edit.blade.php` - Już Bootstrap
 - ✅ `accommodations/create.blade.php` - Już Bootstrap
 - ✅ `accommodations/edit.blade.php` - Już Bootstrap
-- ⏳ `demands/create.blade.php`
-- ⏳ `demands/edit.blade.php`
-- ⏳ `rotations/create.blade.php`
+- ✅ `demands/create.blade.php` - Bootstrap z card i form-control
+- ✅ `demands/edit.blade.php` - Bootstrap z card i form-control
+- ✅ `rotations/create.blade.php` - Bootstrap z card i form-control
+- ✅ `documents/create.blade.php` - Bootstrap z card i form-control
+- ✅ `documents/edit.blade.php` - Bootstrap z card i form-control
+- ✅ `return-trips/create.blade.php` - Bootstrap z card i form-control
+- ✅ `return-trips/edit.blade.php` - Bootstrap z card i form-control
+- ✅ `transport-costs/create.blade.php` - Bootstrap z card i form-control
+- ✅ `transport-costs/edit.blade.php` - Bootstrap z card i form-control
+- ✅ `equipment-issues/create.blade.php` - Bootstrap z card i form-control
 - ✅ `vehicle-assignments/create.blade.php` - Bootstrap z card i form-control
 - ✅ `vehicle-assignments/edit.blade.php` - Bootstrap z card i form-control
 - ✅ `accommodation-assignments/create.blade.php` - Bootstrap z card i form-control
 - ✅ `accommodation-assignments/edit.blade.php` - Bootstrap z card i form-control
-- ⏳ Wszystkie inne formularze
+- ⏳ Wszystkie inne formularze (time-logs, roles, locations, users, user-roles, employee-documents, employees/rotations)
 
 ### Widoki szczegółów (show)
 - ✅ `assignments/show.blade.php` - Bootstrap z card i dl/row
@@ -91,7 +105,9 @@
 - ⏳ `welcome.blade.php`
 
 ### Pozostałe widoki
-- ⏳ Wszystkie widoki w `locations/`, `roles/`, `documents/`, `equipment/`, `time-logs/`, `equipment-issues/`, `transport-costs/`, `return-trips/`, `users/`, `user-roles/`, `employee-documents/`, `employees/rotations/`
+- ✅ `documents/index.blade.php` - Bootstrap z <x-app-layout>
+- ✅ `return-trips/show.blade.php` - Bootstrap z card
+- ⏳ Pozostałe widoki w `equipment-issues/`, `time-logs/`, `roles/`, `locations/`, `users/`, `user-roles/`, `employee-documents/`, `employees/rotations/`
 
 ## 📋 Spójność designu
 
@@ -113,6 +129,6 @@
 - ✅ Wsparcie dla wszystkich komponentów
 - ✅ Spójne kolory w obu trybach
 
-## 🎯 Postęp: ~75% zakończone
+## 🎯 Postęp: ~85% zakończone
 
-Główne komponenty Livewire i widoki index zostały przekonwertowane. Pozostało przekonwertować formularze, widoki szczegółów i komponenty Blade.
+Główne komponenty Livewire, widoki index i większość formularzy zostały przekonwertowane. Pozostało przekonwertować pozostałe formularze, widoki szczegółów i komponenty Blade (modal, dropdown).

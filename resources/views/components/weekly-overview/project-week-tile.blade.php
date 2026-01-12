@@ -1,29 +1,26 @@
 @props(['weekData', 'project'])
 
 @if($weekData['has_data'])
-    <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body">
+    <x-ui.card class="mb-3">
             <!-- Zapotrzebowanie -->
             <div class="mb-3">
-                <div class="bg-info bg-opacity-10 rounded p-2 border border-info">
-                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                        <h4 class="small fw-bold text-dark mb-0">Zapotrzebowanie</h4>
-                        <a href="{{ route('projects.demands.create', ['project' => $project, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" 
-                           class="btn btn-sm btn-info">
+                <x-ui.card label="Zapotrzebowanie">
+                    <div class="d-flex justify-content-end mb-2">
+                        <x-ui.button variant="ghost" href="{{ route('projects.demands.create', ['project' => $project, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="btn-sm">
                             <i class="bi bi-pencil"></i>
                             Edytuj
-                        </a>
+                        </x-ui.button>
                     </div>
                     
                     <!-- Tabelka zapotrzebowania -->
                     @if(!empty($weekData['requirements_summary']['role_details']))
                         <div class="mb-2 table-responsive">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead class="table-light">
+                            <table class="table">
+                                <thead>
                                     <tr>
-                                        <th class="text-start small fw-bold text-dark">Rola</th>
-                                        <th class="text-center small fw-bold text-dark">Potrzebnych</th>
-                                        <th class="text-center small fw-bold text-dark">Przypisanych</th>
+                                        <th class="text-start small fw-bold">Rola</th>
+                                        <th class="text-center small fw-bold">Potrzebnych</th>
+                                        <th class="text-center small fw-bold">Przypisanych</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -38,7 +35,7 @@
                                             $isPartial = $isStable && $assigned !== null && $assigned > 0 && $assigned < $needed;
                                         @endphp
                                         <tr>
-                                            <td class="small text-dark">{{ Str::lower($roleDetail['role']->name) }}</td>
+                                            <td class="small">{{ Str::lower($roleDetail['role']->name) }}</td>
                                             <td class="text-center small fw-semibold {{ $isComplete ? 'text-success' : ($isPartial ? 'text-warning' : 'text-danger') }}">
                                                 {{ $needed }}
                                             </td>
@@ -47,10 +44,10 @@
                                             </td>
                                         </tr>
                                     @endforeach
-                                    <tr class="table-secondary fw-bold">
-                                        <td class="small text-dark">łącznie</td>
-                                        <td class="text-center small text-dark">{{ $weekData['requirements_summary']['total_needed'] }}</td>
-                                        <td class="text-center small text-dark">
+                                    <tr class="fw-bold">
+                                        <td class="small">łącznie</td>
+                                        <td class="text-center small">{{ $weekData['requirements_summary']['total_needed'] }}</td>
+                                        <td class="text-center small">
                                             {{ $weekData['requirements_summary']['total_assigned_max'] ?? 0 }}
                                         </td>
                                     </tr>
@@ -59,45 +56,44 @@
                         </div>
                     @else
                         <div class="mb-2 table-responsive">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead class="table-light">
+                            <table class="table">
+                                <thead>
                                     <tr>
-                                        <th class="text-start small fw-bold text-dark">Rola</th>
-                                        <th class="text-center small fw-bold text-dark">Potrzebnych</th>
-                                        <th class="text-center small fw-bold text-dark">Przypisanych</th>
+                                        <th class="text-start small fw-bold">Rola</th>
+                                        <th class="text-center small fw-bold">Potrzebnych</th>
+                                        <th class="text-center small fw-bold">Przypisanych</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr class="table-secondary fw-bold">
-                                        <td class="small text-dark">łącznie</td>
-                                        <td class="text-center small text-dark">{{ $weekData['requirements_summary']['total_needed'] }}</td>
-                                        <td class="text-center small text-dark">{{ $weekData['requirements_summary']['total_assigned'] }}</td>
+                                    <tr class="fw-bold">
+                                        <td class="small">łącznie</td>
+                                        <td class="text-center small">{{ $weekData['requirements_summary']['total_needed'] }}</td>
+                                        <td class="text-center small">{{ $weekData['requirements_summary']['total_assigned'] }}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     @endif
-                </div>
+                </x-ui.card>
             </div>
 
             <!-- Osoby w projekcie -->
             <div class="mb-3">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body">
-                        <h4 class="fw-bold text-dark mb-2 d-flex align-items-center gap-1 small">
+                <x-ui.card>
+                        <h4 class="fw-bold mb-2 d-flex align-items-center gap-1 small">
                             <i class="bi bi-people text-warning"></i>
-                            Osoby
+                            <span class="text-warning">Osoby</span>
                         </h4>
                         @if($weekData['assigned_employees']->isNotEmpty())
                             <div class="table-responsive">
-                                <table class="table table-sm table-bordered mb-2">
-                                    <thead class="table-light">
+                                <table class="table">
+                                    <thead>
                                         <tr>
-                                            <th class="text-start small fw-bold text-dark">Zdjęcie</th>
-                                            <th class="text-start small fw-bold text-dark">Imię i nazwisko</th>
-                                            <th class="text-start small fw-bold text-dark">Rola w projekcie</th>
-                                            <th class="text-center small fw-bold text-dark">Pokrycie</th>
-                                            <th class="text-start small fw-bold text-dark">Do rotacji</th>
+                                            <th class="text-start small fw-bold">Zdjęcie</th>
+                                            <th class="text-start small fw-bold">Imię i nazwisko</th>
+                                            <th class="text-start small fw-bold">Rola w projekcie</th>
+                                            <th class="text-center small fw-bold">Pokrycie</th>
+                                            <th class="text-start small fw-bold">Do rotacji</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -113,19 +109,19 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-dark text-decoration-none">{{ $employeeData['employee']->full_name }}</a>
+                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-decoration-none">{{ $employeeData['employee']->full_name }}</a>
                                                 </td>
                                                 <td>
                                                     @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
-                                                        <span class="badge bg-warning" title="Rola zmienia się w trakcie tygodnia">
+                                                        <x-ui.badge variant="warning" title="Rola zmienia się w trakcie tygodnia">
                                                             <i class="bi bi-arrow-left-right"></i> Zmienna
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @elseif(isset($employeeData['assignment']))
                                                         <a href="{{ route('assignments.show', $employeeData['assignment']) }}" class="text-decoration-none">
-                                                            <span class="badge bg-primary">{{ $employeeData['role']->name ?? '-' }}</span>
+                                                            <x-ui.badge variant="accent">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
                                                         </a>
                                                     @else
-                                                        <span class="badge bg-secondary">{{ $employeeData['role']->name ?? '-' }}</span>
+                                                        <x-ui.badge variant="info">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
                                                     @endif
                                                 </td>
                                                 @php
@@ -134,7 +130,7 @@
                                                     $shouldHighlight = !$isFullWeek;
                                                 @endphp
                                                 <td class="text-center {{ $shouldHighlight ? 'bg-danger bg-opacity-25' : '' }}">
-                                                    <span class="text-dark fw-semibold">
+                                                    <span class="fw-semibold">
                                                         {{ $dateRange }}
                                                     </span>
                                                 </td>
@@ -164,15 +160,15 @@
                             </div>
                             <div class="mt-2">
                                 @if(isset($weekData['week']) && isset($weekData['week']['start']) && isset($weekData['week']['end']))
-                                    <a href="{{ route('projects.assignments.create', ['project' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="btn btn-sm btn-primary w-100">
+                                    <x-ui.button variant="primary" href="{{ route('projects.assignments.create', ['project' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         {{ $weekData['assigned_employees']->count() > 0 ? 'Dodaj' : 'Przypisz' }}
-                                    </a>
+                                    </x-ui.button>
                                 @else
-                                    <a href="{{ route('projects.assignments.create', $project) }}" class="btn btn-sm btn-primary w-100">
+                                    <x-ui.button variant="primary" href="{{ route('projects.assignments.create', $project) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         {{ $weekData['assigned_employees']->count() > 0 ? 'Dodaj' : 'Przypisz' }}
-                                    </a>
+                                    </x-ui.button>
                                 @endif
                             </div>
                         @else
@@ -181,53 +177,48 @@
                             </div>
                             <div class="mt-2">
                                 @if(isset($weekData['week']) && isset($weekData['week']['start']) && isset($weekData['week']['end']))
-                                    <a href="{{ route('projects.assignments.create', ['project' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="btn btn-sm btn-primary w-100">
+                                    <x-ui.button variant="primary" href="{{ route('projects.assignments.create', ['project' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         Przypisz osoby
-                                    </a>
+                                    </x-ui.button>
                                 @else
-                                    <a href="{{ route('projects.assignments.create', $project) }}" class="btn btn-sm btn-primary w-100">
+                                    <x-ui.button variant="primary" href="{{ route('projects.assignments.create', $project) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         Przypisz osoby
-                                    </a>
+                                    </x-ui.button>
                                 @endif
                             </div>
                         @endif
-                    </div>
-                </div>
+                </x-ui.card>
             </div>
 
             <!-- Auta i Domy - w stylu Album -->
             <div class="row g-3 mb-3">
                 <!-- Auta -->
                 <div class="col-12">
-                    <h5 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
-                        <i class="bi bi-car-front text-info"></i>
-                        Auta
-                    </h5>
-                    @if($weekData['vehicles']->isNotEmpty())
+                    <x-ui.card label="Auta">
+                        @if($weekData['vehicles']->isNotEmpty())
                         <div class="row g-3 mb-3">
                             @foreach($weekData['vehicles']->take(6) as $vehicleData)
                                 <div class="col-6 col-md-4 col-lg-3">
-                                    <div class="card shadow-sm h-100">
-                                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 120px; overflow: hidden;">
-                                            @if($vehicleData['vehicle']->image_path)
-                                                <img src="{{ $vehicleData['vehicle']->image_url }}" 
-                                                     alt="{{ $vehicleData['vehicle_name'] }}" 
-                                                     class="w-100 h-100 object-fit-cover"
-                                                     onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2306b6d4\'%3E%3Cpath d=\'M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2\'/%3E%3C/svg%3E';">
-                                            @else
-                                                <div class="bg-info bg-opacity-10 w-100 h-100 d-flex align-items-center justify-content-center">
-                                                    <i class="bi bi-car-front text-info" style="font-size: 3rem;"></i>
-                                                </div>
-                                            @endif
-                                        </div>
-                                        <div class="card-body d-flex flex-column">
-                                            <h6 class="card-title">
-                                                <a href="{{ route('vehicles.show', $vehicleData['vehicle']) }}" class="text-decoration-none text-dark">
+                                    <a href="{{ route('vehicles.show', $vehicleData['vehicle']) }}" class="text-decoration-none" style="display: block;">
+                                        <x-ui.card class="h-100 vehicle-card-clickable">
+                                            <div class="card-img-top d-flex align-items-center justify-content-center" style="height: 120px; background: var(--bg-card); padding: 8px;">
+                                                @if($vehicleData['vehicle']->image_path)
+                                                    <img src="{{ $vehicleData['vehicle']->image_url }}" 
+                                                         alt="{{ $vehicleData['vehicle_name'] }}" 
+                                                         style="max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 8px;"
+                                                         onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2306b6d4\'%3E%3Cpath d=\'M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2\'/%3E%3C/svg%3E';">
+                                                @else
+                                                    <div class="bg-info bg-opacity-10 w-100 h-100 d-flex align-items-center justify-content-center" style="border-radius: 8px;">
+                                                        <i class="bi bi-car-front text-info" style="font-size: 3rem;"></i>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div class="d-flex flex-column">
+                                                <h6 class="card-title mb-0">
                                                     {{ $vehicleData['vehicle_name'] }}
-                                                </a>
-                                            </h6>
+                                                </h6>
                                             <p class="card-text small text-muted mb-2">
                                                 {{ $vehicleData['usage'] }}
                                                 @if($vehicleData['driver'])
@@ -237,22 +228,23 @@
                                                 @endif
                                             </p>
                                             @if(isset($vehicleData['return_trip']) && $vehicleData['return_trip'] && isset($vehicleData['return_trip_assignments']) && $vehicleData['return_trip_assignments']->isNotEmpty())
-                                                <div class="alert alert-info alert-sm mb-2 py-1 px-2">
+                                                <div class="alert alert-info mb-2">
                                                     <i class="bi bi-arrow-down-circle"></i>
-                                                    <strong>Zjazd:</strong> {{ $vehicleData['return_trip']->event_date->format('d.m.Y') }}
-                                                    <br>
-                                                    <small>
-                                                        @foreach($vehicleData['return_trip_assignments'] as $returnAssignment)
-                                                            <a href="{{ route('vehicle-assignments.show', $returnAssignment) }}" class="text-decoration-none text-info">
-                                                                {{ $returnAssignment->employee->full_name }}
-                                                            </a>@if(!$loop->last), @endif
-                                                        @endforeach
-                                                    </small>
+                                                    <div>
+                                                        <div class="fw-bold">Zjazd: {{ $vehicleData['return_trip']->event_date->format('d.m.Y') }}</div>
+                                                        <div class="text-muted small">
+                                                            @foreach($vehicleData['return_trip_assignments'] as $returnAssignment)
+                                                                <a href="{{ route('vehicle-assignments.show', $returnAssignment) }}" class="text-decoration-none">
+                                                                    {{ $returnAssignment->employee->full_name }}
+                                                                </a>@if(!$loop->last), @endif
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             @endif
                                             @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
-                                                <div class="mt-auto" wire:ignore.self>
-                                                    <button class="btn btn-sm btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#vehicle-{{ $vehicleData['vehicle']->id }}-assignments" aria-expanded="false">
+                                                <div class="mt-auto" wire:ignore.self onclick="event.stopPropagation();">
+                                                    <button class="btn-link w-100" type="button" data-bs-toggle="collapse" data-bs-target="#vehicle-{{ $vehicleData['vehicle']->id }}-assignments" aria-expanded="false" style="background: none; border: 1px solid var(--glass-border); color: var(--text-main); padding: 0.375rem 0.75rem; border-radius: 6px;">
                                                         <i class="bi bi-people"></i> Osoby ({{ $vehicleData['assignments']->count() }})
                                                     </button>
                                                     <div class="collapse mt-2" id="vehicle-{{ $vehicleData['vehicle']->id }}-assignments">
@@ -269,7 +261,7 @@
                                                                         <i class="bi {{ $isDriver ? 'bi-car-front-fill' : 'bi-person' }}"></i>
                                                                         {{ $assignment->employee->full_name }}
                                                                         @if($isDriver)
-                                                                            <span class="badge bg-success ms-1">Kierowca</span>
+                                                                            <x-ui.badge variant="success" class="ms-1">Kierowca</x-ui.badge>
                                                                         @endif
                                                                     </a>
                                                                 </li>
@@ -279,25 +271,24 @@
                                                 </div>
                                             @endif
                                         </div>
-                                    </div>
+                                        </x-ui.card>
+                                    </a>
                                 </div>
                             @endforeach
                         </div>
                         @if($weekData['vehicles']->count() > 6)
                             <div class="text-center">
-                                <span class="badge bg-secondary">+{{ $weekData['vehicles']->count() - 6 }} więcej</span>
+                                <x-ui.badge variant="info">+{{ $weekData['vehicles']->count() - 6 }} więcej</x-ui.badge>
                             </div>
                         @endif
                     @endif
+                    </x-ui.card>
                 </div>
 
                 <!-- Domy -->
                 @if($weekData['accommodations']->isNotEmpty() || $weekData['assigned_employees']->isNotEmpty())
                     <div class="col-12">
-                        <h5 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
-                            <i class="bi bi-house text-success"></i>
-                            Domy
-                        </h5>
+                        <x-ui.card label="Domy">
                         @if($weekData['accommodations']->isNotEmpty())
                             <div class="row g-3 mb-3">
                                 @foreach($weekData['accommodations'] as $accommodationData)
@@ -305,31 +296,30 @@
                                         $accommodation = $accommodationData['accommodation'];
                                     @endphp
                                     <div class="col-6 col-md-4 col-lg-3">
-                                        <div class="card shadow-sm h-100">
-                                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 120px; overflow: hidden;">
-                                                @if($accommodation->image_path)
-                                                    <img src="{{ $accommodation->image_url }}" 
-                                                         alt="{{ $accommodation->name }}" 
-                                                         class="w-100 h-100 object-fit-cover"
-                                                         onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2310b981\'%3E%3Cpath d=\'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6\'/%3E%3C/svg%3E';">
-                                                @else
-                                                    <div class="bg-success bg-opacity-10 w-100 h-100 d-flex align-items-center justify-content-center">
-                                                        <i class="bi bi-house text-success" style="font-size: 3rem;"></i>
-                                                    </div>
-                                                @endif
-                                            </div>
-                                            <div class="card-body d-flex flex-column">
-                                                <h6 class="card-title">
-                                                    <a href="{{ route('accommodations.show', $accommodation) }}" class="text-decoration-none text-dark">
+                                        <a href="{{ route('accommodations.show', $accommodation) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 accommodation-card-clickable">
+                                                <div class="card-img-top d-flex align-items-center justify-content-center" style="height: 120px; background: var(--bg-card); padding: 8px;">
+                                                    @if($accommodation->image_path)
+                                                        <img src="{{ $accommodation->image_url }}" 
+                                                             alt="{{ $accommodation->name }}" 
+                                                             style="max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 8px;"
+                                                             onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%2310b981\'%3E%3Cpath d=\'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6\'/%3E%3C/svg%3E';">
+                                                    @else
+                                                        <div class="bg-success bg-opacity-10 w-100 h-100 d-flex align-items-center justify-content-center" style="border-radius: 8px;">
+                                                            <i class="bi bi-house text-success" style="font-size: 3rem;"></i>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                                <div class="d-flex flex-column">
+                                                    <h6 class="card-title mb-0">
                                                         {{ $accommodation->name }}
-                                                    </a>
-                                                </h6>
+                                                    </h6>
                                                 <p class="card-text small text-muted mb-2">
                                                     {{ $accommodationData['usage'] }}
                                                 </p>
                                                 @if(isset($accommodationData['assignments']) && $accommodationData['assignments']->count() > 0)
-                                                    <div class="mt-auto" wire:ignore.self>
-                                                        <button class="btn btn-sm btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#accommodation-{{ $accommodation->id }}-assignments" aria-expanded="false">
+                                                    <div class="mt-auto" wire:ignore.self onclick="event.stopPropagation();">
+                                                        <button class="btn-link w-100" type="button" data-bs-toggle="collapse" data-bs-target="#accommodation-{{ $accommodation->id }}-assignments" aria-expanded="false" style="background: none; border: 1px solid var(--glass-border); color: var(--text-main); padding: 0.375rem 0.75rem; border-radius: 6px;">
                                                             <i class="bi bi-people"></i> Osoby ({{ $accommodationData['assignments']->count() }})
                                                         </button>
                                                         <div class="collapse mt-2" id="accommodation-{{ $accommodation->id }}-assignments">
@@ -348,7 +338,8 @@
                                                     </div>
                                                 @endif
                                             </div>
-                                        </div>
+                                            </x-ui.card>
+                                        </a>
                                     </div>
                                 @endforeach
                             </div>
@@ -362,10 +353,13 @@
                         @endphp
                         @if($employeesWithoutAccommodation->isNotEmpty())
                             <div class="alert alert-danger mb-0">
-                                <h6 class="alert-heading small fw-bold mb-2">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    Bez domu ({{ $employeesWithoutAccommodation->count() }})
-                                </h6>
+                                <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                                <div>
+                                    <div class="fw-bold text-danger">Alert Logistyczny</div>
+                                    <div class="text-muted small">Bez domu ({{ $employeesWithoutAccommodation->count() }})</div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
                                 <div class="row g-2">
                                     @foreach($employeesWithoutAccommodation as $employeeData)
                                         <div class="col-md-6">
@@ -378,8 +372,8 @@
                                                     </div>
                                                 @endif
                                                 <div class="flex-grow-1">
-                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-dark text-decoration-none d-block">{{ $employeeData['employee']->full_name }}</a>
-                                                    <span class="badge bg-secondary small">{{ $employeeData['role']->name }}</span>
+                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-decoration-none d-block">{{ $employeeData['employee']->full_name }}</a>
+                                                    <x-ui.badge variant="info" class="small">{{ $employeeData['role']->name }}</x-ui.badge>
                                                 </div>
                                                 @php
                                                     $employee = $employeeData['employee'];
@@ -388,16 +382,17 @@
                                                         $url .= '?date_from=' . $weekData['week']['start']->format('Y-m-d') . '&date_to=' . $weekData['week']['end']->format('Y-m-d');
                                                     }
                                                 @endphp
-                                                <a href="{{ $url }}" class="btn btn-sm btn-primary">
+                                                <x-ui.button variant="primary" href="{{ $url }}" class="btn-sm">
                                                     <i class="bi bi-plus"></i>
                                                     Dom
-                                                </a>
+                                                </x-ui.button>
                                             </div>
                                         </div>
                                     @endforeach
                                 </div>
                             </div>
                         @endif
+                        </x-ui.card>
                     </div>
                 @endif
             </div>
@@ -408,28 +403,25 @@
                     :assignedEmployees="$weekData['assigned_employees']"
                 />
             @endif
-        </div>
-    </div>
+    </x-ui.card>
 @else
-    <div class="card shadow-sm border-0">
-        <div class="card-body text-center py-5">
+    <x-ui.card>
+        <div class="text-center py-5">
             <div class="mb-4">
                 <i class="bi bi-file-earmark-text text-muted" style="font-size: 4rem;"></i>
             </div>
             <p class="text-muted fs-5 fw-medium mb-4">Brak prac w tym tygodniu</p>
             @if(isset($weekData['week']) && isset($weekData['week']['start']) && isset($weekData['week']['end']))
-                <a href="{{ route('projects.demands.create', ['project' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" 
-                   class="btn btn-success">
+                <x-ui.button variant="primary" href="{{ route('projects.demands.create', ['project' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}">
                     <i class="bi bi-plus"></i>
                     Dodaj zapotrzebowanie
-                </a>
+                </x-ui.button>
             @else
-                <a href="{{ route('projects.demands.create', $project) }}" 
-                   class="btn btn-success">
+                <x-ui.button variant="primary" href="{{ route('projects.demands.create', $project) }}">
                     <i class="bi bi-plus"></i>
                     Dodaj zapotrzebowanie
-                </a>
+                </x-ui.button>
             @endif
         </div>
-    </div>
+    </x-ui.card>
 @endif

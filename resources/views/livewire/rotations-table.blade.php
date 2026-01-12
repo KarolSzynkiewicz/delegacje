@@ -41,11 +41,9 @@
 
                     <!-- Przycisk wyczyść -->
                     <div class="col-md-2">
-                        <button type="button" 
-                                wire:click="clearFilters" 
-                                class="btn btn-outline-secondary btn-sm w-100">
+                        <x-ui.button variant="ghost" wire:click="clearFilters" class="w-100 btn-sm">
                             <i class="bi bi-x-circle"></i> Wyczyść
-                        </button>
+                        </x-ui.button>
                     </div>
 
                     <!-- Informacja o liczbie wyników -->
@@ -61,8 +59,8 @@
 
             @if($rotations->count() > 0)
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
+                    <table class="table align-middle">
+                        <thead>
                             <tr>
                                 <th class="text-start" style="cursor: pointer;" wire:click="sortBy('employee_id')">
                                     Pracownik
@@ -167,9 +165,9 @@
                         @endif
                     </p>
                     @if(empty($search) && empty($statusFilter))
-                        <a href="{{ route('rotations.create') }}" class="btn btn-primary">
+                        <x-ui.button variant="primary" href="{{ route('rotations.create') }}">
                             <i class="bi bi-plus-circle"></i> Dodaj pierwszą rotację
-                        </a>
+                        </x-ui.button>
                     @endif
                 </div>
             @endif

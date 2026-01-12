@@ -6,7 +6,7 @@
         <div class="col-md-8 offset-md-2">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1>Pracownik: {{ $employee->first_name }} {{ $employee->last_name }}</h1>
-                <a href="{{ route('employees.index') }}" class="btn btn-secondary">Wróć do listy</a>
+                <x-ui.button variant="ghost" href="{{ route('employees.index') }}">Wróć do listy</x-ui.button>
             </div>
 
             <!-- Zakładki -->
@@ -64,7 +64,7 @@
                             <p>
                                 @if($employee->roles->count() > 0)
                                     @foreach($employee->roles as $role)
-                                        <span class="badge bg-primary me-1">{{ $role->name }}</span>
+                                        <x-ui.badge variant="accent" class="me-1">{{ $role->name }}</x-ui.badge>
                                     @endforeach
                                 @else
                                     <span class="text-muted">-</span>
@@ -92,7 +92,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        <a href="{{ route('employees.edit', $employee) }}" class="btn btn-warning">Edytuj</a>
+                        <x-ui.button variant="warning" href="{{ route('employees.edit', $employee) }}">Edytuj</x-ui.button>
                     </div>
                 </div>
             </div>
@@ -100,16 +100,14 @@
 
                 <!-- Zakładka Dokumenty -->
                 <div class="tab-pane fade" id="documents" role="tabpanel">
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-4" id="dokumenty">
+                    <x-ui.card>
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>Dokumenty</h5>
-                            <a href="{{ route('employees.employee-documents.create', $employee) }}" class="btn btn-primary btn-sm">Dodaj Dokument</a>
+                            <h5 class="mb-0">Dokumenty</h5>
+                            <x-ui.button variant="primary" href="{{ route('employees.employee-documents.create', $employee) }}" class="btn-sm">Dodaj Dokument</x-ui.button>
                         </div>
                         @if($employee->employeeDocuments->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Typ</th>
@@ -126,9 +124,9 @@
                                             <tr>
                                                 <td>{{ $employeeDocument->document->name ?? '-' }}</td>
                                                 <td>
-                                                    <span class="badge bg-{{ $employeeDocument->kind === 'bezokresowy' ? 'info' : 'secondary' }}">
+                                                    <x-ui.badge variant="{{ $employeeDocument->kind === 'bezokresowy' ? 'info' : 'info' }}">
                                                         {{ $employeeDocument->kind === 'okresowy' ? 'Okresowy' : 'Bezokresowy' }}
-                                                    </span>
+                                                    </x-ui.badge>
                                                 </td>
                                                 <td>{{ $employeeDocument->valid_from ? $employeeDocument->valid_from->format('Y-m-d') : '-' }}</td>
                                                 <td>
@@ -140,34 +138,33 @@
                                                 </td>
                                                 <td>
                                                     @if($employeeDocument->file_path)
-                                                        <a href="{{ $employeeDocument->file_url }}" target="_blank" class="btn btn-sm btn-info" title="Pobierz plik">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
-                                                                <path d="M.5 9.9a.5.5 0 0 1 .5.5h2.5a.5.5 0 0 1 0 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h2.717a.5.5 0 0 1 .357.135l2.415 2.414A.5.5 0 0 1 8 6.5v3.9a.5.5 0 0 1 .5.5h2.5a.5.5 0 0 1 0 1H9a1 1 0 0 1-1-1V6.5a.5.5 0 0 1 .146-.354l2.415-2.414A.5.5 0 0 1 11 3.5v-.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v6.5a.5.5 0 0 1-.5.5h-2.5a.5.5 0 0 1 0-1H13V4h-2v.5a.5.5 0 0 1-.5.5H9.5a.5.5 0 0 1-.5-.5V3H6.5a.5.5 0 0 1-.5.5v6.9z"/>
-                                                                <path d="M14 10.5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zm-2.5-2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
-                                                            </svg>
-                                                        </a>
+                                                        <x-ui.button variant="ghost" href="{{ $employeeDocument->file_url }}" target="_blank" class="btn-sm" title="Pobierz plik">
+                                                            <i class="bi bi-download"></i>
+                                                        </x-ui.button>
                                                     @else
                                                         <span class="text-muted">-</span>
                                                     @endif
                                                 </td>
                                                 <td>
                                                     @if($employeeDocument->kind === 'bezokresowy')
-                                                        <span class="badge bg-success">Ważny</span>
+                                                        <x-ui.badge variant="success">Ważny</x-ui.badge>
                                                     @elseif($employeeDocument->isExpired())
-                                                        <span class="badge bg-danger">Wygasł</span>
+                                                        <x-ui.badge variant="danger">Wygasł</x-ui.badge>
                                                     @elseif($employeeDocument->isExpiringSoon())
-                                                        <span class="badge bg-warning">Wygasa wkrótce</span>
+                                                        <x-ui.badge variant="warning">Wygasa wkrótce</x-ui.badge>
                                                     @else
-                                                        <span class="badge bg-success">Ważny</span>
+                                                        <x-ui.badge variant="success">Ważny</x-ui.badge>
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <a href="{{ route('employees.employee-documents.edit', [$employee, $employeeDocument]) }}" class="btn btn-sm btn-warning">Edytuj</a>
-                                                    <form action="{{ route('employees.employee-documents.destroy', [$employee, $employeeDocument]) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć ten dokument?')">Usuń</button>
-                                                    </form>
+                                                    <div class="d-flex gap-1">
+                                                        <x-ui.button variant="warning" href="{{ route('employees.employee-documents.edit', [$employee, $employeeDocument]) }}" class="btn-sm">Edytuj</x-ui.button>
+                                                        <form action="{{ route('employees.employee-documents.destroy', [$employee, $employeeDocument]) }}" method="POST" class="d-inline">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <x-ui.button variant="danger" type="submit" class="btn-sm" onclick="return confirm('Czy na pewno chcesz usunąć ten dokument?')">Usuń</x-ui.button>
+                                                        </form>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -177,9 +174,7 @@
                         @else
                             <p class="text-muted">Brak dokumentów</p>
                         @endif
-                    </div>
-                </div>
-            </div>
+                    </x-ui.card>
                 </div>
 
                 <!-- Zakładka Rotacje -->
@@ -189,11 +184,11 @@
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5>Rotacje</h5>
-                            <a href="{{ route('employees.rotations.create', $employee) }}" class="btn btn-primary btn-sm">Dodaj Rotację</a>
+                            <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}" class="btn-sm">Dodaj Rotację</x-ui.button>
                         </div>
                         @if($employee->rotations->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Data rozpoczęcia</th>
@@ -213,13 +208,13 @@
                                                         $status = $rotation->status;
                                                     @endphp
                                                     @if($status === 'active')
-                                                        <span class="badge bg-success">Aktywna</span>
+                                                        <x-ui.badge variant="success">Aktywna</x-ui.badge>
                                                     @elseif($status === 'scheduled')
-                                                        <span class="badge bg-primary">Zaplanowana</span>
+                                                        <x-ui.badge variant="accent">Zaplanowana</x-ui.badge>
                                                     @elseif($status === 'completed')
-                                                        <span class="badge bg-info">Zakończona</span>
+                                                        <x-ui.badge variant="info">Zakończona</x-ui.badge>
                                                     @elseif($status === 'cancelled')
-                                                        <span class="badge bg-danger">Anulowana</span>
+                                                        <x-ui.badge variant="danger">Anulowana</x-ui.badge>
                                                     @endif
                                                 </td>
                                                 <td>{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</td>
@@ -238,7 +233,7 @@
                             </div>
                         @else
                             <p class="text-muted">Brak rotacji dla tego pracownika.</p>
-                            <a href="{{ route('employees.rotations.create', $employee) }}" class="btn btn-primary">Dodaj pierwszą rotację</a>
+                            <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}">Dodaj pierwszą rotację</x-ui.button>
                         @endif
                     </div>
                 </div>
@@ -253,7 +248,7 @@
                         <h5>Przypisania do projektów</h5>
                         @if($projectAssignments->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Projekt</th>
@@ -320,13 +315,13 @@
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5>Przypisania do aut</h5>
-                            <a href="{{ route('employees.vehicles.create', $employee) }}" class="btn btn-primary btn-sm">
+                            <x-ui.button variant="primary" href="{{ route('employees.vehicles.create', $employee) }}" class="btn-sm">
                                 <i class="bi bi-plus-circle"></i> Dodaj przypisanie
-                            </a>
+                            </x-ui.button>
                         </div>
                         @if($vehicleAssignments->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Pojazd</th>
@@ -352,9 +347,9 @@
                                                         $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
                                                         $isDriver = $positionValue === 'driver';
                                                     @endphp
-                                                    <x-badge type="{{ $isDriver ? 'success' : 'secondary' }}">
+                                                    <x-ui.badge variant="{{ $isDriver ? 'success' : 'info' }}">
                                                         {{ $isDriver ? 'Kierowca' : 'Pasażer' }}
-                                                    </x-badge>
+                                                    </x-ui.badge>
                                                 </td>
                                                 <td>
                                                     {{ $assignment->start_date->format('Y-m-d') }}
@@ -375,7 +370,7 @@
                             </div>
                         @else
                             <p class="text-muted">Brak przypisań do aut dla tego pracownika.</p>
-                            <a href="{{ route('employees.vehicles.create', $employee) }}" class="btn btn-primary">Dodaj pierwsze przypisanie</a>
+                            <x-ui.button variant="primary" href="{{ route('employees.vehicles.create', $employee) }}">Dodaj pierwsze przypisanie</x-ui.button>
                         @endif
                     </div>
                 </div>
@@ -389,13 +384,13 @@
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5>Przypisania do domów</h5>
-                            <a href="{{ route('employees.accommodations.create', $employee) }}" class="btn btn-primary btn-sm">
+                            <x-ui.button variant="primary" href="{{ route('employees.accommodations.create', $employee) }}" class="btn-sm">
                                 <i class="bi bi-plus-circle"></i> Dodaj przypisanie
-                            </a>
+                            </x-ui.button>
                         </div>
                         @if($accommodationAssignments->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Mieszkanie</th>
@@ -433,7 +428,7 @@
                             </div>
                         @else
                             <p class="text-muted">Brak przypisań do domów dla tego pracownika.</p>
-                            <a href="{{ route('employees.accommodations.create', $employee) }}" class="btn btn-primary">Dodaj pierwsze przypisanie</a>
+                            <x-ui.button variant="primary" href="{{ route('employees.accommodations.create', $employee) }}">Dodaj pierwsze przypisanie</x-ui.button>
                         @endif
                     </div>
                 </div>

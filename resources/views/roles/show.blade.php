@@ -4,9 +4,9 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">Rola: {{ $role->name }}</h2>
             <div class="d-flex gap-2">
                 <x-edit-button href="{{ route('roles.edit', $role) }}" />
-                <a href="{{ route('roles.index') }}" class="btn btn-outline-secondary btn-sm">
+                <x-ui.button variant="ghost" href="{{ route('roles.index') }}" class="btn-sm">
                     <i class="bi bi-arrow-left"></i> Powrót
-                </a>
+                </x-ui.button>
             </div>
         </div>
     </x-slot>
@@ -35,8 +35,8 @@
                 <div class="card-body">
                     <h5 class="fw-bold text-dark mb-4">Pracownicy z tą rolą ({{ $role->employees->count() }})</h5>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
+                        <table class="table align-middle">
+                            <thead>
                                 <tr>
                                     <th class="text-start">Imię i Nazwisko</th>
                                     <th class="text-start">Email</th>
@@ -67,8 +67,8 @@
                 <div class="card-body">
                     <h5 class="fw-bold text-dark mb-4">Zapotrzebowania na tę rolę ({{ $role->projectDemands->count() }})</h5>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
+                        <table class="table align-middle">
+                            <thead>
                                 <tr>
                                     <th class="text-start">Projekt</th>
                                     <th class="text-start">Liczba osób</th>

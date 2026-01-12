@@ -7,39 +7,45 @@
     $overcrowdedAccommodations = $summary->getOvercrowdedAccommodations();
 @endphp
 
-<div class="bg-success bg-opacity-10 rounded p-2 border border-success mb-2">
-        <h5 class="small fw-bold text-dark mb-1">Domy</h5>
-        @if($allHaveAccommodation)
-            <div class="small text-success fw-semibold mb-1">
-                <i class="bi bi-check-circle"></i> Wszyscy mają dom
+<x-ui.card label="Domy">
+    @if($allHaveAccommodation)
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle-fill text-success fs-3"></i>
+            <div>
+                <div class="fw-bold text-success">Status OK</div>
+                <div class="text-muted small">Wszyscy mają dom</div>
             </div>
-            @if($overcrowdedAccommodations->isNotEmpty())
-                <div class="small text-danger fw-semibold">
-                    <i class="bi bi-exclamation-triangle"></i> Przepełnione:
-                    @foreach($overcrowdedAccommodations as $accommodationData)
-                        <div class="ms-2">
-                            {{ $accommodationData['accommodation']->name }} 
-                            ({{ $accommodationData['usage'] }})
-                        </div>
-                    @endforeach
+        </div>
+        @if($overcrowdedAccommodations->isNotEmpty())
+            @foreach($overcrowdedAccommodations as $accommodationData)
+                <div class="alert alert-danger mt-2">
+                    <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                    <div>
+                        <div class="fw-bold text-danger">Alert Logistyczny</div>
+                        <div class="text-muted small">{{ $accommodationData['accommodation']->name }} jest przepełnione ({{ $accommodationData['usage'] }})</div>
+                    </div>
                 </div>
-            @endif
-        @else
-            <div class="small text-warning">
-                Brakuje {{ $employeesWithoutAccommodation->count() }} {{ $employeesWithoutAccommodation->count() == 1 ? 'domu' : 'domów' }}
-            </div>
-            @if($overcrowdedAccommodations->isNotEmpty())
-                <div class="small text-danger fw-semibold mt-1">
-                    <i class="bi bi-exclamation-triangle"></i> Przepełnione:
-                    @foreach($overcrowdedAccommodations as $accommodationData)
-                        <div class="ms-2">
-                            {{ $accommodationData['accommodation']->name }} 
-                            ({{ $accommodationData['usage'] }})
-                        </div>
-                    @endforeach
-                </div>
-            @endif
+            @endforeach
         @endif
-    </div>
-</div>
+    @else
+        <div class="alert alert-danger">
+            <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+            <div>
+                <div class="fw-bold text-danger">Alert Logistyczny</div>
+                <div class="text-muted small">Brakuje {{ $employeesWithoutAccommodation->count() }} {{ $employeesWithoutAccommodation->count() == 1 ? 'domu' : 'domów' }}</div>
+            </div>
+        </div>
+        @if($overcrowdedAccommodations->isNotEmpty())
+            @foreach($overcrowdedAccommodations as $accommodationData)
+                <div class="alert alert-danger mt-2">
+                    <i class="bi bi-shield-lock-fill text-danger fs-3"></i>
+                    <div>
+                        <div class="fw-bold text-danger">Alert Logistyczny</div>
+                        <div class="text-muted small">{{ $accommodationData['accommodation']->name }} jest przepełnione ({{ $accommodationData['usage'] }})</div>
+                    </div>
+                </div>
+            @endforeach
+        @endif
+    @endif
+</x-ui.card>
 @endif

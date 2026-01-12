@@ -2,9 +2,9 @@
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="fw-semibold fs-4 text-dark mb-0">Szczegóły Zjazdu</h2>
-            <a href="{{ route('return-trips.index') }}" class="btn btn-outline-secondary btn-sm">
+            <x-ui.button variant="ghost" href="{{ route('return-trips.index') }}" class="btn-sm">
                 <i class="bi bi-arrow-left"></i> Powrót
-            </a>
+            </x-ui.button>
         </div>
     </x-slot>
 
@@ -28,14 +28,14 @@
                         <h5 class="fw-bold text-dark mb-0">Informacje podstawowe</h5>
                         <div class="d-flex gap-2">
                             @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
-                                <a href="{{ route('return-trips.edit', $returnTrip) }}" class="btn btn-outline-primary btn-sm">
+                                <x-ui.button variant="warning" href="{{ route('return-trips.edit', $returnTrip) }}" class="btn-sm">
                                     <i class="bi bi-pencil"></i> Edytuj
-                                </a>
+                                </x-ui.button>
                                 <form method="POST" action="{{ route('return-trips.cancel', $returnTrip) }}" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz anulować ten zjazd?');">
                                     @csrf
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <x-ui.button variant="danger" type="submit" class="btn-sm">
                                         <i class="bi bi-x-circle"></i> Anuluj Zjazd
-                                    </button>
+                                    </x-ui.button>
                                 </form>
                             @endif
                         </div>
@@ -84,8 +84,8 @@
                         <h5 class="fw-bold text-dark mb-4">Uczestnicy ({{ $returnTrip->participants->count() }})</h5>
                         @if($returnTrip->participants->count() > 0)
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle">
-                                    <thead class="table-light">
+                                <table class="table align-middle">
+                                    <thead>
                                         <tr>
                                             <th class="text-start">Pracownik</th>
                                             <th class="text-start">Przypisanie</th>
