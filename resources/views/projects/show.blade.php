@@ -2,49 +2,31 @@
     <div class="row">
         <div class="col-lg-8">
             <x-ui.card label="Szczegóły Projektu: {{ $project->name }}">
-                <dl class="row mb-0">
-                    <div class="col-md-6 mb-3">
-                        <dt class="fw-semibold mb-1">Nazwa:</dt>
-                        <dd>{{ $project->name }}</dd>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <dt class="fw-semibold mb-1">Klient:</dt>
-                        <dd>{{ $project->client_name ?? '-' }}</dd>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <dt class="fw-semibold mb-1">Status:</dt>
-                        <dd>
-                            @php
-                                $badgeVariant = match($project->status) {
-                                    'active' => 'success',
-                                    'on_hold' => 'warning',
-                                    'completed' => 'info',
-                                    'cancelled' => 'danger',
-                                    default => 'info'
-                                };
-                            @endphp
-                            <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($project->status) }}</x-ui.badge>
-                        </dd>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <dt class="fw-semibold mb-1">Budżet:</dt>
-                        <dd>{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</dd>
-                    </div>
+                <x-ui.detail-list>
+                    <x-ui.detail-item label="Nazwa:">{{ $project->name }}</x-ui.detail-item>
+                    <x-ui.detail-item label="Klient:">{{ $project->client_name ?? '-' }}</x-ui.detail-item>
+                    <x-ui.detail-item label="Status:">
+                        @php
+                            $badgeVariant = match($project->status) {
+                                'active' => 'success',
+                                'on_hold' => 'warning',
+                                'completed' => 'info',
+                                'cancelled' => 'danger',
+                                default => 'info'
+                            };
+                        @endphp
+                        <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($project->status) }}</x-ui.badge>
+                    </x-ui.detail-item>
+                    <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</x-ui.detail-item>
                     @if($project->location)
-                    <div class="col-md-6 mb-3">
-                        <dt class="fw-semibold mb-1">Lokalizacja:</dt>
-                        <dd>
-                            <i class="bi bi-geo-alt me-1"></i>{{ $project->location->name }}
-                        </dd>
-                    </div>
+                    <x-ui.detail-item label="Lokalizacja:">
+                        <i class="bi bi-geo-alt me-1"></i>{{ $project->location->name }}
+                    </x-ui.detail-item>
                     @endif
                     @if($project->description)
-                    <div class="col-12 mb-3">
-                        <dt class="fw-semibold mb-1">Opis:</dt>
-                        <dd>{{ $project->description }}</dd>
-                    </div>
+                    <x-ui.detail-item label="Opis:" :full-width="true">{{ $project->description }}</x-ui.detail-item>
                     @endif
-                </dl>
+                </x-ui.detail-list>
 
                 <div class="mt-4 pt-3 border-top">
                     <x-ui.button variant="primary" href="{{ route('projects.edit', $project) }}">

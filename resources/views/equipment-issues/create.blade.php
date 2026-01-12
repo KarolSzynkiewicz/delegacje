@@ -11,15 +11,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Wydaj Nowy Sprzęt">
-                @if ($errors->any())
-                    <x-ui.alert variant="danger" title="Wystąpiły błędy" class="mb-4">
-                        <ul class="mb-0">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </x-ui.alert>
-                @endif
+                <x-ui.errors />
 
                 <form method="POST" action="{{ route('equipment-issues.store') }}">
                     @csrf

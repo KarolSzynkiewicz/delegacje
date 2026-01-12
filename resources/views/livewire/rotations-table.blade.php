@@ -1,15 +1,13 @@
 <div>
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
+    <x-ui.card>
+        @if(session('success'))
+            <x-ui.alert variant="success" dismissible>
+                {{ session('success') }}
+            </x-ui.alert>
+        @endif
 
-            <!-- Filtry -->
-            <div class="mb-4 bg-light rounded p-3 border">
+        <!-- Filtry -->
+        <div class="mb-4 pb-3 border-top border-bottom">
                 <div class="row g-2 align-items-end">
                     <!-- Wyszukiwanie po pracowniku -->
                     <div class="col-md-4">
@@ -55,31 +53,22 @@
                         @endif
                     </div>
                 </div>
-            </div>
+        </div>
 
-            @if($rotations->count() > 0)
+        @if($rotations->count() > 0)
                 <div class="table-responsive">
                     <table class="table align-middle">
                         <thead>
                             <tr>
-                                <th class="text-start" style="cursor: pointer;" wire:click="sortBy('employee_id')">
+                                <x-livewire.sortable-header field="employee_id" :sortField="$sortField" :sortDirection="$sortDirection">
                                     Pracownik
-                                    @if($sortField === 'employee_id')
-                                        <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}-short"></i>
-                                    @endif
-                                </th>
-                                <th class="text-start" style="cursor: pointer;" wire:click="sortBy('start_date')">
+                                </x-livewire.sortable-header>
+                                <x-livewire.sortable-header field="start_date" :sortField="$sortField" :sortDirection="$sortDirection">
                                     Data rozpoczęcia
-                                    @if($sortField === 'start_date')
-                                        <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}-short"></i>
-                                    @endif
-                                </th>
-                                <th class="text-start" style="cursor: pointer;" wire:click="sortBy('end_date')">
+                                </x-livewire.sortable-header>
+                                <x-livewire.sortable-header field="end_date" :sortField="$sortField" :sortDirection="$sortDirection">
                                     Data zakończenia
-                                    @if($sortField === 'end_date')
-                                        <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}-short"></i>
-                                    @endif
-                                </th>
+                                </x-livewire.sortable-header>
                                 <th class="text-start">Status</th>
                                 <th class="text-start">Notatki</th>
                                 <th class="text-start">Akcje</th>
@@ -116,27 +105,29 @@
                                                 }
                                             }
                                             
-                                            $badgeClass = match($status) {
-                                                'active' => 'bg-success',
-                                                'scheduled' => 'bg-primary',
-                                                'completed' => 'bg-secondary',
-                                                'cancelled' => 'bg-danger',
-                                                default => 'bg-secondary'
+                                            $badgeVariant = match($status) {
+                                                'active' => 'success',
+                                                'scheduled' => 'info',
+                                                'completed' => 'accent',
+                                                'cancelled' => 'danger',
+                                                default => 'accent'
+                                            };
+                                            
+                                            $badgeLabel = match($status) {
+                                                'active' => 'Aktywna',
+                                                'scheduled' => 'Zaplanowana',
+                                                'completed' => 'Zakończona',
+                                                'cancelled' => 'Anulowana',
+                                                default => '-'
                                             };
                                         @endphp
-                                        <span class="badge {{ $badgeClass }}">
-                                            @if($status === 'active') Aktywna
-                                            @elseif($status === 'scheduled') Zaplanowana
-                                            @elseif($status === 'completed') Zakończona
-                                            @elseif($status === 'cancelled') Anulowana
-                                            @endif
-                                        </span>
+                                        <x-ui.badge variant="{{ $badgeVariant }}">{{ $badgeLabel }}</x-ui.badge>
                                     </td>
                                     <td>
                                         <small class="text-muted">{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</small>
                                     </td>
                                     <td>
-                                        <x-action-buttons
+                                        <x-ui.action-buttons
                                             viewRoute="{{ route('employees.rotations.show', [$rotation->employee, $rotation]) }}"
                                             editRoute="{{ route('employees.rotations.edit', [$rotation->employee, $rotation]) }}"
                                             deleteRoute="{{ route('employees.rotations.destroy', [$rotation->employee, $rotation]) }}"
@@ -154,23 +145,19 @@
                         {{ $rotations->links() }}
                     </div>
                 @endif
-            @else
-                <div class="text-center py-5">
-                    <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                    <p class="text-muted mb-3">
-                        @if(!empty($search) || !empty($statusFilter))
-                            Nie znaleziono rotacji spełniających kryteria wyszukiwania.
-                        @else
-                            Brak rotacji w systemie.
-                        @endif
-                    </p>
-                    @if(empty($search) && empty($statusFilter))
-                        <x-ui.button variant="primary" href="{{ route('rotations.create') }}">
-                            <i class="bi bi-plus-circle"></i> Dodaj pierwszą rotację
-                        </x-ui.button>
-                    @endif
-                </div>
-            @endif
-        </div>
-    </div>
+        @else
+            <x-ui.empty-state 
+                icon="inbox"
+                :message="!empty($search) || !empty($statusFilter) ? 'Nie znaleziono rotacji spełniających kryteria wyszukiwania.' : 'Brak rotacji w systemie.'"
+                :has-filters="!empty($search) || !empty($statusFilter)"
+                clear-filters-action="wire:clearFilters"
+            >
+                @if(empty($search) && empty($statusFilter))
+                    <x-ui.button variant="primary" href="{{ route('rotations.create') }}">
+                        <i class="bi bi-plus-circle"></i> Dodaj pierwszą rotację
+                    </x-ui.button>
+                @endif
+            </x-ui.empty-state>
+        @endif
+    </x-ui.card>
 </div>

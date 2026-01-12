@@ -1,16 +1,17 @@
-@extends('layouts.app')
-
-@section('content')
-<div class="container">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>Typ Dokumentu: {{ $documentType->name }}</h1>
-                <div>
-                    <x-ui.button variant="warning" href="{{ route('document-types.edit', $documentType) }}" class="me-2">Edytuj</x-ui.button>
-                    <x-ui.button variant="ghost" href="{{ route('document-types.index') }}">Wróć do listy</x-ui.button>
-                </div>
+<x-app-layout>
+    <x-slot name="header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 mb-0">Typ Dokumentu: {{ $documentType->name }}</h2>
+            <div>
+                <x-ui.button variant="warning" href="{{ route('document-types.edit', $documentType) }}" class="me-2">Edytuj</x-ui.button>
+                <x-ui.button variant="ghost" href="{{ route('document-types.index') }}">Wróć do listy</x-ui.button>
             </div>
+        </div>
+    </x-slot>
+
+    <div class="container-xxl">
+        <div class="row">
+            <div class="col-md-12">
 
             <div class="card mb-4">
                 <div class="card-body">
@@ -83,5 +84,4 @@
             </div>
         </div>
     </div>
-</div>
-@endsection
+</x-app-layout>

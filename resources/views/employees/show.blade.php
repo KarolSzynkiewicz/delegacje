@@ -1,13 +1,14 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot name="header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 mb-0">Pracownik: {{ $employee->full_name }}</h2>
+            <x-ui.button variant="ghost" href="{{ route('employees.index') }}">Wróć do listy</x-ui.button>
+        </div>
+    </x-slot>
 
-@section('content')
-<div class="container">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>Pracownik: {{ $employee->first_name }} {{ $employee->last_name }}</h1>
-                <x-ui.button variant="ghost" href="{{ route('employees.index') }}">Wróć do listy</x-ui.button>
-            </div>
+    <div class="container-xxl">
+        <div class="row">
+            <div class="col-md-12">
 
             <!-- Zakładki -->
             <ul class="nav nav-tabs mb-4" id="employeeTabs" role="tablist">
@@ -101,10 +102,11 @@
                 <!-- Zakładka Dokumenty -->
                 <div class="tab-pane fade" id="documents" role="tabpanel">
                     <x-ui.card>
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Dokumenty</h5>
-                            <x-ui.button variant="primary" href="{{ route('employees.employee-documents.create', $employee) }}" class="btn-sm">Dodaj Dokument</x-ui.button>
-                        </div>
+                        <x-ui.table-header title="Dokumenty">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employees.employee-documents.create', $employee) }}" class="btn-sm">Dodaj Dokument</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
                         @if($employee->employeeDocuments->count() > 0)
                             <div class="table-responsive">
                                 <table class="table">
@@ -157,14 +159,13 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <div class="d-flex gap-1">
+                                                    <x-ui.action-buttons>
                                                         <x-ui.button variant="warning" href="{{ route('employees.employee-documents.edit', [$employee, $employeeDocument]) }}" class="btn-sm">Edytuj</x-ui.button>
-                                                        <form action="{{ route('employees.employee-documents.destroy', [$employee, $employeeDocument]) }}" method="POST" class="d-inline">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <x-ui.button variant="danger" type="submit" class="btn-sm" onclick="return confirm('Czy na pewno chcesz usunąć ten dokument?')">Usuń</x-ui.button>
-                                                        </form>
-                                                    </div>
+                                                        <x-ui.delete-form 
+                                                            :url="route('employees.employee-documents.destroy', [$employee, $employeeDocument])"
+                                                            message="Czy na pewno chcesz usunąć ten dokument?"
+                                                        />
+                                                    </x-ui.action-buttons>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -172,7 +173,10 @@
                                 </table>
                             </div>
                         @else
-                            <p class="text-muted">Brak dokumentów</p>
+                            <x-ui.empty-state 
+                                icon="file-earmark"
+                                message="Brak dokumentów"
+                            />
                         @endif
                     </x-ui.card>
                 </div>
@@ -182,10 +186,11 @@
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>Rotacje</h5>
-                            <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}" class="btn-sm">Dodaj Rotację</x-ui.button>
-                        </div>
+                        <x-ui.table-header title="Rotacje">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}" class="btn-sm">Dodaj Rotację</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
                         @if($employee->rotations->count() > 0)
                             <div class="table-responsive">
                                 <table class="table">
@@ -219,12 +224,14 @@
                                                 </td>
                                                 <td>{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</td>
                                                 <td>
-                                                    <a href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" class="btn btn-sm btn-warning">Edytuj</a>
-                                                    <form action="{{ route('employees.rotations.destroy', [$employee, $rotation]) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć tę rotację?')">Usuń</button>
-                                                    </form>
+                                                    <x-ui.button variant="ghost" href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                    <x-ui.delete-form 
+                                                        action="{{ route('employees.rotations.destroy', [$employee, $rotation]) }}"
+                                                        message="Czy na pewno chcesz usunąć tę rotację?"
+                                                        size="sm"
+                                                    />
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -293,7 +300,9 @@
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <a href="{{ route('assignments.show', $assignment) }}" class="btn btn-sm btn-info">Szczegóły</a>
+                                                    <x-ui.button variant="ghost" href="{{ route('assignments.show', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -313,12 +322,13 @@
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>Przypisania do aut</h5>
-                            <x-ui.button variant="primary" href="{{ route('employees.vehicles.create', $employee) }}" class="btn-sm">
-                                <i class="bi bi-plus-circle"></i> Dodaj przypisanie
-                            </x-ui.button>
-                        </div>
+                        <x-ui.table-header title="Przypisania do aut">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employees.vehicles.create', $employee) }}" class="btn-sm">
+                                    <i class="bi bi-plus-circle"></i> Dodaj przypisanie
+                                </x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
                         @if($vehicleAssignments->count() > 0)
                             <div class="table-responsive">
                                 <table class="table">
@@ -360,8 +370,12 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="btn btn-sm btn-info">Szczegóły</a>
-                                                    <a href="{{ route('vehicle-assignments.edit', $assignment) }}" class="btn btn-sm btn-warning">Edytuj</a>
+                                                    <x-ui.button variant="ghost" href="{{ route('vehicle-assignments.show', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('vehicle-assignments.edit', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -382,12 +396,13 @@
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>Przypisania do domów</h5>
-                            <x-ui.button variant="primary" href="{{ route('employees.accommodations.create', $employee) }}" class="btn-sm">
-                                <i class="bi bi-plus-circle"></i> Dodaj przypisanie
-                            </x-ui.button>
-                        </div>
+                        <x-ui.table-header title="Przypisania do domów">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employees.accommodations.create', $employee) }}" class="btn-sm">
+                                    <i class="bi bi-plus-circle"></i> Dodaj przypisanie
+                                </x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
                         @if($accommodationAssignments->count() > 0)
                             <div class="table-responsive">
                                 <table class="table">
@@ -418,8 +433,12 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="btn btn-sm btn-info">Szczegóły</a>
-                                                    <a href="{{ route('accommodation-assignments.edit', $assignment) }}" class="btn btn-sm btn-warning">Edytuj</a>
+                                                    <x-ui.button variant="ghost" href="{{ route('accommodation-assignments.show', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('accommodation-assignments.edit', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -439,6 +458,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     // Przełącz na zakładkę dokumentów jeśli jest hash #dokumenty w URL
     if (window.location.hash === '#dokumenty') {
@@ -449,4 +469,5 @@
         }
     }
 </script>
-@endsection
+@endpush
+</x-app-layout>

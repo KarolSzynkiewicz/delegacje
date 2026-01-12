@@ -54,6 +54,28 @@ body {
     object-fit: cover;
 }
 
+/* Dashboard styles */
+.dashboard-card {
+    padding: 1.5rem !important;
+    min-height: 140px;
+    transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dashboard-card .card-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+}
+
+.dashboard-card .card-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
 /* ============================================
    UI System Variables - z ui-concept/layout
    ============================================ */

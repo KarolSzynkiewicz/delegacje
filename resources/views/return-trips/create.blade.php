@@ -11,15 +11,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Utwórz Nowy Zjazd">
-                @if ($errors->any())
-                    <x-ui.alert variant="danger" title="Wystąpiły błędy" class="mb-4">
-                        <ul class="mb-0">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </x-ui.alert>
-                @endif
+                <x-ui.errors />
 
                 <form method="POST" action="{{ route('return-trips.prepare-form') }}">
                     @csrf

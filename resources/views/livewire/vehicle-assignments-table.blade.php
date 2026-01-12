@@ -1,12 +1,12 @@
 <div>
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="fs-5 fw-semibold text-dark mb-0">Filtry</h3>
-                <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                </x-ui.button>
-            </div>
+    <x-ui.card class="mb-4">
+            <x-ui.table-header title="Filtry" class="mb-3">
+                <x-slot name="actions">
+                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
+                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                    </x-ui.button>
+                </x-slot>
+            </x-ui.table-header>
             
             <div class="row g-3">
                 <!-- Pracownik -->
@@ -37,8 +37,7 @@
                     <input type="date" wire:model.live="dateTo" class="form-control form-control-sm">
                 </div>
             </div>
-        </div>
-    </div>
+    </x-ui.card>
 
     @php
         $groupedAssignments = $assignments->groupBy(function($assignment) {
@@ -50,7 +49,7 @@
         @php
             $vehicle = $vehicleAssignments->first()->vehicle;
         @endphp
-        <div class="card shadow-sm border-0 mb-3">
+        <x-ui.card class="mb-3">
             <div class="card-header bg-light">
                 <h5 class="mb-0 fw-semibold">
                     <a href="{{ route('vehicles.show', $vehicle) }}" class="text-decoration-none text-dark">
@@ -61,7 +60,7 @@
                     </a>
                 </h5>
             </div>
-            <div class="card-body p-0">
+            <div class="p-0">
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
                         <thead>
@@ -86,9 +85,9 @@
                                             $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
                                             $isDriver = $positionValue === 'driver';
                                         @endphp
-                                        <span class="badge {{ $isDriver ? 'bg-success' : 'bg-secondary' }}">
+                                        <x-ui.badge variant="{{ $isDriver ? 'success' : 'accent' }}">
                                             {{ $isDriver ? 'Kierowca' : 'Pasażer' }}
-                                        </span>
+                                        </x-ui.badge>
                                     </td>
                                     <td>
                                         <small class="text-muted">
@@ -97,7 +96,7 @@
                                         </small>
                                     </td>
                                     <td>
-                                        <x-action-buttons
+                                        <x-ui.action-buttons
                                             viewRoute="{{ route('vehicle-assignments.show', $assignment) }}"
                                             editRoute="{{ route('vehicle-assignments.edit', $assignment) }}"
                                             deleteRoute="{{ route('vehicle-assignments.destroy', $assignment) }}"
@@ -110,7 +109,7 @@
                     </table>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
     @endforeach
 
     @if($assignments->hasPages())
@@ -120,13 +119,11 @@
     @endif
 
     @if($assignments->isEmpty())
-        <div class="card shadow-sm border-0">
-            <div class="card-body text-center py-5">
-                <div class="empty-state">
-                    <i class="bi bi-car-front"></i>
-                    <p class="text-muted small fw-medium mb-0">Brak przypisań pojazdów</p>
-                </div>
-            </div>
-        </div>
+        <x-ui.card>
+            <x-ui.empty-state 
+                icon="car-front"
+                message="Brak przypisań pojazdów"
+            />
+        </x-ui.card>
     @endif
 </div>

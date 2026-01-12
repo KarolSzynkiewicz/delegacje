@@ -2,6 +2,7 @@
     'variant' => 'info', // info, success, danger, warning
     'icon' => null,
     'title' => null,
+    'dismissible' => false,
 ])
 
 @php
@@ -34,7 +35,7 @@
     $finalIcon = $icon ?? $defaultIcon;
 @endphp
 
-<div {{ $attributes->merge(['class' => $classes]) }}>
+<div {{ $attributes->merge(['class' => $classes . ($dismissible ? ' alert-dismissible fade show' : '')]) }} role="alert">
     <i class="{{ $finalIcon }} {{ $iconClass }} fs-3"></i>
     <div>
         @if($title)
@@ -44,4 +45,7 @@
             {{ $slot }}
         </div>
     </div>
+    @if($dismissible)
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    @endif
 </div>

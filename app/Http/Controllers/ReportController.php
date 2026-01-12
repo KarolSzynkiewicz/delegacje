@@ -27,8 +27,9 @@ class ReportController extends Controller
      */
     public function create()
     {
-        $projects = Project::all();
-        $employees = Employee::all();
+        // Use orderBy for better UX and limit if needed for large datasets
+        $projects = Project::orderBy('name')->get();
+        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
         
         return view('reports.create', compact('projects', 'employees'));
     }

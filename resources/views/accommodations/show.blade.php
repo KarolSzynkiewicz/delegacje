@@ -109,10 +109,10 @@
                         </table>
                     </div>
                 @else
-                    <div class="text-center py-4">
-                        <i class="bi bi-inbox text-muted fs-1 d-block mb-2"></i>
-                        <p class="text-muted mb-0">Brak przypisań do tego mieszkania.</p>
-                    </div>
+                    <x-ui.empty-state 
+                        icon="inbox"
+                        message="Brak przypisań do tego mieszkania."
+                    />
                 @endif
             </x-ui.card>
         </div>

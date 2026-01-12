@@ -47,18 +47,9 @@
                 <thead>
                     <tr>
                         <th class="text-start">Zdjęcie</th>
-                        <th class="text-start">
-                            <button wire:click="sortBy('name')" class="btn-link text-decoration-none p-0 fw-semibold d-flex align-items-center gap-1" style="background: none; border: none; color: var(--text-main);">
-                                <span>Nazwa</span>
-                                @if($sortField === 'name')
-                                    @if($sortDirection === 'asc')
-                                        <i class="bi bi-chevron-up"></i>
-                                    @else
-                                        <i class="bi bi-chevron-down"></i>
-                                    @endif
-                                @endif
-                            </button>
-                        </th>
+                        <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
+                            Nazwa
+                        </x-livewire.sortable-header>
                         <th class="text-start d-none d-md-table-cell">Adres</th>
                         <th class="text-start">Pojemność</th>
                         <th class="text-start">Status</th>
@@ -75,13 +66,13 @@
                         <tr>
                             <td>
                                 <div class="d-flex align-items-center justify-content-center">
-                                    @if($accommodation->image_path)
-                                        <img src="{{ $accommodation->image_url }}" alt="{{ $accommodation->name }}" class="rounded border border-2 accommodation-image">
-                                    @else
-                                        <div class="avatar-ui accommodation-image">
-                                            <span>{{ substr($accommodation->name, 0, 2) }}</span>
-                                        </div>
-                                    @endif
+                                    <x-ui.avatar 
+                                        :image-url="$accommodation->image_path ? $accommodation->image_url : null"
+                                        :alt="$accommodation->name"
+                                        :initials="substr($accommodation->name, 0, 2)"
+                                        size="50px"
+                                        shape="rounded"
+                                    />
                                 </div>
                             </td>
                             <td>
@@ -118,20 +109,14 @@
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="bi bi-house-x text-muted fs-1 d-block mb-2"></i>
-                                    <p class="text-muted small fw-medium mb-0">
-                                        @if($search || $statusFilter)
-                                            Brak mieszkań spełniających kryteria
-                                        @else
-                                            Brak mieszkań
-                                        @endif
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
+                        <x-ui.empty-state 
+                            icon="house-x"
+                            :message="$search || $statusFilter ? 'Brak mieszkań spełniających kryteria' : 'Brak mieszkań'"
+                            :has-filters="$search || $statusFilter"
+                            clear-filters-action="wire:clearFilters"
+                            :in-table="true"
+                            colspan="6"
+                        />
                     @endforelse
                 </tbody>
             </table>

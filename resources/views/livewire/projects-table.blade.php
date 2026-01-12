@@ -74,35 +74,13 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th class="text-start">
-                            <button wire:click="sortBy('name')" class="btn-link text-decoration-none p-0 fw-semibold d-flex align-items-center gap-1" style="background: none; border: none; color: var(--text-main);">
-                                <span>Nazwa</span>
-                                @if($sortField === 'name')
-                                    @if($sortDirection === 'asc')
-                                        <i class="bi bi-chevron-up"></i>
-                                    @else
-                                        <i class="bi bi-chevron-down"></i>
-                                    @endif
-                                @else
-                                    <i class="bi bi-chevron-expand text-muted"></i>
-                                @endif
-                            </button>
-                        </th>
+                        <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
+                            Nazwa
+                        </x-livewire.sortable-header>
                         <th class="text-start d-none d-md-table-cell">Klient</th>
-                        <th class="text-start">
-                            <button wire:click="sortBy('status')" class="btn-link text-decoration-none p-0 fw-semibold d-flex align-items-center gap-1" style="background: none; border: none; color: var(--text-main);">
-                                <span>Status</span>
-                                @if($sortField === 'status')
-                                    @if($sortDirection === 'asc')
-                                        <i class="bi bi-chevron-up"></i>
-                                    @else
-                                        <i class="bi bi-chevron-down"></i>
-                                    @endif
-                                @else
-                                    <i class="bi bi-chevron-expand text-muted"></i>
-                                @endif
-                            </button>
-                        </th>
+                        <x-livewire.sortable-header field="status" :sortField="$sortField" :sortDirection="$sortDirection">
+                            Status
+                        </x-livewire.sortable-header>
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
@@ -148,25 +126,14 @@
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="4" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="bi bi-folder-x text-muted fs-1 d-block mb-2"></i>
-                                    <p class="text-muted small fw-medium mb-2">
-                                        @if($search || $statusFilter || $locationFilter)
-                                            Brak projektów spełniających kryteria wyszukiwania
-                                        @else
-                                            Brak projektów
-                                        @endif
-                                    </p>
-                                    @if($search || $statusFilter || $locationFilter)
-                                        <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                                            Wyczyść filtry
-                                        </x-ui.button>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
+                        <x-ui.empty-state 
+                            icon="folder-x"
+                            :message="$search || $statusFilter || $locationFilter ? 'Brak projektów spełniających kryteria wyszukiwania' : 'Brak projektów'"
+                            :has-filters="$search || $statusFilter || $locationFilter"
+                            clear-filters-action="wire:clearFilters"
+                            :in-table="true"
+                            colspan="4"
+                        />
                     @endforelse
                 </tbody>
             </table>

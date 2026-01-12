@@ -28,12 +28,8 @@ class TimeLogController extends Controller
     public function index()
     {
         $this->authorize('viewAny', TimeLog::class);
-
-        $timeLogs = TimeLog::with('projectAssignment.employee', 'projectAssignment.project')
-            ->orderBy('start_time', 'desc')
-            ->paginate(20);
         
-        return view('time-logs.index', compact('timeLogs'));
+        return view('time-logs.index');
     }
 
     /**

@@ -15,64 +15,7 @@
 
     <div class="py-4">
         <div class="container-xxl">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    @if($timeLogs->count() > 0)
-                        <div class="table-responsive">
-                            <table class="table align-middle">
-                                <thead>
-                                    <tr>
-                                        <th class="text-start">Data</th>
-                                        <th class="text-start">Pracownik</th>
-                                        <th class="text-start">Projekt</th>
-                                        <th class="text-start">Godziny</th>
-                                        <th class="text-start">Akcje</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($timeLogs as $timeLog)
-                                        <tr>
-                                            <td>{{ $timeLog->start_time->format('Y-m-d') }}</td>
-                                            <td>{{ $timeLog->projectAssignment->employee->full_name }}</td>
-                                            <td>{{ $timeLog->projectAssignment->project->name }}</td>
-                                            <td class="fw-semibold">{{ number_format($timeLog->hours_worked, 2) }}h</td>
-                                            <td>
-                                                @can('delete', $timeLog)
-                                                    <x-action-buttons
-                                                        viewRoute="{{ route('time-logs.show', $timeLog) }}"
-                                                        editRoute="{{ route('time-logs.edit', $timeLog) }}"
-                                                        deleteRoute="{{ route('time-logs.destroy', $timeLog) }}"
-                                                        deleteMessage="Czy na pewno chcesz usunąć ten wpis?"
-                                                    />
-                                                @else
-                                                    <x-action-buttons
-                                                        viewRoute="{{ route('time-logs.show', $timeLog) }}"
-                                                        editRoute="{{ route('time-logs.edit', $timeLog) }}"
-                                                    />
-                                                @endcan
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-
-                        @if($timeLogs->hasPages())
-                            <div class="mt-3">
-                                {{ $timeLogs->links() }}
-                            </div>
-                        @endif
-                    @else
-                        <div class="text-center py-5">
-                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                            <p class="text-muted mb-3">Brak wpisów w systemie.</p>
-                            <x-ui.button variant="primary" href="{{ route('time-logs.create') }}">
-                                <i class="bi bi-plus-circle"></i> Dodaj pierwszy wpis
-                            </x-ui.button>
-                        </div>
-                    @endif
-                </div>
-            </div>
+            <livewire:time-logs-table />
         </div>
     </div>
 </x-app-layout>

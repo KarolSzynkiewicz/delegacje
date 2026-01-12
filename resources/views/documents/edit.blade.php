@@ -11,18 +11,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Dokument">
-                @if ($errors->any())
-                    <div class="alert alert-danger mb-4" role="alert">
-                        <h5 class="alert-heading mb-2">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>Wystąpiły błędy:
-                        </h5>
-                        <ul class="mb-0">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
+                <x-ui.errors />
 
                 <form action="{{ route('documents.update', $document) }}" method="POST">
                     @csrf

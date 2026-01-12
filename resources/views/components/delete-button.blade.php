@@ -15,12 +15,10 @@
       onsubmit="return confirm('{{ $message }}')">
     @csrf
     @method('DELETE')
-    <button type="submit" 
-            class="btn btn-outline-danger {{ $sizeClass }}"
-            title="{{ $title }}">
+    <x-ui.button variant="danger" type="submit" title="{{ $title }}" class="{{ $sizeClass }}">
         <i class="bi bi-trash"></i>
         @if($slot->isNotEmpty())
             <span class="ms-1">{{ $slot }}</span>
         @endif
-    </button>
+    </x-ui.button>
 </form>

@@ -6,16 +6,7 @@
                         <h2 class="h4 fw-semibold text-dark mb-0">Edytuj Przypisanie Pojazdu</h2>
                     </div>
                     <div class="card-body">
-                        @if ($errors->any())
-                            <div class="alert alert-danger mb-4">
-                                <h5 class="alert-heading fw-semibold mb-2">Wystąpiły błędy:</h5>
-                                <ul class="mb-0">
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
+                        <x-ui.errors />
 
                         @if (session('success'))
                             <div class="alert alert-success mb-4">

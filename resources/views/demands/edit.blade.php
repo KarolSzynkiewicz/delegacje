@@ -17,18 +17,7 @@
                     @csrf
                     @method('PUT')
                     
-                    @if ($errors->any())
-                        <div class="alert alert-danger mb-4" role="alert">
-                            <h5 class="alert-heading mb-2">
-                                <i class="bi bi-exclamation-triangle-fill me-2"></i>Wystąpiły błędy:
-                            </h5>
-                            <ul class="mb-0">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
+                    <x-ui.errors />
 
                     @if(isset($isDateInPast) && $isDateInPast)
                     <div class="alert alert-warning mb-4" id="past-date-warning" role="alert">

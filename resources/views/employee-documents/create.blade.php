@@ -10,15 +10,7 @@
             <div class="row justify-content-center">
                 <div class="col-md-8">
                     <x-ui.card>
-                        @if ($errors->any())
-                            <x-ui.alert variant="danger" title="Błędy walidacji">
-                                <ul class="mb-0">
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </x-ui.alert>
-                        @endif
+                        <x-ui.errors />
 
                         <form action="{{ route('employees.employee-documents.store', $employee) }}" method="POST" enctype="multipart/form-data">
                             @csrf

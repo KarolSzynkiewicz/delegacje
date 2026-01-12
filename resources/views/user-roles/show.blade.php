@@ -1,93 +1,80 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Rola: {{ $userRole->name }}</h2>
-            <div>
-                <a href="{{ route('user-roles.edit', $userRole->name) }}" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded mr-2">Edytuj</a>
-                <a href="{{ route('user-roles.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Powrót</a>
-            </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Rola: {{ $userRole->name }}</h2>
+            <x-ui.button variant="ghost" href="{{ route('user-roles.index') }}" class="btn-sm">
+                <i class="bi bi-arrow-left"></i> Powrót
+            </x-ui.button>
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" id="success-message">
+    <div class="py-4">
+        <div class="container-xxl">
+            <x-ui.errors :errors="$errors" />
+
+            @if(session('success'))
+                <x-ui.alert variant="success" dismissible>
                     {{ session('success') }}
-                </div>
+                </x-ui.alert>
             @endif
 
-            @if (session('error'))
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" id="error-message">
+            @if(session('error'))
+                <x-ui.alert variant="danger" dismissible>
                     {{ session('error') }}
-                </div>
+                </x-ui.alert>
             @endif
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                    <h3 class="text-lg font-semibold mb-4">Informacje o roli</h3>
-                    <dl class="space-y-2">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Nazwa</dt>
-                            <dd class="text-sm text-gray-900">{{ $userRole->name }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Liczba uprawnień</dt>
-                            <dd class="text-sm text-gray-900">
+            <!-- Informacje o roli -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <x-ui.card>
+                        <h3 class="fs-5 fw-semibold mb-3">Informacje o roli</h3>
+                        <x-ui.detail-list>
+                            <x-ui.detail-item label="Nazwa">
+                                {{ $userRole->name }}
+                            </x-ui.detail-item>
+                            <x-ui.detail-item label="Liczba uprawnień">
                                 @if($userRole->name === 'administrator')
-                                    <span class="text-blue-600 font-semibold">Wszystkie ({{ \Spatie\Permission\Models\Permission::count() }})</span>
-                                    <span class="text-xs text-gray-500 block mt-1">Administrator ma wszystkie uprawnienia przez logikę biznesową</span>
+                                    <span class="text-primary fw-semibold">Wszystkie ({{ \Spatie\Permission\Models\Permission::count() }})</span>
+                                    <small class="d-block text-muted mt-1">Administrator ma wszystkie uprawnienia przez logikę biznesową</small>
                                 @else
-                                    <span id="permission-count">{{ $userRole->permissions->count() }}</span>
+                                    {{ $userRole->permissions->count() }}
                                 @endif
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-gray-500">Liczba użytkowników</dt>
-                            <dd class="text-sm text-gray-900">{{ $userRole->users->count() }}</dd>
-                        </div>
-                    </dl>
+                            </x-ui.detail-item>
+                            <x-ui.detail-item label="Liczba użytkowników">
+                                {{ $userRole->users->count() }}
+                            </x-ui.detail-item>
+                        </x-ui.detail-list>
+                    </x-ui.card>
                 </div>
 
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                    <h3 class="text-lg font-semibold mb-4">Użytkownicy z tą rolą</h3>
-                    @if($userRole->users->count() > 0)
-                        <ul class="space-y-2">
-                            @foreach($userRole->users as $user)
-                                <li class="text-sm text-gray-900">{{ $user->name }} ({{ $user->email }})</li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <p class="text-sm text-gray-500">Brak użytkowników z tą rolą</p>
-                    @endif
+                <div class="col-md-6">
+                    <x-ui.card>
+                        <h3 class="fs-5 fw-semibold mb-3">Użytkownicy z tą rolą</h3>
+                        @if($userRole->users->count() > 0)
+                            <ul class="list-unstyled mb-0">
+                                @foreach($userRole->users as $user)
+                                    <li class="mb-2">
+                                        <i class="bi bi-person-circle me-2"></i>
+                                        {{ $user->name }} <small class="text-muted">({{ $user->email }})</small>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <p class="text-muted mb-0">Brak użytkowników z tą rolą</p>
+                        @endif
+                    </x-ui.card>
                 </div>
             </div>
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold">Uprawnienia</h3>
-                    @if($userRole->name !== 'administrator')
-                        <button type="button" id="save-permissions-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Zapisz zmiany
-                        </button>
-                    @endif
-                </div>
+            <!-- Uprawnienia -->
+            <x-ui.card>
+                <h3 class="fs-5 fw-semibold mb-4">Uprawnienia</h3>
 
                 @if($userRole->name === 'administrator')
-                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <p class="text-sm text-blue-700">
-                                    <strong>Rola Administrator</strong> - użytkownicy z tą rolą mają <strong>wszystkie uprawnienia</strong> w systemie przez logikę biznesową (nie wymaga przypisanych uprawnień).
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <x-ui.alert variant="info">
+                        <strong>Rola Administrator</strong> - użytkownicy z tą rolą mają <strong>wszystkie uprawnienia</strong> w systemie przez logikę biznesową Spatie Permission (nie wymaga przypisanych uprawnień w bazie danych).
+                    </x-ui.alert>
                 @else
                     @php
                         // Grupuj uprawnienia według zasobu
@@ -151,35 +138,31 @@
                         ksort($groupedPermissions);
                     @endphp
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zasób</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Twórz</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Czytaj</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aktualizuj</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Usuwaj</th>
+                                    <th class="text-start">Zasób</th>
+                                    <th class="text-center">Twórz</th>
+                                    <th class="text-center">Czytaj</th>
+                                    <th class="text-center">Aktualizuj</th>
+                                    <th class="text-center">Usuwaj</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
+                            <tbody>
                                 @foreach($groupedPermissions as $resource => $data)
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {{ $data['name'] }}
-                                        </td>
+                                    <tr>
+                                        <td class="fw-medium">{{ $data['name'] }}</td>
                                         @foreach(['C', 'R', 'U', 'D'] as $action)
-                                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                            <td class="text-center">
                                                 @if($data['permissions'][$action])
-                                                    <input 
-                                                        type="checkbox" 
-                                                        class="permission-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                        data-permission-id="{{ $data['permissions'][$action]['id'] }}"
-                                                        data-permission-name="{{ $data['permissions'][$action]['name'] }}"
-                                                        {{ $data['permissions'][$action]['checked'] ? 'checked' : '' }}
-                                                    >
+                                                    @if($data['permissions'][$action]['checked'])
+                                                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                                    @else
+                                                        <i class="bi bi-circle text-muted"></i>
+                                                    @endif
                                                 @else
-                                                    <span class="text-gray-300">-</span>
+                                                    <span class="text-muted">-</span>
                                                 @endif
                                             </td>
                                         @endforeach
@@ -189,89 +172,7 @@
                         </table>
                     </div>
                 @endif
-            </div>
+            </x-ui.card>
         </div>
     </div>
-
-    @if($userRole->name !== 'administrator')
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const checkboxes = document.querySelectorAll('.permission-checkbox');
-                const saveBtn = document.getElementById('save-permissions-btn');
-                const roleName = '{{ $userRole->name }}';
-                let hasChanges = false;
-
-                // Śledź zmiany
-                checkboxes.forEach(checkbox => {
-                    checkbox.addEventListener('change', function() {
-                        hasChanges = true;
-                        saveBtn.disabled = false;
-                        saveBtn.classList.remove('disabled:opacity-50', 'disabled:cursor-not-allowed');
-                    });
-                });
-
-                // Zapisz zmiany
-                saveBtn.addEventListener('click', function() {
-                    if (!hasChanges) return;
-
-                    const checkedPermissions = Array.from(checkboxes)
-                        .filter(cb => cb.checked)
-                        .map(cb => cb.dataset.permissionId);
-
-                    saveBtn.disabled = true;
-                    saveBtn.textContent = 'Zapisywanie...';
-
-                    fetch(`/user-roles/${roleName}/permissions`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                        },
-                        body: JSON.stringify({
-                            permissions: checkedPermissions
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Pokaż komunikat sukcesu
-                            const successMsg = document.getElementById('success-message') || document.createElement('div');
-                            successMsg.id = 'success-message';
-                            successMsg.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4';
-                            successMsg.textContent = 'Uprawnienia zostały zaktualizowane.';
-                            
-                            const container = document.querySelector('.py-12 > .max-w-7xl');
-                            if (!document.getElementById('success-message')) {
-                                container.insertBefore(successMsg, container.firstChild);
-                            }
-
-                            // Ukryj komunikat po 3 sekundach
-                            setTimeout(() => {
-                                successMsg.remove();
-                            }, 3000);
-
-                            // Zaktualizuj licznik
-                            const countElement = document.getElementById('permission-count');
-                            if (countElement) {
-                                countElement.textContent = checkedPermissions.length;
-                            }
-
-                            hasChanges = false;
-                            saveBtn.disabled = true;
-                            saveBtn.textContent = 'Zapisz zmiany';
-                            saveBtn.classList.add('disabled:opacity-50', 'disabled:cursor-not-allowed');
-                        } else {
-                            throw new Error(data.message || 'Błąd podczas zapisywania');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Wystąpił błąd podczas zapisywania uprawnień: ' + error.message);
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Zapisz zmiany';
-                    });
-                });
-            });
-        </script>
-    @endif
 </x-app-layout>

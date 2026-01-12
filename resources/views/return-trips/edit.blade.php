@@ -9,15 +9,7 @@
         <div class="container-xxl">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-body">
-                    @if ($errors->any())
-                        <div class="alert alert-danger mb-4">
-                            <ul class="mb-0">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
+                    <x-ui.errors />
 
                     <form method="POST" action="{{ route('return-trips.update', $returnTrip) }}">
                         @csrf

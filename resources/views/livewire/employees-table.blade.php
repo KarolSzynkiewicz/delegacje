@@ -59,34 +59,12 @@
                 <thead>
                     <tr>
                         <th class="text-start">Zdjęcie</th>
-                        <th class="text-start">
-                            <button wire:click="sortBy('name')" class="btn-link text-decoration-none p-0 fw-semibold d-flex align-items-center gap-1" style="background: none; border: none; color: var(--text-main);">
-                                <span>Imię i Nazwisko</span>
-                                @if($sortField === 'name')
-                                    @if($sortDirection === 'asc')
-                                        <i class="bi bi-chevron-up"></i>
-                                    @else
-                                        <i class="bi bi-chevron-down"></i>
-                                    @endif
-                                @else
-                                    <i class="bi bi-chevron-expand text-muted"></i>
-                                @endif
-                            </button>
-                        </th>
-                        <th class="text-start d-none d-md-table-cell">
-                            <button wire:click="sortBy('email')" class="btn-link text-decoration-none p-0 fw-semibold d-flex align-items-center gap-1" style="background: none; border: none; color: var(--text-main);">
-                                <span>Email</span>
-                                @if($sortField === 'email')
-                                    @if($sortDirection === 'asc')
-                                        <i class="bi bi-chevron-up"></i>
-                                    @else
-                                        <i class="bi bi-chevron-down"></i>
-                                    @endif
-                                @else
-                                    <i class="bi bi-chevron-expand text-muted"></i>
-                                @endif
-                            </button>
-                        </th>
+                        <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
+                            Imię i Nazwisko
+                        </x-livewire.sortable-header>
+                        <x-livewire.sortable-header field="email" :sortField="$sortField" :sortDirection="$sortDirection" class="d-none d-md-table-cell">
+                            Email
+                        </x-livewire.sortable-header>
                         <th class="text-start">Rola</th>
                         <th class="text-start d-none d-lg-table-cell">Zasoby</th>
                         <th class="text-end">Akcje</th>
@@ -96,15 +74,13 @@
                     @forelse ($employees as $employee)
                         <tr>
                             <td>
-                                @if($employee->image_path)
-                                    <img src="{{ $employee->image_url }}" alt="{{ $employee->full_name }}" 
-                                        class="rounded-circle border border-2" 
-                                        style="width: 50px; height: 50px; object-fit: cover;">
-                                @else
-                                    <div class="avatar-ui" style="width: 50px; height: 50px;">
-                                        <span>{{ substr($employee->first_name, 0, 1) }}{{ substr($employee->last_name, 0, 1) }}</span>
-                                    </div>
-                                @endif
+                                <x-ui.avatar 
+                                    :image-url="$employee->image_path ? $employee->image_url : null"
+                                    :alt="$employee->full_name"
+                                    :initials="substr($employee->first_name, 0, 1) . substr($employee->last_name, 0, 1)"
+                                    size="50px"
+                                    shape="circle"
+                                />
                             </td>
                             <td>
                                 <div class="fw-medium">{{ $employee->full_name }}</div>
@@ -165,25 +141,14 @@
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="bi bi-people text-muted fs-1 d-block mb-2"></i>
-                                    <p class="text-muted small fw-medium mb-2">
-                                        @if($search || $roleFilter)
-                                            Brak pracowników spełniających kryteria wyszukiwania
-                                        @else
-                                            Brak pracowników
-                                        @endif
-                                    </p>
-                                    @if($search || $roleFilter)
-                                        <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                                            Wyczyść filtry
-                                        </x-ui.button>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
+                        <x-ui.empty-state 
+                            icon="people"
+                            :message="$search || $roleFilter ? 'Brak pracowników spełniających kryteria wyszukiwania' : 'Brak pracowników'"
+                            :has-filters="$search || $roleFilter"
+                            clear-filters-action="wire:clearFilters"
+                            :in-table="true"
+                            colspan="6"
+                        />
                     @endforelse
                 </tbody>
             </table>

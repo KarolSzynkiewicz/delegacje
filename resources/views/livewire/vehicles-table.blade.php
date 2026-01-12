@@ -58,18 +58,9 @@
                 <thead>
                     <tr>
                         <th class="text-start">Zdjęcie</th>
-                        <th class="text-start">
-                            <button wire:click="sortBy('registration_number')" class="btn-link text-decoration-none p-0 fw-semibold d-flex align-items-center gap-1" style="background: none; border: none; color: var(--text-main);">
-                                <span>Nr Rejestracyjny</span>
-                                @if($sortField === 'registration_number')
-                                    @if($sortDirection === 'asc')
-                                        <i class="bi bi-chevron-up"></i>
-                                    @else
-                                        <i class="bi bi-chevron-down"></i>
-                                    @endif
-                                @endif
-                            </button>
-                        </th>
+                        <x-livewire.sortable-header field="registration_number" :sortField="$sortField" :sortDirection="$sortDirection">
+                            Nr Rejestracyjny
+                        </x-livewire.sortable-header>
                         <th class="text-start">Marka i Model</th>
                         <th class="text-start">Stan</th>
                         <th class="text-start d-none d-lg-table-cell">Pojemność</th>
@@ -82,13 +73,13 @@
                         <tr>
                             <td>
                                 <div class="d-flex align-items-center justify-content-center">
-                                    @if($vehicle->image_path)
-                                        <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->brand }} {{ $vehicle->model }}" class="rounded border border-2 vehicle-image">
-                                    @else
-                                        <div class="avatar-ui vehicle-image">
-                                            <span>{{ substr($vehicle->registration_number, 0, 2) }}</span>
-                                        </div>
-                                    @endif
+                                    <x-ui.avatar 
+                                        :image-url="$vehicle->image_path ? $vehicle->image_url : null"
+                                        :alt="($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '')"
+                                        :initials="substr($vehicle->registration_number, 0, 2)"
+                                        size="50px"
+                                        shape="rounded"
+                                    />
                                 </div>
                             </td>
                             <td>
@@ -136,20 +127,14 @@
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="7" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="bi bi-car-front text-muted fs-1 d-block mb-2"></i>
-                                    <p class="text-muted small fw-medium mb-0">
-                                        @if($search || $conditionFilter || $statusFilter)
-                                            Brak pojazdów spełniających kryteria
-                                        @else
-                                            Brak pojazdów
-                                        @endif
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
+                        <x-ui.empty-state 
+                            icon="car-front"
+                            :message="$search || $conditionFilter || $statusFilter ? 'Brak pojazdów spełniających kryteria' : 'Brak pojazdów'"
+                            :has-filters="$search || $conditionFilter || $statusFilter"
+                            clear-filters-action="wire:clearFilters"
+                            :in-table="true"
+                            colspan="7"
+                        />
                     @endforelse
                 </tbody>
             </table>

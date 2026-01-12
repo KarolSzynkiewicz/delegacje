@@ -1,12 +1,12 @@
 <div>
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="fs-5 fw-semibold text-dark mb-0">Filtry</h3>
-                <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                </x-ui.button>
-            </div>
+    <x-ui.card class="mb-4">
+            <x-ui.table-header title="Filtry" class="mb-3">
+                <x-slot name="actions">
+                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
+                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                    </x-ui.button>
+                </x-slot>
+            </x-ui.table-header>
             
             <div class="row g-3">
                 <!-- Pracownik -->
@@ -37,11 +37,9 @@
                     <input type="date" wire:model.live="dateTo" class="form-control form-control-sm">
                 </div>
             </div>
-        </div>
-    </div>
+    </x-ui.card>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <x-ui.card>
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>
@@ -72,7 +70,7 @@
                                     </small>
                                 </td>
                                 <td>
-                                    <x-action-buttons
+                                    <x-ui.action-buttons
                                         viewRoute="{{ route('accommodation-assignments.show', $assignment) }}"
                                         editRoute="{{ route('accommodation-assignments.edit', $assignment) }}"
                                         deleteRoute="{{ route('accommodation-assignments.destroy', $assignment) }}"
@@ -81,14 +79,12 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="4" class="text-center py-5">
-                                    <div class="empty-state">
-                                        <i class="bi bi-house-x"></i>
-                                        <p class="text-muted small fw-medium mb-0">Brak przypisań mieszkań</p>
-                                    </div>
-                                </td>
-                            </tr>
+                            <x-ui.empty-state 
+                                icon="house-x"
+                                message="Brak przypisań mieszkań"
+                                :in-table="true"
+                                colspan="4"
+                            />
                         @endforelse
                     </tbody>
                 </table>
@@ -99,6 +95,5 @@
                     {{ $assignments->links() }}
                 </div>
             @endif
-        </div>
-    </div>
+    </x-ui.card>
 </div>

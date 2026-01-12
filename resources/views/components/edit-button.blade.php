@@ -8,11 +8,9 @@
     $sizeClass = $size === 'sm' ? 'btn-sm' : ($size === 'lg' ? 'btn-lg' : '');
 @endphp
 
-<a href="{{ $href }}" 
-   class="btn btn-outline-secondary {{ $sizeClass }}" 
-   title="{{ $title }}">
+<x-ui.button variant="ghost" href="{{ $href }}" title="{{ $title }}" class="{{ $sizeClass }}">
     <i class="bi bi-pencil"></i>
     @if($slot->isNotEmpty())
         <span class="ms-1">{{ $slot }}</span>
     @endif
-</a>
+</x-ui.button>

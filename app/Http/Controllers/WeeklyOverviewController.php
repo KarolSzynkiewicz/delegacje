@@ -35,7 +35,7 @@ class WeeklyOverviewController extends Controller
         $navigation = $this->buildNavigation('weekly-overview.index', $weeks[0], $projectId);
         
         // Get all projects for the search dropdown
-        $allProjects = Project::orderBy('name')->get();
+        $allProjects = $this->getAllProjectsForDropdown();
         
         return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects'));
     }
@@ -57,7 +57,7 @@ class WeeklyOverviewController extends Controller
         $navigation = $this->buildNavigation('weekly-overview.planner2', $weeks[0], $projectId);
         
         // Get all projects for the search dropdown
-        $allProjects = Project::orderBy('name')->get();
+        $allProjects = $this->getAllProjectsForDropdown();
         
         return view('weekly-overview.planner2', compact('weeks', 'projectsWithCalendar', 'startDate', 'navigation', 'projectId', 'allProjects'));
     }
@@ -186,6 +186,16 @@ class WeeklyOverviewController extends Controller
             );
             return $projectData;
         }, $projects);
+    }
+
+    /**
+     * Get all projects for dropdowns (cached for performance).
+     */
+    protected function getAllProjectsForDropdown()
+    {
+        return cache()->remember('all_projects_dropdown', 3600, function () {
+            return Project::orderBy('name')->get();
+        });
     }
 }
 
