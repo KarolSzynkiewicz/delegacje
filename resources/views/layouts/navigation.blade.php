@@ -12,7 +12,7 @@
 
         <!-- Navigation content -->
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
+            <ul class="navbar-nav mx-auto">
                 @auth
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('weekly-overview.*') ? 'active' : '' }}" href="{{ route('weekly-overview.index') }}">
@@ -31,12 +31,6 @@
                             <li><a class="dropdown-item {{ request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*') ? 'active' : '' }}" href="{{ route('accommodations.index') }}"><i class="bi bi-house"></i> Mieszkania</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('locations.*') ? 'active' : '' }}" href="{{ route('locations.index') }}"><i class="bi bi-geo-alt"></i> Lokalizacje</a></li>
                         </ul>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}" href="{{ route('roles.index') }}">
-                            <i class="bi bi-person-badge"></i> Role pracowników
-                        </a>
                     </li>
 
                     <!-- Przypisania Dropdown -->
@@ -59,29 +53,22 @@
                             <i class="bi bi-truck"></i> Logistyka
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="logistykaDropdown">
-                            @can('viewAny', \App\Models\Equipment::class)
-                                <li><a class="dropdown-item {{ request()->routeIs('equipment.*') ? 'active' : '' }}" href="{{ route('equipment.index') }}"><i class="bi bi-tools"></i> Sprzęt</a></li>
-                            @endcan
-                            @can('viewAny', \App\Models\EquipmentIssue::class)
-                                <li><a class="dropdown-item {{ request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="{{ route('equipment-issues.index') }}"><i class="bi bi-box-arrow-up"></i> Wydania sprzętu</a></li>
-                            @endcan
-                            @can('viewAny', \App\Models\TransportCost::class)
-                                <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-currency-dollar"></i> Koszty transportu</a></li>
-                            @endcan
+                            <li><a class="dropdown-item {{ request()->routeIs('equipment.*') ? 'active' : '' }}" href="{{ route('equipment.index') }}"><i class="bi bi-tools"></i> Sprzęt</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="{{ route('equipment-issues.index') }}"><i class="bi bi-box-arrow-up"></i> Wydania sprzętu</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-currency-dollar"></i> Koszty transportu</a></li>
                         </ul>
                     </li>
 
                     <!-- Kadry Dropdown -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('employees.*') || request()->routeIs('adjustments.*') || request()->routeIs('time-logs.*') || request()->routeIs('payrolls.*') || request()->routeIs('rotations.*') || request()->routeIs('documents.*') || request()->routeIs('employee-documents.*') || request()->routeIs('employee-rates.*') || request()->routeIs('advances.*') ? 'active' : '' }}" href="#" id="hrDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('employees.*') || request()->routeIs('roles.*') || request()->routeIs('adjustments.*') || request()->routeIs('time-logs.*') || request()->routeIs('payrolls.*') || request()->routeIs('rotations.*') || request()->routeIs('documents.*') || request()->routeIs('employee-documents.*') || request()->routeIs('employee-rates.*') || request()->routeIs('advances.*') ? 'active' : '' }}" href="#" id="hrDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-briefcase"></i> Kadry
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="hrDropdown">
                             <li><a class="dropdown-item {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> Pracownicy</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('roles.*') ? 'active' : '' }}" href="{{ route('roles.index') }}"><i class="bi bi-person-badge"></i> Role pracowników</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('adjustments.*') ? 'active' : '' }}" href="{{ route('adjustments.index') }}"><i class="bi bi-award"></i> Kary i nagrody</a></li>
-                            @can('viewAny', \App\Models\TimeLog::class)
-                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.*') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Ewidencje godzin</a></li>
-                            @endcan
+                            <li><a class="dropdown-item {{ request()->routeIs('time-logs.*') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Ewidencje godzin</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('payrolls.*') ? 'active' : '' }}" href="{{ route('payrolls.index') }}"><i class="bi bi-cash-stack"></i> Payroll</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('rotations.*') ? 'active' : '' }}" href="{{ route('rotations.index') }}"><i class="bi bi-arrow-repeat"></i> Rotacje</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('employee-rates.*') ? 'active' : '' }}" href="{{ route('employee-rates.index') }}"><i class="bi bi-currency-dollar"></i> Stawki pracowników</a></li>
@@ -92,21 +79,15 @@
                     </li>
 
                     <!-- Administracja Dropdown -->
-                    @canany(['users.viewAny', 'user-roles.viewAny'])
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ request()->routeIs('users.*') || request()->routeIs('user-roles.*') ? 'active' : '' }}" href="#" id="administracjaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-shield-lock"></i> Administracja
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="administracjaDropdown">
-                            @can('users.viewAny')
-                                <li><a class="dropdown-item {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i class="bi bi-person-gear"></i> Użytkownicy</a></li>
-                            @endcan
-                            @can('user-roles.viewAny')
-                                <li><a class="dropdown-item {{ request()->routeIs('user-roles.*') ? 'active' : '' }}" href="{{ route('user-roles.index') }}"><i class="bi bi-shield-check"></i> Role użytkowników</a></li>
-                            @endcan
+                            <li><a class="dropdown-item {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i class="bi bi-person-gear"></i> Użytkownicy</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('user-roles.*') ? 'active' : '' }}" href="{{ route('user-roles.index') }}"><i class="bi bi-shield-check"></i> Role użytkowników</a></li>
                         </ul>
                     </li>
-                    @endcanany
                 @endauth
             </ul>
 

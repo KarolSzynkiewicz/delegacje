@@ -44,23 +44,6 @@
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="currency" class="form-label">Waluta <span class="text-danger">*</span></label>
-                        <select class="form-select @error('currency') is-invalid @enderror" 
-                                id="currency" 
-                                name="currency" 
-                                required>
-                            <option value="PLN" {{ old('currency', 'PLN') === 'PLN' ? 'selected' : '' }}>PLN</option>
-                            <option value="EUR" {{ old('currency') === 'EUR' ? 'selected' : '' }}>EUR</option>
-                            <option value="USD" {{ old('currency') === 'USD' ? 'selected' : '' }}>USD</option>
-                        </select>
-                        @error('currency')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
                 <div class="mb-3">
                     <label for="notes" class="form-label">Notatki</label>
                     <textarea class="form-control @error('notes') is-invalid @enderror" 

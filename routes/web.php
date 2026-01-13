@@ -168,6 +168,7 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     // Payroll
     Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])->name('payrolls.generate-batch');
     Route::post('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatch'])->name('payrolls.generate-batch.store');
+    Route::post('payrolls/recalculate-all', [\App\Http\Controllers\PayrollController::class, 'recalculateAll'])->name('payrolls.recalculate-all');
     Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])->name('payrolls.recalculate');
     Route::resource('payrolls', \App\Http\Controllers\PayrollController::class);
     

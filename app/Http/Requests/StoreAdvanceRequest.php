@@ -22,7 +22,7 @@ class StoreAdvanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'employee_id' => ['required', 'exists:employees,id'],
+            'payroll_id' => ['required', 'exists:payrolls,id'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
             'date' => ['required', 'date'],
@@ -50,8 +50,8 @@ class StoreAdvanceRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'employee_id.required' => 'Pracownik jest wymagany.',
-            'employee_id.exists' => 'Wybrany pracownik nie istnieje.',
+            'payroll_id.required' => 'Payroll jest wymagany.',
+            'payroll_id.exists' => 'Wybrany payroll nie istnieje.',
             'amount.required' => 'Kwota jest wymagana.',
             'amount.numeric' => 'Kwota musi być liczbą.',
             'amount.min' => 'Kwota nie może być ujemna.',

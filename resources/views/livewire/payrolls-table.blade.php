@@ -6,8 +6,30 @@
             </x-ui.alert>
         @endif
 
-        <!-- Filtry -->
+        <!-- Statystyki i Filtry -->
         <div class="mb-4 pb-3 border-top border-bottom">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                <div>
+                    <h3 class="fs-5 fw-semibold mb-1">Payroll</h3>
+                    <p class="small text-muted mb-0">
+                        @if(!empty($search) || !empty($statusFilter) || !empty($currencyFilter))
+                            Znaleziono: <span class="fw-semibold">{{ $payrolls->total() }}</span> payrolli
+                        @else
+                            Łącznie: <span class="fw-semibold">{{ $payrolls->total() }}</span> payrolli
+                        @endif
+                    </p>
+                </div>
+                <x-ui.button 
+                    variant="ghost" 
+                    wire:click="clearFilters" 
+                    class="btn-sm"
+                    :disabled="empty($search) && empty($statusFilter) && empty($currencyFilter)"
+                >
+                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                </x-ui.button>
+            </div>
+
+            <!-- Filtry -->
             <div class="row g-2 align-items-end">
                 <!-- Wyszukiwanie po pracowniku -->
                 <div class="col-md-4">
@@ -51,22 +73,6 @@
                         <option value="USD">USD</option>
                     </select>
                 </div>
-
-                <!-- Przycisk wyczyść -->
-                <div class="col-md-2">
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="w-100 btn-sm">
-                        <i class="bi bi-x-circle"></i> Wyczyść
-                    </x-ui.button>
-                </div>
-
-                <!-- Informacja o liczbie wyników -->
-                <div class="col-md-1 text-end">
-                    @if($payrolls->total() > 0)
-                        <small class="text-muted">
-                            <strong>{{ $payrolls->total() }}</strong>
-                        </small>
-                    @endif
-                </div>
             </div>
         </div>
 
@@ -76,13 +82,7 @@
                     <thead>
                         <tr>
                             <x-livewire.sortable-header field="employee_id" :sortField="$sortField" :sortDirection="$sortDirection">
-                                Pracownik
-                            </x-livewire.sortable-header>
-                            <x-livewire.sortable-header field="period_start" :sortField="$sortField" :sortDirection="$sortDirection">
-                                Okres od
-                            </x-livewire.sortable-header>
-                            <x-livewire.sortable-header field="period_end" :sortField="$sortField" :sortDirection="$sortDirection">
-                                Okres do
+                                Payroll
                             </x-livewire.sortable-header>
                             <x-livewire.sortable-header field="hours_amount" :sortField="$sortField" :sortDirection="$sortDirection">
                                 Kwota z godzin
@@ -102,16 +102,10 @@
                         @foreach($payrolls as $payroll)
                             <tr wire:key="payroll-{{ $payroll->id }}">
                                 <td>
-                                    <a href="{{ route('employees.show', $payroll->employee) }}" 
+                                    <a href="{{ route('payrolls.show', $payroll) }}" 
                                        class="text-primary text-decoration-none fw-medium">
-                                        {{ $payroll->employee->full_name }}
+                                        {{ $payroll->display_name }}
                                     </a>
-                                </td>
-                                <td>
-                                    <small class="text-muted">{{ $payroll->period_start->format('Y-m-d') }}</small>
-                                </td>
-                                <td>
-                                    <small class="text-muted">{{ $payroll->period_end->format('Y-m-d') }}</small>
                                 </td>
                                 <td>
                                     <strong>{{ number_format($payroll->hours_amount, 2, ',', ' ') }}</strong>
@@ -162,7 +156,7 @@
             </div>
 
             @if($payrolls->hasPages())
-                <div class="mt-3">
+                <div class="mt-3 pt-3 border-top">
                     {{ $payrolls->links() }}
                 </div>
             @endif

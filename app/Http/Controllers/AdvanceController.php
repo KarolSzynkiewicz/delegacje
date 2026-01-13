@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Advance;
-use App\Models\Employee;
+use App\Models\Payroll;
 use App\Http\Requests\StoreAdvanceRequest;
 use App\Http\Requests\UpdateAdvanceRequest;
 use Illuminate\View\View;
@@ -29,8 +29,12 @@ class AdvanceController extends Controller
      */
     public function create(): View
     {
-        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('advances.create', compact('employees'));
+        // Pobierz wszystkie payrolle z informacją o pracowniku i okresie
+        $payrolls = Payroll::with('employee')
+            ->orderBy('period_start', 'desc')
+            ->orderBy('employee_id')
+            ->get();
+        return view('advances.create', compact('payrolls'));
     }
 
     /**
@@ -38,7 +42,20 @@ class AdvanceController extends Controller
      */
     public function store(StoreAdvanceRequest $request): RedirectResponse
     {
-        Advance::create($request->validated());
+        $validated = $request->validated();
+        
+        // Pobierz payroll i ustaw employee_id automatycznie
+        $payroll = Payroll::findOrFail($validated['payroll_id']);
+        $validated['employee_id'] = $payroll->employee_id;
+        
+        Advance::create($validated);
+        
+        // Przelicz payroll jeśli jest w statusie draft/issued
+        if ($payroll->canBeRecalculated()) {
+            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
+            $payroll->recalculateTotal();
+            $payroll->save();
+        }
 
         return redirect()->route('advances.index')
             ->with('success', 'Zaliczka została dodana.');
@@ -58,8 +75,12 @@ class AdvanceController extends Controller
      */
     public function edit(Advance $advance): View
     {
-        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('advances.edit', compact('advance', 'employees'));
+        // Pobierz wszystkie payrolle z informacją o pracowniku i okresie
+        $payrolls = Payroll::with('employee')
+            ->orderBy('period_start', 'desc')
+            ->orderBy('employee_id')
+            ->get();
+        return view('advances.edit', compact('advance', 'payrolls'));
     }
 
     /**
@@ -67,7 +88,20 @@ class AdvanceController extends Controller
      */
     public function update(UpdateAdvanceRequest $request, Advance $advance): RedirectResponse
     {
-        $advance->update($request->validated());
+        $validated = $request->validated();
+        
+        // Pobierz payroll i ustaw employee_id automatycznie
+        $payroll = Payroll::findOrFail($validated['payroll_id']);
+        $validated['employee_id'] = $payroll->employee_id;
+        
+        $advance->update($validated);
+        
+        // Przelicz payroll jeśli jest w statusie draft/issued
+        if ($payroll->canBeRecalculated()) {
+            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
+            $payroll->recalculateTotal();
+            $payroll->save();
+        }
 
         return redirect()->route('advances.index')
             ->with('success', 'Zaliczka została zaktualizowana.');
@@ -78,7 +112,15 @@ class AdvanceController extends Controller
      */
     public function destroy(Advance $advance): RedirectResponse
     {
+        $payroll = $advance->payroll;
         $advance->delete();
+        
+        // Przelicz payroll jeśli jest w statusie draft/issued
+        if ($payroll && $payroll->canBeRecalculated()) {
+            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
+            $payroll->recalculateTotal();
+            $payroll->save();
+        }
 
         return redirect()->route('advances.index')
             ->with('success', 'Zaliczka została usunięta.');

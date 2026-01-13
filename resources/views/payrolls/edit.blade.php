@@ -134,16 +134,13 @@
                     @method('PUT')
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="number" 
-                            name="adjustments_amount" 
-                            id="adjustments_amount"
-                            label="Korekty (dodatnie lub ujemne)"
-                            value="{{ old('adjustments_amount', $payroll->adjustments_amount) }}"
-                            step="0.01"
-                            required="true"
-                        />
-                        <small class="form-text text-muted">Wprowadź dodatnią wartość dla premii lub ujemną dla kar.</small>
+                        <label class="form-label">Korekty (obliczane automatycznie)</label>
+                        <div class="form-control-plaintext">
+                            <strong>{{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}</strong>
+                            <small class="text-muted d-block mt-1">
+                                Kwota jest obliczana automatycznie na podstawie zaliczek, kar i nagród przypisanych do tego payroll.
+                            </small>
+                        </div>
                     </div>
 
                     <div class="mb-3">

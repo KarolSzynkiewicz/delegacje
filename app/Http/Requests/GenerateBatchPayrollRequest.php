@@ -24,7 +24,6 @@ class GenerateBatchPayrollRequest extends FormRequest
         return [
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after_or_equal:period_start'],
-            'currency' => ['required', 'string', 'size:3'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -42,8 +41,6 @@ class GenerateBatchPayrollRequest extends FormRequest
             'period_end.required' => 'Data zakończenia okresu jest wymagana.',
             'period_end.date' => 'Data zakończenia okresu musi być poprawną datą.',
             'period_end.after_or_equal' => 'Data zakończenia okresu nie może być wcześniejsza niż data rozpoczęcia.',
-            'currency.required' => 'Waluta jest wymagana.',
-            'currency.size' => 'Waluta musi składać się z 3 znaków.',
         ];
     }
 }

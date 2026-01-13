@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Adjustment;
-use App\Models\Employee;
+use App\Models\Payroll;
 use App\Http\Requests\StoreAdjustmentRequest;
 use App\Http\Requests\UpdateAdjustmentRequest;
 use Illuminate\View\View;
@@ -29,8 +29,12 @@ class AdjustmentController extends Controller
      */
     public function create(): View
     {
-        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('adjustments.create', compact('employees'));
+        // Pobierz wszystkie payrolle z informacją o pracowniku i okresie
+        $payrolls = Payroll::with('employee')
+            ->orderBy('period_start', 'desc')
+            ->orderBy('employee_id')
+            ->get();
+        return view('adjustments.create', compact('payrolls'));
     }
 
     /**
@@ -38,7 +42,13 @@ class AdjustmentController extends Controller
      */
     public function store(StoreAdjustmentRequest $request): RedirectResponse
     {
-        Adjustment::create($request->validated());
+        $validated = $request->validated();
+        
+        // Pobierz payroll i ustaw employee_id automatycznie
+        $payroll = Payroll::findOrFail($validated['payroll_id']);
+        $validated['employee_id'] = $payroll->employee_id;
+        
+        Adjustment::create($validated);
 
         return redirect()->route('adjustments.index')
             ->with('success', 'Kara/nagroda została dodana.');
@@ -58,8 +68,12 @@ class AdjustmentController extends Controller
      */
     public function edit(Adjustment $adjustment): View
     {
-        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('adjustments.edit', compact('adjustment', 'employees'));
+        // Pobierz wszystkie payrolle z informacją o pracowniku i okresie
+        $payrolls = Payroll::with('employee')
+            ->orderBy('period_start', 'desc')
+            ->orderBy('employee_id')
+            ->get();
+        return view('adjustments.edit', compact('adjustment', 'payrolls'));
     }
 
     /**
@@ -67,7 +81,20 @@ class AdjustmentController extends Controller
      */
     public function update(UpdateAdjustmentRequest $request, Adjustment $adjustment): RedirectResponse
     {
-        $adjustment->update($request->validated());
+        $validated = $request->validated();
+        
+        // Pobierz payroll i ustaw employee_id automatycznie
+        $payroll = Payroll::findOrFail($validated['payroll_id']);
+        $validated['employee_id'] = $payroll->employee_id;
+        
+        $adjustment->update($validated);
+        
+        // Przelicz payroll jeśli jest w statusie draft/issued
+        if ($payroll->canBeRecalculated()) {
+            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
+            $payroll->recalculateTotal();
+            $payroll->save();
+        }
 
         return redirect()->route('adjustments.index')
             ->with('success', 'Kara/nagroda została zaktualizowana.');
@@ -78,7 +105,15 @@ class AdjustmentController extends Controller
      */
     public function destroy(Adjustment $adjustment): RedirectResponse
     {
+        $payroll = $adjustment->payroll;
         $adjustment->delete();
+        
+        // Przelicz payroll jeśli jest w statusie draft/issued
+        if ($payroll && $payroll->canBeRecalculated()) {
+            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
+            $payroll->recalculateTotal();
+            $payroll->save();
+        }
 
         return redirect()->route('adjustments.index')
             ->with('success', 'Kara/nagroda została usunięta.');

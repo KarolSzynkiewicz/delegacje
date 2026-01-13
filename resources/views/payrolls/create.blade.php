@@ -59,20 +59,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="currency" 
-                            id="currency"
-                            label="Waluta"
-                            required="true"
-                        >
-                            <option value="PLN" {{ old('currency', 'PLN') == 'PLN' ? 'selected' : '' }}>PLN</option>
-                            <option value="EUR" {{ old('currency') == 'EUR' ? 'selected' : '' }}>EUR</option>
-                            <option value="USD" {{ old('currency') == 'USD' ? 'selected' : '' }}>USD</option>
-                        </x-ui.input>
-                    </div>
-
                     <div class="mb-4">
                         <x-ui.input 
                             type="textarea" 

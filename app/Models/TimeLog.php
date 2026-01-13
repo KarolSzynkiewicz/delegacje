@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class TimeLog extends Model
@@ -42,43 +41,9 @@ class TimeLog extends Model
     protected static function boot()
     {
         parent::boot();
-
-        static::creating(function ($timeLog) {
-            $timeLog->validateDateWithinAssignment();
-        });
-
-        static::updating(function ($timeLog) {
-            $timeLog->validateDateWithinAssignment();
-        });
-    }
-
-    /**
-     * Validate that the time log date is within the assignment period.
-     * 
-     * @throws ValidationException
-     */
-    protected function validateDateWithinAssignment(): void
-    {
-        if (!$this->projectAssignment) {
-            return; // Skip validation if assignment is not loaded
-        }
-
-        $workDate = Carbon::parse($this->start_time);
-        $assignment = $this->projectAssignment;
-        $startDate = Carbon::parse($assignment->start_date);
-        $endDate = $assignment->end_date ? Carbon::parse($assignment->end_date) : null;
-
-        if ($workDate->lt($startDate)) {
-            throw ValidationException::withMessages([
-                'start_time' => 'Data pracy nie może być wcześniejsza niż data rozpoczęcia przypisania (' . $startDate->format('Y-m-d') . ').'
-            ]);
-        }
-
-        if ($endDate && $workDate->gt($endDate)) {
-            throw ValidationException::withMessages([
-                'start_time' => 'Data pracy nie może być późniejsza niż data zakończenia przypisania (' . $endDate->format('Y-m-d') . ').'
-            ]);
-        }
+        
+        // Walidacja daty w przypisaniu została usunięta - niepotrzebna,
+        // ponieważ time log jest przypisany do project assignment
     }
 
     /**

@@ -18,18 +18,19 @@
                     <div class="mb-3">
                         <x-ui.input 
                             type="select" 
-                            name="employee_id" 
-                            id="employee_id"
-                            label="Pracownik"
+                            name="payroll_id" 
+                            id="payroll_id"
+                            label="Payroll"
                             required="true"
                         >
-                            <option value="">Wybierz pracownika</option>
-                            @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}" {{ old('employee_id', $adjustment->employee_id) == $employee->id ? 'selected' : '' }}>
-                                    {{ $employee->full_name }} ({{ $employee->email }})
+                            <option value="">Wybierz payroll</option>
+                            @foreach($payrolls as $payroll)
+                                <option value="{{ $payroll->id }}" {{ old('payroll_id', $adjustment->payroll_id) == $payroll->id ? 'selected' : '' }}>
+                                    {{ $payroll->display_name }}
                                 </option>
                             @endforeach
                         </x-ui.input>
+                        <small class="form-text text-muted">Wybierz payroll, do którego przypisać karę/nagrodę</small>
                     </div>
 
                     <div class="row mb-3">

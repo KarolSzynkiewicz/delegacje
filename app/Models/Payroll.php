@@ -59,6 +59,21 @@ class Payroll extends Model
     }
 
     /**
+     * Get formatted display name for payroll.
+     * Format: "Pracownik | od YYYY-MM-DD do YYYY-MM-DD"
+     * 
+     * @return string
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        $employeeName = $this->employee ? $this->employee->full_name : 'Nieznany';
+        $periodStart = $this->period_start->format('Y-m-d');
+        $periodEnd = $this->period_end->format('Y-m-d');
+        
+        return "{$employeeName} | od {$periodStart} do {$periodEnd}";
+    }
+
+    /**
      * Recalculate total_amount based on hours_amount and adjustments_amount.
      * Should be called after updating adjustments_amount.
      */
@@ -128,7 +143,7 @@ class Payroll extends Model
     }
 
     /**
-     * Check if payroll exists for employee and period.
+     * Check if payroll exists for employee and period (exact match).
      * 
      * @param int $employeeId
      * @param Carbon $periodStart
@@ -141,5 +156,40 @@ class Payroll extends Model
             ->where('period_start', $periodStart->toDateString())
             ->where('period_end', $periodEnd->toDateString())
             ->exists();
+    }
+
+    /**
+     * Check if a payroll overlaps with existing payrolls for an employee.
+     * Excludes a specific payroll (for updates).
+     * 
+     * @param int $employeeId
+     * @param Carbon $periodStart
+     * @param Carbon $periodEnd
+     * @param int|null $excludePayrollId
+     * @return bool
+     */
+    public static function hasOverlappingPayrolls(
+        int $employeeId,
+        Carbon $periodStart,
+        Carbon $periodEnd,
+        ?int $excludePayrollId = null
+    ): bool {
+        $query = static::where('employee_id', $employeeId)
+            ->where(function ($query) use ($periodStart, $periodEnd) {
+                // Check if any existing payroll overlaps with the new period
+                $query->whereBetween('period_start', [$periodStart->toDateString(), $periodEnd->toDateString()])
+                    ->orWhereBetween('period_end', [$periodStart->toDateString(), $periodEnd->toDateString()])
+                    ->orWhere(function ($q) use ($periodStart, $periodEnd) {
+                        // Existing payroll completely covers the new period
+                        $q->where('period_start', '<=', $periodStart->toDateString())
+                          ->where('period_end', '>=', $periodEnd->toDateString());
+                    });
+            });
+
+        if ($excludePayrollId) {
+            $query->where('id', '!=', $excludePayrollId);
+        }
+
+        return $query->exists();
     }
 }

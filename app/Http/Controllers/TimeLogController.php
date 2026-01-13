@@ -206,8 +206,14 @@ class TimeLogController extends Controller
         $results = $this->timeLogService->bulkUpdateTimeLogs($entries);
 
         $message = 'Zaktualizowano: ' . $results['created'] . ' utworzono, ' . $results['updated'] . ' zaktualizowano, ' . $results['deleted'] . ' usunięto.';
+        
         if (count($results['errors']) > 0) {
-            $message .= ' Błędy: ' . count($results['errors']);
+            $errorMessages = [];
+            foreach ($results['errors'] as $error) {
+                $dateStr = $error['date'] ?? 'nieznana data';
+                $errorMessages[] = "Data {$dateStr}: " . ($error['message'] ?? 'Nieznany błąd');
+            }
+            $message .= ' Błędy (' . count($results['errors']) . '): ' . implode('; ', $errorMessages);
         }
 
         if ($request->expectsJson()) {
@@ -221,6 +227,7 @@ class TimeLogController extends Controller
         if (count($results['errors']) > 0) {
             return redirect()->back()
                 ->with('error', $message)
+                ->with('bulkErrors', $results['errors'])
                 ->withInput();
         }
 

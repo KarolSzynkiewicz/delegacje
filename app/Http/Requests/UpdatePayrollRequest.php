@@ -24,7 +24,6 @@ class UpdatePayrollRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'adjustments_amount' => ['required', 'numeric'],
             'status' => ['required', Rule::enum(PayrollStatus::class)],
             'notes' => ['nullable', 'string'],
         ];
@@ -38,8 +37,6 @@ class UpdatePayrollRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'adjustments_amount.required' => 'Kwota korekt jest wymagana.',
-            'adjustments_amount.numeric' => 'Kwota korekt musi być liczbą.',
             'status.required' => 'Status jest wymagany.',
             'status.enum' => 'Status musi być poprawną wartością.',
         ];

@@ -17,5 +17,5 @@
         <div class="container-xxl">
             <livewire:time-logs-table />
         </div>
-    </div>
+    </div> 
 </x-app-layout>

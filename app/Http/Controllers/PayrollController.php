@@ -78,7 +78,7 @@ class PayrollController extends Controller
                     $employeeId,
                     $periodStart,
                     $periodEnd,
-                    $validated['currency'],
+                    'PLN', // Domyślna waluta, system automatycznie określi właściwą na podstawie stawek
                     $validated['notes'] ?? null
                 );
                 $generated++;
@@ -111,7 +111,7 @@ class PayrollController extends Controller
                 $validated['employee_id'],
                 $validated['period_start'],
                 $validated['period_end'],
-                $validated['currency'],
+                'PLN', // Domyślna waluta, system automatycznie określi właściwą na podstawie stawek
                 $validated['notes'] ?? null
             );
 
@@ -195,7 +195,8 @@ class PayrollController extends Controller
     {
         $validated = $request->validated();
 
-        $payroll->adjustments_amount = $validated['adjustments_amount'];
+        // Recalculate adjustments_amount from advances/adjustments linked to this payroll
+        $payroll->adjustments_amount = $this->generatePayrollService->calculateAdjustmentsAmountForPayroll($payroll);
         $payroll->status = $validated['status'];
         if (isset($validated['notes'])) {
             $payroll->notes = $validated['notes'];
@@ -240,5 +241,32 @@ class PayrollController extends Controller
 
         return redirect()->route('payrolls.index')
             ->with('success', 'Payroll został usunięty.');
+    }
+
+    /**
+     * Recalculate all payrolls that can be recalculated.
+     */
+    public function recalculateAll(): RedirectResponse
+    {
+        $payrolls = Payroll::recalculatable()->get();
+        $recalculated = 0;
+        $errors = [];
+
+        foreach ($payrolls as $payroll) {
+            try {
+                $this->generatePayrollService->recalculate($payroll);
+                $recalculated++;
+            } catch (\Exception $e) {
+                $errors[] = "Payroll ID {$payroll->id}: " . $e->getMessage();
+            }
+        }
+
+        $message = "Przeliczono {$recalculated} payrolli.";
+        if (!empty($errors)) {
+            $message .= " Błędy: " . implode(', ', $errors);
+        }
+
+        return redirect()->route('payrolls.index')
+            ->with('success', $message);
     }
 }

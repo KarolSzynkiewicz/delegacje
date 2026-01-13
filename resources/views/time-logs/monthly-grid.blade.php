@@ -38,9 +38,25 @@
                 </x-ui.alert>
             @endif
 
-            @if(session('error'))
+            @if(session(key: 'error'))
                 <x-ui.alert variant="danger" title="Błąd" class="mb-3">
-                    {{ session('error') }}
+                    <div class="mb-2">{{ session('error') }}</div>
+                    @if(session('bulkErrors'))
+                        <div class="mt-3">
+                            <strong>Szczegóły błędów:</strong>
+                            <ul class="mb-0 mt-2">
+                                @foreach(session('bulkErrors') as $error)
+                                    <li>
+                                        <strong>Data {{ $error['date'] ?? 'nieznana' }}:</strong> 
+                                        {{ $error['message'] ?? 'Nieznany błąd' }}
+                                        @if(isset($error['assignment_id']))
+                                            (Assignment ID: {{ $error['assignment_id'] }})
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                 </x-ui.alert>
             @endif
 
@@ -147,9 +163,11 @@
                                                 // If no assignment from time log, find assignment for this day
                                                 if (!$assignmentId) {
                                                     foreach ($assignmentData['assignments'] as $ass) {
-                                                        $assStart = Carbon\Carbon::parse($ass->start_date);
-                                                        $assEnd = $ass->end_date ? Carbon\Carbon::parse($ass->end_date) : $monthEnd;
-                                                        if ($date->between($assStart, $assEnd)) {
+                                                        $assStart = Carbon\Carbon::parse($ass->start_date)->startOfDay();
+                                                        $assEnd = $ass->end_date ? Carbon\Carbon::parse($ass->end_date)->startOfDay() : $monthEnd->startOfDay();
+                                                        $dateDay = $date->copy()->startOfDay();
+                                                        // Check if date is within assignment period (inclusive - both start and end dates are allowed)
+                                                        if ($dateDay->gte($assStart) && $dateDay->lte($assEnd)) {
                                                             $assignmentId = $ass->id;
                                                             break;
                                                         }

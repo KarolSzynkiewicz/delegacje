@@ -50,9 +50,14 @@ class GeneratePayrollForEmployee
             throw new \InvalidArgumentException('Data rozpoczęcia okresu nie może być późniejsza niż data zakończenia.');
         }
 
-        // Check if payroll already exists for this period
+        // Check if payroll already exists for this period (exact match)
         if (Payroll::existsForPeriod($employeeId, $periodStart, $periodEnd)) {
             throw new \Exception('Payroll dla tego pracownika i okresu już istnieje.');
+        }
+
+        // Check if payroll overlaps with existing payrolls
+        if (Payroll::hasOverlappingPayrolls($employeeId, $periodStart, $periodEnd)) {
+            throw new \Exception('Payroll dla tego pracownika nakłada się z istniejącym payroll w tym okresie.');
         }
 
         // Get all TimeLogs for this employee in the period
@@ -64,24 +69,24 @@ class GeneratePayrollForEmployee
         // Calculate hours_amount based on TimeLogs and EmployeeRates
         $hoursAmount = $this->calculateHoursAmount($timeLogs, $actualCurrency);
 
-        // Calculate adjustments_amount (adjustments + advances)
-        $adjustmentsAmount = $this->calculateAdjustmentsAmount($employeeId, $periodStart, $periodEnd, $actualCurrency);
-
-        // Create payroll snapshot
+        // Create payroll snapshot (draft status - placeholder)
         $payroll = Payroll::create([
             'employee_id' => $employeeId,
             'period_start' => $periodStart->toDateString(),
             'period_end' => $periodEnd->toDateString(),
             'hours_amount' => $hoursAmount,
-            'adjustments_amount' => $adjustmentsAmount,
-            'total_amount' => $hoursAmount + $adjustmentsAmount,
+            'adjustments_amount' => 0, // Będzie obliczone z advances/adjustments które mają payroll_id
+            'total_amount' => $hoursAmount,
             'currency' => $actualCurrency,
-            'status' => PayrollStatus::ISSUED,
+            'status' => PayrollStatus::DRAFT, // Draft - placeholder, user może dodać advances/adjustments
             'notes' => $notes,
         ]);
 
-        // Link adjustments and advances to this payroll
-        $this->linkAdjustmentsAndAdvancesToPayroll($employeeId, $periodStart, $periodEnd, $payroll);
+        // Oblicz adjustments_amount z advances/adjustments które mają payroll_id
+        $adjustmentsAmount = $this->calculateAdjustmentsAmountForPayroll($payroll);
+        $payroll->adjustments_amount = $adjustmentsAmount;
+        $payroll->recalculateTotal();
+        $payroll->save();
 
         return $payroll;
     }
@@ -95,10 +100,12 @@ class GeneratePayrollForEmployee
      */
     public function getEmployeeIdsWithTimeLogsInPeriod(Carbon $periodStart, Carbon $periodEnd)
     {
+        // Używamy whereBetween z startOfDay/endOfDay zamiast DATE() w SQL (problemy z granicami dni)
+        // endOfDay() zapewnia, że ostatni dzień jest uwzględniony
         return TimeLog::whereHas('projectAssignment')
-            ->whereBetween(DB::raw('DATE(start_time)'), [
-                $periodStart->toDateString(),
-                $periodEnd->toDateString()
+            ->whereBetween('start_time', [
+                $periodStart->copy()->startOfDay(),
+                $periodEnd->copy()->endOfDay()
             ])
             ->with('projectAssignment.employee')
             ->get()
@@ -118,12 +125,14 @@ class GeneratePayrollForEmployee
      */
     public function getTimeLogsForPeriod(int $employeeId, Carbon $periodStart, Carbon $periodEnd)
     {
+        // Używamy whereBetween z startOfDay/endOfDay zamiast DATE() w SQL (problemy z granicami dni)
+        // endOfDay() zapewnia, że ostatni dzień jest uwzględniony
         return TimeLog::whereHas('projectAssignment', function ($query) use ($employeeId) {
             $query->where('employee_id', $employeeId);
         })
-        ->whereBetween(DB::raw('DATE(start_time)'), [
-            $periodStart->toDateString(),
-            $periodEnd->toDateString()
+        ->whereBetween('start_time', [
+            $periodStart->copy()->startOfDay(),
+            $periodEnd->copy()->endOfDay()
         ])
         ->with('projectAssignment.employee')
         ->get();
@@ -281,30 +290,24 @@ class GeneratePayrollForEmployee
     }
 
     /**
-     * Calculate adjustments_amount based on adjustments and advances in the period.
+     * Calculate total adjustments amount (adjustments + advances) for a specific payroll.
+     * Now advances and adjustments are directly linked to payroll_id.
      * 
-     * Adjustments: sum of all adjustment amounts (can be positive for bonuses or negative for penalties)
-     * Advances: sum of advance amounts + interest if applicable
-     * 
-     * @param int $employeeId
-     * @param Carbon $periodStart
-     * @param Carbon $periodEnd
-     * @param string $currency
-     * @param Payroll|null $excludePayroll Payroll to exclude from search (for recalculation)
+     * @param Payroll $payroll
      * @return float
      */
-    public function calculateAdjustmentsAmount(int $employeeId, Carbon $periodStart, Carbon $periodEnd, string $currency, ?Payroll $excludePayroll = null): float
+    public function calculateAdjustmentsAmountForPayroll(Payroll $payroll): float
     {
         $totalAdjustments = 0;
 
-        // Calculate adjustments contribution
-        $adjustments = $this->getAdjustmentsForPeriod($employeeId, $periodStart, $periodEnd, $currency, $excludePayroll);
+        // Get adjustments linked to this payroll
+        $adjustments = Adjustment::where('payroll_id', $payroll->id)->get();
         foreach ($adjustments as $adjustment) {
             $totalAdjustments += $adjustment->getEffectiveAmount();
         }
 
-        // Calculate advances contribution
-        $advances = $this->getAdvancesForPeriod($employeeId, $periodStart, $periodEnd, $currency, $excludePayroll);
+        // Get advances linked to this payroll
+        $advances = Advance::where('payroll_id', $payroll->id)->get();
         foreach ($advances as $advance) {
             $totalAdjustments -= (float) $advance->amount;
             $totalAdjustments -= $advance->getInterestAmount();
@@ -313,93 +316,6 @@ class GeneratePayrollForEmployee
         return round($totalAdjustments, 2);
     }
 
-    /**
-     * Get adjustments for a period, trying requested currency first, then any currency.
-     * 
-     * @param int $employeeId
-     * @param Carbon $periodStart
-     * @param Carbon $periodEnd
-     * @param string $currency
-     * @param Payroll|null $excludePayroll
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    protected function getAdjustmentsForPeriod(int $employeeId, Carbon $periodStart, Carbon $periodEnd, string $currency, ?Payroll $excludePayroll = null)
-    {
-        $query = Adjustment::forEmployee($employeeId)
-            ->inDateRange($periodStart->toDateString(), $periodEnd->toDateString());
-
-        if ($excludePayroll) {
-            $query->forPayrollRecalculation($excludePayroll);
-        } else {
-            $query->unlinked();
-        }
-
-        // First try requested currency
-        $adjustments = (clone $query)->where('currency', $currency)->get();
-        
-        // If no adjustments in requested currency, get all adjustments (any currency)
-        if ($adjustments->isEmpty()) {
-            $adjustments = $query->get();
-        }
-
-        return $adjustments;
-    }
-
-    /**
-     * Get advances for a period, trying requested currency first, then any currency.
-     * 
-     * @param int $employeeId
-     * @param Carbon $periodStart
-     * @param Carbon $periodEnd
-     * @param string $currency
-     * @param Payroll|null $excludePayroll
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    protected function getAdvancesForPeriod(int $employeeId, Carbon $periodStart, Carbon $periodEnd, string $currency, ?Payroll $excludePayroll = null)
-    {
-        $query = Advance::forEmployee($employeeId)
-            ->inDateRange($periodStart->toDateString(), $periodEnd->toDateString());
-
-        if ($excludePayroll) {
-            $query->forPayrollRecalculation($excludePayroll);
-        } else {
-            $query->unlinked();
-        }
-
-        // First try requested currency
-        $advances = (clone $query)->where('currency', $currency)->get();
-        
-        // If no advances in requested currency, get all advances (any currency)
-        if ($advances->isEmpty()) {
-            $advances = $query->get();
-        }
-
-        return $advances;
-    }
-
-    /**
-     * Link adjustments and advances to the payroll.
-     * 
-     * @param int $employeeId
-     * @param Carbon $periodStart
-     * @param Carbon $periodEnd
-     * @param Payroll $payroll
-     * @return void
-     */
-    public function linkAdjustmentsAndAdvancesToPayroll(int $employeeId, Carbon $periodStart, Carbon $periodEnd, Payroll $payroll): void
-    {
-        // Link adjustments (including those that were previously linked to this payroll)
-        Adjustment::forEmployee($employeeId)
-            ->inDateRange($periodStart->toDateString(), $periodEnd->toDateString())
-            ->forPayrollRecalculation($payroll)
-            ->update(['payroll_id' => $payroll->id]);
-
-        // Link advances (including those that were previously linked to this payroll)
-        Advance::forEmployee($employeeId)
-            ->inDateRange($periodStart->toDateString(), $periodEnd->toDateString())
-            ->forPayrollRecalculation($payroll)
-            ->update(['payroll_id' => $payroll->id]);
-    }
 
     /**
      * Recalculate an existing payroll.
@@ -436,26 +352,8 @@ class GeneratePayrollForEmployee
         // Recalculate hours_amount
         $newHoursAmount = $this->calculateHoursAmount($timeLogs, $actualCurrency);
 
-        // Unlink old adjustments and advances from this payroll
-        Adjustment::where('payroll_id', $payroll->id)->update(['payroll_id' => null]);
-        Advance::where('payroll_id', $payroll->id)->update(['payroll_id' => null]);
-
-        // Recalculate adjustments_amount
-        $newAdjustmentsAmount = $this->calculateAdjustmentsAmount(
-            $payroll->employee_id,
-            $periodStart,
-            $periodEnd,
-            $actualCurrency,
-            $payroll
-        );
-
-        // Link adjustments and advances to this payroll
-        $this->linkAdjustmentsAndAdvancesToPayroll(
-            $payroll->employee_id,
-            $periodStart,
-            $periodEnd,
-            $payroll
-        );
+        // Recalculate adjustments_amount from advances/adjustments linked to this payroll
+        $newAdjustmentsAmount = $this->calculateAdjustmentsAmountForPayroll($payroll);
 
         // Update payroll
         $payroll->hours_amount = $newHoursAmount;

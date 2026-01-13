@@ -28,18 +28,23 @@ class TimeLogService
      */
     public function createTimeLog(ProjectAssignment $assignment, array $data): TimeLog
     {
-        $workDate = Carbon::parse($data['work_date']);
+        $workDate = Carbon::parse($data['work_date'])->startOfDay();
         $hoursWorked = $data['hours_worked'];
 
+        // Assignment jest już świeży - nie trzeba refresh()
+        
         // Validate work date is within assignment period
-        $this->validateWorkDateWithinAssignment($assignment, $workDate);
-
+        // WYŁĄCZONE - wykomentowane na prośbę użytkownika
+        // $this->validateWorkDateWithinAssignment($assignment, $workDate);
         // Validate hours worked
         $this->validateHoursWorked($hoursWorked);
 
         // Check if time log already exists for this date
+        // Używamy whereBetween z startOfDay/endOfDay zamiast whereDate (problemy z timezone)
+        $dayStart = $workDate->copy()->startOfDay();
+        $dayEnd = $workDate->copy()->endOfDay();
         $existingLog = TimeLog::where('project_assignment_id', $assignment->id)
-            ->whereDate('start_time', $workDate)
+            ->whereBetween('start_time', [$dayStart, $dayEnd])
             ->first();
 
         if ($existingLog) {
@@ -63,18 +68,35 @@ class TimeLogService
      */
     public function updateTimeLog(TimeLog $timeLog, array $data): bool
     {
-        $workDate = Carbon::parse($data['work_date']);
+        $assignment = $timeLog->projectAssignment;
+        return $this->updateTimeLogWithAssignment($timeLog, $assignment, $data);
+    }
+
+    /**
+     * Update an existing time log with a specific assignment.
+     * Used in bulk updates to ensure we validate against the correct assignment.
+     */
+    protected function updateTimeLogWithAssignment(TimeLog $timeLog, ProjectAssignment $assignment, array $data): bool
+    {
+        $workDate = Carbon::parse($data['work_date'])->startOfDay();
         $hoursWorked = $data['hours_worked'];
 
+        // Assignment jest już świeży z bulkUpdateTimeLogs (findOrFail)
+        // Nie trzeba refresh() - może powodować problemy z cast 'date'
+        
         // Validate work date is within assignment period
-        $this->validateWorkDateWithinAssignment($timeLog->projectAssignment, $workDate);
+        // WYŁĄCZONE - wykomentowane na prośbę użytkownika
+        // $this->validateWorkDateWithinAssignment($assignment, $workDate);
 
         // Validate hours worked
         $this->validateHoursWorked($hoursWorked);
 
         // Check if another time log exists for this date (excluding current)
+        // Używamy whereBetween z startOfDay/endOfDay zamiast whereDate (problemy z timezone)
+        $dayStart = $workDate->copy()->startOfDay();
+        $dayEnd = $workDate->copy()->endOfDay();
         $existingLog = TimeLog::where('project_assignment_id', $timeLog->project_assignment_id)
-            ->whereDate('start_time', $workDate)
+            ->whereBetween('start_time', [$dayStart, $dayEnd])
             ->where('id', '!=', $timeLog->id)
             ->first();
 
@@ -117,10 +139,14 @@ class TimeLogService
      */
     public function getTotalHoursForEmployee(int $employeeId, Carbon $startDate, Carbon $endDate): float
     {
+        // Używamy endOfDay() dla endDate, aby uwzględnić cały ostatni dzień
         return TimeLog::whereHas('projectAssignment', function ($query) use ($employeeId) {
             $query->where('employee_id', $employeeId);
         })
-        ->whereBetween('start_time', [$startDate, $endDate])
+        ->whereBetween('start_time', [
+            $startDate->copy()->startOfDay(),
+            $endDate->copy()->endOfDay()
+        ])
         ->sum('hours_worked');
     }
 
@@ -142,23 +168,55 @@ class TimeLogService
      * Validate work date is within assignment period.
      * 
      * @throws ValidationException
+     * 
+     * WYŁĄCZONE - wykomentowane na prośbę użytkownika
      */
     protected function validateWorkDateWithinAssignment(ProjectAssignment $assignment, Carbon $workDate): void
     {
-        $startDate = Carbon::parse($assignment->start_date);
-        $endDate = $assignment->end_date ? Carbon::parse($assignment->end_date) : null;
+        // WALIDACJA WYŁĄCZONA - metoda nie wykonuje żadnych sprawdzeń
+        return;
+        
+        /*
+        // start_date i end_date są już obiektami Carbon (cast 'date')
+        // Upewniamy się, że wszystkie daty są w tym samym formacie (bez czasu)
+        $startDate = $assignment->start_date instanceof Carbon 
+            ? $assignment->start_date->copy()->startOfDay() 
+            : Carbon::parse($assignment->start_date)->startOfDay();
+        $endDate = $assignment->end_date 
+            ? ($assignment->end_date instanceof Carbon 
+                ? $assignment->end_date->copy()->startOfDay() 
+                : Carbon::parse($assignment->end_date)->startOfDay())
+            : null;
+        $workDateDay = $workDate->copy()->startOfDay();
 
-        if ($workDate->lt($startDate)) {
+        // Porównujemy tylko daty (bez czasu) jako stringi
+        $startDateOnly = $startDate->format('Y-m-d');
+        $endDateOnly = $endDate ? $endDate->format('Y-m-d') : null;
+        $workDateOnly = $workDateDay->format('Y-m-d');
+
+        if ($workDateOnly < $startDateOnly) {
+            $startDateStr = $assignment->start_date instanceof Carbon 
+                ? $assignment->start_date->format('Y-m-d') 
+                : Carbon::parse($assignment->start_date)->format('Y-m-d');
             throw ValidationException::withMessages([
-                'work_date' => 'Data pracy nie może być wcześniejsza niż data rozpoczęcia przypisania (' . $startDate->format('Y-m-d') . ').'
+                'work_date' => 'Data pracy (' . $workDate->format('Y-m-d') . ') nie może być wcześniejsza niż data rozpoczęcia przypisania (' . $startDateStr . ').'
             ]);
         }
 
-        if ($endDate && $workDate->gt($endDate)) {
+        // Data może być równa end_date (ostatni dzień przypisania jest dozwolony)
+        // Porównujemy stringi dat (Y-m-d) zamiast obiektów Carbon
+        if ($endDateOnly && $workDateOnly > $endDateOnly) {
+            $endDateStr = $assignment->end_date instanceof Carbon 
+                ? $assignment->end_date->format('Y-m-d') 
+                : Carbon::parse($assignment->end_date)->format('Y-m-d');
+            $startDateStr = $assignment->start_date instanceof Carbon 
+                ? $assignment->start_date->format('Y-m-d') 
+                : Carbon::parse($assignment->start_date)->format('Y-m-d');
             throw ValidationException::withMessages([
-                'work_date' => 'Data pracy nie może być późniejsza niż data zakończenia przypisania (' . $endDate->format('Y-m-d') . ').'
+                'work_date' => 'Data pracy (' . $workDate->format('Y-m-d') . ') nie może być późniejsza niż data zakończenia przypisania (' . $endDateStr . '). Przypisanie: ID ' . $assignment->id . ', okres: ' . $startDateStr . ' - ' . $endDateStr . '.'
             ]);
         }
+        */
     }
 
     /**
@@ -290,9 +348,10 @@ class TimeLogService
         }
 
         // Generate days array
+        // Upewniamy się, że wszystkie daty są w startOfDay() dla stabilności
         $days = [];
         for ($day = 1; $day <= $daysInMonth; $day++) {
-            $date = $monthStart->copy()->addDays($day - 1);
+            $date = $monthStart->copy()->addDays($day - 1)->startOfDay();
             $days[] = [
                 'number' => $day,
                 'date' => $date,
@@ -337,18 +396,23 @@ class TimeLogService
             try {
                 $assignmentId = (int)$entry['assignment_id'];
                 $assignment = ProjectAssignment::findOrFail($assignmentId);
-                $date = Carbon::parse($entry['date']);
+                // Parsuj datę i ustaw na startOfDay() od razu - zapewnia stabilność
+                $date = Carbon::parse($entry['date'])->startOfDay();
                 $hours = isset($entry['hours']) && $entry['hours'] !== '' && $entry['hours'] !== null ? (float)$entry['hours'] : 0;
 
                 // Find existing time log
+                // Używamy whereBetween z startOfDay/endOfDay zamiast whereDate (problemy z timezone)
+                $dayStart = $date->copy()->startOfDay();
+                $dayEnd = $date->copy()->endOfDay();
                 $timeLog = TimeLog::where('project_assignment_id', $assignment->id)
-                    ->whereDate('start_time', $date)
+                    ->whereBetween('start_time', [$dayStart, $dayEnd])
                     ->first();
 
                 if ($hours > 0) {
                     if ($timeLog) {
-                        // Update existing
-                        $this->updateTimeLog($timeLog, [
+                        // Update existing - use the assignment from bulkUpdate, not from timeLog
+                        // This ensures we validate against the correct assignment
+                        $this->updateTimeLogWithAssignment($timeLog, $assignment, [
                             'work_date' => $date->format('Y-m-d'),
                             'hours_worked' => $hours,
                         ]);
