@@ -243,6 +243,28 @@
                     </x-ui.card>
                 </div>
                 @endcan
+
+                <!-- Stawki Pracowników -->
+                <div class="col-md-6 col-lg-4">
+                    <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('employee-rates.index') }}'">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-currency-exchange text-success fs-2 me-3"></i>
+                            <h4 class="card-title mb-0 text-success fw-semibold">Stawki Pracowników</h4>
+                        </div>
+                        <p class="card-text text-muted mb-0">Zarządzaj stawkami pracowników</p>
+                    </x-ui.card>
+                </div>
+
+                <!-- Payroll -->
+                <div class="col-md-6 col-lg-4">
+                    <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('payrolls.index') }}'">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-cash-stack text-primary fs-2 me-3"></i>
+                            <h4 class="card-title mb-0 text-primary fw-semibold">Payroll</h4>
+                        </div>
+                        <p class="card-text text-muted mb-0">Rozliczenia pracowników</p>
+                    </x-ui.card>
+                </div>
             </div>
         </div>
     </div>

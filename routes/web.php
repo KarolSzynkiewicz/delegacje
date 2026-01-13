@@ -17,6 +17,7 @@ use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\WeeklyOverviewController;
 use App\Http\Controllers\RotationController;
+use App\Http\Controllers\EmployeeRateController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -165,6 +166,12 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])->name('time-logs.bulk-update');
     Route::resource('time-logs', \App\Http\Controllers\TimeLogController::class);
     Route::get('assignments/{assignment}/time-logs', [\App\Http\Controllers\TimeLogController::class, 'byAssignment'])->name('assignments.time-logs');
+    
+    // Employee Rates
+    Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
+    
+    // Payroll
+    Route::resource('payrolls', \App\Http\Controllers\PayrollController::class);
 });
 
 // Route for users without roles (must be outside role.required middleware)
