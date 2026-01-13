@@ -5,6 +5,7 @@ namespace App\Enums;
 enum PayrollStatus: string
 {
     case DRAFT = 'draft';
+    case ISSUED = 'issued';
     case APPROVED = 'approved';
     case PAID = 'paid';
 
@@ -12,6 +13,7 @@ enum PayrollStatus: string
     {
         return match($this) {
             self::DRAFT => 'Szkic',
+            self::ISSUED => 'Wystawiony',
             self::APPROVED => 'Zatwierdzony',
             self::PAID => 'Wypłacony',
         };

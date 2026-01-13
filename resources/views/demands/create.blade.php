@@ -62,7 +62,7 @@
                                 name="date_to" 
                                 id="date_to"
                                 label="Data do (opcjonalnie)"
-                                value="{{ $dateTo ?? '' }}"
+                                value="{{ old('date_to', $existingDateTo ?? $dateTo ?? '') }}"
                             />
                         </div>
                     </div>

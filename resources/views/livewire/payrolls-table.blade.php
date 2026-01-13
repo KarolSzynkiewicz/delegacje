@@ -31,6 +31,7 @@
                             class="form-select form-select-sm">
                         <option value="">Wszystkie</option>
                         <option value="draft">Szkic</option>
+                        <option value="issued">Wystawiony</option>
                         <option value="approved">Zatwierdzony</option>
                         <option value="paid">Wypłacony</option>
                     </select>
@@ -128,6 +129,7 @@
                                     @php
                                         $badgeVariant = match($payroll->status->value) {
                                             'draft' => 'accent',
+                                            'issued' => 'warning',
                                             'approved' => 'info',
                                             'paid' => 'success',
                                             default => 'accent'
@@ -136,12 +138,22 @@
                                     <x-ui.badge variant="{{ $badgeVariant }}">{{ $payroll->status->label() }}</x-ui.badge>
                                 </td>
                                 <td>
-                                    <x-ui.action-buttons
-                                        viewRoute="{{ route('payrolls.show', $payroll) }}"
-                                        editRoute="{{ route('payrolls.edit', $payroll) }}"
-                                        deleteRoute="{{ route('payrolls.destroy', $payroll) }}"
-                                        deleteMessage="Czy na pewno chcesz usunąć ten payroll?"
-                                    />
+                                    <div class="d-flex gap-1">
+                                        @if(in_array($payroll->status->value, ['draft', 'issued']))
+                                        <form action="{{ route('payrolls.recalculate', $payroll) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            <x-ui.button variant="warning" type="submit" class="btn-sm" title="Przelicz na podstawie aktualnych stawek">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </x-ui.button>
+                                        </form>
+                                        @endif
+                                        <x-action-buttons
+                                            viewRoute="{{ route('payrolls.show', $payroll) }}"
+                                            editRoute="{{ route('payrolls.edit', $payroll) }}"
+                                            deleteRoute="{{ route('payrolls.destroy', $payroll) }}"
+                                            deleteMessage="Czy na pewno chcesz usunąć ten payroll?"
+                                        />
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

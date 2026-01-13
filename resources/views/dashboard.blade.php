@@ -265,6 +265,28 @@
                         <p class="card-text text-muted mb-0">Rozliczenia pracowników</p>
                     </x-ui.card>
                 </div>
+
+                <!-- Kary i Nagrody -->
+                <div class="col-md-6 col-lg-4">
+                    <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('adjustments.index') }}'">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-exclamation-triangle text-warning fs-2 me-3"></i>
+                            <h4 class="card-title mb-0 text-warning fw-semibold">Kary i Nagrody</h4>
+                        </div>
+                        <p class="card-text text-muted mb-0">Zarządzaj karami i nagrodami</p>
+                    </x-ui.card>
+                </div>
+
+                <!-- Zaliczki -->
+                <div class="col-md-6 col-lg-4">
+                    <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('advances.index') }}'">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-wallet text-info fs-2 me-3"></i>
+                            <h4 class="card-title mb-0 text-info fw-semibold">Zaliczki</h4>
+                        </div>
+                        <p class="card-text text-muted mb-0">Zarządzaj zaliczkami pracowników</p>
+                    </x-ui.card>
+                </div>
             </div>
         </div>
     </div>

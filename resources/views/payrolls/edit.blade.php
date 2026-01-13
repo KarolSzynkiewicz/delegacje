@@ -16,6 +16,10 @@
                     Kwota z godzin (hours_amount) jest niemutowalna.
                 </x-ui.alert>
 
+                @php
+                    $payroll->load(['adjustments', 'advances']);
+                @endphp
+
                 <div class="mb-4 p-3 bg-light rounded">
                     <div class="row">
                         <div class="col-md-6">
@@ -33,11 +37,97 @@
                             <strong>{{ number_format($payroll->hours_amount, 2, ',', ' ') }} {{ $payroll->currency }}</strong>
                         </div>
                         <div class="col-md-6">
+                            <small class="text-muted d-block">Korekty:</small>
+                            <strong class="{{ $payroll->adjustments_amount >= 0 ? 'text-success' : 'text-danger' }}">
+                                {{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}
+                            </strong>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-12">
                             <small class="text-muted d-block">Razem:</small>
-                            <strong class="text-success">{{ number_format($payroll->total_amount, 2, ',', ' ') }} {{ $payroll->currency }}</strong>
+                            <strong class="text-success fs-5">{{ number_format($payroll->total_amount, 2, ',', ' ') }} {{ $payroll->currency }}</strong>
                         </div>
                     </div>
                 </div>
+
+                @if($payroll->adjustments->count() > 0 || $payroll->advances->count() > 0)
+                <div class="mb-4">
+                    <h5 class="mb-3">Szczegóły korekt</h5>
+                    
+                    @if($payroll->adjustments->count() > 0)
+                    <div class="mb-3">
+                        <h6>Kary i nagrody:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Typ</th>
+                                        <th>Kwota</th>
+                                        <th>Notatki</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($payroll->adjustments as $adjustment)
+                                    <tr>
+                                        <td>{{ $adjustment->date->format('d.m.Y') }}</td>
+                                        <td>
+                                            <span class="badge {{ $adjustment->type === 'bonus' ? 'bg-success' : 'bg-danger' }}">
+                                                {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
+                                            </span>
+                                        </td>
+                                        <td class="{{ $adjustment->amount >= 0 ? 'text-success' : 'text-danger' }}">
+                                            {{ number_format($adjustment->amount, 2, ',', ' ') }} {{ $adjustment->currency }}
+                                        </td>
+                                        <td>{{ $adjustment->notes ?? '-' }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($payroll->advances->count() > 0)
+                    <div class="mb-3">
+                        <h6>Zaliczki:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Kwota</th>
+                                        <th>Oprocentowanie</th>
+                                        <th>Do odliczenia</th>
+                                        <th>Notatki</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($payroll->advances as $advance)
+                                    <tr>
+                                        <td>{{ $advance->date->format('d.m.Y') }}</td>
+                                        <td>{{ number_format($advance->amount, 2, ',', ' ') }} {{ $advance->currency }}</td>
+                                        <td>
+                                            @if($advance->is_interest_bearing && $advance->interest_rate)
+                                                {{ number_format($advance->interest_rate, 2, ',', ' ') }}%
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="text-danger">
+                                            <strong>{{ number_format($advance->getTotalDeductionAmount(), 2, ',', ' ') }} {{ $advance->currency }}</strong>
+                                        </td>
+                                        <td>{{ $advance->notes ?? '-' }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+                @endif
 
                 <form method="POST" action="{{ route('payrolls.update', $payroll) }}">
                     @csrf
@@ -65,6 +155,7 @@
                             required="true"
                         >
                             <option value="draft" {{ old('status', $payroll->status->value) == 'draft' ? 'selected' : '' }}>Szkic</option>
+                            <option value="issued" {{ old('status', $payroll->status->value) == 'issued' ? 'selected' : '' }}>Wystawiony</option>
                             <option value="approved" {{ old('status', $payroll->status->value) == 'approved' ? 'selected' : '' }}>Zatwierdzony</option>
                             <option value="paid" {{ old('status', $payroll->status->value) == 'paid' ? 'selected' : '' }}>Wypłacony</option>
                         </x-ui.input>

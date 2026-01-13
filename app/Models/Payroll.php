@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\PayrollStatus;
 use Carbon\Carbon;
 
@@ -64,5 +65,81 @@ class Payroll extends Model
     public function recalculateTotal(): void
     {
         $this->total_amount = $this->hours_amount + $this->adjustments_amount;
+    }
+
+    /**
+     * Get all adjustments for this payroll.
+     */
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(Adjustment::class);
+    }
+
+    /**
+     * Get all advances for this payroll.
+     */
+    public function advances(): HasMany
+    {
+        return $this->hasMany(Advance::class);
+    }
+
+    /**
+     * Scope a query to only include payrolls with a specific status.
+     */
+    public function scopeWithStatus($query, PayrollStatus $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope a query to only include payrolls that can be recalculated.
+     */
+    public function scopeRecalculatable($query)
+    {
+        return $query->whereIn('status', [PayrollStatus::DRAFT, PayrollStatus::ISSUED]);
+    }
+
+    /**
+     * Scope a query to only include payrolls that can be deleted.
+     */
+    public function scopeDeletable($query)
+    {
+        return $query->where('status', PayrollStatus::DRAFT);
+    }
+
+    /**
+     * Check if this payroll can be recalculated.
+     * 
+     * @return bool
+     */
+    public function canBeRecalculated(): bool
+    {
+        return in_array($this->status, [PayrollStatus::DRAFT, PayrollStatus::ISSUED]);
+    }
+
+    /**
+     * Check if this payroll can be deleted.
+     * 
+     * @return bool
+     */
+    public function canBeDeleted(): bool
+    {
+        return $this->status === PayrollStatus::DRAFT;
+    }
+
+    /**
+     * Check if payroll exists for employee and period.
+     * 
+     * @param int $employeeId
+     * @param Carbon $periodStart
+     * @param Carbon $periodEnd
+     * @return bool
+     */
+    public static function existsForPeriod(int $employeeId, Carbon $periodStart, Carbon $periodEnd): bool
+    {
+        return static::where('employee_id', $employeeId)
+            ->where('period_start', $periodStart->toDateString())
+            ->where('period_end', $periodEnd->toDateString())
+            ->exists();
     }
 }

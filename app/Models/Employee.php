@@ -503,4 +503,28 @@ class Employee extends Model
 
         return !$hasConflictingAssignments;
     }
+
+    /**
+     * Get all adjustments for this employee.
+     */
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(Adjustment::class);
+    }
+
+    /**
+     * Get all advances for this employee.
+     */
+    public function advances(): HasMany
+    {
+        return $this->hasMany(Advance::class);
+    }
+
+    /**
+     * Get all payrolls for this employee.
+     */
+    public function payrolls(): HasMany
+    {
+        return $this->hasMany(Payroll::class);
+    }
 }

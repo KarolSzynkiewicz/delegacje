@@ -14,10 +14,14 @@ class TimeLogsTable extends Component
 
     public $employeeFilter = '';
     public $projectFilter = '';
+    public $dateFrom = '';
+    public $dateTo = '';
 
     protected $queryString = [
         'employeeFilter' => ['except' => ''],
         'projectFilter' => ['except' => ''],
+        'dateFrom' => ['except' => ''],
+        'dateTo' => ['except' => ''],
     ];
 
     public function updatingEmployeeFilter()
@@ -30,10 +34,22 @@ class TimeLogsTable extends Component
         $this->resetPage();
     }
 
+    public function updatingDateFrom()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingDateTo()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->employeeFilter = '';
         $this->projectFilter = '';
+        $this->dateFrom = '';
+        $this->dateTo = '';
         $this->resetPage();
     }
 
@@ -53,6 +69,16 @@ class TimeLogsTable extends Component
             $query->whereHas('projectAssignment', function($q) {
                 $q->where('project_id', $this->projectFilter);
             });
+        }
+
+        // Filtrowanie po dacie od
+        if ($this->dateFrom) {
+            $query->whereDate('start_time', '>=', $this->dateFrom);
+        }
+
+        // Filtrowanie po dacie do
+        if ($this->dateTo) {
+            $query->whereDate('start_time', '<=', $this->dateTo);
         }
 
         $timeLogs = $query->orderBy('start_time', 'desc')

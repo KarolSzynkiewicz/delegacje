@@ -130,7 +130,7 @@
                                     <small class="text-muted">{{ $rate->notes ? Str::limit($rate->notes, 50) : '-' }}</small>
                                 </td>
                                 <td>
-                                    <x-ui.action-buttons
+                                    <x-action-buttons
                                         viewRoute="{{ route('employee-rates.show', $rate) }}"
                                         editRoute="{{ route('employee-rates.edit', $rate) }}"
                                         deleteRoute="{{ route('employee-rates.destroy', $rate) }}"

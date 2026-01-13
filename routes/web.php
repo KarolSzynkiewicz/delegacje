@@ -171,7 +171,16 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
     
     // Payroll
+    Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])->name('payrolls.generate-batch');
+    Route::post('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatch'])->name('payrolls.generate-batch.store');
+    Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])->name('payrolls.recalculate');
     Route::resource('payrolls', \App\Http\Controllers\PayrollController::class);
+    
+    // Adjustments (Kary/Nagrody)
+    Route::resource('adjustments', \App\Http\Controllers\AdjustmentController::class);
+    
+    // Advances (Zaliczki)
+    Route::resource('advances', \App\Http\Controllers\AdvanceController::class);
 });
 
 // Route for users without roles (must be outside role.required middleware)

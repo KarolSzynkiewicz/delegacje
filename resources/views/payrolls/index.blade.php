@@ -2,9 +2,14 @@
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="fw-semibold fs-4 text-dark mb-0">Payroll</h2>
-            <x-ui.button variant="primary" href="{{ route('payrolls.create') }}">
-                <i class="bi bi-plus-circle"></i> Wygeneruj Payroll
-            </x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button variant="primary" href="{{ route('payrolls.generate-batch') }}">
+                    <i class="bi bi-gear"></i> Generuj Payroll
+                </x-ui.button>
+                <x-ui.button variant="secondary" href="{{ route('payrolls.create') }}">
+                    <i class="bi bi-plus-circle"></i> Nowy Payroll
+                </x-ui.button>
+            </div>
         </div>
     </x-slot>
 

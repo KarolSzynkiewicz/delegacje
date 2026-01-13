@@ -66,6 +66,7 @@ class ProjectDemandController extends Controller
         
         // Pobierz istniejące zapotrzebowania dla tego projektu w tym okresie (jeśli daty są podane)
         $existingDemands = collect();
+        $existingDateTo = null;
         if ($dateFrom && $dateTo) {
             $existingDemands = $project->demands()
                 ->where('date_from', '<=', $dateTo)
@@ -74,11 +75,35 @@ class ProjectDemandController extends Controller
                       ->orWhere('date_to', '>=', $dateFrom);
                 })
                 ->with('role')
-                ->get()
-                ->keyBy('role_id');
+                ->get();
+            
+            // Znajdź najpóźniejszą datę do z istniejących zapotrzebowań
+            $demandsWithDateTo = $existingDemands->filter(function($d) {
+                return $d->date_to !== null;
+            });
+            
+            if ($demandsWithDateTo->isNotEmpty()) {
+                // Jeśli są zapotrzebowania z date_to, użyj najpóźniejszej
+                $latestDateTo = $demandsWithDateTo->max('date_to');
+                $existingDateTo = $latestDateTo->format('Y-m-d');
+            } else {
+                // Jeśli wszystkie mają date_to = null, sprawdź czy wszystkie mają tę samą date_from
+                // Jeśli tak, użyj date_to z parametrów, w przeciwnym razie zostaw puste
+                $uniqueDateFrom = $existingDemands->pluck('date_from')->unique();
+                if ($uniqueDateFrom->count() === 1 && $uniqueDateFrom->first()->format('Y-m-d') === $dateFrom) {
+                    // Wszystkie zapotrzebowania zaczynają się w tym samym dniu co zakres, użyj date_to z parametrów
+                    $existingDateTo = $dateTo;
+                } else {
+                    // Różne daty, zostaw puste (użytkownik sam zdecyduje)
+                    $existingDateTo = null;
+                }
+            }
+            
+            // Kluczuj po role_id (jeśli jest wiele dla tej samej roli, weź pierwsze)
+            $existingDemands = $existingDemands->keyBy('role_id');
         }
         
-        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo", "existingDemands", "isDateInPast"));
+        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo", "existingDemands", "existingDateTo", "isDateInPast"));
     }
 
     /**

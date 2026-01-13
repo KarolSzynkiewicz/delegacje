@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Enums\PayrollStatus;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdatePayrollRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'adjustments_amount' => ['required', 'numeric'],
+            'status' => ['required', Rule::enum(PayrollStatus::class)],
+            'notes' => ['nullable', 'string'],
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'adjustments_amount.required' => 'Kwota korekt jest wymagana.',
+            'adjustments_amount.numeric' => 'Kwota korekt musi być liczbą.',
+            'status.required' => 'Status jest wymagany.',
+            'status.enum' => 'Status musi być poprawną wartością.',
+        ];
+    }
+}

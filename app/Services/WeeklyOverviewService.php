@@ -230,6 +230,9 @@ class WeeklyOverviewService
                 'role' => $role,
                 'needed' => 0,
                 'assigned' => $roleAssignments->count(),
+                'assigned_min' => $roleAssignments->count(),
+                'assigned_max' => $roleAssignments->count(),
+                'is_stable' => true,
                 'missing' => 0,
                 'excess' => $roleAssignments->count(),
             ];
@@ -244,7 +247,7 @@ class WeeklyOverviewService
         $allStable = true;
         
         foreach ($roleDetails as $roleDetail) {
-            if ($roleDetail['is_stable'] && $roleDetail['assigned'] !== null) {
+            if (!empty($roleDetail['assigned']) && $roleDetail['is_stable']) {
                 $totalAssignedForNeededRoles += $roleDetail['assigned'];
             } else {
                 $allStable = false;
@@ -629,16 +632,6 @@ class WeeklyOverviewService
                             ($assignment->end_date === null || $assignment->end_date->gte($weekEnd));
             $isPartial = !$coversFullWeek;
             
-            // Debug: log if needed
-            // \Log::info('Assignment partial check', [
-            //     'employee_id' => $employee->id,
-            //     'start_date' => $assignment->start_date->format('Y-m-d'),
-            //     'end_date' => $assignment->end_date?->format('Y-m-d'),
-            //     'week_start' => $weekStart->format('Y-m-d'),
-            //     'week_end' => $weekEnd->format('Y-m-d'),
-            //     'is_partial' => $isPartial
-            // ]);
-            
             $assignmentStart = max($assignment->start_date, $weekStart);
             $assignmentEnd = min($assignment->end_date ?? $weekEnd, $weekEnd);
             
@@ -704,10 +697,9 @@ class WeeklyOverviewService
         // Get all days of the week
         $days = $this->getWeekDays($weekStart);
         
-        // Get daily demands and assignments for each day (always, even if no assignments)
-        $dailyDemands = $this->getDailyDemandsAndAssignments($project, $weekStart, $weekEnd, $days);
-        
         if ($assignments->isEmpty()) {
+            // Get daily demands and assignments for each day (even if no assignments)
+            $dailyDemands = $this->getDailyDemandsAndAssignments($project, $weekStart, $weekEnd, $days);
             return [
                 'employees' => collect(),
                 'days' => $days,
@@ -739,9 +731,6 @@ class WeeklyOverviewService
                 $returnTripsByEmployeeAndDate->get($employeeId)->put($eventDate, $returnTrip);
             }
         }
-        
-        // Get all days of the week
-        $days = $this->getWeekDays($weekStart);
         
         // For each employee, get daily data
         $employees = $employeeIds->map(function ($employeeId) use ($assignments, $days, $weekStart, $weekEnd, $returnTripsByEmployeeAndDate, $employeeIds) {

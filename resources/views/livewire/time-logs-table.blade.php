@@ -7,14 +7,14 @@
                 <div>
                     <h3 class="fs-5 fw-semibold mb-1">Ewidencja Godzin</h3>
                     <p class="small text-muted mb-0">
-                        @if($employeeFilter || $projectFilter)
+                        @if($employeeFilter || $projectFilter || $dateFrom || $dateTo)
                             Znaleziono: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
                         @else
                             Łącznie: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
                         @endif
                     </p>
                 </div>
-                @if($employeeFilter || $projectFilter)
+                @if($employeeFilter || $projectFilter || $dateFrom || $dateTo)
                     <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
                         <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                     </x-ui.button>
@@ -25,7 +25,7 @@
         <!-- Filtry -->
         <div class="row g-3">
             <!-- Pracownik -->
-            <div class="col-md-6">
+            <div class="col-md-6 col-lg-3">
                 <label class="form-label small">
                     <i class="bi bi-person me-1"></i> Pracownik
                 </label>
@@ -38,7 +38,7 @@
             </div>
 
             <!-- Projekt -->
-            <div class="col-md-6">
+            <div class="col-md-6 col-lg-3">
                 <label class="form-label small">
                     <i class="bi bi-folder me-1"></i> Projekt
                 </label>
@@ -48,6 +48,32 @@
                         <option value="{{ $project->id }}">{{ $project->name }}</option>
                     @endforeach
                 </select>
+            </div>
+
+            <!-- Data od -->
+            <div class="col-md-6 col-lg-3">
+                <label class="form-label small">
+                    <i class="bi bi-calendar-event me-1"></i> Data od
+                </label>
+                <input 
+                    type="date" 
+                    wire:model.live="dateFrom" 
+                    class="form-control"
+                    max="{{ $dateTo ? $dateTo : '' }}"
+                >
+            </div>
+
+            <!-- Data do -->
+            <div class="col-md-6 col-lg-3">
+                <label class="form-label small">
+                    <i class="bi bi-calendar-event me-1"></i> Data do
+                </label>
+                <input 
+                    type="date" 
+                    wire:model.live="dateTo" 
+                    class="form-control"
+                    min="{{ $dateFrom ? $dateFrom : '' }}"
+                >
             </div>
         </div>
     </x-ui.card>
@@ -91,8 +117,8 @@
                     @empty
                         <x-ui.empty-state 
                             icon="inbox"
-                            :message="$employeeFilter || $projectFilter ? 'Brak wpisów spełniających kryteria wyszukiwania.' : 'Brak wpisów w systemie.'"
-                            :has-filters="$employeeFilter || $projectFilter"
+                            :message="$employeeFilter || $projectFilter || $dateFrom || $dateTo ? 'Brak wpisów spełniających kryteria wyszukiwania.' : 'Brak wpisów w systemie.'"
+                            :has-filters="$employeeFilter || $projectFilter || $dateFrom || $dateTo"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
                             colspan="5"
