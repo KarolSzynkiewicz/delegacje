@@ -22,33 +22,15 @@
 
                     <!-- Zasoby Dropdown -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('projects.*') || request()->routeIs('employees.*') || request()->routeIs('vehicles.*') || request()->routeIs('accommodations.*') ? 'active' : '' }}" href="#" id="zasobyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('projects.*') || request()->routeIs('vehicles.*') || request()->routeIs('accommodations.*') || request()->routeIs('locations.*') ? 'active' : '' }}" href="#" id="zasobyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-boxes"></i> Zasoby
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="zasobyDropdown">
                             <li><a class="dropdown-item {{ request()->routeIs('projects.*') ? 'active' : '' }}" href="{{ route('projects.index') }}"><i class="bi bi-folder"></i> Projekty</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> Pracownicy</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('vehicles.*') || request()->routeIs('vehicle-assignments.*') ? 'active' : '' }}" href="{{ route('vehicles.index') }}"><i class="bi bi-car-front"></i> Pojazdy</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*') ? 'active' : '' }}" href="{{ route('accommodations.index') }}"><i class="bi bi-house"></i> Mieszkania</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('locations.*') ? 'active' : '' }}" href="{{ route('locations.index') }}"><i class="bi bi-geo-alt"></i> Lokalizacje</a></li>
                         </ul>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('documents.*') ? 'active' : '' }}" href="{{ route('documents.index') }}">
-                            <i class="bi bi-file-earmark-text"></i> Wymagania formalne
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('employee-documents.*') || request()->routeIs('employees.*employee-documents.*') ? 'active' : '' }}" href="{{ route('employee-documents.index') }}">
-                            <i class="bi bi-file-earmark-medical"></i> Dokumenty pracowników
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('locations.*') ? 'active' : '' }}" href="{{ route('locations.index') }}">
-                            <i class="bi bi-geo-alt"></i> Lokalizacje
-                        </a>
                     </li>
 
                     <li class="nav-item">
@@ -57,10 +39,10 @@
                         </a>
                     </li>
 
-                    <!-- Historia Przypisań Dropdown -->
+                    <!-- Przypisania Dropdown -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ request()->routeIs('assignments.*') || request()->routeIs('vehicle-assignments.*') || request()->routeIs('accommodation-assignments.*') || request()->routeIs('demands.*') || request()->routeIs('return-trips.*') ? 'active' : '' }}" href="#" id="historiaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-clock-history"></i> Historia przypisań
+                            <i class="bi bi-clock-history"></i> Przypisania
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="historiaDropdown">
                             <li><a class="dropdown-item {{ request()->routeIs('project-assignments.*') || request()->routeIs('assignments.*') ? 'active' : '' }}" href="{{ route('project-assignments.index') }}"><i class="bi bi-person-check"></i> Przypisania pracowników</a></li>
@@ -73,7 +55,7 @@
 
                     <!-- Logistyka Dropdown -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') || request()->routeIs('transport-costs.*') || request()->routeIs('time-logs.*') ? 'active' : '' }}" href="#" id="logistykaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') || request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="#" id="logistykaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-truck"></i> Logistyka
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="logistykaDropdown">
@@ -86,10 +68,26 @@
                             @can('viewAny', \App\Models\TransportCost::class)
                                 <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-currency-dollar"></i> Koszty transportu</a></li>
                             @endcan
+                        </ul>
+                    </li>
+
+                    <!-- Kadry Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('employees.*') || request()->routeIs('adjustments.*') || request()->routeIs('time-logs.*') || request()->routeIs('payrolls.*') || request()->routeIs('rotations.*') || request()->routeIs('documents.*') || request()->routeIs('employee-documents.*') || request()->routeIs('employee-rates.*') || request()->routeIs('advances.*') ? 'active' : '' }}" href="#" id="hrDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-briefcase"></i> Kadry
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="hrDropdown">
+                            <li><a class="dropdown-item {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> Pracownicy</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('adjustments.*') ? 'active' : '' }}" href="{{ route('adjustments.index') }}"><i class="bi bi-award"></i> Kary i nagrody</a></li>
                             @can('viewAny', \App\Models\TimeLog::class)
-                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.monthly-grid') ? 'active' : '' }}" href="{{ route('time-logs.monthly-grid') }}"><i class="bi bi-calendar-month"></i> Ewidencja godzin (grid)</a></li>
-                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.index') && !request()->routeIs('time-logs.monthly-grid') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Lista wpisów</a></li>
+                                <li><a class="dropdown-item {{ request()->routeIs('time-logs.*') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Ewidencje godzin</a></li>
                             @endcan
+                            <li><a class="dropdown-item {{ request()->routeIs('payrolls.*') ? 'active' : '' }}" href="{{ route('payrolls.index') }}"><i class="bi bi-cash-stack"></i> Payroll</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('rotations.*') ? 'active' : '' }}" href="{{ route('rotations.index') }}"><i class="bi bi-arrow-repeat"></i> Rotacje</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('employee-rates.*') ? 'active' : '' }}" href="{{ route('employee-rates.index') }}"><i class="bi bi-currency-dollar"></i> Stawki pracowników</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('advances.*') ? 'active' : '' }}" href="{{ route('advances.index') }}"><i class="bi bi-wallet2"></i> Zaliczki</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('documents.*') ? 'active' : '' }}" href="{{ route('documents.index') }}"><i class="bi bi-file-earmark-text"></i> Wymagania formalne</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('employee-documents.*') || request()->routeIs('employees.*employee-documents.*') ? 'active' : '' }}" href="{{ route('employee-documents.index') }}"><i class="bi bi-file-earmark-medical"></i> Dokumenty pracowników</a></li>
                         </ul>
                     </li>
 
@@ -109,12 +107,6 @@
                         </ul>
                     </li>
                     @endcanany
-
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->is('utest') ? 'active' : '' }}" href="{{ url('/utest') }}">
-                            <i class="bi bi-palette"></i> UI Test
-                        </a>
-                    </li>
                 @endauth
             </ul>
 

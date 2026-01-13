@@ -30,11 +30,6 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-// UI Concept Sandbox
-Route::get('/utest', function() {
-    return view('ui-concept.utest');
-});
-
 Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');

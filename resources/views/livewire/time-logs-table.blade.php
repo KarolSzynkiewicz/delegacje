@@ -14,11 +14,14 @@
                         @endif
                     </p>
                 </div>
-                @if($employeeFilter || $projectFilter || $dateFrom || $dateTo)
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                @endif
+                <x-ui.button 
+                    variant="ghost" 
+                    wire:click="clearFilters" 
+                    class="btn-sm"
+                    :disabled="!($employeeFilter || $projectFilter || $dateFrom || $dateTo)"
+                >
+                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                </x-ui.button>
             </div>
         </div>
 
