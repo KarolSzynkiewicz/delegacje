@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
-use App\Traits\HasDateRangeScope;
+use App\Traits\HasDateRange;
 
 class Rotation extends Model
 {
-    use HasFactory, HasDateRangeScope;
+    use HasFactory, HasDateRange;
 
     /**
      * The attributes that are mass assignable.
@@ -21,7 +21,6 @@ class Rotation extends Model
         'employee_id',
         'start_date',
         'end_date',
-        'status', // Tylko dla 'cancelled' - reszta jest automatyczna
         'notes',
     ];
 
@@ -31,8 +30,8 @@ class Rotation extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
     ];
 
     /**
@@ -49,14 +48,9 @@ class Rotation extends Model
      */
     public function getStatusAttribute($value): string
     {
-        // Jeśli status jest ustawiony na 'cancelled', zwróć go (anulowane ręcznie)
-        if ($value === 'cancelled') {
-            return 'cancelled';
-        }
-
-        // Jeśli brak dat, zwróć wartość z bazy lub 'scheduled'
+        // Jeśli brak dat, zwróć 'scheduled'
         if (!$this->start_date || !$this->end_date) {
-            return $value ?? 'scheduled';
+            return 'scheduled';
         }
 
         $today = now()->startOfDay();
@@ -77,13 +71,7 @@ class Rotation extends Model
      */
     public function scopeActive(Builder $query): Builder
     {
-        $today = now()->toDateString();
-        return $query->whereDate('start_date', '<=', $today)
-            ->whereDate('end_date', '>=', $today)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            });
+        return $this->scopeActiveAtDate($query, \Carbon\Carbon::today());
     }
 
     /**
@@ -91,12 +79,10 @@ class Rotation extends Model
      */
     public function scopeScheduled(Builder $query): Builder
     {
-        $today = now()->toDateString();
-        return $query->whereDate('start_date', '>', $today)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            });
+        $today = \Carbon\Carbon::today();
+        $startColumn = $this->getStartDateColumn();
+
+        return $query->where($startColumn, '>', $today);
     }
 
     /**
@@ -104,21 +90,16 @@ class Rotation extends Model
      */
     public function scopeCompleted(Builder $query): Builder
     {
-        $today = now()->toDateString();
-        return $query->whereDate('end_date', '<', $today)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            });
+        $today = \Carbon\Carbon::today();
+        $endColumn = $this->getEndDateColumn();
+
+        return $query->whereNotNull($endColumn)
+            ->where($endColumn, '<', $today);
     }
 
     /**
-     * Scope a query to only include rotations within a date range.
-     */
-
-    /**
      * Check if a rotation overlaps with existing rotations for an employee.
-     * Excludes cancelled rotations and optionally excludes a specific rotation (for updates).
+     * Optionally excludes a specific rotation (for updates).
      */
     public static function hasOverlappingRotations(
         int $employeeId,
@@ -127,18 +108,7 @@ class Rotation extends Model
         ?int $excludeRotationId = null
     ): bool {
         $query = static::where('employee_id', $employeeId)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            })
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                    ->orWhere(function ($q) use ($startDate, $endDate) {
-                        $q->where('start_date', '<=', $startDate)
-                          ->where('end_date', '>=', $endDate);
-                    });
-            });
+            ->overlappingWith($startDate, $endDate);
 
         if ($excludeRotationId) {
             $query->where('id', '!=', $excludeRotationId);

@@ -5,14 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Traits\HasDateRangeScope;
+use Illuminate\Database\Eloquent\Builder;
+use App\Traits\HasDateRange;
 use App\Traits\HasAssignmentLifecycle;
-use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
 
 class EmployeeRate extends Model
 {
-    use HasFactory, HasDateRangeScope, HasAssignmentLifecycle;
+    use HasFactory, 
+        HasDateRange, 
+        HasAssignmentLifecycle {
+            HasAssignmentLifecycle::scopeActiveAtDate insteadof HasDateRange;
+            HasAssignmentLifecycle::scopeCompleted insteadof HasDateRange;
+            HasAssignmentLifecycle::scopeScheduled insteadof HasDateRange;
+        }
 
     /**
      * The attributes that are mass assignable.
@@ -25,7 +31,6 @@ class EmployeeRate extends Model
         'end_date',
         'amount',
         'currency',
-        'status',
         'actual_start_date',
         'actual_end_date',
         'notes',
@@ -37,12 +42,11 @@ class EmployeeRate extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
-        'actual_start_date' => 'date',
-        'actual_end_date' => 'date',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'actual_start_date' => 'datetime',
+        'actual_end_date' => 'datetime',
         'amount' => 'decimal:2',
-        'status' => AssignmentStatus::class,
     ];
 
     /**
@@ -54,26 +58,11 @@ class EmployeeRate extends Model
     }
 
     /**
-     * Get the status of this rate.
+     * Scope: Filter rates that are active (date-based).
+     * Uses HasAssignmentLifecycle::scopeActive() which filters by dates only.
      */
-    public function getStatus(): AssignmentStatus
+    public function scopeActive(Builder $query): Builder
     {
-        return $this->status ?? AssignmentStatus::ACTIVE;
-    }
-
-    /**
-     * Get the start date of this rate.
-     */
-    public function getStartDate(): Carbon
-    {
-        return $this->start_date;
-    }
-
-    /**
-     * Get the end date of this rate.
-     */
-    public function getEndDate(): ?Carbon
-    {
-        return $this->end_date;
+        return $this->scopeActiveAtDate($query, Carbon::today());
     }
 }

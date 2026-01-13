@@ -14,7 +14,7 @@ class ReportService
     public function generateAssignmentSummary(array $filters): Collection
     {
         $query = ProjectAssignment::with('employee', 'project', 'role')
-            ->whereBetween('start_date', [$filters['start_date'], $filters['end_date']]);
+            ->overlappingWith($filters['start_date'], $filters['end_date']);
 
         if (isset($filters['project_id'])) {
             $query->where('project_id', $filters['project_id']);
@@ -45,7 +45,7 @@ class ReportService
     public function generateProjectStatus(array $filters): Collection
     {
         $query = Project::with(['assignments' => function ($q) use ($filters) {
-            $q->whereBetween('start_date', [$filters['start_date'], $filters['end_date']]);
+            $q->overlappingWith($filters['start_date'], $filters['end_date']);
         }, 'demands']);
 
         if (isset($filters['project_id'])) {
@@ -62,8 +62,8 @@ class ReportService
     {
         // Compare project demands with actual assignments
         $query = Project::with(['demands.role', 'assignments' => function ($q) use ($filters) {
-            $q->whereBetween('start_date', [$filters['start_date'], $filters['end_date']])
-              ->where('status', 'active');
+            $q->overlappingWith($filters['start_date'], $filters['end_date'])
+              ->active();
         }]);
 
         if (isset($filters['project_id'])) {

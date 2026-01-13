@@ -122,12 +122,7 @@ class LocationTrackingService
 
         // Priority 2: AccommodationAssignment with status ACTIVE
         $accommodationAssignment = $employee->accommodationAssignments()
-            ->where('status', AssignmentStatus::ACTIVE)
-            ->where('start_date', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now());
-            })
+            ->active()
             ->with('accommodation.location')
             ->first();
 
@@ -137,12 +132,7 @@ class LocationTrackingService
 
         // Priority 3: ProjectAssignment with status ACTIVE
         $projectAssignment = $employee->assignments()
-            ->where('status', AssignmentStatus::ACTIVE)
-            ->where('start_date', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now());
-            })
+            ->active()
             ->with('project.location')
             ->first();
 
@@ -169,8 +159,7 @@ class LocationTrackingService
 
         // Otherwise, check active assignment and infer location
         $activeAssignment = $vehicle->assignments()
-            ->where('status', AssignmentStatus::ACTIVE)
-            ->where('start_date', '<=', now())
+            ->active()
             ->where(function ($q) {
                 $q->whereNull('end_date')
                   ->orWhere('end_date', '>=', now());

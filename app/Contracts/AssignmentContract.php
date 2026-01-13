@@ -3,7 +3,6 @@
 namespace App\Contracts;
 
 use App\Models\Employee;
-use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
 
 /**
@@ -11,6 +10,9 @@ use Carbon\Carbon;
  * 
  * Provides polymorphic interface for ProjectAssignment, VehicleAssignment, 
  * and AccommodationAssignment to enable unified operations in services.
+ * 
+ * Status is calculated from dates - no status field needed.
+ * If assignment is not needed, simply delete it from database.
  * 
  * @see app/Models/ProjectAssignment
  * @see app/Models/VehicleAssignment
@@ -28,11 +30,6 @@ interface AssignmentContract
     public function getEmployee(): Employee;
 
     /**
-     * Get the current status of this assignment.
-     */
-    public function getStatus(): AssignmentStatus;
-
-    /**
      * Get the start date of this assignment.
      */
     public function getStartDate(): Carbon;
@@ -44,13 +41,7 @@ interface AssignmentContract
 
     /**
      * Complete this assignment on the given date.
-     * Updates status to COMPLETED and sets actual_end_date.
+     * Sets actual_end_date if the column exists.
      */
     public function complete(Carbon $date): void;
-
-    /**
-     * Cancel this assignment.
-     * Updates status to CANCELLED.
-     */
-    public function cancel(): void;
 }

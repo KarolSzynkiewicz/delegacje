@@ -25,7 +25,6 @@ class StoreRotationRequest extends FormRequest
             'employee_id' => ['sometimes', 'required', 'exists:employees,id'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'status' => ['nullable', 'in:cancelled'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -45,7 +44,6 @@ class StoreRotationRequest extends FormRequest
             'end_date.required' => 'Data zakończenia jest wymagana.',
             'end_date.date' => 'Data zakończenia musi być poprawną datą.',
             'end_date.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
-            'status.in' => 'Status może być tylko "cancelled".',
         ];
     }
 }

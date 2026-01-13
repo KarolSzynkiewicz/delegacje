@@ -2,159 +2,88 @@
 
 namespace App\Traits;
 
-use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use App\Services\DateRangeService;
 
 /**
  * Trait providing common lifecycle methods for Assignment models.
  * 
- * IMPORTANT: This trait contains ONLY state mechanics, NOT business logic.
- * 
- * DO NOT ADD:
- * - moveToBase() - business logic, belongs in services
- * - attachToEvent() - logistics logic, belongs in services
- * - getLocation() - location logic, belongs in LocationTrackingService
- * - Knowledge about transport, equipment, events
- * 
- * ALLOWED:
- * - Status checks (isActive, isInTransit, isAtBase)
- * - Status changes (complete, cancel)
- * - Date range queries (getDateRange)
- * - Employee access (getEmployee)
+ * All status is calculated from dates - no status field needed.
+ * If assignment is not needed, simply delete it from database.
  */
 trait HasAssignmentLifecycle
 {
-    /**
-     * Check if this assignment is active.
-     */
-    public function isActive(): bool
-    {
-        return $this->getStatus() === AssignmentStatus::ACTIVE;
-    }
-
-    /**
-     * Check if this assignment is in transit.
-     */
-    public function isInTransit(): bool
-    {
-        return $this->getStatus() === AssignmentStatus::IN_TRANSIT;
-    }
-
-    /**
-     * Check if this assignment is at base.
-     */
-    public function isAtBase(): bool
-    {
-        return $this->getStatus() === AssignmentStatus::AT_BASE;
-    }
-
-    /**
-     * Check if this assignment is completed.
-     */
-    public function isCompleted(): bool
-    {
-        return $this->getStatus() === AssignmentStatus::COMPLETED;
-    }
-
-    /**
-     * Check if this assignment is cancelled.
-     */
-    public function isCancelled(): bool
-    {
-        return $this->getStatus() === AssignmentStatus::CANCELLED;
-    }
+    // Note: isCurrentlyActive(), isPast(), isScheduled() are provided by HasDateRange trait
 
     /**
      * Complete this assignment on the given date.
-     * Updates status to COMPLETED and sets actual_end_date if the column exists.
-     * 
-     * NOTE: This method is part of AssignmentContract interface.
-     * It must be implemented in the model, but we provide default implementation here.
+     * Sets actual_end_date if the column exists.
      */
     public function complete(Carbon $date): void
     {
-        $updateData = [
-            'status' => AssignmentStatus::COMPLETED,
-        ];
-
-        // Set actual_end_date if column exists
+        $updateData = [];
+        
         if ($this->getConnection()->getSchemaBuilder()->hasColumn($this->getTable(), 'actual_end_date')) {
             $updateData['actual_end_date'] = $date;
         }
-
+        
         $this->update($updateData);
     }
 
     /**
-     * Cancel this assignment.
-     * Updates status to CANCELLED.
-     * 
-     * NOTE: This method is part of AssignmentContract interface.
-     * It must be implemented in the model, but we provide default implementation here.
-     */
-    public function cancel(): void
-    {
-        $this->update([
-            'status' => AssignmentStatus::CANCELLED,
-        ]);
-    }
-
-    /**
-     * Scope a query to only include active assignments.
+     * Scope: Filter assignments that are currently active (date-based).
+     * Active = start_date <= today <= end_date (or end_date is null)
      */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('status', AssignmentStatus::ACTIVE);
+        $today = Carbon::today();
+        $startColumn = $this->getStartDateColumn();
+        $endColumn = $this->getEndDateColumn();
+        
+        return $query->where($startColumn, '<=', $today)
+            ->where(function ($q) use ($today, $endColumn) {
+                $q->whereNull($endColumn)
+                  ->orWhere($endColumn, '>=', $today);
+            });
     }
 
     /**
-     * Scope a query to only include assignments in transit.
+     * Scope: Filter assignments that are scheduled (future).
      */
-    public function scopeInTransit(Builder $query): Builder
+    public function scopeScheduled(Builder $query): Builder
     {
-        return $query->where('status', AssignmentStatus::IN_TRANSIT);
+        $today = Carbon::today();
+        $startColumn = $this->getStartDateColumn();
+        
+        return $query->where($startColumn, '>', $today);
     }
 
     /**
-     * Scope a query to only include assignments at base.
-     */
-    public function scopeAtBase(Builder $query): Builder
-    {
-        return $query->where('status', AssignmentStatus::AT_BASE);
-    }
-
-    /**
-     * Scope a query to only include completed assignments.
+     * Scope: Filter assignments that are completed (past).
      */
     public function scopeCompleted(Builder $query): Builder
     {
-        return $query->where('status', AssignmentStatus::COMPLETED);
+        $today = Carbon::today();
+        $endColumn = $this->getEndDateColumn();
+        
+        return $query->whereNotNull($endColumn)
+            ->where($endColumn, '<', $today);
     }
 
     /**
-     * Scope a query to only include cancelled assignments.
-     */
-    public function scopeCancelled(Builder $query): Builder
-    {
-        return $query->where('status', AssignmentStatus::CANCELLED);
-    }
-
-    /**
-     * Scope a query to only include assignments active at a specific date.
-     * 
-     * An assignment is active at a date if:
-     * - status is ACTIVE
-     * - start_date <= date
-     * - end_date is null OR end_date >= date
+     * Scope: Filter assignments active at a specific date.
      */
     public function scopeActiveAtDate(Builder $query, Carbon $date): Builder
     {
-        return $query->active()
-            ->where('start_date', '<=', $date)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', $date);
+        $date = DateRangeService::normalizeDate($date);
+        $startColumn = $this->getStartDateColumn();
+        $endColumn = $this->getEndDateColumn();
+        
+        return $query->where($startColumn, '<=', $date)
+            ->where(function ($q) use ($date, $endColumn) {
+                $q->whereNull($endColumn)
+                  ->orWhere($endColumn, '>=', $date);
             });
     }
 }

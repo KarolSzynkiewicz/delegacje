@@ -65,15 +65,8 @@ class EmployeeAvailabilityChecker extends Component
         
         if (!$this->isAvailable) {
             $this->conflicts = $employee->assignments()
-                ->where('status', 'active')
-                ->where(function ($query) use ($endDate) {
-                    $query->whereBetween('start_date', [$this->startDate, $endDate])
-                        ->orWhereBetween('end_date', [$this->startDate, $endDate])
-                        ->orWhere(function ($q) use ($endDate) {
-                            $q->where('start_date', '<=', $this->startDate)
-                              ->where('end_date', '>=', $endDate);
-                        });
-                })
+                ->active()
+                ->overlappingWith($this->startDate, $endDate)
                 ->with('project')
                 ->get();
         } else {
@@ -85,10 +78,6 @@ class EmployeeAvailabilityChecker extends Component
     {
         // Pobierz wszystkie rotacje (nie anulowane), które nakładają się z okresem
         $rotations = $employee->rotations()
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            })
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->where('start_date', '<=', $endDate)
                   ->where('end_date', '>=', $startDate);

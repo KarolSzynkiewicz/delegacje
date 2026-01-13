@@ -27,7 +27,6 @@ class UpdateProjectAssignmentRequest extends FormRequest
             'role_id' => ['required', 'exists:roles,id'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'status' => ['required', 'in:pending,active,completed,cancelled'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -51,8 +50,6 @@ class UpdateProjectAssignmentRequest extends FormRequest
             'start_date.date' => 'Data rozpoczęcia musi być poprawną datą.',
             'end_date.date' => 'Data zakończenia musi być poprawną datą.',
             'end_date.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
-            'status.required' => 'Status jest wymagany.',
-            'status.in' => 'Status musi być jednym z: pending, active, completed, cancelled.',
         ];
     }
 }

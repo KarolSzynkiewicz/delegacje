@@ -6,16 +6,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
-use App\Traits\HasDateRangeScope;
+use App\Traits\HasDateRange;
 use App\Traits\HasAssignmentLifecycle;
 use App\Contracts\AssignmentContract;
 use App\Models\Employee;
-use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
 
 class AccommodationAssignment extends Model implements AssignmentContract
 {
-    use HasFactory, HasDateRangeScope, HasAssignmentLifecycle;
+    use HasFactory, 
+        HasDateRange, 
+        HasAssignmentLifecycle {
+            HasAssignmentLifecycle::scopeActiveAtDate insteadof HasDateRange;
+            HasAssignmentLifecycle::scopeCompleted insteadof HasDateRange;
+            HasAssignmentLifecycle::scopeScheduled insteadof HasDateRange;
+        }
 
     /**
      * The attributes that are mass assignable.
@@ -27,7 +32,6 @@ class AccommodationAssignment extends Model implements AssignmentContract
         'accommodation_id',
         'start_date',
         'end_date',
-        'status',
         'actual_start_date',
         'actual_end_date',
         'notes',
@@ -39,11 +43,10 @@ class AccommodationAssignment extends Model implements AssignmentContract
      * @var array<string, string>
      */
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
-        'actual_start_date' => 'date',
-        'actual_end_date' => 'date',
-        'status' => AssignmentStatus::class,
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'actual_start_date' => 'datetime',
+        'actual_end_date' => 'datetime',
     ];
 
     /**
@@ -71,14 +74,6 @@ class AccommodationAssignment extends Model implements AssignmentContract
     }
 
     /**
-     * Implementation of AssignmentContract::getStatus()
-     */
-    public function getStatus(): AssignmentStatus
-    {
-        return $this->status ?? AssignmentStatus::ACTIVE;
-    }
-
-    /**
      * Implementation of AssignmentContract::getStartDate()
      */
     public function getStartDate(): Carbon
@@ -94,4 +89,12 @@ class AccommodationAssignment extends Model implements AssignmentContract
         return $this->end_date;
     }
 
+    /**
+     * Scope: Filter assignments that are active (date-based).
+     * Uses HasAssignmentLifecycle::scopeActive() which filters by dates only.
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $this->scopeActiveAtDate($query, Carbon::today());
+    }
 }

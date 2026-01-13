@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\HasDateRange;
 
 class ProjectDemand extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDateRange;
 
     /**
      * The attributes that are mass assignable.
@@ -30,10 +31,26 @@ class ProjectDemand extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'date_from' => 'date',
-        'date_to' => 'date',
+        'date_from' => 'datetime',
+        'date_to' => 'datetime',
         'required_count' => 'integer',
     ];
+
+    /**
+     * Override column names for HasDateRange trait.
+     */
+    public function getStartDateColumn(): string
+    {
+        return 'date_from';
+    }
+
+    /**
+     * Override column names for HasDateRange trait.
+     */
+    public function getEndDateColumn(): string
+    {
+        return 'date_to';
+    }
 
     /**
      * Get the project that owns the demand.

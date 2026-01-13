@@ -72,32 +72,15 @@ class RotationsTable extends Component
 
         // Filtrowanie po statusie
         if (!empty($this->statusFilter)) {
-            $today = now()->toDateString();
             switch ($this->statusFilter) {
                 case 'scheduled':
-                    $query->whereDate('start_date', '>', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
+                    $query->scheduled();
                     break;
                 case 'active':
-                    $query->whereDate('start_date', '<=', $today)
-                        ->whereDate('end_date', '>=', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
+                    $query->active();
                     break;
                 case 'completed':
-                    $query->whereDate('end_date', '<', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
-                    break;
-                case 'cancelled':
-                    $query->where('status', 'cancelled');
+                    $query->completed();
                     break;
             }
         }

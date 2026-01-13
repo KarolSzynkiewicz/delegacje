@@ -114,21 +114,7 @@ class WeeklyOverviewService
     protected function getOverlappingDemands(Project $project, Carbon $startDate, Carbon $endDate): Collection
     {
         return ProjectDemand::where('project_id', $project->id)
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->where(function ($q) use ($startDate, $endDate) {
-                    // Demand starts in range
-                    $q->whereBetween('date_from', [$startDate, $endDate])
-                      ->orWhereBetween('date_to', [$startDate, $endDate])
-                      // Demand covers the whole range
-                      ->orWhere(function ($q2) use ($startDate, $endDate) {
-                          $q2->where('date_from', '<=', $startDate)
-                             ->where(function ($q3) use ($endDate) {
-                                 $q3->where('date_to', '>=', $endDate)
-                                    ->orWhereNull('date_to');
-                             });
-                      });
-                });
-            })
+            ->overlappingWith($startDate, $endDate)
             ->with('role')
             ->get();
     }
@@ -139,22 +125,8 @@ class WeeklyOverviewService
     protected function getAssignmentsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
     {
         return ProjectAssignment::where('project_id', $project->id)
-            ->where('status', 'active')
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    // Assignment starts in week
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      // Assignment covers the whole week
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+            ->active()
+            ->overlappingWith($weekStart, $weekEnd)
             ->with(['employee', 'role', 'project'])
             ->get();
     }
@@ -305,20 +277,9 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Find accommodation assignments for these employees in this week
-        $accommodationAssignments = AccommodationAssignment::active()->whereIn('employee_id', $employeeIds)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+        $accommodationAssignments = AccommodationAssignment::active()
+            ->whereIn('employee_id', $employeeIds)
+            ->overlappingWith($weekStart, $weekEnd)
             ->with(['accommodation', 'employee'])
             ->get();
         
@@ -334,19 +295,7 @@ class WeeklyOverviewService
         
         // Get all accommodation assignments for these accommodations in this week (single query)
         $allAccommodationAssignments = AccommodationAssignment::whereIn('accommodation_id', $accommodationIds)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+            ->overlappingWith($weekStart, $weekEnd)
             ->get()
             ->groupBy('accommodation_id');
         
@@ -378,20 +327,9 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Find vehicle assignments for these employees in this week
-        $vehicleAssignments = VehicleAssignment::active()->whereIn('employee_id', $employeeIds)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+        $vehicleAssignments = VehicleAssignment::active()
+            ->whereIn('employee_id', $employeeIds)
+            ->overlappingWith($weekStart, $weekEnd)
             ->with(['vehicle', 'employee'])
             ->get();
         
@@ -407,19 +345,7 @@ class WeeklyOverviewService
         
         // Get all vehicle assignments for these vehicles in this week (single query with eager loading)
         $allVehicleAssignments = VehicleAssignment::whereIn('vehicle_id', $vehicleIds)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+            ->overlappingWith($weekStart, $weekEnd)
             ->with('employee')
             ->get()
             ->groupBy('vehicle_id');
@@ -500,39 +426,17 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Eager load all accommodation assignments for these employees in this week (single query)
-        $accommodationAssignments = AccommodationAssignment::active()->whereIn('employee_id', $employeeIds)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+        $accommodationAssignments = AccommodationAssignment::active()
+            ->whereIn('employee_id', $employeeIds)
+            ->overlappingWith($weekStart, $weekEnd)
             ->with('accommodation')
             ->get()
             ->groupBy('employee_id');
         
         // Eager load all vehicle assignments for these employees in this week (single query)
-        $vehicleAssignments = VehicleAssignment::active()->whereIn('employee_id', $employeeIds)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+        $vehicleAssignments = VehicleAssignment::active()
+            ->whereIn('employee_id', $employeeIds)
+            ->overlappingWith($weekStart, $weekEnd)
             ->with('vehicle')
             ->get()
             ->groupBy('employee_id');
@@ -549,10 +453,6 @@ class WeeklyOverviewService
                           ->whereDate('end_date', '>=', $weekStart->toDateString());
                 })
                 ->orWhereNull('end_date'); // Rotacje bez daty zakończenia
-            })
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
             })
             ->orderBy('end_date', 'asc')
             ->get()
@@ -766,7 +666,7 @@ class WeeklyOverviewService
                         $q->whereRaw('DATE(end_date) >= ?', [$dayDateString])
                           ->orWhereNull('end_date');
                     })
-                    ->where('status', AssignmentStatus::ACTIVE)
+                    ->active()
                     ->with('accommodation')
                     ->first();
                 
@@ -781,7 +681,7 @@ class WeeklyOverviewService
                             $q->whereRaw('DATE(end_date) >= ?', [$dayDateString])
                               ->orWhereNull('end_date');
                         })
-                        ->where('status', AssignmentStatus::ACTIVE)
+                        ->active()
                         ->count();
                 }
                 
@@ -793,7 +693,7 @@ class WeeklyOverviewService
                         $q->whereRaw('DATE(end_date) >= ?', [$dayDateString])
                           ->orWhereNull('end_date');
                     })
-                    ->where('status', AssignmentStatus::ACTIVE)
+                    ->active()
                     ->with('vehicle')
                     ->first();
                 
@@ -809,7 +709,7 @@ class WeeklyOverviewService
                             $q->whereRaw('DATE(end_date) >= ?', [$dayDateString])
                               ->orWhereNull('end_date');
                         })
-                        ->where('status', AssignmentStatus::ACTIVE)
+                        ->active()
                         ->count();
                 }
                 

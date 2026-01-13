@@ -101,7 +101,7 @@ class Employee extends Model
      */
     public function activeAssignments(): HasMany
     {
-        return $this->assignments()->where('status', 'active');
+        return $this->assignments()->active();
     }
 
     /**
@@ -173,14 +173,7 @@ class Employee extends Model
      */
     public function activeRotations(): HasMany
     {
-        $today = now()->toDateString();
-        return $this->rotations()
-            ->whereDate('start_date', '<=', $today)
-            ->whereDate('end_date', '>=', $today)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            });
+        return $this->rotations()->active();
     }
 
     /**
@@ -192,19 +185,19 @@ class Employee extends Model
     {
         // Sprawdź czy istnieje rotacja (aktywna lub zaplanowana, nie anulowana),
         // która pokrywa CAŁY okres przypisania
-        // Rotacja musi zaczynać się przed lub w dniu rozpoczęcia przypisania
-        // i kończyć się po lub w dniu zakończenia przypisania
-        $hasCoveringRotation = $this->rotations()
-            ->where(function ($q) {
-                $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
-            })
-            ->where('start_date', '<=', $startDate)
-            ->where('end_date', '>=', $endDate)
-            ->exists();
+        $rotations = $this->rotations()
+            ->overlappingWith($startDate, $endDate)
+            ->get();
 
-        if ($hasCoveringRotation) {
-            return true;
+        if ($rotations->isEmpty()) {
+            return false;
+        }
+
+        // Sprawdź czy któraś rotacja pokrywa cały okres
+        foreach ($rotations as $rotation) {
+            if ($rotation->covers($startDate, $endDate)) {
+                return true;
+            }
         }
 
         // Jeśli nie ma jednej rotacji pokrywającej cały okres,
@@ -225,11 +218,7 @@ class Employee extends Model
                 $q->whereNull('status')
                   ->orWhere('status', '!=', 'cancelled');
             })
-            ->where(function ($q) use ($startDate, $endDate) {
-                // Rotacja zaczyna się przed końcem okresu i kończy po początku okresu
-                $q->where('start_date', '<=', $endDate)
-                  ->where('end_date', '>=', $startDate);
-            })
+            ->overlappingWith($startDate, $endDate)
             ->orderBy('start_date')
             ->get();
 
@@ -238,13 +227,20 @@ class Employee extends Model
         }
 
         // Sprawdź czy rotacje pokrywają cały okres bez przerw
-        $targetStart = \Carbon\Carbon::parse($startDate)->startOfDay();
-        $targetEnd = \Carbon\Carbon::parse($endDate)->startOfDay();
+        $targetStart = \App\Services\DateRangeService::normalizeDate($startDate);
+        $targetEnd = \App\Services\DateRangeService::normalizeDate($endDate);
         $coveredUntil = $targetStart->copy();
 
         foreach ($rotations as $rotation) {
-            $rotationStart = \Carbon\Carbon::parse($rotation->start_date)->startOfDay();
-            $rotationEnd = \Carbon\Carbon::parse($rotation->end_date)->startOfDay();
+            $rotationStart = $rotation->getStartDate();
+            $rotationEnd = $rotation->getEndDate();
+            
+            if ($rotationStart === null || $rotationEnd === null) {
+                continue; // Skip rotations without dates
+            }
+            
+            $rotationStart = \App\Services\DateRangeService::normalizeDate($rotationStart);
+            $rotationEnd = \App\Services\DateRangeService::normalizeDate($rotationEnd);
 
             // Jeśli rotacja zaczyna się przed lub w dniu pokrytego okresu
             if ($rotationStart->lte($coveredUntil)) {
@@ -272,9 +268,8 @@ class Employee extends Model
      */
     public function getActiveRotationForDate($date): ?Rotation
     {
-        return $this->activeRotations()
-            ->where('start_date', '<=', $date)
-            ->where('end_date', '>=', $date)
+        return $this->rotations()
+            ->activeAtDate($date)
             ->first();
     }
 
@@ -439,15 +434,8 @@ class Employee extends Model
 
         // 3. Sprawdź konfliktujące przypisania (wykluczając aktualnie edytowane przypisanie)
         $query = $this->assignments()
-            ->where('status', 'active')
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                    ->orWhere(function ($q) use ($startDate, $endDate) {
-                        $q->where('start_date', '<=', $startDate)
-                          ->where('end_date', '>=', $endDate);
-                    });
-            });
+            ->active()
+            ->overlappingWith($startDate, $endDate);
         
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);
@@ -485,15 +473,8 @@ class Employee extends Model
 
         // 3. Sprawdź czy nie ma konfliktujących przypisań (wykluczając aktualnie edytowane przypisanie)
         $query = $this->assignments()
-            ->where('status', 'active')
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                    ->orWhere(function ($q) use ($startDate, $endDate) {
-                        $q->where('start_date', '<=', $startDate)
-                          ->where('end_date', '>=', $endDate);
-                    });
-            });
+            ->active()
+            ->overlappingWith($startDate, $endDate);
         
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);

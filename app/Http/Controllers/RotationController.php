@@ -33,32 +33,15 @@ class RotationController extends Controller
 
         // Filtrowanie po statusie (na podstawie dat)
         if ($request->filled('status')) {
-            $today = now()->toDateString();
             switch ($request->status) {
                 case 'scheduled':
-                    $query->whereDate('start_date', '>', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
+                    $query->scheduled();
                     break;
                 case 'active':
-                    $query->whereDate('start_date', '<=', $today)
-                        ->whereDate('end_date', '>=', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
+                    $query->active();
                     break;
                 case 'completed':
-                    $query->whereDate('end_date', '<', $today)
-                        ->where(function ($q) {
-                            $q->whereNull('status')
-                              ->orWhere('status', '!=', 'cancelled');
-                        });
-                    break;
-                case 'cancelled':
-                    $query->where('status', 'cancelled');
+                    $query->completed();
                     break;
             }
         }
@@ -114,10 +97,8 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Status jest automatyczny - nie zapisujemy go (chyba że cancelled)
-        if (!isset($validated['status']) || $validated['status'] !== 'cancelled') {
-            unset($validated['status']);
-        }
+        // Status jest automatyczny - nie zapisujemy go (obliczany z dat)
+        unset($validated['status']);
 
         try {
             $this->rotationService->createRotation($validated['employee_id'], $validated);
@@ -139,10 +120,8 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Status jest automatyczny - nie zapisujemy go (chyba że cancelled)
-        if (!isset($validated['status']) || $validated['status'] !== 'cancelled') {
-            unset($validated['status']);
-        }
+        // Status jest automatyczny - nie zapisujemy go (obliczany z dat)
+        unset($validated['status']);
 
         try {
             $this->rotationService->createRotation($employee->id, $validated);
@@ -181,27 +160,8 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Obsługa statusu:
-        // - Jeśli status jest 'cancelled' w request, ustawiamy 'cancelled'
-        // - Jeśli status jest pusty/null, a w bazie jest 'cancelled', ustawiamy 'active' (odanulowanie)
-        // - W przeciwnym razie nie aktualizujemy statusu (usuwamy z tablicy)
-        if (isset($validated['status']) && $validated['status'] === 'cancelled') {
-            // Ustawiamy cancelled
-            $validated['status'] = 'cancelled';
-        } elseif (empty($validated['status']) || !isset($validated['status'])) {
-            // Jeśli status jest pusty, sprawdź czy rotacja była anulowana
-            $currentStatus = $rotation->getAttributes()['status'] ?? null;
-            if ($currentStatus === 'cancelled') {
-                // Odanulowanie - ustawiamy na 'active' (wartość domyślna)
-                $validated['status'] = 'active';
-            } else {
-                // Nie aktualizujemy statusu - zostanie obliczony automatycznie
-                unset($validated['status']);
-            }
-        } else {
-            // Status nie jest 'cancelled' i nie jest pusty - nie aktualizujemy
-            unset($validated['status']);
-        }
+        // Status jest automatyczny - nie zapisujemy go (obliczany z dat)
+        unset($validated['status']);
 
         try {
             $this->rotationService->updateRotation($rotation, $validated);

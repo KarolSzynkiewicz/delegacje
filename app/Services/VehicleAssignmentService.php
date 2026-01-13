@@ -35,7 +35,6 @@ class VehicleAssignmentService
             'position' => $position,
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'] ?? null,
-            'status' => $data['status'] ?? \App\Enums\AssignmentStatus::ACTIVE,
             'notes' => $data['notes'] ?? null,
             'is_return_trip' => false, // Always false for manual assignments
         ]);
@@ -82,18 +81,7 @@ class VehicleAssignmentService
     {
         $query = $vehicle->assignments()
             ->where('position', \App\Enums\VehiclePosition::DRIVER->value)
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                    ->orWhere(function ($q) use ($startDate, $endDate) {
-                        $q->where('start_date', '<=', $startDate)
-                          ->where(function ($q2) use ($endDate) {
-                              $q2->where('end_date', '>=', $endDate)
-                                 ->orWhereNull('end_date');
-                          });
-                    });
-            })
-            ->where('status', '!=', \App\Enums\AssignmentStatus::CANCELLED->value);
+            ->overlappingWith($startDate, $endDate);
 
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);

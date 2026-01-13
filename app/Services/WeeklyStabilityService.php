@@ -117,7 +117,7 @@ class WeeklyStabilityService
                 $q->where('end_date', '>=', $day)
                   ->orWhereNull('end_date');
             })
-            ->where('status', AssignmentStatus::ACTIVE)
+            ->active()
             ->with('role')
             ->first();
         
@@ -139,7 +139,7 @@ class WeeklyStabilityService
                 $q->where('end_date', '>=', $day)
                   ->orWhereNull('end_date');
             })
-            ->where('status', AssignmentStatus::ACTIVE)
+            ->active()
             ->with('vehicle')
             ->first();
         
@@ -150,7 +150,7 @@ class WeeklyStabilityService
                 $q->where('end_date', '>=', $day)
                   ->orWhereNull('end_date');
             })
-            ->where('status', AssignmentStatus::ACTIVE)
+            ->active()
             ->with('accommodation')
             ->first();
         
@@ -196,20 +196,8 @@ class WeeklyStabilityService
     {
         // Get all project assignments for this week
         $assignments = ProjectAssignment::where('project_id', $project->id)
-            ->where('status', AssignmentStatus::ACTIVE)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+            ->active()
+            ->overlappingWith($weekStart, $weekEnd)
             ->with(['employee', 'role'])
             ->get();
         
@@ -296,16 +284,7 @@ class WeeklyStabilityService
     protected function getDemandsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
     {
         return \App\Models\ProjectDemand::where('project_id', $project->id)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('date_from', [$weekStart, $weekEnd])
-                      ->orWhereBetween('date_to', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('date_from', '<=', $weekStart)
-                             ->where('date_to', '>=', $weekEnd);
-                      });
-                });
-            })
+            ->overlappingWith($weekStart, $weekEnd)
             ->with('role')
             ->get()
             ->groupBy('role_id')
@@ -324,20 +303,8 @@ class WeeklyStabilityService
     protected function getAssignmentsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
     {
         return ProjectAssignment::where('project_id', $project->id)
-            ->where('status', AssignmentStatus::ACTIVE)
-            ->where(function ($query) use ($weekStart, $weekEnd) {
-                $query->where(function ($q) use ($weekStart, $weekEnd) {
-                    $q->whereBetween('start_date', [$weekStart, $weekEnd])
-                      ->orWhereBetween('end_date', [$weekStart, $weekEnd])
-                      ->orWhere(function ($q2) use ($weekStart, $weekEnd) {
-                          $q2->where('start_date', '<=', $weekStart)
-                             ->where(function ($q3) use ($weekEnd) {
-                                 $q3->where('end_date', '>=', $weekEnd)
-                                    ->orWhereNull('end_date');
-                             });
-                      });
-                });
-            })
+            ->active()
+            ->overlappingWith($weekStart, $weekEnd)
             ->with(['employee', 'role', 'project'])
             ->get();
     }

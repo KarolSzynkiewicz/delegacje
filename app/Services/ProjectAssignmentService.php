@@ -163,16 +163,9 @@ class ProjectAssignmentService
         if ($excludeAssignmentId) {
             // For updates, check conflicts excluding current assignment
             $hasConflictingAssignments = $employee->assignments()
-                ->where('status', 'active')
+                ->active()
                 ->where('id', '!=', $excludeAssignmentId)
-                ->where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('start_date', [$startDate, $endDate])
-                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                        ->orWhere(function ($q) use ($startDate, $endDate) {
-                            $q->where('start_date', '<=', $startDate)
-                              ->where('end_date', '>=', $endDate);
-                        });
-                })
+                ->overlappingWith($startDate, $endDate)
                 ->exists();
 
             if ($hasConflictingAssignments) {

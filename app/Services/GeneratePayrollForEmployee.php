@@ -210,7 +210,7 @@ class GeneratePayrollForEmployee
     {
         return EmployeeRate::where('employee_id', $employeeId)
             ->where('currency', $currency)
-            ->where('status', AssignmentStatus::ACTIVE)
+            ->active()
             ->where('start_date', '<=', $date)
             ->where(function ($query) use ($date) {
                 $query->whereNull('end_date')
@@ -236,7 +236,7 @@ class GeneratePayrollForEmployee
     public function findAnyEmployeeRateForDate(int $employeeId, string $date): ?EmployeeRate
     {
         return EmployeeRate::where('employee_id', $employeeId)
-            ->where('status', AssignmentStatus::ACTIVE)
+            ->active()
             ->where('start_date', '<=', $date)
             ->where(function ($query) use ($date) {
                 $query->whereNull('end_date')
@@ -262,7 +262,7 @@ class GeneratePayrollForEmployee
     {
         // Find all active rates that overlap with the period
         $rates = EmployeeRate::where('employee_id', $employeeId)
-            ->where('status', AssignmentStatus::ACTIVE)
+            ->active()
             ->where(function ($query) use ($periodStart, $periodEnd) {
                 $query->where(function ($q) use ($periodStart, $periodEnd) {
                     // Rate starts before or during period

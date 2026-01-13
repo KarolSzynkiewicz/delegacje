@@ -85,17 +85,7 @@ class Vehicle extends Model
     public function isAvailableInDateRange($startDate, $endDate): bool
     {
         return !$this->assignments()
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                    ->orWhere(function ($q) use ($startDate, $endDate) {
-                        $q->where('start_date', '<=', $startDate)
-                          ->where(function ($q2) use ($endDate) {
-                              $q2->where('end_date', '>=', $endDate)
-                                 ->orWhereNull('end_date');
-                          });
-                    });
-            })
+            ->overlappingWith($startDate, $endDate)
             ->exists();
     }
 
