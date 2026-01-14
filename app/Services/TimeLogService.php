@@ -252,7 +252,11 @@ class TimeLogService
                          ->orWhere('end_date', '>=', $monthStart);
                   });
             })
-            ->whereIn('status', [AssignmentStatus::ACTIVE, AssignmentStatus::IN_TRANSIT, AssignmentStatus::AT_BASE]);
+            ->where(function($q) {
+                // Exclude only cancelled assignments, include all others (active, completed, pending, null)
+                $q->where('status', '!=', 'cancelled')
+                  ->orWhereNull('status');
+            });
         })
         ->orderBy('name')
         ->get();
@@ -291,7 +295,9 @@ class TimeLogService
             // Group assignments by employee
             $employeesMap = [];
             foreach ($project->assignments as $assignment) {
-                if (!in_array($assignment->status, [AssignmentStatus::ACTIVE, AssignmentStatus::IN_TRANSIT, AssignmentStatus::AT_BASE])) {
+                // Include active, completed, and pending assignments (exclude cancelled)
+                $status = $assignment->status ?? 'active'; // Default to active if null
+                if ($status === 'cancelled') {
                     continue;
                 }
                 

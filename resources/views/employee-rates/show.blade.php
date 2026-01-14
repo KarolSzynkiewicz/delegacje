@@ -31,14 +31,21 @@
                             </x-ui.detail-item>
                             <x-ui.detail-item label="Status:">
                                 @php
-                                    $badgeVariant = match($employeeRate->status->value) {
-                                        'active' => 'success',
-                                        'completed' => 'accent',
-                                        'cancelled' => 'danger',
-                                        default => 'accent'
-                                    };
+                                    if ($employeeRate->isCurrentlyActive()) {
+                                        $statusLabel = 'Aktywna';
+                                        $badgeVariant = 'success';
+                                    } elseif ($employeeRate->isPast()) {
+                                        $statusLabel = 'Zakończona';
+                                        $badgeVariant = 'accent';
+                                    } elseif ($employeeRate->isScheduled()) {
+                                        $statusLabel = 'Zaplanowana';
+                                        $badgeVariant = 'info';
+                                    } else {
+                                        $statusLabel = 'Nieznany';
+                                        $badgeVariant = 'accent';
+                                    }
                                 @endphp
-                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $employeeRate->status->label() }}</x-ui.badge>
+                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
                             </x-ui.detail-item>
                             @if($employeeRate->notes)
                             <x-ui.detail-item label="Notatki:" :full-width="true">{{ $employeeRate->notes }}</x-ui.detail-item>

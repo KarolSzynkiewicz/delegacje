@@ -6,7 +6,8 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\Vehicle;
-use App\Contracts\AssignmentContract;
+use App\Contracts\HasEmployee;
+use App\Contracts\HasDateRange;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -79,7 +80,7 @@ class ReturnTripPreparation
      * 
      * Does NOT modify the database.
      * 
-     * @param Collection<AssignmentContract> $activeAssignments All active assignments for employees
+     * @param Collection<HasEmployee&HasDateRange> $activeAssignments All active assignments for employees
      * @param Collection<VehicleAssignment> $returnVehicleAssignments Assignments for return vehicle
      * @return self
      */
@@ -173,7 +174,7 @@ class ReturnTripPreparation
 class AssignmentToShorten
 {
     public function __construct(
-        public AssignmentContract $assignment,
+        public HasEmployee&HasDateRange $assignment,
         public ?Carbon $currentEndDate,
         public Carbon $newEndDate
     ) {}
@@ -195,7 +196,7 @@ class AssignmentToShorten
 class ReturnTripConflict
 {
     public function __construct(
-        public AssignmentContract $assignment,
+        public HasEmployee&HasDateRange $assignment,
         public ?Vehicle $vehicle,
         public string $message,
         public bool $isBlocking = true

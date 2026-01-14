@@ -7,21 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Traits\HasDateRange;
-use App\Traits\HasAssignmentLifecycle;
-use App\Contracts\AssignmentContract;
+use App\Contracts\HasEmployee;
+use App\Contracts\HasDateRange as HasDateRangeContract;
 use App\Models\Employee;
 use App\Enums\VehiclePosition;
 use Carbon\Carbon;
 
-class VehicleAssignment extends Model implements AssignmentContract
+class VehicleAssignment extends Model implements HasEmployee, HasDateRangeContract
 {
-    use HasFactory, 
-        HasDateRange, 
-        HasAssignmentLifecycle {
-            HasAssignmentLifecycle::scopeActiveAtDate insteadof HasDateRange;
-            HasAssignmentLifecycle::scopeCompleted insteadof HasDateRange;
-            HasAssignmentLifecycle::scopeScheduled insteadof HasDateRange;
-        }
+    use HasFactory, HasDateRange;
 
     /**
      * The attributes that are mass assignable.
@@ -34,8 +28,6 @@ class VehicleAssignment extends Model implements AssignmentContract
         'position',
         'start_date',
         'end_date',
-        'actual_start_date',
-        'actual_end_date',
         'notes',
         'is_return_trip',
     ];
@@ -48,8 +40,6 @@ class VehicleAssignment extends Model implements AssignmentContract
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
-        'actual_start_date' => 'datetime',
-        'actual_end_date' => 'datetime',
         'position' => VehiclePosition::class,
         'is_return_trip' => 'boolean',
     ];
@@ -71,7 +61,7 @@ class VehicleAssignment extends Model implements AssignmentContract
     }
 
     /**
-     * Implementation of AssignmentContract::getEmployee()
+     * Implementation of HasEmployee::getEmployee()
      */
     public function getEmployee(): Employee
     {
@@ -79,27 +69,26 @@ class VehicleAssignment extends Model implements AssignmentContract
     }
 
     /**
-     * Implementation of AssignmentContract::getStartDate()
+     * Implementation of HasDateRange::getStartDate()
+     * 
+     * Note: Trait HasDateRange already provides this method, but we override it
+     * to ensure it returns Carbon (not CarbonInterface) to match the contract.
      */
     public function getStartDate(): Carbon
     {
-        return $this->start_date ?? Carbon::now();
+        $date = $this->start_date;
+        return $date ? Carbon::instance($date) : Carbon::now();
     }
 
     /**
-     * Implementation of AssignmentContract::getEndDate()
+     * Implementation of HasDateRange::getEndDate()
+     * 
+     * Note: Trait HasDateRange already provides this method, but we override it
+     * to ensure it returns Carbon|null (not CarbonInterface|null) to match the contract.
      */
     public function getEndDate(): ?Carbon
     {
-        return $this->end_date;
-    }
-
-    /**
-     * Scope: Filter assignments that are active (date-based).
-     * Uses HasAssignmentLifecycle::scopeActive() which filters by dates only.
-     */
-    public function scopeActive(Builder $query): Builder
-    {
-        return $this->scopeActiveAtDate($query, Carbon::today());
+        $date = $this->end_date;
+        return $date ? Carbon::instance($date) : null;
     }
 }

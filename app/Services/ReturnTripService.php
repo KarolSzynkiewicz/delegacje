@@ -11,10 +11,10 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Repositories\Contracts\EmployeeRepositoryInterface;
-use App\Contracts\AssignmentContract;
+use App\Contracts\HasEmployee;
+use App\Contracts\HasDateRange;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
-use App\Enums\AssignmentStatus;
 use App\Services\AssignmentQueryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -197,12 +197,11 @@ class ReturnTripService
                     $newVehicleAssignment = VehicleAssignment::create([
                         'employee_id' => $employeeId,
                         'vehicle_id' => $preparation->returnVehicle->id,
-                        'start_date' => $preparation->returnDate,
-                        'end_date' => $preparation->returnDate->copy()->addDays(1),
-                        'status' => AssignmentStatus::IN_TRANSIT,
-                        'notes' => 'Zjazd do bazy',
-                        'is_return_trip' => true,
-                    ]);
+                    'start_date' => $preparation->returnDate,
+                    'end_date' => $preparation->returnDate->copy()->addDays(1),
+                    'notes' => 'Zjazd do bazy',
+                    'is_return_trip' => true,
+                ]);
 
                     LogisticsEventParticipant::create([
                         'logistics_event_id' => $event->id,

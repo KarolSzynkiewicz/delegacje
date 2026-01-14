@@ -39,8 +39,12 @@ class ProjectAssignmentService
     /**
      * Update an existing project assignment with business logic validation.
      */
-    public function updateAssignment(ProjectAssignment $assignment, array $data): bool
+    public function updateAssignment(\App\Contracts\HasEmployee&\App\Contracts\HasDateRange $assignment, array $data): bool
     {
+        if (!$assignment instanceof ProjectAssignment) {
+            throw new \InvalidArgumentException('Assignment must be a ProjectAssignment instance.');
+        }
+
         $employee = $this->employeeRepository->findOrFail($data['employee_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
 
@@ -83,7 +87,7 @@ class ProjectAssignmentService
      */
     protected function validateEmployeeDocuments(Employee $employee, string $startDate, string $endDate): void
     {
-        // Sprawdź czy kolumna is_required istnieje
+        // Sprawdź czy dokument is required
         $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
         
         // Jeśli kolumna nie istnieje, nie ma wymaganych dokumentów - nie blokuj

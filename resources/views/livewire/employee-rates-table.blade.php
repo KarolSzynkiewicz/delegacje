@@ -21,23 +21,8 @@
                            placeholder="Imię lub nazwisko...">
                 </div>
 
-                <!-- Filtrowanie po statusie -->
-                <div class="col-md-3">
-                    <label for="statusFilter" class="form-label small fw-semibold mb-1">
-                        Status
-                    </label>
-                    <select id="statusFilter" 
-                            wire:model.live="statusFilter" 
-                            class="form-select form-select-sm">
-                        <option value="">Wszystkie</option>
-                        <option value="active">Aktywna</option>
-                        <option value="completed">Zakończona</option>
-                        <option value="cancelled">Anulowana</option>
-                    </select>
-                </div>
-
                 <!-- Filtrowanie po walucie -->
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label for="currencyFilter" class="form-label small fw-semibold mb-1">
                         Waluta
                     </label>
@@ -117,14 +102,21 @@
                                 </td>
                                 <td>
                                     @php
-                                        $badgeVariant = match($rate->status->value) {
-                                            'active' => 'success',
-                                            'completed' => 'accent',
-                                            'cancelled' => 'danger',
-                                            default => 'accent'
-                                        };
+                                        if ($rate->isCurrentlyActive()) {
+                                            $statusLabel = 'Aktywna';
+                                            $badgeVariant = 'success';
+                                        } elseif ($rate->isPast()) {
+                                            $statusLabel = 'Zakończona';
+                                            $badgeVariant = 'accent';
+                                        } elseif ($rate->isScheduled()) {
+                                            $statusLabel = 'Zaplanowana';
+                                            $badgeVariant = 'info';
+                                        } else {
+                                            $statusLabel = 'Nieznany';
+                                            $badgeVariant = 'accent';
+                                        }
                                     @endphp
-                                    <x-ui.badge variant="{{ $badgeVariant }}">{{ $rate->status->label() }}</x-ui.badge>
+                                    <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
                                 </td>
                                 <td>
                                     <small class="text-muted">{{ $rate->notes ? Str::limit($rate->notes, 50) : '-' }}</small>
@@ -151,11 +143,11 @@
         @else
             <x-ui.empty-state 
                 icon="inbox"
-                :message="!empty($search) || !empty($statusFilter) || !empty($currencyFilter) ? 'Nie znaleziono stawek spełniających kryteria wyszukiwania.' : 'Brak stawek w systemie.'"
-                :has-filters="!empty($search) || !empty($statusFilter) || !empty($currencyFilter)"
+                :message="!empty($search) || !empty($currencyFilter) ? 'Nie znaleziono stawek spełniających kryteria wyszukiwania.' : 'Brak stawek w systemie.'"
+                :has-filters="!empty($search) || !empty($currencyFilter)"
                 clear-filters-action="wire:clearFilters"
             >
-                @if(empty($search) && empty($statusFilter) && empty($currencyFilter))
+                @if(empty($search) && empty($currencyFilter))
                     <x-ui.button variant="primary" href="{{ route('employee-rates.create') }}">
                         <i class="bi bi-plus-circle"></i> Dodaj pierwszą stawkę
                     </x-ui.button>

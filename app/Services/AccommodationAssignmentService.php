@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
+use App\Contracts\HasEmployee;
+use App\Contracts\HasDateRange;
 use Illuminate\Validation\ValidationException;
 
 class AccommodationAssignmentService
@@ -25,7 +27,6 @@ class AccommodationAssignmentService
             'accommodation_id' => $data['accommodation_id'],
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'] ?? null,
-            'status' => $data['status'] ?? \App\Enums\AssignmentStatus::ACTIVE,
             'notes' => $data['notes'] ?? null,
         ]);
     }
@@ -35,8 +36,12 @@ class AccommodationAssignmentService
      *
      * @throws ValidationException
      */
-    public function updateAssignment(AccommodationAssignment $assignment, array $data): AccommodationAssignment
+    public function updateAssignment(HasEmployee&HasDateRange $assignment, array $data): AccommodationAssignment
     {
+        if (!$assignment instanceof AccommodationAssignment) {
+            throw new \InvalidArgumentException('Assignment must be an AccommodationAssignment instance.');
+        }
+
         $accommodation = Accommodation::findOrFail($data['accommodation_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
 

@@ -296,8 +296,8 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
      * @property mixed $notes
-     * @property \Illuminate\Support\Carbon|null $actual_end_date
-     * @property \Illuminate\Support\Carbon|null $actual_start_date
+     * @property string|null $actual_end_date
+     * @property string|null $actual_start_date
      * @property mixed $status
      * @property \Illuminate\Support\Carbon|null $end_date
      * @property \Illuminate\Support\Carbon $start_date
@@ -320,12 +320,12 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment query()
-     * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment active()
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment overlappingWith(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment inDateRange(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
+     * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment activeAtDate(\Carbon\CarbonInterface|string $date)
+     * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment active()
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment scheduled()
      * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment completed()
-     * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment activeAtDate(\Carbon\Carbon $date)
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -2023,8 +2023,8 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
      * @property mixed $notes
-     * @property \Illuminate\Support\Carbon|null $actual_end_date
-     * @property \Illuminate\Support\Carbon|null $actual_start_date
+     * @property string|null $actual_end_date
+     * @property string|null $actual_start_date
      * @property mixed $status
      * @property mixed $currency
      * @property float $amount
@@ -2051,9 +2051,9 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate active()
      * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate overlappingWith(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
      * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate inDateRange(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
+     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate activeAtDate(\Carbon\CarbonInterface|string $date)
      * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate scheduled()
      * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate completed()
-     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeRate>|EmployeeRate activeAtDate(\Carbon\Carbon $date)
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -4612,8 +4612,8 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
      * @property mixed $notes
-     * @property \Illuminate\Support\Carbon|null $actual_end_date
-     * @property \Illuminate\Support\Carbon|null $actual_start_date
+     * @property string|null $actual_end_date
+     * @property string|null $actual_start_date
      * @property mixed $status
      * @property \Illuminate\Support\Carbon|null $end_date
      * @property \Illuminate\Support\Carbon $start_date
@@ -4641,12 +4641,12 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment query()
-     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment active()
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment overlappingWith(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment inDateRange(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
+     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment activeAtDate(\Carbon\CarbonInterface|string $date)
+     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment active()
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment scheduled()
      * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment completed()
-     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment activeAtDate(\Carbon\Carbon $date)
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -6878,8 +6878,8 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $created_at
      * @property boolean $is_return_trip
      * @property mixed $notes
-     * @property \Illuminate\Support\Carbon|null $actual_end_date
-     * @property \Illuminate\Support\Carbon|null $actual_start_date
+     * @property string|null $actual_end_date
+     * @property string|null $actual_start_date
      * @property mixed $status
      * @property \Illuminate\Support\Carbon|null $end_date
      * @property \Illuminate\Support\Carbon $start_date
@@ -6905,12 +6905,12 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment query()
-     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment active()
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment overlappingWith(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment inDateRange(\Carbon\CarbonInterface|string $startDate, \Carbon\CarbonInterface|string|null $endDate = null)
+     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment activeAtDate(\Carbon\CarbonInterface|string $date)
+     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment active()
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment scheduled()
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment completed()
-     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment activeAtDate(\Carbon\Carbon $date)
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)

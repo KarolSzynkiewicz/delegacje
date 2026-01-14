@@ -81,18 +81,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="status" 
-                            id="status"
-                            label="Status"
-                        >
-                            <option value="active" {{ old('status', 'active') == 'active' ? 'selected' : '' }}>Aktywna</option>
-                            <option value="completed" {{ old('status') == 'completed' ? 'selected' : '' }}>Zakończona</option>
-                            <option value="cancelled" {{ old('status') == 'cancelled' ? 'selected' : '' }}>Anulowana</option>
-                        </x-ui.input>
-                    </div>
 
                     <div class="mb-4">
                         <x-ui.input 

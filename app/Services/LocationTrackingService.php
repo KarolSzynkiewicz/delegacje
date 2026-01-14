@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\Vehicle;
 use App\Models\Location;
-use App\Contracts\AssignmentContract;
-use App\Enums\AssignmentStatus;
+use App\Contracts\HasEmployee;
+use App\Contracts\HasDateRange;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -19,13 +19,13 @@ use Illuminate\Support\Facades\Cache;
  * - Multiple calls with same data → same result
  * - No heuristics dependent on if-order
  * 
- * Priority rules for employee location:
- * 1. VehicleAssignment with status 'in_transit' → vehicle's current_location_id
- * 2. AccommodationAssignment with status 'active' → accommodation's location_id
- * 3. ProjectAssignment with status 'active' → project's location_id
+ * Priority rules for employee location (all based on date ranges):
+ * 1. VehicleAssignment that is currently active → vehicle's current_location_id
+ * 2. AccommodationAssignment that is currently active → accommodation's location_id
+ * 3. ProjectAssignment that is currently active → project's location_id
  * 4. No active assignments → base (Location::getBase())
  * 
- * In case of conflicts (e.g., active project + active vehicle in_transit):
+ * In case of conflicts (e.g., active project + active vehicle):
  * Priority: VehicleAssignment > AccommodationAssignment > ProjectAssignment
  */
 class LocationTrackingService
@@ -66,19 +66,19 @@ class LocationTrackingService
     /**
      * Get the location for a specific assignment.
      * 
-     * @param AssignmentContract $assignment
+     * @param HasEmployee&HasDateRange $assignment
      * @return Location|null
      */
-    public function forAssignment(AssignmentContract $assignment): ?Location
+    public function forAssignment(HasEmployee&HasDateRange $assignment): ?Location
     {
         // ProjectAssignment → project's location
         if ($assignment instanceof \App\Models\ProjectAssignment) {
             return $assignment->project?->location;
         }
 
-        // VehicleAssignment → vehicle's current_location_id (if in_transit)
+        // VehicleAssignment → vehicle's current_location_id (if currently active)
         if ($assignment instanceof \App\Models\VehicleAssignment) {
-            if ($assignment->isInTransit()) {
+            if ($assignment->isCurrentlyActive()) {
                 return $assignment->vehicle?->currentLocation;
             }
         }
@@ -105,9 +105,9 @@ class LocationTrackingService
      */
     private function calculateEmployeeLocation(Employee $employee): ?Location
     {
-        // Priority 1: VehicleAssignment with status IN_TRANSIT
+        // Priority 1: VehicleAssignment that is currently active
+        // Note: Status-based filtering removed - we use date-based filtering only
         $vehicleAssignment = $employee->vehicleAssignments()
-            ->where('status', AssignmentStatus::IN_TRANSIT)
             ->where('start_date', '<=', now())
             ->where(function ($q) {
                 $q->whereNull('end_date')
@@ -120,7 +120,7 @@ class LocationTrackingService
             return $vehicleAssignment->vehicle->currentLocation;
         }
 
-        // Priority 2: AccommodationAssignment with status ACTIVE
+        // Priority 2: AccommodationAssignment that is currently active (date-based)
         $accommodationAssignment = $employee->accommodationAssignments()
             ->active()
             ->with('accommodation.location')
@@ -130,7 +130,7 @@ class LocationTrackingService
             return $accommodationAssignment->accommodation->location;
         }
 
-        // Priority 3: ProjectAssignment with status ACTIVE
+        // Priority 3: ProjectAssignment that is currently active (date-based)
         $projectAssignment = $employee->assignments()
             ->active()
             ->with('project.location')

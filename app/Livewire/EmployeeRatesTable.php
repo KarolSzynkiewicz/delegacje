@@ -13,25 +13,18 @@ class EmployeeRatesTable extends Component
     use WithPagination;
 
     public $search = '';
-    public $statusFilter = '';
     public $currencyFilter = '';
     public $sortField = 'start_date';
     public $sortDirection = 'desc';
 
     protected $queryString = [
         'search' => ['except' => ''],
-        'statusFilter' => ['except' => ''],
         'currencyFilter' => ['except' => ''],
         'sortField' => ['except' => 'start_date'],
         'sortDirection' => ['except' => 'desc'],
     ];
 
     public function updatingSearch()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingStatusFilter()
     {
         $this->resetPage();
     }
@@ -44,7 +37,6 @@ class EmployeeRatesTable extends Component
     public function clearFilters()
     {
         $this->search = '';
-        $this->statusFilter = '';
         $this->currencyFilter = '';
         $this->sortField = 'start_date';
         $this->sortDirection = 'desc';
@@ -76,11 +68,6 @@ class EmployeeRatesTable extends Component
                           ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $searchTerm . '%']);
                 });
             });
-        }
-
-        // Filtrowanie po statusie
-        if (!empty($this->statusFilter)) {
-            $query->where('status', $this->statusFilter);
         }
 
         // Filtrowanie po walucie

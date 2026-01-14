@@ -78,7 +78,6 @@ class EmployeeRateController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'amount' => 'required|numeric|min:0',
             'currency' => 'required|string|size:3',
-            'status' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 

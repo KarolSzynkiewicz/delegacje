@@ -7,18 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Traits\HasDateRange;
-use App\Traits\HasAssignmentLifecycle;
 use Carbon\Carbon;
 
 class EmployeeRate extends Model
 {
-    use HasFactory, 
-        HasDateRange, 
-        HasAssignmentLifecycle {
-            HasAssignmentLifecycle::scopeActiveAtDate insteadof HasDateRange;
-            HasAssignmentLifecycle::scopeCompleted insteadof HasDateRange;
-            HasAssignmentLifecycle::scopeScheduled insteadof HasDateRange;
-        }
+    use HasFactory, HasDateRange;
 
     /**
      * The attributes that are mass assignable.
@@ -31,8 +24,6 @@ class EmployeeRate extends Model
         'end_date',
         'amount',
         'currency',
-        'actual_start_date',
-        'actual_end_date',
         'notes',
     ];
 
@@ -44,8 +35,6 @@ class EmployeeRate extends Model
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
-        'actual_start_date' => 'datetime',
-        'actual_end_date' => 'datetime',
         'amount' => 'decimal:2',
     ];
 
@@ -59,7 +48,7 @@ class EmployeeRate extends Model
 
     /**
      * Scope: Filter rates that are active (date-based).
-     * Uses HasAssignmentLifecycle::scopeActive() which filters by dates only.
+     * Uses HasDateRange::scopeActive() which filters by dates only.
      */
     public function scopeActive(Builder $query): Builder
     {

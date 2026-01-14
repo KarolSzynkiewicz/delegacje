@@ -24,8 +24,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Custom morph map for AssignmentContract implementations and User (for Spatie Permission)
-        // This ensures polymorphic assignments only point to AssignmentContract implementations
+        // Custom morph map for HasEmployee & HasDateRange implementations and User (for Spatie Permission)
+        // This ensures polymorphic assignments only point to models implementing HasEmployee & HasDateRange
         // User is included because Spatie Permission uses morphedByMany for User model
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,

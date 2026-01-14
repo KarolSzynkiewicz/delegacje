@@ -45,8 +45,12 @@ class VehicleAssignmentService
      *
      * @throws ValidationException
      */
-    public function updateAssignment(VehicleAssignment $assignment, array $data): VehicleAssignment
+    public function updateAssignment(\App\Contracts\HasEmployee&\App\Contracts\HasDateRange $assignment, array $data): VehicleAssignment
     {
+        if (!$assignment instanceof VehicleAssignment) {
+            throw new \InvalidArgumentException('Assignment must be a VehicleAssignment instance.');
+        }
+
         $vehicle = Vehicle::findOrFail($data['vehicle_id']);
         $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
         

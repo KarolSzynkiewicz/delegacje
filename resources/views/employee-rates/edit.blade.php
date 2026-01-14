@@ -82,18 +82,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="status" 
-                            id="status"
-                            label="Status"
-                        >
-                            <option value="active" {{ old('status', $employeeRate->status->value) == 'active' ? 'selected' : '' }}>Aktywna</option>
-                            <option value="completed" {{ old('status', $employeeRate->status->value) == 'completed' ? 'selected' : '' }}>Zakończona</option>
-                            <option value="cancelled" {{ old('status', $employeeRate->status->value) == 'cancelled' ? 'selected' : '' }}>Anulowana</option>
-                        </x-ui.input>
-                    </div>
 
                     <div class="mb-4">
                         <x-ui.input 
