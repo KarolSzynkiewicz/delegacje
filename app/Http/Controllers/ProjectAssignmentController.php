@@ -48,19 +48,24 @@ class ProjectAssignmentController extends Controller
      */
     public function create(Project $project, Request $request): View
     {
-        $startDate = $request->query('date_from');
-        $endDate = $request->query('date_to');
+        $startDate = $request->query('start_date') ?? $request->query('date_from');
+        $endDate = $request->query('end_date') ?? $request->query('date_to');
         
         // Sprawdź czy daty są w przeszłości
         $isDateInPast = false;
+        $startDateCarbon = null;
+        $endDateCarbon = null;
+        
         if ($startDate) {
-            $isDateInPast = \Carbon\Carbon::parse($startDate)->startOfDay()->isPast();
+            $startDateCarbon = \Carbon\Carbon::parse($startDate);
+            $isDateInPast = $startDateCarbon->startOfDay()->isPast();
         }
         if ($endDate && !$isDateInPast) {
-            $isDateInPast = \Carbon\Carbon::parse($endDate)->startOfDay()->isPast();
+            $endDateCarbon = \Carbon\Carbon::parse($endDate);
+            $isDateInPast = $endDateCarbon->startOfDay()->isPast();
         }
         
-        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate);
+        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDateCarbon, $endDateCarbon);
         $roles = Role::orderBy("name")->get();
         
         return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate", "isDateInPast"));
@@ -72,9 +77,20 @@ class ProjectAssignmentController extends Controller
     public function store(StoreProjectAssignmentRequest $request, Project $project): RedirectResponse
     {
         try {
+            $validated = $request->validated();
+            
+            $employee = Employee::findOrFail($validated['employee_id']);
+            $role = Role::findOrFail($validated['role_id']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
             $assignment = $this->assignmentService->createAssignment(
                 $project,
-                $request->validated()
+                $employee,
+                $role,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
             );
 
             return redirect()
@@ -105,8 +121,8 @@ class ProjectAssignmentController extends Controller
         $projects = Project::orderBy("name")->get();
         
         // Pobierz daty z przypisania do sprawdzenia dostępności
-        $startDate = $assignment->start_date->format('Y-m-d');
-        $endDate = $assignment->end_date ? $assignment->end_date->format('Y-m-d') : $startDate;
+        $startDate = $assignment->start_date;
+        $endDate = $assignment->end_date;
         
         // Sprawdź dostępność pracowników dla dat przypisania (wykluczając aktualnie edytowane przypisanie)
         $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate, $assignment->id);
@@ -122,9 +138,22 @@ class ProjectAssignmentController extends Controller
     public function update(UpdateProjectAssignmentRequest $request, ProjectAssignment $assignment): RedirectResponse
     {
         try {
+            $validated = $request->validated();
+            
+            $project = Project::findOrFail($validated['project_id']);
+            $employee = Employee::findOrFail($validated['employee_id']);
+            $role = Role::findOrFail($validated['role_id']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
             $this->assignmentService->updateAssignment(
                 $assignment,
-                $request->validated()
+                $project,
+                $employee,
+                $role,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
             );
 
             return redirect()

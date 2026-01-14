@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
+use App\Models\Employee;
+use App\Enums\VehiclePosition;
+use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class VehicleAssignmentService
@@ -14,28 +17,28 @@ class VehicleAssignmentService
      *
      * @throws ValidationException
      */
-    public function createAssignment(int $employeeId, array $data): VehicleAssignment
-    {
-        $vehicle = Vehicle::findOrFail($data['vehicle_id']);
-        $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
-        
-        // Convert position string to enum if needed
-        $position = $data['position'] instanceof \App\Enums\VehiclePosition 
-            ? $data['position'] 
-            : \App\Enums\VehiclePosition::from($data['position'] ?? 'passenger');
+    public function createAssignment(
+        Employee $employee,
+        Vehicle $vehicle,
+        VehiclePosition $position,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null
+    ): VehicleAssignment {
+        $endDate = $endDate ?? now()->addYears(10);
 
         // Validate driver availability (only one driver per vehicle per period)
-        if ($position === \App\Enums\VehiclePosition::DRIVER) {
-            $this->validateDriverAvailability($vehicle, $data['start_date'], $endDate);
+        if ($position === VehiclePosition::DRIVER) {
+            $this->validateDriverAvailability($vehicle, $startDate, $endDate);
         }
 
         return VehicleAssignment::create([
-            'employee_id' => $employeeId,
-            'vehicle_id' => $data['vehicle_id'],
+            'employee_id' => $employee->id,
+            'vehicle_id' => $vehicle->id,
             'position' => $position,
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'] ?? null,
-            'notes' => $data['notes'] ?? null,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
             'is_return_trip' => false, // Always false for manual assignments
         ]);
     }
@@ -45,33 +48,30 @@ class VehicleAssignmentService
      *
      * @throws ValidationException
      */
-    public function updateAssignment(\App\Contracts\HasEmployee&\App\Contracts\HasDateRange $assignment, array $data): VehicleAssignment
-    {
-        if (!$assignment instanceof VehicleAssignment) {
-            throw new \InvalidArgumentException('Assignment must be a VehicleAssignment instance.');
-        }
-
-        $vehicle = Vehicle::findOrFail($data['vehicle_id']);
-        $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
-        
-        // Convert position string to enum if needed
-        $position = $data['position'] instanceof \App\Enums\VehiclePosition 
-            ? $data['position'] 
-            : \App\Enums\VehiclePosition::from($data['position'] ?? 'passenger');
+    public function updateAssignment(
+        VehicleAssignment $assignment,
+        Vehicle $vehicle,
+        VehiclePosition $position,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null
+    ): VehicleAssignment {
+        $endDate = $endDate ?? now()->addYears(10);
 
         // Validate driver availability (only one driver per vehicle per period)
         // Exclude current assignment if it's being updated
-        if ($position === \App\Enums\VehiclePosition::DRIVER) {
-            $this->validateDriverAvailability($vehicle, $data['start_date'], $endDate, $assignment->id);
+        if ($position === VehiclePosition::DRIVER) {
+            $this->validateDriverAvailability($vehicle, $startDate, $endDate, $assignment->id);
         }
 
-        // Ensure position is converted to enum value for database
-        $data['position'] = $position;
-        
-        // Always keep is_return_trip as false for manual updates (only zjazd sets it to true)
-        $data['is_return_trip'] = false;
-
-        $assignment->update($data);
+        $assignment->update([
+            'vehicle_id' => $vehicle->id,
+            'position' => $position,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+            'is_return_trip' => false, // Always false for manual updates (only zjazd sets it to true)
+        ]);
 
         return $assignment;
     }
@@ -81,10 +81,10 @@ class VehicleAssignmentService
      *
      * @throws ValidationException
      */
-    protected function validateDriverAvailability(Vehicle $vehicle, string $startDate, string $endDate, ?int $excludeAssignmentId = null): void
+    protected function validateDriverAvailability(Vehicle $vehicle, Carbon $startDate, Carbon $endDate, ?int $excludeAssignmentId = null): void
     {
         $query = $vehicle->assignments()
-            ->where('position', \App\Enums\VehiclePosition::DRIVER->value)
+            ->where('position', VehiclePosition::DRIVER->value)
             ->overlappingWith($startDate, $endDate);
 
         if ($excludeAssignmentId) {

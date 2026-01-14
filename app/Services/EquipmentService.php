@@ -19,21 +19,23 @@ class EquipmentService
      * 
      * @param Equipment $equipment
      * @param Employee $employee
-     * @param array $data [
-     *   'quantity_issued' => int,
-     *   'issue_date' => string (Y-m-d),
-     *   'expected_return_date' => string|null (Y-m-d),
-     *   'project_assignment_id' => int|null,
-     *   'notes' => string|null
-     * ]
+     * @param int $quantityIssued
+     * @param Carbon $issueDate
+     * @param Carbon|null $expectedReturnDate
+     * @param ProjectAssignment|null $projectAssignment
+     * @param string|null $notes
      * @return EquipmentIssue
      * @throws ValidationException
      */
-    public function issueEquipment(Equipment $equipment, Employee $employee, array $data): EquipmentIssue
-    {
-        $quantityIssued = $data['quantity_issued'] ?? 1;
-        $issueDate = Carbon::parse($data['issue_date']);
-
+    public function issueEquipment(
+        Equipment $equipment,
+        Employee $employee,
+        int $quantityIssued,
+        Carbon $issueDate,
+        ?Carbon $expectedReturnDate = null,
+        ?ProjectAssignment $projectAssignment = null,
+        ?string $notes = null
+    ): EquipmentIssue {
         // Validate available quantity
         if ($equipment->available_quantity < $quantityIssued) {
             throw ValidationException::withMessages([
@@ -45,12 +47,12 @@ class EquipmentService
         return EquipmentIssue::create([
             'equipment_id' => $equipment->id,
             'employee_id' => $employee->id,
-            'project_assignment_id' => $data['project_assignment_id'] ?? null,
+            'project_assignment_id' => $projectAssignment?->id,
             'quantity_issued' => $quantityIssued,
             'issue_date' => $issueDate,
-            'expected_return_date' => isset($data['expected_return_date']) ? Carbon::parse($data['expected_return_date']) : null,
+            'expected_return_date' => $expectedReturnDate,
             'status' => 'issued',
-            'notes' => $data['notes'] ?? null,
+            'notes' => $notes,
             'issued_by' => auth()->id(),
         ]);
     }
@@ -59,20 +61,19 @@ class EquipmentService
      * Return equipment from an employee.
      * 
      * @param EquipmentIssue $equipmentIssue
-     * @param array $data [
-     *   'return_date' => string (Y-m-d),
-     *   'notes' => string|null
-     * ]
+     * @param Carbon $returnDate
+     * @param string|null $notes
      * @return bool
      */
-    public function returnEquipment(EquipmentIssue $equipmentIssue, array $data): bool
-    {
-        $returnDate = Carbon::parse($data['return_date']);
-
+    public function returnEquipment(
+        EquipmentIssue $equipmentIssue,
+        Carbon $returnDate,
+        ?string $notes = null
+    ): bool {
         $equipmentIssue->markAsReturned($returnDate, auth()->id());
 
-        if (isset($data['notes'])) {
-            $equipmentIssue->update(['notes' => $data['notes']]);
+        if ($notes !== null) {
+            $equipmentIssue->update(['notes' => $notes]);
         }
 
         return true;

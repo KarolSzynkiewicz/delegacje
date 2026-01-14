@@ -96,7 +96,13 @@ class ReturnTripController extends Controller
         ]);
 
         try {
-            $preparation = $this->returnTripService->prepareZjazd($validated);
+            $employeeIds = $validated['employee_ids'];
+            $returnDate = \Carbon\Carbon::parse($validated['return_date']);
+            $returnVehicle = isset($validated['vehicle_id']) 
+                ? Vehicle::findOrFail($validated['vehicle_id'])
+                : null;
+            
+            $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
 
             // Store preparation in session for commit
             session(['return_trip_preparation' => serialize($preparation)]);
@@ -170,7 +176,8 @@ class ReturnTripController extends Controller
             }
 
             // Commit the return trip (create or update)
-            $event = $this->returnTripService->commitZjazd($preparation, $validated, $existingEvent);
+            $notes = $validated['notes'] ?? null;
+            $event = $this->returnTripService->commitZjazd($preparation, $notes, $existingEvent);
 
             // Clear preparation from session
             session()->forget('return_trip_preparation');
@@ -273,10 +280,17 @@ class ReturnTripController extends Controller
             $this->returnTripService->reverseZjazd($returnTrip);
 
             // Prepare new return trip
-            $preparation = $this->returnTripService->prepareZjazd($validated);
+            $employeeIds = $validated['employee_ids'];
+            $returnDate = \Carbon\Carbon::parse($validated['return_date']);
+            $returnVehicle = isset($validated['vehicle_id']) 
+                ? Vehicle::findOrFail($validated['vehicle_id'])
+                : null;
+            
+            $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
 
             // Commit new return trip (updates existing event)
-            $event = $this->returnTripService->commitZjazd($preparation, $validated, $returnTrip);
+            $notes = $validated['notes'] ?? null;
+            $event = $this->returnTripService->commitZjazd($preparation, $notes, $returnTrip);
 
             return redirect()
                 ->route('return-trips.show', $event)

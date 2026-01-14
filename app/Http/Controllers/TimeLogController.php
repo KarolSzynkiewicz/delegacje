@@ -56,8 +56,17 @@ class TimeLogController extends Controller
         $this->authorize('create', TimeLog::class);
 
         try {
-            $assignment = ProjectAssignment::findOrFail($request->validated()['project_assignment_id']);
-            $this->timeLogService->createTimeLog($assignment, $request->validated());
+            $validated = $request->validated();
+            $assignment = ProjectAssignment::findOrFail($validated['project_assignment_id']);
+            $workDate = \Carbon\Carbon::parse($validated['work_date']);
+            $hoursWorked = (float) $validated['hours_worked'];
+            
+            $this->timeLogService->createTimeLog(
+                $assignment,
+                $workDate,
+                $hoursWorked,
+                $validated['notes'] ?? null
+            );
 
             return redirect()
                 ->route('time-logs.index')
@@ -105,7 +114,16 @@ class TimeLogController extends Controller
         $this->authorize('update', $timeLog);
 
         try {
-            $this->timeLogService->updateTimeLog($timeLog, $request->validated());
+            $validated = $request->validated();
+            $workDate = \Carbon\Carbon::parse($validated['work_date']);
+            $hoursWorked = (float) $validated['hours_worked'];
+            
+            $this->timeLogService->updateTimeLog(
+                $timeLog,
+                $workDate,
+                $hoursWorked,
+                $validated['notes'] ?? null
+            );
 
             return redirect()
                 ->route('time-logs.index')

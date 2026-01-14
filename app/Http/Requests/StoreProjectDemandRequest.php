@@ -22,8 +22,8 @@ class StoreProjectDemandRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'date_from' => ['required', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
             'demands' => ['required', 'array'],
             'demands.*.role_id' => ['required', 'exists:roles,id'],
@@ -39,10 +39,10 @@ class StoreProjectDemandRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'date_from.required' => 'Data rozpoczęcia jest wymagana.',
-            'date_from.date' => 'Data rozpoczęcia musi być poprawną datą.',
-            'date_to.date' => 'Data zakończenia musi być poprawną datą.',
-            'date_to.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
+            'start_date.required' => 'Data rozpoczęcia jest wymagana.',
+            'start_date.date' => 'Data rozpoczęcia musi być poprawną datą.',
+            'end_date.date' => 'Data zakończenia musi być poprawną datą.',
+            'end_date.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
             'demands.required' => 'Brak danych o rolach.',
             'demands.array' => 'Dane o rolach muszą być tablicą.',
             'demands.*.role_id.required' => 'Rola jest wymagana.',

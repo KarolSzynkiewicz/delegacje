@@ -36,10 +36,20 @@ class LocationController extends Controller
     {
         $this->authorize('create', Location::class);
         
-        $data = $request->validated();
-        $data['is_base'] = $request->has('is_base') && $request->input('is_base') == '1';
+        $validated = $request->validated();
+        $isBase = $request->has('is_base') && $request->input('is_base') == '1';
         
-        Location::create($data);
+        app(\App\Services\LocationService::class)->createLocation(
+            $validated['name'],
+            $validated['address'],
+            $validated['city'] ?? null,
+            $validated['postal_code'] ?? null,
+            $validated['contact_person'] ?? null,
+            $validated['phone'] ?? null,
+            $validated['email'] ?? null,
+            $validated['description'] ?? null,
+            $isBase
+        );
 
         return redirect()->route('locations.index')->with('success', 'Lokalizacja została dodana.');
     }
@@ -70,10 +80,21 @@ class LocationController extends Controller
     {
         $this->authorize('update', $location);
         
-        $data = $request->validated();
-        $data['is_base'] = $request->has('is_base') && $request->input('is_base') == '1';
+        $validated = $request->validated();
+        $isBase = $request->has('is_base') && $request->input('is_base') == '1';
         
-        $location->update($data);
+        app(\App\Services\LocationService::class)->updateLocation(
+            $location,
+            $validated['name'],
+            $validated['address'],
+            $validated['city'] ?? null,
+            $validated['postal_code'] ?? null,
+            $validated['contact_person'] ?? null,
+            $validated['phone'] ?? null,
+            $validated['email'] ?? null,
+            $validated['description'] ?? null,
+            $isBase
+        );
 
         return redirect()->route('locations.index')->with('success', 'Lokalizacja została zaktualizowana.');
     }

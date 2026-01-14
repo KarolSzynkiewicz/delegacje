@@ -406,7 +406,66 @@ delegacje/
 
 ---
 
-## 🏗️ Architektura i Best Practices
+## 🏗️ Architektura i Konwencje
+
+### 1. Kontrakty (Contracts)
+**Gdzie:** `app/Contracts/`
+**Kiedy używać:**
+- Polimorficzne relacje (HasEmployee, HasDateRange)
+- Read-models / Query services
+- Gdzie naprawdę potrzebujesz polimorfizmu
+
+**NIE używaj:**
+- Gdy masz konkretny typ - typuj konkretnie
+- Nigdy razem z instanceof
+
+### 2. Traity (Traits)
+**Gdzie:** `app/Traits/`
+**Kiedy używać:**
+- Wspólna logika powtarzająca się w wielu klasach
+- Częste operacje: overlap dat, walidacja start_date < end_date
+- Przykład: `HasDateRange` trait dla operacji na zakresach dat
+
+### 3. Modele (Models)
+**Konwencja nazewnictwa pól dat:**
+- ZAWSZE: `start_date` / `end_date` (nie date_from/date_to/issued_date/returned_date)
+- Zgodnie z konwencją od poziomu bazy danych
+- Użyj trait `HasDateRange` dla spójnej obsługi
+
+### 4. Migracje (Migrations)
+**Konwencja:**
+```php
+$table->date('start_date');
+$table->date('end_date')->nullable();
+```
+- ZAWSZE `start_date` / `end_date`
+- Spójnie we wszystkich tabelach
+
+### 5. Kontrolery (Controllers)
+**Zasady:**
+- CIENKIE - tylko orkiestracja
+- Przekazują logikę biznesową do serwisów
+- Przekazują CAŁE OBIEKTY, nie ID
+- Używają route model binding
+- Robią findOrFail (nie serwisy)
+
+### 6. Serwisy (Services)
+**Zasady:**
+- NIE robią findOrFail
+- NIE pytają bazy danych (dostają obiekty)
+- Liczą / sprawdzają / wykonują logikę biznesową
+- Używają Eloquent (scopes, relationships)
+- Używają Carbona - operują na obiektach
+- Przyjmują JAWNE ARGUMENTY, nie array $data
+
+### 7. Traity w Serwisach
+- Centralizują tę samą logikę w różnych serwisach
+- Częste operacje: overlap dat, walidacja dat
+
+### 8. Kontrakty w Serwisach
+- Serwisy implementują kontrakty
+- Zapewniają spójne nazewnictwo + przejrzystość
+- Definiują kontrakt API serwisu
 
 ### Warstwy Aplikacji
 
@@ -420,6 +479,8 @@ delegacje/
 - **DRY (Don't Repeat Yourself)** - Logika biznesowa w serwisach, nie duplikowana
 - **Single Responsibility** - Każda klasa ma jedną odpowiedzialność
 - **Separation of Concerns** - Form Requests dla walidacji, Services dla logiki, Controllers dla orkiestracji
+- **No Repository Pattern** - Używamy Eloquent bezpośrednio + scopes + query services
+- **No Overengineering** - Kontrakty tylko tam, gdzie naprawdę potrzebne (polimorfizm, read-models)
 
 ---
 

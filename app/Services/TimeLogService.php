@@ -18,18 +18,19 @@ class TimeLogService
      * Create a time log entry for a project assignment.
      * 
      * @param ProjectAssignment $assignment
-     * @param array $data [
-     *   'work_date' => string (Y-m-d),
-     *   'hours_worked' => float,
-     *   'notes' => string|null
-     * ]
+     * @param Carbon $workDate
+     * @param float $hoursWorked
+     * @param string|null $notes
      * @return TimeLog
      * @throws ValidationException
      */
-    public function createTimeLog(ProjectAssignment $assignment, array $data): TimeLog
-    {
-        $workDate = Carbon::parse($data['work_date'])->startOfDay();
-        $hoursWorked = $data['hours_worked'];
+    public function createTimeLog(
+        ProjectAssignment $assignment,
+        Carbon $workDate,
+        float $hoursWorked,
+        ?string $notes = null
+    ): TimeLog {
+        $workDate = $workDate->copy()->startOfDay();
 
         // Assignment jest już świeży - nie trzeba refresh()
         
@@ -59,27 +60,35 @@ class TimeLogService
             'start_time' => $workDate->copy()->setTime(8, 0), // Default start time
             'end_time' => $workDate->copy()->setTime(8, 0)->addHours($hoursWorked),
             'hours_worked' => $hoursWorked,
-            'notes' => $data['notes'] ?? null,
+            'notes' => $notes,
         ]);
     }
 
     /**
      * Update an existing time log.
      */
-    public function updateTimeLog(TimeLog $timeLog, array $data): bool
-    {
+    public function updateTimeLog(
+        TimeLog $timeLog,
+        Carbon $workDate,
+        float $hoursWorked,
+        ?string $notes = null
+    ): bool {
         $assignment = $timeLog->projectAssignment;
-        return $this->updateTimeLogWithAssignment($timeLog, $assignment, $data);
+        return $this->updateTimeLogWithAssignment($timeLog, $assignment, $workDate, $hoursWorked, $notes);
     }
 
     /**
      * Update an existing time log with a specific assignment.
      * Used in bulk updates to ensure we validate against the correct assignment.
      */
-    protected function updateTimeLogWithAssignment(TimeLog $timeLog, ProjectAssignment $assignment, array $data): bool
-    {
-        $workDate = Carbon::parse($data['work_date'])->startOfDay();
-        $hoursWorked = $data['hours_worked'];
+    protected function updateTimeLogWithAssignment(
+        TimeLog $timeLog,
+        ProjectAssignment $assignment,
+        Carbon $workDate,
+        float $hoursWorked,
+        ?string $notes = null
+    ): bool {
+        $workDate = $workDate->copy()->startOfDay();
 
         // Assignment jest już świeży z bulkUpdateTimeLogs (findOrFail)
         // Nie trzeba refresh() - może powodować problemy z cast 'date'
@@ -110,7 +119,7 @@ class TimeLogService
             'start_time' => $workDate->copy()->setTime(8, 0),
             'end_time' => $workDate->copy()->setTime(8, 0)->addHours($hoursWorked),
             'hours_worked' => $hoursWorked,
-            'notes' => $data['notes'] ?? null,
+            'notes' => $notes,
         ]);
     }
 
@@ -418,17 +427,11 @@ class TimeLogService
                     if ($timeLog) {
                         // Update existing - use the assignment from bulkUpdate, not from timeLog
                         // This ensures we validate against the correct assignment
-                        $this->updateTimeLogWithAssignment($timeLog, $assignment, [
-                            'work_date' => $date->format('Y-m-d'),
-                            'hours_worked' => $hours,
-                        ]);
+                        $this->updateTimeLogWithAssignment($timeLog, $assignment, $date, $hours);
                         $results['updated']++;
                     } else {
                         // Create new
-                        $this->createTimeLog($assignment, [
-                            'work_date' => $date->format('Y-m-d'),
-                            'hours_worked' => $hours,
-                        ]);
+                        $this->createTimeLog($assignment, $date, $hours);
                         $results['created']++;
                     }
                 } else {

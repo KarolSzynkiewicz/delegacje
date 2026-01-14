@@ -804,8 +804,8 @@ class WeeklyOverviewService
                 $requiredCount = 0;
                 foreach ($allDemands as $demand) {
                     if ($demand->role_id == $roleId) {
-                        $demandStart = $demand->date_from ? $demand->date_from->copy()->startOfDay() : null;
-                        $demandEnd = $demand->date_to ? $demand->date_to->copy()->endOfDay() : null;
+                        $demandStart = $demand->start_date ? $demand->start_date->copy()->startOfDay() : null;
+                        $demandEnd = $demand->end_date ? $demand->end_date->copy()->endOfDay() : null;
                         
                         if ($demandStart && $dayDate->gte($demandStart) && ($demandEnd === null || $dayDate->lte($demandEnd))) {
                             $requiredCount += $demand->required_count;

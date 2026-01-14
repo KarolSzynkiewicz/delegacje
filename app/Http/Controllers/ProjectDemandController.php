@@ -24,7 +24,7 @@ class ProjectDemandController extends Controller
         // Pobierz wszystkie zapotrzebowania z required_count > 0, pogrupowane po projektach
         $demands = ProjectDemand::with("project", "role")
             ->where('required_count', '>', 0)
-            ->orderBy("date_from", "asc")
+            ->orderBy("start_date", "asc")
             ->get()
             ->groupBy('project_id');
         
@@ -52,8 +52,9 @@ class ProjectDemandController extends Controller
         $roles = Role::all();
         
         // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
-        $dateFrom = $request->query('date_from');
-        $dateTo = $request->query('date_to');
+        // Obsługujemy oba warianty dla backward compatibility
+        $dateFrom = $request->query('start_date') ?? $request->query('date_from');
+        $dateTo = $request->query('end_date') ?? $request->query('date_to');
         
         // Sprawdź czy daty są w przeszłości
         $isDateInPast = false;
@@ -69,29 +70,29 @@ class ProjectDemandController extends Controller
         $existingDateTo = null;
         if ($dateFrom && $dateTo) {
             $existingDemands = $project->demands()
-                ->where('date_from', '<=', $dateTo)
+                ->where('start_date', '<=', $dateTo)
                 ->where(function ($q) use ($dateFrom) {
-                    $q->whereNull('date_to')
-                      ->orWhere('date_to', '>=', $dateFrom);
+                    $q->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $dateFrom);
                 })
                 ->with('role')
                 ->get();
             
             // Znajdź najpóźniejszą datę do z istniejących zapotrzebowań
             $demandsWithDateTo = $existingDemands->filter(function($d) {
-                return $d->date_to !== null;
+                return $d->end_date !== null;
             });
             
             if ($demandsWithDateTo->isNotEmpty()) {
-                // Jeśli są zapotrzebowania z date_to, użyj najpóźniejszej
-                $latestDateTo = $demandsWithDateTo->max('date_to');
+                // Jeśli są zapotrzebowania z end_date, użyj najpóźniejszej
+                $latestDateTo = $demandsWithDateTo->max('end_date');
                 $existingDateTo = $latestDateTo->format('Y-m-d');
             } else {
-                // Jeśli wszystkie mają date_to = null, sprawdź czy wszystkie mają tę samą date_from
-                // Jeśli tak, użyj date_to z parametrów, w przeciwnym razie zostaw puste
-                $uniqueDateFrom = $existingDemands->pluck('date_from')->unique();
+                // Jeśli wszystkie mają end_date = null, sprawdź czy wszystkie mają tę samą start_date
+                // Jeśli tak, użyj end_date z parametrów, w przeciwnym razie zostaw puste
+                $uniqueDateFrom = $existingDemands->pluck('start_date')->unique();
                 if ($uniqueDateFrom->count() === 1 && $uniqueDateFrom->first()->format('Y-m-d') === $dateFrom) {
-                    // Wszystkie zapotrzebowania zaczynają się w tym samym dniu co zakres, użyj date_to z parametrów
+                    // Wszystkie zapotrzebowania zaczynają się w tym samym dniu co zakres, użyj end_date z parametrów
                     $existingDateTo = $dateTo;
                 } else {
                     // Różne daty, zostaw puste (użytkownik sam zdecyduje)
@@ -112,7 +113,18 @@ class ProjectDemandController extends Controller
     public function store(StoreProjectDemandRequest $request, Project $project)
     {
         try {
-            $this->demandService->createDemands($project, $request->validated());
+            $validated = $request->validated();
+            
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
+            $this->demandService->createDemands(
+                $project,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null,
+                $validated['demands'] ?? []
+            );
 
             return redirect()
                 ->route("projects.demands.index", $project)
@@ -142,9 +154,9 @@ class ProjectDemandController extends Controller
         $roles = Role::all();
         
         // Sprawdź czy data jest w przeszłości
-        $isDateInPast = $demand->date_from->startOfDay()->isPast();
-        if ($demand->date_to && !$isDateInPast) {
-            $isDateInPast = $demand->date_to->startOfDay()->isPast();
+        $isDateInPast = $demand->start_date->startOfDay()->isPast();
+        if ($demand->end_date && !$isDateInPast) {
+            $isDateInPast = $demand->end_date->startOfDay()->isPast();
         }
         
         return view("demands.edit", compact("demand", "roles", "isDateInPast"));

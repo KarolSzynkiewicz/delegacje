@@ -5,63 +5,80 @@ namespace App\Services;
 use App\Models\ProjectAssignment;
 use App\Models\Project;
 use App\Models\Employee;
-use App\Repositories\Contracts\EmployeeRepositoryInterface;
+use App\Models\Role;
+use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class ProjectAssignmentService
 {
-    public function __construct(
-        protected EmployeeRepositoryInterface $employeeRepository
-    ) {}
     /**
      * Create a new project assignment with business logic validation.
      */
-    public function createAssignment(Project $project, array $data): ProjectAssignment
-    {
-        $employee = $this->employeeRepository->findOrFail($data['employee_id']);
-        $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
+    public function createAssignment(
+        Project $project,
+        Employee $employee,
+        Role $role,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null
+    ): ProjectAssignment {
+        $endDate = $endDate ?? now()->addYears(10);
 
         // Validate employee has the required role
-        $this->validateEmployeeHasRole($employee, $data['role_id']);
+        $this->validateEmployeeHasRole($employee, $role->id);
 
         // Validate employee has all documents
-        $this->validateEmployeeDocuments($employee, $data['start_date'], $endDate);
+        $this->validateEmployeeDocuments($employee, $startDate, $endDate);
 
         // Validate employee availability
-        $this->validateEmployeeAvailability($employee, $data['start_date'], $endDate);
+        $this->validateEmployeeAvailability($employee, $startDate, $endDate);
 
         // Validate project demand
-        $this->validateProjectDemand($project, $data['role_id'], $data['start_date'], $endDate);
+        $this->validateProjectDemand($project, $role->id, $startDate, $endDate);
 
-        return $project->assignments()->create($data);
+        return $project->assignments()->create([
+            'employee_id' => $employee->id,
+            'role_id' => $role->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+        ]);
     }
 
     /**
      * Update an existing project assignment with business logic validation.
      */
-    public function updateAssignment(\App\Contracts\HasEmployee&\App\Contracts\HasDateRange $assignment, array $data): bool
-    {
-        if (!$assignment instanceof ProjectAssignment) {
-            throw new \InvalidArgumentException('Assignment must be a ProjectAssignment instance.');
-        }
-
-        $employee = $this->employeeRepository->findOrFail($data['employee_id']);
-        $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
+    public function updateAssignment(
+        ProjectAssignment $assignment,
+        Project $project,
+        Employee $employee,
+        Role $role,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null
+    ): bool {
+        $endDate = $endDate ?? now()->addYears(10);
 
         // Validate employee has the required role
-        $this->validateEmployeeHasRole($employee, $data['role_id']);
+        $this->validateEmployeeHasRole($employee, $role->id);
 
         // Validate employee has all documents
-        $this->validateEmployeeDocuments($employee, $data['start_date'], $endDate);
+        $this->validateEmployeeDocuments($employee, $startDate, $endDate);
 
         // Validate employee availability (excluding current assignment)
-        $this->validateEmployeeAvailability($employee, $data['start_date'], $endDate, $assignment->id);
+        $this->validateEmployeeAvailability($employee, $startDate, $endDate, $assignment->id);
 
         // Validate project demand
-        $project = Project::findOrFail($data['project_id']);
-        $this->validateProjectDemand($project, $data['role_id'], $data['start_date'], $endDate);
+        $this->validateProjectDemand($project, $role->id, $startDate, $endDate);
 
-        return $assignment->update($data);
+        return $assignment->update([
+            'project_id' => $project->id,
+            'employee_id' => $employee->id,
+            'role_id' => $role->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+        ]);
     }
 
     /**
@@ -85,7 +102,7 @@ class ProjectAssignmentService
      *
      * @throws ValidationException
      */
-    protected function validateEmployeeDocuments(Employee $employee, string $startDate, string $endDate): void
+    protected function validateEmployeeDocuments(Employee $employee, Carbon $startDate, Carbon $endDate): void
     {
         // Sprawdź czy dokument is required
         $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
@@ -152,14 +169,14 @@ class ProjectAssignmentService
      */
     protected function validateEmployeeAvailability(
         Employee $employee,
-        string $startDate,
-        string $endDate,
+        Carbon $startDate,
+        Carbon $endDate,
         ?int $excludeAssignmentId = null
     ): void {
         // Check if employee has active rotation covering the entire period
         if (!$employee->hasActiveRotationInDateRange($startDate, $endDate)) {
             throw ValidationException::withMessages([
-                'employee_id' => "Pracownik nie ma aktywnej rotacji pokrywającej cały okres przypisania (od {$startDate} do {$endDate}). Rotacja musi pokrywać cały okres przypisania."
+                'employee_id' => "Pracownik nie ma aktywnej rotacji pokrywającej cały okres przypisania (od {$startDate->format('Y-m-d')} do {$endDate->format('Y-m-d')}). Rotacja musi pokrywać cały okres przypisania."
             ]);
         }
 
@@ -195,12 +212,12 @@ class ProjectAssignmentService
     protected function validateProjectDemand(
         Project $project,
         int $roleId,
-        string $startDate,
-        string $endDate
+        Carbon $startDate,
+        Carbon $endDate
     ): void {
         if (!$project->hasDemandForRoleInDateRange($roleId, $startDate, $endDate)) {
             throw ValidationException::withMessages([
-                'role_id' => "Brak zapotrzebowania dla roli w tym projekcie w okresie od {$startDate} do {$endDate}."
+                'role_id' => "Brak zapotrzebowania dla roli w tym projekcie w okresie od {$startDate->format('Y-m-d')} do {$endDate->format('Y-m-d')}."
             ]);
         }
     }
@@ -208,10 +225,11 @@ class ProjectAssignmentService
     /**
      * Get employees with availability status for assignment creation.
      */
-    public function getEmployeesWithAvailabilityStatus(?string $startDate = null, ?string $endDate = null, ?int $excludeAssignmentId = null): \Illuminate\Support\Collection
+    public function getEmployeesWithAvailabilityStatus(?Carbon $startDate = null, ?Carbon $endDate = null, ?int $excludeAssignmentId = null): \Illuminate\Support\Collection
     {
-        $employees = $this->employeeRepository->withRolesAndDocuments()
-            ->sortBy('last_name');
+        $employees = Employee::with(['roles', 'employeeDocuments.document'])
+            ->orderBy('last_name')
+            ->get();
 
         if ($startDate && $endDate) {
             return $employees->map(function ($employee) use ($startDate, $endDate, $excludeAssignmentId) {

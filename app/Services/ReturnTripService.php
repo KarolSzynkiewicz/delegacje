@@ -10,7 +10,7 @@ use App\Models\Location;
 use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
-use App\Repositories\Contracts\EmployeeRepositoryInterface;
+use App\Models\Employee;
 use App\Contracts\HasEmployee;
 use App\Contracts\HasDateRange;
 use App\Enums\LogisticsEventType;
@@ -30,8 +30,7 @@ use Illuminate\Support\Collection;
 class ReturnTripService
 {
     public function __construct(
-        protected AssignmentQueryService $assignmentQueryService,
-        protected EmployeeRepositoryInterface $employeeRepository
+        protected AssignmentQueryService $assignmentQueryService
     ) {}
 
     /**
@@ -43,23 +42,20 @@ class ReturnTripService
      * 
      * Does NOT modify the database.
      * 
-     * @param array $data [
-     *   'vehicle_id' => int|null,
-     *   'employee_ids' => array<int>,
-     *   'return_date' => string (Y-m-d),
-     * ]
+     * @param array $employeeIds
+     * @param Carbon $returnDate
+     * @param Vehicle|null $returnVehicle
      * @return ReturnTripPreparation
      * @throws ValidationException
      */
-    public function prepareZjazd(array $data): ReturnTripPreparation
-    {
-        $employeeIds = $data['employee_ids'];
-        $returnDate = Carbon::parse($data['return_date']);
-        $returnVehicle = isset($data['vehicle_id']) ? Vehicle::findOrFail($data['vehicle_id']) : null;
-
+    public function prepareZjazd(
+        array $employeeIds,
+        Carbon $returnDate,
+        ?Vehicle $returnVehicle = null
+    ): ReturnTripPreparation {
         // Validate employees exist
         foreach ($employeeIds as $employeeId) {
-            $this->employeeRepository->findOrFail($employeeId);
+            Employee::findOrFail($employeeId);
         }
 
         // Get all active assignments for returning employees
@@ -90,12 +86,16 @@ class ReturnTripService
      * This is an atomic transaction.
      * 
      * @param ReturnTripPreparation $preparation
-     * @param array $data Additional data (notes, etc.)
+     * @param string|null $notes Additional notes
      * @param LogisticsEvent|null $existingEvent If provided, updates existing event instead of creating new one
      * @return LogisticsEvent
      * @throws ValidationException
      */
-    public function commitZjazd(ReturnTripPreparation $preparation, array $data = [], ?LogisticsEvent $existingEvent = null): LogisticsEvent
+    public function commitZjazd(
+        ReturnTripPreparation $preparation,
+        ?string $notes = null,
+        ?LogisticsEvent $existingEvent = null
+    ): LogisticsEvent
     {
         // Validate preparation is valid (no blocking conflicts)
         if (!$preparation->isValid) {
@@ -109,19 +109,14 @@ class ReturnTripService
 
         $baseLocation = Location::getBase();
 
-        return DB::transaction(function () use ($preparation, $baseLocation, $data, $existingEvent) {
+        return DB::transaction(function () use ($preparation, $baseLocation, $notes, $existingEvent) {
             // Shorten all assignments
             foreach ($preparation->assignmentsToShorten as $assignmentToShorten) {
                 $assignment = $assignmentToShorten->assignment;
                 
                 // Update end_date to return date
-                if ($assignment instanceof ProjectAssignment) {
-                    $assignment->update(['end_date' => $preparation->returnDate]);
-                } elseif ($assignment instanceof AccommodationAssignment) {
-                    $assignment->update(['end_date' => $preparation->returnDate]);
-                } elseif ($assignment instanceof VehicleAssignment) {
-                    $assignment->update(['end_date' => $preparation->returnDate]);
-                }
+                // All assignments implement HasDateRange and have end_date column
+                $assignment->update(['end_date' => $preparation->returnDate]);
             }
 
             // End old vehicle assignments for returning employees (if not already shortened)
@@ -170,7 +165,7 @@ class ReturnTripService
                     'vehicle_id' => $preparation->returnVehicle?->id,
                     'from_location_id' => $this->getCurrentLocationForEmployees($preparation->employeeIds)?->id ?? $baseLocation->id,
                     'to_location_id' => $baseLocation->id,
-                    'notes' => $data['notes'] ?? null,
+                    'notes' => $notes,
                 ]);
                 
                 // Delete old participants
@@ -186,7 +181,7 @@ class ReturnTripService
                     'from_location_id' => $this->getCurrentLocationForEmployees($preparation->employeeIds)?->id ?? $baseLocation->id,
                     'to_location_id' => $baseLocation->id,
                     'status' => LogisticsEventStatus::PLANNED,
-                    'notes' => $data['notes'] ?? null,
+                    'notes' => $notes,
                     'created_by' => auth()->id() ?? 1,
                 ]);
             }
@@ -231,7 +226,7 @@ class ReturnTripService
             return null;
         }
 
-        $employee = $this->employeeRepository->find($employeeIds[0]);
+        $employee = Employee::find($employeeIds[0]);
         if (!$employee) {
             return null;
         }
@@ -285,10 +280,14 @@ class ReturnTripService
      * This method uses complete() which changes status to COMPLETED.
      * New implementation uses end_date to shorten assignments.
      */
-    public function createReturn(array $data): LogisticsEvent
-    {
+    public function createReturn(
+        array $employeeIds,
+        Carbon $returnDate,
+        ?Vehicle $returnVehicle = null,
+        ?string $notes = null
+    ): LogisticsEvent {
         // For backward compatibility, delegate to new prepare/commit flow
-        $preparation = $this->prepareZjazd($data);
-        return $this->commitZjazd($preparation, $data);
+        $preparation = $this->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
+        return $this->commitZjazd($preparation, $notes);
     }
 }

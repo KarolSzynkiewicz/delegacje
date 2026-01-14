@@ -18,17 +18,56 @@ class LocationService
     /**
      * Create a new location.
      */
-    public function createLocation(array $data): Location
-    {
-        return Location::create($data);
+    public function createLocation(
+        string $name,
+        string $address,
+        ?string $city = null,
+        ?string $postalCode = null,
+        ?string $contactPerson = null,
+        ?string $phone = null,
+        ?string $email = null,
+        ?string $description = null,
+        bool $isBase = false
+    ): Location {
+        return Location::create([
+            'name' => $name,
+            'address' => $address,
+            'city' => $city,
+            'postal_code' => $postalCode,
+            'contact_person' => $contactPerson,
+            'phone' => $phone,
+            'email' => $email,
+            'description' => $description,
+            'is_base' => $isBase,
+        ]);
     }
 
     /**
      * Update a location.
      */
-    public function updateLocation(Location $location, array $data): bool
-    {
-        return $location->update($data);
+    public function updateLocation(
+        Location $location,
+        string $name,
+        string $address,
+        ?string $city = null,
+        ?string $postalCode = null,
+        ?string $contactPerson = null,
+        ?string $phone = null,
+        ?string $email = null,
+        ?string $description = null,
+        bool $isBase = false
+    ): bool {
+        return $location->update([
+            'name' => $name,
+            'address' => $address,
+            'city' => $city,
+            'postal_code' => $postalCode,
+            'contact_person' => $contactPerson,
+            'phone' => $phone,
+            'email' => $email,
+            'description' => $description,
+            'is_base' => $isBase,
+        ]);
     }
 
     /**

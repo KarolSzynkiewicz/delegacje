@@ -4907,8 +4907,8 @@ namespace App\Models {
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
      * @property mixed $notes
-     * @property \Illuminate\Support\Carbon|null $date_to
-     * @property \Illuminate\Support\Carbon $date_from
+     * @property string|null $date_to
+     * @property string $date_from
      * @property integer $required_count
      * @property int $role_id
      * @property int $project_id

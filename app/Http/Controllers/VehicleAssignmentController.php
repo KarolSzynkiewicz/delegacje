@@ -62,7 +62,19 @@ class VehicleAssignmentController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->assignmentService->createAssignment($employee->id, $validated);
+            $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
+            $position = \App\Enums\VehiclePosition::from($validated['position']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
+            $this->assignmentService->createAssignment(
+                $employee,
+                $vehicle,
+                $position,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
@@ -101,7 +113,21 @@ class VehicleAssignmentController extends Controller
     public function update(UpdateVehicleAssignmentRequest $request, VehicleAssignment $vehicleAssignment)
     {
         try {
-            $this->assignmentService->updateAssignment($vehicleAssignment, $request->validated());
+            $validated = $request->validated();
+            
+            $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
+            $position = \App\Enums\VehiclePosition::from($validated['position']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
+            $this->assignmentService->updateAssignment(
+                $vehicleAssignment,
+                $vehicle,
+                $position,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()

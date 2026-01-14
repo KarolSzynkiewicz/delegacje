@@ -4,43 +4,57 @@ namespace App\Services;
 
 use App\Models\Project;
 use App\Models\ProjectDemand;
+use App\Models\Role;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ProjectDemandService
 {
     /**
-     * Create multiple project demands from validated data.
+     * Create multiple project demands.
      * Filters out demands with required_count = 0 and validates that at least one demand exists.
      *
+     * @param Project $project
+     * @param Carbon $startDate
+     * @param Carbon|null $endDate
+     * @param string|null $notes
+     * @param array $demands Array of [role_id => required_count] or [role_id => ['role_id' => int, 'required_count' => int]]
+     * @return array
      * @throws ValidationException
      */
-    public function createDemands(Project $project, array $validated): array
-    {
+    public function createDemands(
+        Project $project,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null,
+        array $demands = []
+    ): array {
         // Przetwórz wszystkie role (również te z required_count = 0, aby je usunąć)
         $demandsToProcess = [];
         $demandsToDelete = [];
         
-        foreach ($validated["demands"] as $roleId => $demandData) {
-            // Check if data is correct
-            if (!isset($demandData["role_id"]) || !isset($demandData["required_count"])) {
-                continue;
+        foreach ($demands as $roleId => $demandData) {
+            // Support both formats: [role_id => count] or [role_id => ['role_id' => int, 'required_count' => int]]
+            if (is_array($demandData)) {
+                $roleId = (int) ($demandData['role_id'] ?? $roleId);
+                $requiredCount = (int) ($demandData['required_count'] ?? 0);
+            } else {
+                $requiredCount = (int) $demandData;
             }
-            
-            $requiredCount = (int) $demandData["required_count"];
             
             if ($requiredCount > 0) {
                 // Zapotrzebowanie do utworzenia/aktualizacji
                 $demandsToProcess[] = [
-                    "role_id" => (int) $demandData["role_id"],
+                    "role_id" => $roleId,
                     "required_count" => $requiredCount,
-                    "date_from" => $validated["date_from"],
-                    "date_to" => $validated["date_to"] ?? null,
-                    "notes" => $validated["notes"] ?? null,
+                    "start_date" => $startDate,
+                    "end_date" => $endDate,
+                    "notes" => $notes,
                 ];
             } else {
                 // Zapotrzebowanie do usunięcia (required_count = 0)
-                $demandsToDelete[] = (int) $demandData["role_id"];
+                $demandsToDelete[] = $roleId;
             }
         }
 
@@ -58,10 +72,10 @@ class ProjectDemandService
             if (!empty($demandsToDelete)) {
                 $project->demands()
                     ->whereIn('role_id', $demandsToDelete)
-                    ->where('date_from', '<=', $validated['date_to'] ?? $validated['date_from'])
-                    ->where(function ($q) use ($validated) {
-                        $q->whereNull('date_to')
-                          ->orWhere('date_to', '>=', $validated['date_from']);
+                    ->where('start_date', '<=', $endDate ?? $startDate)
+                    ->where(function ($q) use ($startDate) {
+                        $q->whereNull('end_date')
+                          ->orWhere('end_date', '>=', $startDate);
                     })
                     ->delete();
             }
@@ -72,12 +86,12 @@ class ProjectDemandService
                 // Użyj dokładnego dopasowania dat, aby uniknąć duplikatów
                 $existingDemand = $project->demands()
                     ->where('role_id', $demandData['role_id'])
-                    ->where('date_from', $demandData['date_from'])
+                    ->where('start_date', $demandData['start_date'])
                     ->where(function ($q) use ($demandData) {
-                        if ($demandData['date_to']) {
-                            $q->where('date_to', $demandData['date_to']);
+                        if ($demandData['end_date']) {
+                            $q->where('end_date', $demandData['end_date']);
                         } else {
-                            $q->whereNull('date_to');
+                            $q->whereNull('end_date');
                         }
                     })
                     ->first();
@@ -93,8 +107,8 @@ class ProjectDemandService
                     
                     $updated = $existingDemand->update([
                         'required_count' => $demandData['required_count'],
-                        'date_from' => $demandData['date_from'],
-                        'date_to' => $demandData['date_to'],
+                        'start_date' => $demandData['start_date'],
+                        'end_date' => $demandData['end_date'],
                         'notes' => $demandData['notes'],
                     ]);
                     

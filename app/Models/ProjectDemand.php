@@ -20,8 +20,8 @@ class ProjectDemand extends Model
         'project_id',
         'role_id',
         'required_count',
-        'date_from',
-        'date_to',
+        'start_date',
+        'end_date',
         'notes',
     ];
 
@@ -31,26 +31,10 @@ class ProjectDemand extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'date_from' => 'datetime',
-        'date_to' => 'datetime',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
         'required_count' => 'integer',
     ];
-
-    /**
-     * Override column names for HasDateRange trait.
-     */
-    public function getStartDateColumn(): string
-    {
-        return 'date_from';
-    }
-
-    /**
-     * Override column names for HasDateRange trait.
-     */
-    public function getEndDateColumn(): string
-    {
-        return 'date_to';
-    }
 
     /**
      * Get the project that owns the demand.

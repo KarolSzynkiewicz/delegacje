@@ -62,7 +62,17 @@ class AccommodationAssignmentController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->assignmentService->createAssignment($employee->id, $validated);
+            $accommodation = Accommodation::findOrFail($validated['accommodation_id']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
+            $this->assignmentService->createAssignment(
+                $employee,
+                $accommodation,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
@@ -101,7 +111,19 @@ class AccommodationAssignmentController extends Controller
     public function update(UpdateAccommodationAssignmentRequest $request, AccommodationAssignment $accommodationAssignment)
     {
         try {
-            $this->assignmentService->updateAssignment($accommodationAssignment, $request->validated());
+            $validated = $request->validated();
+            
+            $accommodation = Accommodation::findOrFail($validated['accommodation_id']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
+            $this->assignmentService->updateAssignment(
+                $accommodationAssignment,
+                $accommodation,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()

@@ -24,8 +24,8 @@ class UpdateProjectDemandRequest extends FormRequest
         return [
             'role_id' => ['required', 'exists:roles,id'],
             'required_count' => ['required', 'integer', 'min:0'],
-            'date_from' => ['required', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -43,10 +43,10 @@ class UpdateProjectDemandRequest extends FormRequest
             'required_count.required' => 'Ilość jest wymagana.',
             'required_count.integer' => 'Ilość musi być liczbą całkowitą.',
             'required_count.min' => 'Ilość nie może być ujemna. Ustaw 0 aby usunąć zapotrzebowanie.',
-            'date_from.required' => 'Data rozpoczęcia jest wymagana.',
-            'date_from.date' => 'Data rozpoczęcia musi być poprawną datą.',
-            'date_to.date' => 'Data zakończenia musi być poprawną datą.',
-            'date_to.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
+            'start_date.required' => 'Data rozpoczęcia jest wymagana.',
+            'start_date.date' => 'Data rozpoczęcia musi być poprawną datą.',
+            'end_date.date' => 'Data zakończenia musi być poprawną datą.',
+            'end_date.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
         ];
     }
 }

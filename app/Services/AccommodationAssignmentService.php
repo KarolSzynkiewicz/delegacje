@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
-use App\Contracts\HasEmployee;
-use App\Contracts\HasDateRange;
+use App\Models\Employee;
+use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class AccommodationAssignmentService
@@ -15,19 +15,23 @@ class AccommodationAssignmentService
      *
      * @throws ValidationException
      */
-    public function createAssignment(int $employeeId, array $data): AccommodationAssignment
-    {
-        $accommodation = Accommodation::findOrFail($data['accommodation_id']);
-        $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
+    public function createAssignment(
+        Employee $employee,
+        Accommodation $accommodation,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null
+    ): AccommodationAssignment {
+        $endDate = $endDate ?? now()->addYears(10);
 
-        $this->validateAccommodationCapacity($accommodation, $data['start_date'], $endDate);
+        $this->validateAccommodationCapacity($accommodation, $startDate, $endDate);
 
         return AccommodationAssignment::create([
-            'employee_id' => $employeeId,
-            'accommodation_id' => $data['accommodation_id'],
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'] ?? null,
-            'notes' => $data['notes'] ?? null,
+            'employee_id' => $employee->id,
+            'accommodation_id' => $accommodation->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
         ]);
     }
 
@@ -36,19 +40,24 @@ class AccommodationAssignmentService
      *
      * @throws ValidationException
      */
-    public function updateAssignment(HasEmployee&HasDateRange $assignment, array $data): AccommodationAssignment
-    {
-        if (!$assignment instanceof AccommodationAssignment) {
-            throw new \InvalidArgumentException('Assignment must be an AccommodationAssignment instance.');
-        }
-
-        $accommodation = Accommodation::findOrFail($data['accommodation_id']);
-        $endDate = $data['end_date'] ?? now()->addYears(10)->format('Y-m-d');
+    public function updateAssignment(
+        AccommodationAssignment $assignment,
+        Accommodation $accommodation,
+        Carbon $startDate,
+        ?Carbon $endDate = null,
+        ?string $notes = null
+    ): AccommodationAssignment {
+        $endDate = $endDate ?? now()->addYears(10);
 
         // Validate capacity excluding current assignment
-        $this->validateAccommodationCapacity($accommodation, $data['start_date'], $endDate, $assignment->id);
+        $this->validateAccommodationCapacity($accommodation, $startDate, $endDate, $assignment->id);
 
-        $assignment->update($data);
+        $assignment->update([
+            'accommodation_id' => $accommodation->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+        ]);
 
         return $assignment;
     }
@@ -58,7 +67,7 @@ class AccommodationAssignmentService
      *
      * @throws ValidationException
      */
-    protected function validateAccommodationCapacity(Accommodation $accommodation, string $startDate, string $endDate, ?int $excludeAssignmentId = null): void
+    protected function validateAccommodationCapacity(Accommodation $accommodation, Carbon $startDate, Carbon $endDate, ?int $excludeAssignmentId = null): void
     {
         if (!$accommodation->hasAvailableSpace($startDate, $endDate, $excludeAssignmentId)) {
             throw ValidationException::withMessages([

@@ -67,8 +67,24 @@ class EquipmentIssueController extends Controller
         try {
             $equipment = Equipment::findOrFail($validated['equipment_id']);
             $employee = Employee::findOrFail($validated['employee_id']);
+            $projectAssignment = isset($validated['project_assignment_id']) 
+                ? \App\Models\ProjectAssignment::findOrFail($validated['project_assignment_id'])
+                : null;
+            $quantityIssued = (int) ($validated['quantity_issued'] ?? 1);
+            $issueDate = \Carbon\Carbon::parse($validated['issue_date']);
+            $expectedReturnDate = isset($validated['expected_return_date'])
+                ? \Carbon\Carbon::parse($validated['expected_return_date'])
+                : null;
 
-            $issue = $this->equipmentService->issueEquipment($equipment, $employee, $validated);
+            $issue = $this->equipmentService->issueEquipment(
+                $equipment,
+                $employee,
+                $quantityIssued,
+                $issueDate,
+                $expectedReturnDate,
+                $projectAssignment,
+                $validated['notes'] ?? null
+            );
 
             return redirect()
                 ->route('equipment-issues.show', $issue)
@@ -122,7 +138,13 @@ class EquipmentIssueController extends Controller
         ]);
 
         try {
-            $this->equipmentService->returnEquipment($equipmentIssue, $validated);
+            $returnDate = \Carbon\Carbon::parse($validated['return_date']);
+            
+            $this->equipmentService->returnEquipment(
+                $equipmentIssue,
+                $returnDate,
+                $validated['notes'] ?? null
+            );
 
             return redirect()
                 ->route('equipment-issues.show', $equipmentIssue)

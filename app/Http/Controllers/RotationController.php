@@ -97,11 +97,17 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Status jest automatyczny - nie zapisujemy go (obliczany z dat)
-        unset($validated['status']);
-
         try {
-            $this->rotationService->createRotation($validated['employee_id'], $validated);
+            $employee = Employee::findOrFail($validated['employee_id']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = \Carbon\Carbon::parse($validated['end_date']);
+            
+            $this->rotationService->createRotation(
+                $employee,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
@@ -120,11 +126,16 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Status jest automatyczny - nie zapisujemy go (obliczany z dat)
-        unset($validated['status']);
-
         try {
-            $this->rotationService->createRotation($employee->id, $validated);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = \Carbon\Carbon::parse($validated['end_date']);
+            
+            $this->rotationService->createRotation(
+                $employee,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
@@ -160,11 +171,16 @@ class RotationController extends Controller
     {
         $validated = $request->validated();
 
-        // Status jest automatyczny - nie zapisujemy go (obliczany z dat)
-        unset($validated['status']);
-
         try {
-            $this->rotationService->updateRotation($rotation, $validated);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = \Carbon\Carbon::parse($validated['end_date']);
+            
+            $this->rotationService->updateRotation(
+                $rotation,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null
+            );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()

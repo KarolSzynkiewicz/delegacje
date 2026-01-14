@@ -3,44 +3,55 @@
 namespace App\Services;
 
 use App\Models\Rotation;
-use App\Repositories\Contracts\EmployeeRepositoryInterface;
+use App\Models\Employee;
+use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class RotationService
 {
-    public function __construct(
-        protected EmployeeRepositoryInterface $employeeRepository
-    ) {}
-
     /**
      * Create a new rotation with business logic validation.
      */
-    public function createRotation(int $employeeId, array $data): Rotation
-    {
-        $employee = $this->employeeRepository->findOrFail($employeeId);
-        
+    public function createRotation(
+        Employee $employee,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?string $notes = null
+    ): Rotation {
         $this->validateNoOverlappingRotations(
-            $employeeId,
-            $data['start_date'],
-            $data['end_date']
+            $employee->id,
+            $startDate,
+            $endDate
         );
 
-        return $employee->rotations()->create($data);
+        return $employee->rotations()->create([
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+        ]);
     }
 
     /**
      * Update an existing rotation with business logic validation.
      */
-    public function updateRotation(Rotation $rotation, array $data): bool
-    {
+    public function updateRotation(
+        Rotation $rotation,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?string $notes = null
+    ): bool {
         $this->validateNoOverlappingRotations(
             $rotation->employee_id,
-            $data['start_date'],
-            $data['end_date'],
+            $startDate,
+            $endDate,
             $rotation->id
         );
 
-        return $rotation->update($data);
+        return $rotation->update([
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+        ]);
     }
 
     /**
@@ -50,8 +61,8 @@ class RotationService
      */
     protected function validateNoOverlappingRotations(
         int $employeeId,
-        string $startDate,
-        string $endDate,
+        Carbon $startDate,
+        Carbon $endDate,
         ?int $excludeRotationId = null
     ): void {
         if (Rotation::hasOverlappingRotations($employeeId, $startDate, $endDate, $excludeRotationId)) {
