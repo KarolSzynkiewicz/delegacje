@@ -62,17 +62,21 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <x-ui.input 
-                                    type="select" 
-                                    name="technical_condition" 
-                                    label="Stan Techniczny"
-                                    required="true"
-                                >
-                                    <option value="">-- Wybierz Stan --</option>
-                                    <option value="excellent" {{ old('technical_condition') == 'excellent' ? 'selected' : '' }}>Doskonały</option>
-                                    <option value="good" {{ old('technical_condition') == 'good' ? 'selected' : '' }}>Dobry</option>
-                                    <option value="fair" {{ old('technical_condition') == 'fair' ? 'selected' : '' }}>Zadowalający</option>
-                                    <option value="poor" {{ old('technical_condition') == 'poor' ? 'selected' : '' }}>Słaby</option>
-                                </x-ui.input>
+                                type="select" 
+                                name="technical_condition" 
+                                label="Stan Techniczny"
+                                required="true"
+                            >
+                                <option value="">-- Wybierz Stan --</option>
+                                @foreach(\App\Enums\VehicleCondition::cases() as $condition)
+                                    <option 
+                                        value="{{ $condition->value }}" 
+                                        {{ old('technical_condition') == $condition->value ? 'selected' : '' }}
+                                    >
+                                        {{ $condition->label() }}
+                                    </option>
+                                @endforeach
+                            </x-ui.input>
                             </div>
                         </div>
                     </div>

@@ -8,6 +8,7 @@ enum VehicleCondition: string
     case GOOD = 'good';
     case FAIR = 'fair';
     case POOR = 'poor';
+    case WORKSHOP = 'workshop';
 
     public function label(): string
     {
@@ -16,6 +17,8 @@ enum VehicleCondition: string
             self::GOOD => 'Dobry',
             self::FAIR => 'Zadowalający',
             self::POOR => 'Słaby',
+            self::WORKSHOP => "Warsztat"
+            
         };
     }
 
