@@ -18,6 +18,7 @@ use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\WeeklyOverviewController;
 use App\Http\Controllers\RotationController;
 use App\Http\Controllers\EmployeeRateController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -34,6 +35,9 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    // Profitability Dashboard
+    Route::get('/dashboard/profitability', [DashboardController::class, 'index'])->name('dashboard.profitability');
 
     // Weekly Overview
     Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])->name('weekly-overview.index');
@@ -155,6 +159,12 @@ Route::middleware(['auth', 'verified', 'role.required'])->group(function () {
     
     // Transport Costs
     Route::resource('transport-costs', \App\Http\Controllers\TransportCostController::class);
+    
+    // Project Variable Costs
+    Route::resource('project-variable-costs', \App\Http\Controllers\ProjectVariableCostController::class);
+    
+    // Fixed Costs
+    Route::resource('fixed-costs', \App\Http\Controllers\FixedCostController::class);
     
     // Time Logs
     Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])->name('time-logs.monthly-grid');

@@ -64,6 +64,60 @@
                         </x-ui.input>
                     </div>
 
+                    <div class="mb-3" x-data="{ projectType: '{{ old('type', 'contract') }}' }">
+                        <x-ui.input 
+                            type="select" 
+                            name="type" 
+                            label="Typ Projektu"
+                            required="true"
+                            x-model="projectType"
+                        >
+                            <option value="contract" {{ old('type', 'contract') == 'contract' ? 'selected' : '' }}>Zakontraktowany</option>
+                            <option value="hourly" {{ old('type') == 'hourly' ? 'selected' : '' }}>Rozliczany godzinowo</option>
+                        </x-ui.input>
+
+                        <!-- Pola dla projektów rozliczanych godzinowo -->
+                        <div x-show="projectType === 'hourly'" x-transition class="mt-3">
+                            <x-ui.input 
+                                type="number" 
+                                name="hourly_rate" 
+                                label="Stawka za godzinę"
+                                value="{{ old('hourly_rate') }}"
+                                step="0.01"
+                                required="true"
+                            />
+                        </div>
+
+                        <!-- Pola dla projektów zakontraktowanych -->
+                        <div x-show="projectType === 'contract'" x-transition class="mt-3">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <x-ui.input 
+                                        type="number" 
+                                        name="contract_amount" 
+                                        label="Kwota kontraktu"
+                                        value="{{ old('contract_amount') }}"
+                                        step="0.01"
+                                        required="true"
+                                    />
+                                </div>
+                                <div class="col-md-4">
+                                    <x-ui.input 
+                                        type="select" 
+                                        name="currency" 
+                                        label="Waluta"
+                                        required="true"
+                                    >
+                                        <option value="PLN" {{ old('currency', 'PLN') == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                        <option value="EUR" {{ old('currency') == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                        <option value="USD" {{ old('currency') == 'USD' ? 'selected' : '' }}>USD</option>
+                                        <option value="GBP" {{ old('currency') == 'GBP' ? 'selected' : '' }}>GBP</option>
+                                    </x-ui.input>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <x-ui.input 
                             type="number" 

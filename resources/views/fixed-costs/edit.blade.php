@@ -1,0 +1,107 @@
+<x-app-layout>
+    <x-slot name="header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 mb-0">Edytuj Koszt Stały</h2>
+            <x-ui.button variant="ghost" href="{{ route('fixed-costs.index') }}">
+                <i class="bi bi-arrow-left"></i> Powrót
+            </x-ui.button>
+        </div>
+    </x-slot>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Edytuj Koszt Stały">
+                <form method="POST" action="{{ route('fixed-costs.update', $fixedCost) }}">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="name" 
+                            label="Nazwa kosztu"
+                            value="{{ old('name', $fixedCost->name) }}"
+                            required="true"
+                        />
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="number" 
+                                name="amount" 
+                                label="Kwota"
+                                value="{{ old('amount', $fixedCost->amount) }}"
+                                step="0.01"
+                                min="0"
+                                required="true"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input 
+                                type="select" 
+                                name="currency" 
+                                label="Waluta"
+                                required="true"
+                            >
+                                <option value="PLN" {{ old('currency', $fixedCost->currency) == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                <option value="EUR" {{ old('currency', $fixedCost->currency) == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                <option value="USD" {{ old('currency', $fixedCost->currency) == 'USD' ? 'selected' : '' }}>USD</option>
+                                <option value="GBP" {{ old('currency', $fixedCost->currency) == 'GBP' ? 'selected' : '' }}>GBP</option>
+                            </x-ui.input>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="date" 
+                            name="cost_date" 
+                            label="Data kosztu"
+                            value="{{ old('cost_date', $fixedCost->cost_date?->format('Y-m-d')) }}"
+                            required="true"
+                        />
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="date" 
+                                name="start_date" 
+                                label="Data rozpoczęcia"
+                                value="{{ old('start_date', $fixedCost->start_date?->format('Y-m-d')) }}"
+                                required="true"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input 
+                                type="date" 
+                                name="end_date" 
+                                label="Data zakończenia (opcjonalne)"
+                                value="{{ old('end_date', $fixedCost->end_date?->format('Y-m-d')) }}"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <x-ui.input 
+                            type="textarea" 
+                            name="notes" 
+                            label="Notatki"
+                            value="{{ old('notes', $fixedCost->notes) }}"
+                            rows="3"
+                        />
+                    </div>
+
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                        <x-ui.button variant="ghost" href="{{ route('fixed-costs.index') }}">
+                            Anuluj
+                        </x-ui.button>
+                        <x-ui.button variant="primary" type="submit">
+                            <i class="bi bi-save me-1"></i> Aktualizuj
+                        </x-ui.button>
+                    </div>
+                </form>
+            </x-ui.card>
+        </div>
+    </div>
+</x-app-layout>

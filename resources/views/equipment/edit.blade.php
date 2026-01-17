@@ -1,75 +1,115 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Edytuj Sprzęt: {{ $equipment->name }}
-        </h2>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-semibold fs-4 mb-0">Edytuj Sprzęt: {{ $equipment->name }}</h2>
+            <x-ui.button variant="ghost" href="{{ route('equipment.show', $equipment) }}">
+                <i class="bi bi-arrow-left"></i> Powrót
+            </x-ui.button>
+        </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Edytuj Sprzęt">
+                <x-ui.errors />
+
                 <form method="POST" action="{{ route('equipment.update', $equipment) }}">
                     @csrf
                     @method('PUT')
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Nazwa *</label>
-                        <input type="text" name="name" value="{{ old('name', $equipment->name) }}" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                        @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="name" 
+                            label="Nazwa"
+                            value="{{ old('name', $equipment->name) }}"
+                            required="true"
+                        />
                     </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Opis</label>
-                        <textarea name="description" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('description', $equipment->description) }}</textarea>
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="textarea" 
+                            name="description" 
+                            label="Opis"
+                            value="{{ old('description', $equipment->description) }}"
+                            rows="3"
+                        />
                     </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Kategoria</label>
-                        <input type="text" name="category" value="{{ old('category', $equipment->category) }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="category" 
+                            label="Kategoria"
+                            value="{{ old('category', $equipment->category) }}"
+                        />
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Ilość w magazynie *</label>
-                            <input type="number" name="quantity_in_stock" value="{{ old('quantity_in_stock', $equipment->quantity_in_stock) }}" min="0" required
-                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="number" 
+                                name="quantity_in_stock" 
+                                label="Ilość w magazynie"
+                                value="{{ old('quantity_in_stock', $equipment->quantity_in_stock) }}"
+                                min="0"
+                                required="true"
+                            />
                         </div>
-                        <div>
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Minimalna ilość *</label>
-                            <input type="number" name="min_quantity" value="{{ old('min_quantity', $equipment->min_quantity) }}" min="0" required
-                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                        <div class="col-md-6">
+                            <x-ui.input 
+                                type="number" 
+                                name="min_quantity" 
+                                label="Minimalna ilość"
+                                value="{{ old('min_quantity', $equipment->min_quantity) }}"
+                                min="0"
+                                required="true"
+                            />
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Jednostka *</label>
-                        <input type="text" name="unit" value="{{ old('unit', $equipment->unit) }}" required
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="unit" 
+                            label="Jednostka"
+                            value="{{ old('unit', $equipment->unit) }}"
+                            required="true"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="number" 
+                            name="unit_cost" 
+                            label="Koszt jednostkowy"
+                            value="{{ old('unit_cost', $equipment->unit_cost) }}"
+                            step="0.01"
+                            min="0"
+                        />
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Koszt jednostkowy</label>
-                        <input type="number" name="unit_cost" value="{{ old('unit_cost', $equipment->unit_cost) }}" step="0.01" min="0"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
+                        <x-ui.input 
+                            type="textarea" 
+                            name="notes" 
+                            label="Notatki"
+                            value="{{ old('notes', $equipment->notes) }}"
+                            rows="3"
+                        />
                     </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Notatki</label>
-                        <textarea name="notes" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('notes', $equipment->notes) }}</textarea>
-                    </div>
-
-                    <div class="flex items-center justify-end">
-                        <a href="{{ route('equipment.show', $equipment) }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mr-3">
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                        <x-ui.button variant="ghost" href="{{ route('equipment.show', $equipment) }}">
                             Anuluj
-                        </a>
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                            Zapisz
-                        </button>
+                        </x-ui.button>
+                        <x-ui.button variant="primary" type="submit">
+                            <i class="bi bi-save me-1"></i> Zapisz
+                        </x-ui.button>
                     </div>
                 </form>
-            </div>
+            </x-ui.card>
         </div>
     </div>
 </x-app-layout>

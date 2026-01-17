@@ -58,7 +58,7 @@ class TimeLogController extends Controller
         try {
             $validated = $request->validated();
             $assignment = ProjectAssignment::findOrFail($validated['project_assignment_id']);
-            $workDate = \Carbon\Carbon::parse($validated['work_date']);
+            $workDate = Carbon::parse($validated['work_date']);
             $hoursWorked = (float) $validated['hours_worked'];
             
             $this->timeLogService->createTimeLog(
@@ -115,7 +115,7 @@ class TimeLogController extends Controller
 
         try {
             $validated = $request->validated();
-            $workDate = \Carbon\Carbon::parse($validated['work_date']);
+            $workDate = Carbon::parse($validated['work_date']);
             $hoursWorked = (float) $validated['hours_worked'];
             
             $this->timeLogService->updateTimeLog(

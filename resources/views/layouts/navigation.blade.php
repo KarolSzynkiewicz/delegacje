@@ -15,6 +15,11 @@
             <ul class="navbar-nav mx-auto">
                 @auth
                     <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dashboard.profitability') ? 'active' : '' }}" href="{{ route('dashboard.profitability') }}">
+                            <i class="bi bi-graph-up-arrow"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('weekly-overview.*') ? 'active' : '' }}" href="{{ route('weekly-overview.index') }}">
                             <i class="bi bi-calendar-week"></i> Przegląd Tygodniowy
                         </a>
@@ -49,13 +54,24 @@
 
                     <!-- Logistyka Dropdown -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') || request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="#" id="logistykaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="#" id="logistykaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-truck"></i> Logistyka
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="logistykaDropdown">
                             <li><a class="dropdown-item {{ request()->routeIs('equipment.*') ? 'active' : '' }}" href="{{ route('equipment.index') }}"><i class="bi bi-tools"></i> Sprzęt</a></li>
                             <li><a class="dropdown-item {{ request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="{{ route('equipment-issues.index') }}"><i class="bi bi-box-arrow-up"></i> Wydania sprzętu</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-currency-dollar"></i> Koszty transportu</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Koszty Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('project-variable-costs.*') || request()->routeIs('transport-costs.*') || request()->routeIs('fixed-costs.*') ? 'active' : '' }}" href="#" id="kosztyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-cash-stack"></i> Koszty
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="kosztyDropdown">
+                            <li><a class="dropdown-item {{ request()->routeIs('project-variable-costs.*') ? 'active' : '' }}" href="{{ route('project-variable-costs.index') }}"><i class="bi bi-arrow-repeat"></i> Koszty zmienne</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-truck"></i> Koszty transportu</a></li>
+                            <li><a class="dropdown-item {{ request()->routeIs('fixed-costs.*') ? 'active' : '' }}" href="{{ route('fixed-costs.index') }}"><i class="bi bi-lock"></i> Koszty stałe</a></li>
                         </ul>
                     </li>
 

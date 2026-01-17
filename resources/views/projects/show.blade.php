@@ -7,7 +7,8 @@
                     <x-ui.detail-item label="Klient:">{{ $project->client_name ?? '-' }}</x-ui.detail-item>
                     <x-ui.detail-item label="Status:">
                         @php
-                            $badgeVariant = match($project->status) {
+                            $statusValue = $project->status instanceof \App\Enums\ProjectStatus ? $project->status->value : $project->status;
+                            $badgeVariant = match($statusValue) {
                                 'active' => 'success',
                                 'on_hold' => 'warning',
                                 'completed' => 'info',
@@ -15,8 +16,27 @@
                                 default => 'info'
                             };
                         @endphp
-                        <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($project->status) }}</x-ui.badge>
+                        <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($statusValue) }}</x-ui.badge>
                     </x-ui.detail-item>
+                    <x-ui.detail-item label="Typ Projektu:">
+                        @if($project->type)
+                            <x-ui.badge variant="info">{{ $project->type->label() }}</x-ui.badge>
+                        @else
+                            -
+                        @endif
+                    </x-ui.detail-item>
+                    @php
+                        $projectTypeValue = $project->type instanceof \App\Enums\ProjectType ? $project->type->value : ($project->type ?? null);
+                    @endphp
+                    @if($projectTypeValue === \App\Enums\ProjectType::HOURLY->value)
+                        <x-ui.detail-item label="Stawka za godzinę:">
+                            {{ $project->hourly_rate ? number_format($project->hourly_rate, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
+                        </x-ui.detail-item>
+                    @elseif($projectTypeValue === \App\Enums\ProjectType::CONTRACT->value)
+                        <x-ui.detail-item label="Kwota kontraktu:">
+                            {{ $project->contract_amount ? number_format($project->contract_amount, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
+                        </x-ui.detail-item>
+                    @endif
                     <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</x-ui.detail-item>
                     @if($project->location)
                     <x-ui.detail-item label="Lokalizacja:">

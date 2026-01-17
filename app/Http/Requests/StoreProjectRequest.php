@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\ProjectStatus;
+use App\Enums\ProjectType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,14 +24,30 @@ class StoreProjectRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $type = $this->input('type', ProjectType::CONTRACT->value);
+        
+        $rules = [
             'location_id' => ['required', 'exists:locations,id'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['required', Rule::enum(ProjectStatus::class)],
+            'type' => ['required', Rule::enum(ProjectType::class)],
             'client_name' => ['nullable', 'string', 'max:255'],
             'budget' => ['nullable', 'numeric', 'min:0'],
         ];
+
+        // Warunkowa walidacja w zależności od typu projektu
+        if ($type === ProjectType::HOURLY->value) {
+            $rules['hourly_rate'] = ['required', 'numeric', 'min:0'];
+            $rules['contract_amount'] = ['nullable'];
+            $rules['currency'] = ['nullable'];
+        } else {
+            $rules['hourly_rate'] = ['nullable'];
+            $rules['contract_amount'] = ['required', 'numeric', 'min:0'];
+            $rules['currency'] = ['required', 'string', 'size:3'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -45,8 +62,17 @@ class StoreProjectRequest extends FormRequest
             'location_id.exists' => 'Wybrana lokalizacja nie istnieje.',
             'name.required' => 'Nazwa projektu jest wymagana.',
             'status.required' => 'Status projektu jest wymagany.',
+            'type.required' => 'Typ projektu jest wymagany.',
             'budget.numeric' => 'Budżet musi być liczbą.',
             'budget.min' => 'Budżet nie może być ujemny.',
+            'hourly_rate.required' => 'Stawka za godzinę jest wymagana dla projektów rozliczanych godzinowo.',
+            'hourly_rate.numeric' => 'Stawka za godzinę musi być liczbą.',
+            'hourly_rate.min' => 'Stawka za godzinę nie może być ujemna.',
+            'contract_amount.required' => 'Kwota kontraktu jest wymagana dla projektów zakontraktowanych.',
+            'contract_amount.numeric' => 'Kwota kontraktu musi być liczbą.',
+            'contract_amount.min' => 'Kwota kontraktu nie może być ujemna.',
+            'currency.required' => 'Waluta jest wymagana dla projektów zakontraktowanych.',
+            'currency.size' => 'Kod waluty musi składać się z 3 znaków.',
         ];
     }
 }

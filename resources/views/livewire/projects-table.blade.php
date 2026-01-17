@@ -100,16 +100,22 @@
                             </td>
                             <td>
                                 @php
-                                    $badgeVariant = match(\App\Services\StatusColorService::getProjectStatusColor($project->status)) {
+                                    $status = $project->status ?? \App\Enums\ProjectStatus::ACTIVE;
+                                    $statusValue = $status instanceof \App\Enums\ProjectStatus ? $status->value : $status;
+                                    $statusLabel = $status instanceof \App\Enums\ProjectStatus ? $status->label() : ucfirst($status);
+                                    
+                                    $badgeVariant = match(\App\Services\StatusColorService::getProjectStatusColor($status)) {
                                         'success' => 'success',
                                         'danger' => 'danger',
                                         'warning' => 'warning',
                                         'info' => 'info',
+                                        'primary' => 'info',
+                                        'secondary' => 'info',
                                         default => 'info'
                                     };
                                 @endphp
                                 <x-ui.badge variant="{{ $badgeVariant }}">
-                                    {{ ucfirst($project->status) }}
+                                    {{ $statusLabel }}
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">

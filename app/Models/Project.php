@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\ProjectType;
+use App\Enums\ProjectStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,8 +25,24 @@ class Project extends Model
         'name',
         'description',
         'status',
+        'type',
         'client_name',
         'budget',
+        'hourly_rate',
+        'contract_amount',
+        'currency',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'status' => ProjectStatus::class,
+        'type' => ProjectType::class,
+        'hourly_rate' => 'decimal:2',
+        'contract_amount' => 'decimal:2',
     ];
 
     /**
@@ -67,6 +85,14 @@ class Project extends Model
     public function activeAssignments(): HasMany
     {
         return $this->assignments()->active();
+    }
+
+    /**
+     * Get the variable costs for this project.
+     */
+    public function variableCosts(): HasMany
+    {
+        return $this->hasMany(ProjectVariableCost::class);
     }
 
     /**

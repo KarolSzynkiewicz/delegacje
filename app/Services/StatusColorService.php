@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AssignmentStatus;
+use App\Enums\ProjectStatus;
 use App\Enums\VehiclePosition;
 
 class StatusColorService
@@ -31,9 +32,15 @@ class StatusColorService
     /**
      * Mapowanie statusów projektów na kolory Bootstrap
      */
-    public static function getProjectStatusColor(string $status): string
+    public static function getProjectStatusColor($status): string
     {
-        return match($status) {
+        if ($status instanceof ProjectStatus) {
+            $statusValue = $status->value;
+        } else {
+            $statusValue = $status;
+        }
+
+        return match($statusValue) {
             'active' => 'success',
             'completed' => 'primary',
             'cancelled' => 'danger',
