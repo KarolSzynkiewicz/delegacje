@@ -24,9 +24,11 @@ Sprawdź czy użytkownik jest zalogowany
     ↓
 Sprawdź czy użytkownik jest administratorem (bypass)
     ↓
-Ekstraktuj resource z nazwy route
+Pobierz permission_type z route defaults
     ↓
-Mapuj HTTP method + route action → permission action
+Ekstraktuj resource z nazwy route (na podstawie permission_type)
+    ↓
+Mapuj HTTP method + route action → permission action (na podstawie permission_type)
     ↓
 Zbuduj nazwę uprawnienia: {resource}.{action}
     ↓
@@ -36,50 +38,81 @@ Jeśli TAK → pozwól na dostęp
 Jeśli NIE → zwróć 403 Forbidden
 ```
 
-### 2. Mapowanie Route → Uprawnienie
+### 2. Typy Route i Permission Types
+
+System używa trzech typów route, określonych przez `permission_type` w route defaults:
+
+#### Resource Routes (`permission_type: 'resource'`)
+Pełny CRUD - wszystkie akcje (view, create, update, delete)
+
+#### View Routes (`permission_type: 'view'`)
+Tylko odczyt - zawsze sprawdza uprawnienie `{resource}.view`
+
+#### Action Routes (`permission_type: 'action'`)
+Pojedyncze akcje - zawsze sprawdza uprawnienie `{resource}.update`
+
+### 3. Mapowanie Route → Uprawnienie
 
 #### Ekstrakcja Resource z Route
 
 Route `time-logs.index` → Resource: `time-logs`
 Route `projects.assignments.index` → Resource: `assignments`
-Route `dashboard.profitability` → Resource: `profitability` (przez custom mapping)
+Route `return-trips.cancel` → Resource: `return-trips.cancel` (action route)
 
-#### Mapowanie HTTP Method + Action → Permission Action
+#### Mapowanie HTTP Method + Action → Permission Action (Resource Routes)
 
 | HTTP Method | Route Action | Permission Action |
 |-------------|--------------|-------------------|
-| GET | `index` | `viewAny` |
+| GET | `index` | `view` |
 | GET | `show` | `view` |
 | GET | `create` | `create` |
 | GET | `edit` | `update` |
 | POST | `store` | `create` |
 | PUT/PATCH | `update` | `update` |
 | DELETE | `destroy` | `delete` |
-| GET | (brak) | `viewAny` (fallback) |
+
+**WAŻNE:** `index` i `show` oba mapują się do `.view` (nie `viewAny` i `view`).
 
 #### Przykłady Mapowania
 
-- `GET /time-logs` → `time-logs.index` → `time-logs.viewAny`
-- `GET /time-logs/1` → `time-logs.show` → `time-logs.view`
-- `POST /time-logs` → `time-logs.store` → `time-logs.create`
-- `PUT /time-logs/1` → `time-logs.update` → `time-logs.update`
-- `DELETE /time-logs/1` → `time-logs.destroy` → `time-logs.delete`
+- `GET /time-logs` → `time-logs.index` → `time-logs.view` (resource)
+- `GET /time-logs/1` → `time-logs.show` → `time-logs.view` (resource)
+- `POST /time-logs` → `time-logs.store` → `time-logs.create` (resource)
+- `GET /profitability` → `profitability.index` → `profitability.view` (view)
+- `POST /return-trips/{id}/cancel` → `return-trips.cancel` → `return-trips.cancel.update` (action)
 
-### 3. Custom Mappings
+### 4. Route Groups z Permission Type
 
-Niektóre route wymagają specjalnego mapowania:
+Wszystkie route są organizowane w grupy z jawnie ustawionym `permission_type`:
 
 ```php
-'project-demands' => 'demands',
-'project-assignments' => 'assignments',
-'return-trips' => 'logistics-events',
-'dashboard' => 'profitability', // dashboard.profitability → profitability
+// Resource routes
+Route::group(['defaults' => ['permission_type' => 'resource']], function () {
+    Route::resource('projects', ProjectController::class);
+    // ...
+});
+
+// View routes
+Route::group(['defaults' => ['permission_type' => 'view']], function () {
+    Route::get('/dashboard', ...)->name('dashboard');
+    Route::get('/profitability', ...)->name('profitability.index');
+    // ...
+});
+
+// Action routes
+Route::group(['defaults' => ['permission_type' => 'action']], function () {
+    Route::post('return-trips/{returnTrip}/cancel', ...)->name('return-trips.cancel');
+    // ...
+});
 ```
 
-### 4. Specjalne Przypadki
+### 5. Fail-Fast Mechanism
 
-#### weekly-overview
-Wszystkie route `weekly-overview.*` sprawdzają uprawnienie `weekly-overview.view` (nie `viewAny`), ponieważ w bazie istnieje tylko to jedno uprawnienie.
+Jeśli route nie ma ustawionego `permission_type`:
+- **Dev/Testing:** Rzuca wyjątek z jasnym komunikatem
+- **Production:** Abort(500) z logowaniem błędu
+
+Zapewnia to, że każdy nowy route musi mieć jawnie określony typ uprawnienia.
 
 ## Cache i Wydajność
 
@@ -114,6 +147,35 @@ Wszystkie route `weekly-overview.*` sprawdzają uprawnienie `weekly-overview.vie
   - Spatie automatycznie czyści cache
   - Następny request pobierze dane z bazy i zaktualizuje cache
 
+## Generowanie Uprawnień z Route
+
+### RoutePermissionService
+
+System używa `RoutePermissionService` do dynamicznego generowania uprawnień z route. **Route są jedynym źródłem prawdy** - każdy route z `permission_type` automatycznie generuje odpowiednie uprawnienia.
+
+### Jak Działa Generowanie
+
+1. **Pobieranie Route:** Serwis iteruje przez wszystkie zarejestrowane route
+2. **Filtrowanie:** Tylko route z `permission_type` w defaults są przetwarzane
+3. **Mapowanie:** Używa tej samej logiki co middleware do mapowania route → permission name
+4. **Filtrowanie viewAny:** Widok tabelki ignoruje `viewAny` - pokazuje tylko `view`
+
+### Automatyczne Tworzenie Uprawnień
+
+Przy zapisie formularza edycji roli:
+1. System pobiera wszystkie uprawnienia z route (używając `RoutePermissionService`)
+2. Dla każdego zaznaczonego checkboxa sprawdza czy uprawnienie istnieje w bazie
+3. Jeśli nie istnieje, automatycznie tworzy je z odpowiednim `type`
+4. Następnie przypisuje uprawnienia do roli
+
+### viewAny vs view
+
+**WAŻNE:** System zachowuje pełną semantykę Spatie:
+- `viewAny` może istnieć w bazie (zachowane z seederów)
+- Widok tabelki **ignoruje `viewAny`** - pokazuje tylko `view` w kolumnie "Czytaj"
+- Middleware generuje tylko `view` dla index/show (nie `viewAny`)
+- Różna granularność: Blade upraszcza do jednej kolumny "Czytaj", Spatie ma pełną semantykę
+
 ## Struktura Bazy Danych
 
 ### Tabele Spatie Permission
@@ -126,8 +188,9 @@ user_roles (role)
 
 permissions
 ├── id
-├── name (np. 'time-logs.viewAny', 'projects.create')
+├── name (np. 'time-logs.view', 'projects.create')
 ├── guard_name ('web')
+├── type ('resource', 'view', 'action') - typ uprawnienia
 └── ...
 
 role_has_permissions (many-to-many)
@@ -144,14 +207,13 @@ model_has_roles (user → role)
 
 Format: `{resource}.{action}`
 
-- `projects.viewAny` - Przeglądanie listy projektów
-- `projects.view` - Szczegóły projektu
-- `projects.create` - Tworzenie projektu
-- `projects.update` - Edycja projektu
-- `projects.delete` - Usuwanie projektu
-- `time-logs.viewAny` - Przeglądanie listy ewidencji godzin
-- `profitability.viewAny` - Dostęp do dashboardu rentowności
-- `weekly-overview.view` - Dostęp do planera tygodniowego
+- `projects.view` - Przeglądanie listy i szczegółów projektów (resource)
+- `projects.create` - Tworzenie projektu (resource)
+- `projects.update` - Edycja projektu (resource)
+- `projects.delete` - Usuwanie projektu (resource)
+- `profitability.view` - Dostęp do dashboardu rentowności (view)
+- `weekly-overview.view` - Dostęp do planera tygodniowego (view)
+- `return-trips.cancel.update` - Anulowanie zjazdu (action)
 
 ## Metoda hasPermission() w User Model
 
@@ -189,19 +251,25 @@ Następujące route są wykluczone z sprawdzania uprawnień:
 
 ### Tabelka Uprawnień
 
-W widoku edycji roli (`/user-roles/{role}/edit`) znajduje się tabelka z wszystkimi zasobami i akcjami:
+W widoku edycji roli (`/user-roles/{role}/edit`) znajduje się tabelka z wszystkimi zasobami i akcjami. **Uprawnienia są generowane dynamicznie z route** - nie ma potrzeby aktualizowania seederów.
 
-| Zasób | Czytaj | Tworzenie | Edycja | Usuwanie |
-|-------|--------|-----------|--------|----------|
+| Zasób | Twórz | Czytaj | Aktualizuj | Usuwaj |
+|-------|-------|--------|------------|--------|
 | Projekty | ☑ | ☑ | ☑ | ☐ |
-| Pracownicy | ☑ | ☑ | ☑ | ☐ |
+| Dashboard rentowności | - | ☑ | - | - |
+| Anulowanie zjazdu | - | - | ☑ | - |
 | ... | ... | ... | ... | ... |
 
 ### Jak Działa
 
-1. **Zmiana checkboxa** → zapis do bazy (`role_has_permissions`)
-2. **Spatie automatycznie czyści cache** uprawnień
-3. **Następny request** → nowe uprawnienia są aktywne
+1. **Renderowanie:** System pobiera wszystkie route z `permission_type` i generuje uprawnienia
+2. **Wyświetlanie:** Tabelka pokazuje checkboxy wg typu:
+   - **VIEW** → tylko kolumna "Czytaj" (`.view`)
+   - **ACTION** → tylko kolumna "Aktualizuj" (`.update`)
+   - **RESOURCE** → pełny CRUD (`.view`, `.create`, `.update`, `.delete`)
+3. **Zapis:** Przy zapisie brakujące uprawnienia są automatycznie tworzone w bazie
+4. **Cache:** Spatie automatycznie czyści cache uprawnień
+5. **Następny request** → nowe uprawnienia są aktywne
 
 ### Lista Zasobów w Tabelce
 
@@ -277,8 +345,9 @@ Zamiast `@can` (które wymaga Policy), używamy bezpośredniego sprawdzenia:
 
 - Middleware `CheckResourcePermission`
 - Metoda `hasPermission()` w modelu User
-- Tabelka uprawnień w UI
-- Seeder uprawnień (`PermissionSeeder`)
+- Tabelka uprawnień w UI (generowana dynamicznie z route)
+- `RoutePermissionService` - generowanie uprawnień z route
+- Automatyczne tworzenie uprawnień przy zapisie formularza
 
 ## Rozwiązywanie Problemów
 
@@ -287,8 +356,9 @@ Zamiast `@can` (które wymaga Policy), używamy bezpośredniego sprawdzenia:
 **Przyczyna:** Uprawnienie nie istnieje w bazie danych.
 
 **Rozwiązanie:**
-1. Uruchom seeder: `php artisan db:seed --class=PermissionSeeder`
-2. Sprawdź czy uprawnienie jest w `PermissionSeeder.php`
+1. Sprawdź czy route ma ustawiony `permission_type` w defaults
+2. Uprawnienie zostanie automatycznie utworzone przy zapisie formularza edycji roli
+3. Jeśli problem występuje, sprawdź czy route jest w odpowiedniej grupie w `routes/web.php`
 
 ### Problem: Route zwraca 403 mimo że użytkownik ma uprawnienie
 
@@ -313,10 +383,12 @@ php artisan permission:cache-reset
 ## Best Practices
 
 1. **Zawsze używaj nazw route** - Middleware wymaga nazwanych route
-2. **Dodawaj nowe uprawnienia do PermissionSeeder** - Zapewnia spójność
-3. **Dodawaj nowe zasoby do tabelki w UI** - Użytkownicy muszą móc zarządzać uprawnieniami
-4. **Używaj `hasPermission()` zamiast `@can`** - Spójność z nowym systemem
-5. **Nie używaj `$this->authorize()` w kontrolerach** - Middleware obsługuje to automatycznie
+2. **Ustawiaj `permission_type` dla każdego route** - Używaj grup route z `defaults`
+3. **Route są jedynym źródłem prawdy** - Nie ma potrzeby aktualizowania seederów
+4. **Nowe route automatycznie pojawiają się w tabelce** - System generuje uprawnienia z route
+5. **Używaj `hasPermission()` zamiast `@can`** - Spójność z nowym systemem
+6. **Nie używaj `$this->authorize()` w kontrolerach** - Middleware obsługuje to automatycznie
+7. **Organizuj route w grupy** - Resource, View, Action - dla czytelności i spójności
 
 ## Podsumowanie
 
