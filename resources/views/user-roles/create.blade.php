@@ -38,10 +38,11 @@
                         <label class="form-label fw-semibold mb-3">Uprawnienia</label>
                         
                         @php
+                            // Get selected permissions by name (from route permissions)
                             $selectedPermissions = old('permissions', []);
                             
-                            // Grupuj uprawnienia według zasobu
-                            $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
+                            // Get permissions from routes (already filtered to exclude viewAny)
+                            $allPermissions = $routePermissions;
                             
                             // Mapowanie nazw zasobów na polskie
                             $resourceNames = [
@@ -56,6 +57,7 @@
                                 'accommodation-assignments' => 'Przypisania mieszkań',
                                 'demands' => 'Zapotrzebowania',
                                 'reports' => 'Raporty',
+                                'dashboard' => 'Dashboard',
                                 'weekly-overview' => 'Planer tygodniowy',
                                 'profitability' => 'Dashboard rentowności',
                                 'user-roles' => 'Role użytkowników',
@@ -74,40 +76,68 @@
                                 'payrolls' => 'Payroll',
                                 'project-variable-costs' => 'Koszty zmienne projektów',
                                 'rotations' => 'Rotacje',
+                                // Action resources
+                                'return-trips.prepare' => 'Przygotowanie zjazdu',
+                                'return-trips.cancel' => 'Anulowanie zjazdu',
+                                'equipment-issues.return' => 'Zwrot sprzętu',
+                                'time-logs.monthly-grid' => 'Siatka miesięczna ewidencji',
+                                'time-logs.bulk-update' => 'Masowa aktualizacja ewidencji',
+                                'payrolls.generate-batch' => 'Generowanie batcha payrolli',
+                                'payrolls.recalculate-all' => 'Przeliczanie wszystkich payrolli',
+                                'payrolls.recalculate' => 'Przeliczanie payrolla',
+                                'assignments.time-logs' => 'Ewidencje godzin przypisania',
                             ];
                             
                             $groupedPermissions = [];
                             foreach ($allPermissions as $permission) {
-                                // Format: resource.action (np. projects.viewAny)
-                                $parts = explode('.', $permission->name);
-                                if (count($parts) === 2) {
-                                    $resource = $parts[0];
-                                    $action = $parts[1];
-                                    
-                                    // Mapuj akcje na CRUD
+                                // Permission is now an array from RoutePermissionService
+                                $permissionName = $permission['name'];
+                                $type = $permission['type'];
+                                $resource = $permission['resource'];
+                                $action = $permission['action'];
+                                
+                                // Skip viewAny - should not appear, but filter just in case
+                                if (str_ends_with($permissionName, '.viewAny')) {
+                                    continue;
+                                }
+                                
+                                if (!isset($groupedPermissions[$resource])) {
+                                    $resourceName = $resourceNames[$resource] ?? ucfirst(str_replace('-', ' ', $resource));
+                                    $groupedPermissions[$resource] = [
+                                        'name' => $resourceName,
+                                        'type' => $type,
+                                        'permissions' => ['C' => null, 'R' => null, 'U' => null, 'D' => null]
+                                    ];
+                                }
+                                
+                                // Map actions to CRUD columns based on type
+                                $crud = null;
+                                if ($type === 'view') {
+                                    // VIEW: only .view -> R (Czytaj)
+                                    if ($action === 'view') {
+                                        $crud = 'R';
+                                    }
+                                } elseif ($type === 'action') {
+                                    // ACTION: only .update -> U (Edycja)
+                                    if ($action === 'update') {
+                                        $crud = 'U';
+                                    }
+                                } else {
+                                    // RESOURCE: full CRUD
                                     $crudMap = [
-                                        'viewAny' => 'R',
                                         'view' => 'R',
                                         'create' => 'C',
                                         'update' => 'U',
                                         'delete' => 'D',
                                     ];
-                                    
                                     $crud = $crudMap[$action] ?? null;
-                                    if ($crud) {
-                                        if (!isset($groupedPermissions[$resource])) {
-                                            $resourceName = $resourceNames[$resource] ?? ucfirst(str_replace('-', ' ', $resource));
-                                            $groupedPermissions[$resource] = [
-                                                'name' => $resourceName,
-                                                'permissions' => ['C' => null, 'R' => null, 'U' => null, 'D' => null]
-                                            ];
-                                        }
-                                        $groupedPermissions[$resource]['permissions'][$crud] = [
-                                            'id' => $permission->id,
-                                            'name' => $permission->name,
-                                            'checked' => in_array($permission->id, $selectedPermissions)
-                                        ];
-                                    }
+                                }
+                                
+                                if ($crud) {
+                                    $groupedPermissions[$resource]['permissions'][$crud] = [
+                                        'name' => $permissionName,
+                                        'checked' => in_array($permissionName, $selectedPermissions)
+                                    ];
                                 }
                             }
                             
@@ -128,21 +158,35 @@
                                 </thead>
                                 <tbody>
                                     @foreach($groupedPermissions as $resource => $data)
+                                        @php
+                                            $type = $data['type'] ?? 'resource';
+                                        @endphp
                                         <tr>
                                             <td class="fw-medium">{{ $data['name'] }}</td>
                                             @foreach(['C', 'R', 'U', 'D'] as $action)
-                                                <td class="text-center">
-                                                    @if($data['permissions'][$action])
+                                                @php
+                                                    // Determine if this column should be shown/active based on type
+                                                    $shouldShow = false;
+                                                    if ($type === 'view' && $action === 'R') {
+                                                        $shouldShow = true; // VIEW: only Czytaj
+                                                    } elseif ($type === 'action' && $action === 'U') {
+                                                        $shouldShow = true; // ACTION: only Edycja
+                                                    } elseif ($type === 'resource') {
+                                                        $shouldShow = true; // RESOURCE: all columns
+                                                    }
+                                                @endphp
+                                                <td class="text-center {{ !$shouldShow ? 'text-muted' : '' }}">
+                                                    @if($data['permissions'][$action] && $shouldShow)
                                                         <div class="form-check d-inline-block">
                                                             <input 
                                                                 type="checkbox" 
                                                                 name="permissions[]" 
-                                                                value="{{ $data['permissions'][$action]['id'] }}"
-                                                                id="perm-{{ $data['permissions'][$action]['id'] }}"
+                                                                value="{{ $data['permissions'][$action]['name'] }}"
+                                                                id="perm-{{ md5($data['permissions'][$action]['name']) }}"
                                                                 {{ $data['permissions'][$action]['checked'] ? 'checked' : '' }}
                                                                 class="form-check-input"
                                                             >
-                                                            <label class="form-check-label" for="perm-{{ $data['permissions'][$action]['id'] }}"></label>
+                                                            <label class="form-check-label" for="perm-{{ md5($data['permissions'][$action]['name']) }}"></label>
                                                         </div>
                                                     @else
                                                         <span class="text-muted">-</span>

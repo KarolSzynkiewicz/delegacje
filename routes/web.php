@@ -32,26 +32,11 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
-
-    // Profitability Dashboard
-    Route::get('/dashboard/profitability', [DashboardController::class, 'index'])->name('dashboard.profitability');
-
-    // Weekly Overview
-    Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])->name('weekly-overview.index');
-    Route::get('/weekly-overview/planner2', [WeeklyOverviewController::class, 'planner2'])->name('weekly-overview.planner2');
-    Route::get('/weekly-overview/planner3', [WeeklyOverviewController::class, 'planner3'])->name('weekly-overview.planner3');
-
-    Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/', [ProfileController::class, 'edit'])->name('edit');
-        Route::patch('/', [ProfileController::class, 'update'])->name('update');
-        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
-    });
-
+    
+    // ===== RESOURCE ROUTES =====
+    Route::group(['defaults' => ['permission_type' => 'resource']], function () {
     // Projects + nested demands + assignments
-    Route::resource('projects', controller: ProjectController::class);
+        Route::resource('projects', ProjectController::class);
 
     Route::resource('projects.demands', ProjectDemandController::class)
         ->shallow()
@@ -81,7 +66,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);
-    Route::resource('employees.employee-documents', EmployeeDocumentController::class)->except(['index', 'show'])->parameters(['employee-documents' => 'employeeDocument']);
+        Route::resource('employees.employee-documents', EmployeeDocumentController::class)
+            ->except(['index', 'show'])
+            ->parameters(['employee-documents' => 'employeeDocument']);
     
     // Rotations (global routes)
     Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
@@ -140,22 +127,16 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     
     // User Roles (RBAC)
     Route::resource('user-roles', UserRoleController::class);
-    Route::post('user-roles/{userRole}/permissions', [UserRoleController::class, 'updatePermissions'])->name('user-roles.permissions.update');
     
     // Users Management
     Route::resource('users', UserController::class);
     
-    // Return Trips (Zjazdy)
-    Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])->name('return-trips.prepare-form');
-    Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])->name('return-trips.prepare');
-    Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])->name('return-trips.cancel');
+        // Return Trips (Zjazdy) - resource routes
     Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
     
     // Equipment
     Route::resource('equipment', \App\Http\Controllers\EquipmentController::class);
     Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
-    Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])->name('equipment-issues.return');
-    Route::post('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'return'])->name('equipment-issues.return.store');
     
     // Transport Costs
     Route::resource('transport-costs', \App\Http\Controllers\TransportCostController::class);
@@ -167,19 +148,14 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::resource('fixed-costs', \App\Http\Controllers\FixedCostController::class);
     
     // Time Logs
-    Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])->name('time-logs.monthly-grid');
-    Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])->name('time-logs.bulk-update');
     Route::resource('time-logs', \App\Http\Controllers\TimeLogController::class);
-    Route::get('assignments/{assignment}/time-logs', [\App\Http\Controllers\TimeLogController::class, 'byAssignment'])->name('assignments.time-logs');
+        Route::get('assignments/{assignment}/time-logs', [\App\Http\Controllers\TimeLogController::class, 'byAssignment'])
+            ->name('assignments.time-logs');
     
     // Employee Rates
     Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
     
     // Payroll
-    Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])->name('payrolls.generate-batch');
-    Route::post('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatch'])->name('payrolls.generate-batch.store');
-    Route::post('payrolls/recalculate-all', [\App\Http\Controllers\PayrollController::class, 'recalculateAll'])->name('payrolls.recalculate-all');
-    Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])->name('payrolls.recalculate');
     Route::resource('payrolls', \App\Http\Controllers\PayrollController::class);
     
     // Adjustments (Kary/Nagrody)
@@ -187,6 +163,71 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     
     // Advances (Zaliczki)
     Route::resource('advances', \App\Http\Controllers\AdvanceController::class);
+    });
+    
+    // ===== VIEW ROUTES =====
+    Route::group(['defaults' => ['permission_type' => 'view']], function () {
+        Route::get('/dashboard', function () {
+            return view('dashboard');
+        })->name('dashboard');
+        
+        // Redirect old route to new one
+        Route::get('/dashboard/profitability', function () {
+            return redirect()->route('profitability.index');
+        });
+        
+        Route::get('/profitability', [DashboardController::class, 'index'])
+            ->name('profitability.index');
+        
+        Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])
+            ->name('weekly-overview.index');
+        
+        Route::get('/weekly-overview/planner2', [WeeklyOverviewController::class, 'planner2'])
+            ->name('weekly-overview.planner2');
+        
+        Route::get('/weekly-overview/planner3', [WeeklyOverviewController::class, 'planner3'])
+            ->name('weekly-overview.planner3');
+    });
+    
+    // ===== ACTION ROUTES =====
+    Route::group(['defaults' => ['permission_type' => 'action']], function () {
+        // Return Trips Actions
+        Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
+            ->name('return-trips.prepare-form');
+        Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])
+            ->name('return-trips.prepare');
+        Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])
+            ->name('return-trips.cancel');
+        
+        // Equipment Issues Actions
+        Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])
+            ->name('equipment-issues.return');
+        Route::post('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'return'])
+            ->name('equipment-issues.return.store');
+        
+        // Time Logs Actions
+        Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])
+            ->name('time-logs.monthly-grid');
+        Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])
+            ->name('time-logs.bulk-update');
+        
+        // Payrolls Actions
+        Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])
+            ->name('payrolls.generate-batch');
+        Route::post('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatch'])
+            ->name('payrolls.generate-batch.store');
+        Route::post('payrolls/recalculate-all', [\App\Http\Controllers\PayrollController::class, 'recalculateAll'])
+            ->name('payrolls.recalculate-all');
+        Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])
+            ->name('payrolls.recalculate');
+    });
+    
+    // Profile routes (excluded from permission checking)
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'edit'])->name('edit');
+        Route::patch('/', [ProfileController::class, 'update'])->name('update');
+        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+    });
 });
 
 // Route for users without roles (must be outside role.required middleware)
