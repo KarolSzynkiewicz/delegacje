@@ -15,8 +15,6 @@ class TransportCostController extends Controller
      */
     public function index()
     {
-        $this->authorize('viewAny', TransportCost::class);
-
         $costs = TransportCost::with(['logisticsEvent', 'vehicle', 'transport', 'creator'])
             ->orderBy('cost_date', 'desc')
             ->paginate(20);
@@ -29,8 +27,6 @@ class TransportCostController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', TransportCost::class);
-
         $events = LogisticsEvent::orderBy('event_date', 'desc')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
         $transports = Transport::with('logisticsEvent')->orderBy('departure_datetime', 'desc')->get();
@@ -43,8 +39,6 @@ class TransportCostController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', TransportCost::class);
-
         $validated = $request->validate([
             'logistics_event_id' => 'nullable|exists:logistics_events,id',
             'vehicle_id' => 'nullable|exists:vehicles,id',
@@ -72,8 +66,6 @@ class TransportCostController extends Controller
      */
     public function show(TransportCost $transportCost)
     {
-        $this->authorize('view', $transportCost);
-
         $transportCost->load(['logisticsEvent', 'vehicle', 'transport', 'creator']);
 
         return view('transport-costs.show', compact('transportCost'));
@@ -84,8 +76,6 @@ class TransportCostController extends Controller
      */
     public function edit(TransportCost $transportCost)
     {
-        $this->authorize('update', $transportCost);
-
         $events = LogisticsEvent::orderBy('event_date', 'desc')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
         $transports = Transport::with('logisticsEvent')->orderBy('departure_datetime', 'desc')->get();
@@ -98,8 +88,6 @@ class TransportCostController extends Controller
      */
     public function update(Request $request, TransportCost $transportCost)
     {
-        $this->authorize('update', $transportCost);
-
         $validated = $request->validate([
             'logistics_event_id' => 'nullable|exists:logistics_events,id',
             'vehicle_id' => 'nullable|exists:vehicles,id',
@@ -125,8 +113,6 @@ class TransportCostController extends Controller
      */
     public function destroy(TransportCost $transportCost)
     {
-        $this->authorize('delete', $transportCost);
-
         $transportCost->delete();
 
         return redirect()

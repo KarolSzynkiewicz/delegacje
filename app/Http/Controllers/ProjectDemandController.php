@@ -86,7 +86,7 @@ class ProjectDemandController extends Controller
             if ($demandsWithDateTo->isNotEmpty()) {
                 // Jeśli są zapotrzebowania z end_date, użyj najpóźniejszej
                 $latestDateTo = $demandsWithDateTo->max('end_date');
-                $existingDateTo = $latestDateTo->format('Y-m-d');
+                $existingDateTo = $latestDateTo ? $latestDateTo->format('Y-m-d') : null;
             } else {
                 // Jeśli wszystkie mają end_date = null, sprawdź czy wszystkie mają tę samą start_date
                 // Jeśli tak, użyj end_date z parametrów, w przeciwnym razie zostaw puste

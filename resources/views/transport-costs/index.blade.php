@@ -42,7 +42,7 @@
                                             </td>
                                             <td>{{ $cost->description ?? '-' }}</td>
                                             <td>
-                                                @can('delete', $cost)
+                                                @if(auth()->user()->hasPermission('transport-costs.delete'))
                                                     <x-action-buttons
                                                         viewRoute="{{ route('transport-costs.show', $cost) }}"
                                                         editRoute="{{ route('transport-costs.edit', $cost) }}"
@@ -54,7 +54,7 @@
                                                         viewRoute="{{ route('transport-costs.show', $cost) }}"
                                                         editRoute="{{ route('transport-costs.edit', $cost) }}"
                                                     />
-                                                @endcan
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach

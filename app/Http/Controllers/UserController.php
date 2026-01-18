@@ -17,7 +17,6 @@ class UserController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', User::class);
         
         $users = User::with('roles')->orderBy('name')->paginate(15);
         return view('users.index', compact('users'));
@@ -28,7 +27,6 @@ class UserController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', User::class);
         
         $roles = Role::orderBy('name')->get();
         return view('users.create', compact('roles'));
@@ -39,7 +37,6 @@ class UserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', User::class);
         
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -68,7 +65,6 @@ class UserController extends Controller
      */
     public function show(User $user): View
     {
-        $this->authorize('view', $user);
         
         $user->load(['roles', 'permissions']);
         return view('users.show', compact('user'));
@@ -79,7 +75,6 @@ class UserController extends Controller
      */
     public function edit(User $user): View
     {
-        $this->authorize('update', $user);
         
         $roles = Role::orderBy('name')->get();
         $user->load('roles');
@@ -92,7 +87,6 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user): RedirectResponse
     {
-        $this->authorize('update', $user);
         
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -128,7 +122,6 @@ class UserController extends Controller
      */
     public function destroy(User $user): RedirectResponse
     {
-        $this->authorize('delete', $user);
         
         // Nie można usunąć samego siebie
         if ($user->id === auth()->id()) {

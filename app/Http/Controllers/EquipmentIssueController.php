@@ -22,8 +22,6 @@ class EquipmentIssueController extends Controller
      */
     public function index()
     {
-        $this->authorize('viewAny', EquipmentIssue::class);
-
         $issues = EquipmentIssue::with('equipment', 'employee', 'projectAssignment')
             ->orderBy('issue_date', 'desc')
             ->paginate(20);
@@ -36,8 +34,6 @@ class EquipmentIssueController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', EquipmentIssue::class);
-
         $equipment = Equipment::orderBy('name')->get();
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
         $assignments = \App\Models\ProjectAssignment::where('status', 'active')
@@ -52,8 +48,6 @@ class EquipmentIssueController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', EquipmentIssue::class);
-
         $validated = $request->validate([
             'equipment_id' => 'required|exists:equipment,id',
             'employee_id' => 'required|exists:employees,id',
@@ -102,8 +96,6 @@ class EquipmentIssueController extends Controller
      */
     public function show(EquipmentIssue $equipmentIssue)
     {
-        $this->authorize('view', $equipmentIssue);
-
         $equipmentIssue->load('equipment', 'employee', 'projectAssignment', 'issuer', 'returner');
 
         return view('equipment-issues.show', compact('equipmentIssue'));
@@ -114,8 +106,6 @@ class EquipmentIssueController extends Controller
      */
     public function returnForm(EquipmentIssue $equipmentIssue)
     {
-        $this->authorize('update', $equipmentIssue);
-
         if ($equipmentIssue->status === 'returned') {
             return redirect()
                 ->route('equipment-issues.show', $equipmentIssue)
@@ -130,8 +120,6 @@ class EquipmentIssueController extends Controller
      */
     public function return(Request $request, EquipmentIssue $equipmentIssue)
     {
-        $this->authorize('update', $equipmentIssue);
-
         $validated = $request->validate([
             'return_date' => 'required|date|after_or_equal:' . $equipmentIssue->issue_date->format('Y-m-d'),
             'notes' => 'nullable|string',

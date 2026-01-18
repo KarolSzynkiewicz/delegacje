@@ -18,7 +18,6 @@ class EmployeeController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', Employee::class);
         // Dane są pobierane przez komponent Livewire EmployeesTable
         return view('employees.index');
     }
@@ -28,7 +27,6 @@ class EmployeeController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', Employee::class);
         $roles = Role::all();
         return view('employees.create', compact('roles'));
     }
@@ -38,8 +36,6 @@ class EmployeeController extends Controller
      */
     public function store(StoreEmployeeRequest $request): RedirectResponse
     {
-        $this->authorize('create', Employee::class);
-        
         $validated = $this->processImageUpload($request->validated(), $request, 'employees');
         
         $roles = $validated['roles'] ?? [];
@@ -56,7 +52,6 @@ class EmployeeController extends Controller
      */
     public function show(Employee $employee): View
     {
-        $this->authorize('view', $employee);
         $employee->load(['roles', 'employeeDocuments.document', 'rotations']);
         
         // Get project assignments ordered by start_date descending (newest first)
@@ -85,7 +80,6 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee): View
     {
-        $this->authorize('update', $employee);
         $roles = Role::all();
         return view('employees.edit', compact('employee', 'roles'));
     }
@@ -95,8 +89,6 @@ class EmployeeController extends Controller
      */
     public function update(UpdateEmployeeRequest $request, Employee $employee): RedirectResponse
     {
-        $this->authorize('update', $employee);
-        
         $validated = $this->processImageUpload($request->validated(), $request, 'employees', $employee->image_path);
         
         $roles = $validated['roles'] ?? [];
@@ -113,8 +105,6 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee): RedirectResponse
     {
-        $this->authorize('delete', $employee);
-        
         $employee->delete();
         return redirect()->route('employees.index')->with('success', 'Pracownik został usunięty.');
     }

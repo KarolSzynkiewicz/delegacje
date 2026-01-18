@@ -102,7 +102,7 @@
                             <td>{{ $timeLog->projectAssignment->project->name }}</td>
                             <td class="fw-semibold">{{ number_format($timeLog->hours_worked, 2) }}h</td>
                             <td>
-                                @can('delete', $timeLog)
+                                @if(auth()->user()->hasPermission('time-logs.delete'))
                                     <x-ui.action-buttons
                                         viewRoute="{{ route('time-logs.show', $timeLog) }}"
                                         editRoute="{{ route('time-logs.edit', $timeLog) }}"
@@ -114,7 +114,7 @@
                                         viewRoute="{{ route('time-logs.show', $timeLog) }}"
                                         editRoute="{{ route('time-logs.edit', $timeLog) }}"
                                     />
-                                @endcan
+                                @endif
                             </td>
                         </tr>
                     @empty

@@ -89,6 +89,8 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->hasPermissionTo($permissionName);
+        // Użyj checkPermissionTo() zamiast hasPermissionTo()
+        // - zwraca false zamiast rzucać wyjątek gdy uprawnienie nie istnieje
+        return $this->checkPermissionTo($permissionName);
     }
 }

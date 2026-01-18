@@ -180,7 +180,7 @@
                 </div>
 
                 <!-- Zjazdy -->
-                @can('viewAny', \App\Models\LogisticsEvent::class)
+                @if(auth()->user()->hasPermission('logistics-events.viewAny'))
                 <div class="col-md-6 col-lg-4">
                     <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('return-trips.index') }}'">
                         <div class="d-flex align-items-center mb-3">
@@ -190,10 +190,10 @@
                         <p class="card-text text-muted mb-0">Zarządzaj zjazdami pracowników do bazy</p>
                     </x-ui.card>
                 </div>
-                @endcan
+                @endif
 
                 <!-- Sprzęt -->
-                @can('viewAny', \App\Models\Equipment::class)
+                @if(auth()->user()->hasPermission('equipment.viewAny'))
                 <div class="col-md-6 col-lg-4">
                     <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('equipment.index') }}'">
                         <div class="d-flex align-items-center mb-3">
@@ -203,10 +203,10 @@
                         <p class="card-text text-muted mb-0">Zarządzaj sprzętem i magazynem</p>
                     </x-ui.card>
                 </div>
-                @endcan
+                @endif
 
                 <!-- Wydania Sprzętu -->
-                @can('viewAny', \App\Models\EquipmentIssue::class)
+                @if(auth()->user()->hasPermission('equipment-issues.viewAny'))
                 <div class="col-md-6 col-lg-4">
                     <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('equipment-issues.index') }}'">
                         <div class="d-flex align-items-center mb-3">
@@ -216,10 +216,10 @@
                         <p class="card-text text-muted mb-0">Wydania i zwroty sprzętu</p>
                     </x-ui.card>
                 </div>
-                @endcan
+                @endif
 
                 <!-- Koszty Transportu -->
-                @can('viewAny', \App\Models\TransportCost::class)
+                @if(auth()->user()->hasPermission('transport-costs.viewAny'))
                 <div class="col-md-6 col-lg-4">
                     <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('transport-costs.index') }}'">
                         <div class="d-flex align-items-center mb-3">
@@ -229,10 +229,10 @@
                         <p class="card-text text-muted mb-0">Ewidencja kosztów transportu</p>
                     </x-ui.card>
                 </div>
-                @endcan
+                @endif
 
                 <!-- Ewidencja Godzin -->
-                @can('viewAny', \App\Models\TimeLog::class)
+                @if(auth()->user()->hasPermission('time-logs.viewAny'))
                 <div class="col-md-6 col-lg-4">
                     <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('time-logs.index') }}'">
                         <div class="d-flex align-items-center mb-3">
@@ -242,7 +242,7 @@
                         <p class="card-text text-muted mb-0">Rejestracja rzeczywistych godzin pracy</p>
                     </x-ui.card>
                 </div>
-                @endcan
+                @endif
 
                 <!-- Stawki Pracowników -->
                 <div class="col-md-6 col-lg-4">

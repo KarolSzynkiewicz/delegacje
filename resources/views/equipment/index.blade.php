@@ -42,7 +42,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @can('delete', $item)
+                                                @if(auth()->user()->hasPermission('equipment.delete'))
                                                     <x-action-buttons
                                                         viewRoute="{{ route('equipment.show', $item) }}"
                                                         editRoute="{{ route('equipment.edit', $item) }}"
@@ -54,7 +54,7 @@
                                                         viewRoute="{{ route('equipment.show', $item) }}"
                                                         editRoute="{{ route('equipment.edit', $item) }}"
                                                     />
-                                                @endcan
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach

@@ -17,7 +17,6 @@ class VehicleController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', Vehicle::class);
         // Dane są pobierane przez komponent Livewire VehiclesTable
         return view('vehicles.index');
     }
@@ -27,7 +26,6 @@ class VehicleController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', Vehicle::class);
         return view('vehicles.create');
     }
 
@@ -36,8 +34,6 @@ class VehicleController extends Controller
      */
     public function store(StoreVehicleRequest $request): RedirectResponse
     {
-        $this->authorize('create', Vehicle::class);
-        
         $validated = $this->processImageUpload($request->validated(), $request, 'vehicles');
         Vehicle::create($validated);
         
@@ -49,7 +45,6 @@ class VehicleController extends Controller
      */
     public function show(Vehicle $vehicle): View
     {
-        $this->authorize('view', $vehicle);
         $assignments = $vehicle->assignments()
             ->with(['employee'])
             ->orderBy('start_date', 'desc')
@@ -63,7 +58,6 @@ class VehicleController extends Controller
      */
     public function edit(Vehicle $vehicle): View
     {
-        $this->authorize('update', $vehicle);
         return view('vehicles.edit', compact('vehicle'));
     }
 
@@ -72,8 +66,6 @@ class VehicleController extends Controller
      */
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): RedirectResponse
     {
-        $this->authorize('update', $vehicle);
-        
         $validated = $this->processImageUpload($request->validated(), $request, 'vehicles', $vehicle->image_path);
         $vehicle->update($validated);
         
@@ -85,7 +77,6 @@ class VehicleController extends Controller
      */
     public function destroy(Vehicle $vehicle): RedirectResponse
     {
-        $this->authorize('delete', $vehicle);
         $vehicle->delete();
         return redirect()->route('vehicles.index')->with('success', 'Pojazd został usunięty.');
     }

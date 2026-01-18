@@ -17,7 +17,6 @@ class AccommodationController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', Accommodation::class);
         // Dane są pobierane przez komponent Livewire AccommodationsTable
         return view('accommodations.index');
     }
@@ -27,7 +26,6 @@ class AccommodationController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', Accommodation::class);
         return view('accommodations.create');
     }
 
@@ -36,7 +34,6 @@ class AccommodationController extends Controller
      */
     public function store(StoreAccommodationRequest $request): RedirectResponse
     {
-        $this->authorize('create', Accommodation::class);
         
         $validated = $this->processImageUpload($request->validated(), $request, 'accommodations');
         Accommodation::create($validated);
@@ -49,7 +46,6 @@ class AccommodationController extends Controller
      */
     public function show(Accommodation $accommodation): View
     {
-        $this->authorize('view', $accommodation);
         $assignments = $accommodation->assignments()
             ->with(['employee'])
             ->orderBy('start_date', 'desc')
@@ -63,7 +59,6 @@ class AccommodationController extends Controller
      */
     public function edit(Accommodation $accommodation): View
     {
-        $this->authorize('update', $accommodation);
         return view('accommodations.edit', compact('accommodation'));
     }
 
@@ -72,7 +67,6 @@ class AccommodationController extends Controller
      */
     public function update(UpdateAccommodationRequest $request, Accommodation $accommodation): RedirectResponse
     {
-        $this->authorize('update', $accommodation);
         
         $validated = $this->processImageUpload($request->validated(), $request, 'accommodations', $accommodation->image_path);
         $accommodation->update($validated);
@@ -85,7 +79,6 @@ class AccommodationController extends Controller
      */
     public function destroy(Accommodation $accommodation): RedirectResponse
     {
-        $this->authorize('delete', $accommodation);
         $accommodation->delete();
         return redirect()->route('accommodations.index')->with('success', 'Akomodacja została usunięta.');
     }

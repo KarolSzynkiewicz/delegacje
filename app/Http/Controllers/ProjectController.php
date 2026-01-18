@@ -16,7 +16,6 @@ class ProjectController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', Project::class);
         // Dane są pobierane przez komponent Livewire ProjectsTable
         return view('projects.index');
     }
@@ -26,7 +25,6 @@ class ProjectController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', Project::class);
         $locations = Location::all();
         return view('projects.create', compact('locations'));
     }
@@ -36,8 +34,6 @@ class ProjectController extends Controller
      */
     public function store(StoreProjectRequest $request): RedirectResponse
     {
-        $this->authorize('create', Project::class);
-        
         Project::create($request->validated());
 
         return redirect()->route('projects.index')->with('success', 'Projekt został dodany.');
@@ -48,7 +44,6 @@ class ProjectController extends Controller
      */
     public function show(Project $project): View
     {
-        $this->authorize('view', $project);
         $project->load('location', 'assignments');
         return view('projects.show', compact('project'));
     }
@@ -58,7 +53,6 @@ class ProjectController extends Controller
      */
     public function edit(Project $project): View
     {
-        $this->authorize('update', $project);
         $locations = Location::all();
         return view('projects.edit', compact('project', 'locations'));
     }
@@ -68,8 +62,6 @@ class ProjectController extends Controller
      */
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $this->authorize('update', $project);
-        
         $project->update($request->validated());
 
         return redirect()->route('projects.index')->with('success', 'Projekt został zaktualizowany.');
@@ -80,8 +72,6 @@ class ProjectController extends Controller
      */
     public function destroy(Project $project): RedirectResponse
     {
-        $this->authorize('delete', $project);
-        
         $project->delete();
 
         return redirect()->route('projects.index')->with('success', 'Projekt został usunięty.');

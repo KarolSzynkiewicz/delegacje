@@ -93,6 +93,9 @@ class PermissionSeeder extends Seeder
             // Weekly Overview
             ['name' => 'Przeglądanie planera tygodniowego', 'slug' => 'weekly-overview.view', 'model' => 'weekly-overview', 'action' => 'view', 'description' => 'Może przeglądać planer tygodniowy'],
 
+            // Profitability Dashboard
+            ['name' => 'Przeglądanie dashboardu rentowności', 'slug' => 'profitability.viewAny', 'model' => 'profitability', 'action' => 'viewAny', 'description' => 'Może przeglądać dashboard rentowności'],
+
             // User Roles Management (zarządzanie rolami użytkowników)
             ['name' => 'Przeglądanie ról użytkowników', 'slug' => 'user-roles.viewAny', 'model' => 'user-roles', 'action' => 'viewAny', 'description' => 'Może przeglądać listę ról użytkowników'],
             ['name' => 'Szczegóły roli użytkownika', 'slug' => 'user-roles.view', 'model' => 'user-roles', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły roli użytkownika'],
@@ -141,6 +144,68 @@ class PermissionSeeder extends Seeder
             ['name' => 'Tworzenie ewidencji godzin', 'slug' => 'time-logs.create', 'model' => 'time-logs', 'action' => 'create', 'description' => 'Może tworzyć nowe wpisy ewidencji godzin'],
             ['name' => 'Edycja ewidencji godzin', 'slug' => 'time-logs.update', 'model' => 'time-logs', 'action' => 'update', 'description' => 'Może edytować wpisy ewidencji godzin'],
             ['name' => 'Usuwanie ewidencji godzin', 'slug' => 'time-logs.delete', 'model' => 'time-logs', 'action' => 'delete', 'description' => 'Może usuwać wpisy ewidencji godzin'],
+
+            // Adjustments (Kary/Nagrody)
+            ['name' => 'Przeglądanie kar i nagród', 'slug' => 'adjustments.viewAny', 'model' => 'adjustments', 'action' => 'viewAny', 'description' => 'Może przeglądać listę kar i nagród'],
+            ['name' => 'Szczegóły kary/nagrody', 'slug' => 'adjustments.view', 'model' => 'adjustments', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły kary/nagrody'],
+            ['name' => 'Tworzenie kar i nagród', 'slug' => 'adjustments.create', 'model' => 'adjustments', 'action' => 'create', 'description' => 'Może tworzyć nowe kary i nagrody'],
+            ['name' => 'Edycja kar i nagród', 'slug' => 'adjustments.update', 'model' => 'adjustments', 'action' => 'update', 'description' => 'Może edytować kary i nagrody'],
+            ['name' => 'Usuwanie kar i nagród', 'slug' => 'adjustments.delete', 'model' => 'adjustments', 'action' => 'delete', 'description' => 'Może usuwać kary i nagrody'],
+
+            // Advances (Zaliczki)
+            ['name' => 'Przeglądanie zaliczek', 'slug' => 'advances.viewAny', 'model' => 'advances', 'action' => 'viewAny', 'description' => 'Może przeglądać listę zaliczek'],
+            ['name' => 'Szczegóły zaliczki', 'slug' => 'advances.view', 'model' => 'advances', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły zaliczki'],
+            ['name' => 'Tworzenie zaliczek', 'slug' => 'advances.create', 'model' => 'advances', 'action' => 'create', 'description' => 'Może tworzyć nowe zaliczki'],
+            ['name' => 'Edycja zaliczek', 'slug' => 'advances.update', 'model' => 'advances', 'action' => 'update', 'description' => 'Może edytować zaliczki'],
+            ['name' => 'Usuwanie zaliczek', 'slug' => 'advances.delete', 'model' => 'advances', 'action' => 'delete', 'description' => 'Może usuwać zaliczki'],
+
+            // Documents (Słownik dokumentów)
+            ['name' => 'Przeglądanie dokumentów', 'slug' => 'documents.viewAny', 'model' => 'documents', 'action' => 'viewAny', 'description' => 'Może przeglądać listę dokumentów'],
+            ['name' => 'Szczegóły dokumentu', 'slug' => 'documents.view', 'model' => 'documents', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły dokumentu'],
+            ['name' => 'Tworzenie dokumentów', 'slug' => 'documents.create', 'model' => 'documents', 'action' => 'create', 'description' => 'Może tworzyć nowe dokumenty'],
+            ['name' => 'Edycja dokumentów', 'slug' => 'documents.update', 'model' => 'documents', 'action' => 'update', 'description' => 'Może edytować dokumenty'],
+            ['name' => 'Usuwanie dokumentów', 'slug' => 'documents.delete', 'model' => 'documents', 'action' => 'delete', 'description' => 'Może usuwać dokumenty'],
+
+            // Employee Documents (Dokumenty pracowników)
+            ['name' => 'Przeglądanie dokumentów pracowników', 'slug' => 'employee-documents.viewAny', 'model' => 'employee-documents', 'action' => 'viewAny', 'description' => 'Może przeglądać listę dokumentów pracowników'],
+            ['name' => 'Tworzenie dokumentów pracowników', 'slug' => 'employee-documents.create', 'model' => 'employee-documents', 'action' => 'create', 'description' => 'Może tworzyć nowe dokumenty pracowników'],
+            ['name' => 'Edycja dokumentów pracowników', 'slug' => 'employee-documents.update', 'model' => 'employee-documents', 'action' => 'update', 'description' => 'Może edytować dokumenty pracowników'],
+            ['name' => 'Usuwanie dokumentów pracowników', 'slug' => 'employee-documents.delete', 'model' => 'employee-documents', 'action' => 'delete', 'description' => 'Może usuwać dokumenty pracowników'],
+
+            // Employee Rates (Stawki pracowników)
+            ['name' => 'Przeglądanie stawek pracowników', 'slug' => 'employee-rates.viewAny', 'model' => 'employee-rates', 'action' => 'viewAny', 'description' => 'Może przeglądać listę stawek pracowników'],
+            ['name' => 'Szczegóły stawki pracownika', 'slug' => 'employee-rates.view', 'model' => 'employee-rates', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły stawki pracownika'],
+            ['name' => 'Tworzenie stawek pracowników', 'slug' => 'employee-rates.create', 'model' => 'employee-rates', 'action' => 'create', 'description' => 'Może tworzyć nowe stawki pracowników'],
+            ['name' => 'Edycja stawek pracowników', 'slug' => 'employee-rates.update', 'model' => 'employee-rates', 'action' => 'update', 'description' => 'Może edytować stawki pracowników'],
+            ['name' => 'Usuwanie stawek pracowników', 'slug' => 'employee-rates.delete', 'model' => 'employee-rates', 'action' => 'delete', 'description' => 'Może usuwać stawki pracowników'],
+
+            // Fixed Costs (Koszty stałe)
+            ['name' => 'Przeglądanie kosztów stałych', 'slug' => 'fixed-costs.viewAny', 'model' => 'fixed-costs', 'action' => 'viewAny', 'description' => 'Może przeglądać listę kosztów stałych'],
+            ['name' => 'Szczegóły kosztu stałego', 'slug' => 'fixed-costs.view', 'model' => 'fixed-costs', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły kosztu stałego'],
+            ['name' => 'Tworzenie kosztów stałych', 'slug' => 'fixed-costs.create', 'model' => 'fixed-costs', 'action' => 'create', 'description' => 'Może tworzyć nowe koszty stałe'],
+            ['name' => 'Edycja kosztów stałych', 'slug' => 'fixed-costs.update', 'model' => 'fixed-costs', 'action' => 'update', 'description' => 'Może edytować koszty stałe'],
+            ['name' => 'Usuwanie kosztów stałych', 'slug' => 'fixed-costs.delete', 'model' => 'fixed-costs', 'action' => 'delete', 'description' => 'Może usuwać koszty stałe'],
+
+            // Payrolls (Payroll)
+            ['name' => 'Przeglądanie payroll', 'slug' => 'payrolls.viewAny', 'model' => 'payrolls', 'action' => 'viewAny', 'description' => 'Może przeglądać listę payroll'],
+            ['name' => 'Szczegóły payroll', 'slug' => 'payrolls.view', 'model' => 'payrolls', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły payroll'],
+            ['name' => 'Tworzenie payroll', 'slug' => 'payrolls.create', 'model' => 'payrolls', 'action' => 'create', 'description' => 'Może tworzyć nowe payroll'],
+            ['name' => 'Edycja payroll', 'slug' => 'payrolls.update', 'model' => 'payrolls', 'action' => 'update', 'description' => 'Może edytować payroll'],
+            ['name' => 'Usuwanie payroll', 'slug' => 'payrolls.delete', 'model' => 'payrolls', 'action' => 'delete', 'description' => 'Może usuwać payroll'],
+
+            // Project Variable Costs (Koszty zmienne projektów)
+            ['name' => 'Przeglądanie kosztów zmiennych projektów', 'slug' => 'project-variable-costs.viewAny', 'model' => 'project-variable-costs', 'action' => 'viewAny', 'description' => 'Może przeglądać listę kosztów zmiennych projektów'],
+            ['name' => 'Szczegóły kosztu zmiennego projektu', 'slug' => 'project-variable-costs.view', 'model' => 'project-variable-costs', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły kosztu zmiennego projektu'],
+            ['name' => 'Tworzenie kosztów zmiennych projektów', 'slug' => 'project-variable-costs.create', 'model' => 'project-variable-costs', 'action' => 'create', 'description' => 'Może tworzyć nowe koszty zmienne projektów'],
+            ['name' => 'Edycja kosztów zmiennych projektów', 'slug' => 'project-variable-costs.update', 'model' => 'project-variable-costs', 'action' => 'update', 'description' => 'Może edytować koszty zmienne projektów'],
+            ['name' => 'Usuwanie kosztów zmiennych projektów', 'slug' => 'project-variable-costs.delete', 'model' => 'project-variable-costs', 'action' => 'delete', 'description' => 'Może usuwać koszty zmienne projektów'],
+
+            // Rotations (Rotacje)
+            ['name' => 'Przeglądanie rotacji', 'slug' => 'rotations.viewAny', 'model' => 'rotations', 'action' => 'viewAny', 'description' => 'Może przeglądać listę rotacji'],
+            ['name' => 'Szczegóły rotacji', 'slug' => 'rotations.view', 'model' => 'rotations', 'action' => 'view', 'description' => 'Może zobaczyć szczegóły rotacji'],
+            ['name' => 'Tworzenie rotacji', 'slug' => 'rotations.create', 'model' => 'rotations', 'action' => 'create', 'description' => 'Może tworzyć nowe rotacje'],
+            ['name' => 'Edycja rotacji', 'slug' => 'rotations.update', 'model' => 'rotations', 'action' => 'update', 'description' => 'Może edytować rotacje'],
+            ['name' => 'Usuwanie rotacji', 'slug' => 'rotations.delete', 'model' => 'rotations', 'action' => 'delete', 'description' => 'Może usuwać rotacje'],
 
         ];
 

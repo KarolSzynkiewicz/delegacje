@@ -16,8 +16,6 @@ class UserRoleController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', Role::class);
-        
         $userRoles = Role::with('permissions')->orderBy('name')->get();
         return view('user-roles.index', compact('userRoles'));
     }
@@ -27,8 +25,6 @@ class UserRoleController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', Role::class);
-        
         $permissions = Permission::orderBy('name')->get();
         return view('user-roles.create', compact('permissions'));
     }
@@ -38,8 +34,6 @@ class UserRoleController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', Role::class);
-        
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name',
             'permissions' => 'nullable|array',
@@ -64,8 +58,6 @@ class UserRoleController extends Controller
      */
     public function show(Role $userRole): View
     {
-        $this->authorize('view', $userRole);
-        
         $userRole->load(['permissions', 'users']);
         
         return view('user-roles.show', compact('userRole'));
@@ -76,8 +68,6 @@ class UserRoleController extends Controller
      */
     public function edit(Role $userRole): View
     {
-        $this->authorize('update', $userRole);
-        
         $permissions = Permission::orderBy('name')->get();
         $userRole->load('permissions');
         
@@ -89,8 +79,6 @@ class UserRoleController extends Controller
      */
     public function update(Request $request, Role $userRole): RedirectResponse
     {
-        $this->authorize('update', $userRole);
-        
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name,' . $userRole->id,
             'permissions' => 'nullable|array',
@@ -116,8 +104,6 @@ class UserRoleController extends Controller
      */
     public function destroy(Role $userRole): RedirectResponse
     {
-        $this->authorize('delete', $userRole);
-        
         // Sprawdź czy rola nie jest przypisana do użytkowników
         if ($userRole->users()->count() > 0) {
             return redirect()->route('user-roles.index')
@@ -134,8 +120,6 @@ class UserRoleController extends Controller
      */
     public function updatePermissions(Request $request, Role $userRole): \Illuminate\Http\JsonResponse
     {
-        $this->authorize('update', $userRole);
-
         // Administrator nie może mieć zmienianych uprawnień
         if ($userRole->name === 'administrator') {
             return response()->json([

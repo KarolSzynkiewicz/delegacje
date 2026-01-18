@@ -68,8 +68,23 @@
                                 'demands' => 'Zapotrzebowania',
                                 'reports' => 'Raporty',
                                 'weekly-overview' => 'Planer tygodniowy',
+                                'profitability' => 'Dashboard rentowności',
                                 'user-roles' => 'Role użytkowników',
                                 'users' => 'Użytkownicy',
+                                'logistics-events' => 'Zdarzenia logistyczne',
+                                'equipment' => 'Sprzęt',
+                                'equipment-issues' => 'Wydania sprzętu',
+                                'transport-costs' => 'Koszty transportu',
+                                'time-logs' => 'Ewidencje godzin',
+                                'adjustments' => 'Kary i nagrody',
+                                'advances' => 'Zaliczki',
+                                'documents' => 'Dokumenty',
+                                'employee-documents' => 'Dokumenty pracowników',
+                                'employee-rates' => 'Stawki pracowników',
+                                'fixed-costs' => 'Koszty stałe',
+                                'payrolls' => 'Payroll',
+                                'project-variable-costs' => 'Koszty zmienne projektów',
+                                'rotations' => 'Rotacje',
                             ];
                             
                             $groupedPermissions = [];

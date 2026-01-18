@@ -14,7 +14,7 @@
     @forelse ($demands as $projectId => $projectDemands)
         @php
             $project = $projectDemands->first()->project;
-            $sortedDemands = $projectDemands->sortBy('date_from');
+            $sortedDemands = $projectDemands->sortBy('start_date');
         @endphp
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white border-bottom">
@@ -46,9 +46,9 @@
                                     </td>
                                     <td>
                                         <small class="text-muted">
-                                            {{ $demand->date_from->format('Y-m-d') }}
-                                            @if($demand->date_to)
-                                                - {{ $demand->date_to->format('Y-m-d') }}
+                                            {{ $demand->start_date->format('Y-m-d') }}
+                                            @if($demand->end_date)
+                                                - {{ $demand->end_date->format('Y-m-d') }}
                                             @else
                                                 - ...
                                             @endif

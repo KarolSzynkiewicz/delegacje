@@ -28,8 +28,6 @@ class TimeLogController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', TimeLog::class);
-        
         return view('time-logs.index');
     }
 
@@ -38,8 +36,6 @@ class TimeLogController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', TimeLog::class);
-
         $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->whereIn('status', [AssignmentStatus::ACTIVE, AssignmentStatus::IN_TRANSIT, AssignmentStatus::AT_BASE])
             ->orderBy('start_date', 'desc')
@@ -53,8 +49,6 @@ class TimeLogController extends Controller
      */
     public function store(StoreTimeLogRequest $request): RedirectResponse
     {
-        $this->authorize('create', TimeLog::class);
-
         try {
             $validated = $request->validated();
             $assignment = ProjectAssignment::findOrFail($validated['project_assignment_id']);
@@ -84,8 +78,6 @@ class TimeLogController extends Controller
      */
     public function show(TimeLog $timeLog): View
     {
-        $this->authorize('view', $timeLog);
-
         $timeLog->load('projectAssignment.employee', 'projectAssignment.project', 'projectAssignment.role');
         
         return view('time-logs.show', compact('timeLog'));
@@ -96,8 +88,6 @@ class TimeLogController extends Controller
      */
     public function edit(TimeLog $timeLog): View
     {
-        $this->authorize('update', $timeLog);
-
         $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->whereIn('status', [AssignmentStatus::ACTIVE, AssignmentStatus::IN_TRANSIT, AssignmentStatus::AT_BASE])
             ->orderBy('start_date', 'desc')
@@ -111,8 +101,6 @@ class TimeLogController extends Controller
      */
     public function update(UpdateTimeLogRequest $request, TimeLog $timeLog): RedirectResponse
     {
-        $this->authorize('update', $timeLog);
-
         try {
             $validated = $request->validated();
             $workDate = Carbon::parse($validated['work_date']);
@@ -141,8 +129,6 @@ class TimeLogController extends Controller
      */
     public function destroy(TimeLog $timeLog): RedirectResponse
     {
-        $this->authorize('delete', $timeLog);
-
         $timeLog->delete();
 
         return redirect()
@@ -155,8 +141,6 @@ class TimeLogController extends Controller
      */
     public function byAssignment(ProjectAssignment $assignment): View
     {
-        $this->authorize('viewAny', TimeLog::class);
-
         $timeLogs = $assignment->timeLogs()
             ->orderBy('start_time', 'desc')
             ->get();
@@ -169,8 +153,6 @@ class TimeLogController extends Controller
      */
     public function monthlyGrid(Request $request): View
     {
-        $this->authorize('viewAny', TimeLog::class);
-
         $month = $request->query('month', Carbon::now()->format('Y-m'));
         $data = $this->timeLogService->getMonthlyGridData($month);
 
@@ -182,8 +164,6 @@ class TimeLogController extends Controller
      */
     public function bulkUpdate(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
-        $this->authorize('create', TimeLog::class);
-
         // Convert form data to entries array format
         $entries = [];
         $formEntries = $request->input('entries', []);

@@ -22,8 +22,6 @@ class ReturnTripController extends Controller
      */
     public function index()
     {
-        $this->authorize('viewAny', LogisticsEvent::class);
-
         $returnTrips = LogisticsEvent::where('type', 'return')
             ->with(['vehicle', 'fromLocation', 'toLocation', 'creator', 'participants.employee'])
             ->orderBy('event_date', 'desc')
@@ -37,8 +35,6 @@ class ReturnTripController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', LogisticsEvent::class);
-
         // Get employees with active assignments
         $employees = $this->assignmentQueryService->getEmployeesWithActiveAssignments(Carbon::now());
 
@@ -56,8 +52,6 @@ class ReturnTripController extends Controller
      */
     public function prepareFromForm(Request $request)
     {
-        $this->authorize('create', LogisticsEvent::class);
-
         $validated = $request->validate([
             'vehicle_id' => 'nullable|exists:vehicles,id',
             'employee_ids' => 'required|array|min:1',
@@ -77,8 +71,6 @@ class ReturnTripController extends Controller
      */
     public function prepare(Request $request)
     {
-        $this->authorize('create', LogisticsEvent::class);
-
         // If no data provided, redirect to create form
         if (!$request->has('employee_ids') && !$request->old('employee_ids')) {
             return redirect()->route('return-trips.create')
@@ -142,8 +134,6 @@ class ReturnTripController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', LogisticsEvent::class);
-
         $validated = $request->validate([
             'notes' => 'nullable|string|max:1000',
             'accept_consequences' => 'required|accepted',
@@ -165,7 +155,6 @@ class ReturnTripController extends Controller
             $existingEvent = null;
             if (isset($validated['return_trip_id'])) {
                 $existingEvent = LogisticsEvent::findOrFail($validated['return_trip_id']);
-                $this->authorize('update', $existingEvent);
                 
                 // Only allow updating if status is PLANNED
                 if ($existingEvent->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
@@ -203,8 +192,6 @@ class ReturnTripController extends Controller
      */
     public function show(LogisticsEvent $returnTrip)
     {
-        $this->authorize('view', $returnTrip);
-
         $returnTrip->load([
             'vehicle',
             'fromLocation',
@@ -229,8 +216,6 @@ class ReturnTripController extends Controller
      */
     public function edit(LogisticsEvent $returnTrip)
     {
-        $this->authorize('update', $returnTrip);
-
         // Only allow editing if status is PLANNED
         if ($returnTrip->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
             return redirect()
@@ -257,8 +242,6 @@ class ReturnTripController extends Controller
      */
     public function update(Request $request, LogisticsEvent $returnTrip)
     {
-        $this->authorize('update', $returnTrip);
-
         // Only allow updating if status is PLANNED
         if ($returnTrip->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
             return redirect()
@@ -314,8 +297,6 @@ class ReturnTripController extends Controller
      */
     public function cancel(LogisticsEvent $returnTrip)
     {
-        $this->authorize('update', $returnTrip);
-
         // Only allow cancellation if status is PLANNED
         if ($returnTrip->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
             return redirect()

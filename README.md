@@ -2,6 +2,21 @@
 
 **Stocznia** to aplikacja webowa stworzona w oparciu o framework **Laravel**, zaprojektowana do zarządzania kluczowymi aspektami logistyki i zasobów ludzkich w firmie delegującej pracowników.
 
+## 🔐 System Autoryzacji
+
+Aplikacja wykorzystuje **dynamiczny system autoryzacji** oparty na **Spatie Laravel Permission**. Zamiast tradycyjnych Policy, system używa middleware do automatycznego sprawdzania uprawnień na podstawie route i metody HTTP.
+
+**Kluczowe cechy:**
+- ✅ Dynamiczne sprawdzanie uprawnień przez middleware
+- ✅ Zarządzanie uprawnieniami przez UI (tabelka w edycji roli)
+- ✅ Cache uprawnień (24h) dla wydajności
+- ✅ Administratorzy mają pełny dostęp
+- ✅ Brak potrzeby pisania Policy dla każdego modelu
+
+**Szczegółowa dokumentacja:** Zobacz [authorization.readme.md](authorization.readme.md) dla pełnego opisu działania systemu autoryzacji.
+
+---
+
 ## 🚀 Funkcjonalności
 
 Aplikacja oferuje następujące moduły:

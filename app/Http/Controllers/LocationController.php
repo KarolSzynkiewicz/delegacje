@@ -15,7 +15,6 @@ class LocationController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('viewAny', Location::class);
         $locations = Location::all();
         return view('locations.index', compact('locations'));
     }
@@ -25,7 +24,6 @@ class LocationController extends Controller
      */
     public function create(): View
     {
-        $this->authorize('create', Location::class);
         return view('locations.create');
     }
 
@@ -34,7 +32,6 @@ class LocationController extends Controller
      */
     public function store(StoreLocationRequest $request): RedirectResponse
     {
-        $this->authorize('create', Location::class);
         
         $validated = $request->validated();
         $isBase = $request->has('is_base') && $request->input('is_base') == '1';
@@ -59,7 +56,6 @@ class LocationController extends Controller
      */
     public function show(Location $location): View
     {
-        $this->authorize('view', $location);
         $location->load('projects');
         return view('locations.show', compact('location'));
     }
@@ -69,7 +65,6 @@ class LocationController extends Controller
      */
     public function edit(Location $location): View
     {
-        $this->authorize('update', $location);
         return view('locations.edit', compact('location'));
     }
 
@@ -78,7 +73,6 @@ class LocationController extends Controller
      */
     public function update(UpdateLocationRequest $request, Location $location): RedirectResponse
     {
-        $this->authorize('update', $location);
         
         $validated = $request->validated();
         $isBase = $request->has('is_base') && $request->input('is_base') == '1';
@@ -104,7 +98,6 @@ class LocationController extends Controller
      */
     public function destroy(Location $location): RedirectResponse
     {
-        $this->authorize('delete', $location);
         
         $location->delete();
 

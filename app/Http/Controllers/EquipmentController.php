@@ -13,8 +13,6 @@ class EquipmentController extends Controller
      */
     public function index()
     {
-        $this->authorize('viewAny', Equipment::class);
-
         $equipment = Equipment::with('requirements.role')
             ->orderBy('name')
             ->paginate(20);
@@ -27,8 +25,6 @@ class EquipmentController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', Equipment::class);
-
         return view('equipment.create');
     }
 
@@ -37,8 +33,6 @@ class EquipmentController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', Equipment::class);
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -62,8 +56,6 @@ class EquipmentController extends Controller
      */
     public function show(Equipment $equipment)
     {
-        $this->authorize('view', $equipment);
-
         $equipment->load('requirements.role', 'issues.employee', 'issues.projectAssignment');
 
         return view('equipment.show', compact('equipment'));
@@ -74,8 +66,6 @@ class EquipmentController extends Controller
      */
     public function edit(Equipment $equipment)
     {
-        $this->authorize('update', $equipment);
-
         $roles = Role::orderBy('name')->get();
 
         return view('equipment.edit', compact('equipment', 'roles'));
@@ -86,8 +76,6 @@ class EquipmentController extends Controller
      */
     public function update(Request $request, Equipment $equipment)
     {
-        $this->authorize('update', $equipment);
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -111,8 +99,6 @@ class EquipmentController extends Controller
      */
     public function destroy(Equipment $equipment)
     {
-        $this->authorize('delete', $equipment);
-
         $equipment->delete();
 
         return redirect()
