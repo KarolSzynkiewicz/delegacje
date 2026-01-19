@@ -7,6 +7,7 @@
                 <x-ui.button 
                     variant="primary"
                     href="{{ route('equipment.create') }}"
+                    routeName="equipment.create"
                     action="create"
                 >
                     Dodaj Sprzęt
@@ -79,6 +80,7 @@
                         <x-ui.button 
                             variant="primary" 
                             href="{{ route('equipment.create') }}"
+                            routeName="equipment.create"
                             action="create"
                         >
                             Dodaj pierwszy sprzęt

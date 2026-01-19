@@ -76,9 +76,9 @@ Layout `app-layout` już zawiera:
             <!-- Opcjonalnie: przyciski po prawej (np. Create) -->
             <x-ui.button 
                 variant="primary"
-                href="{{ route('create') }}"
+                href="{{ route('equipment.create') }}"
+                routeName="equipment.create"
                 action="create"
-                permission="resource.create"
             >
                 Dodaj
             </x-ui.button>
@@ -156,19 +156,34 @@ Layout `app-layout` już zawiera:
 - Użyj prop `action` zamiast ręcznego dodawania `<i class="bi...">`
 - Komponent automatycznie dodaje odpowiednią ikonę na podstawie `ButtonAction` enum
 
-**Obsługa uprawnień:**
-- Użyj prop `permission` - komponent automatycznie sprawdza uprawnienia
+**Automatyczne generowanie uprawnień:**
+- Jeśli podasz `routeName`, komponent automatycznie generuje uprawnienie z route name
+- Nie musisz ręcznie sprawdzać uprawnień w widoku - komponent robi to za Ciebie
 - Jeśli użytkownik nie ma dostępu, przycisk nie jest renderowany
+
+**Logika generowania uprawnień:**
+- `equipment.create` → `equipment.create`
+- `equipment.edit` → `equipment.update` (mapowanie edit → update)
+- `equipment.destroy` → `equipment.delete` (mapowanie destroy → delete)
+- `equipment.index` → `equipment.view` (mapowanie index → view)
+- `equipment.show` → `equipment.view` (mapowanie show → view)
+- `projects.assignments.create` → `assignments.create` (nested routes)
 
 **Przykłady:**
 
 ```blade
-<!-- Z automatyczną ikoną -->
-<x-ui.button variant="primary" href="{{ route('create') }}" action="create">
-    Dodaj
+<!-- Z automatyczną ikoną i automatycznym uprawnieniem -->
+<x-ui.button 
+    variant="primary" 
+    href="{{ route('equipment.create') }}" 
+    routeName="equipment.create"
+    action="create"
+>
+    Dodaj Sprzęt
 </x-ui.button>
+<!-- Komponent automatycznie sprawdza uprawnienie: equipment.create -->
 
-<!-- Z uprawnieniami -->
+<!-- Z ręcznym uprawnieniem (gdy route name nie wystarcza) -->
 <x-ui.button 
     variant="danger" 
     href="{{ route('destroy', $item) }}" 
@@ -178,9 +193,9 @@ Layout `app-layout` już zawiera:
     Usuń
 </x-ui.button>
 
-<!-- Bez ikony (tylko tekst) -->
-<x-ui.button variant="ghost" href="{{ route('index') }}">
-    Anuluj
+<!-- Bez uprawnień (zawsze widoczny) -->
+<x-ui.button variant="ghost" href="{{ route('index') }}" action="back">
+    Powrót
 </x-ui.button>
 ```
 
@@ -261,22 +276,38 @@ Layout `app-layout` już zawiera:
 
 ### Automatyczne Sprawdzanie Uprawnień
 
-Zamiast warunków w widokach:
+**Przed (z warunkami w widokach):**
 ```blade
-@if(auth()->user()->hasPermission('resource.create'))
-    <x-ui.button>...</x-ui.button>
+@if(auth()->user()->hasPermission('equipment.create'))
+    <x-ui.button href="{{ route('equipment.create') }}">
+        <i class="bi bi-plus-circle"></i> Dodaj
+    </x-ui.button>
 @endif
 ```
 
-Użyj prop `permission`:
+**Po (automatyczne generowanie z routeName):**
 ```blade
-<x-ui.button permission="resource.create">...</x-ui.button>
+<x-ui.button 
+    href="{{ route('equipment.create') }}"
+    routeName="equipment.create"
+    action="create"
+>
+    Dodaj
+</x-ui.button>
 ```
 
+**Jak to działa:**
+1. Komponent automatycznie generuje uprawnienie z `routeName`: `equipment.create` → `equipment.create`
+2. Sprawdza czy użytkownik ma uprawnienie
+3. Jeśli nie ma - przycisk nie jest renderowany
+4. Ikona jest dodawana automatycznie na podstawie `action="create"`
+
 **Korzyści:**
-- Mniej kodu w widokach
-- Centralne zarządzanie logiką uprawnień
-- Czytelność - widok deklaruje intencję, komponent obsługuje logikę
+- **Zero warunków w widokach** - komponent sam sprawdza uprawnienia
+- **Automatyczne ikony** - nie trzeba ręcznie dodawać `<i class="bi...">`
+- **Automatyczne generowanie uprawnień** - nie trzeba ręcznie podawać `permission`
+- **Centralne zarządzanie** - logika w komponencie, nie w widokach
+- **Czytelność** - widok deklaruje intencję (`routeName`, `action`), komponent obsługuje resztę
 
 ## Przykład: Pełny Modelowy Widok
 
@@ -288,8 +319,8 @@ Użyj prop `permission`:
                 <x-ui.button 
                     variant="primary"
                     href="{{ route('equipment.create') }}"
+                    routeName="equipment.create"
                     action="create"
-                    permission="equipment.create"
                 >
                     Dodaj Sprzęt
                 </x-ui.button>
@@ -360,7 +391,8 @@ Użyj prop `permission`:
 - [ ] Używa `x-ui.empty-state` dla pustych stanów
 - [ ] Nie ma zbędnych wrapperów (`container-xxl`, `py-4`)
 - [ ] `th` nie mają `class="text-start"` (ustawione globalnie)
-- [ ] Używa prop `permission` zamiast `@if(auth()->user()->hasPermission(...))`
+- [ ] Używa prop `routeName` dla automatycznego generowania uprawnień (lub `permission` jeśli potrzebne ręczne)
+- [ ] Brak warunków `@if(auth()->user()->hasPermission(...))` w widokach
 - [ ] Tylko Bootstrap layout classes (row, col, d-flex, etc.)
 - [ ] Brak inline styles (poza koniecznymi przypadkami)
 
