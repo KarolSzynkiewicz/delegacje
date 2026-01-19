@@ -1,28 +1,33 @@
 <x-app-layout>
+    
     <x-slot name="header">
-        <x-ui.page-header 
-            title="Sprzęt"
-            primaryActionLabel="Dodaj Sprzęt"
-            primaryActionHref="{{ route('equipment.create') }}"
-            primaryActionAction="create"
-        />
+        <x-ui.page-header title="Sprzęt">
+
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary"
+                    href="{{ route('equipment.create') }}"
+                    action="create"
+                >
+                    Dodaj Sprzęt
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <x-ui.card>
+    <x-ui.card>
                 @if($equipment->count() > 0)
                     <div class="table-responsive">
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th class="text-start">Nazwa</th>
-                                    <th class="text-start">Kategoria</th>
-                                    <th class="text-start">W magazynie</th>
-                                    <th class="text-start">Dostępne</th>
-                                    <th class="text-start">Min. ilość</th>
-                                    <th class="text-start">Status</th>
-                                    <th class="text-start">Akcje</th>
+                                    <th>Nazwa</th>
+                                    <th>Kategoria</th>
+                                    <th>W magazynie</th>
+                                    <th>Dostępne</th>
+                                    <th>Min. ilość</th>
+                                    <th>Status</th>
+                                    <th>Akcje</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -80,7 +85,5 @@
                         </x-ui.button>
                     </x-ui.empty-state>
                 @endif
-            </x-ui.card>
-        </div>
-    </div>
+    </x-ui.card>
 </x-app-layout>

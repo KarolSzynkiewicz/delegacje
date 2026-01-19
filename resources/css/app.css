@@ -505,6 +505,7 @@ textarea.form-control {
     letter-spacing: 0.05em;
     border: none !important;
     background: transparent !important;
+    text-align: start !important;
 }
 .table tbody tr {
     background: rgba(255, 255, 255, 0.03) !important;

@@ -7,6 +7,7 @@
     'type' => 'button',
     'href' => null,
     'action' => null, // create, edit, save, delete, back, view, etc. - automatyczna ikona (string lub ButtonAction enum)
+    'permission' => null, // Nazwa uprawnienia - jeśli ustawione, przycisk jest renderowany tylko gdy użytkownik ma uprawnienie
 ])
 
 @php
@@ -35,9 +36,19 @@
     $icon = $buttonAction?->icon();
     $hasIcon = $icon !== null;
     $hasSlotContent = $slot->isNotEmpty();
+    
+    // Sprawdź uprawnienia - jeśli ustawione i użytkownik nie ma dostępu, nie renderuj przycisku
+    $hasPermission = true;
+    if ($permission && auth()->check()) {
+        $hasPermission = auth()->user()->hasPermission($permission);
+    } elseif ($permission && !auth()->check()) {
+        $hasPermission = false;
+    }
 @endphp
 
-@if($href)
+@if(!$hasPermission)
+    {{-- Użytkownik nie ma uprawnienia - nie renderuj przycisku --}}
+@elseif($href)
     <a href="{{ $href }}" {{ $attributes->merge(['class' => $classes]) }}>
         @if($hasIcon && $hasSlotContent)
             <i class="{{ $icon }} me-1"></i>
