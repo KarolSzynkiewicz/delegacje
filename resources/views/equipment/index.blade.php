@@ -47,19 +47,12 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if(auth()->user()->hasPermission('equipment.delete'))
-                                                <x-action-buttons
-                                                    viewRoute="{{ route('equipment.show', $item) }}"
-                                                    editRoute="{{ route('equipment.edit', $item) }}"
-                                                    deleteRoute="{{ route('equipment.destroy', $item) }}"
-                                                    deleteMessage="Czy na pewno chcesz usunąć ten sprzęt?"
-                                                />
-                                            @else
-                                                <x-action-buttons
-                                                    viewRoute="{{ route('equipment.show', $item) }}"
-                                                    editRoute="{{ route('equipment.edit', $item) }}"
-                                                />
-                                            @endif
+                                            <x-action-buttons
+                                                viewRoute="{{ route('equipment.show', $item) }}"
+                                                editRoute="{{ route('equipment.edit', $item) }}"
+                                                deleteRoute="{{ route('equipment.destroy', $item) }}"
+                                                deleteMessage="Czy na pewno chcesz usunąć ten sprzęt?"
+                                            />
                                         </td>
                                     </tr>
                                 @endforeach

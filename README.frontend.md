@@ -272,6 +272,71 @@ Layout `app-layout` już zawiera:
 </x-ui.empty-state>
 ```
 
+### `x-action-buttons`
+
+**Automatyczne wyciąganie resource:**
+- Komponent automatycznie wyciąga `resource` z route name (np. `equipment.show` → `equipment`)
+- Nie musisz podawać `resource` prop - komponent sam to wykryje z `viewRoute`
+- Działa dla wszystkich widoków bez konieczności zmian
+
+**Automatyczne ikony i uprawnienia:**
+- Wszystkie przyciski używają `x-ui.button` z automatycznymi ikonami (`action="view"`, `action="edit"`, `action="delete"`)
+- Uprawnienia są automatycznie generowane z route names
+- Jeśli użytkownik nie ma uprawnienia, przycisk nie jest renderowany
+
+**Użycie:**
+```blade
+<x-action-buttons
+    viewRoute="{{ route('equipment.show', $item) }}"
+    editRoute="{{ route('equipment.edit', $item) }}"
+    deleteRoute="{{ route('equipment.destroy', $item) }}"
+    deleteMessage="Czy na pewno chcesz usunąć ten element?"
+/>
+```
+
+**Jak to działa:**
+1. Komponent wyciąga route name z `viewRoute` używając Route facade
+2. Wyciąga resource z route name (np. `equipment.show` → `equipment`)
+3. Generuje route names dla wszystkich przycisków: `equipment.show`, `equipment.edit`, `equipment.destroy`
+4. Przekazuje route names do `x-ui.button` dla automatycznego generowania uprawnień
+5. `x-ui.button` automatycznie sprawdza uprawnienia i renderuje ikony
+
+**Opcjonalne propsy:**
+- `resource` - można podać ręcznie, jeśli automatyczne wykrywanie nie działa (np. dla nested routes)
+- `size` - `sm`, `null`, `lg` (domyślnie `sm`)
+- `deleteMessage` - komunikat potwierdzenia usunięcia
+
+**Przed (z warunkami i ręcznymi ikonami):**
+```blade
+@if(auth()->user()->hasPermission('equipment.delete'))
+    <x-action-buttons
+        viewRoute="..."
+        editRoute="..."
+        deleteRoute="..."
+    />
+@else
+    <x-action-buttons
+        viewRoute="..."
+        editRoute="..."
+    />
+@endif
+```
+
+**Po (automatyczne):**
+```blade
+<x-action-buttons
+    viewRoute="{{ route('equipment.show', $item) }}"
+    editRoute="{{ route('equipment.edit', $item) }}"
+    deleteRoute="{{ route('equipment.destroy', $item) }}"
+/>
+```
+
+**Korzyści:**
+- **Zero warunków w widokach** - komponent sam sprawdza uprawnienia
+- **Automatyczne ikony** - nie trzeba ręcznie dodawać `<i class="bi...">`
+- **Automatyczne wykrywanie resource** - nie trzeba podawać `resource` prop
+- **Działa dla wszystkich widoków** - bez konieczności zmian w istniejących widokach
+
 ## System Uprawnień w Komponentach
 
 ### Automatyczne Sprawdzanie Uprawnień
@@ -351,6 +416,7 @@ Layout `app-layout` już zawiera:
                                         viewRoute="{{ route('equipment.show', $item) }}"
                                         editRoute="{{ route('equipment.edit', $item) }}"
                                         deleteRoute="{{ route('equipment.destroy', $item) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć ten sprzęt?"
                                     />
                                 </td>
                             </tr>
@@ -392,6 +458,7 @@ Layout `app-layout` już zawiera:
 - [ ] Nie ma zbędnych wrapperów (`container-xxl`, `py-4`)
 - [ ] `th` nie mają `class="text-start"` (ustawione globalnie)
 - [ ] Używa prop `routeName` dla automatycznego generowania uprawnień (lub `permission` jeśli potrzebne ręczne)
+- [ ] Używa `x-action-buttons` zamiast ręcznych przycisków akcji (automatyczne wykrywanie resource)
 - [ ] Brak warunków `@if(auth()->user()->hasPermission(...))` w widokach
 - [ ] Tylko Bootstrap layout classes (row, col, d-flex, etc.)
 - [ ] Brak inline styles (poza koniecznymi przypadkami)
