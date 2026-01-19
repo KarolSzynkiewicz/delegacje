@@ -1,20 +1,29 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Lokalizacja: {{ $location->name }}</h2>
-            <div class="d-flex gap-2">
-                <x-edit-button href="{{ route('locations.edit', $location) }}" />
-                <a href="{{ route('locations.index') }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-arrow-left"></i> Powrót
-                </a>
-            </div>
-        </div>
+        <x-ui.page-header title="Lokalizacja: {{ $location->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('locations.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('locations.edit', $location) }}"
+                    routeName="locations.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
+    <x-ui.card label="Informacje podstawowe">
                     <div class="row g-4">
                         <div class="col-md-6">
                             <h5 class="fw-bold text-dark mb-2">Nazwa</h5>
@@ -33,7 +42,7 @@
                         <div class="col-md-6">
                             <h5 class="fw-bold text-dark mb-2">Baza</h5>
                             @if($location->is_base)
-                                <span class="badge bg-success">Tak - Lokalizacja jest bazą</span>
+                                <x-ui.badge variant="success">Tak - Lokalizacja jest bazą</x-ui.badge>
                             @else
                                 <span class="text-muted">Nie</span>
                             @endif
@@ -70,22 +79,19 @@
                         @endif
                     </div>
 
-                    @if($location->projects->count() > 0)
-                    <div class="mt-4 pt-4 border-top">
-                        <h5 class="fw-bold text-dark mb-3">Projekty w tej lokalizacji ({{ $location->projects->count() }})</h5>
-                        <ul class="list-group">
-                            @foreach($location->projects as $project)
-                                <li class="list-group-item">
-                                    <a href="{{ route('projects.show', $project) }}" class="text-decoration-none">
-                                        {{ $project->name }}
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                    @endif
-                </div>
-            </div>
+        @if($location->projects->count() > 0)
+        <div class="mt-4 pt-4 border-top">
+            <h5 class="fw-bold text-dark mb-3">Projekty w tej lokalizacji ({{ $location->projects->count() }})</h5>
+            <ul class="list-group">
+                @foreach($location->projects as $project)
+                    <li class="list-group-item">
+                        <a href="{{ route('projects.show', $project) }}" class="text-decoration-none">
+                            {{ $project->name }}
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
         </div>
-    </div>
+        @endif
+    </x-ui.card>
 </x-app-layout>

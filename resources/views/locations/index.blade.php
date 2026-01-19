@@ -1,87 +1,92 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Lokalizacje</h2>
-            <x-ui.button variant="primary" href="{{ route('locations.create') }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Lokalizację
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Lokalizacje">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('locations.create') }}"
+                    routeName="locations.create"
+                    action="create"
+                >
+                    Dodaj Lokalizację
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            @if (session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
+    @if (session('success'))
+        <x-alert type="success" dismissible icon="check-circle">
+            {{ session('success') }}
+        </x-alert>
+    @endif
 
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    @if($locations->count() > 0)
-                        <div class="table-responsive">
-                            <table class="table align-middle">
-                                <thead>
-                                    <tr>
-                                        <th class="text-start">Nazwa</th>
-                                        <th class="text-start">Adres</th>
-                                        <th class="text-start">Miasto</th>
-                                        <th class="text-start">Baza</th>
-                                        <th class="text-start">Kontakt</th>
-                                        <th class="text-start">Akcje</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($locations as $location)
-                                        <tr>
-                                            <td class="fw-medium">{{ $location->name }}</td>
-                                            <td>{{ $location->address }}</td>
-                                            <td>{{ $location->city ?? '-' }}</td>
-                                            <td>
-                                                @if($location->is_base)
-                                                    <span class="badge bg-success">Baza</span>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if($location->contact_person)
-                                                    <div>{{ $location->contact_person }}</div>
-                                                    @if($location->phone)
-                                                        <small class="text-muted d-block">{{ $location->phone }}</small>
-                                                    @endif
-                                                    @if($location->email)
-                                                        <small class="text-muted d-block">{{ $location->email }}</small>
-                                                    @endif
-                                                @else
-                                                    -
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <x-action-buttons
-                                                    viewRoute="{{ route('locations.show', $location) }}"
-                                                    editRoute="{{ route('locations.edit', $location) }}"
-                                                    deleteRoute="{{ route('locations.destroy', $location) }}"
-                                                    deleteMessage="Czy na pewno chcesz usunąć tę lokalizację?"
-                                                />
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <div class="text-center py-5">
-                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                            <p class="text-muted mb-3">Brak lokalizacji w systemie.</p>
-                            <x-ui.button variant="primary" href="{{ route('locations.create') }}">
-                                <i class="bi bi-plus-circle"></i> Dodaj pierwszą lokalizację
-                            </x-ui.button>
-                        </div>
-                    @endif
-                </div>
+    <x-ui.card>
+        @if($locations->count() > 0)
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Adres</th>
+                            <th>Miasto</th>
+                            <th>Baza</th>
+                            <th>Kontakt</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($locations as $location)
+                            <tr>
+                                <td class="fw-medium">{{ $location->name }}</td>
+                                <td>{{ $location->address }}</td>
+                                <td>{{ $location->city ?? '-' }}</td>
+                                <td>
+                                    @if($location->is_base)
+                                        <x-ui.badge variant="success">Baza</x-ui.badge>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($location->contact_person)
+                                        <div>{{ $location->contact_person }}</div>
+                                        @if($location->phone)
+                                            <small class="text-muted d-block">{{ $location->phone }}</small>
+                                        @endif
+                                        @if($location->email)
+                                            <small class="text-muted d-block">{{ $location->email }}</small>
+                                        @endif
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                <td>
+                                    <x-action-buttons
+                                        viewRoute="{{ route('locations.show', $location) }}"
+                                        editRoute="{{ route('locations.edit', $location) }}"
+                                        deleteRoute="{{ route('locations.destroy', $location) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć tę lokalizację?"
+                                    />
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-        </div>
-    </div>
+        @else
+            <x-ui.empty-state 
+                icon="inbox" 
+                message="Brak lokalizacji w systemie."
+            >
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('locations.create') }}"
+                    routeName="locations.create"
+                    action="create"
+                >
+                    Dodaj pierwszą lokalizację
+                </x-ui.button>
+            </x-ui.empty-state>
+        @endif
+    </x-ui.card>
 </x-app-layout>

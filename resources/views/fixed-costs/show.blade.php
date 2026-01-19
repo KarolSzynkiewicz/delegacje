@@ -1,21 +1,29 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Koszt Stały</h2>
-            <div class="d-flex gap-2">
-                <x-ui.button variant="ghost" href="{{ route('fixed-costs.edit', $fixedCost) }}">
-                    <i class="bi bi-pencil"></i> Edytuj
+        <x-ui.page-header title="Koszt Stały">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('fixed-costs.index') }}"
+                    action="back"
+                >
+                    Powrót
                 </x-ui.button>
-                <x-ui.button variant="ghost" href="{{ route('fixed-costs.index') }}">
-                    <i class="bi bi-arrow-left"></i> Powrót
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('fixed-costs.edit', $fixedCost) }}"
+                    routeName="fixed-costs.edit"
+                    action="edit"
+                >
+                    Edytuj
                 </x-ui.button>
-            </div>
-        </div>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <x-ui.card>
+    <x-ui.card>
                 <x-ui.detail-list>
                     <x-ui.detail-item label="Nazwa:">{{ $fixedCost->name }}</x-ui.detail-item>
                     <x-ui.detail-item label="Kwota:">
@@ -30,7 +38,5 @@
                         <x-ui.detail-item label="Notatki:" :full-width="true">{{ $fixedCost->notes }}</x-ui.detail-item>
                     @endif
                 </x-ui.detail-list>
-            </x-ui.card>
-        </div>
-    </div>
+    </x-ui.card>
 </x-app-layout>

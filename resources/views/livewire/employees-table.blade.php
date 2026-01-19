@@ -119,16 +119,11 @@
                                 </div>
                             </td>
                             <td class="text-end">
-                                <div class="d-flex gap-2 justify-content-end">
-                                    <x-ui.button variant="ghost" href="{{ route('employees.show', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-eye"></i>
-                                        <span class="d-none d-sm-inline ms-1">Zobacz</span>
-                                    </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route('employees.edit', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-pencil"></i>
-                                        <span class="d-none d-sm-inline ms-1">Edytuj</span>
-                                    </x-ui.button>
-                                </div>
+                                <x-action-buttons
+                                viewRoute="{{ route('employees.show', $employee) }}"
+                                editRoute="{{ route('employees.edit', $employee) }}"
+                                deleteRoute="{{ route('employees.destroy', $employee) }}"
+                            />
                                 <!-- Mobile: Zasoby -->
                                 <div class="d-lg-none mt-2">
                                     <x-ui.button variant="ghost" href="{{ route('employees.vehicles.index', $employee) }}" class="btn-sm me-1">

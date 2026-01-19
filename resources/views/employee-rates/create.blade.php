@@ -1,11 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Dodaj Nową Stawkę</h2>
-            <x-ui.button variant="ghost" href="{{ route('employee-rates.index') }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Dodaj Nową Stawkę">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('employee-rates.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -94,10 +99,18 @@
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Zapisz
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zapisz
                         </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('employee-rates.index') }}">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('employee-rates.index') }}"
+                            action="cancel"
+                        >
                             Anuluj
                         </x-ui.button>
                     </div>

@@ -1,11 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Edytuj Sprzęt: {{ $equipment->name }}</h2>
-            <x-ui.button variant="ghost" href="{{ route('equipment.show', $equipment) }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Edytuj Sprzęt: {{ $equipment->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('equipment.show', $equipment) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -101,11 +106,19 @@
                     </div>
 
                     <div class="d-flex justify-content-end align-items-center gap-2">
-                        <x-ui.button variant="ghost" href="{{ route('equipment.show', $equipment) }}">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('equipment.show', $equipment) }}"
+                            action="cancel"
+                        >
                             Anuluj
                         </x-ui.button>
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Zapisz
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zapisz
                         </x-ui.button>
                     </div>
                 </form>

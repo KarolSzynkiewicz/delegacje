@@ -1,4 +1,18 @@
 <x-app-layout>
+    <x-slot name="header">
+        <x-ui.page-header title="Edytuj Przypisanie">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('assignments.show', $assignment) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
+    </x-slot>
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Przypisanie">
@@ -163,10 +177,20 @@
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Aktualizuj
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Aktualizuj
                         </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('project-assignments.index') }}">Anuluj</x-ui.button>
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('project-assignments.index') }}"
+                            action="cancel"
+                        >
+                            Anuluj
+                        </x-ui.button>
                     </div>
                 </form>
             </x-ui.card>

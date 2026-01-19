@@ -1,26 +1,32 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Zjazdy</h2>
-            <x-ui.button variant="primary" href="{{ route('return-trips.create') }}">
-                <i class="bi bi-plus-circle"></i> Utwórz Zjazd
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Zjazdy">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('return-trips.create') }}"
+                    routeName="return-trips.create"
+                    action="create"
+                >
+                    Utwórz Zjazd
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <x-ui.card>
         @if($returnTrips->count() > 0)
             <div class="table-responsive">
-                <table class="table">
+                <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th class="text-start">Data</th>
-                            <th class="text-start">Pojazd</th>
-                            <th class="text-start">Z</th>
-                            <th class="text-start">Do</th>
-                            <th class="text-start">Uczestnicy</th>
-                            <th class="text-start">Status</th>
-                            <th class="text-end">Akcje</th>
+                            <th>Data</th>
+                            <th>Pojazd</th>
+                            <th>Z</th>
+                            <th>Do</th>
+                            <th>Uczestnicy</th>
+                            <th>Status</th>
+                            <th>Akcje</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -43,17 +49,17 @@
                                     @endphp
                                     <x-ui.badge variant="{{ $badgeVariant }}">{{ $trip->status->label() }}</x-ui.badge>
                                 </td>
-                                <td class="text-end">
-                                    <div class="d-flex gap-1 justify-content-end">
-                                        <x-ui.button variant="ghost" href="{{ route('return-trips.show', $trip) }}">
-                                            <i class="bi bi-eye"></i>
-                                        </x-ui.button>
-                                        @if($trip->status === \App\Enums\LogisticsEventStatus::PLANNED)
-                                            <x-ui.button variant="ghost" href="{{ route('return-trips.edit', $trip) }}">
-                                                <i class="bi bi-pencil"></i>
-                                            </x-ui.button>
-                                        @endif
-                                    </div>
+                                <td>
+                                    @if($trip->status === \App\Enums\LogisticsEventStatus::PLANNED)
+                                        <x-action-buttons
+                                            viewRoute="{{ route('return-trips.show', $trip) }}"
+                                            editRoute="{{ route('return-trips.edit', $trip) }}"
+                                        />
+                                    @else
+                                        <x-action-buttons
+                                            viewRoute="{{ route('return-trips.show', $trip) }}"
+                                        />
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -67,13 +73,19 @@
                 </div>
             @endif
         @else
-            <div class="text-center py-5">
-                <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                <p class="text-muted mb-3">Brak zjazdów w systemie.</p>
-                <x-ui.button variant="primary" href="{{ route('return-trips.create') }}">
-                    <i class="bi bi-plus-circle"></i> Utwórz pierwszy zjazd
+            <x-ui.empty-state 
+                icon="inbox" 
+                message="Brak zjazdów w systemie."
+            >
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('return-trips.create') }}"
+                    routeName="return-trips.create"
+                    action="create"
+                >
+                    Utwórz pierwszy zjazd
                 </x-ui.button>
-            </div>
+            </x-ui.empty-state>
         @endif
     </x-ui.card>
 </x-app-layout>

@@ -82,11 +82,11 @@ class DashboardController extends Controller
                 'start' => $currentMonth->copy()->startOfMonth(),
                 'end' => $currentMonth->copy()->endOfMonth(),
             ],
-            'prevUrl' => route('dashboard.profitability', [
+            'prevUrl' => route('profitability.index', [
                 'year' => $prevMonth->format('Y'),
                 'month' => $prevMonth->format('m'),
             ]),
-            'nextUrl' => route('dashboard.profitability', [
+            'nextUrl' => route('profitability.index', [
                 'year' => $nextMonth->format('Y'),
                 'month' => $nextMonth->format('m'),
             ]),

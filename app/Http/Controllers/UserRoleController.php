@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\RoutePermissionService;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
@@ -23,21 +24,22 @@ class UserRoleController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(): View
+    public function create(RoutePermissionService $routePermissionService): View
     {
-        $permissions = Permission::orderBy('name')->get();
-        return view('user-roles.create', compact('permissions'));
+        // Get permissions from routes instead of database
+        $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
+        return view('user-roles.create', compact('routePermissions'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, RoutePermissionService $routePermissionService): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name',
             'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,id',
+            'permissions.*' => 'string', // Permission names instead of IDs
         ]);
 
         $role = Role::create([
@@ -46,7 +48,31 @@ class UserRoleController extends Controller
         ]);
 
         if (isset($validated['permissions'])) {
-            $permissions = Permission::whereIn('id', $validated['permissions'])->get();
+            // Get all permissions from routes
+            $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
+            
+            // Create missing permissions and collect Permission models
+            $permissions = collect();
+            foreach ($validated['permissions'] as $permissionName) {
+                // Find in route permissions to get type
+                $routePerm = $routePermissions->firstWhere('name', $permissionName);
+                
+                if ($routePerm) {
+                    // Create permission if it doesn't exist
+                    $permission = Permission::firstOrCreate(
+                        ['name' => $permissionName, 'guard_name' => 'web'],
+                        ['type' => $routePerm['type']]
+                    );
+                    
+                    // Update type if it changed
+                    if ($permission->type !== $routePerm['type']) {
+                        $permission->update(['type' => $routePerm['type']]);
+                    }
+                    
+                    $permissions->push($permission);
+                }
+            }
+            
             $role->syncPermissions($permissions);
         }
 
@@ -66,23 +92,24 @@ class UserRoleController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Role $userRole): View
+    public function edit(Role $userRole, RoutePermissionService $routePermissionService): View
     {
-        $permissions = Permission::orderBy('name')->get();
+        // Get permissions from routes instead of database
+        $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
         $userRole->load('permissions');
         
-        return view('user-roles.edit', compact('userRole', 'permissions'));
+        return view('user-roles.edit', compact('userRole', 'routePermissions'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Role $userRole): RedirectResponse
+    public function update(Request $request, Role $userRole, RoutePermissionService $routePermissionService): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name,' . $userRole->id,
             'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,id',
+            'permissions.*' => 'string', // Permission names instead of IDs
         ]);
 
         $userRole->update([
@@ -90,7 +117,31 @@ class UserRoleController extends Controller
         ]);
 
         if (isset($validated['permissions'])) {
-            $permissions = Permission::whereIn('id', $validated['permissions'])->get();
+            // Get all permissions from routes
+            $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
+            
+            // Create missing permissions and collect Permission models
+            $permissions = collect();
+            foreach ($validated['permissions'] as $permissionName) {
+                // Find in route permissions to get type
+                $routePerm = $routePermissions->firstWhere('name', $permissionName);
+                
+                if ($routePerm) {
+                    // Create permission if it doesn't exist
+                    $permission = Permission::firstOrCreate(
+                        ['name' => $permissionName, 'guard_name' => 'web'],
+                        ['type' => $routePerm['type']]
+                    );
+                    
+                    // Update type if it changed
+                    if ($permission->type !== $routePerm['type']) {
+                        $permission->update(['type' => $routePerm['type']]);
+                    }
+                    
+                    $permissions->push($permission);
+                }
+            }
+            
             $userRole->syncPermissions($permissions);
         } else {
             $userRole->syncPermissions([]);
@@ -118,7 +169,7 @@ class UserRoleController extends Controller
     /**
      * Update permissions for a role via AJAX.
      */
-    public function updatePermissions(Request $request, Role $userRole): \Illuminate\Http\JsonResponse
+    public function updatePermissions(Request $request, Role $userRole, RoutePermissionService $routePermissionService): \Illuminate\Http\JsonResponse
     {
         // Administrator nie może mieć zmienianych uprawnień
         if ($userRole->name === 'administrator') {
@@ -130,19 +181,44 @@ class UserRoleController extends Controller
 
         $validated = $request->validate([
             'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,id',
+            'permissions.*' => 'string', // Permission names instead of IDs
         ]);
 
-        $permissions = isset($validated['permissions']) 
-            ? Permission::whereIn('id', $validated['permissions'])->get()
-            : collect();
-
-        $userRole->syncPermissions($permissions);
+        if (isset($validated['permissions'])) {
+            // Get all permissions from routes
+            $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
+            
+            // Create missing permissions and collect Permission models
+            $permissions = collect();
+            foreach ($validated['permissions'] as $permissionName) {
+                // Find in route permissions to get type
+                $routePerm = $routePermissions->firstWhere('name', $permissionName);
+                
+                if ($routePerm) {
+                    // Create permission if it doesn't exist
+                    $permission = Permission::firstOrCreate(
+                        ['name' => $permissionName, 'guard_name' => 'web'],
+                        ['type' => $routePerm['type']]
+                    );
+                    
+                    // Update type if it changed
+                    if ($permission->type !== $routePerm['type']) {
+                        $permission->update(['type' => $routePerm['type']]);
+                    }
+                    
+                    $permissions->push($permission);
+                }
+            }
+            
+            $userRole->syncPermissions($permissions);
+        } else {
+            $userRole->syncPermissions([]);
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Uprawnienia zostały zaktualizowane.',
-            'count' => $permissions->count()
+            'count' => isset($validated['permissions']) ? count($validated['permissions']) : 0
         ]);
     }
 }

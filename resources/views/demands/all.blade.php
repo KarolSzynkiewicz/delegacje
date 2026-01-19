@@ -1,8 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Wszystkie zapotrzebowania projektów</h2>
-        </div>
+        <x-ui.page-header title="Wszystkie zapotrzebowania projektów" />
     </x-slot>
 
     @if (session('success'))
@@ -16,15 +14,7 @@
             $project = $projectDemands->first()->project;
             $sortedDemands = $projectDemands->sortBy('start_date');
         @endphp
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white border-bottom">
-                <h3 class="h5 fw-semibold mb-0">
-                    <a href="{{ route('projects.show', $project) }}" class="text-decoration-none text-dark">
-                        <i class="bi bi-folder me-2"></i>{{ $project->name }}
-                    </a>
-                </h3>
-            </div>
-            <div class="card-body">
+        <x-ui.card label="{{ $project->name }}" class="mb-4">
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
                         <thead>
@@ -39,7 +29,7 @@
                             @foreach ($sortedDemands as $demand)
                                 <tr>
                                     <td>
-                                        <span class="badge bg-secondary">{{ $demand->role->name }}</span>
+                                        <x-ui.badge variant="accent">{{ $demand->role->name }}</x-ui.badge>
                                     </td>
                                     <td>
                                         <span class="fw-semibold">{{ $demand->required_count }}</span>
@@ -55,35 +45,23 @@
                                         </small>
                                     </td>
                                     <td>
-                                        <div class="d-flex gap-1">
-                                            <x-ui.button variant="ghost" href="{{ route('demands.show', $demand) }}" class="btn-sm" title="Zobacz">
-                                                <i class="bi bi-eye"></i>
-                                            </x-ui.button>
-                                            <x-ui.button variant="warning" href="{{ route('demands.edit', $demand) }}" class="btn-sm" title="Edytuj">
-                                                <i class="bi bi-pencil"></i>
-                                            </x-ui.button>
-                                            <form action="{{ route('demands.destroy', $demand) }}" method="POST" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz usunąć to zapotrzebowanie?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <x-ui.button variant="danger" type="submit" class="btn-sm" title="Usuń">
-                                                    <i class="bi bi-trash"></i>
-                                                </x-ui.button>
-                                            </form>
-                                        </div>
+                                        <x-action-buttons
+                                            viewRoute="{{ route('demands.show', $demand) }}"
+                                            editRoute="{{ route('demands.edit', $demand) }}"
+                                            deleteRoute="{{ route('demands.destroy', $demand) }}"
+                                            deleteMessage="Czy na pewno chcesz usunąć to zapotrzebowanie?"
+                                        />
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+        </x-ui.card>
     @empty
-        <div class="card shadow-sm border-0">
-            <div class="card-body text-center text-muted py-5">
-                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                Brak zapotrzebowań
-            </div>
-        </div>
+        <x-ui.empty-state 
+            icon="inbox" 
+            message="Brak zapotrzebowań"
+        />
     @endforelse
 </x-app-layout>

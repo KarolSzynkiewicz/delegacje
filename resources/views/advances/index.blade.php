@@ -1,35 +1,39 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Zaliczki</h2>
-            <x-ui.button variant="primary" href="{{ route('advances.create') }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Zaliczkę
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Zaliczki">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('advances.create') }}"
+                    routeName="advances.create"
+                    action="create"
+                >
+                    Dodaj Zaliczkę
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <x-ui.card>
-                @if (session('success'))
-                    <x-ui.alert variant="success" dismissible>
-                        {{ session('success') }}
-                    </x-ui.alert>
-                @endif
+    @if (session('success'))
+        <x-alert type="success" dismissible icon="check-circle">
+            {{ session('success') }}
+        </x-alert>
+    @endif
 
-                @if($advances->count() > 0)
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th class="text-start">Pracownik</th>
-                                    <th class="text-start">Kwota</th>
-                                    <th class="text-start">Oprocentowanie</th>
-                                    <th class="text-start">Do odliczenia</th>
-                                    <th class="text-start">Data</th>
-                                    <th class="text-start">Akcje</th>
-                                </tr>
-                            </thead>
+    <x-ui.card>
+        @if($advances->count() > 0)
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Pracownik</th>
+                            <th>Kwota</th>
+                            <th>Oprocentowanie</th>
+                            <th>Do odliczenia</th>
+                            <th>Data</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
                             <tbody>
                                 @foreach ($advances as $advance)
                                     <tr>
@@ -72,18 +76,21 @@
                         <div class="mt-3 pt-3 border-top">
                             {{ $advances->links() }}
                         </div>
-                    @endif
-                @else
-                    <x-ui.empty-state 
-                        icon="inbox"
-                        message="Brak zaliczek w systemie."
-                    >
-                        <x-ui.button variant="primary" href="{{ route('advances.create') }}">
-                            <i class="bi bi-plus-circle"></i> Dodaj pierwszą zaliczkę
-                        </x-ui.button>
-                    </x-ui.empty-state>
-                @endif
-            </x-ui.card>
-        </div>
-    </div>
+            @endif
+        @else
+            <x-ui.empty-state 
+                icon="inbox"
+                message="Brak zaliczek w systemie."
+            >
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('advances.create') }}"
+                    routeName="advances.create"
+                    action="create"
+                >
+                    Dodaj pierwszą zaliczkę
+                </x-ui.button>
+            </x-ui.empty-state>
+        @endif
+    </x-ui.card>
 </x-app-layout>

@@ -27,8 +27,8 @@ class ViewTest extends TestCase
     {
         parent::setUp();
         
-        // Run seeders to set up roles and permissions
-        $this->artisan('db:seed', ['--class' => 'PermissionSeeder']);
+        // Run seeders to set up roles
+        // Note: Permissions are now generated dynamically from routes, no PermissionSeeder needed
         $this->artisan('db:seed', ['--class' => 'UserRoleSeeder']);
         
         $this->user = User::factory()->create();

@@ -1,4 +1,28 @@
 <x-app-layout>
+    <x-slot name="header">
+        <x-ui.page-header title="Projekt: {{ $project->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('projects.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('projects.edit', $project) }}"
+                    routeName="projects.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
+    </x-slot>
+
     <div class="row">
         <div class="col-lg-8">
             <x-ui.card label="Szczegóły Projektu: {{ $project->name }}">
@@ -39,23 +63,13 @@
                     @endif
                     <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</x-ui.detail-item>
                     @if($project->location)
-                    <x-ui.detail-item label="Lokalizacja:">
-                        <i class="bi bi-geo-alt me-1"></i>{{ $project->location->name }}
-                    </x-ui.detail-item>
+                    <x-ui.detail-item label="Lokalizacja:">{{ $project->location->name }}</x-ui.detail-item>
                     @endif
                     @if($project->description)
                     <x-ui.detail-item label="Opis:" :full-width="true">{{ $project->description }}</x-ui.detail-item>
                     @endif
                 </x-ui.detail-list>
 
-                <div class="mt-4 pt-3 border-top">
-                    <x-ui.button variant="primary" href="{{ route('projects.edit', $project) }}">
-                        <i class="bi bi-pencil me-1"></i> Edytuj
-                    </x-ui.button>
-                    <x-ui.button variant="ghost" href="{{ route('projects.index') }}">
-                        <i class="bi bi-arrow-left me-1"></i> Powrót
-                    </x-ui.button>
-                </div>
             </x-ui.card>
 
             @if($project->demand)
@@ -122,10 +136,13 @@
                                             @endphp
                                             <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($statusValue) }}</x-ui.badge>
                                         </td>
-                                        <td class="text-end">
-                                            <x-ui.button variant="ghost" href="{{ route('assignments.show', $assignment) }}">
-                                                <i class="bi bi-eye"></i>
-                                            </x-ui.button>
+                                        <td>
+                                            <x-ui.button 
+                                                variant="ghost" 
+                                                href="{{ route('assignments.show', $assignment) }}"
+                                                routeName="assignments.show"
+                                                action="view"
+                                            />
                                         </td>
                                     </tr>
                                 @endforeach
@@ -133,10 +150,10 @@
                         </table>
                     </div>
                 @else
-                    <div class="text-center py-4">
-                        <i class="bi bi-people text-muted"></i>
-                        <p class="text-muted mt-2 mb-0">Brak przypisanych pracowników</p>
-                    </div>
+                    <x-ui.empty-state 
+                        icon="people" 
+                        message="Brak przypisanych pracowników"
+                    />
                 @endif
             </x-ui.card>
         </div>

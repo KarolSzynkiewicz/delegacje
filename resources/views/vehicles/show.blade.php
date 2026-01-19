@@ -1,6 +1,26 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 mb-0">Pojazd: {{ $vehicle->registration_number }}</h2>
+        <x-ui.page-header title="Pojazd: {{ $vehicle->registration_number }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('vehicles.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('vehicles.edit', $vehicle) }}"
+                    routeName="vehicles.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row">

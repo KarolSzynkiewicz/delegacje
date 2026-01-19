@@ -1,4 +1,28 @@
 <x-app-layout>
+    <x-slot name="header">
+        <x-ui.page-header title="Szczegóły Przypisania">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('project-assignments.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('assignments.edit', $assignment) }}"
+                    routeName="assignments.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
+    </x-slot>
+
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <x-ui.card label="Szczegóły Przypisania">
@@ -61,14 +85,6 @@
                     @endif
                 </dl>
 
-                <div class="mt-4 pt-3 border-top">
-                    <x-ui.button variant="primary" href="{{ route('assignments.edit', $assignment) }}">
-                        <i class="bi bi-pencil me-1"></i> Edytuj
-                    </x-ui.button>
-                    <x-ui.button variant="ghost" href="{{ route('project-assignments.index') }}">
-                        <i class="bi bi-arrow-left me-1"></i> Powrót
-                    </x-ui.button>
-                </div>
             </x-ui.card>
         </div>
     </div>

@@ -1,14 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">
-            Edytuj Zjazd
-        </h2>
+        <x-ui.page-header title="Edytuj Zjazd">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('return-trips.show', $returnTrip) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Edytuj Zjazd">
                     <x-ui.errors />
 
                     <form method="POST" action="{{ route('return-trips.update', $returnTrip) }}">
@@ -54,17 +61,24 @@
                             <textarea name="notes" rows="3" class="form-control">{{ old('notes', $returnTrip->notes) }}</textarea>
                         </div>
 
-                        <div class="d-flex gap-2">
-                            <x-ui.button variant="ghost" href="{{ route('return-trips.show', $returnTrip) }}">
-                                <i class="bi bi-arrow-left"></i> Anuluj
-                            </x-ui.button>
-                            <x-ui.button variant="primary" type="submit">
-                                <i class="bi bi-check-circle"></i> Przygotuj Zmiany
-                            </x-ui.button>
-                        </div>
-                    </form>
+                <div class="d-flex gap-2">
+                    <x-ui.button 
+                        variant="ghost" 
+                        href="{{ route('return-trips.show', $returnTrip) }}"
+                        action="cancel"
+                    >
+                        Anuluj
+                    </x-ui.button>
+                    <x-ui.button 
+                        variant="primary" 
+                        type="submit"
+                        action="save"
+                    >
+                        Przygotuj Zmiany
+                    </x-ui.button>
                 </div>
-            </div>
-        </div>
+            </form>
+        </x-ui.card>
     </div>
+</div>
 </x-app-layout>

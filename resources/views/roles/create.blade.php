@@ -1,38 +1,64 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">Dodaj Nową Rolę</h2>
+        <x-ui.page-header title="Dodaj Nową Rolę">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('roles.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <form method="POST" action="{{ route('roles.store') }}">
-                        @csrf
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Dodaj Nową Rolę">
+                <x-ui.errors />
 
-                        <div class="mb-3">
-                            <x-input-label for="name" value="Nazwa" />
-                            <span class="text-danger">*</span>
-                            <x-text-input id="name" name="name" type="text" class="mt-1" :value="old('name')" required />
-                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
-                        </div>
+                <form method="POST" action="{{ route('roles.store') }}">
+                    @csrf
 
-                        <div class="mb-3">
-                            <x-input-label for="description" value="Opis" />
-                            <textarea id="description" name="description" rows="4" class="form-control mt-1">{{ old('description') }}</textarea>
-                        </div>
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="name" 
+                            label="Nazwa"
+                            value="{{ old('name') }}"
+                            required="true"
+                        />
+                    </div>
 
-                        <div class="d-flex justify-content-between align-items-center">
-                            <x-primary-button>
-                                <i class="bi bi-check-circle me-1"></i> Zapisz
-                            </x-primary-button>
-                            <a href="{{ route('roles.index') }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-x-circle me-1"></i> Anuluj
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="textarea" 
+                            name="description" 
+                            label="Opis"
+                            value="{{ old('description') }}"
+                            rows="4"
+                        />
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zapisz
+                        </x-ui.button>
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('roles.index') }}"
+                            action="cancel"
+                        >
+                            Anuluj
+                        </x-ui.button>
+                    </div>
+                </form>
+            </x-ui.card>
         </div>
     </div>
 </x-app-layout>

@@ -1,11 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Wygeneruj Payroll</h2>
-            <x-ui.button variant="ghost" href="{{ route('payrolls.index') }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Wygeneruj Payroll">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('payrolls.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -71,10 +76,18 @@
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-calculator me-1"></i> Wygeneruj Payroll
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Wygeneruj Payroll
                         </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('payrolls.index') }}">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('payrolls.index') }}"
+                            action="cancel"
+                        >
                             Anuluj
                         </x-ui.button>
                     </div>

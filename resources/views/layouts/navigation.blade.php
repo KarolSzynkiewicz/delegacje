@@ -15,7 +15,7 @@
             <ul class="navbar-nav mx-auto">
                 @auth
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('dashboard.profitability') ? 'active' : '' }}" href="{{ route('dashboard.profitability') }}">
+                        <a class="nav-link {{ request()->routeIs('profitability.*') ? 'active' : '' }}" href="{{ route('profitability.index') }}">
                             <i class="bi bi-graph-up-arrow"></i> Dashboard
                         </a>
                     </li>

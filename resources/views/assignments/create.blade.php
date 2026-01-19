@@ -1,4 +1,18 @@
 <x-app-layout>
+    <x-slot name="header">
+        <x-ui.page-header title="Dodaj Przypisanie Pracownika do Projektu">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('projects.show', $project) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
+    </x-slot>
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Dodaj Przypisanie Pracownika do Projektu">

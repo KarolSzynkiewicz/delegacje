@@ -1,28 +1,39 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Lista Płac - {{ $payroll->employee->full_name }}</h2>
-            <div class="d-flex gap-2">
+        <x-ui.page-header title="Lista Płac - {{ $payroll->employee->full_name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('payrolls.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
                 @if($payroll->canBeRecalculated())
                     <form method="POST" action="{{ route('payrolls.recalculate', $payroll) }}" class="d-inline">
                         @csrf
-                        <x-ui.button variant="info" type="submit" size="sm">
-                            <i class="bi bi-arrow-clockwise"></i> Przelicz
+                        <x-ui.button 
+                            variant="ghost" 
+                            type="submit"
+                            action="refresh"
+                        >
+                            Przelicz
                         </x-ui.button>
                     </form>
                 @endif
-                <x-ui.button variant="primary" href="{{ route('payrolls.edit', $payroll) }}">
-                    <i class="bi bi-pencil"></i> Edytuj
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('payrolls.edit', $payroll) }}"
+                    routeName="payrolls.edit"
+                    action="edit"
+                >
+                    Edytuj
                 </x-ui.button>
-                <x-ui.button variant="ghost" href="{{ route('payrolls.index') }}">
-                    <i class="bi bi-arrow-left"></i> Powrót
-                </x-ui.button>
-            </div>
-        </div>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
-
-    <div class="py-4">
-        <div class="container-xxl">
             <!-- Dokument do wypłaty -->
             <div class="row justify-content-center">
                 <div class="col-lg-10 col-xl-9">
@@ -260,6 +271,4 @@
                     </x-ui.card>
                 </div>
             </div>
-        </div>
-    </div>
 </x-app-layout>

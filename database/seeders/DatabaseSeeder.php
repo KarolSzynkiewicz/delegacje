@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            PermissionSeeder::class,
+            // PermissionSeeder removed - permissions are now generated dynamically from routes
             UserRoleSeeder::class,
             UserSeeder::class,
             RoleSeeder::class,

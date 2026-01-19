@@ -1,11 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Utwórz Zjazd</h2>
-            <x-ui.button variant="ghost" href="{{ route('return-trips.index') }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Utwórz Zjazd">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('return-trips.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -67,11 +72,19 @@
                     </div>
 
                     <div class="d-flex justify-content-end align-items-center gap-2">
-                        <x-ui.button variant="ghost" href="{{ route('return-trips.index') }}">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('return-trips.index') }}"
+                            action="cancel"
+                        >
                             Anuluj
                         </x-ui.button>
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-check-circle me-1"></i> Przygotuj Zjazd
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Przygotuj Zjazd
                         </x-ui.button>
                     </div>
                 </form>

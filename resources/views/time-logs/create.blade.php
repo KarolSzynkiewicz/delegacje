@@ -1,15 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 mb-0">
-            Dodaj Wpis Ewidencji Godzin
-        </h2>
+        <x-ui.page-header title="Dodaj Wpis Ewidencji Godzin">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('time-logs.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="row justify-content-center">
-                <div class="col-md-8">
-                    <x-ui.card>
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <x-ui.card label="Dodaj Wpis Ewidencji Godzin">
                         <x-ui.errors />
 
                         <form method="POST" action="{{ route('time-logs.store') }}">
@@ -66,18 +72,24 @@
                                 />
                             </div>
 
-                            <div class="d-flex gap-2">
-                                <x-ui.button variant="primary" type="submit">
-                                    Zapisz
-                                </x-ui.button>
-                                <x-ui.button variant="ghost" href="{{ route('time-logs.index') }}">
-                                    Anuluj
-                                </x-ui.button>
-                            </div>
-                        </form>
-                    </x-ui.card>
+                <div class="d-flex gap-2">
+                    <x-ui.button 
+                        variant="primary" 
+                        type="submit"
+                        action="save"
+                    >
+                        Zapisz
+                    </x-ui.button>
+                    <x-ui.button 
+                        variant="ghost" 
+                        href="{{ route('time-logs.index') }}"
+                        action="cancel"
+                    >
+                        Anuluj
+                    </x-ui.button>
                 </div>
-            </div>
-        </div>
+            </form>
+        </x-ui.card>
     </div>
+</div>
 </x-app-layout>

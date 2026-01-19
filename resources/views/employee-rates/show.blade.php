@@ -1,22 +1,30 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Stawka: {{ $employeeRate->employee->full_name }}</h2>
-            <div class="d-flex gap-2">
-                <x-ui.button variant="primary" href="{{ route('employee-rates.edit', $employeeRate) }}">
-                    <i class="bi bi-pencil"></i> Edytuj
+        <x-ui.page-header title="Stawka: {{ $employeeRate->employee->full_name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('employee-rates.index') }}"
+                    action="back"
+                >
+                    Powrót
                 </x-ui.button>
-                <x-ui.button variant="ghost" href="{{ route('employee-rates.index') }}">
-                    <i class="bi bi-arrow-left"></i> Powrót
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('employee-rates.edit', $employeeRate) }}"
+                    routeName="employee-rates.edit"
+                    action="edit"
+                >
+                    Edytuj
                 </x-ui.button>
-            </div>
-        </div>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="row">
-                <div class="col-lg-8">
+    <div class="row">
+        <div class="col-lg-8">
                     <x-ui.card label="Szczegóły Stawki">
                         <x-ui.detail-list>
                             <x-ui.detail-item label="Pracownik:">
@@ -53,9 +61,6 @@
                             <x-ui.detail-item label="Utworzono:">{{ $employeeRate->created_at->format('d.m.Y H:i') }}</x-ui.detail-item>
                             <x-ui.detail-item label="Zaktualizowano:">{{ $employeeRate->updated_at->format('d.m.Y H:i') }}</x-ui.detail-item>
                         </x-ui.detail-list>
-                    </x-ui.card>
-                </div>
-            </div>
-        </div>
+        </x-ui.card>
     </div>
 </x-app-layout>

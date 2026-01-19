@@ -1,18 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">
-                Wszystkie Rotacje Pracowników
-            </h2>
-            <a href="{{ route('rotations.create') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Dodaj Rotację
-            </a>
-        </div>
+        <x-ui.page-header title="Wszystkie Rotacje Pracowników">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('rotations.create') }}"
+                    routeName="rotations.create"
+                    action="create"
+                >
+                    Dodaj Rotację
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <livewire:rotations-table />
-        </div>
-    </div>
+    <livewire:rotations-table />
 </x-app-layout>

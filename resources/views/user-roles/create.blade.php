@@ -1,18 +1,22 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Dodaj Nową Rolę</h2>
-            <x-ui.button variant="ghost" href="{{ route('user-roles.index') }}" class="btn-sm">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Dodaj Nową Rolę">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('user-roles.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <x-ui.errors :errors="$errors" />
-
-            <x-ui.card>
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <x-ui.card label="Dodaj Nową Rolę">
+                <x-ui.errors />
                 <form method="POST" action="{{ route('user-roles.store') }}">
                     @csrf
 
@@ -204,17 +208,25 @@
                         @enderror
                     </div>
 
-                    <!-- Przyciski -->
-                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-check-circle"></i> Zapisz
-                        </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('user-roles.index') }}">
-                            Anuluj
-                        </x-ui.button>
-                    </div>
-                </form>
-            </x-ui.card>
-        </div>
+                <!-- Przyciski -->
+                <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                    <x-ui.button 
+                        variant="primary" 
+                        type="submit"
+                        action="save"
+                    >
+                        Zapisz
+                    </x-ui.button>
+                    <x-ui.button 
+                        variant="ghost" 
+                        href="{{ route('user-roles.index') }}"
+                        action="cancel"
+                    >
+                        Anuluj
+                    </x-ui.button>
+                </div>
+            </form>
+        </x-ui.card>
     </div>
+</div>
 </x-app-layout>

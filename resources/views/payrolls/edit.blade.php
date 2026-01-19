@@ -170,10 +170,18 @@
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Zapisz
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zapisz
                         </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('payrolls.index') }}">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('payrolls.index') }}"
+                            action="cancel"
+                        >
                             Anuluj
                         </x-ui.button>
                     </div>

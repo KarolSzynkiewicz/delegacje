@@ -13,7 +13,22 @@
             </x-ui.card>
             
             <div class="row g-4 mb-4">
+                <!-- Dashboard Rentowności -->
+                @if(auth()->user()->hasPermission('profitability.view'))
+                <div class="col-md-6 col-lg-4">
+                    <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('profitability.index') }}'">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-graph-up-arrow text-success fs-2 me-3"></i>
+                            <h4 class="card-title mb-0 text-success fw-semibold">Dashboard Rentowności</h4>
+                        </div>
+                        <p class="card-text text-muted mb-2">Analiza rentowności projektów i pracowników</p>
+                        <p class="card-text small text-muted mb-0">Projekty • Pracownicy • Koszty • Przychody</p>
+                    </x-ui.card>
+                </div>
+                @endif
+
                 <!-- Widok Tygodniowy -->
+                @if(auth()->user()->hasPermission('weekly-overview.view'))
                 <div class="col-md-6 col-lg-4">
                     <x-ui.card class="h-100 dashboard-card" style="cursor: pointer;" onclick="window.location.href='{{ route('weekly-overview.index') }}'">
                         <div class="d-flex align-items-center mb-3">
@@ -24,6 +39,7 @@
                         <p class="card-text small text-muted mb-0">Projekty • Pracownicy • Domy • Auta</p>
                     </x-ui.card>
                 </div>
+                @endif
 
                 <!-- Projekty -->
                 <div class="col-md-6 col-lg-4">

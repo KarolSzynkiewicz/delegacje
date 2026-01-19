@@ -1,6 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 mb-0">Edytuj Akomodację: {{ $accommodation->name }}</h2>
+        <x-ui.page-header title="Edytuj Akomodację: {{ $accommodation->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('accommodations.show', $accommodation) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -83,10 +93,20 @@
                     />
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Zaktualizuj Akomodację
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zaktualizuj Akomodację
                         </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('accommodations.show', $accommodation) }}">Anuluj</x-ui.button>
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('accommodations.show', $accommodation) }}"
+                            action="cancel"
+                        >
+                            Anuluj
+                        </x-ui.button>
                     </div>
                 </form>
             </x-ui.card>

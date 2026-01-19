@@ -1,8 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Generuj Payroll dla wszystkich pracowników</h2>
-        </div>
+        <x-ui.page-header title="Generuj Payroll dla wszystkich pracowników">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('payrolls.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     @if (session('success'))
@@ -11,8 +19,9 @@
         </x-alert>
     @endif
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Generuj Payroll dla wszystkich pracowników">
             <form action="{{ route('payrolls.generate-batch.store') }}" method="POST">
                 @csrf
 
@@ -62,18 +71,25 @@
                 @endif
 
                 <div class="d-flex justify-content-end gap-2">
-                    <a href="{{ route('payrolls.index') }}" class="btn btn-secondary">Anuluj</a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-gear"></i> Generuj Payroll
-                    </button>
+                    <x-ui.button 
+                        variant="ghost" 
+                        href="{{ route('payrolls.index') }}"
+                        action="cancel"
+                    >
+                        Anuluj
+                    </x-ui.button>
+                    <x-ui.button 
+                        variant="primary" 
+                        type="submit"
+                        action="save"
+                    >
+                        Generuj Payroll
+                    </x-ui.button>
                 </div>
             </form>
-        </div>
-    </div>
+        </x-ui.card>
 
-    <div class="card shadow-sm border-0 mt-4">
-        <div class="card-body">
-            <h5 class="card-title">Informacje</h5>
+        <x-ui.card label="Informacje" class="mt-4">
             <p class="text-muted mb-0">
                 System wygeneruje listy płac dla wszystkich pracowników, którzy mają jakiekolwiek logowane godziny w wybranym okresie.
                 Listy płac będą miały status "Wystawiony" i będą zawierać:
@@ -83,6 +99,7 @@
                 <li>Kary i nagrody (z Adjustments)</li>
                 <li>Zaliczki (z Advances, z oprocentowaniem jeśli dotyczy)</li>
             </ul>
-        </div>
+        </x-ui.card>
     </div>
+</div>
 </x-app-layout>

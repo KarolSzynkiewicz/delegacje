@@ -1,11 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Edytuj Dokument: {{ $document->name }}</h2>
-            <x-ui.button variant="ghost" href="{{ route('documents.index') }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Edytuj Dokument: {{ $document->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('documents.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -62,9 +67,19 @@
                     </div>
 
                     <div class="d-flex justify-content-end align-items-center gap-2">
-                        <x-ui.button variant="ghost" href="{{ route('documents.index') }}">Anuluj</x-ui.button>
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Zaktualizuj Dokument
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('documents.index') }}"
+                            action="cancel"
+                        >
+                            Anuluj
+                        </x-ui.button>
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zaktualizuj Dokument
                         </x-ui.button>
                     </div>
                 </form>

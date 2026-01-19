@@ -394,7 +394,10 @@ php artisan permission:cache-reset
 
 System autoryzacji jest:
 - ✅ **Dynamiczny** - Nie wymaga pisania Policy dla każdego modelu
+- ✅ **Automatyczny** - Uprawnienia generowane z route, brak potrzeby seederów
 - ✅ **Wydajny** - Cache'uje uprawnienia na 24h
 - ✅ **Elastyczny** - Zarządzanie uprawnieniami przez UI
 - ✅ **Bezpieczny** - Administratorzy mają pełny dostęp, reszta przez uprawnienia
 - ✅ **Prosty** - Jedna tabelka w UI jako źródło prawdy
+- ✅ **Skalowalny** - Nowy route = automatycznie w tabelce uprawnień
+- ✅ **Fail-fast** - Route bez `permission_type` rzucają błąd w dev/testing

@@ -1,21 +1,29 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Koszt Transportu</h2>
-            <div class="d-flex gap-2">
-                <x-edit-button href="{{ route('transport-costs.edit', $transportCost) }}" />
-                <a href="{{ route('transport-costs.index') }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-arrow-left"></i> Powrót
-                </a>
-            </div>
-        </div>
+        <x-ui.page-header title="Koszt Transportu">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('transport-costs.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('transport-costs.edit', $transportCost) }}"
+                    routeName="transport-costs.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h5 class="fw-bold text-dark mb-4">Informacje podstawowe</h5>
+    <x-ui.card label="Informacje podstawowe">
                     <div class="row g-4">
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Typ kosztu</h6>
@@ -68,8 +76,5 @@
                         </div>
                         @endif
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    </x-ui.card>
 </x-app-layout>

@@ -1,88 +1,108 @@
 <x-app-layout>
+    <x-slot name="header">
+        <x-ui.page-header title="Przypisz Auto do Pracownika">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('employees.vehicles.index', $employee) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
+    </x-slot>
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white border-bottom">
-                        <h2 class="h4 fw-semibold text-dark mb-0">Przypisz Auto do Pracownika</h2>
+            <x-ui.card label="Przypisz Auto do Pracownika">
+                <x-ui.errors />
+
+                <form method="POST" action="{{ route('employees.vehicles.store', $employee) }}">
+                    @csrf
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Pracownik</label>
+                        <input type="text" value="{{ $employee->full_name }}" disabled
+                            class="form-control bg-light">
                     </div>
-                    <div class="card-body">
-                        <form method="POST" action="{{ route('employees.vehicles.store', $employee) }}">
-                            @csrf
 
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Pracownik</label>
-                                <input type="text" value="{{ $employee->full_name }}" disabled
-                                    class="form-control bg-light">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Pojazd</label>
-                                <select name="vehicle_id" required
-                                    class="form-select @error('vehicle_id') is-invalid @enderror">
-                                    <option value="">Wybierz pojazd</option>
-                                    @foreach($vehicles as $vehicle)
-                                        <option value="{{ $vehicle->id }}" {{ old('vehicle_id') == $vehicle->id ? 'selected' : '' }}>
-                                            {{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @error('vehicle_id')
-                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Rola w pojeździe <span class="text-danger">*</span></label>
-                                <select name="position" required
-                                    class="form-select @error('position') is-invalid @enderror">
-                                    <option value="passenger" {{ old('position', 'passenger') == 'passenger' ? 'selected' : '' }}>Pasażer</option>
-                                    <option value="driver" {{ old('position') == 'driver' ? 'selected' : '' }}>Kierowca</option>
-                                </select>
-                                <small class="form-text text-muted">Uwaga: W jednym pojeździe może być tylko jeden kierowca w danym okresie</small>
-                                @error('position')
-                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Data Rozpoczęcia</label>
-                                <input type="date" 
-                                       name="start_date" 
-                                       value="{{ old('start_date', $dateFrom ?? '') }}" 
-                                       required
-                                    class="form-control @error('start_date') is-invalid @enderror">
-                                @error('start_date')
-                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Data Zakończenia (opcjonalnie)</label>
-                                <input type="date" 
-                                       name="end_date" 
-                                       value="{{ old('end_date', $dateTo ?? '') }}"
-                                    class="form-control @error('end_date') is-invalid @enderror">
-                                @error('end_date')
-                                    <div class="invalid-feedback d-block">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Uwagi</label>
-                                <textarea name="notes" rows="3"
-                                    class="form-control">{{ old('notes') }}</textarea>
-                            </div>
-
-                            <div class="d-flex justify-content-between align-items-center">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-save me-1"></i> Zapisz
-                                </button>
-                                <a href="{{ route('employees.vehicles.index', $employee) }}" class="btn btn-link text-decoration-none">Anuluj</a>
-                            </div>
-                        </form>
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="vehicle_id" 
+                            label="Pojazd"
+                            required="true"
+                        >
+                            <option value="">Wybierz pojazd</option>
+                            @foreach($vehicles as $vehicle)
+                                <option value="{{ $vehicle->id }}" {{ old('vehicle_id') == $vehicle->id ? 'selected' : '' }}>
+                                    {{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
                     </div>
-                </div>
-            </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="position" 
+                            label="Rola w pojeździe"
+                            required="true"
+                        >
+                            <option value="passenger" {{ old('position', 'passenger') == 'passenger' ? 'selected' : '' }}>Pasażer</option>
+                            <option value="driver" {{ old('position') == 'driver' ? 'selected' : '' }}>Kierowca</option>
+                        </x-ui.input>
+                        <small class="form-text text-muted">Uwaga: W jednym pojeździe może być tylko jeden kierowca w danym okresie</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="date" 
+                            name="start_date" 
+                            label="Data Rozpoczęcia"
+                            value="{{ old('start_date', $dateFrom ?? '') }}"
+                            required="true"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="date" 
+                            name="end_date" 
+                            label="Data Zakończenia (opcjonalnie)"
+                            value="{{ old('end_date', $dateTo ?? '') }}"
+                        />
+                    </div>
+
+                    <div class="mb-4">
+                        <x-ui.input 
+                            type="textarea" 
+                            name="notes" 
+                            label="Uwagi"
+                            value="{{ old('notes') }}"
+                            rows="3"
+                        />
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zapisz
+                        </x-ui.button>
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('employees.vehicles.index', $employee) }}"
+                            action="cancel"
+                        >
+                            Anuluj
+                        </x-ui.button>
+                    </div>
+                </form>
+            </x-ui.card>
         </div>
     </div>
 </x-app-layout>

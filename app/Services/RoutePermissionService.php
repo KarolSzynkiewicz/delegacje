@@ -1,118 +1,87 @@
 <?php
 
-namespace App\Http\Middleware;
+namespace App\Services;
 
-use Closure;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Collection;
 
-class CheckResourcePermission
+class RoutePermissionService
 {
     /**
-     * Routes that should be excluded from permission checking.
-     * Only technical routes (login, logout, no-role, profile).
+     * Get all permissions generated from routes with permission_type.
+     * Filters out viewAny - only returns view for UI table.
      */
-    protected array $excludedRoutes = [
-        'profile.*',
-        'no-role',
-        'logout',
-        'home',
-    ];
-
-    /**
-     * Handle an incoming request.
-     */
-    public function handle(Request $request, Closure $next): Response
+    public function getAllPermissionsFromRoutes(): Collection
     {
-        $user = $request->user();
-
-        // If user is not authenticated, let auth middleware handle it
-        if (!$user) {
-            return $next($request);
-        }
-
-        // Admin always has access
-        if ($user->isAdmin()) {
-            return $next($request);
-        }
-
-        $route = $request->route();
-        $routeName = $route?->getName();
-
-        // If route has no name, allow (might be closure routes or special cases)
-        if (!$routeName) {
-            return $next($request);
-        }
-
-        // Check if route is excluded
-        if ($this->isExcluded($routeName)) {
-            return $next($request);
-        }
-
-        // Get permission type from route defaults (check both action['defaults'] and defaults)
-        $permissionType = $route->action['defaults']['permission_type'] ?? $route->defaults['permission_type'] ?? null;
-
-        // Fail fast: route must have permission_type
-        if (!$permissionType) {
-            if (app()->environment('local', 'testing')) {
-                throw new \Exception("Route {$routeName} missing permission_type default. All routes must have permission_type set via route group defaults.");
+        $routes = Route::getRoutes();
+        $permissions = collect();
+        
+        foreach ($routes as $route) {
+            // Access defaults from action array (route groups store defaults in action['defaults'])
+            $permissionType = $route->action['defaults']['permission_type'] ?? $route->defaults['permission_type'] ?? null;
+            if (!$permissionType) {
+                continue;
             }
-            Log::error("Route missing permission_type", [
-                'route' => $routeName,
-                'uri' => $request->path(),
-                'method' => $request->method(),
-            ]);
-            abort(500, 'Route configuration error');
-        }
-
-        // Extract resource and action based on permission type
-        $resource = $this->extractResourceFromRoute($routeName, $permissionType);
-        $routeAction = $this->getRouteAction($routeName);
-        $httpMethod = $request->method();
-
-        // If we can't determine resource, fail fast
-        if (!$resource) {
-            if (app()->environment('local', 'testing')) {
-                throw new \Exception("Cannot determine resource from route name: {$routeName} (type: {$permissionType})");
+            
+            $routeName = $route->getName();
+            if (!$routeName) {
+                continue;
             }
-            Log::error("Cannot determine resource from route", [
-                'route' => $routeName,
-                'type' => $permissionType,
-                'uri' => $request->path(),
-            ]);
-            abort(500, 'Route configuration error');
-        }
-
-        // Map to permission name based on permission type
-        $permissionName = $this->mapToPermissionName($permissionType, $resource, $routeAction, $httpMethod);
-
-        if (!$permissionName) {
-            if (app()->environment('local', 'testing')) {
-                throw new \Exception("Cannot determine permission for route: {$routeName} (type: {$permissionType})");
+            
+            // Skip excluded routes (same as middleware)
+            if ($this->isExcluded($routeName)) {
+                continue;
             }
-            Log::error("Cannot determine permission", [
-                'route' => $routeName,
+            
+            // Extract resource and action using same logic as middleware
+            $resource = $this->extractResourceFromRoute($routeName, $permissionType);
+            if (!$resource) {
+                continue;
+            }
+            
+            $routeAction = $this->getRouteAction($routeName);
+            $httpMethod = $route->methods()[0] ?? 'GET';
+            
+            // Generate permission name using same logic as middleware
+            $permissionName = $this->generatePermissionName(
+                $permissionType,
+                $resource,
+                $routeAction,
+                $httpMethod
+            );
+            
+            if (!$permissionName) {
+                continue;
+            }
+            
+            // Ensure we never return viewAny - middleware generates view for index/show
+            // But for safety, if somehow viewAny appears, replace with view
+            if (str_ends_with($permissionName, '.viewAny')) {
+                $permissionName = str_replace('.viewAny', '.view', $permissionName);
+            }
+            
+            $permissions->push([
+                'name' => $permissionName,
                 'type' => $permissionType,
                 'resource' => $resource,
-                'action' => $routeAction,
+                'action' => $this->getPermissionAction($permissionName, $permissionType),
             ]);
-            abort(500, 'Route configuration error');
         }
-
-        // Check if user has permission
-        if (!$user->hasPermission($permissionName)) {
-            abort(403, 'Brak uprawnień do wykonania tej akcji.');
-        }
-
-        return $next($request);
+        
+        // Remove duplicates and return
+        return $permissions->unique('name')->values();
     }
-
+    
     /**
-     * Map to permission name based on permission type.
+     * Generate permission name based on permission type.
+     * Uses same logic as CheckResourcePermission middleware.
      */
-    protected function mapToPermissionName(string $permissionType, string $resource, ?string $routeAction, string $httpMethod): ?string
-    {
+    protected function generatePermissionName(
+        string $permissionType,
+        string $resource,
+        ?string $routeAction,
+        string $httpMethod
+    ): ?string {
         return match ($permissionType) {
             'resource' => $this->mapResourcePermission($resource, $routeAction, $httpMethod),
             'view' => $this->mapViewPermission($resource),
@@ -120,7 +89,7 @@ class CheckResourcePermission
             default => null,
         };
     }
-
+    
     /**
      * Map resource route to permission (CRUD).
      * IMPORTANT: index and show both map to .view (not viewAny and view).
@@ -136,7 +105,7 @@ class CheckResourcePermission
             'update' => 'update',
             'destroy' => 'delete',
         ];
-
+        
         // If route action is explicitly mapped, use it
         if ($routeAction && isset($actionMap[$routeAction])) {
             $action = $actionMap[$routeAction];
@@ -151,10 +120,10 @@ class CheckResourcePermission
             ];
             $action = $methodMap[$httpMethod] ?? 'view';
         }
-
+        
         return "{$resource}.{$action}";
     }
-
+    
     /**
      * Map view route to permission (always .view).
      */
@@ -162,7 +131,7 @@ class CheckResourcePermission
     {
         return "{$resource}.view";
     }
-
+    
     /**
      * Map action route to permission (always .update).
      */
@@ -170,16 +139,17 @@ class CheckResourcePermission
     {
         return "{$resource}.update";
     }
-
+    
     /**
      * Extract resource name from route name.
+     * Uses same logic as CheckResourcePermission middleware.
      */
     protected function extractResourceFromRoute(?string $routeName, string $permissionType): ?string
     {
         if (!$routeName) {
             return null;
         }
-
+        
         // Split route name by dots
         $parts = explode('.', $routeName);
         
@@ -212,7 +182,7 @@ class CheckResourcePermission
         // e.g., "projects.assignments.index" -> "assignments"
         // e.g., "vehicle-assignments.show" -> "vehicle-assignments"
         $resource = implode('.', $parts);
-
+        
         // For nested resources, take the last part
         // e.g., "employees.vehicles" -> "vehicles"
         // e.g., "employees.accommodations" -> "accommodations"
@@ -228,10 +198,10 @@ class CheckResourcePermission
             
             return $nestedMappings[$lastPart] ?? $lastPart;
         }
-
+        
         return $resource ?: null;
     }
-
+    
     /**
      * Get route action from route name.
      */
@@ -240,17 +210,34 @@ class CheckResourcePermission
         if (!$routeName) {
             return null;
         }
-
+        
         $parts = explode('.', $routeName);
         return end($parts);
     }
-
+    
     /**
-     * Check if route should be excluded from permission checking.
+     * Get permission action from permission name (for UI grouping).
+     */
+    protected function getPermissionAction(string $permissionName, string $permissionType): string
+    {
+        $parts = explode('.', $permissionName);
+        return end($parts);
+    }
+    
+    /**
+     * Check if route should be excluded from permission generation.
+     * Same exclusions as middleware.
      */
     protected function isExcluded(string $routeName): bool
     {
-        foreach ($this->excludedRoutes as $pattern) {
+        $excludedRoutes = [
+            'profile.*',
+            'no-role',
+            'logout',
+            'home',
+        ];
+        
+        foreach ($excludedRoutes as $pattern) {
             if (str_ends_with($pattern, '.*')) {
                 $prefix = rtrim($pattern, '.*');
                 if (str_starts_with($routeName, $prefix . '.')) {
@@ -260,7 +247,21 @@ class CheckResourcePermission
                 return true;
             }
         }
-
+        
         return false;
+    }
+    
+    /**
+     * Group permissions by resource for UI display.
+     */
+    public function groupPermissionsByResource(Collection $permissions): Collection
+    {
+        return $permissions->groupBy('resource')->map(function ($group, $resource) {
+            return [
+                'resource' => $resource,
+                'type' => $group->first()['type'] ?? 'resource',
+                'permissions' => $group->keyBy('action'),
+            ];
+        });
     }
 }

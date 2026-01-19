@@ -1,45 +1,52 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Szczegóły Zjazdu</h2>
-            <x-ui.button variant="ghost" href="{{ route('return-trips.index') }}" class="btn-sm">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Szczegóły Zjazdu">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('return-trips.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
+                    <x-ui.button 
+                        variant="ghost" 
+                        href="{{ route('return-trips.edit', $returnTrip) }}"
+                        routeName="return-trips.edit"
+                        action="edit"
+                    >
+                        Edytuj
+                    </x-ui.button>
+                    <form method="POST" action="{{ route('return-trips.cancel', $returnTrip) }}" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz anulować ten zjazd?');">
+                        @csrf
+                        <x-ui.button 
+                            variant="danger" 
+                            type="submit"
+                            action="cancel"
+                        >
+                            Anuluj Zjazd
+                        </x-ui.button>
+                    </form>
+                @endif
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            @endif
-            @if(session('error'))
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="bi bi-exclamation-triangle me-2"></i>{{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            @endif
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold text-dark mb-0">Informacje podstawowe</h5>
-                        <div class="d-flex gap-2">
-                            @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
-                                <x-ui.button variant="warning" href="{{ route('return-trips.edit', $returnTrip) }}" class="btn-sm">
-                                    <i class="bi bi-pencil"></i> Edytuj
-                                </x-ui.button>
-                                <form method="POST" action="{{ route('return-trips.cancel', $returnTrip) }}" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz anulować ten zjazd?');">
-                                    @csrf
-                                    <x-ui.button variant="danger" type="submit" class="btn-sm">
-                                        <i class="bi bi-x-circle"></i> Anuluj Zjazd
-                                    </x-ui.button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
+    @if(session('success'))
+        <x-alert type="success" dismissible icon="check-circle">
+            {{ session('success') }}
+        </x-alert>
+    @endif
+    @if(session('error'))
+        <x-alert type="danger" dismissible icon="exclamation-triangle">
+            {{ session('error') }}
+        </x-alert>
+    @endif
+
+    <x-ui.card label="Informacje podstawowe">
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Data zjazdu</h6>
@@ -48,15 +55,15 @@
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Status</h6>
                             @php
-                                $badgeClass = match($returnTrip->status->value) {
-                                    'planned' => 'bg-primary',
-                                    'in_progress' => 'bg-info',
-                                    'completed' => 'bg-success',
-                                    'cancelled' => 'bg-danger',
-                                    default => 'bg-secondary'
+                                $badgeVariant = match($returnTrip->status->value) {
+                                    'planned' => 'primary',
+                                    'in_progress' => 'info',
+                                    'completed' => 'success',
+                                    'cancelled' => 'danger',
+                                    default => 'accent'
                                 };
                             @endphp
-                            <span class="badge {{ $badgeClass }}">{{ $returnTrip->status->label() }}</span>
+                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $returnTrip->status->label() }}</x-ui.badge>
                         </div>
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Pojazd</h6>
@@ -104,7 +111,7 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <span class="badge bg-secondary">{{ ucfirst($participant->status) }}</span>
+                                                    <x-ui.badge variant="accent">{{ ucfirst($participant->status) }}</x-ui.badge>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -115,8 +122,5 @@
                             <p class="text-muted">Brak uczestników</p>
                         @endif
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    </x-ui.card>
 </x-app-layout>

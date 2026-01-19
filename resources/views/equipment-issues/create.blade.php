@@ -105,11 +105,19 @@
                     </div>
 
                     <div class="d-flex justify-content-end align-items-center gap-2">
-                        <x-ui.button variant="ghost" href="{{ route('equipment-issues.index') }}">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('equipment-issues.index') }}"
+                            action="cancel"
+                        >
                             Anuluj
                         </x-ui.button>
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-box-arrow-up me-1"></i> Wydaj Sprzęt
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Wydaj Sprzęt
                         </x-ui.button>
                     </div>
                 </form>

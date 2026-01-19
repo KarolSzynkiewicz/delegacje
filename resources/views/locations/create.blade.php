@@ -1,12 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">Dodaj Nową Lokalizację</h2>
+        <x-ui.page-header title="Dodaj Nową Lokalizację">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('locations.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Dodaj Nową Lokalizację">
                     <form method="POST" action="{{ route('locations.store') }}">
                         @csrf
 
@@ -71,17 +80,24 @@
                             <small class="text-muted d-block mt-1">Zaznacz, jeśli ta lokalizacja jest siedzibą główną firmy</small>
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center">
-                            <x-primary-button>
-                                <i class="bi bi-check-circle me-1"></i> Zapisz
-                            </x-primary-button>
-                            <a href="{{ route('locations.index') }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-x-circle me-1"></i> Anuluj
-                            </a>
-                        </div>
-                    </form>
+                <div class="d-flex justify-content-between align-items-center">
+                    <x-ui.button 
+                        variant="primary" 
+                        type="submit"
+                        action="save"
+                    >
+                        Zapisz
+                    </x-ui.button>
+                    <x-ui.button 
+                        variant="ghost" 
+                        href="{{ route('locations.index') }}"
+                        action="cancel"
+                    >
+                        Anuluj
+                    </x-ui.button>
                 </div>
-            </div>
-        </div>
+            </form>
+        </x-ui.card>
     </div>
+</div>
 </x-app-layout>

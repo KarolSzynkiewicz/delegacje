@@ -1,16 +1,27 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Dokument: {{ $document->name }}</h2>
-            <div class="d-flex gap-2">
-                <x-ui.button variant="warning" href="{{ route('documents.edit', $document) }}">Edytuj</x-ui.button>
-                <x-ui.button variant="ghost" href="{{ route('documents.index') }}">Wróć do listy</x-ui.button>
-            </div>
-        </div>
+        <x-ui.page-header title="Dokument: {{ $document->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('documents.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('documents.edit', $document) }}"
+                    routeName="documents.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
-
-    <div class="py-4">
-        <div class="container-xxl">
             <x-ui.card class="mb-4">
                 <h5 class="fw-bold mb-3">Opis</h5>
                 <p>{{ $document->description ?? 'Brak opisu' }}</p>
@@ -71,6 +82,4 @@
                     <p class="text-muted">Brak przypisanych dokumentów</p>
                 @endif
             </x-ui.card>
-        </div>
-    </div>
 </x-app-layout>

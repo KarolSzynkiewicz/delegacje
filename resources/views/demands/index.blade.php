@@ -1,13 +1,17 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">
-                Zapotrzebowanie projektu: {{ $project->name }}
-            </h2>
-            <x-ui.button variant="primary" href="{{ route('projects.demands.create', $project) }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Zapotrzebowanie
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Zapotrzebowanie projektu: {{ $project->name }}">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('projects.demands.create', $project) }}"
+                    routeName="projects.demands.create"
+                    action="create"
+                >
+                    Dodaj Zapotrzebowanie
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     @if (session('success'))
@@ -16,23 +20,23 @@
         </x-alert>
     @endif
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <x-ui.card>
+        @if($demands->count() > 0)
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th class="text-start">Rola</th>
-                            <th class="text-start">Liczba osób</th>
-                            <th class="text-start">Od - Do</th>
-                            <th class="text-start">Akcje</th>
+                            <th>Rola</th>
+                            <th>Liczba osób</th>
+                            <th>Od - Do</th>
+                            <th>Akcje</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($demands as $demand)
+                        @foreach ($demands as $demand)
                             <tr>
                                 <td>
-                                    <span class="badge bg-secondary">{{ $demand->role->name }}</span>
+                                    <x-ui.badge variant="accent">{{ $demand->role->name }}</x-ui.badge>
                                 </td>
                                 <td>
                                     <span class="fw-semibold">{{ $demand->required_count }}</span>
@@ -56,14 +60,7 @@
                                     />
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-4">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    Brak zapotrzebowań dla tego projektu
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
@@ -73,6 +70,20 @@
                     {{ $demands->links() }}
                 </div>
             @endif
-        </div>
-    </div>
+        @else
+            <x-ui.empty-state 
+                icon="inbox" 
+                message="Brak zapotrzebowań dla tego projektu."
+            >
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('projects.demands.create', $project) }}"
+                    routeName="projects.demands.create"
+                    action="create"
+                >
+                    Dodaj pierwsze zapotrzebowanie
+                </x-ui.button>
+            </x-ui.empty-state>
+        @endif
+    </x-ui.card>
 </x-app-layout>

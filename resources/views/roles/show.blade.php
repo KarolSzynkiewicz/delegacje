@@ -1,20 +1,29 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Rola: {{ $role->name }}</h2>
-            <div class="d-flex gap-2">
-                <x-edit-button href="{{ route('roles.edit', $role) }}" />
-                <x-ui.button variant="ghost" href="{{ route('roles.index') }}" class="btn-sm">
-                    <i class="bi bi-arrow-left"></i> Powrót
+        <x-ui.page-header title="Rola: {{ $role->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('roles.index') }}"
+                    action="back"
+                >
+                    Powrót
                 </x-ui.button>
-            </div>
-        </div>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('roles.edit', $role) }}"
+                    routeName="roles.edit"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-body">
+    <x-ui.card label="Informacje podstawowe" class="mb-3">
                     <div class="row g-4">
                         <div class="col-md-6">
                             <h5 class="fw-bold text-dark mb-2">Nazwa</h5>
@@ -27,22 +36,19 @@
                         </div>
                         @endif
                     </div>
-                </div>
-            </div>
+    </x-ui.card>
 
-            @if($role->employees->count() > 0)
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-body">
-                    <h5 class="fw-bold text-dark mb-4">Pracownicy z tą rolą ({{ $role->employees->count() }})</h5>
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th class="text-start">Imię i Nazwisko</th>
-                                    <th class="text-start">Email</th>
-                                    <th class="text-start">Telefon</th>
-                                </tr>
-                            </thead>
+    @if($role->employees->count() > 0)
+    <x-ui.card label="Pracownicy z tą rolą ({{ $role->employees->count() }})" class="mb-3">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Imię i Nazwisko</th>
+                        <th>Email</th>
+                        <th>Telefon</th>
+                    </tr>
+                </thead>
                             <tbody>
                                 @foreach($role->employees as $employee)
                                     <tr>
@@ -55,26 +61,23 @@
                                         <td>{{ $employee->phone ?? '-' }}</td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            @endif
+                </tbody>
+            </table>
+        </div>
+    </x-ui.card>
+    @endif
 
-            @if($role->projectDemands->count() > 0)
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h5 class="fw-bold text-dark mb-4">Zapotrzebowania na tę rolę ({{ $role->projectDemands->count() }})</h5>
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th class="text-start">Projekt</th>
-                                    <th class="text-start">Liczba osób</th>
-                                    <th class="text-start">Okres</th>
-                                </tr>
-                            </thead>
+    @if($role->projectDemands->count() > 0)
+    <x-ui.card label="Zapotrzebowania na tę rolę ({{ $role->projectDemands->count() }})">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Projekt</th>
+                        <th>Liczba osób</th>
+                        <th>Okres</th>
+                    </tr>
+                </thead>
                             <tbody>
                                 @foreach($role->projectDemands as $demand)
                                     <tr>
@@ -92,12 +95,9 @@
                                         </td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            @endif
+                </tbody>
+            </table>
         </div>
-    </div>
+    </x-ui.card>
+    @endif
 </x-app-layout>

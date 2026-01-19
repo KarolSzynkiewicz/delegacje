@@ -1,26 +1,30 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="h4 mb-0 fw-bold text-dark">
-                Rotacja: {{ $employee->full_name }}
-            </h2>
-            <div class="d-flex gap-2">
-                <a href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" class="btn btn-primary btn-sm">
-                    <i class="bi bi-pencil"></i> Edytuj
-                </a>
-                <a href="{{ route('employees.rotations.index', $employee) }}" class="btn btn-secondary btn-sm">
-                    <i class="bi bi-arrow-left"></i> Powrót
-                </a>
-            </div>
-        </div>
+        <x-ui.page-header title="Rotacja: {{ $employee->full_name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('employees.rotations.index', $employee) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}"
+                    action="edit"
+                >
+                    Edytuj
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="container-xxl py-4">
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card shadow-sm border-0">
-                    <div class="card-body">
-                        <h5 class="card-title fw-bold mb-4">Szczegóły rotacji</h5>
+    <div class="row">
+        <div class="col-lg-8">
+            <x-ui.card label="Szczegóły rotacji">
                         
                         <div class="row mb-3">
                             <div class="col-md-4">
@@ -64,17 +68,23 @@
                                     $isScheduled = $rotation->start_date->toDateString() > $today;
                                     $isCancelled = $rotation->status === 'cancelled';
                                 @endphp
-                                @if($isCancelled)
-                                    <span class="badge bg-danger">Anulowana</span>
-                                @elseif($isActive)
-                                    <span class="badge bg-success">Aktywna</span>
-                                @elseif($isCompleted)
-                                    <span class="badge bg-secondary">Zakończona</span>
-                                @elseif($isScheduled)
-                                    <span class="badge bg-info">Zaplanowana</span>
-                                @else
-                                    <span class="badge bg-secondary">Nieznany</span>
-                                @endif
+                                @php
+                                    $badgeVariant = match(true) {
+                                        $isCancelled => 'danger',
+                                        $isActive => 'success',
+                                        $isCompleted => 'accent',
+                                        $isScheduled => 'info',
+                                        default => 'accent'
+                                    };
+                                    $badgeLabel = match(true) {
+                                        $isCancelled => 'Anulowana',
+                                        $isActive => 'Aktywna',
+                                        $isCompleted => 'Zakończona',
+                                        $isScheduled => 'Zaplanowana',
+                                        default => 'Nieznany'
+                                    };
+                                @endphp
+                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $badgeLabel }}</x-ui.badge>
                             </div>
                         </div>
 
@@ -106,9 +116,7 @@
                                 {{ $rotation->updated_at->format('d.m.Y H:i') }}
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
+            </x-ui.card>
         </div>
     </div>
 </x-app-layout>

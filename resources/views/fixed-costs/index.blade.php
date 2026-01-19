@@ -1,28 +1,32 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Koszty Stałe</h2>
-            <x-ui.button variant="primary" href="{{ route('fixed-costs.create') }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Koszt
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Koszty Stałe">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('fixed-costs.create') }}"
+                    routeName="fixed-costs.create"
+                    action="create"
+                >
+                    Dodaj Koszt
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
-            <x-ui.card>
-                @if($costs->count() > 0)
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead>
-                                <tr>
-                                    <th class="text-start">Nazwa</th>
-                                    <th class="text-start">Kwota</th>
-                                    <th class="text-start">Data kosztu</th>
-                                    <th class="text-start">Okres</th>
-                                    <th class="text-start">Akcje</th>
-                                </tr>
-                            </thead>
+    <x-ui.card>
+        @if($costs->count() > 0)
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Kwota</th>
+                            <th>Data kosztu</th>
+                            <th>Okres</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
                             <tbody>
                                 @foreach ($costs as $cost)
                                     <tr>
@@ -56,17 +60,20 @@
                             {{ $costs->links() }}
                         </div>
                     @endif
-                @else
-                    <x-ui.empty-state 
-                        icon="folder-x"
-                        message="Brak kosztów stałych w systemie"
-                    >
-                        <x-ui.button variant="primary" href="{{ route('fixed-costs.create') }}">
-                            <i class="bi bi-plus-circle"></i> Dodaj pierwszy koszt
-                        </x-ui.button>
-                    </x-ui.empty-state>
-                @endif
-            </x-ui.card>
-        </div>
-    </div>
+        @else
+            <x-ui.empty-state 
+                icon="folder-x"
+                message="Brak kosztów stałych w systemie"
+            >
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('fixed-costs.create') }}"
+                    routeName="fixed-costs.create"
+                    action="create"
+                >
+                    Dodaj pierwszy koszt
+                </x-ui.button>
+            </x-ui.empty-state>
+        @endif
+    </x-ui.card>
 </x-app-layout>

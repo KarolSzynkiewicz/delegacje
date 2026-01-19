@@ -1,6 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 mb-0">Edytuj Pojazd: {{ $vehicle->registration_number }}</h2>
+        <x-ui.page-header title="Edytuj Pojazd: {{ $vehicle->registration_number }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('vehicles.show', $vehicle) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -105,10 +115,20 @@
                     />
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button variant="primary" type="submit">
-                            <i class="bi bi-save me-1"></i> Zaktualizuj Pojazd
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zaktualizuj Pojazd
                         </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('vehicles.show', $vehicle) }}">Anuluj</x-ui.button>
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('vehicles.show', $vehicle) }}"
+                            action="cancel"
+                        >
+                            Anuluj
+                        </x-ui.button>
                     </div>
                 </form>
             </x-ui.card>

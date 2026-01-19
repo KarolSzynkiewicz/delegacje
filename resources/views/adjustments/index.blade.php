@@ -1,11 +1,17 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Kary i Nagrody</h2>
-            <x-ui.button variant="primary" href="{{ route('adjustments.create') }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Karę/Nagrodę
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Kary i Nagrody">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('adjustments.create') }}"
+                    routeName="adjustments.create"
+                    action="create"
+                >
+                    Dodaj Karę/Nagrodę
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     @if (session('success'))
@@ -14,21 +20,21 @@
         </x-alert>
     @endif
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <x-ui.card>
+        @if($adjustments->count() > 0)
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th class="text-start">Pracownik</th>
-                            <th class="text-start">Typ</th>
-                            <th class="text-start">Kwota</th>
-                            <th class="text-start">Data</th>
-                            <th class="text-start">Akcje</th>
+                            <th>Pracownik</th>
+                            <th>Typ</th>
+                            <th>Kwota</th>
+                            <th>Data</th>
+                            <th>Akcje</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($adjustments as $adjustment)
+                        @foreach ($adjustments as $adjustment)
                             <tr>
                                 <td>
                                     <a href="{{ route('employees.show', $adjustment->employee) }}" class="text-primary text-decoration-none">
@@ -36,9 +42,9 @@
                                     </a>
                                 </td>
                                 <td>
-                                    <span class="badge {{ $adjustment->type === 'bonus' ? 'bg-success' : 'bg-danger' }}">
+                                    <x-ui.badge variant="{{ $adjustment->type === 'bonus' ? 'success' : 'danger' }}">
                                         {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
-                                    </span>
+                                    </x-ui.badge>
                                 </td>
                                 <td>
                                     <strong class="{{ $adjustment->amount >= 0 ? 'text-success' : 'text-danger' }}">
@@ -57,14 +63,7 @@
                                     />
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-muted py-4">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    Brak kar/nagród
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
@@ -74,6 +73,20 @@
                     {{ $adjustments->links() }}
                 </div>
             @endif
-        </div>
-    </div>
+        @else
+            <x-ui.empty-state 
+                icon="inbox" 
+                message="Brak kar/nagród w systemie."
+            >
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('adjustments.create') }}"
+                    routeName="adjustments.create"
+                    action="create"
+                >
+                    Dodaj pierwszą karę/nagrodę
+                </x-ui.button>
+            </x-ui.empty-state>
+        @endif
+    </x-ui.card>
 </x-app-layout>
