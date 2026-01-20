@@ -50,7 +50,7 @@
             $vehicle = $vehicleAssignments->first()->vehicle;
         @endphp
         <x-ui.card class="mb-3">
-            <div class="card-header bg-light">
+            <div class="card-header">
                 <h5 class="mb-0 fw-semibold">
                     <a href="{{ route('vehicles.show', $vehicle) }}" class="text-decoration-none text-dark">
                         <i class="bi bi-car-front me-2"></i>{{ $vehicle->registration_number }}
@@ -60,54 +60,52 @@
                     </a>
                 </h5>
             </div>
-            <div class="p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Pracownik</th>
+                            <th>Rola</th>
+                            <th>Od - Do</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($vehicleAssignments->sortBy('start_date') as $assignment)
                             <tr>
-                                <th class="text-start">Pracownik</th>
-                                <th class="text-start">Rola</th>
-                                <th class="text-start">Od - Do</th>
-                                <th class="text-start">Akcje</th>
+                                <td>
+                                    <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
+                                        {{ $assignment->employee->full_name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    @php
+                                        $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
+                                        $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
+                                        $isDriver = $positionValue === 'driver';
+                                    @endphp
+                                    <x-ui.badge variant="{{ $isDriver ? 'success' : 'accent' }}">
+                                        {{ $isDriver ? 'Kierowca' : 'Pasażer' }}
+                                    </x-ui.badge>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ $assignment->start_date->format('Y-m-d') }} - 
+                                        {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <x-action-buttons
+                                        viewRoute="{{ route('vehicle-assignments.show', $assignment) }}"
+                                        editRoute="{{ route('vehicle-assignments.edit', $assignment) }}"
+                                        deleteRoute="{{ route('vehicle-assignments.destroy', $assignment) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć to przypisanie pojazdu?"
+                                    />
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($vehicleAssignments->sortBy('start_date') as $assignment)
-                                <tr>
-                                    <td>
-                                        <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
-                                            {{ $assignment->employee->full_name }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        @php
-                                            $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
-                                            $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
-                                            $isDriver = $positionValue === 'driver';
-                                        @endphp
-                                        <x-ui.badge variant="{{ $isDriver ? 'success' : 'accent' }}">
-                                            {{ $isDriver ? 'Kierowca' : 'Pasażer' }}
-                                        </x-ui.badge>
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ $assignment->start_date->format('Y-m-d') }} - 
-                                            {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <x-ui.action-buttons
-                                            viewRoute="{{ route('vehicle-assignments.show', $assignment) }}"
-                                            editRoute="{{ route('vehicle-assignments.edit', $assignment) }}"
-                                            deleteRoute="{{ route('vehicle-assignments.destroy', $assignment) }}"
-                                            deleteMessage="Czy na pewno chcesz usunąć to przypisanie pojazdu?"
-                                        />
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
         </x-ui.card>
     @endforeach
@@ -119,11 +117,9 @@
     @endif
 
     @if($assignments->isEmpty())
-        <x-ui.card>
-            <x-ui.empty-state 
-                icon="car-front"
-                message="Brak przypisań pojazdów"
-            />
-        </x-ui.card>
+        <x-ui.empty-state 
+            icon="car-front"
+            message="Brak przypisań pojazdów"
+        />
     @endif
 </div>

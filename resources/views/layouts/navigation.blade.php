@@ -14,96 +14,304 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav mx-auto">
                 @auth
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('profitability.*') ? 'active' : '' }}" href="{{ route('profitability.index') }}">
-                            <i class="bi bi-graph-up-arrow"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('weekly-overview.*') ? 'active' : '' }}" href="{{ route('weekly-overview.index') }}">
-                            <i class="bi bi-calendar-week"></i> Przegląd Tygodniowy
-                        </a>
-                    </li>
+                    <x-nav.link 
+                        route="profitability.index" 
+                        routePattern="profitability.*"
+                        icon="bi bi-graph-up-arrow"
+                        permission="profitability.view"
+                    >
+                        Dashboard
+                    </x-nav.link>
+
+                    <x-nav.link 
+                        route="weekly-overview.index" 
+                        routePattern="weekly-overview.*"
+                        icon="bi bi-calendar-week"
+                        permission="weekly-overview.view"
+                    >
+                        Przegląd Tygodniowy
+                    </x-nav.link>
 
                     <!-- Zasoby Dropdown -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('projects.*') || request()->routeIs('vehicles.*') || request()->routeIs('accommodations.*') || request()->routeIs('locations.*') ? 'active' : '' }}" href="#" id="zasobyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-boxes"></i> Zasoby
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="zasobyDropdown">
-                            <li><a class="dropdown-item {{ request()->routeIs('projects.*') ? 'active' : '' }}" href="{{ route('projects.index') }}"><i class="bi bi-folder"></i> Projekty</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('vehicles.*') || request()->routeIs('vehicle-assignments.*') ? 'active' : '' }}" href="{{ route('vehicles.index') }}"><i class="bi bi-car-front"></i> Pojazdy</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('accommodations.*') || request()->routeIs('accommodation-assignments.*') ? 'active' : '' }}" href="{{ route('accommodations.index') }}"><i class="bi bi-house"></i> Mieszkania</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('locations.*') ? 'active' : '' }}" href="{{ route('locations.index') }}"><i class="bi bi-geo-alt"></i> Lokalizacje</a></li>
-                        </ul>
-                    </li>
+                    @php
+                        $zasobyPatterns = ['projects.*', 'vehicles.*', 'accommodations.*', 'locations.*', 'vehicle-assignments.*', 'accommodation-assignments.*'];
+                    @endphp
+                    <x-nav.dropdown 
+                        label="Zasoby" 
+                        icon="bi bi-boxes"
+                        :routePatterns="$zasobyPatterns"
+                    >
+                        <x-nav.item 
+                            route="projects.index" 
+                            routePattern="projects.*"
+                            icon="bi bi-folder"
+                            permission="projects.view"
+                        >
+                            Projekty
+                        </x-nav.item>
+                        @php
+                            $vehiclesPatterns = ['vehicles.*', 'vehicle-assignments.*'];
+                            $accommodationsPatterns = ['accommodations.*', 'accommodation-assignments.*'];
+                        @endphp
+                        <x-nav.item 
+                            route="vehicles.index" 
+                            :routePattern="$vehiclesPatterns"
+                            icon="bi bi-car-front"
+                            permission="vehicles.view"
+                        >
+                            Pojazdy
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="accommodations.index" 
+                            :routePattern="$accommodationsPatterns"
+                            icon="bi bi-house"
+                            permission="accommodations.view"
+                        >
+                            Mieszkania
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="locations.index" 
+                            routePattern="locations.*"
+                            icon="bi bi-geo-alt"
+                            permission="locations.view"
+                        >
+                            Lokalizacje
+                        </x-nav.item>
+                    </x-nav.dropdown>
 
                     <!-- Przypisania Dropdown -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('assignments.*') || request()->routeIs('vehicle-assignments.*') || request()->routeIs('accommodation-assignments.*') || request()->routeIs('demands.*') || request()->routeIs('return-trips.*') ? 'active' : '' }}" href="#" id="historiaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-clock-history"></i> Przypisania
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="historiaDropdown">
-                            <li><a class="dropdown-item {{ request()->routeIs('project-assignments.*') || request()->routeIs('assignments.*') ? 'active' : '' }}" href="{{ route('project-assignments.index') }}"><i class="bi bi-person-check"></i> Przypisania pracowników</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('vehicle-assignments.*') ? 'active' : '' }}" href="{{ route('vehicle-assignments.index') }}"><i class="bi bi-car-front-fill"></i> Przypisania pojazdów</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('accommodation-assignments.*') ? 'active' : '' }}" href="{{ route('accommodation-assignments.index') }}"><i class="bi bi-house-fill"></i> Przypisania mieszkań</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('project-demands.*') || request()->routeIs('demands.*') ? 'active' : '' }}" href="{{ route('project-demands.index') }}"><i class="bi bi-clipboard-data"></i> Zapotrzebowania projektów</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('return-trips.*') ? 'active' : '' }}" href="{{ route('return-trips.index') }}"><i class="bi bi-arrow-left-right"></i> Zjazdy</a></li>
-                        </ul>
-                    </li>
+                    @php
+                        $przypisaniaPatterns = ['assignments.*', 'vehicle-assignments.*', 'accommodation-assignments.*', 'demands.*', 'return-trips.*', 'project-assignments.*', 'project-demands.*'];
+                        $assignmentsPatterns = ['project-assignments.*', 'assignments.*'];
+                        $demandsPatterns = ['project-demands.*', 'demands.*'];
+                        $employeeDocsPatterns = ['employee-documents.*', 'employees.*employee-documents.*'];
+                    @endphp
+                    <x-nav.dropdown 
+                        label="Przypisania" 
+                        icon="bi bi-clock-history"
+                        :routePatterns="$przypisaniaPatterns"
+                    >
+                        <x-nav.item 
+                            route="project-assignments.index" 
+                            :routePattern="$assignmentsPatterns"
+                            icon="bi bi-person-check"
+                            permission="assignments.view"
+                        >
+                            Przypisania pracowników
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="vehicle-assignments.index" 
+                            routePattern="vehicle-assignments.*"
+                            icon="bi bi-car-front-fill"
+                            permission="vehicle-assignments.view"
+                        >
+                            Przypisania pojazdów
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="accommodation-assignments.index" 
+                            routePattern="accommodation-assignments.*"
+                            icon="bi bi-house-fill"
+                            permission="accommodation-assignments.view"
+                        >
+                            Przypisania mieszkań
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="project-demands.index" 
+                            :routePattern="$demandsPatterns"
+                            icon="bi bi-clipboard-data"
+                            permission="demands.view"
+                        >
+                            Zapotrzebowania projektów
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="return-trips.index" 
+                            routePattern="return-trips.*"
+                            icon="bi bi-arrow-left-right"
+                            permission="return-trips.view"
+                        >
+                            Zjazdy
+                        </x-nav.item>
+                    </x-nav.dropdown>
 
                     <!-- Logistyka Dropdown -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('equipment.*') || request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="#" id="logistykaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-truck"></i> Logistyka
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="logistykaDropdown">
-                            <li><a class="dropdown-item {{ request()->routeIs('equipment.*') ? 'active' : '' }}" href="{{ route('equipment.index') }}"><i class="bi bi-tools"></i> Sprzęt</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('equipment-issues.*') ? 'active' : '' }}" href="{{ route('equipment-issues.index') }}"><i class="bi bi-box-arrow-up"></i> Wydania sprzętu</a></li>
-                        </ul>
-                    </li>
+                    @php
+                        $logistykaPatterns = ['equipment.*', 'equipment-issues.*'];
+                    @endphp
+                    <x-nav.dropdown 
+                        label="Logistyka" 
+                        icon="bi bi-truck"
+                        :routePatterns="$logistykaPatterns"
+                    >
+                        <x-nav.item 
+                            route="equipment.index" 
+                            routePattern="equipment.*"
+                            icon="bi bi-tools"
+                            permission="equipment.view"
+                        >
+                            Sprzęt
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="equipment-issues.index" 
+                            routePattern="equipment-issues.*"
+                            icon="bi bi-box-arrow-up"
+                            permission="equipment-issues.view"
+                        >
+                            Wydania sprzętu
+                        </x-nav.item>
+                    </x-nav.dropdown>
 
                     <!-- Koszty Dropdown -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('project-variable-costs.*') || request()->routeIs('transport-costs.*') || request()->routeIs('fixed-costs.*') ? 'active' : '' }}" href="#" id="kosztyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-cash-stack"></i> Koszty
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="kosztyDropdown">
-                            <li><a class="dropdown-item {{ request()->routeIs('project-variable-costs.*') ? 'active' : '' }}" href="{{ route('project-variable-costs.index') }}"><i class="bi bi-arrow-repeat"></i> Koszty zmienne</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('transport-costs.*') ? 'active' : '' }}" href="{{ route('transport-costs.index') }}"><i class="bi bi-truck"></i> Koszty transportu</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('fixed-costs.*') ? 'active' : '' }}" href="{{ route('fixed-costs.index') }}"><i class="bi bi-lock"></i> Koszty stałe</a></li>
-                        </ul>
-                    </li>
+                    @php
+                        $kosztyPatterns = ['project-variable-costs.*', 'transport-costs.*', 'fixed-costs.*'];
+                    @endphp
+                    <x-nav.dropdown 
+                        label="Koszty" 
+                        icon="bi bi-cash-stack"
+                        :routePatterns="$kosztyPatterns"
+                    >
+                        <x-nav.item 
+                            route="project-variable-costs.index" 
+                            routePattern="project-variable-costs.*"
+                            icon="bi bi-arrow-repeat"
+                            permission="project-variable-costs.view"
+                        >
+                            Koszty zmienne
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="transport-costs.index" 
+                            routePattern="transport-costs.*"
+                            icon="bi bi-truck"
+                            permission="transport-costs.view"
+                        >
+                            Koszty transportu
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="fixed-costs.index" 
+                            routePattern="fixed-costs.*"
+                            icon="bi bi-lock"
+                            permission="fixed-costs.view"
+                        >
+                            Koszty stałe
+                        </x-nav.item>
+                    </x-nav.dropdown>
 
                     <!-- Kadry Dropdown -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('employees.*') || request()->routeIs('roles.*') || request()->routeIs('adjustments.*') || request()->routeIs('time-logs.*') || request()->routeIs('payrolls.*') || request()->routeIs('rotations.*') || request()->routeIs('documents.*') || request()->routeIs('employee-documents.*') || request()->routeIs('employee-rates.*') || request()->routeIs('advances.*') ? 'active' : '' }}" href="#" id="hrDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-briefcase"></i> Kadry
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="hrDropdown">
-                            <li><a class="dropdown-item {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> Pracownicy</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('roles.*') ? 'active' : '' }}" href="{{ route('roles.index') }}"><i class="bi bi-person-badge"></i> Role pracowników</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('adjustments.*') ? 'active' : '' }}" href="{{ route('adjustments.index') }}"><i class="bi bi-award"></i> Kary i nagrody</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('time-logs.*') ? 'active' : '' }}" href="{{ route('time-logs.index') }}"><i class="bi bi-clock"></i> Ewidencje godzin</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('payrolls.*') ? 'active' : '' }}" href="{{ route('payrolls.index') }}"><i class="bi bi-cash-stack"></i> Payroll</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('rotations.*') ? 'active' : '' }}" href="{{ route('rotations.index') }}"><i class="bi bi-arrow-repeat"></i> Rotacje</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('employee-rates.*') ? 'active' : '' }}" href="{{ route('employee-rates.index') }}"><i class="bi bi-currency-dollar"></i> Stawki pracowników</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('advances.*') ? 'active' : '' }}" href="{{ route('advances.index') }}"><i class="bi bi-wallet2"></i> Zaliczki</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('documents.*') ? 'active' : '' }}" href="{{ route('documents.index') }}"><i class="bi bi-file-earmark-text"></i> Wymagania formalne</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('employee-documents.*') || request()->routeIs('employees.*employee-documents.*') ? 'active' : '' }}" href="{{ route('employee-documents.index') }}"><i class="bi bi-file-earmark-medical"></i> Dokumenty pracowników</a></li>
-                        </ul>
-                    </li>
+                    @php
+                        $kadryPatterns = ['employees.*', 'roles.*', 'adjustments.*', 'time-logs.*', 'payrolls.*', 'rotations.*', 'documents.*', 'employee-documents.*', 'employee-rates.*', 'advances.*'];
+                    @endphp
+                    <x-nav.dropdown 
+                        label="Kadry" 
+                        icon="bi bi-briefcase"
+                        :routePatterns="$kadryPatterns"
+                    >
+                        <x-nav.item 
+                            route="employees.index" 
+                            routePattern="employees.*"
+                            icon="bi bi-people"
+                            permission="employees.view"
+                        >
+                            Pracownicy
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="roles.index" 
+                            routePattern="roles.*"
+                            icon="bi bi-person-badge"
+                            permission="roles.view"
+                        >
+                            Role pracowników
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="adjustments.index" 
+                            routePattern="adjustments.*"
+                            icon="bi bi-award"
+                            permission="adjustments.view"
+                        >
+                            Kary i nagrody
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="time-logs.index" 
+                            routePattern="time-logs.*"
+                            icon="bi bi-clock"
+                            permission="time-logs.view"
+                        >
+                            Ewidencje godzin
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="payrolls.index" 
+                            routePattern="payrolls.*"
+                            icon="bi bi-cash-stack"
+                            permission="payrolls.view"
+                        >
+                            Payroll
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="rotations.index" 
+                            routePattern="rotations.*"
+                            icon="bi bi-arrow-repeat"
+                            permission="rotations.view"
+                        >
+                            Rotacje
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="employee-rates.index" 
+                            routePattern="employee-rates.*"
+                            icon="bi bi-currency-dollar"
+                            permission="employee-rates.view"
+                        >
+                            Stawki pracowników
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="advances.index" 
+                            routePattern="advances.*"
+                            icon="bi bi-wallet2"
+                            permission="advances.view"
+                        >
+                            Zaliczki
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="documents.index" 
+                            routePattern="documents.*"
+                            icon="bi bi-file-earmark-text"
+                            permission="documents.view"
+                        >
+                            Wymagania formalne
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="employee-documents.index" 
+                            :routePattern="$employeeDocsPatterns"
+                            icon="bi bi-file-earmark-medical"
+                            permission="employee-documents.view"
+                        >
+                            Dokumenty pracowników
+                        </x-nav.item>
+                    </x-nav.dropdown>
 
                     <!-- Administracja Dropdown -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('users.*') || request()->routeIs('user-roles.*') ? 'active' : '' }}" href="#" id="administracjaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-shield-lock"></i> Administracja
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="administracjaDropdown">
-                            <li><a class="dropdown-item {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i class="bi bi-person-gear"></i> Użytkownicy</a></li>
-                            <li><a class="dropdown-item {{ request()->routeIs('user-roles.*') ? 'active' : '' }}" href="{{ route('user-roles.index') }}"><i class="bi bi-shield-check"></i> Role użytkowników</a></li>
-                        </ul>
-                    </li>
+                    @php
+                        $adminPatterns = ['users.*', 'user-roles.*'];
+                    @endphp
+                    <x-nav.dropdown 
+                        label="Administracja" 
+                        icon="bi bi-shield-lock"
+                        :routePatterns="$adminPatterns"
+                    >
+                        <x-nav.item 
+                            route="users.index" 
+                            routePattern="users.*"
+                            icon="bi bi-person-gear"
+                            permission="users.view"
+                        >
+                            Użytkownicy
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="user-roles.index" 
+                            routePattern="user-roles.*"
+                            icon="bi bi-shield-check"
+                            permission="user-roles.view"
+                        >
+                            Role użytkowników
+                        </x-nav.item>
+                    </x-nav.dropdown>
                 @endauth
             </ul>
 

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <x-ui.page-header 
-            title="@isset($project) Pracownicy w projekcie: {{ $project->name }} @else Wszystkie przypisania @endisset"
+            title="{{ isset($project) ? 'Pracownicy w projekcie: ' . $project->name : 'Wszystkie przypisania' }}"
         >
             @isset($project)
                 <x-slot name="right">

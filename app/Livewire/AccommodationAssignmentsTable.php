@@ -3,8 +3,8 @@
 namespace App\Livewire;
 
 use App\Models\AccommodationAssignment;
-use App\Models\Employee;
-use App\Models\Accommodation;
+use App\Models\Employee; //not used
+use App\Models\Accommodation; //not used
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -12,7 +12,7 @@ class AccommodationAssignmentsTable extends Component
 {
     use WithPagination;
 
-    public $searchEmployee = '';
+    public $searchEmployee = '';// to wpisal w input- to stan ui- zmiana ui- odswiezenie danych
     public $searchAccommodation = '';
     public $dateFrom = '';
     public $dateTo = '';

@@ -97,14 +97,11 @@
                             </td>
                             <td class="text-end">
                                 <div class="d-flex gap-2 justify-content-end">
-                                    <x-ui.button variant="ghost" href="{{ route('accommodations.show', $accommodation) }}" class="btn-sm">
-                                        <i class="bi bi-eye"></i>
-                                        <span class="d-none d-sm-inline ms-1">Zobacz</span>
-                                    </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route('accommodations.edit', $accommodation) }}" class="btn-sm">
-                                        <i class="bi bi-pencil"></i>
-                                        <span class="d-none d-sm-inline ms-1">Edytuj</span>
-                                    </x-ui.button>
+                                    <x-action-buttons    
+                                        viewRoute="{{ route('accommodations.show', $accommodation) }}"
+                                        editRoute="{{ route('accommodations.edit', $accommodation) }}"
+                                        deleteRoute="{{ route('accommodations.destroy', $accommodation) }}"
+                                    />                                   
                                 </div>
                             </td>
                         </tr>

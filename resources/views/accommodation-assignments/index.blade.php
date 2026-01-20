@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <x-ui.page-header 
-            title="@isset($employee) Mieszkania pracownika: {{ $employee->full_name }} @else Wszystkie przypisania mieszkań @endisset"
+            title="{{ isset($employee) ? 'Mieszkania pracownika: ' . $employee->full_name : 'Wszystkie przypisania mieszkań' }}"
         >
             @isset($employee)
                 <x-slot name="right">

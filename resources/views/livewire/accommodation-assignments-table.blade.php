@@ -1,12 +1,6 @@
 <div>
     <x-ui.card class="mb-4">
-            <x-ui.table-header title="Filtry" class="mb-3">
-                <x-slot name="actions">
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                </x-slot>
-            </x-ui.table-header>
+
             
             <div class="row g-3">
                 <!-- Pracownik -->

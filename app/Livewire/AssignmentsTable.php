@@ -28,33 +28,9 @@ class AssignmentsTable extends Component
         'dateFrom' => ['except' => ''],
         'dateTo' => ['except' => ''],
     ];
+    protected $updatesQueryString = ['searchEmployee', 'searchProject', 'searchRole', 'status', 'dateFrom', 'dateTo'];
 
-    public function updatingSearchEmployee()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingSearchProject()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingSearchRole()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingStatus()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingDateFrom()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingDateTo()
+    public function updating($name, $value)
     {
         $this->resetPage();
     }

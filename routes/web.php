@@ -31,6 +31,10 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+Route::get('/2', function () {
+    return view('welcome2');
+})->name('home2');
+
 Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->group(function () {
     
     // ===== RESOURCE ROUTES =====
