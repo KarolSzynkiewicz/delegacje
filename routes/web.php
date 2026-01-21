@@ -66,10 +66,36 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     
     // Global route for all assignments (without project context)
     Route::get('project-assignments', [ProjectAssignmentController::class, 'all'])
-        ->name('project-assignments.index');
+        ->name('project-assignments.index')
+        ->defaults('resource', 'assignments');
 
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);
+    
+    // Employee tabs with separate routes for permission checking
+    // Using /tab/ prefix to avoid conflicts with resource routes
+    Route::get('employees/{employee}/tab/documents', [EmployeeController::class, 'showDocuments'])
+        ->name('employees.show.documents')
+        ->defaults('resource', 'employee-documents');
+    Route::get('employees/{employee}/tab/assignments', [EmployeeController::class, 'showAssignments'])
+        ->name('employees.show.assignments')
+        ->defaults('resource', 'assignments');
+    Route::get('employees/{employee}/tab/payrolls', [EmployeeController::class, 'showPayrolls'])
+        ->name('employees.show.payrolls')
+        ->defaults('resource', 'payrolls');
+    Route::get('employees/{employee}/tab/employee-rates', [EmployeeController::class, 'showEmployeeRates'])
+        ->name('employees.show.employee-rates')
+        ->defaults('resource', 'employee-rates');
+    Route::get('employees/{employee}/tab/advances', [EmployeeController::class, 'showAdvances'])
+        ->name('employees.show.advances')
+        ->defaults('resource', 'advances');
+    Route::get('employees/{employee}/tab/time-logs', [EmployeeController::class, 'showTimeLogs'])
+        ->name('employees.show.time-logs')
+        ->defaults('resource', 'time-logs');
+    Route::get('employees/{employee}/tab/adjustments', [EmployeeController::class, 'showAdjustments'])
+        ->name('employees.show.adjustments')
+        ->defaults('resource', 'adjustments');
+    
         Route::resource('employees.employee-documents', EmployeeDocumentController::class)
             ->except(['index', 'show'])
             ->parameters(['employee-documents' => 'employeeDocument']);
@@ -78,6 +104,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
     Route::get('rotations/create', [RotationController::class, 'createGlobal'])->name('rotations.create');
     Route::post('rotations', [RotationController::class, 'storeGlobal'])->name('rotations.store');
+    
+    // Employee rotations tab - using /tab/ prefix to avoid conflicts
+    Route::get('employees/{employee}/tab/rotations', [EmployeeController::class, 'showRotations'])
+        ->name('employees.show.rotations')
+        ->defaults('resource', 'rotations');
     
     // Rotations (nested under employees) - scoped for security
     Route::resource('employees.rotations', RotationController::class)
@@ -90,6 +121,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Documents (słownik dokumentów)
     Route::resource('documents', \App\Http\Controllers\DocumentController::class);
 
+    // Employee vehicle assignments tab - using /tab/ prefix to avoid conflicts
+    Route::get('employees/{employee}/tab/vehicle-assignments', [EmployeeController::class, 'showVehicleAssignments'])
+        ->name('employees.show.vehicle-assignments')
+        ->defaults('resource', 'vehicle-assignments');
+    
     Route::resource('employees.vehicle-assignments', VehicleAssignmentController::class)
         ->shallow()
         ->names([
@@ -102,6 +138,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             'destroy' => 'vehicle-assignments.destroy',
         ]);
 
+    // Employee accommodation assignments tab - using /tab/ prefix to avoid conflicts
+    Route::get('employees/{employee}/tab/accommodation-assignments', [EmployeeController::class, 'showAccommodationAssignments'])
+        ->name('employees.show.accommodation-assignments')
+        ->defaults('resource', 'accommodation-assignments');
+    
     Route::resource('employees.accommodation-assignments', AccommodationAssignmentController::class)
         ->shallow()
         ->names([

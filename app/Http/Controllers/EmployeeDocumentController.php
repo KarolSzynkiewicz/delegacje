@@ -63,7 +63,7 @@ class EmployeeDocumentController extends Controller
 
         $employee->employeeDocuments()->create($validated);
 
-        return redirect()->route('employees.show', $employee)
+        return redirect()->route('employees.show.documents', $employee)
             ->with('success', 'Dokument został dodany.');
     }
 
@@ -133,7 +133,7 @@ class EmployeeDocumentController extends Controller
         unset($validated['remove_file']);
         $employeeDocument->update($validated);
 
-        return redirect()->route('employees.show', $employee)
+        return redirect()->route('employees.show.documents', $employee)
             ->with('success', 'Dokument został zaktualizowany.');
     }
 
@@ -154,7 +154,7 @@ class EmployeeDocumentController extends Controller
 
         $employeeDocument->delete();
 
-        return redirect()->route('employees.show', $employee)
+        return redirect()->route('employees.show.documents', $employee)
             ->with('success', 'Dokument został usunięty.');
     }
 }

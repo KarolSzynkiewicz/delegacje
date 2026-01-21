@@ -66,15 +66,18 @@ class CheckResourcePermission
             abort(500, 'Route configuration error');
         }
 
-        // Extract resource and action based on permission type
-        $resource = $this->extractResourceFromRoute($routeName, $permissionType);
-        $routeAction = $this->getRouteAction($routeName);
-        $httpMethod = $request->method();
+        // Get resource from route defaults - REQUIRED, no guessing!
+        $resource = $route->action['defaults']['resource'] ?? $route->defaults['resource'] ?? null;
 
-        // If we can't determine resource, fail fast
+        // If resource is not explicitly set, try to extract from route name (fallback for resource routes)
+        if (!$resource) {
+            $resource = $this->extractResourceFromRoute($routeName, $permissionType);
+        }
+
+        // If we still can't determine resource, fail fast
         if (!$resource) {
             if (app()->environment('local', 'testing')) {
-                throw new \Exception("Cannot determine resource from route name: {$routeName} (type: {$permissionType})");
+                throw new \Exception("Route {$routeName} missing resource default. All routes must have resource set via ->defaults('resource', '...') or be a standard resource route.");
             }
             Log::error("Cannot determine resource from route", [
                 'route' => $routeName,
@@ -83,6 +86,9 @@ class CheckResourcePermission
             ]);
             abort(500, 'Route configuration error');
         }
+
+        $routeAction = $this->getRouteAction($routeName);
+        $httpMethod = $request->method();
 
         // Map to permission name based on permission type
         $permissionName = $this->mapToPermissionName($permissionType, $resource, $routeAction, $httpMethod);
@@ -172,7 +178,8 @@ class CheckResourcePermission
     }
 
     /**
-     * Extract resource name from route name.
+     * Extract resource name from route name (fallback for standard resource routes).
+     * This is only used when resource is not explicitly set in route defaults.
      */
     protected function extractResourceFromRoute(?string $routeName, string $permissionType): ?string
     {
@@ -184,7 +191,7 @@ class CheckResourcePermission
         $parts = explode('.', $routeName);
         
         if ($permissionType === 'action') {
-            // For action routes: return-trips.cancel -> return-trips.cancel
+            // For action routes: return-trips.cancel -> return-trips
             // Remove the last part (action) to get resource
             array_pop($parts);
             $resource = implode('.', $parts);
@@ -212,6 +219,11 @@ class CheckResourcePermission
         // e.g., "projects.assignments.index" -> "assignments"
         // e.g., "vehicle-assignments.show" -> "vehicle-assignments"
         $resource = implode('.', $parts);
+
+        // Special handling for project-assignments -> assignments
+        if ($resource === 'project-assignments') {
+            return 'assignments';
+        }
 
         // For nested resources, take the last part
         // e.g., "employees.vehicles" -> "vehicles"

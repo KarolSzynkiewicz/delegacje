@@ -66,7 +66,6 @@
                             Email
                         </x-livewire.sortable-header>
                         <th class="text-start">Rola</th>
-                        <th class="text-start d-none d-lg-table-cell">Zasoby</th>
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
@@ -108,31 +107,12 @@
                                     <span class="text-muted small">Brak ról</span>
                                 @endif
                             </td>
-                            <td class="d-none d-lg-table-cell">
-                                <div class="d-flex gap-2">
-                                    <x-ui.button variant="ghost" href="{{ route('employees.vehicles.index', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-car-front"></i> Pojazdy
-                                    </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route('employees.accommodations.index', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-house"></i> Mieszkania
-                                    </x-ui.button>
-                                </div>
-                            </td>
                             <td class="text-end">
                                 <x-action-buttons
                                 viewRoute="{{ route('employees.show', $employee) }}"
                                 editRoute="{{ route('employees.edit', $employee) }}"
                                 deleteRoute="{{ route('employees.destroy', $employee) }}"
                             />
-                                <!-- Mobile: Zasoby -->
-                                <div class="d-lg-none mt-2">
-                                    <x-ui.button variant="ghost" href="{{ route('employees.vehicles.index', $employee) }}" class="btn-sm me-1">
-                                        <i class="bi bi-car-front"></i>
-                                    </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route('employees.accommodations.index', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-house"></i>
-                                    </x-ui.button>
-                                </div>
                             </td>
                         </tr>
                     @empty
@@ -142,7 +122,7 @@
                             :has-filters="$search || $roleFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="6"
+                            colspan="5"
                         />
                     @endforelse
                 </tbody>

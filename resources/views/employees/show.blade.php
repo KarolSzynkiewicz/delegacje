@@ -11,42 +11,91 @@
             <div class="col-md-12">
 
             <!-- Zakładki -->
+            @php
+                $activeTab = $activeTab ?? 'info';
+            @endphp
             <ul class="nav nav-tabs mb-4" id="employeeTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
+                    <a class="nav-link {{ $activeTab === 'info' ? 'active' : '' }}" href="{{ route('employees.show', $employee) }}">
                         Informacje
-                    </button>
+                    </a>
                 </li>
+                @if(auth()->user()->hasPermission('employee-documents.view'))
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab">
+                    <a class="nav-link {{ $activeTab === 'documents' ? 'active' : '' }}" href="{{ route('employees.show.documents', $employee) }}">
                         Dokumenty ({{ $employee->employeeDocuments->count() }})
-                    </button>
+                    </a>
                 </li>
+                @endif
+                @if(auth()->user()->hasPermission('rotations.view'))
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="rotations-tab" data-bs-toggle="tab" data-bs-target="#rotations" type="button" role="tab">
+                    <a class="nav-link {{ $activeTab === 'rotations' ? 'active' : '' }}" href="{{ route('employees.show.rotations', $employee) }}">
                         Rotacje ({{ $employee->rotations->count() }})
-                    </button>
+                    </a>
                 </li>
+                @endif
+                @if(auth()->user()->hasPermission('assignments.view'))
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button" role="tab">
+                    <a class="nav-link {{ $activeTab === 'assignments' ? 'active' : '' }}" href="{{ route('employees.show.assignments', $employee) }}">
                         Przypisania do projektów ({{ $projectAssignments->count() }})
-                    </button>
+                    </a>
                 </li>
+                @endif
+                @if(auth()->user()->hasPermission('vehicle-assignments.view'))
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="vehicle-assignments-tab" data-bs-toggle="tab" data-bs-target="#vehicle-assignments" type="button" role="tab">
+                    <a class="nav-link {{ $activeTab === 'vehicle-assignments' ? 'active' : '' }}" href="{{ route('employees.show.vehicle-assignments', $employee) }}">
                         Przypisania do aut ({{ $vehicleAssignments->count() }})
-                    </button>
+                    </a>
                 </li>
+                @endif
+                @if(auth()->user()->hasPermission('accommodation-assignments.view'))
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="accommodation-assignments-tab" data-bs-toggle="tab" data-bs-target="#accommodation-assignments" type="button" role="tab">
+                    <a class="nav-link {{ $activeTab === 'accommodation-assignments' ? 'active' : '' }}" href="{{ route('employees.show.accommodation-assignments', $employee) }}">
                         Przypisania do domów ({{ $accommodationAssignments->count() }})
-                    </button>
+                    </a>
                 </li>
+                @endif
+                @if(auth()->user()->hasPermission('payrolls.view'))
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {{ $activeTab === 'payrolls' ? 'active' : '' }}" href="{{ route('employees.show.payrolls', $employee) }}">
+                        Płace ({{ $payrolls->count() }})
+                    </a>
+                </li>
+                @endif
+                @if(auth()->user()->hasPermission('employee-rates.view'))
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {{ $activeTab === 'employee-rates' ? 'active' : '' }}" href="{{ route('employees.show.employee-rates', $employee) }}">
+                        Stawki ({{ $employeeRates->count() }})
+                    </a>
+                </li>
+                @endif
+                @if(auth()->user()->hasPermission('advances.view'))
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {{ $activeTab === 'advances' ? 'active' : '' }}" href="{{ route('employees.show.advances', $employee) }}">
+                        Zaliczki ({{ $advances->count() }})
+                    </a>
+                </li>
+                @endif
+                @if(auth()->user()->hasPermission('time-logs.view'))
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {{ $activeTab === 'time-logs' ? 'active' : '' }}" href="{{ route('employees.show.time-logs', $employee) }}">
+                        Godziny ({{ $timeLogs->count() }})
+                    </a>
+                </li>
+                @endif
+                @if(auth()->user()->hasPermission('adjustments.view'))
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {{ $activeTab === 'adjustments' ? 'active' : '' }}" href="{{ route('employees.show.adjustments', $employee) }}">
+                        Kary i nagrody ({{ $adjustments->count() }})
+                    </a>
+                </li>
+                @endif
             </ul>
 
-            <div class="tab-content" id="employeeTabsContent">
+            <div id="employeeTabsContent">
+                @if($activeTab === 'info')
                 <!-- Zakładka Informacje -->
-                <div class="tab-pane fade show active" id="info" role="tabpanel">
+                <div id="info" role="tabpanel">
             <div class="card">
                 <div class="card-body">
                     @if($employee->image_path)
@@ -97,10 +146,9 @@
                     </div>
                 </div>
             </div>
-                </div>
-
+                @elseif($activeTab === 'documents' && auth()->user()->hasPermission('employee-documents.view'))
                 <!-- Zakładka Dokumenty -->
-                <div class="tab-pane fade" id="documents" role="tabpanel">
+                <div id="documents" role="tabpanel">
                     <x-ui.card>
                         <x-ui.table-header title="Dokumenty">
                             <x-slot name="actions">
@@ -180,9 +228,9 @@
                         @endif
                     </x-ui.card>
                 </div>
-
+                @elseif($activeTab === 'rotations' && auth()->user()->hasPermission('rotations.view'))
                 <!-- Zakładka Rotacje -->
-                <div class="tab-pane fade" id="rotations" role="tabpanel">
+                <div id="rotations" role="tabpanel">
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
@@ -245,10 +293,9 @@
                     </div>
                 </div>
             </div>
-                </div>
-
+                @elseif($activeTab === 'assignments' && auth()->user()->hasPermission('assignments.view'))
                 <!-- Zakładka Przypisania do projektów -->
-                <div class="tab-pane fade" id="assignments" role="tabpanel">
+                <div id="assignments" role="tabpanel">
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
@@ -315,10 +362,9 @@
                     </div>
                 </div>
             </div>
-                </div>
-
+                @elseif($activeTab === 'vehicle-assignments' && auth()->user()->hasPermission('vehicle-assignments.view'))
                 <!-- Zakładka Przypisania do aut -->
-                <div class="tab-pane fade" id="vehicle-assignments" role="tabpanel">
+                <div id="vehicle-assignments" role="tabpanel">
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
@@ -389,10 +435,9 @@
                     </div>
                 </div>
             </div>
-                </div>
-
+                @elseif($activeTab === 'accommodation-assignments' && auth()->user()->hasPermission('accommodation-assignments.view'))
                 <!-- Zakładka Przypisania do domów -->
-                <div class="tab-pane fade" id="accommodation-assignments" role="tabpanel">
+                <div id="accommodation-assignments" role="tabpanel">
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
@@ -452,22 +497,286 @@
                     </div>
                 </div>
             </div>
+                @elseif($activeTab === 'payrolls' && auth()->user()->hasPermission('payrolls.view'))
+                <!-- Zakładka Płace -->
+                <div id="payrolls" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Płace">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('payrolls.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Payroll</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($payrolls->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Okres</th>
+                                            <th>Godziny</th>
+                                            <th>Kary/Nagrody</th>
+                                            <th>Suma</th>
+                                            <th>Waluta</th>
+                                            <th>Status</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($payrolls as $payroll)
+                                            <tr>
+                                                <td>
+                                                    {{ $payroll->period_start->format('Y-m-d') }} - {{ $payroll->period_end->format('Y-m-d') }}
+                                                </td>
+                                                <td>{{ number_format($payroll->hours_amount, 2, ',', ' ') }}</td>
+                                                <td>{{ number_format($payroll->adjustments_amount, 2, ',', ' ') }}</td>
+                                                <td><strong>{{ number_format($payroll->total_amount, 2, ',', ' ') }}</strong></td>
+                                                <td>{{ $payroll->currency }}</td>
+                                                <td>
+                                                    <x-ui.badge variant="info">{{ ucfirst($payroll->status->value ?? $payroll->status) }}</x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('payrolls.show', $payroll) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak płac dla tego pracownika.</p>
+                        @endif
+                    </div>
                 </div>
+            </div>
+                </div>
+                @elseif($activeTab === 'employee-rates' && auth()->user()->hasPermission('employee-rates.view'))
+                <!-- Zakładka Stawki -->
+                <div id="employee-rates" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Stawki">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employee-rates.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Stawkę</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($employeeRates->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Od</th>
+                                            <th>Do</th>
+                                            <th>Kwota</th>
+                                            <th>Waluta</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($employeeRates as $rate)
+                                            <tr>
+                                                <td>{{ $rate->start_date->format('Y-m-d') }}</td>
+                                                <td>{{ $rate->end_date ? $rate->end_date->format('Y-m-d') : '-' }}</td>
+                                                <td><strong>{{ number_format($rate->amount, 2, ',', ' ') }}</strong></td>
+                                                <td>{{ $rate->currency }}</td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('employee-rates.show', $rate) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('employee-rates.edit', $rate) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak stawek dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+                @elseif($activeTab === 'advances' && auth()->user()->hasPermission('advances.view'))
+                <!-- Zakładka Zaliczki -->
+                <div id="advances" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Zaliczki">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('advances.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Zaliczkę</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($advances->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Kwota</th>
+                                            <th>Oprocentowanie</th>
+                                            <th>Do odliczenia</th>
+                                            <th>Data</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($advances as $advance)
+                                            <tr>
+                                                <td><strong>{{ number_format($advance->amount, 2, ',', ' ') }} {{ $advance->currency }}</strong></td>
+                                                <td>
+                                                    @if($advance->is_interest_bearing && $advance->interest_rate)
+                                                        <x-ui.badge variant="warning">{{ number_format($advance->interest_rate, 2, ',', ' ') }}%</x-ui.badge>
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                </td>
+                                                <td><strong class="text-danger">{{ number_format($advance->getTotalDeductionAmount(), 2, ',', ' ') }} {{ $advance->currency }}</strong></td>
+                                                <td>{{ $advance->date->format('Y-m-d') }}</td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('advances.show', $advance) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('advances.edit', $advance) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak zaliczek dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+                @elseif($activeTab === 'time-logs' && auth()->user()->hasPermission('time-logs.view'))
+                <!-- Zakładka Godziny -->
+                <div id="time-logs" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Ewidencja Godzin">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('time-logs.create') }}" class="btn-sm">Dodaj Wpis</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($timeLogs->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Projekt</th>
+                                            <th>Data</th>
+                                            <th>Godziny</th>
+                                            <th>Notatki</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($timeLogs as $timeLog)
+                                            <tr>
+                                                <td>
+                                                    @if($timeLog->projectAssignment && $timeLog->projectAssignment->project)
+                                                        <a href="{{ route('projects.show', $timeLog->projectAssignment->project) }}" class="text-primary">
+                                                            {{ $timeLog->projectAssignment->project->name }}
+                                                        </a>
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                </td>
+                                                <td>{{ $timeLog->start_time->format('Y-m-d H:i') }}</td>
+                                                <td><strong>{{ number_format($timeLog->hours_worked, 2, ',', ' ') }}</strong></td>
+                                                <td>{{ $timeLog->notes ?? '-' }}</td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('time-logs.show', $timeLog) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('time-logs.edit', $timeLog) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak wpisów godzin dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+                @elseif($activeTab === 'adjustments' && auth()->user()->hasPermission('adjustments.view'))
+                <!-- Zakładka Kary i Nagrody -->
+                <div id="adjustments" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Kary i Nagrody">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('adjustments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Karę/Nagrodę</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($adjustments->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Typ</th>
+                                            <th>Kwota</th>
+                                            <th>Data</th>
+                                            <th>Notatki</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($adjustments as $adjustment)
+                                            <tr>
+                                                <td>
+                                                    <x-ui.badge variant="{{ $adjustment->type === 'bonus' ? 'success' : 'danger' }}">
+                                                        {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
+                                                    </x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <strong class="{{ $adjustment->type === 'bonus' ? 'text-success' : 'text-danger' }}">
+                                                        {{ number_format($adjustment->amount, 2, ',', ' ') }} {{ $adjustment->currency }}
+                                                    </strong>
+                                                </td>
+                                                <td>{{ $adjustment->date->format('Y-m-d') }}</td>
+                                                <td>{{ $adjustment->notes ?? '-' }}</td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('adjustments.show', $adjustment) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('adjustments.edit', $adjustment) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak kar i nagród dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+                </div>
+                @endif
             </div>
         </div>
     </div>
 </div>
-
-@push('scripts')
-<script>
-    // Przełącz na zakładkę dokumentów jeśli jest hash #dokumenty w URL
-    if (window.location.hash === '#dokumenty') {
-        const documentsTab = document.getElementById('documents-tab');
-        if (documentsTab) {
-            const tab = new bootstrap.Tab(documentsTab);
-            tab.show();
-        }
-    }
-</script>
-@endpush
 </x-app-layout>
