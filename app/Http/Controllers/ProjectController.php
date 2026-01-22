@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Location;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -36,6 +37,9 @@ class ProjectController extends Controller
     {
         Project::create($request->validated());
 
+        // Wyczyść cache dla dropdowna projektów
+        Cache::forget('active_projects_dropdown');
+
         return redirect()->route('projects.index')->with('success', 'Projekt został dodany.');
     }
 
@@ -64,6 +68,9 @@ class ProjectController extends Controller
     {
         $project->update($request->validated());
 
+        // Wyczyść cache dla dropdowna projektów (może zmienić się status lub nazwa)
+        Cache::forget('active_projects_dropdown');
+
         return redirect()->route('projects.index')->with('success', 'Projekt został zaktualizowany.');
     }
 
@@ -73,6 +80,9 @@ class ProjectController extends Controller
     public function destroy(Project $project): RedirectResponse
     {
         $project->delete();
+
+        // Wyczyść cache dla dropdowna projektów
+        Cache::forget('active_projects_dropdown');
 
         return redirect()->route('projects.index')->with('success', 'Projekt został usunięty.');
     }

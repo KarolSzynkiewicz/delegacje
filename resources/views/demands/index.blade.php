@@ -43,9 +43,9 @@
                                 </td>
                                 <td>
                                     <small class="text-muted">
-                                        {{ $demand->date_from->format('Y-m-d') }}
-                                        @if($demand->date_to)
-                                            - {{ $demand->date_to->format('Y-m-d') }}
+                                        {{ $demand->start_date->format('Y-m-d') }}
+                                        @if($demand->end_date)
+                                            - {{ $demand->end_date->format('Y-m-d') }}
                                         @else
                                             - ...
                                         @endif

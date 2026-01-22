@@ -38,13 +38,13 @@ class StoreProjectRequest extends FormRequest
 
         // Warunkowa walidacja w zależności od typu projektu
         if ($type === ProjectType::HOURLY->value) {
-            $rules['hourly_rate'] = ['required', 'numeric', 'min:0'];
+            $rules['hourly_rate'] = ['nullable', 'numeric', 'min:0'];
             $rules['contract_amount'] = ['nullable'];
-            $rules['currency'] = ['nullable'];
+            $rules['currency'] = ['nullable', 'string', 'size:3'];
         } else {
             $rules['hourly_rate'] = ['nullable'];
-            $rules['contract_amount'] = ['required', 'numeric', 'min:0'];
-            $rules['currency'] = ['required', 'string', 'size:3'];
+            $rules['contract_amount'] = ['nullable', 'numeric', 'min:0'];
+            $rules['currency'] = ['nullable', 'string', 'size:3'];
         }
 
         return $rules;
@@ -65,13 +65,10 @@ class StoreProjectRequest extends FormRequest
             'type.required' => 'Typ projektu jest wymagany.',
             'budget.numeric' => 'Budżet musi być liczbą.',
             'budget.min' => 'Budżet nie może być ujemny.',
-            'hourly_rate.required' => 'Stawka za godzinę jest wymagana dla projektów rozliczanych godzinowo.',
             'hourly_rate.numeric' => 'Stawka za godzinę musi być liczbą.',
             'hourly_rate.min' => 'Stawka za godzinę nie może być ujemna.',
-            'contract_amount.required' => 'Kwota kontraktu jest wymagana dla projektów zakontraktowanych.',
             'contract_amount.numeric' => 'Kwota kontraktu musi być liczbą.',
             'contract_amount.min' => 'Kwota kontraktu nie może być ujemna.',
-            'currency.required' => 'Waluta jest wymagana dla projektów zakontraktowanych.',
             'currency.size' => 'Kod waluty musi składać się z 3 znaków.',
         ];
     }

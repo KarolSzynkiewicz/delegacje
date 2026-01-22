@@ -1,43 +1,59 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">
-                Edytuj zapotrzebowanie dla projektu: {{ $demand->project->name }}
-            </h2>
-            <x-ui.button variant="ghost" href="{{ route('projects.demands.index', $demand->project) }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Edytuj Zapotrzebowanie: {{ $demand->role->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('demands.show', $demand) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Zapotrzebowanie">
+                <x-ui.errors />
+
+                @if(isset($isDateInPast) && $isDateInPast)
+                <x-ui.alert variant="warning" title="Uwaga: Data w przeszłości" class="mb-4" id="past-date-warning">
+                    <p class="mb-2">
+                        Próbujesz edytować zapotrzebowanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
+                    </p>
+                    <div class="form-check">
+                        <x-ui.input 
+                            type="checkbox" 
+                            id="confirm-past-date"
+                            label="Tak, chcę edytować zapotrzebowanie dla dat w przeszłości"
+                        />
+                    </div>
+                </x-ui.alert>
+                @endif
+
                 <form action="{{ route('demands.update', $demand) }}" method="POST" id="demand-form">
                     @csrf
                     @method('PUT')
-                    
-                    <x-ui.errors />
 
-                    @if(isset($isDateInPast) && $isDateInPast)
-                    <div class="alert alert-warning mb-4" id="past-date-warning" role="alert">
-                        <div class="d-flex align-items-start">
-                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-                            <div class="flex-grow-1">
-                                <h5 class="alert-heading mb-2">Uwaga: Data w przeszłości</h5>
-                                <p class="mb-2">
-                                    Próbujesz edytować zapotrzebowanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
-                                </p>
-                                <div class="form-check">
-                                    <x-ui.input 
-                                        type="checkbox" 
-                                        id="confirm-past-date"
-                                        label="Tak, chcę edytować zapotrzebowanie dla dat w przeszłości"
-                                    />
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="project_id" 
+                            label="Projekt"
+                            required="true"
+                        >
+                            @foreach($projects as $proj)
+                                <option value="{{ $proj->id }}" {{ old('project_id', $demand->project_id) == $proj->id ? 'selected' : '' }}>
+                                    {{ $proj->name }}
+                                    @if($proj->location)
+                                        - {{ $proj->location->name }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </x-ui.input>
                     </div>
-                    @endif
 
                     <div class="mb-3">
                         <x-ui.input 
@@ -58,20 +74,20 @@
                         <div class="col-md-6 mb-3 mb-md-0">
                             <x-ui.input 
                                 type="date" 
-                                name="date_from" 
-                                id="date_from"
+                                name="start_date" 
+                                id="start_date"
                                 label="Data od"
-                                value="{{ old('date_from', $demand->date_from->format('Y-m-d')) }}"
+                                value="{{ old('start_date', $demand->start_date->format('Y-m-d')) }}"
                                 required="true"
                             />
                         </div>
                         <div class="col-md-6">
                             <x-ui.input 
                                 type="date" 
-                                name="date_to" 
-                                id="date_to"
+                                name="end_date" 
+                                id="end_date"
                                 label="Data do (opcjonalnie)"
-                                value="{{ old('date_to', $demand->date_to ? $demand->date_to->format('Y-m-d') : '') }}"
+                                value="{{ old('end_date', $demand->end_date ? $demand->end_date->format('Y-m-d') : '') }}"
                             />
                         </div>
                     </div>
@@ -99,12 +115,20 @@
                         />
                     </div>
 
-                    <div class="d-flex justify-content-end align-items-center gap-2">
-                        <x-ui.button variant="ghost" href="{{ route('projects.demands.index', $demand->project) }}">
-                            Anuluj
+                    <div class="d-flex justify-content-between align-items-center">
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zaktualizuj zapotrzebowanie
                         </x-ui.button>
-                        <x-ui.button variant="primary" type="submit" id="submit-btn">
-                            <i class="bi bi-save me-1"></i> Zaktualizuj zapotrzebowanie
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('demands.show', $demand) }}"
+                            action="cancel"
+                        >
+                            Anuluj
                         </x-ui.button>
                     </div>
                 </form>
@@ -114,12 +138,20 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const dateFromInput = document.getElementById('date_from');
-            const dateToInput = document.getElementById('date_to');
+            const dateFromInput = document.getElementById('start_date');
+            const dateToInput = document.getElementById('end_date');
             const form = document.getElementById('demand-form');
             let pastDateWarning = null;
+            
+            // Sprawdź czy już jest warning z PHP
+            const existingWarning = document.getElementById('past-date-warning');
 
             function checkDates() {
+                // Jeśli już jest warning z PHP, nie dodawaj kolejnego z JS
+                if (existingWarning) {
+                    return;
+                }
+                
                 const dateFrom = dateFromInput.value;
                 const dateTo = dateToInput.value;
                 const today = new Date().toISOString().split('T')[0];
@@ -149,11 +181,11 @@
                                     Próbujesz edytować zapotrzebowanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
                                 </p>
                                 <div class="form-check">
-                                    <x-ui.input 
-                                        type="checkbox" 
-                                        id="confirm-past-date-dynamic"
-                                        label="Tak, chcę edytować zapotrzebowanie dla dat w przeszłości"
-                                    />
+                                    <input class="form-check-input" type="checkbox" id="confirm-past-date-dynamic">
+                                    <label class="form-check-label" for="confirm-past-date-dynamic">
+                                        Tak, chcę edytować zapotrzebowanie dla dat w przeszłości
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     `;

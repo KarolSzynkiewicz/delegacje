@@ -32,6 +32,98 @@ class ProjectDemandController extends Controller
     }
     
     /**
+     * Show the form for creating a new resource without project in URL.
+     */
+    public function createWithoutProject(Request $request)
+    {
+        $roles = Role::all();
+        $projects = Project::with('location')
+            ->orderBy('name')
+            ->get();
+        
+        // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
+        $dateFrom = $request->query('start_date');
+        $dateTo = $request->query('end_date');
+        $projectId = $request->query('project_id');
+        
+        // Sprawdź czy daty są w przeszłości
+        $isDateInPast = false;
+        if ($dateFrom) {
+            $isDateInPast = \Carbon\Carbon::parse($dateFrom)->startOfDay()->isPast();
+        }
+        
+        // Pobierz istniejące zapotrzebowania dla wybranego projektu w tym okresie (jeśli daty i projekt są podane)
+        $existingDemands = collect();
+        $existingDateTo = null;
+        if ($dateFrom && $dateTo && $projectId) {
+            $project = Project::find($projectId);
+            if ($project) {
+                $existingDemands = $project->demands()
+                    ->where('start_date', '<=', $dateTo)
+                    ->where(function ($q) use ($dateFrom) {
+                        $q->whereNull('end_date')
+                          ->orWhere('end_date', '>=', $dateFrom);
+                    })
+                    ->with('role')
+                    ->get();
+                
+                // Znajdź najpóźniejszą datę do z istniejących zapotrzebowań
+                $demandsWithDateTo = $existingDemands->filter(function($d) {
+                    return $d->end_date !== null;
+                });
+                
+                if ($demandsWithDateTo->isNotEmpty()) {
+                    $latestDateTo = $demandsWithDateTo->max('end_date');
+                    $existingDateTo = $latestDateTo ? $latestDateTo->format('Y-m-d') : null;
+                } else {
+                    $uniqueDateFrom = $existingDemands->pluck('start_date')->unique();
+                    if ($uniqueDateFrom->count() === 1 && $uniqueDateFrom->first()->format('Y-m-d') === $dateFrom) {
+                        $existingDateTo = $dateTo;
+                    } else {
+                        $existingDateTo = null;
+                    }
+                }
+                
+                $existingDemands = $existingDemands->keyBy('role_id');
+            }
+        }
+        
+        return view("demands.create", compact("projects", "roles", "dateFrom", "dateTo", "projectId", "existingDemands", "existingDateTo", "isDateInPast"));
+    }
+    
+    /**
+     * Store a newly created resource in storage without project in URL.
+     */
+    public function storeWithoutProject(StoreProjectDemandRequest $request)
+    {
+        try {
+            $validated = $request->validated();
+            
+            // Pobierz projekt z formularza
+            $project = Project::findOrFail($validated['project_id']);
+            
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
+            
+            $this->demandService->createDemands(
+                $project,
+                $startDate,
+                $endDate,
+                $validated['notes'] ?? null,
+                $validated['demands'] ?? []
+            );
+
+            return redirect()
+                ->route("projects.demands.index", $project)
+                ->with("success", "Zapotrzebowania projektu zostały utworzone.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->withErrors($e->errors());
+        }
+    }
+    
+    /**
      * Display a listing of the resource.
      */
     public function index(Project $project)
@@ -50,19 +142,18 @@ class ProjectDemandController extends Controller
     public function create(Project $project, Request $request)
     {
         $roles = Role::all();
+        $projects = Project::with('location')
+            ->orderBy('name')
+            ->get();
         
         // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
-        // Obsługujemy oba warianty dla backward compatibility
-        $dateFrom = $request->query('start_date') ?? $request->query('date_from');
-        $dateTo = $request->query('end_date') ?? $request->query('date_to');
+        $dateFrom = $request->query('start_date');
+        $dateTo = $request->query('end_date');
         
-        // Sprawdź czy daty są w przeszłości
+        // Sprawdź czy daty są w przeszłości (sprawdzamy tylko dateFrom, bo jeśli dateFrom jest w przyszłości, to dateTo też)
         $isDateInPast = false;
         if ($dateFrom) {
             $isDateInPast = \Carbon\Carbon::parse($dateFrom)->startOfDay()->isPast();
-        }
-        if ($dateTo && !$isDateInPast) {
-            $isDateInPast = \Carbon\Carbon::parse($dateTo)->startOfDay()->isPast();
         }
         
         // Pobierz istniejące zapotrzebowania dla tego projektu w tym okresie (jeśli daty są podane)
@@ -104,7 +195,7 @@ class ProjectDemandController extends Controller
             $existingDemands = $existingDemands->keyBy('role_id');
         }
         
-        return view("demands.create", compact("project", "roles", "dateFrom", "dateTo", "existingDemands", "existingDateTo", "isDateInPast"));
+        return view("demands.create", compact("project", "projects", "roles", "dateFrom", "dateTo", "existingDemands", "existingDateTo", "isDateInPast"));
     }
 
     /**
@@ -150,8 +241,11 @@ class ProjectDemandController extends Controller
      */
     public function edit(ProjectDemand $demand)
     {
-        $demand->load("role");
+        $demand->load("role", "project");
         $roles = Role::all();
+        $projects = Project::with('location')
+            ->orderBy('name')
+            ->get();
         
         // Sprawdź czy data jest w przeszłości
         $isDateInPast = $demand->start_date->startOfDay()->isPast();
@@ -159,7 +253,7 @@ class ProjectDemandController extends Controller
             $isDateInPast = $demand->end_date->startOfDay()->isPast();
         }
         
-        return view("demands.edit", compact("demand", "roles", "isDateInPast"));
+        return view("demands.edit", compact("demand", "roles", "projects", "isDateInPast"));
     }
 
     /**
@@ -189,9 +283,12 @@ class ProjectDemandController extends Controller
         // Sprawdź czy zapotrzebowanie zostało zaktualizowane
         $updated = $demand->update($validated);
         
+        // Odśwież model, aby uzyskać zaktualizowany project_id (może być zmieniony)
+        $demand->refresh();
+        
         \Log::info('Demand update result', [
             'updated' => $updated,
-            'demand_after' => $demand->fresh()->toArray()
+            'demand_after' => $demand->toArray()
         ]);
 
         return redirect()

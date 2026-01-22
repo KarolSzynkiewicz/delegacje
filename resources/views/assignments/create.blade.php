@@ -157,11 +157,29 @@
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <div>
+                        <div class="d-flex align-items-center gap-3">
                             <x-ui.button variant="primary" type="submit" id="submit-btn">
                                 <i class="bi bi-save me-1"></i> Zapisz
                             </x-ui.button>
-                            <x-ui.button variant="ghost" href="{{ route('projects.assignments.index', $project) }}" class="ms-2">Anuluj</x-ui.button>
+                            <x-ui.button variant="ghost" href="{{ route('projects.assignments.index', $project) }}">Anuluj</x-ui.button>
+                            
+                            @if(isset($isDateInPast) && $isDateInPast)
+                                <div class="form-check form-check-inline">
+                                    <input type="checkbox" class="form-check-input" id="confirm-past-date" name="confirm_past_date">
+                                    <label class="form-check-label small text-muted" for="confirm-past-date">
+                                        Data w przeszłości
+                                    </label>
+                                </div>
+                            @endif
+                            
+                            <div id="past-date-checkbox-container" class="d-none">
+                                <div class="form-check form-check-inline">
+                                    <input type="checkbox" class="form-check-input" id="confirm-past-date-dynamic" name="confirm_past_date">
+                                    <label class="form-check-label small text-muted" for="confirm-past-date-dynamic">
+                                        Data w przeszłości
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -208,36 +226,27 @@
                 const startDate = startInput.value;
                 const endDate = endInput.value;
                 const isPast = (startDate && startDate < today) || (endDate && endDate < today);
-
-                if (pastDateWarning) {
-                    pastDateWarning.remove();
-                    pastDateWarning = null;
+                
+                const checkboxContainer = document.getElementById('past-date-checkbox-container');
+                const existingCheckbox = document.getElementById('confirm-past-date');
+                
+                // Jeśli już jest checkbox z PHP, nie dodawaj kolejnego
+                if (existingCheckbox) {
+                    return;
                 }
 
                 if (isPast) {
-                    const warningDiv = document.createElement('div');
-                    warningDiv.className = 'alert alert-warning mb-4';
-                    warningDiv.setAttribute('role', 'alert');
-                    warningDiv.innerHTML = `
-                        <div class="d-flex align-items-start">
-                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-                            <div class="flex-grow-1">
-                                <h5 class="alert-heading mb-2">Uwaga: Data w przeszłości</h5>
-                                <p class="mb-2">
-                                    Próbujesz dodać przypisanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
-                                </p>
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="confirm-past-date-dynamic">
-                                    <label class="form-check-label" for="confirm-past-date-dynamic">
-                                        Tak, chcę dodać przypisanie dla dat w przeszłości
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    const firstMb3 = form.querySelector('.mb-3');
-                    form.insertBefore(warningDiv, firstMb3);
-                    pastDateWarning = warningDiv;
+                    if (checkboxContainer) {
+                        checkboxContainer.classList.remove('d-none');
+                    }
+                } else {
+                    if (checkboxContainer) {
+                        checkboxContainer.classList.add('d-none');
+                    }
+                    const dynamicCheckbox = document.getElementById('confirm-past-date-dynamic');
+                    if (dynamicCheckbox) {
+                        dynamicCheckbox.checked = false;
+                    }
                 }
             }
 
@@ -249,7 +258,7 @@
             if (employeeSelect) employeeSelect.addEventListener('change', updateLivewireComponent);
 
             form.addEventListener('submit', function(e) {
-                const checkbox = document.getElementById('confirm-past-date-dynamic');
+                const checkbox = document.getElementById('confirm-past-date') || document.getElementById('confirm-past-date-dynamic');
                 const startDate = startInput.value;
                 const endDate = endInput.value;
                 const today = new Date().toISOString().split('T')[0];

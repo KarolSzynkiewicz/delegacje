@@ -65,8 +65,9 @@
 
                     @php
                         $currentType = old('type', $project->type instanceof \App\Enums\ProjectType ? $project->type->value : ($project->type ?? 'contract'));
+                        $currentCurrency = old('currency', $project->currency ?? 'PLN');
                     @endphp
-                    <div class="mb-3" x-data="{ projectType: '{{ $currentType }}' }">
+                    <div class="mb-3" x-data="{ projectType: '{{ $currentType }}', currency: '{{ $currentCurrency }}' }">
                         <x-ui.input 
                             type="select" 
                             name="type" 
@@ -80,14 +81,30 @@
 
                         <!-- Pola dla projektów rozliczanych godzinowo -->
                         <div x-show="projectType === 'hourly'" x-transition class="mt-3">
-                            <x-ui.input 
-                                type="number" 
-                                name="hourly_rate" 
-                                label="Stawka za godzinę"
-                                value="{{ old('hourly_rate', $project->hourly_rate) }}"
-                                step="0.01"
-                                required="true"
-                            />
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <x-ui.input 
+                                        type="number" 
+                                        name="hourly_rate" 
+                                        label="Stawka za godzinę"
+                                        value="{{ old('hourly_rate', $project->hourly_rate) }}"
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div class="col-md-4">
+                                    <x-ui.input 
+                                        type="select" 
+                                        name="currency" 
+                                        label="Waluta"
+                                        x-model="currency"
+                                    >
+                                        <option value="PLN" {{ $currentCurrency == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                        <option value="EUR" {{ $currentCurrency == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                        <option value="USD" {{ $currentCurrency == 'USD' ? 'selected' : '' }}>USD</option>
+                                        <option value="GBP" {{ $currentCurrency == 'GBP' ? 'selected' : '' }}>GBP</option>
+                                    </x-ui.input>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Pola dla projektów zakontraktowanych -->
@@ -100,7 +117,6 @@
                                         label="Kwota kontraktu"
                                         value="{{ old('contract_amount', $project->contract_amount) }}"
                                         step="0.01"
-                                        required="true"
                                     />
                                 </div>
                                 <div class="col-md-4">
@@ -108,42 +124,56 @@
                                         type="select" 
                                         name="currency" 
                                         label="Waluta"
-                                        required="true"
+                                        x-model="currency"
                                     >
-                                        <option value="PLN" {{ old('currency', $project->currency ?? 'PLN') == 'PLN' ? 'selected' : '' }}>PLN</option>
-                                        <option value="EUR" {{ old('currency', $project->currency ?? 'PLN') == 'EUR' ? 'selected' : '' }}>EUR</option>
-                                        <option value="USD" {{ old('currency', $project->currency ?? 'PLN') == 'USD' ? 'selected' : '' }}>USD</option>
-                                        <option value="GBP" {{ old('currency', $project->currency ?? 'PLN') == 'GBP' ? 'selected' : '' }}>GBP</option>
+                                        <option value="PLN" {{ $currentCurrency == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                        <option value="EUR" {{ $currentCurrency == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                        <option value="USD" {{ $currentCurrency == 'USD' ? 'selected' : '' }}>USD</option>
+                                        <option value="GBP" {{ $currentCurrency == 'GBP' ? 'selected' : '' }}>GBP</option>
+                                    </x-ui.input>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-0">
+                                <div class="col-md-8">
+                                    <x-ui.input 
+                                        type="number" 
+                                        name="budget" 
+                                        label="Budżet"
+                                        value="{{ old('budget', $project->budget) }}"
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div class="col-md-4">
+                                    <x-ui.input 
+                                        type="select" 
+                                        name="currency" 
+                                        label="Waluta"
+                                        x-model="currency"
+                                    >
+                                        <option value="PLN" {{ $currentCurrency == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                        <option value="EUR" {{ $currentCurrency == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                        <option value="USD" {{ $currentCurrency == 'USD' ? 'selected' : '' }}>USD</option>
+                                        <option value="GBP" {{ $currentCurrency == 'GBP' ? 'selected' : '' }}>GBP</option>
                                     </x-ui.input>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="number" 
-                            name="budget" 
-                            label="Budżet (PLN)"
-                            value="{{ old('budget', $project->budget) }}"
-                            step="0.01"
-                        />
-                    </div>
-
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button 
-                            variant="primary" 
-                            type="submit"
-                            action="save"
-                        >
-                            Aktualizuj
-                        </x-ui.button>
                         <x-ui.button 
                             variant="ghost" 
                             href="{{ route('projects.index') }}"
                             action="cancel"
                         >
                             Anuluj
+                        </x-ui.button>
+                        <x-ui.button 
+                            variant="primary" 
+                            type="submit"
+                            action="save"
+                        >
+                            Aktualizuj
                         </x-ui.button>
                     </div>
                 </form>

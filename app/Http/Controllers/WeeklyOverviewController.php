@@ -189,12 +189,13 @@ class WeeklyOverviewController extends Controller
     }
 
     /**
-     * Get all projects for dropdowns (cached for performance).
+     * Get all active projects for dropdowns.
+     * Uses cache with shorter TTL to ensure new projects appear quickly.
      */
     protected function getAllProjectsForDropdown()
     {
-        return cache()->remember('all_projects_dropdown', 3600, function () {
-            return Project::orderBy('name')->get();
+        return cache()->remember('active_projects_dropdown', 300, function () {
+            return Project::active()->orderBy('name')->get();
         });
     }
 }

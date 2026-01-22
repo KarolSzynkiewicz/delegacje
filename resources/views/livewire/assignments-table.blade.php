@@ -31,7 +31,7 @@
                 </div>
             </div>
     </x-ui.card>
-
+ <!-- not here?? -->
     @php
         $groupedAssignments = $assignments->groupBy(function($assignment) {
             return $assignment->project->id;
@@ -43,6 +43,7 @@
         @php
             $project = $projectAssignments->first()->project;
         @endphp
+        <!-- Table for each project -->
         <x-ui.card class="mb-3">
             <div class="card-header">
                 <h5 class="mb-0 fw-semibold">
@@ -80,6 +81,7 @@
                                     </small>
                                 </td>
                                 <td>
+                                    <!-- Status badge not here -->
                                     @php
                                         $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
                                         $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;

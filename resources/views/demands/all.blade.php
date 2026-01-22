@@ -1,6 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Wszystkie zapotrzebowania projektów" />
+        <x-ui.page-header title="Wszystkie zapotrzebowania projektów">
+            <x-slot name="right">
+                @php
+                    $firstProject = \App\Models\Project::orderBy('name')->first();
+                @endphp
+                @if($firstProject)
+                    <x-ui.button 
+                        variant="primary" 
+                        href="{{ route('projects.demands.create', $firstProject) }}"
+                        action="create"
+                    >
+                        Dodaj zapotrzebowanie
+                    </x-ui.button>
+                @endif
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     @if (session('success'))
@@ -15,48 +30,48 @@
             $sortedDemands = $projectDemands->sortBy('start_date');
         @endphp
         <x-ui.card label="{{ $project->name }}" class="mb-4">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="text-start">Rola</th>
+                            <th class="text-start">Liczba osób</th>
+                            <th class="text-start">Od - Do</th>
+                            <th class="text-end" style="width: 120px;">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($sortedDemands as $demand)
                             <tr>
-                                <th class="text-start">Rola</th>
-                                <th class="text-start">Liczba osób</th>
-                                <th class="text-start">Od - Do</th>
-                                <th class="text-start">Akcje</th>
+                                <td>
+                                    <x-ui.badge variant="accent">{{ $demand->role->name }}</x-ui.badge>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold">{{ $demand->required_count }}</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ $demand->start_date->format('Y-m-d') }}
+                                        @if($demand->end_date)
+                                            - {{ $demand->end_date->format('Y-m-d') }}
+                                        @else
+                                            - ...
+                                        @endif
+                                    </small>
+                                </td>
+                                <td class="text-end">
+                                    <x-action-buttons
+                                        viewRoute="{{ route('demands.show', $demand) }}"
+                                        editRoute="{{ route('demands.edit', $demand) }}"
+                                        deleteRoute="{{ route('demands.destroy', $demand) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć to zapotrzebowanie?"
+                                    />
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($sortedDemands as $demand)
-                                <tr>
-                                    <td>
-                                        <x-ui.badge variant="accent">{{ $demand->role->name }}</x-ui.badge>
-                                    </td>
-                                    <td>
-                                        <span class="fw-semibold">{{ $demand->required_count }}</span>
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ $demand->start_date->format('Y-m-d') }}
-                                            @if($demand->end_date)
-                                                - {{ $demand->end_date->format('Y-m-d') }}
-                                            @else
-                                                - ...
-                                            @endif
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <x-action-buttons
-                                            viewRoute="{{ route('demands.show', $demand) }}"
-                                            editRoute="{{ route('demands.edit', $demand) }}"
-                                            deleteRoute="{{ route('demands.destroy', $demand) }}"
-                                            deleteMessage="Czy na pewno chcesz usunąć to zapotrzebowanie?"
-                                        />
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         </x-ui.card>
     @empty
         <x-ui.empty-state 

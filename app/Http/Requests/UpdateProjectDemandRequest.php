@@ -22,6 +22,7 @@ class UpdateProjectDemandRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'project_id' => ['required', 'exists:projects,id'],
             'role_id' => ['required', 'exists:roles,id'],
             'required_count' => ['required', 'integer', 'min:0'],
             'start_date' => ['required', 'date'],
@@ -38,6 +39,8 @@ class UpdateProjectDemandRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'project_id.required' => 'Projekt jest wymagany.',
+            'project_id.exists' => 'Wybrany projekt nie istnieje.',
             'role_id.required' => 'Rola jest wymagana.',
             'role_id.exists' => 'Wybrana rola nie istnieje.',
             'required_count.required' => 'Ilość jest wymagana.',

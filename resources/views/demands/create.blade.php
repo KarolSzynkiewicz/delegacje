@@ -1,13 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">
-                Dodaj zapotrzebowanie dla projektu: {{ $project->name }}
-            </h2>
-            <x-ui.button variant="ghost" href="{{ route('projects.demands.index', $project) }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Dodaj zapotrzebowanie">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('projects.demands.index', $project) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -17,6 +20,24 @@
                     @csrf
                     
                     <x-ui.errors />
+                    
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="project_id" 
+                            label="Projekt"
+                            onchange="if(this.value) { const queryString = '{{ request()->getQueryString() }}'; window.location.href = '{{ url('/projects') }}/' + this.value + '/demands/create' + (queryString ? '?' + queryString : ''); }"
+                        >
+                            @foreach($projects as $proj)
+                                <option value="{{ $proj->id }}" {{ $project->id == $proj->id ? 'selected' : '' }}>
+                                    {{ $proj->name }}
+                                    @if($proj->location)
+                                        - {{ $proj->location->name }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                    </div>
 
                     @if($dateFrom && $dateTo)
                     <div class="alert alert-info mb-4" role="alert">
@@ -49,20 +70,20 @@
                         <div class="col-md-6 mb-3 mb-md-0">
                             <x-ui.input 
                                 type="date" 
-                                name="date_from" 
-                                id="date_from"
+                                name="start_date" 
+                                id="start_date"
                                 label="Data od"
-                                value="{{ $dateFrom ?? '' }}"
+                                value="{{ old('start_date', $dateFrom ?? '') }}"
                                 required="true"
                             />
                         </div>
                         <div class="col-md-6">
                             <x-ui.input 
                                 type="date" 
-                                name="date_to" 
-                                id="date_to"
+                                name="end_date" 
+                                id="end_date"
                                 label="Data do (opcjonalnie)"
-                                value="{{ old('date_to', $existingDateTo ?? $dateTo ?? '') }}"
+                                value="{{ old('end_date', $dateTo ?? $existingDateTo ?? '') }}"
                             />
                         </div>
                     </div>
@@ -155,12 +176,20 @@
             });
 
             // Sprawdzanie dat w przeszłości i wyświetlanie warningu
-            const dateFromInput = document.getElementById('date_from');
-            const dateToInput = document.getElementById('date_to');
+            const dateFromInput = document.getElementById('start_date');
+            const dateToInput = document.getElementById('end_date');
             const form = document.getElementById('demands-form');
             let pastDateWarning = null;
+            
+            // Sprawdź czy już jest warning z PHP
+            const existingWarning = document.getElementById('past-date-warning');
 
             function checkDates() {
+                // Jeśli już jest warning z PHP, nie dodawaj kolejnego z JS
+                if (existingWarning) {
+                    return;
+                }
+                
                 const dateFrom = dateFromInput.value;
                 const dateTo = dateToInput.value;
                 const today = new Date().toISOString().split('T')[0];
@@ -189,11 +218,12 @@
                                 <p class="mb-2">
                                     Próbujesz dodać zapotrzebowanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
                                 </p>
-                                <x-ui.input 
-                                    type="checkbox" 
-                                    id="confirm-past-date-dynamic"
-                                    label="Tak, chcę dodać zapotrzebowanie dla dat w przeszłości"
-                                />
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="confirm-past-date-dynamic">
+                                    <label class="form-check-label" for="confirm-past-date-dynamic">
+                                        Tak, chcę dodać zapotrzebowanie dla dat w przeszłości
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     `;
