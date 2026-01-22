@@ -33,8 +33,14 @@ class RoutePermissionService
                 continue;
             }
             
-            // Extract resource and action using same logic as middleware
-            $resource = $this->extractResourceFromRoute($routeName, $permissionType);
+            // Get resource from route defaults first (same as middleware) - DECLARATIVE, no guessing!
+            $resource = $route->action['defaults']['resource'] ?? $route->defaults['resource'] ?? null;
+            
+            // If resource is not explicitly set, try to extract from route name (fallback for resource routes)
+            if (!$resource) {
+                $resource = $this->extractResourceFromRoute($routeName, $permissionType);
+            }
+            
             if (!$resource) {
                 continue;
             }
@@ -154,11 +160,10 @@ class RoutePermissionService
         $parts = explode('.', $routeName);
         
         if ($permissionType === 'action') {
-            // For action routes: return-trips.cancel -> return-trips.cancel
-            // Remove the last part (action) to get resource
-            array_pop($parts);
-            $resource = implode('.', $parts);
-            return $resource ?: null;
+            // For action routes: return-trips.cancel -> return-trips.cancel (full route name is the resource)
+            // According to documentation: return-trips.cancel -> return-trips.cancel.update
+            // So resource is the full route name, not with last part removed
+            return $routeName;
         }
         
         if ($permissionType === 'view') {
@@ -263,5 +268,53 @@ class RoutePermissionService
                 'permissions' => $group->keyBy('action'),
             ];
         });
+    }
+    
+    /**
+     * Get Polish name for resource (single source of truth for resource labels).
+     */
+    public function getResourceLabel(string $resource): string
+    {
+        $labels = [
+            'projects' => 'Projekty',
+            'employees' => 'Pracownicy',
+            'vehicles' => 'Pojazdy',
+            'accommodations' => 'Mieszkania',
+            'locations' => 'Lokalizacje',
+            'roles' => 'Role',
+            'assignments' => 'Przypisania projektów',
+            'vehicle-assignments' => 'Przypisania pojazdów',
+            'accommodation-assignments' => 'Przypisania mieszkań',
+            'demands' => 'Zapotrzebowania',
+            'project-demands' => 'Zapotrzebowania projektów',
+            'reports' => 'Raporty',
+            'dashboard' => 'Dashboard',
+            'weekly-overview' => 'Planer tygodniowy',
+            'profitability' => 'Dashboard rentowności',
+            'user-roles' => 'Role użytkowników',
+            'users' => 'Użytkownicy',
+            'logistics-events' => 'Zdarzenia logistyczne',
+            'equipment' => 'Sprzęt',
+            'equipment-issues' => 'Wydania sprzętu',
+            'transport-costs' => 'Koszty transportu',
+            'time-logs' => 'Ewidencje godzin',
+            'adjustments' => 'Kary i nagrody',
+            'advances' => 'Zaliczki',
+            'documents' => 'Dokumenty',
+            'employee-documents' => 'Dokumenty pracowników',
+            'employee-rates' => 'Stawki pracowników',
+            'fixed-costs' => 'Koszty stałe',
+            'payrolls' => 'Payroll',
+            'project-variable-costs' => 'Koszty zmienne projektów',
+            'rotations' => 'Rotacje',
+            'return-trips' => 'Zjazdy',
+            'comments' => 'Komentarze',
+            'project-files' => 'Pliki projektów',
+            'project-tasks' => 'Zadania projektów',
+            'files' => 'Pliki',
+            'tasks' => 'Zadania',
+        ];
+        
+        return $labels[$resource] ?? ucfirst(str_replace('-', ' ', $resource));
     }
 }

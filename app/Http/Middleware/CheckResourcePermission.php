@@ -171,6 +171,8 @@ class CheckResourcePermission
 
     /**
      * Map action route to permission (always .update).
+     * According to documentation: action routes always check {resource}.update
+     * Example: return-trips.cancel -> return-trips.cancel.update
      */
     protected function mapActionPermission(string $resource): string
     {
@@ -191,11 +193,10 @@ class CheckResourcePermission
         $parts = explode('.', $routeName);
         
         if ($permissionType === 'action') {
-            // For action routes: return-trips.cancel -> return-trips
-            // Remove the last part (action) to get resource
-            array_pop($parts);
-            $resource = implode('.', $parts);
-            return $resource ?: null;
+            // For action routes: return-trips.cancel -> return-trips.cancel (full route name is the resource)
+            // According to documentation: return-trips.cancel -> return-trips.cancel.update
+            // So resource is the full route name, not with last part removed
+            return $routeName;
         }
         
         if ($permissionType === 'view') {

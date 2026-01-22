@@ -48,49 +48,8 @@
                             // Get permissions from routes (already filtered to exclude viewAny)
                             $allPermissions = $routePermissions;
                             
-                            // Mapowanie nazw zasobów na polskie
-                            $resourceNames = [
-                                'projects' => 'Projekty',
-                                'employees' => 'Pracownicy',
-                                'vehicles' => 'Pojazdy',
-                                'accommodations' => 'Mieszkania',
-                                'locations' => 'Lokalizacje',
-                                'roles' => 'Role',
-                                'assignments' => 'Przypisania projektów',
-                                'vehicle-assignments' => 'Przypisania pojazdów',
-                                'accommodation-assignments' => 'Przypisania mieszkań',
-                                'demands' => 'Zapotrzebowania',
-                                'reports' => 'Raporty',
-                                'dashboard' => 'Dashboard',
-                                'weekly-overview' => 'Planer tygodniowy',
-                                'profitability' => 'Dashboard rentowności',
-                                'user-roles' => 'Role użytkowników',
-                                'users' => 'Użytkownicy',
-                                'logistics-events' => 'Zdarzenia logistyczne',
-                                'equipment' => 'Sprzęt',
-                                'equipment-issues' => 'Wydania sprzętu',
-                                'transport-costs' => 'Koszty transportu',
-                                'time-logs' => 'Ewidencje godzin',
-                                'adjustments' => 'Kary i nagrody',
-                                'advances' => 'Zaliczki',
-                                'documents' => 'Dokumenty',
-                                'employee-documents' => 'Dokumenty pracowników',
-                                'employee-rates' => 'Stawki pracowników',
-                                'fixed-costs' => 'Koszty stałe',
-                                'payrolls' => 'Payroll',
-                                'project-variable-costs' => 'Koszty zmienne projektów',
-                                'rotations' => 'Rotacje',
-                                // Action resources
-                                'return-trips.prepare' => 'Przygotowanie zjazdu',
-                                'return-trips.cancel' => 'Anulowanie zjazdu',
-                                'equipment-issues.return' => 'Zwrot sprzętu',
-                                'time-logs.monthly-grid' => 'Siatka miesięczna ewidencji',
-                                'time-logs.bulk-update' => 'Masowa aktualizacja ewidencji',
-                                'payrolls.generate-batch' => 'Generowanie batcha payrolli',
-                                'payrolls.recalculate-all' => 'Przeliczanie wszystkich payrolli',
-                                'payrolls.recalculate' => 'Przeliczanie payrolla',
-                                'assignments.time-logs' => 'Ewidencje godzin przypisania',
-                            ];
+                            // Use RoutePermissionService to get resource labels (single source of truth)
+                            $routePermissionService = app(\App\Services\RoutePermissionService::class);
                             
                             $groupedPermissions = [];
                             foreach ($allPermissions as $permission) {
@@ -106,7 +65,8 @@
                                 }
                                 
                                 if (!isset($groupedPermissions[$resource])) {
-                                    $resourceName = $resourceNames[$resource] ?? ucfirst(str_replace('-', ' ', $resource));
+                                    // Get Polish name from RoutePermissionService (single source of truth)
+                                    $resourceName = $routePermissionService->getResourceLabel($resource);
                                     $groupedPermissions[$resource] = [
                                         'name' => $resourceName,
                                         'type' => $type,
@@ -145,8 +105,10 @@
                                 }
                             }
                             
-                            // Sortuj zasoby alfabetycznie
-                            ksort($groupedPermissions);
+                            // Sortuj zasoby alfabetycznie po polskiej nazwie
+                            uasort($groupedPermissions, function($a, $b) {
+                                return strcmp($a['name'], $b['name']);
+                            });
                         @endphp
 
                         <div class="table-responsive">

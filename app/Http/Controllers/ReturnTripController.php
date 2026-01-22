@@ -8,7 +8,7 @@ use App\Models\Vehicle;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
+use Carbon\Carbon; 
 
 class ReturnTripController extends Controller
 {
@@ -60,9 +60,10 @@ class ReturnTripController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        // Redirect to prepare route with data as query parameters
-        return redirect()
-            ->route('return-trips.prepare', $validated);
+        // Ręczne zbudowanie query string, tablice są poprawnie zakodowane
+        $query = http_build_query($validated);
+
+        return redirect(route('return-trips.prepare') . '?' . $query);
     }
 
     /**

@@ -37,6 +37,52 @@ Route::get('/2', function () {
 
 Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->group(function () {
     
+    // ===== ACTION ROUTES =====
+    // IMPORTANT: Action routes MUST be defined BEFORE resource routes to avoid route conflicts
+    // Laravel matches routes in order, so specific routes (like /prepare) must come before parameterized routes (like /{id})
+    Route::group(['defaults' => ['permission_type' => 'action']], function () {
+        // Return Trips Actions - MUST BE BEFORE resource routes to avoid route conflict
+        Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
+            ->name('return-trips.prepare-form')
+            ->defaults('resource', 'return-trips');
+        Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])
+            ->name('return-trips.prepare')
+            ->defaults('resource', 'return-trips');
+        Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])
+            ->name('return-trips.cancel')
+            ->defaults('resource', 'return-trips');
+        
+        // Equipment Issues Actions
+        Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])
+            ->name('equipment-issues.return')
+            ->defaults('resource', 'equipment-issues');
+        Route::post('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'return'])
+            ->name('equipment-issues.return.store')
+            ->defaults('resource', 'equipment-issues');
+        
+        // Time Logs Actions
+        Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])
+            ->name('time-logs.monthly-grid')
+            ->defaults('resource', 'time-logs');
+        Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])
+            ->name('time-logs.bulk-update')
+            ->defaults('resource', 'time-logs');
+        
+        // Payrolls Actions
+        Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])
+            ->name('payrolls.generate-batch')
+            ->defaults('resource', 'payrolls');
+        Route::post('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatch'])
+            ->name('payrolls.generate-batch.store')
+            ->defaults('resource', 'payrolls');
+        Route::post('payrolls/recalculate-all', [\App\Http\Controllers\PayrollController::class, 'recalculateAll'])
+            ->name('payrolls.recalculate-all')
+            ->defaults('resource', 'payrolls');
+        Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])
+            ->name('payrolls.recalculate')
+            ->defaults('resource', 'payrolls');
+    });
+    
     // ===== RESOURCE ROUTES =====
     Route::group(['defaults' => ['permission_type' => 'resource']], function () {
     // Projects + nested demands + assignments
@@ -216,9 +262,6 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Users Management
     Route::resource('users', UserController::class);
     
-        // Return Trips (Zjazdy) - resource routes
-    Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
-    
     // Equipment
     Route::resource('equipment', \App\Http\Controllers\EquipmentController::class);
     Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
@@ -248,6 +291,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     
     // Advances (Zaliczki)
     Route::resource('advances', \App\Http\Controllers\AdvanceController::class);
+    
+    // Return Trips (Zjazdy) - resource routes (MUST BE AFTER action routes to avoid route conflict)
+    // Action routes like /return-trips/prepare must be registered before /return-trips/{id}
+    Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
     });
     
     // ===== VIEW ROUTES =====
@@ -272,39 +319,6 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         
         Route::get('/weekly-overview/planner3', [WeeklyOverviewController::class, 'planner3'])
             ->name('weekly-overview.planner3');
-    });
-    
-    // ===== ACTION ROUTES =====
-    Route::group(['defaults' => ['permission_type' => 'action']], function () {
-        // Return Trips Actions
-        Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
-            ->name('return-trips.prepare-form');
-        Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])
-            ->name('return-trips.prepare');
-        Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])
-            ->name('return-trips.cancel');
-        
-        // Equipment Issues Actions
-        Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])
-            ->name('equipment-issues.return');
-        Route::post('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'return'])
-            ->name('equipment-issues.return.store');
-        
-        // Time Logs Actions
-        Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])
-            ->name('time-logs.monthly-grid');
-        Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])
-            ->name('time-logs.bulk-update');
-        
-        // Payrolls Actions
-        Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])
-            ->name('payrolls.generate-batch');
-        Route::post('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatch'])
-            ->name('payrolls.generate-batch.store');
-        Route::post('payrolls/recalculate-all', [\App\Http\Controllers\PayrollController::class, 'recalculateAll'])
-            ->name('payrolls.recalculate-all');
-        Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])
-            ->name('payrolls.recalculate');
     });
     
     // Profile routes (excluded from permission checking)
