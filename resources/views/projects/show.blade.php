@@ -109,25 +109,22 @@
 
             </x-ui.card>
 
-            @if($project->demand)
+            @if($project->demands && $project->demands->isNotEmpty())
             <x-ui.card label="Zapotrzebowanie" class="mt-4">
-                <dl class="row mb-0">
-                    <div class="col-md-6 mb-2">
-                        <dt class="fw-semibold">Liczba pracowników:</dt>
-                        <dd>{{ $project->demand->required_workers_count }}</dd>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <dt class="fw-semibold">Od:</dt>
-                        <dd>{{ $project->demand->start_date->format('Y-m-d') }}</dd>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <dt class="fw-semibold">Do:</dt>
-                        <dd>{{ $project->demand->end_date ? $project->demand->end_date->format('Y-m-d') : 'Nieokreślone' }}</dd>
-                    </div>
-                </dl>
+                @foreach($project->demands as $demand)
+                    <dl class="row mb-0">
+                        <div class="col-md-6 mb-2">
+                            <dt class="fw-semibold">Od:</dt>
+                            <dd>{{ $demand->start_date->format('Y-m-d') }}</dd>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <dt class="fw-semibold">Do:</dt>
+                            <dd>{{ $demand->end_date ? $demand->end_date->format('Y-m-d') : 'Nieokreślone' }}</dd>
+                        </div>
+                    </dl>
+                @endforeach
             </x-ui.card>
-                    @endif
-                        </x-ui.card>
+            @endif
                     </div>
                     @elseif($activeTab === 'files')
                     <!-- Zakładka Pliki -->

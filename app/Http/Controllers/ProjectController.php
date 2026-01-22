@@ -48,7 +48,7 @@ class ProjectController extends Controller
      */
     public function show(Project $project): View
     {
-        $project->load(['location']);
+        $project->load(['location', 'demands']);
         $project->loadCount(['files', 'tasks', 'assignments', 'comments']);
         $activeTab = 'info';
         return view('projects.show', compact('project', 'activeTab'));
