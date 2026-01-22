@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -24,6 +25,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'image_path',
     ];
 
     /**
@@ -92,5 +94,30 @@ class User extends Authenticatable
         // Użyj checkPermissionTo() zamiast hasPermissionTo()
         // - zwraca false zamiast rzucać wyjątek gdy uprawnienie nie istnieje
         return $this->checkPermissionTo($permissionName);
+    }
+
+    /**
+     * Get the image URL for the user.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image_path) {
+            return null;
+        }
+
+        return asset('storage/' . $this->image_path);
+    }
+
+    /**
+     * Get user initials for avatar.
+     */
+    public function getInitialsAttribute(): string
+    {
+        $parts = explode(' ', $this->name);
+        $initials = '';
+        foreach ($parts as $part) {
+            $initials .= strtoupper(substr($part, 0, 1));
+        }
+        return $initials;
     }
 }
