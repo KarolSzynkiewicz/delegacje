@@ -234,9 +234,9 @@ class WeeklyOverviewService
         
         $totalAssigned = $allStable ? $totalAssignedForNeededRoles : null;
         $totalMissing = max(0, $totalNeeded - $totalAssignedMax);
-        $totalExcess = $assignmentsWithoutDemand->count();
         
-        // Dodaj nadmiar z ról które mają zapotrzebowanie ale za dużo przypisanych
+        // Oblicz nadmiar - sumuj excess ze wszystkich ról (również tych bez zapotrzebowania)
+        $totalExcess = 0;
         foreach ($roleDetails as $roleDetail) {
             if ($roleDetail['excess'] > 0) {
                 $totalExcess += $roleDetail['excess'];
