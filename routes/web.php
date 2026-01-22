@@ -49,6 +49,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::get('projects/{project}/tab/tasks', [ProjectController::class, 'showTasks'])
         ->name('projects.show.tasks')
         ->defaults('resource', 'project-tasks');
+    Route::get('projects/{project}/tab/assignments', [ProjectController::class, 'showAssignments'])
+        ->name('projects.show.assignments')
+        ->defaults('resource', 'assignments');
     Route::get('projects/{project}/tab/comments', [ProjectController::class, 'showComments'])
         ->name('projects.show.comments')
         ->defaults('resource', 'comments');

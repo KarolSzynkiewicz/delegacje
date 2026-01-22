@@ -48,7 +48,8 @@ class ProjectController extends Controller
      */
     public function show(Project $project): View
     {
-        $project->load(['location', 'assignments', 'files', 'tasks', 'comments']);
+        $project->load(['location']);
+        $project->loadCount(['files', 'tasks', 'assignments', 'comments']);
         $activeTab = 'info';
         return view('projects.show', compact('project', 'activeTab'));
     }
@@ -59,6 +60,7 @@ class ProjectController extends Controller
     public function showFiles(Project $project): View
     {
         $project->load('files.uploadedBy');
+        $project->loadCount(['files', 'tasks', 'assignments', 'comments']);
         $activeTab = 'files';
         return view('projects.show', compact('project', 'activeTab'));
     }
@@ -69,9 +71,21 @@ class ProjectController extends Controller
     public function showTasks(Project $project): View
     {
         $project->load(['tasks.assignedTo', 'tasks.createdBy']);
+        $project->loadCount(['files', 'tasks', 'assignments', 'comments']);
         $users = \App\Models\User::orderBy('name')->get();
         $activeTab = 'tasks';
         return view('projects.show', compact('project', 'users', 'activeTab'));
+    }
+
+    /**
+     * Display the assignments tab.
+     */
+    public function showAssignments(Project $project): View
+    {
+        $project->load(['assignments.employee', 'assignments.role']);
+        $project->loadCount(['files', 'tasks', 'assignments', 'comments']);
+        $activeTab = 'assignments';
+        return view('projects.show', compact('project', 'activeTab'));
     }
 
     /**
@@ -80,6 +94,7 @@ class ProjectController extends Controller
     public function showComments(Project $project): View
     {
         $project->load('comments.user');
+        $project->loadCount(['files', 'tasks', 'assignments', 'comments']);
         $activeTab = 'comments';
         return view('projects.show', compact('project', 'activeTab'));
     }

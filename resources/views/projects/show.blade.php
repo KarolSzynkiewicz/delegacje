@@ -38,17 +38,22 @@
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link {{ $activeTab === 'files' ? 'active' : '' }}" href="{{ route('projects.show.files', $project) }}">
-                            Pliki ({{ $project->files()->count() }})
+                            Pliki ({{ $project->files_count ?? 0 }})
                         </a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link {{ $activeTab === 'tasks' ? 'active' : '' }}" href="{{ route('projects.show.tasks', $project) }}">
-                            Zadania ({{ $project->tasks()->count() }})
+                            Zadania ({{ $project->tasks_count ?? 0 }})
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'assignments' ? 'active' : '' }}" href="{{ route('projects.show.assignments', $project) }}">
+                            Przypisani pracownicy ({{ $project->assignments_count ?? 0 }})
                         </a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link {{ $activeTab === 'comments' ? 'active' : '' }}" href="{{ route('projects.show.comments', $project) }}">
-                            Komentarze ({{ $project->comments()->count() }})
+                            Komentarze ({{ $project->comments_count ?? 0 }})
                         </a>
                     </li>
                 </ul>
@@ -57,9 +62,7 @@
                     @if($activeTab === 'info')
                     <!-- Zakładka Informacje -->
                     <div id="info" role="tabpanel">
-                        <div class="row">
-                            <div class="col-lg-8">
-                                <x-ui.card label="Szczegóły Projektu: {{ $project->name }}">
+                        <x-ui.card label="Szczegóły Projektu: {{ $project->name }}">
                 <x-ui.detail-list>
                     <x-ui.detail-item label="Nazwa:">{{ $project->name }}</x-ui.detail-item>
                     <x-ui.detail-item label="Klient:">{{ $project->client_name ?? '-' }}</x-ui.detail-item>
@@ -123,74 +126,8 @@
                     </div>
                 </dl>
             </x-ui.card>
-            @endif
-
-            <x-ui.card label="Przypisani Pracownicy" class="mt-4">
-                @if($project->assignments->count() > 0)
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Pracownik</th>
-                                    <th>Rola</th>
-                                    <th>Okres</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Akcje</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($project->assignments as $assignment)
-                                    <tr>
-                                        <td>
-                                            <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
-                                                {{ $assignment->employee->full_name }}
-                                            </a>
-                                        </td>
-                                        <td>
-                                            <x-ui.badge variant="info">{{ $assignment->role->name }}</x-ui.badge>
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">
-                                                {{ $assignment->start_date->format('Y-m-d') }} - 
-                                                {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : 'Bieżące' }}
-                                            </small>
-                                        </td>
-                                        <td>
-                                            @php
-                                                $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
-                                                $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
-                                                $badgeVariant = match($statusValue) {
-                                                    'active' => 'success',
-                                                    'completed' => 'info',
-                                                    'cancelled' => 'danger',
-                                                    'in_transit' => 'warning',
-                                                    'at_base' => 'info',
-                                                    default => 'info'
-                                                };
-                                            @endphp
-                                            <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($statusValue) }}</x-ui.badge>
-                                        </td>
-                                        <td>
-                                            <x-ui.button 
-                                                variant="ghost" 
-                                                href="{{ route('assignments.show', $assignment) }}"
-                                                routeName="assignments.show"
-                                                action="view"
-                                            />
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <x-ui.empty-state 
-                        icon="people" 
-                        message="Brak przypisanych pracowników"
-                    />
-                @endif
-            </x-ui.card>
-                        </div>
+                    @endif
+                        </x-ui.card>
                     </div>
                     @elseif($activeTab === 'files')
                     <!-- Zakładka Pliki -->
@@ -201,6 +138,75 @@
                     <!-- Zakładka Zadania -->
                     <div id="tasks" role="tabpanel">
                         <x-project-tasks :project="$project" :users="$users ?? []" />
+                    </div>
+                    @elseif($activeTab === 'assignments')
+                    <!-- Zakładka Przypisani pracownicy -->
+                    <div id="assignments" role="tabpanel">
+                        <x-ui.card label="Przypisani Pracownicy">
+                            @if($project->assignments->count() > 0)
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Pracownik</th>
+                                                <th>Rola</th>
+                                                <th>Okres</th>
+                                                <th>Status</th>
+                                                <th class="text-end">Akcje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($project->assignments as $assignment)
+                                                <tr>
+                                                    <td>
+                                                        <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
+                                                            {{ $assignment->employee->full_name }}
+                                                        </a>
+                                                    </td>
+                                                    <td>
+                                                        <x-ui.badge variant="info">{{ $assignment->role->name }}</x-ui.badge>
+                                                    </td>
+                                                    <td>
+                                                        <small class="text-muted">
+                                                            {{ $assignment->start_date->format('Y-m-d') }} - 
+                                                            {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : 'Bieżące' }}
+                                                        </small>
+                                                    </td>
+                                                    <td>
+                                                        @php
+                                                            $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
+                                                            $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
+                                                            $badgeVariant = match($statusValue) {
+                                                                'active' => 'success',
+                                                                'completed' => 'info',
+                                                                'cancelled' => 'danger',
+                                                                'in_transit' => 'warning',
+                                                                'at_base' => 'info',
+                                                                default => 'info'
+                                                            };
+                                                        @endphp
+                                                        <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($statusValue) }}</x-ui.badge>
+                                                    </td>
+                                                    <td>
+                                                        <x-ui.button 
+                                                            variant="ghost" 
+                                                            href="{{ route('assignments.show', $assignment) }}"
+                                                            routeName="assignments.show"
+                                                            action="view"
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <x-ui.empty-state 
+                                    icon="people" 
+                                    message="Brak przypisanych pracowników"
+                                />
+                            @endif
+                        </x-ui.card>
                     </div>
                     @elseif($activeTab === 'comments')
                     <!-- Zakładka Komentarze -->
