@@ -571,31 +571,6 @@
                     </div>
                 </div>
 
-                <!-- Zadania projektu - cały wiersz na dole -->
-                @php
-                    $tasks = collect($weekData['tasks'] ?? [])
-                        ->filter(fn($task) => in_array($task->status->value, [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::IN_PROGRESS->value]));
-                @endphp
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <x-ui.card>
-                            <x-ui.table-header title="Zadania projektu">
-                                <x-ui.button variant="primary" href="{{ route('projects.show.tasks', $projectData['project']) }}" action="create" class="btn-sm">
-                                    Dodaj zadanie
-                                </x-ui.button>
-                            </x-ui.table-header>
-                            @if($tasks->isNotEmpty())
-                                @include('components.project-tasks-list', ['tasks' => $tasks, 'project' => $projectData['project'], 'users' => $users ?? []])
-                            @else
-                                <x-ui.empty-state 
-                                    icon="list-check"
-                                    message="Brak zadań oczekujących lub w trakcie"
-                                />
-                            @endif
-                        </x-ui.card>
-                    </div>
-                </div>
-
                 <!-- Tabelka z ludźmi -->
                 @if(isset($weekData['assigned_employees']) && $weekData['assigned_employees']->isNotEmpty())
                     <div class="mt-4">
@@ -725,6 +700,27 @@
                         />
                     </div>
                 @endif
+
+                <!-- Zadania projektu -->
+                @php
+                    $tasks = collect($weekData['tasks'] ?? [])
+                        ->filter(fn($task) => in_array($task->status->value, [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::IN_PROGRESS->value]));
+                @endphp
+                <div class="mt-4">
+                    <x-ui.table-header title="Zadania projektu">
+                        <x-ui.button variant="primary" href="{{ route('projects.show.tasks', $projectData['project']) }}" action="create" class="btn-sm">
+                            Dodaj zadanie
+                        </x-ui.button>
+                    </x-ui.table-header>
+                    @if($tasks->isNotEmpty())
+                        @include('components.project-tasks-list', ['tasks' => $tasks, 'project' => $projectData['project'], 'users' => $users ?? []])
+                    @else
+                        <x-ui.empty-state 
+                            icon="list-check"
+                            message="Brak zadań oczekujących lub w trakcie"
+                        />
+                    @endif
+                </div>
             @else
                 <x-ui.empty-state 
                     icon="folder"
