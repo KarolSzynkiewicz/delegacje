@@ -8,7 +8,7 @@
                     action="back"
                 >
                     Powrót
-                </x-ui.button>
+            </x-ui.button>
             </x-slot>
         </x-ui.page-header>
     </x-slot>
@@ -16,20 +16,20 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Zapotrzebowanie">
-                <x-ui.errors />
+                    <x-ui.errors />
 
-                @if(isset($isDateInPast) && $isDateInPast)
+                    @if(isset($isDateInPast) && $isDateInPast)
                 <x-ui.alert variant="warning" title="Uwaga: Data w przeszłości" class="mb-4" id="past-date-warning">
-                    <p class="mb-2">
-                        Próbujesz edytować zapotrzebowanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
-                    </p>
-                    <div class="form-check">
-                        <x-ui.input 
-                            type="checkbox" 
-                            id="confirm-past-date"
-                            label="Tak, chcę edytować zapotrzebowanie dla dat w przeszłości"
-                        />
-                    </div>
+                                <p class="mb-2">
+                                    Próbujesz edytować zapotrzebowanie dla dat w przeszłości. Czy na pewno chcesz kontynuować?
+                                </p>
+                                <div class="form-check">
+                                    <x-ui.input 
+                                        type="checkbox" 
+                                        id="confirm-past-date"
+                                        label="Tak, chcę edytować zapotrzebowanie dla dat w przeszłości"
+                                    />
+                            </div>
                 </x-ui.alert>
                 @endif
 

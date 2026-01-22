@@ -80,6 +80,9 @@ class WeeklyOverviewService
         // Get assigned employees with their details
         $assignedEmployees = $this->getAssignedEmployeesDetails($assignments, $weekStart, $weekEnd);
         
+        // Get project tasks
+        $tasks = $project->tasks()->with(['assignedTo', 'createdBy'])->get();
+        
         return [
             'week' => $week,
             'demands' => $demands,
@@ -88,6 +91,7 @@ class WeeklyOverviewService
             'accommodations' => $accommodations,
             'vehicles' => $vehicles,
             'assigned_employees' => $assignedEmployees,
+            'tasks' => $tasks,
             'has_data' => $demands->isNotEmpty() || $assignments->isNotEmpty(),
         ];
     }

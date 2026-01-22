@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ProjectType;
 use App\Enums\ProjectStatus;
+use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class Project extends Model
 {
-    use HasFactory;
+    use HasFactory, HasComments;
 
     /**
      * The attributes that are mass assignable.
@@ -93,6 +94,22 @@ class Project extends Model
     public function variableCosts(): HasMany
     {
         return $this->hasMany(ProjectVariableCost::class);
+    }
+
+    /**
+     * Get the files for this project.
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(ProjectFile::class);
+    }
+
+    /**
+     * Get the tasks for this project.
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(ProjectTask::class);
     }
 
     /**

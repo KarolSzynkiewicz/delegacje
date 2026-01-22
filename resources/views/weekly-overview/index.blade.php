@@ -362,6 +362,60 @@
                                                     @endif
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Sekcja "Obsługuje:" -->
+                                            @php
+                                                // Pobierz employee IDs z assignments tego auta
+                                                $vehicleEmployeeIds = collect($vehicleData['assignments'] ?? [])
+                                                    ->pluck('employee_id')
+                                                    ->unique()
+                                                    ->filter();
+                                                
+                                                // Jeśli są pracownicy przypisani do auta, sprawdź ich projekty
+                                                $otherProjects = collect();
+                                                if ($vehicleEmployeeIds->isNotEmpty()) {
+                                                    $weekStart = $weeks[0]['start'] ?? now()->startOfWeek();
+                                                    $weekEnd = $weeks[0]['end'] ?? now()->endOfWeek();
+                                                    
+                                                    // Pobierz project assignments dla tych pracowników w tym okresie
+                                                    $projectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $vehicleEmployeeIds)
+                                                        ->where(function($query) use ($weekStart, $weekEnd) {
+                                                            $query->where(function($q) use ($weekStart, $weekEnd) {
+                                                                $q->where('start_date', '<=', $weekEnd)
+                                                                  ->where(function($q2) use ($weekStart) {
+                                                                      $q2->whereNull('end_date')
+                                                                         ->orWhere('end_date', '>=', $weekStart);
+                                                                  });
+                                                            });
+                                                        })
+                                                        ->with('project')
+                                                        ->get();
+                                                    
+                                                    // Zbierz unikalne projekty (oprócz aktualnego)
+                                                    $otherProjects = $projectAssignments
+                                                        ->pluck('project')
+                                                        ->filter()
+                                                        ->unique('id')
+                                                        ->filter(fn($p) => $p->id !== $project->id)
+                                                        ->values();
+                                                }
+                                            @endphp
+                                            
+                                            @if($otherProjects->isNotEmpty())
+                                                <hr class="my-2">
+                                                <div class="small">
+                                                    <span class="text-muted fw-semibold">Obsługuje:</span>
+                                                    <div class="mt-1">
+                                                        @foreach($otherProjects as $otherProject)
+                                                            <a href="{{ route('projects.show', $otherProject) }}" class="text-decoration-none d-inline-block me-2 mb-1">
+                                                                <x-ui.badge variant="info" class="small">
+                                                                    {{ $otherProject->name }}
+                                                                </x-ui.badge>
+                                                            </a>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </x-ui.card>
                                     @endforeach
                                 </div>
@@ -458,6 +512,31 @@
                                 @endif
                             @else
                                 <p class="text-muted small mb-0">Brak domów w projekcie</p>
+                            @endif
+                        </x-ui.card>
+                    </div>
+                </div>
+
+                <!-- Zadania projektu - cały wiersz na dole -->
+                @php
+                    $tasks = collect($weekData['tasks'] ?? [])
+                        ->filter(fn($task) => in_array($task->status->value, [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::IN_PROGRESS->value]));
+                @endphp
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <x-ui.card>
+                            <x-ui.table-header title="Zadania projektu">
+                                <x-ui.button variant="primary" href="{{ route('projects.show.tasks', $projectData['project']) }}" action="create" class="btn-sm">
+                                    Dodaj zadanie
+                                </x-ui.button>
+                            </x-ui.table-header>
+                            @if($tasks->isNotEmpty())
+                                @include('components.project-tasks-list', ['tasks' => $tasks, 'project' => $projectData['project'], 'users' => $users ?? []])
+                            @else
+                                <x-ui.empty-state 
+                                    icon="list-check"
+                                    message="Brak zadań oczekujących lub w trakcie"
+                                />
                             @endif
                         </x-ui.card>
                     </div>

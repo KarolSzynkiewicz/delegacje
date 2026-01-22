@@ -71,7 +71,7 @@ class CheckResourcePermission
 
         // If resource is not explicitly set, try to extract from route name (fallback for resource routes)
         if (!$resource) {
-            $resource = $this->extractResourceFromRoute($routeName, $permissionType);
+        $resource = $this->extractResourceFromRoute($routeName, $permissionType);
         }
 
         // If we still can't determine resource, fail fast

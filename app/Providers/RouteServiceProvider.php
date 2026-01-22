@@ -60,6 +60,16 @@ class RouteServiceProvider extends ServiceProvider
             return \App\Models\LogisticsEvent::findOrFail($value);
         });
 
+        // Route model binding for ProjectFile (file parameter)
+        Route::bind('file', function ($value) {
+            return \App\Models\ProjectFile::findOrFail($value);
+        });
+
+        // Route model binding for ProjectTask (task parameter)
+        Route::bind('task', function ($value) {
+            return \App\Models\ProjectTask::findOrFail($value);
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

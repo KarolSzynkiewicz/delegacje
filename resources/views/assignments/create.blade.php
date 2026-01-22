@@ -226,7 +226,7 @@
                 const startDate = startInput.value;
                 const endDate = endInput.value;
                 const isPast = (startDate && startDate < today) || (endDate && endDate < today);
-                
+
                 const checkboxContainer = document.getElementById('past-date-checkbox-container');
                 const existingCheckbox = document.getElementById('confirm-past-date');
                 

@@ -28,6 +28,11 @@ class AppServiceProvider extends ServiceProvider
             'vehicle_assignment' => \App\Models\VehicleAssignment::class,
             'accommodation_assignment' => \App\Models\AccommodationAssignment::class,
             'user' => \App\Models\User::class, // Required for Spatie Permission morphedByMany
+            // Commentable models
+            'project' => \App\Models\Project::class,
+            'project_task' => \App\Models\ProjectTask::class,
+            'vehicle' => \App\Models\Vehicle::class,
+            'accommodation' => \App\Models\Accommodation::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
     }

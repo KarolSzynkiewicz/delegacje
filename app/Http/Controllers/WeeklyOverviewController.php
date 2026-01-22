@@ -37,7 +37,10 @@ class WeeklyOverviewController extends Controller
         // Get all projects for the search dropdown
         $allProjects = $this->getAllProjectsForDropdown();
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects'));
+        // Get users for tasks component
+        $users = \App\Models\User::orderBy('name')->get();
+        
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users'));
     }
 
     /**

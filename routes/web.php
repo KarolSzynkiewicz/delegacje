@@ -41,6 +41,43 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::group(['defaults' => ['permission_type' => 'resource']], function () {
     // Projects + nested demands + assignments
         Route::resource('projects', ProjectController::class);
+    
+    // Project tabs with separate routes for permission checking
+    Route::get('projects/{project}/tab/files', [ProjectController::class, 'showFiles'])
+        ->name('projects.show.files')
+        ->defaults('resource', 'project-files');
+    Route::get('projects/{project}/tab/tasks', [ProjectController::class, 'showTasks'])
+        ->name('projects.show.tasks')
+        ->defaults('resource', 'project-tasks');
+    Route::get('projects/{project}/tab/comments', [ProjectController::class, 'showComments'])
+        ->name('projects.show.comments')
+        ->defaults('resource', 'comments');
+    
+    // Project files
+    Route::post('projects/{project}/files', [\App\Http\Controllers\ProjectFileController::class, 'store'])
+        ->name('projects.files.store');
+    Route::delete('projects/{project}/files/{file}', [\App\Http\Controllers\ProjectFileController::class, 'destroy'])
+        ->name('projects.files.destroy');
+    Route::get('projects/{project}/files/{file}/download', [\App\Http\Controllers\ProjectFileController::class, 'download'])
+        ->name('projects.files.download');
+    
+    // Project tasks
+    Route::resource('projects.tasks', \App\Http\Controllers\ProjectTaskController::class)
+        ->except(['index', 'create']);
+    Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])
+        ->name('projects.tasks.mark-in-progress');
+    Route::post('projects/{project}/tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompleted'])
+        ->name('projects.tasks.mark-completed');
+    Route::post('projects/{project}/tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancel'])
+        ->name('projects.tasks.cancel');
+    
+    // Comments (polymorphic)
+    Route::post('comments', [\App\Http\Controllers\CommentController::class, 'store'])
+        ->name('comments.store');
+    Route::put('comments/{comment}', [\App\Http\Controllers\CommentController::class, 'update'])
+        ->name('comments.update');
+    Route::delete('comments/{comment}', [\App\Http\Controllers\CommentController::class, 'destroy'])
+        ->name('comments.destroy');
 
     Route::resource('projects.demands', ProjectDemandController::class)
         ->shallow()

@@ -83,12 +83,12 @@
                         <div x-show="projectType === 'hourly'" x-transition class="mt-3">
                             <div class="row g-3">
                                 <div class="col-md-8">
-                                    <x-ui.input 
-                                        type="number" 
-                                        name="hourly_rate" 
-                                        label="Stawka za godzinę"
-                                        value="{{ old('hourly_rate', $project->hourly_rate) }}"
-                                        step="0.01"
+                            <x-ui.input 
+                                type="number" 
+                                name="hourly_rate" 
+                                label="Stawka za godzinę"
+                                value="{{ old('hourly_rate', $project->hourly_rate) }}"
+                                step="0.01"
                                     />
                                 </div>
                                 <div class="col-md-4">

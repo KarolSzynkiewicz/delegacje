@@ -23,9 +23,43 @@
         </x-ui.page-header>
     </x-slot>
 
-    <div class="row">
-        <div class="col-lg-8">
-            <x-ui.card label="Szczegóły Projektu: {{ $project->name }}">
+    <div class="container-xxl">
+        <div class="row">
+            <div class="col-md-12">
+                <!-- Zakładki -->
+                @php
+                    $activeTab = $activeTab ?? 'info';
+                @endphp
+                <ul class="nav nav-tabs mb-4" id="projectTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'info' ? 'active' : '' }}" href="{{ route('projects.show', $project) }}">
+                            Informacje
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'files' ? 'active' : '' }}" href="{{ route('projects.show.files', $project) }}">
+                            Pliki ({{ $project->files()->count() }})
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'tasks' ? 'active' : '' }}" href="{{ route('projects.show.tasks', $project) }}">
+                            Zadania ({{ $project->tasks()->count() }})
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'comments' ? 'active' : '' }}" href="{{ route('projects.show.comments', $project) }}">
+                            Komentarze ({{ $project->comments()->count() }})
+                        </a>
+                    </li>
+                </ul>
+
+                <div id="projectTabsContent">
+                    @if($activeTab === 'info')
+                    <!-- Zakładka Informacje -->
+                    <div id="info" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <x-ui.card label="Szczegóły Projektu: {{ $project->name }}">
                 <x-ui.detail-list>
                     <x-ui.detail-item label="Nazwa:">{{ $project->name }}</x-ui.detail-item>
                     <x-ui.detail-item label="Klient:">{{ $project->client_name ?? '-' }}</x-ui.detail-item>
@@ -156,6 +190,26 @@
                     />
                 @endif
             </x-ui.card>
+                        </div>
+                    </div>
+                    @elseif($activeTab === 'files')
+                    <!-- Zakładka Pliki -->
+                    <div id="files" role="tabpanel">
+                        <x-project-files :project="$project" />
+                    </div>
+                    @elseif($activeTab === 'tasks')
+                    <!-- Zakładka Zadania -->
+                    <div id="tasks" role="tabpanel">
+                        <x-project-tasks :project="$project" :users="$users ?? []" />
+                    </div>
+                    @elseif($activeTab === 'comments')
+                    <!-- Zakładka Komentarze -->
+                    <div id="comments" role="tabpanel">
+                        <x-comments :commentable="$project" />
+                    </div>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

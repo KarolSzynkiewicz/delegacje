@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\VehicleType;
+use App\Traits\HasComments;
 
 class Vehicle extends Model
 {
-    use HasFactory;
+    use HasFactory, HasComments;
 
     /**
      * The attributes that are mass assignable.

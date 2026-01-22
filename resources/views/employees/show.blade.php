@@ -770,7 +770,7 @@
                         @else
                             <p class="text-muted">Brak kar i nagród dla tego pracownika.</p>
                         @endif
-                    </div>
+            </div>
                 </div>
             </div>
                 </div>

@@ -8,7 +8,7 @@
                     action="back"
                 >
                     Powrót
-                </x-ui.button>
+            </x-ui.button>
             </x-slot>
         </x-ui.page-header>
     </x-slot>

@@ -48,8 +48,40 @@ class ProjectController extends Controller
      */
     public function show(Project $project): View
     {
-        $project->load('location', 'assignments');
-        return view('projects.show', compact('project'));
+        $project->load(['location', 'assignments', 'files', 'tasks', 'comments']);
+        $activeTab = 'info';
+        return view('projects.show', compact('project', 'activeTab'));
+    }
+
+    /**
+     * Display the files tab.
+     */
+    public function showFiles(Project $project): View
+    {
+        $project->load('files.uploadedBy');
+        $activeTab = 'files';
+        return view('projects.show', compact('project', 'activeTab'));
+    }
+
+    /**
+     * Display the tasks tab.
+     */
+    public function showTasks(Project $project): View
+    {
+        $project->load(['tasks.assignedTo', 'tasks.createdBy']);
+        $users = \App\Models\User::orderBy('name')->get();
+        $activeTab = 'tasks';
+        return view('projects.show', compact('project', 'users', 'activeTab'));
+    }
+
+    /**
+     * Display the comments tab.
+     */
+    public function showComments(Project $project): View
+    {
+        $project->load('comments.user');
+        $activeTab = 'comments';
+        return view('projects.show', compact('project', 'activeTab'));
     }
 
     /**
