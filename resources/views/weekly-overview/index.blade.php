@@ -404,7 +404,7 @@
                                             @if($otherProjects->isNotEmpty())
                                                 <hr class="my-2">
                                                 <div class="small">
-                                                    <span class="text-muted fw-semibold">Obsługuje:</span>
+                                                    <span class="text-muted fw-semibold">Obsługuje również:</span>
                                                     <div class="mt-1">
                                                         @foreach($otherProjects as $otherProject)
                                                             <a href="{{ route('projects.show', $otherProject) }}" class="text-decoration-none d-inline-block me-2 mb-1">
@@ -502,6 +502,60 @@
                                                     @endif
                                                 </div>
                                             </div>
+                                            
+                                            <!-- Sekcja "Obsługuje również:" -->
+                                            @php
+                                                // Pobierz employee IDs z assignments tego domu
+                                                $accommodationEmployeeIds = collect($accommodationData['assignments'] ?? [])
+                                                    ->pluck('employee_id')
+                                                    ->unique()
+                                                    ->filter();
+                                                
+                                                // Jeśli są pracownicy przypisani do domu, sprawdź ich projekty
+                                                $otherProjects = collect();
+                                                if ($accommodationEmployeeIds->isNotEmpty()) {
+                                                    $weekStart = $weeks[0]['start'] ?? now()->startOfWeek();
+                                                    $weekEnd = $weeks[0]['end'] ?? now()->endOfWeek();
+                                                    
+                                                    // Pobierz project assignments dla tych pracowników w tym okresie
+                                                    $projectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $accommodationEmployeeIds)
+                                                        ->where(function($query) use ($weekStart, $weekEnd) {
+                                                            $query->where(function($q) use ($weekStart, $weekEnd) {
+                                                                $q->where('start_date', '<=', $weekEnd)
+                                                                  ->where(function($q2) use ($weekStart) {
+                                                                      $q2->whereNull('end_date')
+                                                                         ->orWhere('end_date', '>=', $weekStart);
+                                                                  });
+                                                            });
+                                                        })
+                                                        ->with('project')
+                                                        ->get();
+                                                    
+                                                    // Zbierz unikalne projekty (oprócz aktualnego)
+                                                    $otherProjects = $projectAssignments
+                                                        ->pluck('project')
+                                                        ->filter()
+                                                        ->unique('id')
+                                                        ->filter(fn($p) => $p->id !== $project->id)
+                                                        ->values();
+                                                }
+                                            @endphp
+                                            
+                                            @if($otherProjects->isNotEmpty())
+                                                <hr class="my-2">
+                                                <div class="small">
+                                                    <span class="text-muted fw-semibold">Obsługuje również:</span>
+                                                    <div class="mt-1">
+                                                        @foreach($otherProjects as $otherProject)
+                                                            <a href="{{ route('projects.show', $otherProject) }}" class="text-decoration-none d-inline-block me-2 mb-1">
+                                                                <x-ui.badge variant="info" class="small">
+                                                                    {{ $otherProject->name }}
+                                                                </x-ui.badge>
+                                                            </a>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </x-ui.card>
                                     @endforeach
                                 </div>
