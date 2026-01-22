@@ -169,14 +169,14 @@
                                             @if($summary->getEmployeesWithoutVehicle()->isNotEmpty())
                                                 <div class="mb-1">
                                                     <x-ui.badge variant="danger">
-                                                        <i class="bi bi-exclamation-circle"></i> Brakuje {{ $summary->getEmployeesWithoutVehicle()->count() }} {{ $summary->getEmployeesWithoutVehicle()->count() == 1 ? 'auta' : 'aut' }}
+                                                        <i class="bi bi-exclamation-circle text-white"></i> {{ $summary->getEmployeesWithoutVehicle()->count() }} {{ $summary->getEmployeesWithoutVehicle()->count() == 1 ? 'osobie' : 'osobom' }} brakuje auta
                                                     </x-ui.badge>
                                                 </div>
                                             @endif
                                             @if($summary->getEmployeesWithoutAccommodation()->isNotEmpty())
                                                 <div class="mb-1">
                                                     <x-ui.badge variant="danger">
-                                                        <i class="bi bi-exclamation-circle"></i> Brakuje {{ $summary->getEmployeesWithoutAccommodation()->count() }} {{ $summary->getEmployeesWithoutAccommodation()->count() == 1 ? 'domu' : 'domów' }}
+                                                        <i class="bi bi-exclamation-circle text-white"></i> {{ $summary->getEmployeesWithoutAccommodation()->count() }} {{ $summary->getEmployeesWithoutAccommodation()->count() == 1 ? 'osobie' : 'osobom' }} brakuje domu
                                                     </x-ui.badge>
                                                 </div>
                                             @endif
