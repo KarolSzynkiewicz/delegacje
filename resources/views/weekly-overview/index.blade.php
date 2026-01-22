@@ -66,8 +66,8 @@
             <div class="mb-3">
                 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                     <span class="badge bg-primary rounded-circle" style="width: 8px; height: 8px; padding: 0;"></span>
-                    <h3 class="fs-5 fw-bold mb-0">
-                        <a href="{{ route('projects.show', $project) }}" class="text-decoration-none">{{ $project->name }}</a>
+                    <h3 class="fs-5 fw-bold mb-0 text-dark">
+                        <a href="{{ route('projects.show', $project) }}" class="text-decoration-underline">{{ $project->name }}</a>
                     </h3>
                     
                     @if($weekData && $weekData['has_data'] && $summary)
@@ -574,7 +574,7 @@
                 <!-- Tabelka z ludźmi -->
                 @if(isset($weekData['assigned_employees']) && $weekData['assigned_employees']->isNotEmpty())
                     <div class="mt-4">
-                        <x-ui.table-header title="Przypisani pracownicy">
+                        <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
                             <x-ui.button variant="primary" href="{{ route('projects.assignments.create', ['project' => $project, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
                                 Przypisz osoby
                             </x-ui.button>
@@ -689,7 +689,7 @@
                     </div>
                 @else
                     <div class="mt-4">
-                        <x-ui.table-header title="Przypisani pracownicy">
+                        <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
                             <x-ui.button variant="primary" href="{{ route('projects.assignments.create', ['project' => $project, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
                                 Przypisz osoby
                             </x-ui.button>
@@ -707,7 +707,7 @@
                         ->filter(fn($task) => in_array($task->status->value, [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::IN_PROGRESS->value]));
                 @endphp
                 <div class="mt-4">
-                    <x-ui.table-header title="Zadania projektu">
+                    <x-ui.table-header title="Zadania projektu" titleClass="text-dark">
                         <x-ui.button variant="primary" href="{{ route('projects.show.tasks', $projectData['project']) }}" action="create" class="btn-sm">
                             Dodaj zadanie
                         </x-ui.button>
