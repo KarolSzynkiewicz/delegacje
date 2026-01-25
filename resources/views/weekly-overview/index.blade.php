@@ -283,6 +283,26 @@
                                     Edytuj zapotrzebowanie
                                 </x-ui.button>
                             </div>
+                            
+                            @if($returnTrips->isNotEmpty())
+                                <x-ui.alert variant="warning" title="Zjazdy w tym tygodniu" class="mt-3">
+                                    <ul class="mb-0 small">
+                                        @foreach($returnTrips as $returnTrip)
+                                            <li class="mb-1">
+                                                <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none">
+                                                    <strong>{{ $returnTrip->event_date->format('d.m.Y') }}</strong>
+                                                    @if($returnTrip->vehicle)
+                                                        - {{ $returnTrip->vehicle->registration_number }}
+                                                    @endif
+                                                    @if($returnTrip->participants->isNotEmpty())
+                                                        ({{ $returnTrip->participants->count() }} {{ $returnTrip->participants->count() == 1 ? 'osoba' : 'osób' }})
+                                                    @endif
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </x-ui.alert>
+                            @endif
                         </x-ui.card>
                     </div>
 
@@ -659,16 +679,32 @@
                                             </td>
                                             <td>
                                                 @if(isset($employeeData['rotation']) && $employeeData['rotation'])
-                                                    <x-ui.badge variant="warning">
-                                                        <i class="bi bi-arrow-repeat"></i> 
-                                                        @if(isset($employeeData['rotation']['start_date']))
-                                                            {{ \Carbon\Carbon::parse($employeeData['rotation']['start_date'])->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($employeeData['rotation']['end_date'])->format('d.m.Y') }}
-                                                        @elseif(isset($employeeData['rotation']->start_date))
-                                                            {{ $employeeData['rotation']->start_date->format('d.m.Y') }} - {{ $employeeData['rotation']->end_date->format('d.m.Y') }}
-                                                        @else
-                                                            {{ \Carbon\Carbon::parse($employeeData['rotation']['end_date'])->format('d.m.Y') }}
-                                                        @endif
-                                                    </x-ui.badge>
+                                                    @php
+                                                        $rotation = $employeeData['rotation']['rotation'] ?? null;
+                                                        $startDate = $employeeData['rotation']['start_date'] ?? ($employeeData['rotation']->start_date ?? null);
+                                                        $endDate = $employeeData['rotation']['end_date'] ?? ($employeeData['rotation']->end_date ?? null);
+                                                    @endphp
+                                                    @if($rotation)
+                                                        <a href="{{ route('employees.rotations.edit', [$employeeData['employee'], $rotation]) }}" class="text-decoration-none">
+                                                            <x-ui.badge variant="warning">
+                                                                <i class="bi bi-arrow-repeat"></i> 
+                                                                @if($startDate && $endDate)
+                                                                    {{ \Carbon\Carbon::parse($startDate)->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                                @elseif($endDate)
+                                                                    {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                                @endif
+                                                            </x-ui.badge>
+                                                        </a>
+                                                    @else
+                                                        <x-ui.badge variant="warning">
+                                                            <i class="bi bi-arrow-repeat"></i> 
+                                                            @if($startDate && $endDate)
+                                                                {{ \Carbon\Carbon::parse($startDate)->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                            @elseif($endDate)
+                                                                {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                            @endif
+                                                        </x-ui.badge>
+                                                    @endif
                                                 @else
                                                     <span class="text-muted small">-</span>
                                                 @endif

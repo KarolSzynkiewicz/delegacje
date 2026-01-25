@@ -7,6 +7,7 @@ use App\Models\LogisticsEvent;
 use App\Models\Vehicle;
 use App\Models\Transport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TransportCostController extends Controller
 {
@@ -45,14 +46,24 @@ class TransportCostController extends Controller
             'transport_id' => 'nullable|exists:transports,id',
             'cost_type' => 'required|string|in:fuel,ticket,parking,toll,other',
             'amount' => 'required|numeric|min:0',
-            'currency' => 'required|string|max:3',
+            'currency' => 'required|string|in:PLN,EUR,USD,GBP',
             'cost_date' => 'required|date',
             'description' => 'nullable|string',
-            'receipt_number' => 'nullable|string|max:255',
+            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
             'notes' => 'nullable|string',
         ]);
 
         $validated['created_by'] = auth()->id();
+
+        // Upload pliku jeśli został przesłany
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $directory = 'transport_costs';
+            $filePath = $file->store($directory, 'public');
+            $validated['file_path'] = $filePath;
+        }
+
+        unset($validated['file']);
 
         TransportCost::create($validated);
 
@@ -94,12 +105,34 @@ class TransportCostController extends Controller
             'transport_id' => 'nullable|exists:transports,id',
             'cost_type' => 'required|string|in:fuel,ticket,parking,toll,other',
             'amount' => 'required|numeric|min:0',
-            'currency' => 'required|string|max:3',
+            'currency' => 'required|string|in:PLN,EUR,USD,GBP',
             'cost_date' => 'required|date',
             'description' => 'nullable|string',
-            'receipt_number' => 'nullable|string|max:255',
+            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+            'remove_file' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
+
+        // Usuń plik jeśli zaznaczono checkbox
+        if ($request->has('remove_file') && $request->boolean('remove_file') && $transportCost->file_path) {
+            Storage::disk('public')->delete($transportCost->file_path);
+            $validated['file_path'] = null;
+        }
+
+        // Upload nowego pliku jeśli został przesłany
+        if ($request->hasFile('file')) {
+            // Usuń stary plik jeśli istnieje
+            if ($transportCost->file_path) {
+                Storage::disk('public')->delete($transportCost->file_path);
+            }
+            
+            $file = $request->file('file');
+            $directory = 'transport_costs';
+            $filePath = $file->store($directory, 'public');
+            $validated['file_path'] = $filePath;
+        }
+
+        unset($validated['file'], $validated['remove_file']);
 
         $transportCost->update($validated);
 

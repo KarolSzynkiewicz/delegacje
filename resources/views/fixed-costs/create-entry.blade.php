@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Dodaj Szablon Kosztu Stałego">
+        <x-ui.page-header title="Dodaj Koszt Niestandardowy">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('fixed-costs.index') }}"
+                    href="{{ route('fixed-costs.tab.entries') }}"
                     action="back"
                 >
                     Powrót
@@ -15,8 +15,8 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Dodaj Nowy Szablon Kosztu Stałego">
-                <form method="POST" action="{{ route('fixed-costs.store') }}">
+            <x-ui.card label="Dodaj Nowy Koszt Niestandardowy">
+                <form method="POST" action="{{ route('fixed-cost-entries.store') }}">
                     @csrf
 
                     <div class="mb-3">
@@ -57,68 +57,49 @@
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <x-ui.input 
-                                type="select" 
-                                name="interval_type" 
-                                label="Typ interwału"
-                                required="true"
-                            >
-                                <option value="monthly" {{ old('interval_type') == 'monthly' ? 'selected' : '' }}>Miesięczny</option>
-                                <option value="weekly" {{ old('interval_type') == 'weekly' ? 'selected' : '' }}>Tygodniowy</option>
-                                <option value="yearly" {{ old('interval_type') == 'yearly' ? 'selected' : '' }}>Roczny</option>
-                            </x-ui.input>
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input 
-                                type="number" 
-                                name="interval_day" 
-                                label="Dzień interwału"
-                                value="{{ old('interval_day', 1) }}"
-                                min="1"
-                                max="31"
-                                required="true"
-                            />
-                            <small class="text-muted">
-                                Dla miesięcznego: dzień miesiąca (1-31)<br>
-                                Dla tygodniowego: dzień tygodnia (1-7)<br>
-                                Dla rocznego: dzień roku (1-365)
-                            </small>
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6 mb-3 mb-md-0">
+                        <div class="col-md-4 mb-3 mb-md-0">
                             <x-ui.input 
                                 type="date" 
-                                name="start_date" 
-                                label="Data rozpoczęcia obowiązywania (opcjonalne)"
-                                value="{{ old('start_date') }}"
+                                name="period_start" 
+                                label="Okres od"
+                                value="{{ old('period_start') }}"
+                                required="true"
                             />
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4 mb-3 mb-md-0">
                             <x-ui.input 
                                 type="date" 
-                                name="end_date" 
-                                label="Data zakończenia obowiązywania (opcjonalne)"
-                                value="{{ old('end_date') }}"
+                                name="period_end" 
+                                label="Okres do"
+                                value="{{ old('period_end') }}"
+                                required="true"
+                            />
+                        </div>
+                        <div class="col-md-4">
+                            <x-ui.input 
+                                type="date" 
+                                name="accounting_date" 
+                                label="Data księgowania"
+                                value="{{ old('accounting_date', date('Y-m-d')) }}"
+                                required="true"
                             />
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" 
-                                   type="checkbox" 
-                                   name="is_active" 
-                                   id="is_active" 
-                                   value="1"
-                                   {{ old('is_active', true) ? 'checked' : '' }}>
-                            <label class="form-check-label" for="is_active">
-                                Aktywny
-                            </label>
-                        </div>
-                        <small class="text-muted">Tylko aktywne szablony będą generowane podczas tworzenia kosztów.</small>
+                        <x-ui.input 
+                            type="select" 
+                            name="template_id" 
+                            label="Szablon (opcjonalnie)"
+                        >
+                            <option value="">Brak szablonu</option>
+                            @foreach($templates as $template)
+                                <option value="{{ $template->id }}" {{ old('template_id') == $template->id ? 'selected' : '' }}>
+                                    {{ $template->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                        <small class="text-muted">Możesz powiązać ten koszt z szablonem, jeśli został wygenerowany ręcznie z istniejącego szablonu.</small>
                     </div>
 
                     <div class="mb-4">

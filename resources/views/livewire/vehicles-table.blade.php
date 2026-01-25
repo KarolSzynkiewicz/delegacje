@@ -113,9 +113,12 @@
                                         $tooltipText = $currentProjects->isNotEmpty() 
                                             ? 'Używane w projektach: ' . $projectsList
                                             : 'Pojazd jest zajęty';
+                                        $currentOccupancy = $vehicle->current_occupancy;
+                                        $capacity = $vehicle->capacity ?? 0;
+                                        $occupancyText = $capacity > 0 ? "{$currentOccupancy}/{$capacity}" : $currentOccupancy;
                                     @endphp
                                     <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $tooltipText }}">
-                                        <x-ui.badge variant="danger">Zajęty</x-ui.badge>
+                                        <x-ui.badge variant="danger">{{ $occupancyText }}</x-ui.badge>
                                     </span>
                                 @else
                                     <x-ui.badge variant="success">Wolny</x-ui.badge>

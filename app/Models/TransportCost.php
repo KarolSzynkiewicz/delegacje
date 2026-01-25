@@ -19,7 +19,7 @@ class TransportCost extends Model
         'currency',
         'cost_date',
         'description',
-        'receipt_number',
+        'file_path',
         'notes',
         'created_by',
     ];

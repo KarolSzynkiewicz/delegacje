@@ -49,6 +49,7 @@ class ReturnTripController extends Controller
 
     /**
      * Handle form submission - prepare return trip first.
+     * Works for both create and edit modes.
      */
     public function prepareFromForm(Request $request)
     {
@@ -58,6 +59,8 @@ class ReturnTripController extends Controller
             'employee_ids.*' => 'exists:employees,id',
             'return_date' => 'required|date|after_or_equal:today',
             'notes' => 'nullable|string|max:1000',
+            'edit_mode' => 'nullable|boolean',
+            'return_trip_id' => 'nullable|exists:logistics_events,id',
         ]);
 
         // Ręczne zbudowanie query string, tablice są poprawnie zakodowane
@@ -72,8 +75,17 @@ class ReturnTripController extends Controller
      */
     public function prepare(Request $request)
     {
-        // If no data provided, redirect to create form
+        // If no data provided, redirect to appropriate form
         if (!$request->has('employee_ids') && !$request->old('employee_ids')) {
+            $isEditMode = $request->input('edit_mode', false);
+            $returnTripId = $request->input('return_trip_id');
+            
+            if ($isEditMode && $returnTripId) {
+                return redirect()
+                    ->route('return-trips.edit', $returnTripId)
+                    ->with('info', 'Proszę wypełnić formularz przygotowania zjazdu.');
+            }
+            
             return redirect()->route('return-trips.create')
                 ->with('info', 'Proszę wypełnić formularz przygotowania zjazdu.');
         }
@@ -118,11 +130,31 @@ class ReturnTripController extends Controller
 
             return view('return-trips.prepare', compact('preparation', 'employeeNames', 'returnVehicle', 'validated', 'isEditMode', 'returnTripId'));
         } catch (\Illuminate\Validation\ValidationException $e) {
+            $isEditMode = $request->input('edit_mode', false);
+            $returnTripId = $request->input('return_trip_id');
+            
+            if ($isEditMode && $returnTripId) {
+                return redirect()
+                    ->route('return-trips.edit', $returnTripId)
+                    ->withErrors($e->errors())
+                    ->withInput();
+            }
+            
             return redirect()
                 ->route('return-trips.create')
                 ->withErrors($e->errors())
                 ->withInput();
         } catch (\Exception $e) {
+            $isEditMode = $request->input('edit_mode', false);
+            $returnTripId = $request->input('return_trip_id');
+            
+            if ($isEditMode && $returnTripId) {
+                return redirect()
+                    ->route('return-trips.edit', $returnTripId)
+                    ->with('error', 'Wystąpił błąd podczas przygotowania zjazdu: ' . $e->getMessage())
+                    ->withInput();
+            }
+            
             return redirect()
                 ->route('return-trips.create')
                 ->with('error', 'Wystąpił błąd podczas przygotowania zjazdu: ' . $e->getMessage())

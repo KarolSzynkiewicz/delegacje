@@ -1920,28 +1920,84 @@ html .text-muted,
 /* Nadpisujemy Bootstrap paginację */
 .pagination {
     background: transparent !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.25rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
 }
 
-.page-link {
-    background: var(--bg-card) !important;
-    border-color: var(--glass-border) !important;
+.pagination li {
+    margin: 0 !important;
+}
+
+.page-link i {
+    font-size: 0.75rem !important;
+    line-height: 1 !important;
+    display: inline-block !important;
+}
+
+.page-link,
+.page-item span {
+    display: block !important;
+    padding: 0.375rem 0.75rem !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid var(--glass-border) !important;
     color: var(--text-main) !important;
+    text-decoration: none !important;
+    border-radius: 8px !important;
+    transition: all 0.15s ease-in-out !important;
+    min-width: 38px !important;
+    text-align: center !important;
+    font-size: 0.875rem !important;
 }
 
 .page-link:hover {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(59, 130, 246, 0.1) !important;
     border-color: var(--primary) !important;
     color: var(--primary) !important;
+    z-index: 2 !important;
 }
 
-.page-item.active .page-link {
+.page-item.active .page-link,
+.page-item.active span {
     background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
     border-color: var(--primary) !important;
     color: white !important;
+    z-index: 3 !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4) !important;
 }
 
-.page-item.disabled .page-link {
+.page-item.disabled .page-link,
+.page-item.disabled span {
     background: rgba(255, 255, 255, 0.02) !important;
+    border-color: var(--glass-border) !important;
+    color: var(--text-muted) !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+/* Dla Bootstrap 5 paginacji - ukryj mobile view, pokaż tylko desktop z info */
+.d-flex.justify-items-center.justify-content-between .d-sm-none {
+    display: none !important;
+}
+
+.d-none.flex-sm-fill.d-sm-flex {
+    display: flex !important;
+    width: 100% !important;
+}
+
+/* Zmniejszamy ikony &lsaquo; i &rsaquo; w paginacji */
+.page-link[aria-label*="previous"],
+.page-link[aria-label*="next"],
+.page-link[aria-hidden="true"] {
+    font-size: 0.75rem !important;
+    line-height: 1 !important;
+}
     border-color: var(--glass-border) !important;
     color: var(--text-muted) !important;
     opacity: 0.5;

@@ -548,6 +548,7 @@ class WeeklyOverviewService
                 $daysLeft = now()->diffInDays($activeRotation->end_date, false);
                 $rotationInfo = [
                     'id' => $activeRotation->id,
+                    'rotation' => $activeRotation, // Przekaż cały obiekt dla łatwego dostępu
                     'start_date' => $activeRotation->start_date,
                     'end_date' => $activeRotation->end_date,
                     'days_left' => $daysLeft,

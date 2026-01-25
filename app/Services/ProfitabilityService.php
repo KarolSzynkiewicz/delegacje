@@ -8,7 +8,7 @@ use App\Models\ProjectAssignment;
 use App\Models\EmployeeRate;
 use App\Models\Rotation;
 use App\Models\ProjectVariableCost;
-use App\Models\FixedCost;
+use App\Models\FixedCostEntry;
 use App\Models\Payroll;
 use App\Enums\ProjectType;
 use App\Enums\PayrollStatus;
@@ -816,13 +816,10 @@ class ProfitabilityService
         }
         
         // Get fixed costs for the month (where period overlaps with month) - grouped by currency
-        $fixedCosts = FixedCost::where(function ($query) use ($monthStart, $monthEnd) {
+        $fixedCosts = FixedCostEntry::where(function ($query) use ($monthStart, $monthEnd) {
             $query->where(function ($q) use ($monthStart, $monthEnd) {
-                $q->where('start_date', '<=', $monthEnd)
-                  ->where(function ($q2) use ($monthStart) {
-                      $q2->whereNull('end_date')
-                         ->orWhere('end_date', '>=', $monthStart);
-                  });
+                $q->where('period_start', '<=', $monthEnd)
+                  ->where('period_end', '>=', $monthStart);
             });
         })->get();
         
@@ -857,11 +854,10 @@ class ProfitabilityService
     protected function calculateFixedCostsForMonth($fixedCosts, Carbon $monthStart, Carbon $monthEnd): float
     {
         $totalCost = 0;
-        $daysInMonth = $monthStart->diffInDays($monthEnd) + 1;
 
         foreach ($fixedCosts as $fixedCost) {
-            $costStart = Carbon::parse($fixedCost->start_date);
-            $costEnd = $fixedCost->end_date ? Carbon::parse($fixedCost->end_date) : $monthEnd;
+            $costStart = Carbon::parse($fixedCost->period_start);
+            $costEnd = Carbon::parse($fixedCost->period_end);
             
             // Calculate overlap period
             $periodStart = $costStart->gt($monthStart) ? $costStart : $monthStart;
@@ -893,10 +889,9 @@ class ProfitabilityService
     protected function calculateFixedCostsForMonthByCurrency($fixedCosts, Carbon $monthStart, Carbon $monthEnd): array
     {
         $costsByCurrency = [];
-        $daysInMonth = $monthStart->diffInDays($monthEnd) + 1;
 
         foreach ($fixedCosts as $fixedCost) {
-            $costStart = Carbon::parse($fixedCost->start_date);
+            $costStart = Carbon::parse($fixedCost->period_start);
             $costEnd = $fixedCost->end_date ? Carbon::parse($fixedCost->end_date) : $monthEnd;
             $currency = $fixedCost->currency ?? 'EUR';
             

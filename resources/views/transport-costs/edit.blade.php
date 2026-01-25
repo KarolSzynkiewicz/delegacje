@@ -16,7 +16,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Koszt Transportu">
-                <form method="POST" action="{{ route('transport-costs.update', $transportCost) }}">
+                <form method="POST" action="{{ route('transport-costs.update', $transportCost) }}" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
 
@@ -94,13 +94,16 @@
                         </div>
                         <div class="col-md-6">
                             <x-ui.input 
-                                type="text" 
+                                type="select" 
                                 name="currency" 
                                 label="Waluta"
-                                value="{{ old('currency', $transportCost->currency) }}"
-                                maxlength="3"
                                 required="true"
-                            />
+                            >
+                                <option value="PLN" {{ old('currency', $transportCost->currency) == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                <option value="EUR" {{ old('currency', $transportCost->currency) == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                <option value="USD" {{ old('currency', $transportCost->currency) == 'USD' ? 'selected' : '' }}>USD</option>
+                                <option value="GBP" {{ old('currency', $transportCost->currency) == 'GBP' ? 'selected' : '' }}>GBP</option>
+                            </x-ui.input>
                         </div>
                     </div>
 
@@ -124,12 +127,27 @@
                     </div>
 
                     <div class="mb-3">
+                        @if($transportCost->file_path)
+                            <div class="mb-2">
+                                <label class="form-label">Aktualny plik</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <a href="{{ asset('storage/' . $transportCost->file_path) }}" target="_blank" class="text-primary text-decoration-none">
+                                        <i class="bi bi-file-earmark"></i> Pobierz plik
+                                    </a>
+                                    <label class="form-check-label small">
+                                        <input type="checkbox" name="remove_file" value="1" class="form-check-input">
+                                        Usuń plik
+                                    </label>
+                                </div>
+                            </div>
+                        @endif
                         <x-ui.input 
-                            type="text" 
-                            name="receipt_number" 
-                            label="Numer paragonu"
-                            value="{{ old('receipt_number', $transportCost->receipt_number) }}"
+                            type="file" 
+                            name="file" 
+                            label="{{ $transportCost->file_path ? 'Zastąp plik' : 'Załącz plik (paragon/faktura)' }}"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
                         />
+                        <small class="text-muted d-block mt-1">Dozwolone formaty: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG (max 10MB)</small>
                     </div>
 
                     <div class="mb-4">

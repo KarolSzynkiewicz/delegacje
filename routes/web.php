@@ -273,7 +273,36 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::resource('project-variable-costs', \App\Http\Controllers\ProjectVariableCostController::class);
     
     // Fixed Costs
+    Route::get('fixed-costs/generate', [\App\Http\Controllers\FixedCostController::class, 'generateForm'])
+        ->name('fixed-costs.generate')
+        ->defaults('resource', 'fixed-costs');
+    Route::post('fixed-costs/generate', [\App\Http\Controllers\FixedCostController::class, 'generate'])
+        ->name('fixed-costs.generate.store')
+        ->defaults('resource', 'fixed-costs');
+    
+    // Fixed Costs Tabs
+    Route::get('fixed-costs/tab/templates', [\App\Http\Controllers\FixedCostController::class, 'indexTemplates'])
+        ->name('fixed-costs.tab.templates')
+        ->defaults('resource', 'fixed-costs');
+    Route::get('fixed-costs/tab/entries', [\App\Http\Controllers\FixedCostController::class, 'indexEntries'])
+        ->name('fixed-costs.tab.entries')
+        ->defaults('resource', 'fixed-costs');
+    
     Route::resource('fixed-costs', \App\Http\Controllers\FixedCostController::class);
+    
+    // Fixed Cost Entries (koszty księgowe)
+    Route::get('fixed-cost-entries/create', [\App\Http\Controllers\FixedCostController::class, 'createEntry'])
+        ->name('fixed-cost-entries.create')
+        ->defaults('resource', 'fixed-cost-entries');
+    Route::post('fixed-cost-entries', [\App\Http\Controllers\FixedCostController::class, 'storeEntry'])
+        ->name('fixed-cost-entries.store')
+        ->defaults('resource', 'fixed-cost-entries');
+    Route::get('fixed-cost-entries/{entry}', [\App\Http\Controllers\FixedCostController::class, 'showEntry'])
+        ->name('fixed-cost-entries.show')
+        ->defaults('resource', 'fixed-cost-entries');
+    Route::delete('fixed-cost-entries/{entry}', [\App\Http\Controllers\FixedCostController::class, 'destroyEntry'])
+        ->name('fixed-cost-entries.destroy')
+        ->defaults('resource', 'fixed-cost-entries');
     
     // Time Logs
     Route::resource('time-logs', \App\Http\Controllers\TimeLogController::class);

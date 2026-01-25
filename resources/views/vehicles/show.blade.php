@@ -111,7 +111,7 @@
                 </div>
                 @if($assignments->count() > 0)
                     <div class="table-responsive">
-                        <table class="table">
+                        <table class="table align-middle mb-0">
                             <thead>
                                 <tr>
                                     <th>Pracownik</th>
@@ -164,16 +164,17 @@
                                             <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
                                         </td>
                                         <td class="text-end">
-                                            <x-ui.button variant="ghost" href="{{ route('vehicle-assignments.show', $assignment) }}">Szczegóły</x-ui.button>
+                                            <x-ui.button variant="ghost" href="{{ route('vehicle-assignments.show', $assignment) }}" class="btn-sm">Szczegóły</x-ui.button>
                                         </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
+                    
                     @if($assignments->hasPages())
                         <div class="mt-3 pt-3 border-top">
-                            {{ $assignments->links() }}
+                            {{ $assignments->links('pagination::bootstrap-5') }}
                         </div>
                     @endif
                 @else

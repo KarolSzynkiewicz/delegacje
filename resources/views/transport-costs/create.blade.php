@@ -16,7 +16,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Dodaj Nowy Koszt Transportu">
-                <form method="POST" action="{{ route('transport-costs.store') }}">
+                <form method="POST" action="{{ route('transport-costs.store') }}" enctype="multipart/form-data">
                     @csrf
 
                     <div class="mb-3">
@@ -94,13 +94,16 @@
                         </div>
                         <div class="col-md-6">
                             <x-ui.input 
-                                type="text" 
+                                type="select" 
                                 name="currency" 
                                 label="Waluta"
-                                value="{{ old('currency', 'PLN') }}"
-                                maxlength="3"
                                 required="true"
-                            />
+                            >
+                                <option value="PLN" {{ old('currency', 'PLN') == 'PLN' ? 'selected' : '' }}>PLN</option>
+                                <option value="EUR" {{ old('currency') == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                <option value="USD" {{ old('currency') == 'USD' ? 'selected' : '' }}>USD</option>
+                                <option value="GBP" {{ old('currency') == 'GBP' ? 'selected' : '' }}>GBP</option>
+                            </x-ui.input>
                         </div>
                     </div>
 
@@ -125,11 +128,12 @@
 
                     <div class="mb-3">
                         <x-ui.input 
-                            type="text" 
-                            name="receipt_number" 
-                            label="Numer paragonu"
-                            value="{{ old('receipt_number') }}"
+                            type="file" 
+                            name="file" 
+                            label="Załącz plik (paragon/faktura)"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
                         />
+                        <small class="text-muted d-block mt-1">Dozwolone formaty: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG (max 10MB)</small>
                     </div>
 
                     <div class="mb-4">

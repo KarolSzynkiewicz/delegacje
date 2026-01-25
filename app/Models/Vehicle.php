@@ -138,4 +138,27 @@ class Vehicle extends Model
         
         return $projectAssignments->pluck('project')->filter()->unique('id')->values();
     }
+
+    /**
+     * Get the number of currently assigned people to this vehicle.
+     * 
+     * Counts unique employees, not assignments (one employee can have multiple assignments).
+     * 
+     * @return int
+     */
+    public function getCurrentOccupancyAttribute(): int
+    {
+        // If unique_employees_count is available (from addSelect), use it for better performance
+        if (isset($this->attributes['unique_employees_count'])) {
+            return (int) $this->attributes['unique_employees_count'];
+        }
+        
+        // Otherwise, query directly - count unique employees using groupBy
+        return $this->assignments()
+            ->active()
+            ->select('employee_id')
+            ->groupBy('employee_id')
+            ->get()
+            ->count();
+    }
 }

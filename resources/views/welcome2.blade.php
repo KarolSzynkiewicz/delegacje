@@ -513,15 +513,22 @@
         {{-- Paginacja --}}
         <div class="mb-4">
             <h4 class="fw-semibold">.pagination, .page-link</h4>
-            <p class="text-muted small">Przepisana paginacja</p>
-            <nav>
-                <ul class="pagination">
-                    <li class="page-item disabled"><a class="page-link" href="#">Poprzednia</a></li>
-                    <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                    <li class="page-item"><a class="page-link" href="#">2</a></li>
-                    <li class="page-item"><a class="page-link" href="#">3</a></li>
-                    <li class="page-item"><a class="page-link" href="#">Następna</a></li>
-                </ul>
+            <p class="text-muted small">Przepisana paginacja z info o rekordach</p>
+            <nav class="d-flex align-items-center justify-content-between">
+                <div>
+                    <p class="small text-muted mb-0">
+                        Pokazano <span class="fw-semibold">1</span> do <span class="fw-semibold">10</span> z <span class="fw-semibold">25</span> wyników
+                    </p>
+                </div>
+                <div>
+                    <ul class="pagination mb-0">
+                        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left" style="font-size: 0.75rem;"></i></span></li>
+                        <li class="page-item active"><span class="page-link">1</span></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item"><a class="page-link" href="#">3</a></li>
+                        <li class="page-item"><a class="page-link" href="#"><i class="bi bi-chevron-right" style="font-size: 0.75rem;"></i></a></li>
+                    </ul>
+                </div>
             </nav>
         </div>
         <hr>

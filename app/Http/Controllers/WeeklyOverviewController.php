@@ -40,7 +40,16 @@ class WeeklyOverviewController extends Controller
         // Get users for tasks component
         $users = \App\Models\User::orderBy('name')->get();
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users'));
+        // Get return trips (zjazdy) for the week
+        $weekStart = $weeks[0]['start'];
+        $weekEnd = $weeks[0]['end'];
+        $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
+            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->with(['participants.employee', 'vehicle'])
+            ->orderBy('event_date')
+            ->get();
+        
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips'));
     }
 
     /**

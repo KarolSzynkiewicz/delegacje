@@ -79,25 +79,58 @@
 
                     <!-- Konflikty -->
                     @if($preparation->conflicts->isNotEmpty())
-                        <div class="mb-4">
-                            <h4 class="fs-6 fw-bold mb-3 text-danger">
-                                Konflikty ({{ $preparation->conflicts->count() }})
-                            </h4>
-                            <div class="alert alert-warning">
-                                <p class="fw-bold mb-2">Uwaga! Wykryto konflikty, które mogą uniemożliwić wykonanie zjazdu:</p>
-                                <ul class="mb-0">
-                                    @foreach($preparation->conflicts as $conflict)
-                                        <li>{{ $conflict->message }}</li>
-                                    @endforeach
-                                </ul>
+                        @php
+                            $blockingConflicts = $preparation->conflicts->where('isBlocking', true);
+                            $nonBlockingConflicts = $preparation->conflicts->where('isBlocking', false);
+                        @endphp
+                        
+                        @if($blockingConflicts->isNotEmpty())
+                            <div class="mb-4">
+                                <h4 class="fs-6 fw-bold mb-3 text-danger">
+                                    Konflikty blokujące ({{ $blockingConflicts->count() }})
+                                </h4>
+                                <div class="alert alert-danger">
+                                    <p class="fw-bold mb-2">Uwaga! Wykryto konflikty, które uniemożliwiają wykonanie zjazdu:</p>
+                                    <ul class="mb-0">
+                                        @foreach($blockingConflicts as $conflict)
+                                            <li>{{ $conflict->message }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
                             </div>
-                        </div>
+                        @endif
+                        
+                        @if($nonBlockingConflicts->isNotEmpty())
+                            <div class="mb-4">
+                                <h4 class="fs-6 fw-bold mb-3 text-warning">
+                                    Ostrzeżenia ({{ $nonBlockingConflicts->count() }})
+                                </h4>
+                                <div class="alert alert-warning">
+                                    <p class="fw-bold mb-2">Uwaga! Wykryto sytuacje wymagające uwagi:</p>
+                                    <ul class="mb-0">
+                                        @foreach($nonBlockingConflicts as $conflict)
+                                            <li>{{ $conflict->message }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
                     @endif
 
                     <!-- Komunikat o konsekwencjach -->
                     <div class="alert alert-info mb-4">
-                        <h5 class="fw-bold mb-2">Konsekwencje zjazdu:</h5>
+                        <h5 class="fw-bold mb-2">
+                            @if(isset($isEditMode) && $isEditMode)
+                                Konsekwencje edycji zjazdu:
+                            @else
+                                Konsekwencje zjazdu:
+                            @endif
+                        </h5>
                         <ul class="mb-0">
+                            @if(isset($isEditMode) && $isEditMode)
+                                <li><strong>Poprzednie zmiany zostaną cofnięte</strong> - przypisania wrócą do poprzednich dat końcowych</li>
+                                <li>Nowe zmiany zostaną zastosowane zgodnie z wybranymi danymi</li>
+                            @endif
                             <li>Wszystkie aktywne przypisania wskazanych osób do projektów, domów i aut zostaną skrócone do daty zjazdu</li>
                             @if(isset($isEditMode) && $isEditMode)
                                 <li>Zostanie zaktualizowane zdarzenie domenowe "Zjazd"</li>
@@ -106,7 +139,14 @@
                             @endif
                             @if($returnVehicle)
                                 <li>Pojazd powrotny zostanie przypisany do osób z zjazdu</li>
-                                <li>Pojazd powrotny nie może mieć aktywnych przypisań po dacie zjazdu dla osób NIE objętych zjazdem</li>
+                                @php
+                                    $nonBlockingConflicts = $preparation->conflicts->where('isBlocking', false);
+                                @endphp
+                                @if($nonBlockingConflicts->isNotEmpty())
+                                    <li><strong>Przypisania do auta powrotnego dla osób NIE objętych zjazdem zostaną anulowane</strong> - te osoby zostaną bez auta</li>
+                                @else
+                                    <li>Pojazd powrotny nie może mieć aktywnych przypisań po dacie zjazdu dla osób NIE objętych zjazdem</li>
+                                @endif
                             @endif
                         </ul>
                     </div>

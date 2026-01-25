@@ -131,6 +131,9 @@ class ReturnTripPreparation
      * - Someone is assigned to return vehicle
      * - They are NOT in the return trip
      * - Their assignment extends beyond return date
+     * 
+     * These conflicts are NOT blocking - the assignment will be automatically cancelled
+     * and the person will be left without a vehicle.
      */
     protected function detectReturnVehicleConflicts(Collection $returnVehicleAssignments): void
     {
@@ -148,7 +151,8 @@ class ReturnTripPreparation
                 $this->conflicts->push(new ReturnTripConflict(
                     $assignment,
                     $this->returnVehicle,
-                    "Osoba {$assignment->getEmployee()->full_name} jest przypisana do auta powrotnego po dacie zjazdu."
+                    "Osoba {$assignment->getEmployee()->full_name} jest przypisana do auta powrotnego po dacie zjazdu. Przypisanie zostanie anulowane i osoba zostanie bez auta.",
+                    false // Not blocking - can be accepted
                 ));
             }
         }

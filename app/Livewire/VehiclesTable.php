@@ -95,6 +95,19 @@ class VehiclesTable extends Component
         // Sortowanie
         $query->orderBy($this->sortField, $this->sortDirection);
 
+        // Załaduj liczbę unikalnych pracowników (dla wyświetlenia X/Y)
+        // Liczymy unikalnych pracowników, nie przypisania (jeden pracownik może mieć wiele przypisań)
+        $today = \Carbon\Carbon::today();
+        $query->addSelect([
+            'unique_employees_count' => \App\Models\VehicleAssignment::select(\Illuminate\Support\Facades\DB::raw('count(distinct employee_id)'))
+                ->whereColumn('vehicle_id', 'vehicles.id')
+                ->where('start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $today);
+                })
+        ]);
+
         $vehicles = $query->paginate(10);
 
         return view('livewire.vehicles-table', [

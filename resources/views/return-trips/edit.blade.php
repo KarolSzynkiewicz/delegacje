@@ -18,9 +18,10 @@
             <x-ui.card label="Edytuj Zjazd">
                     <x-ui.errors />
 
-                    <form method="POST" action="{{ route('return-trips.update', $returnTrip) }}">
+                    <form method="POST" action="{{ route('return-trips.prepare-form') }}">
                         @csrf
-                        @method('PUT')
+                        <input type="hidden" name="edit_mode" value="1">
+                        <input type="hidden" name="return_trip_id" value="{{ $returnTrip->id }}">
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Pojazd powrotny</label>

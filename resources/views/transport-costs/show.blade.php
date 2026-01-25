@@ -63,10 +63,12 @@
                             <p class="fw-semibold">{{ $transportCost->description }}</p>
                         </div>
                         @endif
-                        @if($transportCost->receipt_number)
+                        @if($transportCost->file_path)
                         <div class="col-md-6">
-                            <h6 class="text-muted small mb-1">Numer paragonu</h6>
-                            <p class="fw-semibold">{{ $transportCost->receipt_number }}</p>
+                            <h6 class="text-muted small mb-1">Załączony plik</h6>
+                            <a href="{{ asset('storage/' . $transportCost->file_path) }}" target="_blank" class="text-primary text-decoration-none">
+                                <i class="bi bi-file-earmark"></i> Pobierz plik
+                            </a>
                         </div>
                         @endif
                         @if($transportCost->notes)
