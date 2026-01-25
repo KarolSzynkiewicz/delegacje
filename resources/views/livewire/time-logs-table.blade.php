@@ -98,7 +98,9 @@
                     @forelse ($timeLogs as $timeLog)
                         <tr>
                             <td>{{ $timeLog->start_time->format('Y-m-d') }}</td>
-                            <td>{{ $timeLog->projectAssignment->employee->full_name }}</td>
+                            <td>
+                                <x-employee-cell :employee="$timeLog->projectAssignment->employee"  />
+                            </td>
                             <td>{{ $timeLog->projectAssignment->project->name }}</td>
                             <td class="fw-semibold">{{ number_format($timeLog->hours_worked, 2) }}h</td>
                             <td>

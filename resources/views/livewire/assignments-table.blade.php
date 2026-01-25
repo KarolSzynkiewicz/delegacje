@@ -67,9 +67,7 @@
                         @foreach($projectAssignments->sortBy('start_date') as $assignment)
                             <tr wire:key="assignment-{{ $assignment->id }}">
                                 <td>
-                                    <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
-                                        {{ $assignment->employee->full_name }}
-                                    </a>
+                                    <x-employee-cell :employee="$assignment->employee" />
                                 </td>
                                 <td>
                                     <x-ui.badge variant="info">{{ $assignment->role->name }}</x-ui.badge>

@@ -78,10 +78,7 @@
                             @foreach($rotations as $rotation)
                                 <tr wire:key="rotation-{{ $rotation->id }}">
                                     <td>
-                                        <a href="{{ route('employees.show', $rotation->employee) }}" 
-                                           class="text-primary text-decoration-none fw-medium">
-                                            {{ $rotation->employee->full_name }}
-                                        </a>
+                                        <x-employee-cell :employee="$rotation->employee"  />
                                     </td>
                                     <td>
                                         <small class="text-muted">{{ $rotation->start_date->format('Y-m-d') }}</small>

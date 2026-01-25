@@ -74,9 +74,7 @@
                         @foreach($vehicleAssignments->sortBy('start_date') as $assignment)
                             <tr>
                                 <td>
-                                    <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
-                                        {{ $assignment->employee->full_name }}
-                                    </a>
+                                    <x-employee-cell :employee="$assignment->employee" />
                                 </td>
                                 <td>
                                     @php

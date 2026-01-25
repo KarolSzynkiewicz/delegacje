@@ -36,7 +36,9 @@
                         <tbody>
                             @foreach ($assignments as $assignment)
                                 <tr>
-                                    <td>{{ $assignment->employee->full_name }}</td>
+                                    <td>
+                                        <x-employee-cell :employee="$assignment->employee" />
+                                    </td>
                                     <td>
                                         <x-ui.badge variant="info">{{ $assignment->role->name }}</x-ui.badge>
                                     </td>

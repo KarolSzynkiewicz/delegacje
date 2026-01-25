@@ -53,9 +53,7 @@
                                 @foreach($role->employees as $employee)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $employee) }}" class="text-decoration-none">
-                                                {{ $employee->full_name }}
-                                            </a>
+                                            <x-employee-cell :employee="$employee"  />
                                         </td>
                                         <td>{{ $employee->email }}</td>
                                         <td>{{ $employee->phone ?? '-' }}</td>

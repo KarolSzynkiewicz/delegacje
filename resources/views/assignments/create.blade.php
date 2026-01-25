@@ -134,20 +134,6 @@
 
                     <div class="mb-3">
                         <x-ui.input 
-                            type="select" 
-                            name="status" 
-                            label="Status"
-                            required="true"
-                        >
-                            <option value="pending">Oczekujące</option>
-                            <option value="active" selected>Aktywne</option>
-                            <option value="completed">Zakończone</option>
-                            <option value="cancelled">Anulowane</option>
-                        </x-ui.input>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
                             type="textarea" 
                             name="notes" 
                             label="Uwagi"

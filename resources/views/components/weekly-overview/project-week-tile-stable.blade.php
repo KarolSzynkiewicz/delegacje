@@ -88,8 +88,7 @@
                                 <table class="table mb-2">
                                     <thead>
                                         <tr>
-                                            <th class="text-start small fw-bold text-dark">Zdjęcie</th>
-                                            <th class="text-start small fw-bold text-dark">Imię i nazwisko</th>
+                                            <th class="text-start small fw-bold text-dark">Pracownik</th>
                                             <th class="text-start small fw-bold text-dark">Rola w projekcie</th>
                                             <th class="text-center small fw-bold text-dark">Pokrycie</th>
                                         </tr>
@@ -98,16 +97,7 @@
                                         @foreach($stability['assigned_employees'] as $employeeData)
                                             <tr>
                                                 <td>
-                                                    @if($employeeData['employee']->image_path)
-                                                        <img src="{{ $employeeData['employee']->image_url }}" alt="{{ $employeeData['employee']->full_name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                                                    @else
-                                                        <div class="bg-warning bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                                            <span class="text-warning fw-semibold small">{{ substr($employeeData['employee']->first_name, 0, 1) }}{{ substr($employeeData['employee']->last_name, 0, 1) }}</span>
-                                                        </div>
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-dark text-decoration-none">{{ $employeeData['employee']->full_name }}</a>
+                                                    <x-employee-cell :employee="$employeeData['employee']"  />
                                                 </td>
                                                 <td>
                                                     @if($employeeData['role_stable'] && $employeeData['role'])

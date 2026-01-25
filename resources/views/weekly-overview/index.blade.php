@@ -347,13 +347,15 @@
                                                                     $isDriver = $positionValue === 'driver';
                                                                 @endphp
                                                                 <li class="mb-1">
-                                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" 
-                                                                       class="text-decoration-none d-flex align-items-center gap-1">
-                                                                        <i class="bi {{ $isDriver ? 'bi-car-front-fill text-success' : 'bi-person text-primary' }}"></i>
-                                                                        <span class="{{ $isDriver ? 'text-success fw-semibold' : 'text-primary' }}">
-                                                                            {{ $assignment->employee->full_name }}
-                                                                        </span>
-                                                                    </a>
+                                                                    <div class="d-flex align-items-center gap-1">
+                                                                        <a href="{{ route('vehicle-assignments.show', $assignment) }}" 
+                                                                           class="text-decoration-none d-flex align-items-center gap-1">
+                                                                            <i class="bi {{ $isDriver ? 'bi-car-front-fill text-success' : 'bi-person text-primary' }}"></i>
+                                                                            <span class="{{ $isDriver ? 'text-success fw-semibold' : 'text-primary' }}">
+                                                                                {{ $assignment->employee->full_name }}
+                                                                            </span>
+                                                                        </a>
+                                                                    </div>
                                                                 </li>
                                                             @endforeach
                                                         </ul>
@@ -487,13 +489,15 @@
                                                         <ul class="list-unstyled mb-0 small">
                                                             @foreach($accommodationData['assignments'] as $assignment)
                                                                 <li class="mb-1">
-                                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" 
-                                                                       class="text-decoration-none d-flex align-items-center gap-1">
-                                                                        <i class="bi bi-house text-success"></i>
-                                                                        <span class="text-primary">
-                                                                            {{ $assignment->employee->full_name }}
-                                                                        </span>
-                                                                    </a>
+                                                                    <div class="d-flex align-items-center gap-1">
+                                                                        <a href="{{ route('accommodation-assignments.show', $assignment) }}" 
+                                                                           class="text-decoration-none d-flex align-items-center gap-1">
+                                                                            <i class="bi bi-house text-success"></i>
+                                                                            <span class="text-primary">
+                                                                                {{ $assignment->employee->full_name }}
+                                                                            </span>
+                                                                        </a>
+                                                                    </div>
                                                                 </li>
                                                             @endforeach
                                                         </ul>
@@ -583,8 +587,7 @@
                             <table class="table align-middle">
                                 <thead>
                                     <tr>
-                                        <th>Zdjęcie</th>
-                                        <th>Imię i nazwisko</th>
+                                        <th>Pracownik</th>
                                         <th>Rola w projekcie</th>
                                         <th>Pokrycie</th>
                                         <th>Auto</th>
@@ -600,18 +603,7 @@
                                         @endphp
                                         <tr>
                                             <td>
-                                                <x-ui.avatar 
-                                                    :image-url="$employeeData['employee']->image_path ? $employeeData['employee']->image_url : null"
-                                                    :alt="$employeeData['employee']->full_name"
-                                                    :initials="substr($employeeData['employee']->first_name, 0, 1) . substr($employeeData['employee']->last_name, 0, 1)"
-                                                    size="40px"
-                                                    shape="circle"
-                                                />
-                                            </td>
-                                            <td>
-                                                <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-decoration-none">
-                                                    {{ $employeeData['employee']->full_name }}
-                                                </a>
+                                                <x-employee-cell :employee="$employeeData['employee']"  />
                                             </td>
                                             <td>
                                                 @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])

@@ -83,10 +83,7 @@
                         @foreach($rates as $rate)
                             <tr wire:key="rate-{{ $rate->id }}">
                                 <td>
-                                    <a href="{{ route('employees.show', $rate->employee) }}" 
-                                       class="text-primary text-decoration-none fw-medium">
-                                        {{ $rate->employee->full_name }}
-                                    </a>
+                                    <x-employee-cell :employee="$rate->employee"  />
                                 </td>
                                 <td>
                                     <small class="text-muted">{{ $rate->start_date->format('Y-m-d') }}</small>

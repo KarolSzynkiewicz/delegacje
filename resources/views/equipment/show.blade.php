@@ -117,7 +117,9 @@
                                 <tbody>
                                     @foreach($equipment->issues->take(10) as $issue)
                                         <tr>
-                                            <td>{{ $issue->employee->full_name }}</td>
+                                            <td>
+                                                <x-employee-cell :employee="$issue->employee"  />
+                                            </td>
                                             <td>{{ $issue->quantity_issued }} {{ $equipment->unit }}</td>
                                             <td>{{ $issue->issue_date->format('Y-m-d') }}</td>
                                             <td>

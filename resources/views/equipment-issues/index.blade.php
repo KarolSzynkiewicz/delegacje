@@ -31,7 +31,9 @@
                                 @foreach ($issues as $issue)
                                     <tr>
                                         <td>{{ $issue->equipment->name }}</td>
-                                        <td>{{ $issue->employee->full_name }}</td>
+                                        <td>
+                                            <x-employee-cell :employee="$issue->employee"  />
+                                        </td>
                                         <td>{{ $issue->quantity_issued }} {{ $issue->equipment->unit }}</td>
                                         <td>{{ $issue->issue_date->format('Y-m-d') }}</td>
                                         <td>

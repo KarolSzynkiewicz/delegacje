@@ -56,7 +56,7 @@ class EmployeesTable extends Component
 
     public function render()
     {
-        $query = Employee::with('roles');
+        $query = Employee::with(['roles', 'assignments.project']);
 
         // Filtrowanie po imieniu/nazwisku/emailu
         if ($this->search) {

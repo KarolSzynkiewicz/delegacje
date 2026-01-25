@@ -147,27 +147,6 @@
 
                     <div class="mb-3">
                         <x-ui.input 
-                            type="select" 
-                            name="status" 
-                            label="Status"
-                            required="true"
-                        >
-                            @php
-                                $currentStatus = $assignment->status instanceof \App\Enums\AssignmentStatus 
-                                    ? $assignment->status->value 
-                                    : ($assignment->status ?? 'active');
-                                $oldStatus = old('status', $currentStatus);
-                            @endphp
-                            <option value="active" {{ $oldStatus == 'active' ? 'selected' : '' }}>Aktywny</option>
-                            <option value="in_transit" {{ $oldStatus == 'in_transit' ? 'selected' : '' }}>W transporcie</option>
-                            <option value="at_base" {{ $oldStatus == 'at_base' ? 'selected' : '' }}>W bazie</option>
-                            <option value="completed" {{ $oldStatus == 'completed' ? 'selected' : '' }}>Zakończony</option>
-                            <option value="cancelled" {{ $oldStatus == 'cancelled' ? 'selected' : '' }}>Anulowany</option>
-                        </x-ui.input>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
                             type="textarea" 
                             name="notes" 
                             label="Uwagi"

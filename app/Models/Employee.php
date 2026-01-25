@@ -97,6 +97,22 @@ class Employee extends Model
     }
 
     /**
+     * Get current active projects for this employee.
+     * 
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getCurrentProjectsAttribute()
+    {
+        $activeAssignments = $this->assignments()->active()->with('project')->get();
+        
+        if ($activeAssignments->isEmpty()) {
+            return collect();
+        }
+        
+        return $activeAssignments->pluck('project')->filter()->unique('id')->values();
+    }
+
+    /**
      * Get active project assignments for this employee.
      */
     public function activeAssignments(): HasMany

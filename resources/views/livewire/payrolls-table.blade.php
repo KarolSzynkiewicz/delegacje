@@ -82,7 +82,10 @@
                     <thead>
                         <tr>
                             <x-livewire.sortable-header field="employee_id" :sortField="$sortField" :sortDirection="$sortDirection">
-                                Payroll
+                                Pracownik
+                            </x-livewire.sortable-header>
+                            <x-livewire.sortable-header field="period_start" :sortField="$sortField" :sortDirection="$sortDirection">
+                                Daty
                             </x-livewire.sortable-header>
                             <x-livewire.sortable-header field="hours_amount" :sortField="$sortField" :sortDirection="$sortDirection">
                                 Kwota z godzin
@@ -102,10 +105,15 @@
                         @foreach($payrolls as $payroll)
                             <tr wire:key="payroll-{{ $payroll->id }}">
                                 <td>
-                                    <a href="{{ route('payrolls.show', $payroll) }}" 
-                                       class="text-primary text-decoration-none fw-medium">
-                                        {{ $payroll->display_name }}
-                                    </a>
+                                    <x-employee-cell :employee="$payroll->employee" />
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-calendar text-muted"></i>
+                                        <span class="small">
+                                            {{ $payroll->period_start->format('Y-m-d') }} - {{ $payroll->period_end->format('Y-m-d') }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     <strong>{{ number_format($payroll->hours_amount, 2, ',', ' ') }}</strong>

@@ -58,14 +58,14 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th class="text-start">Zdjęcie</th>
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
-                            Imię i Nazwisko
+                            Pracownik
                         </x-livewire.sortable-header>
                         <x-livewire.sortable-header field="email" :sortField="$sortField" :sortDirection="$sortDirection" class="d-none d-md-table-cell">
                             Email
                         </x-livewire.sortable-header>
                         <th class="text-start">Rola</th>
+                        <th class="text-start">Status</th>
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
@@ -73,21 +73,7 @@
                     @forelse ($employees as $employee)
                         <tr>
                             <td>
-                                <x-ui.avatar 
-                                    :image-url="$employee->image_path ? $employee->image_url : null"
-                                    :alt="$employee->full_name"
-                                    :initials="substr($employee->first_name, 0, 1) . substr($employee->last_name, 0, 1)"
-                                    size="50px"
-                                    shape="circle"
-                                />
-                            </td>
-                            <td>
-                                <div class="fw-medium">{{ $employee->full_name }}</div>
-                                @if($employee->phone)
-                                    <div class="small text-muted mt-1">
-                                        <i class="bi bi-telephone"></i> {{ $employee->phone }}
-                                    </div>
-                                @endif
+                                <x-employee-cell :employee="$employee"  />
                                 <div class="d-md-none small text-muted mt-1">{{ $employee->email }}</div>
                             </td>
                             <td class="d-none d-md-table-cell">
@@ -107,6 +93,23 @@
                                     <span class="text-muted small">Brak ról</span>
                                 @endif
                             </td>
+                            <td>
+                                @php
+                                    $currentProjects = $employee->current_projects;
+                                    $hasActiveProjects = $currentProjects->isNotEmpty();
+                                    $projectsList = $currentProjects->pluck('name')->join(', ');
+                                    $tooltipText = $hasActiveProjects 
+                                        ? 'Przypisany do projektów: ' . $projectsList
+                                        : 'Nieprzypisany do żadnego projektu';
+                                @endphp
+                                <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $tooltipText }}">
+                                    @if($hasActiveProjects)
+                                        <x-ui.badge variant="danger">Zajęty</x-ui.badge>
+                                    @else
+                                        <x-ui.badge variant="success">Wolny</x-ui.badge>
+                                    @endif
+                                </span>
+                            </td>
                             <td class="text-end">
                                 <x-action-buttons
                                 viewRoute="{{ route('employees.show', $employee) }}"
@@ -122,7 +125,7 @@
                             :has-filters="$search || $roleFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="5"
+                            colspan="6"
                         />
                     @endforelse
                 </tbody>
@@ -137,3 +140,34 @@
         @endif
     </x-ui.card>
 </div>
+
+@push('scripts')
+<script>
+    function initTooltips() {
+        // Destroy existing tooltips first
+        var existingTooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        existingTooltips.forEach(function(el) {
+            var tooltipInstance = bootstrap.Tooltip.getInstance(el);
+            if (tooltipInstance) {
+                tooltipInstance.dispose();
+            }
+        });
+        
+        // Initialize new tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initTooltips);
+    
+    // Re-initialize after Livewire updates
+    document.addEventListener('livewire:init', function() {
+        Livewire.hook('morph.updated', function() {
+            setTimeout(initTooltips, 100);
+        });
+    });
+</script>
+@endpush

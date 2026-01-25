@@ -37,9 +37,7 @@
                         @foreach ($adjustments as $adjustment)
                             <tr>
                                 <td>
-                                    <a href="{{ route('employees.show', $adjustment->employee) }}" class="text-primary text-decoration-none">
-                                        {{ $adjustment->employee->full_name }}
-                                    </a>
+                                    <x-employee-cell :employee="$adjustment->employee"  />
                                 </td>
                                 <td>
                                     <x-ui.badge variant="{{ $adjustment->type === 'bonus' ? 'success' : 'danger' }}">

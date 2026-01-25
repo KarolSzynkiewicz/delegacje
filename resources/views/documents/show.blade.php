@@ -47,9 +47,7 @@
                                 @foreach($document->employeeDocuments as $employeeDocument)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $employeeDocument->employee) }}" class="text-decoration-none">
-                                                {{ $employeeDocument->employee->full_name }}
-                                            </a>
+                                            <x-employee-cell :employee="$employeeDocument->employee"  />
                                         </td>
                                         <td>{{ $employeeDocument->valid_from->format('Y-m-d') }}</td>
                                         <td>

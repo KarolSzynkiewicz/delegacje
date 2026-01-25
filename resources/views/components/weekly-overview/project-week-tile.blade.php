@@ -89,8 +89,7 @@
                                 <table class="table">
                                     <thead>
                                         <tr>
-                                            <th class="text-start small fw-bold">Zdjęcie</th>
-                                            <th class="text-start small fw-bold">Imię i nazwisko</th>
+                                            <th class="text-start small fw-bold">Pracownik</th>
                                             <th class="text-start small fw-bold">Rola w projekcie</th>
                                             <th class="text-center small fw-bold">Pokrycie</th>
                                             <th class="text-start small fw-bold">Auto</th>
@@ -101,16 +100,7 @@
                                         @foreach($weekData['assigned_employees'] as $employeeData)
                                             <tr>
                                                 <td>
-                                                    @if($employeeData['employee']->image_path)
-                                                        <img src="{{ $employeeData['employee']->image_url }}" alt="{{ $employeeData['employee']->full_name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                                                    @else
-                                                        <div class="bg-warning bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                                            <span class="text-warning fw-semibold small">{{ substr($employeeData['employee']->first_name, 0, 1) }}{{ substr($employeeData['employee']->last_name, 0, 1) }}</span>
-                                                        </div>
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-decoration-none">{{ $employeeData['employee']->full_name }}</a>
+                                                    <x-employee-cell :employee="$employeeData['employee']"  />
                                                 </td>
                                                 <td>
                                                     @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
@@ -284,7 +274,7 @@
                                                                     <a href="{{ route('vehicle-assignments.show', $assignment) }}" 
                                                                        class="text-decoration-none {{ $isDriver ? 'text-success fw-semibold' : 'text-primary' }}">
                                                                         <i class="bi {{ $isDriver ? 'bi-car-front-fill' : 'bi-person' }}"></i>
-                                                                        {{ $assignment->employee->full_name }}
+                                                                        <span>{{ $assignment->employee->full_name }}</span>
                                                                         @if($isDriver)
                                                                             <x-ui.badge variant="success" class="ms-1">Kierowca</x-ui.badge>
                                                                         @endif
@@ -397,7 +387,7 @@
                                                     </div>
                                                 @endif
                                                 <div class="flex-grow-1">
-                                                    <a href="{{ route('employees.show', $employeeData['employee']) }}" class="fw-semibold text-decoration-none d-block">{{ $employeeData['employee']->full_name }}</a>
+                                                    <x-employee-cell :employee="$employeeData['employee']"  :show-phone="false" name-class="fw-semibold" />
                                                     <x-ui.badge variant="info" class="small">{{ $employeeData['role']->name }}</x-ui.badge>
                                                 </div>
                                                 @php

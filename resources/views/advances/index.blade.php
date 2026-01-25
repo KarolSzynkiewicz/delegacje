@@ -38,9 +38,7 @@
                                 @foreach ($advances as $advance)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $advance->employee) }}" class="text-primary text-decoration-none">
-                                                {{ $advance->employee->full_name }}
-                                            </a>
+                                            <x-employee-cell :employee="$advance->employee"  />
                                         </td>
                                         <td>
                                             <strong>{{ number_format($advance->amount, 2, ',', ' ') }} {{ $advance->currency }}</strong>

@@ -11,6 +11,7 @@ use App\Traits\HasDateRange;
 use App\Contracts\HasEmployee;
 use App\Contracts\HasDateRange as HasDateRangeContract;
 use App\Models\Employee;
+use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
 
 class ProjectAssignment extends Model implements HasEmployee, HasDateRangeContract
@@ -29,6 +30,7 @@ class ProjectAssignment extends Model implements HasEmployee, HasDateRangeContra
         'start_date',
         'end_date',
         'notes',
+        'is_cancelled',
     ];
 
     /**
@@ -39,6 +41,7 @@ class ProjectAssignment extends Model implements HasEmployee, HasDateRangeContra
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'is_cancelled' => 'boolean',
     ];
 
     /**
@@ -103,6 +106,46 @@ class ProjectAssignment extends Model implements HasEmployee, HasDateRangeContra
     {
         $date = $this->end_date;
         return $date ? Carbon::instance($date) : null;
+    }
+
+    /**
+     * Get the computed status based on dates.
+     * 
+     * Status calculation priority:
+     * 1. If is_cancelled is true, return CANCELLED
+     * 2. If assignment is currently active (start_date <= today <= end_date or end_date is null) -> ACTIVE
+     * 3. If assignment is in the past (end_date < today) -> COMPLETED
+     * 4. If assignment is scheduled (start_date > today) -> ACTIVE
+     * 
+     * This ensures that "active" status is only shown for assignments that are actually active now,
+     * not for past assignments.
+     * 
+     * @return AssignmentStatus
+     */
+    public function getStatusAttribute($value): AssignmentStatus
+    {
+        // If assignment is explicitly cancelled, return CANCELLED
+        if ($this->is_cancelled) {
+            return AssignmentStatus::CANCELLED;
+        }
+
+        // Calculate status based on dates
+        if ($this->isCurrentlyActive()) {
+            // Currently active: start_date <= today <= end_date (or end_date is null)
+            // Only assignments that are actually active now get ACTIVE status
+            return AssignmentStatus::ACTIVE;
+        } elseif ($this->isPast()) {
+            // Past: end_date < today
+            // Past assignments always get COMPLETED status
+            return AssignmentStatus::COMPLETED;
+        } elseif ($this->isScheduled()) {
+            // Scheduled: start_date > today
+            // Future assignments are shown as ACTIVE (they will become active)
+            return AssignmentStatus::ACTIVE;
+        }
+
+        // Fallback: default to ACTIVE
+        return AssignmentStatus::ACTIVE;
     }
 
 }

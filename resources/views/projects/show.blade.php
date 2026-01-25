@@ -157,7 +157,7 @@
                                                 <tr>
                                                     <td>
                                                         <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
-                                                            {{ $assignment->employee->full_name }}
+                                                            <x-employee-cell :employee="$assignment->employee" />
                                                         </a>
                                                     </td>
                                                     <td>

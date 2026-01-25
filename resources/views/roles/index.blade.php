@@ -35,7 +35,9 @@
                     <tbody>
                         @foreach ($roles as $role)
                             <tr>
-                                <td class="fw-medium">{{ $role->name }}</td>
+                                <td>
+                                    <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
+                                </td>
                                 <td>{{ $role->description ?? '-' }}</td>
                                 <td>{{ $role->employees->count() }}</td>
                                 <td>

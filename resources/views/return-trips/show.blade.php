@@ -102,7 +102,9 @@
                                     <tbody>
                                         @foreach($returnTrip->participants as $participant)
                                             <tr>
-                                                <td>{{ $participant->employee->full_name }}</td>
+                                                <td>
+                                                    <x-employee-cell :employee="$participant->employee"  />
+                                                </td>
                                                 <td>
                                                     @if($participant->assignment)
                                                         {{ class_basename($participant->assignment) }} #{{ $participant->assignment_id }}
