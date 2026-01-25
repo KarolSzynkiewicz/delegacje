@@ -20,6 +20,19 @@
 
     @isset($project)
         {{-- Widok dla konkretnego projektu - bez Livewire --}}
+        
+        @if (session('success'))
+            <x-ui.alert variant="success" title="Sukces" class="mb-3">
+                {{ session('success') }}
+            </x-ui.alert>
+        @endif
+
+        @if (session('error'))
+            <x-ui.alert variant="danger" title="Błąd" class="mb-3">
+                {{ session('error') }}
+            </x-ui.alert>
+        @endif
+
         <x-ui.card>
             @if($assignments->count() > 0)
                 <div class="table-responsive">

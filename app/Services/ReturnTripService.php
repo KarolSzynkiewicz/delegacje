@@ -88,13 +88,15 @@ class ReturnTripService
      * @param ReturnTripPreparation $preparation
      * @param string|null $notes Additional notes
      * @param LogisticsEvent|null $existingEvent If provided, updates existing event instead of creating new one
+     * @param LogisticsEventStatus|null $status If provided, sets this status (only for updates)
      * @return LogisticsEvent
      * @throws ValidationException
      */
     public function commitZjazd(
         ReturnTripPreparation $preparation,
         ?string $notes = null,
-        ?LogisticsEvent $existingEvent = null
+        ?LogisticsEvent $existingEvent = null,
+        ?LogisticsEventStatus $status = null
     ): LogisticsEvent
     {
         // Validate preparation is valid (no blocking conflicts)
@@ -109,10 +111,11 @@ class ReturnTripService
 
         $baseLocation = Location::getBase();
 
-        return DB::transaction(function () use ($preparation, $baseLocation, $notes, $existingEvent) {
-            // Shorten all assignments
+        return DB::transaction(function () use ($preparation, $baseLocation, $notes, $existingEvent, $status) {
+            // Shorten all assignments and save original end_date
             foreach ($preparation->assignmentsToShorten as $assignmentToShorten) {
                 $assignment = $assignmentToShorten->assignment;
+                $originalEndDate = $assignmentToShorten->currentEndDate;
                 
                 // Update end_date to return date
                 // All assignments implement HasDateRange and have end_date column
@@ -120,6 +123,8 @@ class ReturnTripService
             }
 
             // End old vehicle assignments for returning employees (if not already shortened)
+            // Track which vehicle assignments were shortened for later participant creation
+            $shortenedVehicleAssignments = [];
             foreach ($preparation->employeeIds as $employeeId) {
                 $oldVehicleAssignment = $this->assignmentQueryService->getActiveVehicleAssignment(
                     $employeeId,
@@ -135,7 +140,14 @@ class ReturnTripService
                     });
 
                     if (!$alreadyShortened) {
+                        // Get original end_date before updating
+                        $originalEndDate = $oldVehicleAssignment->end_date; // This is already a Carbon or null
                         $oldVehicleAssignment->update(['end_date' => $preparation->returnDate]);
+                        $shortenedVehicleAssignments[] = [
+                            'assignment' => $oldVehicleAssignment,
+                            'original_end_date' => $originalEndDate, // Keep as Carbon/null for proper handling
+                            'employee_id' => $employeeId,
+                        ];
                     }
                 }
             }
@@ -160,13 +172,20 @@ class ReturnTripService
             if ($existingEvent) {
                 // Update existing event
                 $event = $existingEvent;
-                $event->update([
+                $updateData = [
                     'event_date' => $preparation->returnDate,
                     'vehicle_id' => $preparation->returnVehicle?->id,
                     'from_location_id' => $this->getCurrentLocationForEmployees($preparation->employeeIds)?->id ?? $baseLocation->id,
                     'to_location_id' => $baseLocation->id,
                     'notes' => $notes,
-                ]);
+                ];
+                
+                // Update status if provided (only for existing events, not new ones)
+                if ($status !== null) {
+                    $updateData['status'] = $status;
+                }
+                
+                $event->update($updateData);
                 
                 // Delete old participants
                 $event->participants()->delete();
@@ -186,6 +205,41 @@ class ReturnTripService
                 ]);
             }
 
+            // Create participants for shortened assignments (with original_end_date)
+            foreach ($preparation->assignmentsToShorten as $assignmentToShorten) {
+                $assignment = $assignmentToShorten->assignment;
+                $originalEndDate = $assignmentToShorten->currentEndDate;
+                
+                // Determine assignment type for morph map
+                $assignmentType = match (get_class($assignment)) {
+                    ProjectAssignment::class => 'project_assignment',
+                    AccommodationAssignment::class => 'accommodation_assignment',
+                    VehicleAssignment::class => 'vehicle_assignment',
+                    default => strtolower(class_basename($assignment)),
+                };
+                
+                LogisticsEventParticipant::create([
+                    'logistics_event_id' => $event->id,
+                    'employee_id' => $assignment->getEmployee()->id,
+                    'assignment_type' => $assignmentType,
+                    'assignment_id' => $assignment->id,
+                    'original_end_date' => $originalEndDate?->format('Y-m-d'),
+                    'status' => 'pending',
+                ]);
+            }
+            
+            // Create participants for shortened vehicle assignments (not in assignmentsToShorten)
+            foreach ($shortenedVehicleAssignments as $shortened) {
+                LogisticsEventParticipant::create([
+                    'logistics_event_id' => $event->id,
+                    'employee_id' => $shortened['employee_id'],
+                    'assignment_type' => 'vehicle_assignment',
+                    'assignment_id' => $shortened['assignment']->id,
+                    'original_end_date' => $shortened['original_end_date']?->format('Y-m-d'),
+                    'status' => 'pending',
+                ]);
+            }
+
             // Create vehicle assignments for return transport (if vehicle specified)
             if ($preparation->returnVehicle) {
                 foreach ($preparation->employeeIds as $employeeId) {
@@ -196,13 +250,14 @@ class ReturnTripService
                     'end_date' => $preparation->returnDate->copy()->addDays(1),
                     'notes' => 'Zjazd do bazy',
                     'is_return_trip' => true,
-                ]);
+                    ]);
 
                     LogisticsEventParticipant::create([
                         'logistics_event_id' => $event->id,
                         'employee_id' => $employeeId,
                         'assignment_type' => 'vehicle_assignment',
                         'assignment_id' => $newVehicleAssignment->id,
+                        'original_end_date' => null, // New assignment, no original end_date
                         'status' => 'pending',
                     ]);
                 }
@@ -237,11 +292,10 @@ class ReturnTripService
     /**
      * Reverse a return trip - clean up return trip assignments before editing.
      * 
-     * This method removes return trip vehicle assignments (is_return_trip = true)
-     * so that a new return trip can be created with updated data.
-     * 
-     * Note: We don't restore original end_date values because we don't store them.
-     * The new prepare/commit will recalculate which assignments need to be shortened.
+     * This method:
+     * 1. Restores original end_date values for all shortened assignments
+     * 2. Deletes return trip vehicle assignments (is_return_trip = true)
+     * 3. Deletes all participants
      * 
      * @param LogisticsEvent $returnTrip The return trip to reverse
      * @return void
@@ -253,16 +307,28 @@ class ReturnTripService
         }
 
         DB::transaction(function () use ($returnTrip) {
-            // Get all participants and their vehicle assignments
+            // Get all participants with their assignments and original_end_date
             $participants = $returnTrip->participants()->with('assignment')->get();
             
-            // Delete return trip vehicle assignments (those with is_return_trip = true)
+            // Restore original end_date for all shortened assignments
             foreach ($participants as $participant) {
+                // Skip return trip vehicle assignments (they will be deleted)
                 if ($participant->assignment_type === 'vehicle_assignment' && $participant->assignment) {
                     $vehicleAssignment = $participant->assignment;
                     if ($vehicleAssignment->is_return_trip) {
                         $vehicleAssignment->delete();
+                        continue;
                     }
+                }
+                
+                // Restore original end_date if it was stored
+                if ($participant->assignment && $participant->original_end_date !== null) {
+                    $assignment = $participant->assignment;
+                    
+                    // Restore original end_date (null in database means it was indefinite)
+                    $assignment->update([
+                        'end_date' => $participant->original_end_date
+                    ]);
                 }
             }
             

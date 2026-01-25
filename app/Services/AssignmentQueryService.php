@@ -109,4 +109,53 @@ class AssignmentQueryService
             ->activeAtDate($date)
             ->first();
     }
+
+    /**
+     * Get available employees for departure (not in projects, with active rotation, with all required documents).
+     * 
+     * Available means:
+     * - NOT assigned to any project at the given date
+     * - Has active rotation at the given date
+     * - Has all required documents active at the given date
+     * 
+     * @param Carbon $date
+     * @return Collection<Employee>
+     */
+    public function getAvailableEmployeesForDeparture(Carbon $date): Collection
+    {
+        // Get all employees
+        $allEmployees = Employee::with(['rotations', 'employeeDocuments.document', 'assignments'])
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        // Filter employees who are available
+        return $allEmployees->filter(function (Employee $employee) use ($date) {
+            // 1. Check if employee is NOT assigned to any project at the given date
+            $hasProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
+                ->activeAtDate($date)
+                ->exists();
+            
+            if ($hasProjectAssignment) {
+                return false;
+            }
+
+            // 2. Check if employee has active rotation at the given date
+            $hasActiveRotation = $employee->rotations()
+                ->activeAtDate($date)
+                ->exists();
+            
+            if (!$hasActiveRotation) {
+                return false;
+            }
+
+            // 3. Check if employee has all required documents active at the given date
+            // Use a single date for document check (departure is a single date event)
+            if (!$employee->hasAllDocumentsActiveInDateRange($date, $date)) {
+                return false;
+            }
+
+            return true;
+        })->values();
+    }
 }

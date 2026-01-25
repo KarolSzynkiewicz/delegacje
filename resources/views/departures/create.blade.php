@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Utwórz Zjazd">
+        <x-ui.page-header title="Utwórz Wyjazd">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('return-trips.index') }}"
+                    href="{{ route('departures.index') }}"
                     action="back"
                 >
                     Powrót
@@ -15,19 +15,19 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Utwórz Nowy Zjazd">
+            <x-ui.card label="Utwórz Nowy Wyjazd">
                 <x-ui.errors />
 
-                <form method="POST" action="{{ route('return-trips.prepare-form') }}">
+                <form method="POST" action="{{ route('departures.store') }}">
                     @csrf
 
                     <div class="mb-3">
                         <x-ui.input 
                             type="select" 
                             name="vehicle_id" 
-                            label="Pojazd powrotny"
+                            label="Pojazd (opcjonalne)"
                         >
-                            <option value="">Brak pojazdu (opcjonalne)</option>
+                            <option value="">Brak pojazdu</option>
                             @foreach($vehicles as $vehicle)
                                 <option value="{{ $vehicle->id }}" {{ old('vehicle_id') == $vehicle->id ? 'selected' : '' }}>
                                     {{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}
@@ -36,7 +36,23 @@
                         </x-ui.input>
                     </div>
 
-                    @livewire('return-trip-employee-selector', ['returnDate' => old('return_date', date('Y-m-d'))], key('return-trip-selector'))
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="to_location_id" 
+                            label="Lokalizacja docelowa"
+                            required="true"
+                        >
+                            <option value="">Wybierz lokalizację</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}" {{ old('to_location_id') == $location->id ? 'selected' : '' }}>
+                                    {{ $location->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                    </div>
+
+                    @livewire('departure-employee-selector', ['departureDate' => old('departure_date', date('Y-m-d'))], key('departure-selector'))
 
                     <div class="mb-4">
                         <x-ui.input 
@@ -51,7 +67,7 @@
                     <div class="d-flex justify-content-end align-items-center gap-2">
                         <x-ui.button 
                             variant="ghost" 
-                            href="{{ route('return-trips.index') }}"
+                            href="{{ route('departures.index') }}"
                             action="cancel"
                         >
                             Anuluj
@@ -61,11 +77,12 @@
                             type="submit"
                             action="save"
                         >
-                            Przygotuj Zjazd
+                            Utwórz Wyjazd
                         </x-ui.button>
                     </div>
                 </form>
             </x-ui.card>
         </div>
     </div>
+
 </x-app-layout>

@@ -172,13 +172,40 @@ class ProjectAssignmentController extends Controller
      */
     public function destroy(ProjectAssignment $assignment): RedirectResponse
     {
+        $reasons = [];
+        
         // Sprawdź czy są zaksiegowane godziny dla tego przypisania
         $hasTimeLogs = \App\Models\TimeLog::where('project_assignment_id', $assignment->id)->exists();
-        
         if ($hasTimeLogs) {
+            $reasons[] = "są już zaksiegowane godziny pracy dla tego przypisania";
+        }
+        
+        // Sprawdź czy przypisanie jest powiązane z zjazdem (LogisticsEventParticipant)
+        $hasLogisticsEvents = \App\Models\LogisticsEventParticipant::where('assignment_type', 'project_assignment')
+            ->where('assignment_id', $assignment->id)
+            ->exists();
+        if ($hasLogisticsEvents) {
+            $reasons[] = "przypisanie jest powiązane z zjazdem lub wyjazdem";
+        }
+        
+        // Sprawdź czy są powiązane problemy z wyposażeniem (EquipmentIssue)
+        $hasEquipmentIssues = \App\Models\EquipmentIssue::where('project_assignment_id', $assignment->id)->exists();
+        if ($hasEquipmentIssues) {
+            $reasons[] = "są powiązane problemy z wyposażeniem";
+        }
+        
+        if (!empty($reasons)) {
+            $message = "Nie można usunąć przypisania, ponieważ " . implode(", ", $reasons) . ".";
+            if ($hasTimeLogs) {
+                $message .= " Najpierw usuń lub edytuj wpisy czasu pracy.";
+            }
+            if ($hasLogisticsEvents) {
+                $message .= " Najpierw usuń lub edytuj powiązane zjazdy/wyjazdy.";
+            }
+            
             return redirect()
                 ->route("projects.assignments.index", $assignment->project_id)
-                ->with("error", "Nie można usunąć przypisania, ponieważ są już zaksiegowane godziny pracy dla tego przypisania. Najpierw usuń lub edytuj wpisy czasu pracy.");
+                ->with("error", $message);
         }
         
         $projectId = $assignment->project_id;

@@ -32,7 +32,28 @@
 
                     <!-- Przypisania do skrócenia -->
                     <div class="mb-4">
-                        <h4 class="fs-6 fw-bold mb-3">Przypisania, które zostaną skrócone ({{ $preparation->assignmentsToShorten->count() }})</h4>
+                        @php
+                            // Grupuj przypisania po osobie i typie przypisania, aby uniknąć duplikatów
+                            $groupedAssignments = $preparation->assignmentsToShorten->groupBy(function($item) {
+                                $employeeId = $item->assignment->getEmployee()->id;
+                                $type = match(true) {
+                                    $item->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
+                                    $item->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
+                                    $item->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
+                                    default => class_basename($item->assignment),
+                                };
+                                return "{$employeeId}_{$type}";
+                            });
+                            
+                            // Dla każdej grupy weź pierwsze przypisanie (reprezentatywne)
+                            $uniqueAssignments = $groupedAssignments->map(function($group) {
+                                return $group->first();
+                            });
+                        @endphp
+                        <h4 class="fs-6 fw-bold mb-3">
+                            Przypisania, które zostaną skrócone 
+                            <span class="text-muted small">({{ $preparation->assignmentsToShorten->count() }} przypisań, {{ $uniqueAssignments->count() }} unikalnych kombinacji osoba+typ)</span>
+                        </h4>
                         @if($preparation->assignmentsToShorten->isEmpty())
                             <p class="text-muted">Brak przypisań do skrócenia.</p>
                         @else
@@ -47,20 +68,35 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($preparation->assignmentsToShorten as $assignmentToShorten)
+                                        @foreach($uniqueAssignments as $assignmentToShorten)
+                                            @php
+                                                $employee = $assignmentToShorten->assignment->getEmployee();
+                                                $type = match(true) {
+                                                    $assignmentToShorten->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
+                                                    $assignmentToShorten->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
+                                                    $assignmentToShorten->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
+                                                    default => class_basename($assignmentToShorten->assignment),
+                                                };
+                                                
+                                                // Policz ile przypisań tego typu ma ta osoba
+                                                $countForThisType = $preparation->assignmentsToShorten->filter(function($item) use ($employee, $type) {
+                                                    $itemType = match(true) {
+                                                        $item->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
+                                                        $item->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
+                                                        $item->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
+                                                        default => class_basename($item->assignment),
+                                                    };
+                                                    return $item->assignment->getEmployee()->id === $employee->id && $itemType === $type;
+                                                })->count();
+                                            @endphp
                                             <tr>
-                                                <td>{{ $assignmentToShorten->assignment->getEmployee()->full_name }}</td>
                                                 <td>
-                                                    @if($assignmentToShorten->assignment instanceof \App\Models\ProjectAssignment)
-                                                        Projekt
-                                                    @elseif($assignmentToShorten->assignment instanceof \App\Models\AccommodationAssignment)
-                                                        Dom
-                                                    @elseif($assignmentToShorten->assignment instanceof \App\Models\VehicleAssignment)
-                                                        Auto
-                                                    @else
-                                                        {{ class_basename($assignmentToShorten->assignment) }}
+                                                    {{ $employee->full_name }}
+                                                    @if($countForThisType > 1)
+                                                        <span class="badge bg-secondary ms-2" title="{{ $countForThisType }} przypisań tego typu">{{ $countForThisType }}x</span>
                                                     @endif
                                                 </td>
+                                                <td>{{ $type }}</td>
                                                 <td>
                                                     {{ $assignmentToShorten->currentEndDate 
                                                         ? $assignmentToShorten->currentEndDate->format('d.m.Y') 
@@ -156,6 +192,9 @@
                         <form method="POST" action="{{ route('return-trips.store') }}">
                             @csrf
                             <input type="hidden" name="notes" value="{{ $validated['notes'] ?? '' }}">
+                            @if(isset($validated['status']))
+                                <input type="hidden" name="status" value="{{ $validated['status'] }}">
+                            @endif
                             @if(isset($isEditMode) && $isEditMode && isset($returnTripId))
                                 <input type="hidden" name="return_trip_id" value="{{ $returnTripId }}">
                             @endif

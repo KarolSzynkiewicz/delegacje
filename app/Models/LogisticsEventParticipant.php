@@ -27,10 +27,12 @@ class LogisticsEventParticipant extends Model
         'assignment_type',
         'assignment_id',
         'status',
+        'original_end_date',
     ];
 
     protected $casts = [
         'status' => 'string', // pending, in_transit, completed
+        'original_end_date' => 'date',
     ];
 
     /**

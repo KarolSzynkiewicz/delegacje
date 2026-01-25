@@ -35,26 +35,24 @@
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Pracownicy *</label>
-                            <select name="employee_ids[]" multiple required size="10" class="form-select">
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}" {{ in_array($employee->id, old('employee_ids', $currentEmployeeIds)) ? 'selected' : '' }}>
-                                        {{ $employee->full_name }} 
-                                        @if($employee->assignments->count() > 0)
-                                            (Projekt: {{ $employee->assignments->first()->project->name ?? '-' }})
-                                        @endif
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="form-text text-muted">Przytrzymaj Ctrl/Cmd aby wybrać wielu pracowników</small>
-                        </div>
+                    @livewire('return-trip-employee-selector', [
+                        'returnDate' => old('return_date', $returnTrip->event_date->format('Y-m-d')),
+                        'selectedEmployeeIds' => old('employee_ids', $currentEmployeeIds),
+                        'returnTripId' => $returnTrip->id
+                    ], key('return-trip-selector-edit'))
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Data zjazdu *</label>
-                            <input type="date" name="return_date" value="{{ old('return_date', $returnTrip->event_date->format('Y-m-d')) }}" required
-                                min="{{ date('Y-m-d') }}"
-                                class="form-control">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select name="status" class="form-select">
+                                @foreach(\App\Enums\LogisticsEventStatus::cases() as $status)
+                                    @if($status !== \App\Enums\LogisticsEventStatus::CANCELLED)
+                                        <option value="{{ $status->value }}" {{ old('status', $returnTrip->status->value) === $status->value ? 'selected' : '' }}>
+                                            {{ $status->label() }}
+                                        </option>
+                                    @endif
+                                @endforeach
+                            </select>
+                            <small class="form-text text-muted">Status zjazdu można zmienić tylko jeśli nie jest anulowany</small>
                         </div>
 
                         <div class="mb-3">

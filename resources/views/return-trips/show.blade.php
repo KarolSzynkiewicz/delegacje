@@ -11,7 +11,7 @@
                 </x-ui.button>
             </x-slot>
             <x-slot name="right">
-                @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
+                @if($returnTrip->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
                     <x-ui.button 
                         variant="ghost" 
                         href="{{ route('return-trips.edit', $returnTrip) }}"
@@ -20,6 +20,8 @@
                     >
                         Edytuj
                     </x-ui.button>
+                @endif
+                @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
                     <form method="POST" action="{{ route('return-trips.cancel', $returnTrip) }}" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz anulować ten zjazd?');">
                         @csrf
                         <x-ui.button 
@@ -88,32 +90,73 @@
                     </div>
 
                     <div class="border-top pt-4">
-                        <h5 class="fw-bold text-dark mb-4">Uczestnicy ({{ $returnTrip->participants->count() }})</h5>
-                        @if($returnTrip->participants->count() > 0)
+                        @php
+                            // Get unique employees (one employee can have multiple assignments)
+                            // Also remove duplicate assignments (same employee_id + assignment_type + assignment_id)
+                            $uniqueEmployees = $returnTrip->participants
+                                ->groupBy('employee_id')
+                                ->map(function($participants) {
+                                    // Remove duplicate assignments (same assignment_type + assignment_id)
+                                    $uniqueAssignments = $participants
+                                        ->unique(function($p) {
+                                            return $p->assignment_type . '_' . $p->assignment_id;
+                                        })
+                                        ->map(function($p) {
+                                            return [
+                                                'type' => $p->assignment_type,
+                                                'assignment' => $p->assignment,
+                                                'assignment_id' => $p->assignment_id,
+                                            ];
+                                        })
+                                        ->values();
+                                    
+                                    return [
+                                        'employee' => $participants->first()->employee,
+                                        'assignments' => $uniqueAssignments,
+                                    ];
+                                });
+                            $uniqueEmployeeCount = $uniqueEmployees->count();
+                        @endphp
+                        <h5 class="fw-bold text-dark mb-4">Uczestnicy ({{ $uniqueEmployeeCount }} {{ $uniqueEmployeeCount == 1 ? 'osoba' : 'osób' }})</h5>
+                        @if($returnTrip->status === \App\Enums\LogisticsEventStatus::CANCELLED)
+                            <x-ui.alert variant="info" class="mb-3">
+                                Ten zjazd został anulowany. Wszystkie przypisania zostały cofnięte do oryginalnych dat końcowych.
+                            </x-ui.alert>
+                        @endif
+                        @if($uniqueEmployees->isNotEmpty())
                             <div class="table-responsive">
                                 <table class="table align-middle">
                                     <thead>
                                         <tr>
                                             <th class="text-start">Pracownik</th>
-                                            <th class="text-start">Przypisanie</th>
-                                            <th class="text-start">Status</th>
+                                            <th class="text-start">Przypisania</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($returnTrip->participants as $participant)
+                                        @foreach($uniqueEmployees as $employeeData)
                                             <tr>
                                                 <td>
-                                                    <x-employee-cell :employee="$participant->employee"  />
+                                                    <x-employee-cell :employee="$employeeData['employee']"  />
                                                 </td>
                                                 <td>
-                                                    @if($participant->assignment)
-                                                        {{ class_basename($participant->assignment) }} #{{ $participant->assignment_id }}
-                                                    @else
-                                                        -
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <x-ui.badge variant="accent">{{ ucfirst($participant->status) }}</x-ui.badge>
+                                                    <div class="d-flex flex-wrap gap-2">
+                                                        @foreach($employeeData['assignments'] as $assignmentData)
+                                                            @php
+                                                                $assignmentTypeLabel = match($assignmentData['type']) {
+                                                                    'project_assignment' => 'Projekt',
+                                                                    'accommodation_assignment' => 'Mieszkanie',
+                                                                    'vehicle_assignment' => 'Auto',
+                                                                    default => $assignmentData['type'],
+                                                                };
+                                                            @endphp
+                                                            <x-ui.badge variant="info" class="small">
+                                                                {{ $assignmentTypeLabel }}
+                                                                @if($assignmentData['assignment'])
+                                                                    #{{ $assignmentData['assignment_id'] }}
+                                                                @endif
+                                                            </x-ui.badge>
+                                                        @endforeach
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @endforeach

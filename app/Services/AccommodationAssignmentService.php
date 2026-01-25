@@ -24,6 +24,9 @@ class AccommodationAssignmentService
     ): AccommodationAssignment {
         $endDate = $endDate ?? now()->addYears(10);
 
+        // Validate employee doesn't have overlapping assignment to the same accommodation
+        $this->validateNoOverlappingAssignment($employee, $accommodation, $startDate, $endDate);
+
         $this->validateAccommodationCapacity($accommodation, $startDate, $endDate);
 
         return AccommodationAssignment::create([
@@ -49,6 +52,9 @@ class AccommodationAssignmentService
     ): AccommodationAssignment {
         $endDate = $endDate ?? now()->addYears(10);
 
+        // Validate employee doesn't have overlapping assignment to the same accommodation (excluding current)
+        $this->validateNoOverlappingAssignment($assignment->employee, $accommodation, $startDate, $endDate, $assignment->id);
+
         // Validate capacity excluding current assignment
         $this->validateAccommodationCapacity($accommodation, $startDate, $endDate, $assignment->id);
 
@@ -60,6 +66,33 @@ class AccommodationAssignmentService
         ]);
 
         return $assignment;
+    }
+
+    /**
+     * Validate that employee doesn't have overlapping assignment to the same accommodation.
+     *
+     * @throws ValidationException
+     */
+    protected function validateNoOverlappingAssignment(
+        Employee $employee,
+        Accommodation $accommodation,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $excludeAssignmentId = null
+    ): void {
+        $query = $employee->accommodationAssignments()
+            ->where('accommodation_id', $accommodation->id)
+            ->overlappingWith($startDate, $endDate);
+
+        if ($excludeAssignmentId) {
+            $query->where('id', '!=', $excludeAssignmentId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'accommodation_id' => 'Pracownik ma już przypisanie do tego mieszkania w tym okresie. Nie można tworzyć nakładających się przypisań.'
+            ]);
+        }
     }
 
     /**

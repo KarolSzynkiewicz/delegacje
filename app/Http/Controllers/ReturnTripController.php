@@ -35,16 +35,14 @@ class ReturnTripController extends Controller
      */
     public function create()
     {
-        // Get employees with active assignments
-        $employees = $this->assignmentQueryService->getEmployeesWithActiveAssignments(Carbon::now());
-
+        // Employees will be loaded dynamically via Livewire based on selected date
         $vehicles = Vehicle::where('type', 'company_vehicle')
             ->orderBy('registration_number')
             ->get();
 
         $baseLocation = Location::getBase();
 
-        return view('return-trips.create', compact('employees', 'vehicles', 'baseLocation'));
+        return view('return-trips.create', compact('vehicles', 'baseLocation'));
     }
 
     /**
@@ -59,6 +57,7 @@ class ReturnTripController extends Controller
             'employee_ids.*' => 'exists:employees,id',
             'return_date' => 'required|date|after_or_equal:today',
             'notes' => 'nullable|string|max:1000',
+            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
             'edit_mode' => 'nullable|boolean',
             'return_trip_id' => 'nullable|exists:logistics_events,id',
         ]);
@@ -96,6 +95,7 @@ class ReturnTripController extends Controller
             'employee_ids' => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
             'return_date' => 'required|date|after_or_equal:today',
+            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
             'edit_mode' => 'nullable|boolean',
             'return_trip_id' => 'nullable|exists:logistics_events,id',
         ]);
@@ -169,6 +169,7 @@ class ReturnTripController extends Controller
     {
         $validated = $request->validate([
             'notes' => 'nullable|string|max:1000',
+            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
             'accept_consequences' => 'required|accepted',
             'return_trip_id' => 'nullable|exists:logistics_events,id',
         ]);
@@ -189,17 +190,24 @@ class ReturnTripController extends Controller
             if (isset($validated['return_trip_id'])) {
                 $existingEvent = LogisticsEvent::findOrFail($validated['return_trip_id']);
                 
-                // Only allow updating if status is PLANNED
-                if ($existingEvent->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
+                // Only allow updating if status is not CANCELLED
+                if ($existingEvent->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
                     return redirect()
                         ->route('return-trips.show', $existingEvent)
-                        ->with('error', 'Można edytować tylko zjazdy ze statusem "Zaplanowane".');
+                        ->with('error', 'Nie można edytować anulowanych zjazdów.');
                 }
+                
+                // Reverse previous return trip changes (restore original end dates)
+                // This must be done BEFORE commitZjazd() to restore the state before applying new changes
+                $this->returnTripService->reverseZjazd($existingEvent);
             }
 
             // Commit the return trip (create or update)
             $notes = $validated['notes'] ?? null;
-            $event = $this->returnTripService->commitZjazd($preparation, $notes, $existingEvent);
+            $status = isset($validated['status']) 
+                ? \App\Enums\LogisticsEventStatus::from($validated['status'])
+                : null;
+            $event = $this->returnTripService->commitZjazd($preparation, $notes, $existingEvent, $status);
 
             // Clear preparation from session
             session()->forget('return_trip_preparation');
@@ -249,11 +257,17 @@ class ReturnTripController extends Controller
      */
     public function edit(LogisticsEvent $returnTrip)
     {
-        // Only allow editing if status is PLANNED
-        if ($returnTrip->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
+        // Only allow editing if status is not CANCELLED and not COMPLETED
+        if ($returnTrip->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
             return redirect()
                 ->route('return-trips.show', $returnTrip)
-                ->with('error', 'Można edytować tylko zjazdy ze statusem "Zaplanowane".');
+                ->with('error', 'Nie można edytować anulowanych zjazdów.');
+        }
+        
+        if ($returnTrip->status === \App\Enums\LogisticsEventStatus::COMPLETED) {
+            return redirect()
+                ->route('return-trips.show', $returnTrip)
+                ->with('error', 'Nie można edytować zakończonych zjazdów.');
         }
 
         // Get employees with active assignments
@@ -326,7 +340,7 @@ class ReturnTripController extends Controller
 
     /**
      * Cancel a return trip.
-     * Sets status to CANCELLED - does not reverse assignments.
+     * Reverses all assignments and sets status to CANCELLED.
      */
     public function cancel(LogisticsEvent $returnTrip)
     {
@@ -337,12 +351,22 @@ class ReturnTripController extends Controller
                 ->with('error', 'Można anulować tylko zjazdy ze statusem "Planowany".');
         }
 
-        $returnTrip->update([
-            'status' => \App\Enums\LogisticsEventStatus::CANCELLED,
-        ]);
+        try {
+            // Reverse all assignments (restore original end dates, delete return trip assignments)
+            $this->returnTripService->reverseZjazd($returnTrip);
+            
+            // Set status to CANCELLED
+            $returnTrip->update([
+                'status' => \App\Enums\LogisticsEventStatus::CANCELLED,
+            ]);
 
-        return redirect()
-            ->route('return-trips.show', $returnTrip)
-            ->with('success', 'Zjazd został anulowany.');
+            return redirect()
+                ->route('return-trips.show', $returnTrip)
+                ->with('success', 'Zjazd został anulowany i wszystkie przypisania zostały cofnięte.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('return-trips.show', $returnTrip)
+                ->with('error', 'Wystąpił błąd podczas anulowania zjazdu: ' . $e->getMessage());
+        }
     }
 }

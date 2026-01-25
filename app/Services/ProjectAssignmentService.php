@@ -30,7 +30,7 @@ class ProjectAssignmentService
         // Validate employee has all documents
         $this->validateEmployeeDocuments($employee, $startDate, $endDate);
 
-        // Validate employee availability
+        // Validate employee availability (checks ALL projects, including same project - prevents overlaps)
         $this->validateEmployeeAvailability($employee, $startDate, $endDate);
 
         // Validate project demand
@@ -180,25 +180,30 @@ class ProjectAssignmentService
             ]);
         }
 
-        // Check if employee is available (no conflicting assignments)
+        // Check if employee is available (no conflicting assignments in ANY project)
         if ($excludeAssignmentId) {
             // For updates, check conflicts excluding current assignment
             $hasConflictingAssignments = $employee->assignments()
-                ->active()
+                ->where('is_cancelled', false)
                 ->where('id', '!=', $excludeAssignmentId)
                 ->overlappingWith($startDate, $endDate)
                 ->exists();
 
             if ($hasConflictingAssignments) {
                 throw ValidationException::withMessages([
-                    'employee_id' => 'Pracownik jest już przypisany do innego projektu w tym okresie.'
+                    'employee_id' => 'Pracownik jest już przypisany do projektu w tym okresie. Nie można tworzyć nakładających się przypisań.'
                 ]);
             }
         } else {
-            // For creates, use the model method
-            if (!$employee->isAvailableInDateRange($startDate, $endDate)) {
+            // For creates, check all assignments (including same project)
+            $hasConflictingAssignments = $employee->assignments()
+                ->where('is_cancelled', false)
+                ->overlappingWith($startDate, $endDate)
+                ->exists();
+
+            if ($hasConflictingAssignments) {
                 throw ValidationException::withMessages([
-                    'employee_id' => 'Pracownik jest już przypisany do innego projektu w tym okresie.'
+                    'employee_id' => 'Pracownik jest już przypisany do projektu w tym okresie. Nie można tworzyć nakładających się przypisań.'
                 ]);
             }
         }
