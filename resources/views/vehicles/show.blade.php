@@ -41,15 +41,17 @@
                         <h5>Stan Techniczny</h5>
                         <p>
                             @php
+                                $condition = \App\Enums\VehicleCondition::tryFrom($vehicle->technical_condition);
                                 $badgeVariant = match($vehicle->technical_condition) {
                                     'excellent' => 'success',
                                     'good' => 'info',
                                     'fair' => 'warning',
-                                    'poor' => 'danger',
+                                    'poor' => 'warning',
+                                    'workshop' => 'danger',
                                     default => 'info'
                                 };
                             @endphp
-                            <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($vehicle->technical_condition) }}</x-ui.badge>
+                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $condition?->label() ?? ucfirst($vehicle->technical_condition) }}</x-ui.badge>
                         </p>
                     </div>
                 </div>
@@ -97,7 +99,16 @@
                 </div>
             </x-ui.card>
 
-            <x-ui.card label="Przypisania do pojazdu" class="mt-4">
+            <x-ui.card class="mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Przypisania do pojazdu</h5>
+                    <div>
+                        <a href="{{ route('vehicles.show', ['vehicle' => $vehicle->id, 'filter' => $filter === 'active' ? 'all' : 'active']) }}" 
+                           class="btn btn-sm {{ $filter === 'active' ? 'btn-primary' : 'btn-outline-primary' }}">
+                            {{ $filter === 'active' ? 'Aktywne' : 'Wszystkie' }}
+                        </a>
+                    </div>
+                </div>
                 @if($assignments->count() > 0)
                     <div class="table-responsive">
                         <table class="table">
@@ -162,12 +173,21 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($assignments->hasPages())
+                        <div class="mt-3 pt-3 border-top">
+                            {{ $assignments->links() }}
+                        </div>
+                    @endif
                 @else
                     <x-ui.empty-state 
                         icon="inbox"
                         message="Brak przypisań do tego pojazdu."
                     />
                 @endif
+            </x-ui.card>
+
+            <x-ui.card class="mt-4">
+                <x-comments :commentable="$vehicle" />
             </x-ui.card>
         </div>
     </div>

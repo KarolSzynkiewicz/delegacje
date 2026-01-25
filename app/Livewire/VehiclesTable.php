@@ -96,11 +96,9 @@ class VehiclesTable extends Component
         $query->orderBy($this->sortField, $this->sortDirection);
 
         $vehicles = $query->paginate(10);
-        $conditions = ['excellent', 'good', 'fair', 'poor'];
 
         return view('livewire.vehicles-table', [
             'vehicles' => $vehicles,
-            'conditions' => $conditions,
         ]);
     }
 }

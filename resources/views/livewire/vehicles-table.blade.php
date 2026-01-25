@@ -35,10 +35,9 @@
                 <label class="form-label small">Stan techniczny</label>
                 <select wire:model.live="conditionFilter" class="form-control">
                     <option value="">Wszystkie</option>
-                    <option value="excellent">Doskonały</option>
-                    <option value="good">Dobry</option>
-                    <option value="fair">Zadowalający</option>
-                    <option value="poor">Słaby</option>
+                    @foreach(\App\Enums\VehicleCondition::cases() as $condition)
+                        <option value="{{ $condition->value }}">{{ $condition->label() }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="col-md-4">
@@ -91,7 +90,7 @@
                             </td>
                             <td>
                                 @php
-                                    $labels = ['excellent' => 'Doskonały', 'good' => 'Dobry', 'fair' => 'Zadowalający', 'poor' => 'Słaby'];
+                                    $condition = \App\Enums\VehicleCondition::tryFrom($vehicle->technical_condition);
                                     $colorType = \App\Services\StatusColorService::getVehicleConditionColor($vehicle->technical_condition);
                                     $badgeVariant = match($colorType) {
                                         'success' => 'success',
@@ -101,14 +100,23 @@
                                         default => 'info'
                                     };
                                 @endphp
-                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $labels[$vehicle->technical_condition] ?? $vehicle->technical_condition }}</x-ui.badge>
+                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $condition?->label() ?? $vehicle->technical_condition }}</x-ui.badge>
                             </td>
                             <td class="d-none d-lg-table-cell">
                                 <small class="text-muted">{{ $vehicle->capacity ?? '-' }} osób</small>
                             </td>
                             <td>
                                 @if($vehicle->currentAssignment())
-                                    <x-ui.badge variant="danger">Zajęty</x-ui.badge>
+                                    @php
+                                        $currentProjects = $vehicle->current_projects;
+                                        $projectsList = $currentProjects->pluck('name')->join(', ');
+                                        $tooltipText = $currentProjects->isNotEmpty() 
+                                            ? 'Używane w projektach: ' . $projectsList
+                                            : 'Pojazd jest zajęty';
+                                    @endphp
+                                    <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $tooltipText }}">
+                                        <x-ui.badge variant="danger">Zajęty</x-ui.badge>
+                                    </span>
                                 @else
                                     <x-ui.badge variant="success">Wolny</x-ui.badge>
                                 @endif
@@ -147,3 +155,34 @@
         @endif
     </x-ui.card>
 </div>
+
+@push('scripts')
+<script>
+    function initTooltips() {
+        // Destroy existing tooltips first
+        var existingTooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        existingTooltips.forEach(function(el) {
+            var tooltipInstance = bootstrap.Tooltip.getInstance(el);
+            if (tooltipInstance) {
+                tooltipInstance.dispose();
+            }
+        });
+        
+        // Initialize new tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initTooltips);
+    
+    // Re-initialize after Livewire updates
+    document.addEventListener('livewire:init', function() {
+        Livewire.hook('morph.updated', function() {
+            setTimeout(initTooltips, 100);
+        });
+    });
+</script>
+@endpush

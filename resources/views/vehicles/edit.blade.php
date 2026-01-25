@@ -79,7 +79,7 @@
                                 @foreach(\App\Enums\VehicleCondition::cases() as $condition)
                                     <option 
                                         value="{{ $condition->value }}" 
-                                        {{ old('technical_condition') == $condition->value ? 'selected' : '' }}
+                                        {{ old('technical_condition', $vehicle->technical_condition) == $condition->value ? 'selected' : '' }}
                                     >
                                         {{ $condition->label() }}
                                     </option>

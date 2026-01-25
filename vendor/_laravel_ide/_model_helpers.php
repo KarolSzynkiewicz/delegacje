@@ -8022,6 +8022,7 @@ namespace App\Models {
      * @property mixed $registration_number
      * @property int $id
      * @property-read mixed $image_url
+     * @property-read mixed $current_projects
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VehicleAssignment> $assignments
      * @property-read int|null $assignments_count
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Employee> $employees
@@ -8308,13 +8309,13 @@ namespace App\Models {
      * @property mixed $notes
      * @property string|null $actual_end_date
      * @property string|null $actual_start_date
-     * @property mixed $status
      * @property \Illuminate\Support\Carbon|null $end_date
      * @property \Illuminate\Support\Carbon $start_date
      * @property \App\Enums\VehiclePosition $position
      * @property int $vehicle_id
      * @property int $employee_id
      * @property int $id
+     * @property-read mixed $status
      * @property-read \App\Models\Employee $employee
      * @property-read \App\Models\Vehicle $vehicle
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereId($value)
@@ -8323,7 +8324,6 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment wherePosition($value)
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereStartDate($value)
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereEndDate($value)
-     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereStatus($value)
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereActualStartDate($value)
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereActualEndDate($value)
      * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereNotes($value)

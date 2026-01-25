@@ -111,4 +111,31 @@ class Vehicle extends Model
     {
         return $this->belongsTo(Location::class, 'current_location_id');
     }
+
+    /**
+     * Get projects where this vehicle is currently being used.
+     * 
+     * A vehicle is used in a project if:
+     * - There's an active vehicle assignment for this vehicle
+     * - The assigned employee has an active project assignment
+     * 
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getCurrentProjectsAttribute()
+    {
+        $activeAssignments = $this->assignments()->active()->with('employee')->get();
+        
+        if ($activeAssignments->isEmpty()) {
+            return collect();
+        }
+
+        $employeeIds = $activeAssignments->pluck('employee_id')->unique();
+        
+        $projectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $employeeIds)
+            ->active()
+            ->with('project')
+            ->get();
+        
+        return $projectAssignments->pluck('project')->filter()->unique('id')->values();
+    }
 }

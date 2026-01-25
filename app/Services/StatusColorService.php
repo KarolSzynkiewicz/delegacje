@@ -59,7 +59,8 @@ class StatusColorService
             'excellent' => 'success',
             'good' => 'primary',
             'fair' => 'warning',
-            'poor' => 'danger',
+            'poor' => 'warning',
+            'workshop' => 'danger',
             default => 'secondary'
         };
     }

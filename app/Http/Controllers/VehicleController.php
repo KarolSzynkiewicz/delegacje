@@ -43,14 +43,24 @@ class VehicleController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Vehicle $vehicle): View
+    public function show(Vehicle $vehicle, \Illuminate\Http\Request $request): View
     {
-        $assignments = $vehicle->assignments()
-            ->with(['employee'])
-            ->orderBy('start_date', 'desc')
-            ->get();
+        $filter = $request->get('filter', 'all'); // 'all' or 'active'
         
-        return view('vehicles.show', compact('vehicle', 'assignments'));
+        $assignmentsQuery = $vehicle->assignments()
+            ->with(['employee'])
+            ->orderBy('start_date', 'desc');
+        
+        if ($filter === 'active') {
+            $assignmentsQuery->active();
+        }
+        
+        $assignments = $assignmentsQuery->paginate(10)->withQueryString();
+        
+        // Load comments for the vehicle
+        $vehicle->load('comments.user');
+        
+        return view('vehicles.show', compact('vehicle', 'assignments', 'filter'));
     }
 
     /**
