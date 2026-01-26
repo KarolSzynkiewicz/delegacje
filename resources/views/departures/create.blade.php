@@ -15,6 +15,18 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
+            @if(session('success'))
+                <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+                    {{ session('success') }}
+                </x-ui.alert>
+            @endif
+
+            @if(session('error'))
+                <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-3">
+                    {{ session('error') }}
+                </x-ui.alert>
+            @endif
+
             <x-ui.card label="Utwórz Nowy Wyjazd">
                 <x-ui.errors />
 

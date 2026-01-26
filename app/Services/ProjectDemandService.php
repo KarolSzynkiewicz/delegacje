@@ -82,47 +82,20 @@ class ProjectDemandService
 
             $createdDemands = [];
             foreach ($demandsToProcess as $demandData) {
-                // Sprawdź czy zapotrzebowanie już istnieje dla tej roli w tym okresie
-                // Użyj dokładnego dopasowania dat, aby uniknąć duplikatów
-                $existingDemand = $project->demands()
+                // Znajdź wszystkie istniejące zapotrzebowania dla tej roli, które się nakładają z nowym okresem
+                // Użyj scopeOverlappingWith z HasDateRange trait
+                $overlappingDemands = $project->demands()
                     ->where('role_id', $demandData['role_id'])
-                    ->where('start_date', $demandData['start_date'])
-                    ->where(function ($q) use ($demandData) {
-                        if ($demandData['end_date']) {
-                            $q->where('end_date', $demandData['end_date']);
-                        } else {
-                            $q->whereNull('end_date');
-                        }
-                    })
-                    ->first();
+                    ->overlappingWith($demandData['start_date'], $demandData['end_date'])
+                    ->get();
 
-                if ($existingDemand) {
-                    // Aktualizuj istniejące zapotrzebowanie
-                    \Log::info('Updating existing demand via createDemands', [
-                        'existing_demand_id' => $existingDemand->id,
-                        'old_count' => $existingDemand->required_count,
-                        'new_count' => $demandData['required_count'],
-                        'demand_data' => $demandData
-                    ]);
-                    
-                    $updated = $existingDemand->update([
-                        'required_count' => $demandData['required_count'],
-                        'start_date' => $demandData['start_date'],
-                        'end_date' => $demandData['end_date'],
-                        'notes' => $demandData['notes'],
-                    ]);
-                    
-                    \Log::info('Update result', [
-                        'updated' => $updated,
-                        'demand_after' => $existingDemand->fresh()->toArray()
-                    ]);
-                    
-                    $createdDemands[] = $existingDemand;
-                } else {
-                    // Utwórz nowe zapotrzebowanie
-                    \Log::info('Creating new demand', ['demand_data' => $demandData]);
-                    $createdDemands[] = $project->demands()->create($demandData);
+                // Usuń wszystkie nakładające się zapotrzebowania (nadpisujemy je nowym)
+                foreach ($overlappingDemands as $overlappingDemand) {
+                    $overlappingDemand->delete();
                 }
+
+                // Utwórz nowe zapotrzebowanie (nadpisuje wszystkie poprzednie dla tej roli w tym okresie)
+                $createdDemands[] = $project->demands()->create($demandData);
             }
 
             DB::commit();

@@ -306,6 +306,32 @@
                                     </ul>
                                 </x-ui.alert>
                             @endif
+                            
+                            @if(isset($departures) && $departures->isNotEmpty())
+                                <x-ui.alert variant="warning" title="Wyjazdy w tym tygodniu" class="mt-3">
+                                    <ul class="mb-0 small">
+                                        @foreach($departures as $departure)
+                                            <li class="mb-1">
+                                                <a href="{{ route('departures.show', $departure) }}" class="text-decoration-none">
+                                                    <strong>{{ $departure->event_date->format('d.m.Y') }}</strong>
+                                                    @if($departure->toLocation)
+                                                        - {{ $departure->toLocation->name }}
+                                                    @endif
+                                                    @if($departure->vehicle)
+                                                        - {{ $departure->vehicle->registration_number }}
+                                                    @endif
+                                                    @php
+                                                        $uniqueParticipantsCount = $departure->participants->pluck('employee_id')->unique()->count();
+                                                    @endphp
+                                                    @if($uniqueParticipantsCount > 0)
+                                                        ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
+                                                    @endif
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </x-ui.alert>
+                            @endif
                         </x-ui.card>
                     </div>
 
@@ -812,6 +838,15 @@
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <x-employee-cell :employee="$employee" />
                                 </div>
+                                @if($employee->roles->count() > 0)
+                                    <div class="mb-2">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach($employee->roles as $role)
+                                                <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
                                 <div class="small">
                                     @if($vehicles->isNotEmpty())
                                         <div class="mb-1">
@@ -836,11 +871,146 @@
                                         </div>
                                     @endif
                                 </div>
+                                <div class="mt-2">
+                                    @if(isset($allProjects) && $allProjects->isNotEmpty())
+                                        <div class="dropdown" style="position: relative; z-index: 9999;">
+                                            <x-ui.button 
+                                                variant="primary" 
+                                                size="sm"
+                                                data-bs-toggle="dropdown"
+                                                aria-expanded="false"
+                                            >
+                                                <i class="bi bi-person-check"></i> Przypisz projekt
+                                            </x-ui.button>
+                                            <ul class="dropdown-menu" style="background-color: var(--bg-card); opacity: 1; z-index: 9999; position: absolute;">
+                                                @foreach($allProjects as $project)
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('projects.assignments.create', ['project' => $project, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
+                                                            {{ $project->name }}
+                                                        </a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @else
+                                        <x-ui.button 
+                                            variant="primary" 
+                                            size="sm"
+                                            href="{{ route('projects.index') }}"
+                                        >
+                                            <i class="bi bi-person-check"></i> Przypisz projekt
+                                        </x-ui.button>
+                                    @endif
+                                </div>
                             </x-ui.card>
                         </div>
                     @endforeach
                 </div>
             </x-ui.alert>
         </div>
+    @endif
+
+    <!-- Sekcja: Przyjazdy w tym tygodniu -->
+    @if(isset($departures) && $departures->isNotEmpty())
+        @php
+            // Zbierz wszystkich unikalnych uczestników wyjazdów
+            $departureEmployees = collect();
+            foreach ($departures as $departure) {
+                foreach ($departure->participants as $participant) {
+                    if ($participant->employee && !$departureEmployees->contains('id', $participant->employee->id)) {
+                        $departureEmployees->push([
+                            'employee' => $participant->employee,
+                            'departure' => $departure,
+                        ]);
+                    }
+                }
+            }
+        @endphp
+        
+        @if($departureEmployees->isNotEmpty())
+            <div class="mt-4">
+                <x-ui.alert variant="warning" title="Przyjazdy w tym tygodniu">
+                    <p class="mb-3">Następujący pracownicy przyjeżdżają w tym tygodniu i wymagają przypisania do projektu, mieszkania lub auta:</p>
+                    <div class="row g-3">
+                        @foreach($departureEmployees as $departureEmployeeData)
+                            @php
+                                $employee = $departureEmployeeData['employee'];
+                                $departure = $departureEmployeeData['departure'];
+                            @endphp
+                            <div class="col-md-6 col-lg-4">
+                                <x-ui.card>
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <x-employee-cell :employee="$employee" />
+                                    </div>
+                                    @if($employee->roles->count() > 0)
+                                        <div class="mb-2">
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach($employee->roles as $role)
+                                                    <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+                                    <div class="small mb-2">
+                                        <div class="text-muted">
+                                            <i class="bi bi-calendar-event"></i> 
+                                            {{ $departure->event_date->format('d.m.Y') }}
+                                            @if($departure->toLocation)
+                                                - {{ $departure->toLocation->name }}
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @if(isset($allProjects) && $allProjects->isNotEmpty())
+                                            <div class="dropdown" style="position: relative; z-index: 9999;">
+                                                <x-ui.button 
+                                                    variant="primary" 
+                                                    size="sm"
+                                                    data-bs-toggle="dropdown"
+                                                    aria-expanded="false"
+                                                >
+                                                    <i class="bi bi-person-check"></i> Projekt
+                                                </x-ui.button>
+                                                <ul class="dropdown-menu" style="background-color: var(--bg-card); opacity: 1; z-index: 9999; position: absolute;">
+                                                    @foreach($allProjects as $project)
+                                                        <li>
+                                                            <a class="dropdown-item" href="{{ route('projects.assignments.create', ['project' => $project, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
+                                                                {{ $project->name }}
+                                                            </a>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @else
+                                            <x-ui.button 
+                                                variant="primary" 
+                                                size="sm"
+                                                href="{{ route('projects.index') }}"
+                                            >
+                                                <i class="bi bi-person-check"></i> Projekt
+                                            </x-ui.button>
+                                        @endif
+                                        <x-ui.button 
+                                            variant="success" 
+                                            size="sm"
+                                            href="{{ route('employees.accommodations.create', ['employee' => $employee, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}"
+                                        >
+                                            <i class="bi bi-house"></i> Dom
+                                        </x-ui.button>
+                                        <x-ui.button 
+                                            variant="info" 
+                                            size="sm"
+                                            href="{{ route('employees.vehicles.create', ['employee' => $employee, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}"
+                                        >
+                                            <i class="bi bi-car-front"></i> Auto
+                                        </x-ui.button>
+                                    </div>
+                                </x-ui.card>
+                            </div>
+                        @endforeach
+                    </div>
+                </x-ui.alert>
+            </div>
+        @endif
     @endif
 </x-app-layout>

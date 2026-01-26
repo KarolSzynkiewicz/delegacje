@@ -78,7 +78,7 @@
                                     }
                                 @endphp
                                 <option value="{{ $employee->id }}" 
-                                        {{ old('employee_id') == $employee->id ? 'selected' : '' }}
+                                        {{ (old('employee_id') == $employee->id || (isset($employeeId) && $employeeId == $employee->id)) ? 'selected' : '' }}
                                         data-has-issue="{{ $hasRequiredDocIssue ? '1' : '0' }}">
                                     {{ $optionText }}
                                 </option>
@@ -87,8 +87,8 @@
 
                         <div id="availability-checker-container" class="mt-3">
                             <livewire:employee-availability-checker 
-                                wire:key="availability-checker-{{ old('employee_id', '') }}-{{ $startDate ?? '' }}-{{ $endDate ?? '' }}"
-                                :employee-id="old('employee_id')"
+                                wire:key="availability-checker-{{ old('employee_id', $employeeId ?? '') }}-{{ $startDate ?? '' }}-{{ $endDate ?? '' }}"
+                                :employee-id="old('employee_id', $employeeId ?? null)"
                                 :start-date="$startDate ?? null"
                                 :end-date="$endDate ?? null"
                             />

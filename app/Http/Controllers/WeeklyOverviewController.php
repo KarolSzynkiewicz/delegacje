@@ -50,10 +50,35 @@ class WeeklyOverviewController extends Controller
             ->orderBy('event_date')
             ->get();
         
+        // Get departures (wyjazdy) for the week (exclude CANCELLED)
+        $departures = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::DEPARTURE)
+            ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
+            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->with(['participants.employee.roles', 'vehicle', 'toLocation'])
+            ->orderBy('event_date')
+            ->get();
+        
+        // Filter out employees who already have project assignments in this week
+        $employeesWithProjects = \App\Models\ProjectAssignment::where('is_cancelled', false)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->pluck('employee_id')
+            ->unique();
+        
+        // Filter departures to exclude participants who already have project assignments
+        $departures = $departures->map(function($departure) use ($employeesWithProjects) {
+            $filteredParticipants = $departure->participants->filter(function($participant) use ($employeesWithProjects) {
+                return $participant->employee && !$employeesWithProjects->contains($participant->employee_id);
+            });
+            $departure->setRelation('participants', $filteredParticipants);
+            return $departure;
+        })->filter(function($departure) {
+            return $departure->participants->isNotEmpty();
+        });
+        
         // Get employees without project but with vehicle or accommodation
         $employeesWithoutProject = $this->weeklyOverviewService->getEmployeesWithoutProjectButWithResources($weekStart, $weekEnd);
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'employeesWithoutProject'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'departures', 'employeesWithoutProject'));
     }
 
     /**

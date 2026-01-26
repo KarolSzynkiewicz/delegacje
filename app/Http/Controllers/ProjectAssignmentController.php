@@ -50,6 +50,7 @@ class ProjectAssignmentController extends Controller
     {
         $startDate = $request->query('start_date') ?? $request->query('date_from');
         $endDate = $request->query('end_date') ?? $request->query('date_to');
+        $employeeId = $request->query('employee_id');
         
         // Sprawdź czy daty są w przeszłości
         $isDateInPast = false;
@@ -68,7 +69,14 @@ class ProjectAssignmentController extends Controller
         $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDateCarbon, $endDateCarbon);
         $roles = Role::orderBy("name")->get();
         
-        return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate", "isDateInPast"));
+        // If employee_id is provided, set it in old input for pre-selection
+        if ($employeeId) {
+            $request->merge(['employee_id' => $employeeId]);
+            // Also set it in session for old() helper
+            $request->session()->flash('_old_input.employee_id', $employeeId);
+        }
+        
+        return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate", "isDateInPast", "employeeId"));
     }
 
     /**
@@ -93,8 +101,10 @@ class ProjectAssignmentController extends Controller
                 $validated['notes'] ?? null
             );
 
+            // Redirect to weekly overview with the assignment's start date
+            $startDateParam = $startDate->format('Y-m-d');
             return redirect()
-                ->route("projects.assignments.index", $project)
+                ->route("weekly-overview.index", ['start_date' => $startDateParam])
                 ->with("success", "Pracownik został przypisany do projektu.");
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()

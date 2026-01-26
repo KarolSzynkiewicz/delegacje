@@ -834,8 +834,9 @@ class WeeklyOverviewService
             return collect();
         }
         
-        // Load employees with their assignments
+        // Load employees with their assignments and roles
         $employees = \App\Models\Employee::whereIn('id', $employeesWithoutProject)
+            ->with('roles')
             ->get();
         
         // Map to include resource info

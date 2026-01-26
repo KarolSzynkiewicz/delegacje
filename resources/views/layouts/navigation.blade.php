@@ -81,7 +81,7 @@
 
                     <!-- Przypisania Dropdown -->
                     @php
-                        $przypisaniaPatterns = ['assignments.*', 'vehicle-assignments.*', 'accommodation-assignments.*', 'demands.*', 'return-trips.*', 'project-assignments.*', 'project-demands.*'];
+                        $przypisaniaPatterns = ['assignments.*', 'vehicle-assignments.*', 'accommodation-assignments.*', 'demands.*', 'return-trips.*', 'departures.*', 'project-assignments.*', 'project-demands.*'];
                         $assignmentsPatterns = ['project-assignments.*', 'assignments.*'];
                         $demandsPatterns = ['project-demands.*', 'demands.*'];
                         $employeeDocsPatterns = ['employee-documents.*', 'employees.*employee-documents.*'];
@@ -130,6 +130,14 @@
                             permission="return-trips.view"
                         >
                             Zjazdy
+                        </x-nav.item>
+                        <x-nav.item 
+                            route="departures.index" 
+                            routePattern="departures.*"
+                            icon="bi bi-arrow-right"
+                            permission="departures.view"
+                        >
+                            Wyjazdy
                         </x-nav.item>
                     </x-nav.dropdown>
 
