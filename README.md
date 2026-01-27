@@ -10,8 +10,12 @@ Aplikacja wykorzystuje **dynamiczny system autoryzacji** oparty na **Spatie Lara
 - ✅ Dynamiczne sprawdzanie uprawnień przez middleware
 - ✅ Zarządzanie uprawnieniami przez UI (tabelka w edycji roli)
 - ✅ Cache uprawnień (24h) dla wydajności
+- ✅ Cache mapowań route → permission (1h)
+- ✅ Cache menu per user (1h)
+- ✅ Centralizacja logiki w `RoutePermissionService`
 - ✅ Administratorzy mają pełny dostęp
 - ✅ Brak potrzeby pisania Policy dla każdego modelu
+- ✅ Route są jedynym źródłem prawdy dla uprawnień
 
 **Szczegółowa dokumentacja:** Zobacz [authorization.readme.md](authorization.readme.md) dla pełnego opisu działania systemu autoryzacji.
 
@@ -294,6 +298,19 @@ System sprawdza ważność dokumentów przed przypisaniem pracownika do projektu
 ./vendor/bin/sail mysql              # Dostęp do MySQL CLI
 ./vendor/bin/sail shell              # Dostęp do bash w kontenerze
 ./vendor/bin/sail logs               # Zobacz logi kontenerów
+```
+
+### Naprawa Uprawnień Cache (Sail)
+
+Jeśli wystąpi problem z cache (błąd `file_put_contents: Failed to open stream`):
+
+```bash
+./fix-cache-permissions.sh
+```
+
+Lub ręcznie:
+```bash
+./vendor/bin/sail exec laravel.test bash -c "mkdir -p /var/www/html/storage/framework/cache/data && chown -R sail:sail /var/www/html/storage/framework/cache && chmod -R 775 /var/www/html/storage/framework/cache"
 ```
 
 ---

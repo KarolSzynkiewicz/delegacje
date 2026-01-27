@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
+use App\Services\DateRangeService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -22,7 +23,7 @@ class AccommodationAssignmentService
         ?Carbon $endDate = null,
         ?string $notes = null
     ): AccommodationAssignment {
-        $endDate = $endDate ?? now()->addYears(10);
+        $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
         // Validate employee doesn't have overlapping assignment to the same accommodation
         $this->validateNoOverlappingAssignment($employee, $accommodation, $startDate, $endDate);
@@ -50,7 +51,7 @@ class AccommodationAssignmentService
         ?Carbon $endDate = null,
         ?string $notes = null
     ): AccommodationAssignment {
-        $endDate = $endDate ?? now()->addYears(10);
+        $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
         // Validate employee doesn't have overlapping assignment to the same accommodation (excluding current)
         $this->validateNoOverlappingAssignment($assignment->employee, $accommodation, $startDate, $endDate, $assignment->id);
@@ -81,18 +82,16 @@ class AccommodationAssignmentService
         ?int $excludeAssignmentId = null
     ): void {
         $query = $employee->accommodationAssignments()
-            ->where('accommodation_id', $accommodation->id)
-            ->overlappingWith($startDate, $endDate);
+            ->where('accommodation_id', $accommodation->id);
 
-        if ($excludeAssignmentId) {
-            $query->where('id', '!=', $excludeAssignmentId);
-        }
-
-        if ($query->exists()) {
-            throw ValidationException::withMessages([
-                'accommodation_id' => 'Pracownik ma już przypisanie do tego mieszkania w tym okresie. Nie można tworzyć nakładających się przypisań.'
-            ]);
-        }
+        DateRangeService::validateNoOverlappingAssignments(
+            $query,
+            $startDate,
+            $endDate,
+            $excludeAssignmentId,
+            'accommodation_id',
+            'Pracownik ma już przypisanie do tego mieszkania w tym okresie. Nie można tworzyć nakładających się przypisań.'
+        );
     }
 
     /**

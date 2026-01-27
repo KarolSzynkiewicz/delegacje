@@ -6,6 +6,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Models\Employee;
 use App\Enums\VehiclePosition;
+use App\Services\DateRangeService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -25,7 +26,7 @@ class VehicleAssignmentService
         ?Carbon $endDate = null,
         ?string $notes = null
     ): VehicleAssignment {
-        $endDate = $endDate ?? now()->addYears(10);
+        $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
         // Validate driver availability (only one driver per vehicle per period)
         if ($position === VehiclePosition::DRIVER) {
@@ -59,7 +60,7 @@ class VehicleAssignmentService
         ?Carbon $endDate = null,
         ?string $notes = null
     ): VehicleAssignment {
-        $endDate = $endDate ?? now()->addYears(10);
+        $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
         // Validate driver availability (only one driver per vehicle per period)
         // Exclude current assignment if it's being updated
@@ -96,18 +97,16 @@ class VehicleAssignmentService
     ): void {
         $query = $employee->vehicleAssignments()
             ->where('vehicle_id', $vehicle->id)
-            ->where('is_return_trip', false) // Exclude return trip assignments
-            ->overlappingWith($startDate, $endDate);
+            ->where('is_return_trip', false); // Exclude return trip assignments
 
-        if ($excludeAssignmentId) {
-            $query->where('id', '!=', $excludeAssignmentId);
-        }
-
-        if ($query->exists()) {
-            throw ValidationException::withMessages([
-                'vehicle_id' => 'Pracownik ma już przypisanie do tego pojazdu w tym okresie. Nie można tworzyć nakładających się przypisań.'
-            ]);
-        }
+        DateRangeService::validateNoOverlappingAssignments(
+            $query,
+            $startDate,
+            $endDate,
+            $excludeAssignmentId,
+            'vehicle_id',
+            'Pracownik ma już przypisanie do tego pojazdu w tym okresie. Nie można tworzyć nakładających się przypisań.'
+        );
     }
 
     /**

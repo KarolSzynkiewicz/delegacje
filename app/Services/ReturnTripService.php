@@ -11,8 +11,6 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
-use App\Contracts\HasEmployee;
-use App\Contracts\HasDateRange;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use App\Services\AssignmentQueryService;
@@ -134,7 +132,7 @@ class ReturnTripService
                 if ($oldVehicleAssignment) {
                     // Check if this assignment is already in assignmentsToShorten
                     $alreadyShortened = $preparation->assignmentsToShorten->contains(function ($item) use ($oldVehicleAssignment) {
-                        return $item->assignment->getEmployee()->id === $oldVehicleAssignment->getEmployee()->id
+                        return $item->assignment->employee->id === $oldVehicleAssignment->employee->id
                             && get_class($item->assignment) === get_class($oldVehicleAssignment)
                             && $item->assignment->id === $oldVehicleAssignment->id;
                     });
@@ -220,7 +218,7 @@ class ReturnTripService
                 
                 LogisticsEventParticipant::create([
                     'logistics_event_id' => $event->id,
-                    'employee_id' => $assignment->getEmployee()->id,
+                    'employee_id' => $assignment->employee->id,
                     'assignment_type' => $assignmentType,
                     'assignment_id' => $assignment->id,
                     'original_end_date' => $originalEndDate?->format('Y-m-d'),

@@ -5,8 +5,9 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\Vehicle;
 use App\Models\Location;
-use App\Contracts\HasEmployee;
-use App\Contracts\HasDateRange;
+use App\Models\ProjectAssignment;
+use App\Models\VehicleAssignment;
+use App\Models\AccommodationAssignment;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -66,25 +67,25 @@ class LocationTrackingService
     /**
      * Get the location for a specific assignment.
      * 
-     * @param HasEmployee&HasDateRange $assignment
+     * @param ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment
      * @return Location|null
      */
-    public function forAssignment(HasEmployee&HasDateRange $assignment): ?Location
+    public function forAssignment(ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment): ?Location
     {
         // ProjectAssignment → project's location
-        if ($assignment instanceof \App\Models\ProjectAssignment) {
+        if ($assignment instanceof ProjectAssignment) {
             return $assignment->project?->location;
         }
 
         // VehicleAssignment → vehicle's current_location_id (if currently active)
-        if ($assignment instanceof \App\Models\VehicleAssignment) {
+        if ($assignment instanceof VehicleAssignment) {
             if ($assignment->isCurrentlyActive()) {
                 return $assignment->vehicle?->currentLocation;
             }
         }
 
         // AccommodationAssignment → accommodation's location_id
-        if ($assignment instanceof \App\Models\AccommodationAssignment) {
+        if ($assignment instanceof AccommodationAssignment) {
             return $assignment->accommodation?->location;
         }
 

@@ -8,7 +8,11 @@ use App\Models\Vehicle;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Enums\LogisticsEventType;
+use App\Http\Requests\StoreDepartureRequest;
+use App\Http\Requests\UpdateDepartureRequest;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon;
 
 class DepartureController extends Controller
@@ -21,9 +25,9 @@ class DepartureController extends Controller
     /**
      * Display a listing of departures.
      */
-    public function index()
+    public function index(): View
     {
-        $departures = LogisticsEvent::where('type', 'departure')
+        $departures = LogisticsEvent::where('type', LogisticsEventType::DEPARTURE)
             ->with(['vehicle', 'fromLocation', 'toLocation', 'creator', 'participants.employee'])
             ->orderBy('event_date', 'desc')
             ->paginate(20);
@@ -34,7 +38,7 @@ class DepartureController extends Controller
     /**
      * Show the form for creating a new departure.
      */
-    public function create()
+    public function create(): View
     {
         $locations = Location::where('id', '!=', Location::getBase()->id)
             ->orderBy('name')
@@ -52,16 +56,9 @@ class DepartureController extends Controller
     /**
      * Store a newly created departure.
      */
-    public function store(Request $request)
+    public function store(StoreDepartureRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'departure_date' => 'required|date|after_or_equal:today',
-            'to_location_id' => 'required|exists:locations,id',
-            'vehicle_id' => 'nullable|exists:vehicles,id',
-            'notes' => 'nullable|string|max:1000',
-        ]);
+        $validated = $request->validated();
 
         try {
             $employeeIds = $validated['employee_ids'];
@@ -92,7 +89,7 @@ class DepartureController extends Controller
     /**
      * Display the specified departure.
      */
-    public function show(LogisticsEvent $departure)
+    public function show(LogisticsEvent $departure): View
     {
         if ($departure->type !== LogisticsEventType::DEPARTURE) {
             abort(404);
@@ -112,7 +109,7 @@ class DepartureController extends Controller
     /**
      * Show the form for editing a departure.
      */
-    public function edit(LogisticsEvent $departure)
+    public function edit(LogisticsEvent $departure): View|RedirectResponse
     {
         if ($departure->type !== LogisticsEventType::DEPARTURE) {
             abort(404);
@@ -144,7 +141,7 @@ class DepartureController extends Controller
     /**
      * Update a departure.
      */
-    public function update(Request $request, LogisticsEvent $departure)
+    public function update(UpdateDepartureRequest $request, LogisticsEvent $departure): RedirectResponse
     {
         if ($departure->type !== LogisticsEventType::DEPARTURE) {
             abort(404);
@@ -157,15 +154,7 @@ class DepartureController extends Controller
                 ->with('error', 'Nie można edytować anulowanych wyjazdów.');
         }
 
-        $validated = $request->validate([
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'departure_date' => 'required|date|after_or_equal:today',
-            'to_location_id' => 'required|exists:locations,id',
-            'vehicle_id' => 'nullable|exists:vehicles,id',
-            'notes' => 'nullable|string|max:1000',
-            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
-        ]);
+        $validated = $request->validated();
 
         try {
             // Reverse previous departure changes
@@ -204,7 +193,7 @@ class DepartureController extends Controller
     /**
      * Cancel a departure.
      */
-    public function cancel(LogisticsEvent $departure)
+    public function cancel(LogisticsEvent $departure): RedirectResponse
     {
         if ($departure->type !== LogisticsEventType::DEPARTURE) {
             abort(404);

@@ -6,8 +6,6 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\Vehicle;
-use App\Contracts\HasEmployee;
-use App\Contracts\HasDateRange;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -80,7 +78,7 @@ class ReturnTripPreparation
      * 
      * Does NOT modify the database.
      * 
-     * @param Collection<HasEmployee&HasDateRange> $activeAssignments All active assignments for employees
+     * @param Collection<ProjectAssignment|VehicleAssignment|AccommodationAssignment> $activeAssignments All active assignments for employees
      * @param Collection<VehicleAssignment> $returnVehicleAssignments Assignments for return vehicle
      * @return self
      */
@@ -94,7 +92,7 @@ class ReturnTripPreparation
         // Find assignments to shorten for returning employees
         // This includes: ProjectAssignment, AccommodationAssignment, VehicleAssignment
         foreach ($activeAssignments as $assignment) {
-            $employeeId = $assignment->getEmployee()->id;
+            $employeeId = $assignment->employee->id;
             
             // Only process assignments for employees in the return trip
             if (!in_array($employeeId, $this->employeeIds)) {
@@ -138,7 +136,7 @@ class ReturnTripPreparation
     protected function detectReturnVehicleConflicts(Collection $returnVehicleAssignments): void
     {
         foreach ($returnVehicleAssignments as $assignment) {
-            $employeeId = $assignment->getEmployee()->id;
+            $employeeId = $assignment->employee->id;
             
             // Skip if employee is part of the return trip
             if (in_array($employeeId, $this->employeeIds)) {
@@ -151,7 +149,7 @@ class ReturnTripPreparation
                 $this->conflicts->push(new ReturnTripConflict(
                     $assignment,
                     $this->returnVehicle,
-                    "Osoba {$assignment->getEmployee()->full_name} jest przypisana do auta powrotnego po dacie zjazdu. Przypisanie zostanie anulowane i osoba zostanie bez auta.",
+                    "Osoba {$assignment->employee->full_name} jest przypisana do auta powrotnego po dacie zjazdu. Przypisanie zostanie anulowane i osoba zostanie bez auta.",
                     false // Not blocking - can be accepted
                 ));
             }
@@ -178,14 +176,14 @@ class ReturnTripPreparation
 class AssignmentToShorten
 {
     public function __construct(
-        public HasEmployee&HasDateRange $assignment,
+        public ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment,
         public ?Carbon $currentEndDate,
         public Carbon $newEndDate
     ) {}
 
     public function getEmployeeId(): int
     {
-        return $this->assignment->getEmployee()->id;
+        return $this->assignment->employee->id;
     }
 
     public function getAssignmentType(): string
@@ -200,7 +198,7 @@ class AssignmentToShorten
 class ReturnTripConflict
 {
     public function __construct(
-        public HasEmployee&HasDateRange $assignment,
+        public ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment,
         public ?Vehicle $vehicle,
         public string $message,
         public bool $isBlocking = true
@@ -208,6 +206,6 @@ class ReturnTripConflict
 
     public function getEmployeeId(): int
     {
-        return $this->assignment->getEmployee()->id;
+        return $this->assignment->employee->id;
     }
 }

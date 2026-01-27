@@ -39,7 +39,7 @@ class RotationService
         Carbon $startDate,
         Carbon $endDate,
         ?string $notes = null
-    ): bool {
+    ): Rotation {
         $this->validateNoOverlappingRotations(
             $rotation->employee_id,
             $startDate,
@@ -47,11 +47,13 @@ class RotationService
             $rotation->id
         );
 
-        return $rotation->update([
+        $rotation->update([
             'start_date' => $startDate,
             'end_date' => $endDate,
             'notes' => $notes,
         ]);
+
+        return $rotation->fresh();
     }
 
     /**

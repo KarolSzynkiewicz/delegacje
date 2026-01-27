@@ -327,14 +327,8 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Return Trips (Zjazdy) - resource routes (MUST BE AFTER action routes to avoid route conflict)
     // Action routes like /return-trips/prepare must be registered before /return-trips/{id}
     Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
-    Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])
-        ->name('return-trips.cancel')
-        ->defaults('resource', 'return-trips');
     
     Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy']);
-    Route::post('departures/{departure}/cancel', [\App\Http\Controllers\DepartureController::class, 'cancel'])
-        ->name('departures.cancel')
-        ->defaults('resource', 'departures');
     });
     
     // ===== VIEW ROUTES =====

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\RoutePermissionService;
+use App\Services\MenuService;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
@@ -76,6 +77,9 @@ class UserRoleController extends Controller
             $role->syncPermissions($permissions);
         }
 
+        // Clear menu cache for all users since permissions changed
+        app(MenuService::class)->clearMenuCache();
+
         return redirect()->route('user-roles.index')->with('success', 'Rola została utworzona.');
     }
 
@@ -147,6 +151,9 @@ class UserRoleController extends Controller
             $userRole->syncPermissions([]);
         }
 
+        // Clear menu cache for all users since permissions changed
+        app(MenuService::class)->clearMenuCache();
+
         return redirect()->route('user-roles.show', $userRole)->with('success', 'Rola została zaktualizowana.');
     }
 
@@ -214,6 +221,9 @@ class UserRoleController extends Controller
         } else {
             $userRole->syncPermissions([]);
         }
+
+        // Clear menu cache for all users since permissions changed
+        app(MenuService::class)->clearMenuCache();
 
         return response()->json([
             'success' => true,

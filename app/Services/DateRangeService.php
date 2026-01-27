@@ -5,6 +5,8 @@ namespace App\Services;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
@@ -193,5 +195,50 @@ class DateRangeService
         $overlapEnd = $end1->lt($end2) ? $end1 : $end2;
 
         return CarbonPeriod::create($overlapStart, $overlapEnd);
+    }
+
+    /**
+     * Get default end date for assignments (10 years from now).
+     * 
+     * Used when end_date is not provided - represents "indefinite" assignment.
+     * 
+     * @return Carbon
+     */
+    public static function getDefaultEndDate(): Carbon
+    {
+        return now()->addYears(10);
+    }
+
+    /**
+     * Validate that there are no overlapping assignments in the given query.
+     * 
+     * @param Builder $query The query builder for assignments to check
+     * @param CarbonInterface $startDate Start date of the assignment
+     * @param CarbonInterface $endDate End date of the assignment
+     * @param int|null $excludeAssignmentId Assignment ID to exclude from check (for updates)
+     * @param string $errorKey The validation error key (e.g., 'employee_id', 'vehicle_id')
+     * @param string $errorMessage The validation error message
+     * @return void
+     * @throws ValidationException
+     */
+    public static function validateNoOverlappingAssignments(
+        Builder $query,
+        CarbonInterface $startDate,
+        CarbonInterface $endDate,
+        ?int $excludeAssignmentId = null,
+        string $errorKey = 'assignment',
+        string $errorMessage = 'Istnieje już przypisanie nakładające się w tym okresie. Nie można tworzyć nakładających się przypisań.'
+    ): void {
+        $query->overlappingWith($startDate, $endDate);
+
+        if ($excludeAssignmentId) {
+            $query->where('id', '!=', $excludeAssignmentId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                $errorKey => $errorMessage
+            ]);
+        }
     }
 }

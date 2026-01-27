@@ -6,15 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use App\Contracts\HasEmployee;
-use App\Contracts\HasDateRange;
 
 /**
  * LogisticsEventParticipant - uczestnik zdarzenia logistycznego
  * 
- * Uses polymorphic relationship to HasEmployee & HasDateRange implementations.
+ * Uses polymorphic relationship to assignment models.
  * 
- * IMPORTANT: assignment_type + assignment_id MUST point to models implementing HasEmployee & HasDateRange.
+ * IMPORTANT: assignment_type + assignment_id MUST point to assignment models.
  * Custom morph map enforces this.
  */
 class LogisticsEventParticipant extends Model
@@ -54,7 +52,7 @@ class LogisticsEventParticipant extends Model
     /**
      * Get the assignment (polymorphic).
      * 
-     * Returns HasEmployee & HasDateRange implementation.
+     * Returns ProjectAssignment, VehicleAssignment, or AccommodationAssignment.
      */
     public function assignment(): MorphTo
     {

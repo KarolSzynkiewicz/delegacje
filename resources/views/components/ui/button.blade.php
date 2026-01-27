@@ -38,58 +38,11 @@
     $hasIcon = $icon !== null;
     $hasSlotContent = $slot->isNotEmpty();
     
-    // Automatyczne generowanie uprawnienia z routeName i action
-    // Używa tej samej logiki co CheckResourcePermission middleware
+    // Automatyczne generowanie uprawnienia z routeName używając RoutePermissionService
     $permissionName = $permission;
     if (!$permissionName && $routeName) {
-        $routeParts = explode('.', $routeName);
-        
-        // Dla resource routes: usuń ostatnią część (action) aby uzyskać resource
-        // equipment.create -> equipment (resource) + create (action)
-        // projects.assignments.create -> assignments (resource) + create (action)
-        array_pop($routeParts);
-        $resource = implode('.', $routeParts);
-        
-        // Dla nested resources, weź ostatnią część
-        // projects.assignments -> assignments
-        // employees.vehicles -> vehicles
-        if (str_contains($resource, '.')) {
-            $nestedParts = explode('.', $resource);
-            $lastPart = end($nestedParts);
-            
-            // Mapowanie nested resources (zgodne z middleware)
-            $nestedMappings = [
-                'vehicles' => 'vehicle-assignments',
-                'accommodations' => 'accommodation-assignments',
-            ];
-            
-            $resource = $nestedMappings[$lastPart] ?? $lastPart;
-        }
-        
-        // Pobierz akcję route (ostatnia część route name)
-        $routeAction = explode('.', $routeName);
-        $routeAction = end($routeAction);
-        
-        // Mapowanie akcji route na akcje uprawnień (zgodne z CheckResourcePermission middleware)
-        $actionMap = [
-            'index' => 'view',
-            'show' => 'view',
-            'create' => 'create',
-            'store' => 'create',
-            'edit' => 'update',
-            'update' => 'update',
-            'destroy' => 'delete',
-        ];
-        
-        if (isset($actionMap[$routeAction])) {
-            $permissionAction = $actionMap[$routeAction];
-            $permissionName = "{$resource}.{$permissionAction}";
-        } else {
-            // Fallback: użyj route name jako uprawnienia (dla view routes i action routes)
-            // np. profitability.index -> profitability.view (ale to wymaga sprawdzenia permission_type)
-            // Dla prostoty używamy route name jako fallback
-            $permissionName = $routeName;
-        }
+        $routePermissionService = app(\App\Services\RoutePermissionService::class);
+        $permissionName = $routePermissionService->getPermissionForRoute($routeName);
     }
     
     // Sprawdź uprawnienia - jeśli ustawione i użytkownik nie ma dostępu, nie renderuj przycisku

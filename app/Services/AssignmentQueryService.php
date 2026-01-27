@@ -6,8 +6,6 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
-use App\Contracts\HasEmployee;
-use App\Contracts\HasDateRange;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -22,12 +20,12 @@ class AssignmentQueryService
     /**
      * Get all active assignments for employees at a specific date.
      * 
-     * Returns Collection of HasEmployee & HasDateRange implementations.
+     * Returns Collection of assignment models.
      * Includes: ProjectAssignment, AccommodationAssignment, VehicleAssignment
      * 
      * @param array $employeeIds
      * @param Carbon $date
-     * @return Collection<HasEmployee&HasDateRange>
+     * @return Collection<ProjectAssignment|VehicleAssignment|AccommodationAssignment>
      */
     public function getActiveAssignmentsForEmployees(array $employeeIds, Carbon $date): Collection
     {

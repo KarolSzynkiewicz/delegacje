@@ -6,6 +6,7 @@ use App\Models\ProjectAssignment;
 use App\Models\Project;
 use App\Models\Employee;
 use App\Models\Role;
+use App\Services\DateRangeService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -22,7 +23,7 @@ class ProjectAssignmentService
         ?Carbon $endDate = null,
         ?string $notes = null
     ): ProjectAssignment {
-        $endDate = $endDate ?? now()->addYears(10);
+        $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
         // Validate employee has the required role
         $this->validateEmployeeHasRole($employee, $role->id);
@@ -56,8 +57,8 @@ class ProjectAssignmentService
         Carbon $startDate,
         ?Carbon $endDate = null,
         ?string $notes = null
-    ): bool {
-        $endDate = $endDate ?? now()->addYears(10);
+    ): ProjectAssignment {
+        $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
         // Validate employee has the required role
         $this->validateEmployeeHasRole($employee, $role->id);
@@ -71,7 +72,7 @@ class ProjectAssignmentService
         // Validate project demand
         $this->validateProjectDemand($project, $role->id, $startDate, $endDate);
 
-        return $assignment->update([
+        $assignment->update([
             'project_id' => $project->id,
             'employee_id' => $employee->id,
             'role_id' => $role->id,
@@ -79,6 +80,8 @@ class ProjectAssignmentService
             'end_date' => $endDate,
             'notes' => $notes,
         ]);
+
+        return $assignment->fresh();
     }
 
     /**
@@ -181,32 +184,17 @@ class ProjectAssignmentService
         }
 
         // Check if employee is available (no conflicting assignments in ANY project)
-        if ($excludeAssignmentId) {
-            // For updates, check conflicts excluding current assignment
-            $hasConflictingAssignments = $employee->assignments()
-                ->where('is_cancelled', false)
-                ->where('id', '!=', $excludeAssignmentId)
-                ->overlappingWith($startDate, $endDate)
-                ->exists();
+        $query = $employee->assignments()
+            ->where('is_cancelled', false);
 
-            if ($hasConflictingAssignments) {
-                throw ValidationException::withMessages([
-                    'employee_id' => 'Pracownik jest już przypisany do projektu w tym okresie. Nie można tworzyć nakładających się przypisań.'
-                ]);
-            }
-        } else {
-            // For creates, check all assignments (including same project)
-            $hasConflictingAssignments = $employee->assignments()
-                ->where('is_cancelled', false)
-                ->overlappingWith($startDate, $endDate)
-                ->exists();
-
-            if ($hasConflictingAssignments) {
-                throw ValidationException::withMessages([
-                    'employee_id' => 'Pracownik jest już przypisany do projektu w tym okresie. Nie można tworzyć nakładających się przypisań.'
-                ]);
-            }
-        }
+        DateRangeService::validateNoOverlappingAssignments(
+            $query,
+            $startDate,
+            $endDate,
+            $excludeAssignmentId,
+            'employee_id',
+            'Pracownik jest już przypisany do projektu w tym okresie. Nie można tworzyć nakładających się przypisań.'
+        );
     }
 
     /**

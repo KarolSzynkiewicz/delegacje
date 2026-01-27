@@ -83,11 +83,11 @@ class VehiclesTable extends Component
         if ($this->statusFilter) {
             if ($this->statusFilter === 'occupied') {
                 $query->whereHas('assignments', function ($q) {
-                    $q->where('status', 'active');
+                    $q->active(); // Use scope from HasDateRange trait
                 });
             } else {
                 $query->whereDoesntHave('assignments', function ($q) {
-                    $q->where('status', 'active');
+                    $q->active(); // Use scope from HasDateRange trait
                 });
             }
         }

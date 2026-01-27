@@ -7,7 +7,13 @@ use App\Services\AssignmentQueryService;
 use App\Models\Vehicle;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
+use App\Enums\LogisticsEventType;
+use App\Http\Requests\PrepareReturnTripRequest;
+use App\Http\Requests\StoreReturnTripRequest;
+use App\Http\Requests\UpdateReturnTripRequest;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon; 
 
 class ReturnTripController extends Controller
@@ -20,9 +26,9 @@ class ReturnTripController extends Controller
     /**
      * Display a listing of return trips.
      */
-    public function index()
+    public function index(): View
     {
-        $returnTrips = LogisticsEvent::where('type', 'return')
+        $returnTrips = LogisticsEvent::where('type', LogisticsEventType::RETURN)
             ->with(['vehicle', 'fromLocation', 'toLocation', 'creator', 'participants.employee'])
             ->orderBy('event_date', 'desc')
             ->paginate(20);
@@ -33,7 +39,7 @@ class ReturnTripController extends Controller
     /**
      * Show the form for creating a new return trip.
      */
-    public function create()
+    public function create(): View
     {
         // Employees will be loaded dynamically via Livewire based on selected date
         $vehicles = Vehicle::where('type', 'company_vehicle')
@@ -49,18 +55,9 @@ class ReturnTripController extends Controller
      * Handle form submission - prepare return trip first.
      * Works for both create and edit modes.
      */
-    public function prepareFromForm(Request $request)
+    public function prepareFromForm(PrepareReturnTripRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'vehicle_id' => 'nullable|exists:vehicles,id',
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'return_date' => 'required|date|after_or_equal:today',
-            'notes' => 'nullable|string|max:1000',
-            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
-            'edit_mode' => 'nullable|boolean',
-            'return_trip_id' => 'nullable|exists:logistics_events,id',
-        ]);
+        $validated = $request->validated();
 
         // Ręczne zbudowanie query string, tablice są poprawnie zakodowane
         $query = http_build_query($validated);
@@ -72,7 +69,7 @@ class ReturnTripController extends Controller
      * Prepare return trip (dry-run / simulation).
      * Shows what will happen without committing changes.
      */
-    public function prepare(Request $request)
+    public function prepare(PrepareReturnTripRequest $request): View|RedirectResponse
     {
         // If no data provided, redirect to appropriate form
         if (!$request->has('employee_ids') && !$request->old('employee_ids')) {
@@ -90,15 +87,7 @@ class ReturnTripController extends Controller
         }
 
         // Get data from request (either from POST or from old input)
-        $validated = $request->validate([
-            'vehicle_id' => 'nullable|exists:vehicles,id',
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'return_date' => 'required|date|after_or_equal:today',
-            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
-            'edit_mode' => 'nullable|boolean',
-            'return_trip_id' => 'nullable|exists:logistics_events,id',
-        ]);
+        $validated = $request->validated();
 
         try {
             $employeeIds = $validated['employee_ids'];
@@ -165,14 +154,9 @@ class ReturnTripController extends Controller
     /**
      * Store a newly created return trip (commit the preparation).
      */
-    public function store(Request $request)
+    public function store(StoreReturnTripRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'notes' => 'nullable|string|max:1000',
-            'status' => 'nullable|in:' . implode(',', \App\Enums\LogisticsEventStatus::values()),
-            'accept_consequences' => 'required|accepted',
-            'return_trip_id' => 'nullable|exists:logistics_events,id',
-        ]);
+        $validated = $request->validated();
 
         // Get preparation from session
         $preparationSerialized = session('return_trip_preparation');
@@ -231,7 +215,7 @@ class ReturnTripController extends Controller
     /**
      * Display the specified return trip.
      */
-    public function show(LogisticsEvent $returnTrip)
+    public function show(LogisticsEvent $returnTrip): View
     {
         $returnTrip->load([
             'vehicle',
@@ -255,7 +239,7 @@ class ReturnTripController extends Controller
      * Show the form for editing a return trip.
      * Only allowed for PLANNED status.
      */
-    public function edit(LogisticsEvent $returnTrip)
+    public function edit(LogisticsEvent $returnTrip): View|RedirectResponse
     {
         // Only allow editing if status is not CANCELLED and not COMPLETED
         if ($returnTrip->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
@@ -287,7 +271,7 @@ class ReturnTripController extends Controller
      * Update a return trip.
      * Reverses previous changes and applies new ones.
      */
-    public function update(Request $request, LogisticsEvent $returnTrip)
+    public function update(UpdateReturnTripRequest $request, LogisticsEvent $returnTrip): RedirectResponse
     {
         // Only allow updating if status is PLANNED
         if ($returnTrip->status !== \App\Enums\LogisticsEventStatus::PLANNED) {
@@ -296,14 +280,7 @@ class ReturnTripController extends Controller
                 ->with('error', 'Można edytować tylko zjazdy ze statusem "Zaplanowane".');
         }
 
-        $validated = $request->validate([
-            'vehicle_id' => 'nullable|exists:vehicles,id',
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'return_date' => 'required|date|after_or_equal:today',
-            'notes' => 'nullable|string|max:1000',
-            'accept_consequences' => 'required|accepted',
-        ]);
+        $validated = $request->validated();
 
         try {
             // Reverse previous return trip changes
@@ -342,7 +319,7 @@ class ReturnTripController extends Controller
      * Cancel a return trip.
      * Reverses all assignments and sets status to CANCELLED.
      */
-    public function cancel(LogisticsEvent $returnTrip)
+    public function cancel(LogisticsEvent $returnTrip): RedirectResponse
     {
         // Only allow cancellation if status is PLANNED
         if ($returnTrip->status !== \App\Enums\LogisticsEventStatus::PLANNED) {

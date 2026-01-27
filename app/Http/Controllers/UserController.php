@@ -57,6 +57,9 @@ class UserController extends Controller
             $user->syncRoles($roles);
         }
 
+        // Clear menu cache for this user since roles changed
+        app(\App\Services\MenuService::class)->clearMenuCacheForUser($user->id);
+
         return redirect()->route('users.index')->with('success', 'Użytkownik został utworzony.');
     }
 
@@ -113,6 +116,9 @@ class UserController extends Controller
         } else {
             $user->syncRoles([]);
         }
+
+        // Clear menu cache for this user since roles changed
+        app(\App\Services\MenuService::class)->clearMenuCacheForUser($user->id);
 
         return redirect()->route('users.show', $user)->with('success', 'Użytkownik został zaktualizowany.');
     }

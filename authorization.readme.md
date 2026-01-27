@@ -24,19 +24,23 @@ Sprawdź czy użytkownik jest zalogowany
     ↓
 Sprawdź czy użytkownik jest administratorem (bypass)
     ↓
-Pobierz permission_type z route defaults
+RoutePermissionService::getPermissionForRouteObject($route)
     ↓
-Ekstraktuj resource z nazwy route (na podstawie permission_type)
+    ├─ Pobierz permission_type z route defaults
+    ├─ Pobierz resource z route defaults (lub wyciągnij z route name)
+    ├─ Mapuj HTTP method + route action → permission action
+    └─ Zwróć nazwę uprawnienia: {resource}.{action}
     ↓
-Mapuj HTTP method + route action → permission action (na podstawie permission_type)
-    ↓
-Zbuduj nazwę uprawnienia: {resource}.{action}
-    ↓
-Sprawdź czy użytkownik ma uprawnienie
+Sprawdź czy użytkownik ma uprawnienie (Spatie - z cache)
     ↓
 Jeśli TAK → pozwól na dostęp
 Jeśli NIE → zwróć 403 Forbidden
 ```
+
+**Uproszczenie:**
+- Middleware nie zawiera logiki mapowania - tylko wywołuje `RoutePermissionService`
+- Wszystka logika mapowania route → permission jest w jednym miejscu
+- Cache zapewnia wydajność
 
 ### 2. Typy Route i Permission Types
 
@@ -131,20 +135,49 @@ Zapewnia to, że każdy nowy route musi mieć jawnie określony typ uprawnienia.
      - Łączy uprawnienia z ról (`role_has_permissions`)
      - Cache'uje wynik w pamięci na czas requestu
 
+### Cache RoutePermissionService
+
+**Mapowania route → permission:**
+- Klucz: `route_permission:{routeName}` (cache per route)
+- Klucz: `all_route_permissions` (cache wszystkich route)
+- Czas: 1h
+- Automatycznie wygasa przy `php artisan route:clear`
+
+**Korzyści:**
+- Nie iteruje przez wszystkie route przy każdym requestcie
+- Szybkie sprawdzanie uprawnień w middleware i komponentach
+- Cache automatycznie odświeża się przy zmianach route
+
+### Cache MenuService
+
+**Przefiltrowane menu per user:**
+- Klucz: `menu_user_{userId}`
+- Czas: 1h
+- Automatycznie czyszczony przy zmianie uprawnień/rol użytkownika
+
+**Korzyści:**
+- Menu nie jest przetwarzane przy każdym requestcie
+- Szybkie renderowanie menu w widokach
+- Cache automatycznie odświeża się przy zmianach uprawnień
+
 ### Czy Przy Każdym Requestcie Sprawdzana Jest Baza?
 
 **NIE!** System jest bardzo wydajny:
 
 - **Pierwszy request po zmianie uprawnień:**
-  - Cache miss → zapytanie do bazy
-  - Wynik zapisany w cache na 24h
+  - Cache miss → zapytanie do bazy (Spatie)
+  - Cache miss → iteracja przez route (RoutePermissionService)
+  - Wyniki zapisane w cache
 
-- **Kolejne requesty (w ciągu 24h):**
-  - Cache hit → dane z cache
-  - **Brak zapytań do bazy** dla uprawnień
+- **Kolejne requesty:**
+  - Cache hit → dane z cache (Spatie - 24h)
+  - Cache hit → mapowania z cache (RoutePermissionService - 1h)
+  - Cache hit → menu z cache (MenuService - 1h)
+  - **Brak zapytań do bazy** dla uprawnień i route
 
 - **Po zmianie uprawnień w UI:**
   - Spatie automatycznie czyści cache
+  - MenuService automatycznie czyści cache menu
   - Następny request pobierze dane z bazy i zaktualizuje cache
 
 ## Generowanie Uprawnień z Route
@@ -153,12 +186,24 @@ Zapewnia to, że każdy nowy route musi mieć jawnie określony typ uprawnienia.
 
 System używa `RoutePermissionService` do dynamicznego generowania uprawnień z route. **Route są jedynym źródłem prawdy** - każdy route z `permission_type` automatycznie generuje odpowiednie uprawnienia.
 
+**Centralizacja logiki:**
+- Wszystkie miejsca (middleware, komponenty UI, menu) używają `RoutePermissionService` do mapowania route → permission
+- Jeden punkt prawdy - zmiany w jednym miejscu
+- Cache dla wydajności (1h)
+
 ### Jak Działa Generowanie
 
 1. **Pobieranie Route:** Serwis iteruje przez wszystkie zarejestrowane route
 2. **Filtrowanie:** Tylko route z `permission_type` w defaults są przetwarzane
 3. **Mapowanie:** Używa tej samej logiki co middleware do mapowania route → permission name
 4. **Filtrowanie viewAny:** Widok tabelki ignoruje `viewAny` - pokazuje tylko `view`
+5. **Cache:** Wyniki są cache'owane na 1h dla wydajności
+
+### Metody RoutePermissionService
+
+- `getPermissionForRoute(string $routeName): ?string` - Pobiera uprawnienie dla route name (z cache)
+- `getPermissionForRouteObject(RouteObject $route): ?string` - Pobiera uprawnienie dla route object (główna metoda)
+- `getAllPermissionsFromRoutes(): Collection` - Pobiera wszystkie uprawnienia z route (z cache)
 
 ### Automatyczne Tworzenie Uprawnień
 
@@ -252,6 +297,15 @@ Następujące route są wykluczone z sprawdzania uprawnień:
 ### Tabelka Uprawnień
 
 W widoku edycji roli (`/user-roles/{role}/edit`) znajduje się tabelka z wszystkimi zasobami i akcjami. **Uprawnienia są generowane dynamicznie z route** - nie ma potrzeby aktualizowania seederów.
+
+### Menu
+
+Menu jest generowane dynamicznie z `config/menu_items.php`:
+- **Route jest jedynym źródłem prawdy** - nie ma `permission` ani `routePattern` w config
+- `MenuService` automatycznie generuje:
+  - `permission` - używając `RoutePermissionService::getPermissionForRoute()`
+  - `routePattern` - automatycznie z route name (usuwa ostatnią część, dodaje `.*`)
+- Menu jest cache'owane per user (1h) dla wydajności
 
 | Zasób | Twórz | Czytaj | Aktualizuj | Usuwaj |
 |-------|-------|--------|------------|--------|
