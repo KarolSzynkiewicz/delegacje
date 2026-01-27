@@ -46,8 +46,18 @@ class ProjectAssignmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Project $project, Request $request): View
+    public function create(Request $request): View
     {
+        $projectId = $request->query('project_id');
+        $project = null;
+        
+        if ($projectId) {
+            $project = Project::findOrFail($projectId);
+        }
+        
+        // Jeśli nie ma projektu, pobierz listę projektów do wyboru
+        $projects = $project ? collect([$project]) : Project::orderBy('name')->get();
+        
         $startDate = $request->query('start_date') ?? $request->query('date_from');
         $endDate = $request->query('end_date') ?? $request->query('date_to');
         $employeeId = $request->query('employee_id');
@@ -73,20 +83,32 @@ class ProjectAssignmentController extends Controller
         if ($employeeId) {
             $request->merge(['employee_id' => $employeeId]);
             // Also set it in session for old() helper
-            $request->session()->flash('_old_input.employee_id', $employeeId);
+            session()->flash('_old_input.employee_id', $employeeId);
         }
         
-        return view("assignments.create", compact("project", "employees", "roles", "startDate", "endDate", "isDateInPast", "employeeId"));
+        // If project_id is provided, set it in old input for pre-selection
+        if ($projectId) {
+            session()->flash('_old_input.project_id', $projectId);
+        }
+        
+        return view("assignments.create", compact("project", "projects", "employees", "roles", "startDate", "endDate", "isDateInPast", "employeeId"));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreProjectAssignmentRequest $request, Project $project): RedirectResponse
+    public function store(StoreProjectAssignmentRequest $request): RedirectResponse
     {
         try {
             $validated = $request->validated();
             
+            $projectId = $validated['project_id'] ?? $request->input('project_id');
+            if (!$projectId) {
+                return redirect()->route('projects.index')
+                    ->with('error', 'Musisz wybrać projekt');
+            }
+            
+            $project = Project::findOrFail($projectId);
             $employee = Employee::findOrFail($validated['employee_id']);
             $role = Role::findOrFail($validated['role_id']);
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
@@ -167,7 +189,7 @@ class ProjectAssignmentController extends Controller
             );
 
             return redirect()
-                ->route("projects.assignments.index", $assignment->project_id)
+                ->route("projects.show", $assignment->project_id)
                 ->with("success", "Przypisanie zostało zaktualizowane.");
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()
@@ -214,7 +236,7 @@ class ProjectAssignmentController extends Controller
             }
             
             return redirect()
-                ->route("projects.assignments.index", $assignment->project_id)
+                ->route("projects.show", $assignment->project_id)
                 ->with("error", $message);
         }
         
@@ -222,7 +244,7 @@ class ProjectAssignmentController extends Controller
         $assignment->delete();
 
         return redirect()
-            ->route("projects.assignments.index", $projectId)
+            ->route("projects.show", $projectId)
             ->with("success", "Przypisanie zostało usunięte.");
     }
 }

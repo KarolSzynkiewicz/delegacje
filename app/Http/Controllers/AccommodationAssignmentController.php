@@ -9,6 +9,7 @@ use App\Services\AccommodationAssignmentService;
 use App\Http\Requests\StoreAccommodationAssignmentRequest;
 use App\Http\Requests\UpdateAccommodationAssignmentRequest;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class AccommodationAssignmentController extends Controller
 {
@@ -42,24 +43,48 @@ class AccommodationAssignmentController extends Controller
 
     /**
      * Show the form for creating a new resource.
+     * //review
      */
-    public function create(Employee $employee, Request $request)
+    public function create(Request $request): View
     {
+        $employeeId = $request->query('employee_id');
+        $employee = null;
+        
+        if ($employeeId) {
+            $employee = Employee::findOrFail($employeeId);
+        }
+        
+        // Jeśli nie ma pracownika, pobierz listę pracowników do wyboru
+        $employees = $employee ? collect([$employee]) : Employee::orderBy('last_name')->orderBy('first_name')->get();
+        
         $accommodations = Accommodation::orderBy('name')->get();
         
         // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         
-        return view('accommodation-assignments.create', compact('employee', 'accommodations', 'dateFrom', 'dateTo'));
+        // If employee_id is provided, set it in old input for pre-selection
+        if ($employeeId) {
+            session()->flash('_old_input.employee_id', $employeeId);
+        }
+        
+        return view('accommodation-assignments.create', compact('employee', 'employees', 'accommodations', 'dateFrom', 'dateTo'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreAccommodationAssignmentRequest $request, Employee $employee)
+    public function store(StoreAccommodationAssignmentRequest $request)
     {
         $validated = $request->validated();
+        
+        $employeeId = $validated['employee_id'] ?? $request->input('employee_id');
+        if (!$employeeId) {
+            return redirect()->route('employees.index')
+                ->with('error', 'Musisz wybrać pracownika');
+        }
+        
+        $employee = Employee::findOrFail($employeeId);
 
         try {
             $accommodation = Accommodation::findOrFail($validated['accommodation_id']);
@@ -80,7 +105,7 @@ class AccommodationAssignmentController extends Controller
         }
 
         return redirect()
-            ->route('employees.accommodations.index', $employee)
+            ->route('employees.show', $employee)
             ->with('success', 'Mieszkanie zostało przypisane do pracownika.');
     }
 
@@ -131,7 +156,7 @@ class AccommodationAssignmentController extends Controller
         }
 
         return redirect()
-            ->route('employees.accommodations.index', $accommodationAssignment->employee_id)
+            ->route('employees.show', $accommodationAssignment->employee_id)
             ->with('success', 'Przypisanie mieszkania zostało zaktualizowane.');
     }
 
@@ -144,7 +169,7 @@ class AccommodationAssignmentController extends Controller
         $accommodationAssignment->delete();
 
         return redirect()
-            ->route('employees.accommodations.index', $employeeId)
+            ->route('employees.show', $employeeId)
             ->with('success', 'Przypisanie mieszkania zostało usunięte.');
     }
 }

@@ -148,15 +148,15 @@
                                     <td>
                                         @if($docStatus['hasDocument'])
                                             <div class="d-flex gap-1">
-                                                <x-ui.button variant="warning" href="{{ route('employees.employee-documents.edit', [$group['employee'], $docStatus['employeeDocument']]) }}" class="btn-sm">Edytuj</x-ui.button>
-                                                <form action="{{ route('employees.employee-documents.destroy', [$group['employee'], $docStatus['employeeDocument']]) }}" method="POST" class="d-inline">
+                                                <x-ui.button variant="warning" href="{{ route('employee-documents.edit', $docStatus['employeeDocument']) }}" class="btn-sm">Edytuj</x-ui.button>
+                                                <form action="{{ route('employee-documents.destroy', $docStatus['employeeDocument']) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     @method('DELETE')
                                                     <x-ui.button variant="danger" type="submit" class="btn-sm" onclick="return confirm('Czy na pewno chcesz usunąć ten dokument?')">Usuń</x-ui.button>
                                                 </form>
                                             </div>
                                         @else
-                                            <x-ui.button variant="primary" href="{{ route('employees.employee-documents.create', $group['employee']) }}?document_id={{ $docStatus['document']->id }}" class="btn-sm">Dodaj</x-ui.button>
+                                            <x-ui.button variant="primary" href="{{ route('employee-documents.create', ['employee_id' => $group['employee']->id, 'document_id' => $docStatus['document']->id]) }}" class="btn-sm">Dodaj</x-ui.button>
                                         @endif
                                     </td>
                                 </tr>

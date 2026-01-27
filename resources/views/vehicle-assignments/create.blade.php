@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('employees.vehicles.index', $employee) }}"
+                    href="{{ route('employees.show', $employee) }}"
                     action="back"
                 >
                     Powrót
@@ -18,13 +18,30 @@
             <x-ui.card label="Przypisz Auto do Pracownika">
                 <x-ui.errors />
 
-                <form method="POST" action="{{ route('employees.vehicles.store', $employee) }}">
+                <form method="POST" action="{{ route('vehicle-assignments.store') }}">
                     @csrf
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Pracownik</label>
-                        <input type="text" value="{{ $employee->full_name }}" disabled
-                            class="form-control bg-light">
+                        @if($employee)
+                            <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                            <label class="form-label fw-semibold">Pracownik</label>
+                            <input type="text" value="{{ $employee->full_name }}" disabled
+                                class="form-control bg-light">
+                        @else
+                            <x-ui.input 
+                                type="select" 
+                                name="employee_id" 
+                                label="Pracownik"
+                                required="true"
+                            >
+                                <option value="">Wybierz pracownika</option>
+                                @foreach($employees as $emp)
+                                    <option value="{{ $emp->id }}" {{ old('employee_id') == $emp->id ? 'selected' : '' }}>
+                                        {{ $emp->full_name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.input>
+                        @endif
                     </div>
 
                     <div class="mb-3">
@@ -95,7 +112,7 @@
                         </x-ui.button>
                         <x-ui.button 
                             variant="ghost" 
-                            href="{{ route('employees.vehicles.index', $employee) }}"
+                            href="{{ route('employees.show', $employee) }}"
                             action="cancel"
                         >
                             Anuluj

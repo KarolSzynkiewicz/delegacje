@@ -23,8 +23,15 @@ class EmployeeDocumentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Employee $employee, Request $request): View
+    public function create(Request $request): View
     {
+        $employeeId = $request->query('employee_id');
+        if (!$employeeId) {
+            return redirect()->route('employees.index')
+                ->with('error', 'Musisz wybrać pracownika');
+        }
+
+        $employee = Employee::findOrFail($employeeId);
         $documents = Document::orderBy('name')->get();
         $selectedDocumentId = $request->query('document_id');
         return view('employee-documents.create', compact('employee', 'documents', 'selectedDocumentId'));
@@ -33,9 +40,10 @@ class EmployeeDocumentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, Employee $employee): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
             'document_id' => 'required|exists:documents,id',
             'valid_from' => 'required|date',
             'valid_to' => 'nullable|date|after_or_equal:valid_from',
@@ -43,6 +51,9 @@ class EmployeeDocumentController extends Controller
             'notes' => 'nullable|string',
             'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
         ]);
+
+        $employee = Employee::findOrFail($validated['employee_id']);
+        unset($validated['employee_id']);
 
         // Ustaw kind na podstawie checkboxa
         $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
@@ -63,20 +74,16 @@ class EmployeeDocumentController extends Controller
 
         $employee->employeeDocuments()->create($validated);
 
-        return redirect()->route('employees.show.documents', $employee)
+        return redirect()->route('employees.show', $employee)
             ->with('success', 'Dokument został dodany.');
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Employee $employee, EmployeeDocument $employeeDocument): View
+    public function edit(EmployeeDocument $employeeDocument): View
     {
-        // Sprawdź czy dokument należy do pracownika
-        if ($employeeDocument->employee_id !== $employee->id) {
-            abort(404);
-        }
-
+        $employee = $employeeDocument->employee;
         $employeeDocument->load('document');
         $documents = Document::orderBy('name')->get();
         return view('employee-documents.edit', compact('employee', 'employeeDocument', 'documents'));
@@ -85,12 +92,9 @@ class EmployeeDocumentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Employee $employee, EmployeeDocument $employeeDocument): RedirectResponse
+    public function update(Request $request, EmployeeDocument $employeeDocument): RedirectResponse
     {
-        // Sprawdź czy dokument należy do pracownika
-        if ($employeeDocument->employee_id !== $employee->id) {
-            abort(404);
-        }
+        $employee = $employeeDocument->employee;
 
         $validated = $request->validate([
             'document_id' => 'required|exists:documents,id',
@@ -133,19 +137,16 @@ class EmployeeDocumentController extends Controller
         unset($validated['remove_file']);
         $employeeDocument->update($validated);
 
-        return redirect()->route('employees.show.documents', $employee)
+        return redirect()->route('employees.show', $employee)
             ->with('success', 'Dokument został zaktualizowany.');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Employee $employee, EmployeeDocument $employeeDocument): RedirectResponse
+    public function destroy(EmployeeDocument $employeeDocument): RedirectResponse
     {
-        // Sprawdź czy dokument należy do pracownika
-        if ($employeeDocument->employee_id !== $employee->id) {
-            abort(404);
-        }
+        $employee = $employeeDocument->employee;
 
         // Usuń plik jeśli istnieje
         if ($employeeDocument->file_path) {
@@ -154,7 +155,7 @@ class EmployeeDocumentController extends Controller
 
         $employeeDocument->delete();
 
-        return redirect()->route('employees.show.documents', $employee)
+        return redirect()->route('employees.show', $employee)
             ->with('success', 'Dokument został usunięty.');
     }
 }

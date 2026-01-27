@@ -204,7 +204,7 @@
                                 </div>
                             @endif
                             
-                            <x-ui.button variant="ghost" href="{{ route('projects.assignments.create', ['project' => $project, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" class="w-100 mt-4 py-3 border-2 border-dashed">
+                            <x-ui.button variant="ghost" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" class="w-100 mt-4 py-3 border-2 border-dashed">
                                 <i class="bi bi-plus"></i> Dodaj osobę
                             </x-ui.button>
                         </div>

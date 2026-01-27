@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('projects.show', $project) }}"
+                    href="{{ $project ? route('projects.show', $project) : route('project-assignments.index') }}"
                     action="back"
                 >
                     Powrót
@@ -16,13 +16,29 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Dodaj Przypisanie Pracownika do Projektu">
-                <form method="POST" action="{{ route('projects.assignments.store', $project) }}" id="assignment-form">
+                <form method="POST" action="{{ route('project-assignments.store') }}" id="assignment-form">
                     @csrf
 
                     <div class="mb-3">
-                        <label class="form-label">Projekt</label>
-                        <input type="text" value="{{ $project->name }}" disabled class="form-control bg-light">
-                        <input type="hidden" name="project_id" value="{{ $project->id }}">
+                        @if($project)
+                            <label class="form-label">Projekt</label>
+                            <input type="text" value="{{ $project->name }}" disabled class="form-control bg-light">
+                            <input type="hidden" name="project_id" value="{{ $project->id }}">
+                        @else
+                            <x-ui.input 
+                                type="select" 
+                                name="project_id" 
+                                label="Projekt"
+                                required="true"
+                            >
+                                <option value="">Wybierz projekt</option>
+                                @foreach($projects as $proj)
+                                    <option value="{{ $proj->id }}" {{ old('project_id') == $proj->id ? 'selected' : '' }}>
+                                        {{ $proj->name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.input>
+                        @endif
                     </div>
 
                     <div class="mb-3">
@@ -147,7 +163,7 @@
                             <x-ui.button variant="primary" type="submit" id="submit-btn">
                                 <i class="bi bi-save me-1"></i> Zapisz
                             </x-ui.button>
-                            <x-ui.button variant="ghost" href="{{ route('projects.assignments.index', $project) }}">Anuluj</x-ui.button>
+                            <x-ui.button variant="ghost" href="{{ $project ? route('projects.show', $project) : route('project-assignments.index') }}">Anuluj</x-ui.button>
                             
                             @if(isset($isDateInPast) && $isDateInPast)
                                 <div class="form-check form-check-inline">

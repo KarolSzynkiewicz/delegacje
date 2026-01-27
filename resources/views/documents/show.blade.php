@@ -69,7 +69,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <x-ui.button variant="warning" href="{{ route('employees.employee-documents.edit', [$employeeDocument->employee, $employeeDocument]) }}" class="btn-sm">Edytuj</x-ui.button>
+                                            <x-ui.button variant="warning" href="{{ route('employee-documents.edit', $employeeDocument) }}" class="btn-sm">Edytuj</x-ui.button>
                                         </td>
                                     </tr>
                                 @endforeach

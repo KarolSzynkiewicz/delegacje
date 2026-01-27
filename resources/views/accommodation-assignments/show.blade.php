@@ -1,10 +1,11 @@
 <x-app-layout>
+    //review
     <x-slot name="header">
         <x-ui.page-header title="Szczegóły Przypisania Mieszkania">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('employees.accommodations.index', $accommodationAssignment->employee_id) }}"
+                    href="{{ route(name: 'employees.show', parameters: $accommodationAssignment->employee_id) }}"
                     action="back"
                 >
                     Powrót
@@ -13,7 +14,7 @@
             <x-slot name="right">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('accommodation-assignments.edit', $accommodationAssignment) }}"
+                    href="{{ route(name: 'accommodation-assignments.edit', parameters: $accommodationAssignment) }}"
                     routeName="accommodation-assignments.edit"
                     action="edit"
                 >
@@ -28,12 +29,12 @@
             <x-ui.card label="Szczegóły Przypisania Mieszkania">
                 <x-ui.detail-list>
                     <x-ui.detail-item label="Pracownik:">
-                        <a href="{{ route('employees.show', $accommodationAssignment->employee) }}" class="text-primary text-decoration-none">
+                        <a href="{{ route(name: 'employees.show', parameters: $accommodationAssignment->employee) }}" class="text-primary text-decoration-none">
                             {{ $accommodationAssignment->employee->full_name }}
                         </a>
                     </x-ui.detail-item>
                     <x-ui.detail-item label="Mieszkanie:">
-                        <a href="{{ route('accommodations.show', $accommodationAssignment->accommodation) }}" class="text-primary text-decoration-none">
+                        <a href="{{ route(name: 'accommodations.show', parameters: $accommodationAssignment->accommodation) }}" class="text-primary text-decoration-none">
                             {{ $accommodationAssignment->accommodation->name }} - {{ $accommodationAssignment->accommodation->city }}
                         </a>
                     </x-ui.detail-item>

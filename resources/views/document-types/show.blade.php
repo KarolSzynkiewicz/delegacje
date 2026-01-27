@@ -70,7 +70,7 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <a href="{{ route('employees.employee-documents.edit', [$employeeDocument->employee, $employeeDocument]) }}" class="btn btn-sm btn-warning">Edytuj</a>
+                                                <a href="{{ route('employee-documents.edit', $employeeDocument) }}" class="btn btn-sm btn-warning">Edytuj</a>
                                             </td>
                                         </tr>
                                     @endforeach

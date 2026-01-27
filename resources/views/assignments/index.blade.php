@@ -3,18 +3,27 @@
         <x-ui.page-header 
             title="{{ isset($project) ? 'Pracownicy w projekcie: ' . $project->name : 'Wszystkie przypisania' }}"
         >
-            @isset($project)
-                <x-slot name="right">
+            <x-slot name="right">
+                @isset($project)
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('projects.assignments.create', $project) }}"
-                        routeName="projects.assignments.create"
+                        href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}"
+                        routeName="project-assignments.create"
                         action="create"
                     >
                         Przypisz Pracownika
                     </x-ui.button>
-                </x-slot>
-            @endisset
+                @else
+                    <x-ui.button 
+                        variant="primary" 
+                        href="{{ route('project-assignments.create') }}"
+                        routeName="project-assignments.create"
+                        action="create"
+                    >
+                        Dodaj przypisanie
+                    </x-ui.button>
+                @endisset
+            </x-slot>
         </x-ui.page-header>
     </x-slot>
 
@@ -102,8 +111,8 @@
                 >
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('projects.assignments.create', $project) }}"
-                        routeName="projects.assignments.create"
+                        href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}"
+                        routeName="project-assignments.create"
                         action="create"
                     >
                         Przypisz pierwszego pracownika

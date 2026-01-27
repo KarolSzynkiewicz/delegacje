@@ -3,18 +3,27 @@
         <x-ui.page-header 
             title="{{ isset($employee) ? 'Mieszkania pracownika: ' . $employee->full_name : 'Wszystkie przypisania mieszkań' }}"
         >
-            @isset($employee)
-                <x-slot name="right">
+            <x-slot name="right">
+                @isset($employee)
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('employees.accommodations.create', $employee) }}"
-                        routeName="employees.accommodations.create"
+                        href="{{ route('accommodation-assignments.create', ['employee_id' => $employee->id]) }}"
+                        routeName="accommodation-assignments.create"
                         action="create"
                     >
                         Przypisz Mieszkanie
                     </x-ui.button>
-                </x-slot>
-            @endisset
+                @else
+                    <x-ui.button 
+                        variant="primary" 
+                        href="{{ route('accommodation-assignments.create') }}"
+                        routeName="accommodation-assignments.create"
+                        action="create"
+                    >
+                        Dodaj przypisanie
+                    </x-ui.button>
+                @endisset
+            </x-slot>
         </x-ui.page-header>
     </x-slot>
 
@@ -66,8 +75,8 @@
                 >
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('employees.accommodations.create', $employee) }}"
-                        routeName="employees.accommodations.create"
+                        href="{{ route('accommodation-assignments.create', ['employee_id' => $employee->id]) }}"
+                        routeName="accommodation-assignments.create"
                         action="create"
                     >
                         Przypisz pierwsze mieszkanie

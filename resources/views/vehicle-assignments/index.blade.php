@@ -3,18 +3,27 @@
         <x-ui.page-header 
             title="{{ isset($employee) ? 'Pojazdy pracownika: ' . $employee->full_name : 'Wszystkie przypisania pojazdów' }}"
         >
-            @isset($employee)
-                <x-slot name="right">
+            <x-slot name="right">
+                @isset($employee)
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('employees.vehicles.create', $employee) }}"
-                        routeName="employees.vehicles.create"
+                        href="{{ route('vehicle-assignments.create', ['employee_id' => $employee->id]) }}"
+                        routeName="vehicle-assignments.create"
                         action="create"
                     >
                         Przypisz Pojazd
                     </x-ui.button>
-                </x-slot>
-            @endisset
+                @else
+                    <x-ui.button 
+                        variant="primary" 
+                        href="{{ route('vehicle-assignments.create') }}"
+                        routeName="vehicle-assignments.create"
+                        action="create"
+                    >
+                        Dodaj przypisanie
+                    </x-ui.button>
+                @endisset
+            </x-slot>
         </x-ui.page-header>
     </x-slot>
 
@@ -79,8 +88,8 @@
                 >
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('employees.vehicles.create', $employee) }}"
-                        routeName="employees.vehicles.create"
+                        href="{{ route('vehicle-assignments.create', ['employee_id' => $employee->id]) }}"
+                        routeName="vehicle-assignments.create"
                         action="create"
                     >
                         Przypisz pierwszy pojazd

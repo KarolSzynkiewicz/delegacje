@@ -21,6 +21,7 @@ use App\Http\Controllers\EmployeeRateController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
+//review
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -91,19 +92,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Projects + nested demands + assignments
         Route::resource('projects', ProjectController::class);
     
-    // Project tabs with separate routes for permission checking
-    Route::get('projects/{project}/tab/files', [ProjectController::class, 'showFiles'])
-        ->name('projects.show.files')
-        ->defaults('resource', 'project-files');
-    Route::get('projects/{project}/tab/tasks', [ProjectController::class, 'showTasks'])
-        ->name('projects.show.tasks')
-        ->defaults('resource', 'project-tasks');
-    Route::get('projects/{project}/tab/assignments', [ProjectController::class, 'showAssignments'])
-        ->name('projects.show.assignments')
-        ->defaults('resource', 'assignments');
-    Route::get('projects/{project}/tab/comments', [ProjectController::class, 'showComments'])
-        ->name('projects.show.comments')
-        ->defaults('resource', 'comments');
+    // Project tabs - usunięte, teraz przez Livewire ProjectTabs z query string
     
     // Project files
     Route::post('projects/{project}/files', [\App\Http\Controllers\ProjectFileController::class, 'store'])
@@ -144,9 +133,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::get('project-demands', [ProjectDemandController::class, 'all'])
         ->name('project-demands.index');
 
-    Route::resource('projects.assignments', ProjectAssignmentController::class)
-        ->shallow()
+    // Project assignments - globalne resource route z query params
+    Route::resource('project-assignments', ProjectAssignmentController::class)
+        ->except(['index'])
         ->names([
+            'create' => 'project-assignments.create',
+            'store' => 'project-assignments.store',
             'show' => 'assignments.show',
             'edit' => 'assignments.edit',
             'update' => 'assignments.update',
@@ -161,43 +153,19 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);
     
-    // Employee tabs with separate routes for permission checking
-    // Using /tab/ prefix to avoid conflicts with resource routes
-    Route::get('employees/{employee}/tab/documents', [EmployeeController::class, 'showDocuments'])
-        ->name('employees.show.documents')
-        ->defaults('resource', 'employee-documents');
-    Route::get('employees/{employee}/tab/assignments', [EmployeeController::class, 'showAssignments'])
-        ->name('employees.show.assignments')
-        ->defaults('resource', 'assignments');
-    Route::get('employees/{employee}/tab/payrolls', [EmployeeController::class, 'showPayrolls'])
-        ->name('employees.show.payrolls')
-        ->defaults('resource', 'payrolls');
-    Route::get('employees/{employee}/tab/employee-rates', [EmployeeController::class, 'showEmployeeRates'])
-        ->name('employees.show.employee-rates')
-        ->defaults('resource', 'employee-rates');
-    Route::get('employees/{employee}/tab/advances', [EmployeeController::class, 'showAdvances'])
-        ->name('employees.show.advances')
-        ->defaults('resource', 'advances');
-    Route::get('employees/{employee}/tab/time-logs', [EmployeeController::class, 'showTimeLogs'])
-        ->name('employees.show.time-logs')
-        ->defaults('resource', 'time-logs');
-    Route::get('employees/{employee}/tab/adjustments', [EmployeeController::class, 'showAdjustments'])
-        ->name('employees.show.adjustments')
-        ->defaults('resource', 'adjustments');
+    // Employee tabs - usunięte, teraz przez Livewire EmployeeTabs z query string
     
-        Route::resource('employees.employee-documents', EmployeeDocumentController::class)
-            ->except(['index', 'show'])
-            ->parameters(['employee-documents' => 'employeeDocument']);
+    // Employee documents - globalne resource route z query params
+    Route::resource('employee-documents', EmployeeDocumentController::class)
+        ->except(['index', 'show'])
+        ->parameters(['employee-documents' => 'employeeDocument']);
     
     // Rotations (global routes)
     Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
     Route::get('rotations/create', [RotationController::class, 'createGlobal'])->name('rotations.create');
     Route::post('rotations', [RotationController::class, 'storeGlobal'])->name('rotations.store');
     
-    // Employee rotations tab - using /tab/ prefix to avoid conflicts
-    Route::get('employees/{employee}/tab/rotations', [EmployeeController::class, 'showRotations'])
-        ->name('employees.show.rotations')
-        ->defaults('resource', 'rotations');
+    // Employee rotations tab - usunięte, teraz przez Livewire EmployeeTabs
     
     // Rotations (nested under employees) - scoped for security
     Route::resource('employees.rotations', RotationController::class)
@@ -210,39 +178,13 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Documents (słownik dokumentów)
     Route::resource('documents', \App\Http\Controllers\DocumentController::class);
 
-    // Employee vehicle assignments tab - using /tab/ prefix to avoid conflicts
-    Route::get('employees/{employee}/tab/vehicle-assignments', [EmployeeController::class, 'showVehicleAssignments'])
-        ->name('employees.show.vehicle-assignments')
-        ->defaults('resource', 'vehicle-assignments');
-    
-    Route::resource('employees.vehicle-assignments', VehicleAssignmentController::class)
-        ->shallow()
-        ->names([
-            'index' => 'employees.vehicles.index',
-            'create' => 'employees.vehicles.create',
-            'store' => 'employees.vehicles.store',
-            'show' => 'vehicle-assignments.show',
-            'edit' => 'vehicle-assignments.edit',
-            'update' => 'vehicle-assignments.update',
-            'destroy' => 'vehicle-assignments.destroy',
-        ]);
+    // Vehicle assignments - globalne resource route z query params
+    Route::resource('vehicle-assignments', VehicleAssignmentController::class)
+        ->except(['index']);
 
-    // Employee accommodation assignments tab - using /tab/ prefix to avoid conflicts
-    Route::get('employees/{employee}/tab/accommodation-assignments', [EmployeeController::class, 'showAccommodationAssignments'])
-        ->name('employees.show.accommodation-assignments')
-        ->defaults('resource', 'accommodation-assignments');
-    
-    Route::resource('employees.accommodation-assignments', AccommodationAssignmentController::class)
-        ->shallow()
-        ->names([
-            'index' => 'employees.accommodations.index',
-            'create' => 'employees.accommodations.create',
-            'store' => 'employees.accommodations.store',
-            'show' => 'accommodation-assignments.show',
-            'edit' => 'accommodation-assignments.edit',
-            'update' => 'accommodation-assignments.update',
-            'destroy' => 'accommodation-assignments.destroy',
-        ]);
+    // Accommodation assignments - globalne resource route z query params
+    Route::resource('accommodation-assignments', AccommodationAssignmentController::class)
+        ->except(['index']);
     
     // Global routes for all vehicle and accommodation assignments
     Route::get('vehicle-assignments', [VehicleAssignmentController::class, 'all'])

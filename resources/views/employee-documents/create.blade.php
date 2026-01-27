@@ -12,8 +12,9 @@
                     <x-ui.card>
                         <x-ui.errors />
 
-                        <form action="{{ route('employees.employee-documents.store', $employee) }}" method="POST" enctype="multipart/form-data">
+                        <form action="{{ route('employee-documents.store') }}" method="POST" enctype="multipart/form-data">
                             @csrf
+                            <input type="hidden" name="employee_id" value="{{ $employee->id }}">
 
                             <div class="mb-3">
                                 <x-ui.input 

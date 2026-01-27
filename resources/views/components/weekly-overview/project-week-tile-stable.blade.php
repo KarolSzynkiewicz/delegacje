@@ -119,7 +119,7 @@
                                 </table>
                             </div>
                             <div class="mt-2">
-                                <a href="{{ route('projects.assignments.create', ['project' => $project->id, 'date_from' => $weekStart->format('Y-m-d'), 'date_to' => $weekEnd->format('Y-m-d')]) }}" class="btn btn-sm btn-primary w-100">
+                                <a href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weekStart->format('Y-m-d'), 'date_to' => $weekEnd->format('Y-m-d')]) }}" class="btn btn-sm btn-primary w-100">
                                     <i class="bi bi-plus"></i>
                                     {{ $stability['assigned_employees']->count() > 0 ? 'Dodaj' : 'Przypisz' }}
                                 </a>
@@ -129,7 +129,7 @@
                                 Brak osób
                             </div>
                             <div class="mt-2">
-                                <a href="{{ route('projects.assignments.create', ['project' => $project->id, 'date_from' => $weekStart->format('Y-m-d'), 'date_to' => $weekEnd->format('Y-m-d')]) }}" class="btn btn-sm btn-primary w-100">
+                                <a href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weekStart->format('Y-m-d'), 'date_to' => $weekEnd->format('Y-m-d')]) }}" class="btn btn-sm btn-primary w-100">
                                     <i class="bi bi-plus"></i>
                                     Przypisz osoby
                                 </a>

@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('employees.vehicles.index', $vehicleAssignment->employee_id) }}"
+                    href="{{ route('employees.show', $vehicleAssignment->employee_id) }}"
                     action="back"
                 >
                     Powrót
