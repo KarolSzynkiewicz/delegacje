@@ -43,6 +43,11 @@ class RotationsTable extends Component
         $this->resetPage();
     }
 
+    public function paginationView()
+    {
+        return 'vendor.livewire.simple-pagination';
+    }
+
     public function sortBy($field)
     {
         if ($this->sortField === $field) {

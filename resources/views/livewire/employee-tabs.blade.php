@@ -1,39 +1,9 @@
 <div>
-    //review
-<ul class="nav nav-tabs mb-4" id="employeeTabs" role="tablist">
-    @foreach($availableTabs as $tabKey => $tab)
-        <li class="nav-item" role="presentation">
-            <button wire:click="setTab('{{ $tabKey }}')" 
-                    class="nav-link {{ $activeTab === $tabKey ? 'active' : '' }}">
-                @if($tabKey === 'info')
-                    {{ $tab['label'] }}
-                @elseif($tabKey === 'documents')
-                    {{ $tab['label'] }} ({{ $employee->employee_documents_count ?? 0 }})
-                @elseif($tabKey === 'rotations')
-                    {{ $tab['label'] }} ({{ $employee->rotations_count ?? 0 }})
-                @elseif($tabKey === 'assignments')
-                    {{ $tab['label'] }} ({{ $employee->assignments_count ?? 0 }})
-                @elseif($tabKey === 'vehicle-assignments')
-                    {{ $tab['label'] }} ({{ $employee->vehicle_assignments_count ?? 0 }})
-                @elseif($tabKey === 'accommodation-assignments')
-                    {{ $tab['label'] }} ({{ $employee->accommodation_assignments_count ?? 0 }})
-                @elseif($tabKey === 'payrolls')
-                    {{ $tab['label'] }} ({{ $employee->payrolls_count ?? 0 }})
-                @elseif($tabKey === 'employee-rates')
-                    {{ $tab['label'] }} ({{ $employeeRatesCount ?? 0 }})
-                @elseif($tabKey === 'advances')
-                    {{ $tab['label'] }} ({{ $employee->advances_count ?? 0 }})
-                @elseif($tabKey === 'time-logs')
-                    {{ $tab['label'] }} ({{ $timeLogsCount ?? 0 }})
-                @elseif($tabKey === 'adjustments')
-                    {{ $tab['label'] }} ({{ $employee->adjustments_count ?? 0 }})
-                @else
-                    {{ $tab['label'] }}
-                @endif
-            </button>
-        </li>
-    @endforeach
-</ul>
+    <x-ui.tabs 
+        :tabs="$tabsForComponent" 
+        :activeTab="$activeTab" 
+        id="employeeTabs"
+    />
 
 <div id="employeeTabsContent">
     @if($activeTab === 'info')

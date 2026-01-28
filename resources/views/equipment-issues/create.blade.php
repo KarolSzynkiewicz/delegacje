@@ -1,11 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Wydaj Sprzęt</h2>
-            <x-ui.button variant="ghost" href="{{ route('equipment-issues.index') }}">
-                <i class="bi bi-arrow-left"></i> Powrót
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Wydaj Sprzęt">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('equipment-issues.index') }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <div class="row justify-content-center">
@@ -17,11 +22,13 @@
                     @csrf
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
+                        <label class="form-label">
+                            Sprzęt <span class="text-danger">*</span>
+                        </label>
+                        <select 
                             name="equipment_id" 
-                            label="Sprzęt"
-                            required="true"
+                            class="form-control @error('equipment_id') is-invalid @enderror"
+                            required
                         >
                             <option value="">Wybierz sprzęt</option>
                             @foreach($equipment as $item)
@@ -29,15 +36,20 @@
                                     {{ $item->name }} (dostępne: {{ $item->available_quantity }} {{ $item->unit }})
                                 </option>
                             @endforeach
-                        </x-ui.input>
+                        </select>
+                        @error('equipment_id')
+                            <span class="invalid-feedback">{{ $message }}</span>
+                        @enderror
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
+                        <label class="form-label">
+                            Pracownik <span class="text-danger">*</span>
+                        </label>
+                        <select 
                             name="employee_id" 
-                            label="Pracownik"
-                            required="true"
+                            class="form-control @error('employee_id') is-invalid @enderror"
+                            required
                         >
                             <option value="">Wybierz pracownika</option>
                             @foreach($employees as $employee)
@@ -45,14 +57,19 @@
                                     {{ $employee->full_name }}
                                 </option>
                             @endforeach
-                        </x-ui.input>
+                        </select>
+                        @error('employee_id')
+                            <span class="invalid-feedback">{{ $message }}</span>
+                        @enderror
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
+                        <label class="form-label">
+                            Przypisanie do projektu (opcjonalne)
+                        </label>
+                        <select 
                             name="project_assignment_id" 
-                            label="Przypisanie do projektu (opcjonalne)"
+                            class="form-control @error('project_assignment_id') is-invalid @enderror"
                         >
                             <option value="">Brak</option>
                             @foreach($assignments as $assignment)
@@ -60,7 +77,10 @@
                                     {{ $assignment->employee->full_name }} - {{ $assignment->project->name }}
                                 </option>
                             @endforeach
-                        </x-ui.input>
+                        </select>
+                        @error('project_assignment_id')
+                            <span class="invalid-feedback">{{ $message }}</span>
+                        @enderror
                     </div>
 
                     <div class="row mb-3">

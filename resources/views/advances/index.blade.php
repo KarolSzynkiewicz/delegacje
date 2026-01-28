@@ -72,9 +72,9 @@
                     
                     @if($advances->hasPages())
                         <div class="mt-3 pt-3 border-top">
-                            {{ $advances->links() }}
+                            <x-ui.pagination :paginator="$advances" />
                         </div>
-            @endif
+                    @endif
         @else
             <x-ui.empty-state 
                 icon="inbox"

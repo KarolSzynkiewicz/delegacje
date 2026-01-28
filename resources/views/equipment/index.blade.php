@@ -16,6 +16,62 @@
         </x-ui.page-header>
     </x-slot>
 
+    <!-- Filtry -->
+    <x-ui.card class="mb-4">
+        <form method="GET" action="{{ route('equipment.index') }}" id="filter-form">
+            <div class="row g-3">
+                <!-- Wyszukiwanie -->
+                <div class="col-md-4">
+                    <label class="form-label small">
+                        <i class="bi bi-search me-1"></i> Szukaj
+                    </label>
+                    <div class="position-relative">
+                        <input type="text" name="search" value="{{ request('search') }}" 
+                            placeholder="Nazwa sprzętu..."
+                            class="form-control ps-5"
+                            onchange="this.form.submit()">
+                        <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    </div>
+                </div>
+
+                <!-- Kategoria -->
+                <div class="col-md-4">
+                    <label class="form-label small">
+                        <i class="bi bi-tags me-1"></i> Kategoria
+                    </label>
+                    <select name="category" class="form-control" onchange="this.form.submit()">
+                        <option value="">Wszystkie kategorie</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category }}" {{ request('category') === $category ? 'selected' : '' }}>
+                                {{ $category }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Status -->
+                <div class="col-md-4">
+                    <label class="form-label small">
+                        <i class="bi bi-check-circle me-1"></i> Status
+                    </label>
+                    <select name="status" class="form-control" onchange="this.form.submit()">
+                        <option value="">Wszystkie</option>
+                        <option value="low_stock" {{ request('status') === 'low_stock' ? 'selected' : '' }}>Niski stan</option>
+                        <option value="ok" {{ request('status') === 'ok' ? 'selected' : '' }}>OK</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+
+        @if(request('search') || request('category') || request('status'))
+            <div class="mt-3 pt-3 border-top">
+                <a href="{{ route('equipment.index') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                </a>
+            </div>
+        @endif
+    </x-ui.card>
+
     <x-ui.card>
                 @if($equipment->count() > 0)
                     <div class="table-responsive">
@@ -62,22 +118,28 @@
 
                     @if($equipment->hasPages())
                         <div class="mt-3">
-                            {{ $equipment->links() }}
+                            <x-ui.pagination :paginator="$equipment" />
                         </div>
                     @endif
                 @else
                     <x-ui.empty-state 
                         icon="inbox" 
-                        message="Brak sprzętu w systemie."
+                        :message="request('search') || request('category') || request('status') ? 'Brak sprzętu spełniającego kryteria wyszukiwania' : 'Brak sprzętu w systemie.'"
                     >
-                        <x-ui.button 
-                            variant="primary" 
-                            href="{{ route('equipment.create') }}"
-                            routeName="equipment.create"
-                            action="create"
-                        >
-                            Dodaj pierwszy sprzęt
-                        </x-ui.button>
+                        @if(!request('search') && !request('category') && !request('status'))
+                            <x-ui.button 
+                                variant="primary" 
+                                href="{{ route('equipment.create') }}"
+                                routeName="equipment.create"
+                                action="create"
+                            >
+                                Dodaj pierwszy sprzęt
+                            </x-ui.button>
+                        @else
+                            <a href="{{ route('equipment.index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                            </a>
+                        @endif
                     </x-ui.empty-state>
                 @endif
     </x-ui.card>

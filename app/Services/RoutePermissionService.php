@@ -317,7 +317,7 @@ class RoutePermissionService
      * Check if route should be excluded from permission generation.
      * Same exclusions as middleware.
      */
-    protected function isExcluded(string $routeName): bool
+    public function isExcluded(string $routeName): bool
     {
         $excludedRoutes = [
             'profile.*',

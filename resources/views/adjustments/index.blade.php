@@ -68,7 +68,7 @@
             
             @if($adjustments->hasPages())
                 <div class="mt-3">
-                    {{ $adjustments->links() }}
+                    <x-ui.pagination :paginator="$adjustments" />
                 </div>
             @endif
         @else

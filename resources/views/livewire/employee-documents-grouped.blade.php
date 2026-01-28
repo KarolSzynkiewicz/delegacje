@@ -171,5 +171,11 @@
             <div class="mt-4">
                 {{ $employees->links() }}
             </div>
+        @elseif(isset($employees))
+            <div class="mt-4">
+                <p class="small text-muted mb-0">
+                    Pokazano <span class="fw-semibold">{{ $employees->total() }}</span> wyników
+                </p>
+            </div>
         @endif
 </div>

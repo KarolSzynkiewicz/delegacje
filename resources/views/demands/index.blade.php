@@ -67,7 +67,7 @@
             
             @if($demands->hasPages())
                 <div class="mt-3">
-                    {{ $demands->links() }}
+                    <x-ui.pagination :paginator="$demands" />
                 </div>
             @endif
         @else

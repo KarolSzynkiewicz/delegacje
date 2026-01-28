@@ -62,15 +62,29 @@ class EquipmentService
      * 
      * @param EquipmentIssue $equipmentIssue
      * @param Carbon $returnDate
+     * @param string $status Status: 'returned', 'damaged', 'lost'
      * @param string|null $notes
      * @return bool
      */
     public function returnEquipment(
         EquipmentIssue $equipmentIssue,
         Carbon $returnDate,
+        string $status = 'returned',
         ?string $notes = null
     ): bool {
-        $equipmentIssue->markAsReturned($returnDate, auth()->id());
+        // Validate status
+        if (!in_array($status, ['returned', 'damaged', 'lost'])) {
+            throw new \InvalidArgumentException("Invalid status: {$status}. Must be 'returned', 'damaged', or 'lost'.");
+        }
+
+        // Check if equipment is returnable
+        if (!$equipmentIssue->equipment->returnable) {
+            throw ValidationException::withMessages([
+                'equipment' => 'Ten sprzęt nie może być zwracany, zgłaszany jako uszkodzony lub zgubiony.'
+            ]);
+        }
+
+        $equipmentIssue->markAsReturned($returnDate, auth()->id(), $status);
 
         if ($notes !== null) {
             $equipmentIssue->update(['notes' => $notes]);

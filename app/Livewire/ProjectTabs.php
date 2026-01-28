@@ -22,13 +22,13 @@ class ProjectTabs extends Component
 
     protected function buildAvailableTabs()
     {
-        // Definicja wszystkich możliwych tabów z przypisanym permission
+        // Definicja wszystkich możliwych tabów z przypisanym permission i ikonami
         $allTabs = [
-            'info' => ['label' => 'Informacje', 'permission' => null],
-            'files' => ['label' => 'Pliki', 'permission' => 'project-files.view'],
-            'tasks' => ['label' => 'Zadania', 'permission' => 'project-tasks.view'],
-            'assignments' => ['label' => 'Przypisani pracownicy', 'permission' => 'assignments.view'],
-            'comments' => ['label' => 'Komentarze', 'permission' => 'comments.view'],
+            'info' => ['label' => 'Informacje', 'permission' => null, 'icon' => 'bi bi-info-circle'],
+            'files' => ['label' => 'Pliki', 'permission' => 'project-files.view', 'icon' => 'bi bi-file-earmark'],
+            'tasks' => ['label' => 'Zadania', 'permission' => 'project-tasks.view', 'icon' => 'bi bi-list-check'],
+            'assignments' => ['label' => 'Przypisani pracownicy', 'permission' => 'assignments.view', 'icon' => 'bi bi-person-check'],
+            'comments' => ['label' => 'Komentarze', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp
@@ -85,6 +85,25 @@ class ProjectTabs extends Component
             $users = \App\Models\User::orderBy('name')->get();
         }
         
-        return view('livewire.project-tabs', compact('users'));
+        // Przygotuj taby dla komponentu
+        $tabsForComponent = [];
+        foreach ($this->availableTabs as $tabKey => $tab) {
+            $count = match($tabKey) {
+                'files' => $this->project->files_count ?? 0,
+                'tasks' => $this->project->tasks_count ?? 0,
+                'assignments' => $this->project->assignments_count ?? 0,
+                'comments' => $this->project->comments_count ?? 0,
+                default => null,
+            };
+            
+            $tabsForComponent[$tabKey] = [
+                'label' => $tab['label'],
+                'icon' => $tab['icon'] ?? null,
+                'count' => $count,
+                'wireClick' => "setTab('{$tabKey}')",
+            ];
+        }
+        
+        return view('livewire.project-tabs', compact('users', 'tabsForComponent'));
     }
 }

@@ -11,13 +11,48 @@ class EquipmentController extends Controller
     /**
      * Display a listing of equipment.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $equipment = Equipment::with('requirements.role')
-            ->orderBy('name')
-            ->paginate(20);
+        $query = Equipment::with('requirements.role');
 
-        return view('equipment.index', compact('equipment'));
+        // Filter by search (name)
+        if ($request->filled('search')) {
+            $searchTerm = trim($request->search);
+            if (strlen($searchTerm) >= 2) {
+                $query->where('name', 'like', '%' . $searchTerm . '%');
+            }
+        }
+
+        // Filter by category
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
+        // Filter by status (low stock / OK)
+        if ($request->filled('status')) {
+            if ($request->status === 'low_stock') {
+                // Filter for low stock: available_quantity <= min_quantity
+                // We need to calculate this in the query
+                $query->whereRaw('(quantity_in_stock - COALESCE((SELECT SUM(quantity_issued) FROM equipment_issues WHERE equipment_issues.equipment_id = equipment.id AND equipment_issues.status = "issued"), 0)) <= min_quantity');
+            } elseif ($request->status === 'ok') {
+                // Filter for OK stock: available_quantity > min_quantity
+                $query->whereRaw('(quantity_in_stock - COALESCE((SELECT SUM(quantity_issued) FROM equipment_issues WHERE equipment_issues.equipment_id = equipment.id AND equipment_issues.status = "issued"), 0)) > min_quantity');
+            }
+        }
+
+        $equipment = $query->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+
+        // Get unique categories for filter
+        $categories = Equipment::whereNotNull('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category')
+            ->filter()
+            ->values();
+
+        return view('equipment.index', compact('equipment', 'categories'));
     }
 
     /**
@@ -41,8 +76,12 @@ class EquipmentController extends Controller
             'min_quantity' => 'required|integer|min:0',
             'unit' => 'required|string|max:10',
             'unit_cost' => 'nullable|numeric|min:0',
+            'returnable' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
+
+        // Convert checkbox value to boolean
+        $validated['returnable'] = $request->has('returnable') ? true : false;
 
         Equipment::create($validated);
 
@@ -84,8 +123,12 @@ class EquipmentController extends Controller
             'min_quantity' => 'required|integer|min:0',
             'unit' => 'required|string|max:10',
             'unit_cost' => 'nullable|numeric|min:0',
+            'returnable' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
+
+        // Convert checkbox value to boolean
+        $validated['returnable'] = $request->has('returnable') ? true : false;
 
         $equipment->update($validated);
 

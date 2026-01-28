@@ -69,7 +69,7 @@
 
             @if($returnTrips->hasPages())
                 <div class="mt-3">
-                    {{ $returnTrips->links() }}
+                    <x-ui.pagination :paginator="$returnTrips" />
                 </div>
             @endif
         @else

@@ -147,7 +147,7 @@
             </div>
 
             <div class="mt-4">
-                {{ $rotations->links() }}
+                <x-ui.pagination :paginator="$rotations" />
             </div>
         </x-ui.card>
     @else

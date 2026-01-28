@@ -1,27 +1,9 @@
 <div>
-    //review
-<ul class="nav nav-tabs mb-4" id="projectTabs" role="tablist">
-    @foreach($availableTabs as $tabKey => $tab)
-        <li class="nav-item" role="presentation">
-            <button wire:click="setTab('{{ $tabKey }}')" 
-                    class="nav-link {{ $activeTab === $tabKey ? 'active' : '' }}">
-                @if($tabKey === 'info')
-                    {{ $tab['label'] }}
-                @elseif($tabKey === 'files')
-                    {{ $tab['label'] }} ({{ $project->files_count ?? 0 }})
-                @elseif($tabKey === 'tasks')
-                    {{ $tab['label'] }} ({{ $project->tasks_count ?? 0 }})
-                @elseif($tabKey === 'assignments')
-                    {{ $tab['label'] }} ({{ $project->assignments_count ?? 0 }})
-                @elseif($tabKey === 'comments')
-                    {{ $tab['label'] }} ({{ $project->comments_count ?? 0 }})
-                @else
-                    {{ $tab['label'] }}
-                @endif
-            </button>
-        </li>
-    @endforeach
-</ul>
+    <x-ui.tabs 
+        :tabs="$tabsForComponent" 
+        :activeTab="$activeTab" 
+        id="projectTabs"
+    />
 
 <div id="projectTabsContent">
     @if($activeTab === 'info')

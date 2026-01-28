@@ -20,13 +20,35 @@ class EquipmentIssueController extends Controller
     /**
      * Display a listing of equipment issues.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $issues = EquipmentIssue::with('equipment', 'employee', 'projectAssignment')
-            ->orderBy('issue_date', 'desc')
-            ->paginate(20);
+        $query = EquipmentIssue::with('equipment', 'employee', 'projectAssignment');
 
-        return view('equipment-issues.index', compact('issues'));
+        // Filter by status
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by employee
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        // Filter by equipment
+        if ($request->filled('equipment_id')) {
+            $query->where('equipment_id', $request->equipment_id);
+        }
+
+        $issues = $query->orderBy('issue_date', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        // Get filter options
+        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
+        $equipmentList = Equipment::orderBy('name')->get();
+        $statuses = ['issued', 'returned', 'lost', 'damaged'];
+
+        return view('equipment-issues.index', compact('issues', 'employees', 'equipmentList', 'statuses'));
     }
 
     /**
@@ -107,10 +129,17 @@ class EquipmentIssueController extends Controller
      */
     public function returnForm(EquipmentIssue $equipmentIssue)
     {
-        if ($equipmentIssue->status === 'returned') {
+        if ($equipmentIssue->status !== 'issued') {
             return redirect()
                 ->route('equipment-issues.show', $equipmentIssue)
-                ->with('error', 'Sprzęt został już zwrócony.');
+                ->with('error', 'Sprzęt został już zwrócony, zgłoszony jako uszkodzony lub zgubiony.');
+        }
+
+        // Check if equipment is returnable
+        if (!$equipmentIssue->equipment->returnable) {
+            return redirect()
+                ->route('equipment-issues.show', $equipmentIssue)
+                ->with('error', 'Ten sprzęt nie może być zwracany, zgłaszany jako uszkodzony lub zgubiony.');
         }
 
         return view('equipment-issues.return', compact('equipmentIssue'));
@@ -123,6 +152,7 @@ class EquipmentIssueController extends Controller
     {
         $validated = $request->validate([
             'return_date' => 'required|date|after_or_equal:' . $equipmentIssue->issue_date->format('Y-m-d'),
+            'status' => 'required|in:returned,damaged,lost',
             'notes' => 'nullable|string',
         ]);
 
@@ -132,12 +162,19 @@ class EquipmentIssueController extends Controller
             $this->equipmentService->returnEquipment(
                 $equipmentIssue,
                 $returnDate,
+                $validated['status'],
                 $validated['notes'] ?? null
             );
 
+            $statusMessages = [
+                'returned' => 'Sprzęt został zwrócony.',
+                'damaged' => 'Sprzęt został zgłoszony jako uszkodzony.',
+                'lost' => 'Sprzęt został zgłoszony jako zgubiony.',
+            ];
+
             return redirect()
                 ->route('equipment-issues.show', $equipmentIssue)
-                ->with('success', 'Sprzęt został zwrócony.');
+                ->with('success', $statusMessages[$validated['status']]);
         } catch (\Exception $e) {
             return redirect()
                 ->back()

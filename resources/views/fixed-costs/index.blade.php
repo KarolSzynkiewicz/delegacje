@@ -45,19 +45,26 @@
         <!-- Zakładki -->
         @php
             $activeTab = $activeTab ?? 'templates';
+            $tabsForComponent = [
+                'templates' => [
+                    'label' => 'Szablony',
+                    'icon' => 'bi bi-file-earmark-text',
+                    'count' => $templates->total(),
+                    'href' => route('fixed-costs.tab.templates'),
+                ],
+                'entries' => [
+                    'label' => 'Koszty Księgowe',
+                    'icon' => 'bi bi-journal-text',
+                    'count' => $entries->total(),
+                    'href' => route('fixed-costs.tab.entries'),
+                ],
+            ];
         @endphp
-        <ul class="nav nav-tabs mb-4" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'templates' ? 'active' : '' }}" href="{{ route('fixed-costs.tab.templates') }}">
-                    Szablony ({{ $templates->total() }})
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {{ $activeTab === 'entries' ? 'active' : '' }}" href="{{ route('fixed-costs.tab.entries') }}">
-                    Koszty Księgowe ({{ $entries->total() }})
-                </a>
-            </li>
-        </ul>
+        <x-ui.tabs 
+            :tabs="$tabsForComponent" 
+            :activeTab="$activeTab" 
+            id="fixedCostsTabs"
+        />
 
         <div class="tab-content">
             <!-- Tab: Szablony -->
@@ -138,7 +145,7 @@
 
                     @if($templates->hasPages())
                         <div class="mt-3">
-                            {{ $templates->links() }}
+                            <x-ui.pagination :paginator="$templates" />
                         </div>
                     @endif
                 @else
@@ -218,7 +225,7 @@
 
                     @if($entries->hasPages())
                         <div class="mt-3">
-                            {{ $entries->links() }}
+                            <x-ui.pagination :paginator="$entries" />
                         </div>
                     @endif
                 @else

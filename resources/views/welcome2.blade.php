@@ -5,6 +5,29 @@
     </x-slot>
 
     <div class="container-fluid">
+        {{-- Hero Card Example --}}
+        <div class="mb-5">
+            <h3 class="mb-4">Komponent x-ui.hero-card</h3>
+            <x-ui.hero-card
+                title="Are you ready"
+                subtitle="for an adventure?"
+                icon="rocket-takeoff"
+                iconColor="primary"
+                variant="gradient"
+                imagePosition="right"
+            >
+                <x-slot name="image">
+                    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(168, 85, 247, 0.2)); border-radius: 16px; padding: 2rem; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-play-circle" style="font-size: 5rem; color: var(--primary);"></i>
+                    </div>
+                </x-slot>
+                <p class="mb-0">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Minima officia consequatur adipisci tenetur repudiandae rerum quos.
+                </p>
+            </x-ui.hero-card>
+        </div>
+        <hr class="mb-5">
+
         <h3 class="mb-4">Komponenty x-ui.*</h3>
 
         {{-- x-ui.button --}}
@@ -34,6 +57,21 @@
                 <x-ui.badge variant="info">Info</x-ui.badge>
                 <x-ui.badge variant="accent">Akcent</x-ui.badge>
             </div>
+        </div>
+        <hr>
+
+        {{-- x-ui.clickable-badge --}}
+        <div class="mb-4">
+            <h4 class="fw-semibold">x-ui.clickable-badge</h4>
+            <p class="text-muted small">Varianty: success, danger, warning, info, accent | Props: href, route, routeParams | Hover effect podobny do przycisku</p>
+            <div class="d-flex gap-2 flex-wrap mb-3">
+                <x-ui.clickable-badge variant="success" href="{{ route('home') }}">Sukces (link)</x-ui.clickable-badge>
+                <x-ui.clickable-badge variant="danger" href="{{ route('home') }}">Błąd (link)</x-ui.clickable-badge>
+                <x-ui.clickable-badge variant="warning" href="{{ route('home') }}">Ostrzeżenie (link)</x-ui.clickable-badge>
+                <x-ui.clickable-badge variant="info" route="home">Info (route)</x-ui.clickable-badge>
+                <x-ui.clickable-badge variant="accent" href="{{ route('home') }}">Akcent (link)</x-ui.clickable-badge>
+            </div>
+            <p class="text-muted small mb-0">Najedź myszką na badge'y powyżej, aby zobaczyć efekt hover (podobny do przycisków).</p>
         </div>
         <hr>
 

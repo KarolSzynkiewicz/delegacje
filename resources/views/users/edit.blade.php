@@ -42,23 +42,6 @@
                         />
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="password" 
-                            name="password" 
-                            label="Nowe Hasło (zostaw puste, aby nie zmieniać)"
-                        />
-                        <small class="text-muted">Zostaw puste, jeśli nie chcesz zmieniać hasła</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="password" 
-                            name="password_confirmation" 
-                            label="Potwierdź Hasło"
-                        />
-                    </div>
-
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Role</label>
                         <div class="border rounded p-3 bg-light">

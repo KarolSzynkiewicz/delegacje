@@ -94,6 +94,17 @@
                         />
                     </div>
 
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="checkbox" 
+                            name="returnable" 
+                            label="Zwracalny"
+                            value="1"
+                            checked="{{ old('returnable', true) }}"
+                        />
+                        <small class="form-text text-muted">Sprzęt zwracalny może być zwracany, zgłaszany jako uszkodzony lub zgubiony. Sprzęt niezwracalny (np. materiały jednorazowe) nie może być zwracany.</small>
+                    </div>
+
                     <div class="mb-4">
                         <x-ui.input 
                             type="textarea" 

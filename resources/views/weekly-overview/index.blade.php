@@ -7,16 +7,6 @@
                         Wyczyść filtry
                     </x-ui.button>
                 @endif
-                @if(isset($projects) && count($projects) > 0)
-                    @php
-                        $firstProject = $projects[0]['project'];
-                        $firstWeekStart = $weeks[0]['start']->format('Y-m-d');
-                        $firstPlanner2Url = route('weekly-overview.planner2', ['start_date' => $firstWeekStart, 'project_id' => $firstProject->id]);
-                    @endphp
-                    <x-ui.button variant="primary" href="{{ $firstPlanner2Url }}" action="view" class="btn-sm">
-                        Zobacz planer dzienny
-                    </x-ui.button>
-                @endif
             </x-slot>
             <x-slot name="right">
                 <select id="project-search" class="form-select form-select-sm" style="width: 200px;" onchange="(function() { const baseUrl = '{{ route('weekly-overview.index') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
@@ -52,6 +42,55 @@
     </div>
 
     <!-- Projekty -->
+    @php
+        // Pre-load all project assignments for all employees in vehicles/accommodations to avoid N+1 queries
+        $weekStart = $weeks[0]['start'];
+        $weekEnd = $weeks[0]['end'];
+        $allEmployeeIds = collect();
+        
+        // Collect all employee IDs from vehicles and accommodations across all projects
+        foreach ($projects as $projectData) {
+            $weekData = $projectData['weeks_data'][0] ?? null;
+            if ($weekData) {
+                $vehicles = collect($weekData['vehicles'] ?? []);
+                $accommodations = collect($weekData['accommodations'] ?? []);
+                
+                foreach ($vehicles as $vehicleData) {
+                    if (isset($vehicleData['assignments'])) {
+                        $allEmployeeIds = $allEmployeeIds->merge(collect($vehicleData['assignments'])->pluck('employee_id'));
+                    }
+                }
+                
+                foreach ($accommodations as $accommodationData) {
+                    if (isset($accommodationData['assignments'])) {
+                        $allEmployeeIds = $allEmployeeIds->merge(collect($accommodationData['assignments'])->pluck('employee_id'));
+                    }
+                }
+            }
+        }
+        
+        $allEmployeeIds = $allEmployeeIds->unique()->filter();
+        
+        // Pre-load all project assignments for these employees in one query
+        $preloadedProjectAssignments = collect();
+        if ($allEmployeeIds->isNotEmpty()) {
+            $preloadedProjectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $allEmployeeIds)
+                ->where('is_cancelled', false)
+                ->where(function($query) use ($weekStart, $weekEnd) {
+                    $query->where(function($q) use ($weekStart, $weekEnd) {
+                        $q->where('start_date', '<=', $weekEnd)
+                          ->where(function($q2) use ($weekStart) {
+                              $q2->whereNull('end_date')
+                                 ->orWhere('end_date', '>=', $weekStart);
+                          });
+                    });
+                })
+                ->with('project')
+                ->get()
+                ->groupBy('employee_id');
+        }
+    @endphp
+    
     @forelse($projects as $projectData)
         @php
             $project = $projectData['project'];
@@ -69,6 +108,13 @@
                     <h3 class="fs-5 fw-bold mb-0 text-dark">
                         <a href="{{ route('projects.show', $project) }}" class="text-decoration-underline">{{ $project->name }}</a>
                     </h3>
+                    
+                    <!-- Przycisk Planer dzienny -->
+                    <div class="flex-grow-1 text-center">
+                        <x-ui.button variant="warning" href="{{ $planner2Url }}" action="view" class="btn-sm">
+                            Zobacz planer dzienny
+                        </x-ui.button>
+                    </div>
                     
                     @if($weekData && $weekData['has_data'] && $summary)
                         @php
@@ -422,25 +468,16 @@
                                                     ->unique()
                                                     ->filter();
                                                 
-                                                // Jeśli są pracownicy przypisani do auta, sprawdź ich projekty
+                                                // Jeśli są pracownicy przypisani do auta, sprawdź ich projekty (używamy pre-loaded danych)
                                                 $otherProjects = collect();
                                                 if ($vehicleEmployeeIds->isNotEmpty()) {
-                                                    $weekStart = $weeks[0]['start'] ?? now()->startOfWeek();
-                                                    $weekEnd = $weeks[0]['end'] ?? now()->endOfWeek();
-                                                    
-                                                    // Pobierz project assignments dla tych pracowników w tym okresie
-                                                    $projectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $vehicleEmployeeIds)
-                                                        ->where(function($query) use ($weekStart, $weekEnd) {
-                                                            $query->where(function($q) use ($weekStart, $weekEnd) {
-                                                                $q->where('start_date', '<=', $weekEnd)
-                                                                  ->where(function($q2) use ($weekStart) {
-                                                                      $q2->whereNull('end_date')
-                                                                         ->orWhere('end_date', '>=', $weekStart);
-                                                                  });
-                                                            });
-                                                        })
-                                                        ->with('project')
-                                                        ->get();
+                                                    // Użyj pre-loaded project assignments zamiast nowego zapytania
+                                                    $projectAssignments = collect();
+                                                    foreach ($vehicleEmployeeIds as $employeeId) {
+                                                        if ($preloadedProjectAssignments->has($employeeId)) {
+                                                            $projectAssignments = $projectAssignments->merge($preloadedProjectAssignments->get($employeeId));
+                                                        }
+                                                    }
                                                     
                                                     // Zbierz unikalne projekty (oprócz aktualnego)
                                                     $otherProjects = $projectAssignments
@@ -458,11 +495,9 @@
                                                     <span class="text-muted fw-semibold">Obsługuje również:</span>
                                                     <div class="mt-1">
                                                         @foreach($otherProjects as $otherProject)
-                                                            <a href="{{ route('projects.show', $otherProject) }}" class="text-decoration-none d-inline-block me-2 mb-1">
-                                                                <x-ui.badge variant="info" class="small">
-                                                                    {{ $otherProject->name }}
-                                                                </x-ui.badge>
-                                                            </a>
+                                                            <x-ui.clickable-badge variant="info" route="projects.show" :routeParams="['project' => $otherProject]" class="small me-2 mb-1">
+                                                                {{ $otherProject->name }}
+                                                            </x-ui.clickable-badge>
                                                         @endforeach
                                                     </div>
                                                 </div>
@@ -564,25 +599,16 @@
                                                     ->unique()
                                                     ->filter();
                                                 
-                                                // Jeśli są pracownicy przypisani do domu, sprawdź ich projekty
+                                                // Jeśli są pracownicy przypisani do domu, sprawdź ich projekty (używamy pre-loaded danych)
                                                 $otherProjects = collect();
                                                 if ($accommodationEmployeeIds->isNotEmpty()) {
-                                                    $weekStart = $weeks[0]['start'] ?? now()->startOfWeek();
-                                                    $weekEnd = $weeks[0]['end'] ?? now()->endOfWeek();
-                                                    
-                                                    // Pobierz project assignments dla tych pracowników w tym okresie
-                                                    $projectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $accommodationEmployeeIds)
-                                                        ->where(function($query) use ($weekStart, $weekEnd) {
-                                                            $query->where(function($q) use ($weekStart, $weekEnd) {
-                                                                $q->where('start_date', '<=', $weekEnd)
-                                                                  ->where(function($q2) use ($weekStart) {
-                                                                      $q2->whereNull('end_date')
-                                                                         ->orWhere('end_date', '>=', $weekStart);
-                                                                  });
-                                                            });
-                                                        })
-                                                        ->with('project')
-                                                        ->get();
+                                                    // Użyj pre-loaded project assignments zamiast nowego zapytania
+                                                    $projectAssignments = collect();
+                                                    foreach ($accommodationEmployeeIds as $employeeId) {
+                                                        if ($preloadedProjectAssignments->has($employeeId)) {
+                                                            $projectAssignments = $projectAssignments->merge($preloadedProjectAssignments->get($employeeId));
+                                                        }
+                                                    }
                                                     
                                                     // Zbierz unikalne projekty (oprócz aktualnego)
                                                     $otherProjects = $projectAssignments
@@ -600,11 +626,9 @@
                                                     <span class="text-muted fw-semibold">Obsługuje również:</span>
                                                     <div class="mt-1">
                                                         @foreach($otherProjects as $otherProject)
-                                                            <a href="{{ route('projects.show', $otherProject) }}" class="text-decoration-none d-inline-block me-2 mb-1">
-                                                                <x-ui.badge variant="info" class="small">
-                                                                    {{ $otherProject->name }}
-                                                                </x-ui.badge>
-                                                            </a>
+                                                            <x-ui.clickable-badge variant="info" route="projects.show" :routeParams="['project' => $otherProject]" class="small me-2 mb-1">
+                                                                {{ $otherProject->name }}
+                                                            </x-ui.clickable-badge>
                                                         @endforeach
                                                     </div>
                                                 </div>
@@ -660,9 +684,9 @@
                                                         <i class="bi bi-arrow-left-right"></i> Zmienna
                                                     </x-ui.badge>
                                                 @elseif(isset($employeeData['assignment']))
-                                                    <a href="{{ route('assignments.show', $employeeData['assignment']) }}" class="text-decoration-none">
-                                                        <x-ui.badge variant="accent">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
-                                                    </a>
+                                                    <x-ui.clickable-badge variant="accent" route="assignments.show" :routeParams="['project_assignment' => $employeeData['assignment']]">
+                                                        {{ $employeeData['role']->name ?? '-' }}
+                                                    </x-ui.clickable-badge>
                                                 @else
                                                     <x-ui.badge variant="info">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
                                                 @endif
@@ -673,37 +697,29 @@
                                             <td>
                                                 @if($employeeData['has_vehicle_in_week'] ?? false)
                                                     @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
-                                                        <a href="{{ route('vehicle-assignments.show', $employeeData['vehicle_assignment']) }}" class="text-decoration-none">
-                                                            <x-ui.badge variant="success" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
-                                                                <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
-                                                            </x-ui.badge>
-                                                        </a>
+                                                        <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
+                                                            <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
+                                                        </x-ui.clickable-badge>
                                                     @else
                                                         <x-ui.badge variant="success">
                                                             <i class="bi bi-car-front"></i> Tak
                                                         </x-ui.badge>
                                                     @endif
                                                 @else
-                                                    <a href="{{ route('employees.vehicles.create', ['employee' => $employeeData['employee'], 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" class="text-decoration-none">
-                                                        <x-ui.badge variant="danger">
-                                                            <i class="bi bi-x-circle"></i> Brak
-                                                        </x-ui.badge>
-                                                    </a>
+                                                    <x-ui.clickable-badge variant="danger" route="vehicle-assignments.create" :routeParams="['employee_id' => $employeeData['employee']->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]">
+                                                        <i class="bi bi-x-circle"></i> Brak
+                                                    </x-ui.clickable-badge>
                                                 @endif
                                             </td>
                                             <td>
                                                 @if(isset($employeeData['accommodation']) && $employeeData['accommodation'])
-                                                    <a href="{{ route('accommodations.show', $employeeData['accommodation']) }}" class="text-decoration-none">
-                                                        <x-ui.badge variant="info">
-                                                            <i class="bi bi-house"></i> {{ $employeeData['accommodation']->name }}
-                                                        </x-ui.badge>
-                                                    </a>
+                                                    <x-ui.clickable-badge variant="info" route="accommodations.show" :routeParams="['accommodation' => $employeeData['accommodation']]">
+                                                        <i class="bi bi-house"></i> {{ $employeeData['accommodation']->name }}
+                                                    </x-ui.clickable-badge>
                                                 @else
-                                                    <a href="{{ route('employees.accommodations.create', ['employee' => $employeeData['employee'], 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" class="text-decoration-none">
-                                                        <x-ui.badge variant="danger">
-                                                            <i class="bi bi-x-circle"></i> Brak
-                                                        </x-ui.badge>
-                                                    </a>
+                                                    <x-ui.clickable-badge variant="danger" route="accommodation-assignments.create" :routeParams="['employee_id' => $employeeData['employee']->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]">
+                                                        <i class="bi bi-x-circle"></i> Brak
+                                                    </x-ui.clickable-badge>
                                                 @endif
                                             </td>
                                             <td>
@@ -714,16 +730,14 @@
                                                         $endDate = $employeeData['rotation']['end_date'] ?? ($employeeData['rotation']->end_date ?? null);
                                                     @endphp
                                                     @if($rotation)
-                                                        <a href="{{ route('employees.rotations.edit', [$employeeData['employee'], $rotation]) }}" class="text-decoration-none">
-                                                            <x-ui.badge variant="warning">
-                                                                <i class="bi bi-arrow-repeat"></i> 
-                                                                @if($startDate && $endDate)
-                                                                    {{ \Carbon\Carbon::parse($startDate)->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
-                                                                @elseif($endDate)
-                                                                    {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
-                                                                @endif
-                                                            </x-ui.badge>
-                                                        </a>
+                                                        <x-ui.clickable-badge variant="warning" route="employees.rotations.edit" :routeParams="['employee' => $employeeData['employee'], 'rotation' => $rotation]">
+                                                            <i class="bi bi-arrow-repeat"></i> 
+                                                            @if($startDate && $endDate)
+                                                                {{ \Carbon\Carbon::parse($startDate)->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                            @elseif($endDate)
+                                                                {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                            @endif
+                                                        </x-ui.clickable-badge>
                                                     @else
                                                         <x-ui.badge variant="warning">
                                                             <i class="bi bi-arrow-repeat"></i> 
@@ -765,7 +779,7 @@
                 @endphp
                 <div class="mt-4">
                     <x-ui.table-header title="Zadania projektu" titleClass="text-dark">
-                        <x-ui.button variant="primary" href="{{ route('projects.show.tasks', $projectData['project']) }}" action="create" class="btn-sm">
+                        <x-ui.button variant="primary" href="{{ route('projects.show', $projectData['project']) }}#tasks" action="create" class="btn-sm">
                             Dodaj zadanie
                         </x-ui.button>
                     </x-ui.table-header>
@@ -993,14 +1007,14 @@
                                         <x-ui.button 
                                             variant="success" 
                                             size="sm"
-                                            href="{{ route('employees.accommodations.create', ['employee' => $employee, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}"
+                                            href="{{ route('accommodation-assignments.create', ['employee_id' => $employee->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}"
                                         >
                                             <i class="bi bi-house"></i> Dom
                                         </x-ui.button>
                                         <x-ui.button 
                                             variant="info" 
                                             size="sm"
-                                            href="{{ route('employees.vehicles.create', ['employee' => $employee, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}"
+                                            href="{{ route('vehicle-assignments.create', ['employee_id' => $employee->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}"
                                         >
                                             <i class="bi bi-car-front"></i> Auto
                                         </x-ui.button>

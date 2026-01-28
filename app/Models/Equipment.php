@@ -21,6 +21,7 @@ class Equipment extends Model
         'min_quantity',
         'unit',
         'unit_cost',
+        'returnable',
         'notes',
     ];
 
@@ -28,6 +29,7 @@ class Equipment extends Model
         'quantity_in_stock' => 'integer',
         'min_quantity' => 'integer',
         'unit_cost' => 'decimal:2',
+        'returnable' => 'boolean',
     ];
 
     /**

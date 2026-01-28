@@ -1,47 +1,100 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Zwróć Sprzęt: {{ $equipmentIssue->equipment->name }}
-        </h2>
+        <x-ui.page-header title="Zwróć/Zgłoś Sprzęt: {{ $equipmentIssue->equipment->name }}">
+            <x-slot name="left">
+                <x-ui.button 
+                    variant="ghost" 
+                    href="{{ route('equipment-issues.show', $equipmentIssue) }}"
+                    action="back"
+                >
+                    Powrót
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <div class="mb-4">
-                    <p class="text-sm text-gray-600">
-                        <strong>Pracownik:</strong> {{ $equipmentIssue->employee->full_name }}<br>
-                        <strong>Wydano:</strong> {{ $equipmentIssue->issue_date->format('Y-m-d') }}<br>
-                        <strong>Ilość:</strong> {{ $equipmentIssue->quantity_issued }} {{ $equipmentIssue->equipment->unit }}
-                    </p>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <x-ui.card label="Informacje o wydaniu">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Pracownik</h6>
+                        <p class="fw-semibold mb-0">{{ $equipmentIssue->employee->full_name }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Data wydania</h6>
+                        <p class="fw-semibold mb-0">{{ $equipmentIssue->issue_date->format('Y-m-d') }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Ilość</h6>
+                        <p class="fw-semibold mb-0">{{ $equipmentIssue->quantity_issued }} {{ $equipmentIssue->equipment->unit }}</p>
+                    </div>
                 </div>
+            </x-ui.card>
+
+            <x-ui.card label="Zwróć/Zgłoś sprzęt">
+                <x-ui.errors />
 
                 <form method="POST" action="{{ route('equipment-issues.return.store', $equipmentIssue) }}">
                     @csrf
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Data zwrotu *</label>
-                        <input type="date" name="return_date" value="{{ old('return_date', date('Y-m-d')) }}" required
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Status <span class="text-danger">*</span>
+                        </label>
+                        <select 
+                            name="status" 
+                            class="form-control @error('status') is-invalid @enderror"
+                            required
+                        >
+                            <option value="returned" {{ old('status', 'returned') === 'returned' ? 'selected' : '' }}>Zwrócony</option>
+                            <option value="damaged" {{ old('status') === 'damaged' ? 'selected' : '' }}>Uszkodzony</option>
+                            <option value="lost" {{ old('status') === 'lost' ? 'selected' : '' }}>Zgubiony</option>
+                        </select>
+                        @error('status')
+                            <span class="invalid-feedback">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="date" 
+                            name="return_date" 
+                            label="Data zwrotu/zgłoszenia *"
+                            value="{{ old('return_date', date('Y-m-d')) }}"
                             min="{{ $equipmentIssue->issue_date->format('Y-m-d') }}"
-                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">
-                        @error('return_date') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                            required="true"
+                        />
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Notatki</label>
-                        <textarea name="notes" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700">{{ old('notes', $equipmentIssue->notes) }}</textarea>
+                        <x-ui.input 
+                            type="textarea" 
+                            name="notes" 
+                            label="Notatki"
+                            value="{{ old('notes', $equipmentIssue->notes) }}"
+                            rows="3"
+                        />
                     </div>
 
-                    <div class="flex items-center justify-end">
-                        <a href="{{ route('equipment-issues.show', $equipmentIssue) }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mr-3">
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('equipment-issues.show', $equipmentIssue) }}"
+                            action="cancel"
+                        >
                             Anuluj
-                        </a>
-                        <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                            Zwróć Sprzęt
-                        </button>
+                        </x-ui.button>
+                        <x-ui.button 
+                            variant="success" 
+                            type="submit"
+                            action="save"
+                        >
+                            Zatwierdź
+                        </x-ui.button>
                     </div>
                 </form>
-            </div>
+            </x-ui.card>
         </div>
     </div>
 </x-app-layout>

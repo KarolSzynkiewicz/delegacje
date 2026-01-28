@@ -22,19 +22,19 @@ class EmployeeTabs extends Component
 
     protected function buildAvailableTabs()
     {
-        // Definicja wszystkich możliwych tabów z przypisanym permission
+        // Definicja wszystkich możliwych tabów z przypisanym permission i ikonami
         $allTabs = [
-            'info' => ['label' => 'Informacje', 'permission' => null],
-            'documents' => ['label' => 'Dokumenty', 'permission' => 'employee-documents.view'],
-            'rotations' => ['label' => 'Rotacje', 'permission' => 'rotations.view'],
-            'assignments' => ['label' => 'Przypisania do projektów', 'permission' => 'assignments.view'],
-            'vehicle-assignments' => ['label' => 'Przypisania do aut', 'permission' => 'vehicle-assignments.view'],
-            'accommodation-assignments' => ['label' => 'Przypisania do domów', 'permission' => 'accommodation-assignments.view'],
-            'payrolls' => ['label' => 'Płace', 'permission' => 'payrolls.view'],
-            'employee-rates' => ['label' => 'Stawki', 'permission' => 'employee-rates.view'],
-            'advances' => ['label' => 'Zaliczki', 'permission' => 'advances.view'],
-            'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view'],
-            'adjustments' => ['label' => 'Kary i nagrody', 'permission' => 'adjustments.view'],
+            'info' => ['label' => 'Informacje', 'permission' => null, 'icon' => 'bi bi-info-circle'],
+            'documents' => ['label' => 'Dokumenty', 'permission' => 'employee-documents.view', 'icon' => 'bi bi-file-earmark-medical'],
+            'rotations' => ['label' => 'Rotacje', 'permission' => 'rotations.view', 'icon' => 'bi bi-arrow-repeat'],
+            'assignments' => ['label' => 'Przypisania do projektów', 'permission' => 'assignments.view', 'icon' => 'bi bi-person-check'],
+            'vehicle-assignments' => ['label' => 'Przypisania do aut', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
+            'accommodation-assignments' => ['label' => 'Przypisania do domów', 'permission' => 'accommodation-assignments.view', 'icon' => 'bi bi-house-fill'],
+            'payrolls' => ['label' => 'Płace', 'permission' => 'payrolls.view', 'icon' => 'bi bi-cash-stack'],
+            'employee-rates' => ['label' => 'Stawki', 'permission' => 'employee-rates.view', 'icon' => 'bi bi-currency-dollar'],
+            'advances' => ['label' => 'Zaliczki', 'permission' => 'advances.view', 'icon' => 'bi bi-wallet2'],
+            'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
+            'adjustments' => ['label' => 'Kary i nagrody', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp
@@ -110,6 +110,31 @@ class EmployeeTabs extends Component
             $query->where('employee_id', $this->employee->id);
         })->count();
         
-        return view('livewire.employee-tabs', compact('tabData', 'employeeRatesCount', 'timeLogsCount'));
+        // Przygotuj taby dla komponentu
+        $tabsForComponent = [];
+        foreach ($this->availableTabs as $tabKey => $tab) {
+            $count = match($tabKey) {
+                'documents' => $this->employee->employee_documents_count ?? 0,
+                'rotations' => $this->employee->rotations_count ?? 0,
+                'assignments' => $this->employee->assignments_count ?? 0,
+                'vehicle-assignments' => $this->employee->vehicle_assignments_count ?? 0,
+                'accommodation-assignments' => $this->employee->accommodation_assignments_count ?? 0,
+                'payrolls' => $this->employee->payrolls_count ?? 0,
+                'employee-rates' => $employeeRatesCount,
+                'advances' => $this->employee->advances_count ?? 0,
+                'time-logs' => $timeLogsCount,
+                'adjustments' => $this->employee->adjustments_count ?? 0,
+                default => null,
+            };
+            
+            $tabsForComponent[$tabKey] = [
+                'label' => $tab['label'],
+                'icon' => $tab['icon'] ?? null,
+                'count' => $count,
+                'wireClick' => "setTab('{$tabKey}')",
+            ];
+        }
+        
+        return view('livewire.employee-tabs', compact('tabData', 'employeeRatesCount', 'timeLogsCount', 'tabsForComponent'));
     }
 }

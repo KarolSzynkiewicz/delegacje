@@ -167,10 +167,10 @@ class ReturnTripController extends Controller
         }
 
         try {
-            $preparation = unserialize($preparationSerialized);
-
             // Get existing event if editing
             $existingEvent = null;
+            $preparation = null;
+            
             if (isset($validated['return_trip_id'])) {
                 $existingEvent = LogisticsEvent::findOrFail($validated['return_trip_id']);
                 
@@ -181,9 +181,24 @@ class ReturnTripController extends Controller
                         ->with('error', 'Nie można edytować anulowanych zjazdów.');
                 }
                 
+                // Get preparation data from session before reversing
+                // We need employee_ids, return_date, and vehicle_id from the original preparation
+                $originalPreparation = unserialize($preparationSerialized);
+                
                 // Reverse previous return trip changes (restore original end dates)
-                // This must be done BEFORE commitZjazd() to restore the state before applying new changes
+                // This must be done BEFORE preparing new zjazd to restore the state
                 $this->returnTripService->reverseZjazd($existingEvent);
+                
+                // Re-prepare the return trip with restored assignments
+                // This is necessary because the original preparation was done on already-shortened assignments
+                $employeeIds = $originalPreparation->employeeIds;
+                $returnDate = $originalPreparation->returnDate;
+                $returnVehicle = $originalPreparation->returnVehicle;
+                
+                $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
+            } else {
+                // For new return trips, use preparation from session
+                $preparation = unserialize($preparationSerialized);
             }
 
             // Commit the return trip (create or update)

@@ -42,9 +42,16 @@ class CheckResourcePermission
         // Get permission for route using RoutePermissionService
         $permissionName = $this->routePermissionService->getPermissionForRouteObject($route);
 
-        // If we can't determine permission, fail fast
+        // If we can't determine permission, check if route is excluded
         if (!$permissionName) {
             $routeName = $route->getName();
+            
+            // If route is excluded from permission checking, allow access
+            if ($this->routePermissionService->isExcluded($routeName)) {
+                return $next($request);
+            }
+            
+            // Route is not excluded but has no permission - this is an error
             if (app()->environment('local', 'testing')) {
                 throw new \Exception("Cannot determine permission for route: {$routeName}. Route must have permission_type and resource in defaults.");
             }

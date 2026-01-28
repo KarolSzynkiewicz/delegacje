@@ -40,7 +40,15 @@ class WeeklyOverviewService
      */
     public function getProjectsWithWeeklyData(array $weeks): array
     {
-        $projects = Project::with(['location', 'demands.role', 'assignments.employee', 'assignments.role'])->get();
+        // Eager load all necessary relationships to avoid N+1 queries
+        $projects = Project::with([
+            'location', 
+            'demands.role', 
+            'assignments.employee.roles', 
+            'assignments.role',
+            'tasks.assignedTo',
+            'tasks.createdBy'
+        ])->get();
         
         return $projects->map(function ($project) use ($weeks) {
             $weeksData = [];
@@ -80,8 +88,8 @@ class WeeklyOverviewService
         // Get assigned employees with their details
         $assignedEmployees = $this->getAssignedEmployeesDetails($assignments, $weekStart, $weekEnd);
         
-        // Get project tasks
-        $tasks = $project->tasks()->with(['assignedTo', 'createdBy'])->get();
+        // Get project tasks (already eager loaded in getProjectsWithWeeklyData)
+        $tasks = $project->tasks;
         
         return [
             'week' => $week,
@@ -675,22 +683,153 @@ class WeeklyOverviewService
             }
         }
         
-        // For each employee, get daily data
-        $employees = $employeeIds->map(function ($employeeId) use ($assignments, $days, $weekStart, $weekEnd, $returnTripsByEmployeeAndDate, $employeeIds) {
-            $employee = \App\Models\Employee::find($employeeId);
+        // EAGER LOAD: Load all employees at once
+        $employeesCollection = \App\Models\Employee::whereIn('id', $employeeIds)
+            ->with('roles')
+            ->get()
+            ->keyBy('id');
+        
+        // EAGER LOAD: Get all accommodation assignments for all employees in the week (single query)
+        $allAccommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
+            ->where(function($query) use ($weekStart, $weekEnd) {
+                $query->where(function($q) use ($weekStart, $weekEnd) {
+                    $q->where('start_date', '<=', $weekEnd)
+                      ->where(function($q2) use ($weekStart) {
+                          $q2->whereNull('end_date')
+                             ->orWhere('end_date', '>=', $weekStart);
+                      });
+                });
+            })
+            ->with('accommodation')
+            ->get();
+        
+        // EAGER LOAD: Get all vehicle assignments for all employees in the week (single query, exclude return trips)
+        $allVehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
+            ->where('is_return_trip', false)
+            ->where(function($query) use ($weekStart, $weekEnd) {
+                $query->where(function($q) use ($weekStart, $weekEnd) {
+                    $q->where('start_date', '<=', $weekEnd)
+                      ->where(function($q2) use ($weekStart) {
+                          $q2->whereNull('end_date')
+                             ->orWhere('end_date', '>=', $weekStart);
+                      });
+                });
+            })
+            ->with('vehicle')
+            ->get();
+        
+        // EAGER LOAD: Get all accommodation IDs used in this week
+        $accommodationIds = $allAccommodationAssignments->pluck('accommodation_id')->unique()->filter();
+        
+        // EAGER LOAD: Get all vehicle IDs used in this week
+        $vehicleIds = $allVehicleAssignments->pluck('vehicle_id')->unique()->filter();
+        
+        // EAGER LOAD: Pre-calculate occupancy for all accommodations for all days (batch query)
+        $accommodationOccupancyMap = [];
+        if ($accommodationIds->isNotEmpty()) {
+            foreach ($days as $day) {
+                $dayDate = $day['date']->copy()->startOfDay();
+                $occupancyCounts = AccommodationAssignment::whereIn('accommodation_id', $accommodationIds)
+                    ->where(function($query) use ($dayDate) {
+                        $query->where('start_date', '<=', $dayDate)
+                              ->where(function($q2) use ($dayDate) {
+                                  $q2->whereNull('end_date')
+                                     ->orWhere('end_date', '>=', $dayDate);
+                              });
+                    })
+                    ->selectRaw('accommodation_id, COUNT(*) as count')
+                    ->groupBy('accommodation_id')
+                    ->pluck('count', 'accommodation_id')
+                    ->toArray();
+                
+                foreach ($occupancyCounts as $accId => $count) {
+                    $accommodationOccupancyMap[$day['date']->format('Y-m-d')][$accId] = $count;
+                }
+            }
+        }
+        
+        // EAGER LOAD: Pre-calculate occupancy for all vehicles for all days (batch query)
+        $vehicleOccupancyMap = [];
+        if ($vehicleIds->isNotEmpty()) {
+            foreach ($days as $day) {
+                $dayDate = $day['date']->copy()->startOfDay();
+                $occupancyCounts = VehicleAssignment::whereIn('vehicle_id', $vehicleIds)
+                    ->where('is_return_trip', false)
+                    ->where(function($query) use ($dayDate) {
+                        $query->where('start_date', '<=', $dayDate)
+                              ->where(function($q2) use ($dayDate) {
+                                  $q2->whereNull('end_date')
+                                     ->orWhere('end_date', '>=', $dayDate);
+                              });
+                    })
+                    ->selectRaw('vehicle_id, COUNT(*) as count')
+                    ->groupBy('vehicle_id')
+                    ->pluck('count', 'vehicle_id')
+                    ->toArray();
+                
+                foreach ($occupancyCounts as $vehId => $count) {
+                    $vehicleOccupancyMap[$day['date']->format('Y-m-d')][$vehId] = $count;
+                }
+            }
+        }
+        
+        // Group assignments by employee_id and date for quick lookup
+        $accommodationAssignmentsByEmployeeAndDate = collect();
+        foreach ($allAccommodationAssignments as $assignment) {
+            $employeeId = $assignment->employee_id;
+            $startDate = $assignment->start_date->copy()->startOfDay();
+            $endDate = $assignment->end_date ? $assignment->end_date->copy()->startOfDay() : $weekEnd->copy()->endOfDay();
+            
+            foreach ($days as $day) {
+                $dayDate = $day['date']->copy()->startOfDay();
+                if ($dayDate->gte($startDate) && $dayDate->lte($endDate)) {
+                    $dayKey = $dayDate->format('Y-m-d');
+                    if (!$accommodationAssignmentsByEmployeeAndDate->has($employeeId)) {
+                        $accommodationAssignmentsByEmployeeAndDate->put($employeeId, collect());
+                    }
+                    if (!$accommodationAssignmentsByEmployeeAndDate->get($employeeId)->has($dayKey)) {
+                        $accommodationAssignmentsByEmployeeAndDate->get($employeeId)->put($dayKey, $assignment);
+                    }
+                }
+            }
+        }
+        
+        $vehicleAssignmentsByEmployeeAndDate = collect();
+        foreach ($allVehicleAssignments as $assignment) {
+            $employeeId = $assignment->employee_id;
+            $startDate = $assignment->start_date->copy()->startOfDay();
+            $endDate = $assignment->end_date ? $assignment->end_date->copy()->startOfDay() : $weekEnd->copy()->endOfDay();
+            
+            foreach ($days as $day) {
+                $dayDate = $day['date']->copy()->startOfDay();
+                if ($dayDate->gte($startDate) && $dayDate->lte($endDate)) {
+                    $dayKey = $dayDate->format('Y-m-d');
+                    if (!$vehicleAssignmentsByEmployeeAndDate->has($employeeId)) {
+                        $vehicleAssignmentsByEmployeeAndDate->put($employeeId, collect());
+                    }
+                    if (!$vehicleAssignmentsByEmployeeAndDate->get($employeeId)->has($dayKey)) {
+                        $vehicleAssignmentsByEmployeeAndDate->get($employeeId)->put($dayKey, $assignment);
+                    }
+                }
+            }
+        }
+        
+        // For each employee, get daily data (using pre-loaded data)
+        $employees = $employeeIds->map(function ($employeeId) use ($assignments, $days, $weekStart, $weekEnd, $returnTripsByEmployeeAndDate, $employeesCollection, $accommodationAssignmentsByEmployeeAndDate, $vehicleAssignmentsByEmployeeAndDate, $accommodationOccupancyMap, $vehicleOccupancyMap) {
+            $employee = $employeesCollection->get($employeeId);
             if (!$employee) {
                 return null;
             }
             
             // Get daily data for each day
-            $dailyData = $days->map(function ($day) use ($employee, $assignments, $weekStart, $weekEnd, $returnTripsByEmployeeAndDate, $employeeIds) {
+            $dailyData = $days->map(function ($day) use ($employee, $assignments, $returnTripsByEmployeeAndDate, $accommodationAssignmentsByEmployeeAndDate, $vehicleAssignmentsByEmployeeAndDate, $accommodationOccupancyMap, $vehicleOccupancyMap) {
                 $dayDate = $day['date']->copy()->startOfDay();
                 $dayDateString = $dayDate->format('Y-m-d');
                 
                 // Check if this is a return trip day for this employee
                 $returnTrip = $returnTripsByEmployeeAndDate->get($employee->id)?->get($dayDateString);
                 
-                // Get project assignment for this employee for THIS SPECIFIC DAY
+                // Get project assignment for this employee for THIS SPECIFIC DAY (from pre-loaded assignments)
                 $projectAssignment = $assignments->first(function ($assignment) use ($employee, $dayDate) {
                     if ($assignment->employee_id !== $employee->id) {
                         return false;
@@ -702,42 +841,24 @@ class WeeklyOverviewService
                            ($assignmentEnd === null || $assignmentEnd->gte($dayDate));
                 });
                 
-                // Get accommodation for this day
-                // Use activeAtDate() instead of active() to check the specific day, not today
-                $accommodationAssignment = AccommodationAssignment::where('employee_id', $employee->id)
-                    ->activeAtDate($dayDate)
-                    ->with('accommodation')
-                    ->first();
-                
+                // Get accommodation for this day (from pre-loaded data)
+                $accommodationAssignment = $accommodationAssignmentsByEmployeeAndDate->get($employee->id)?->get($dayDateString);
                 $accommodation = $accommodationAssignment?->accommodation;
                 
-                // Count how many people are in this accommodation on this day
-                // Use activeAtDate() instead of active() to check the specific day, not today
+                // Get occupancy from pre-calculated map
                 $accommodationOccupancy = 0;
                 if ($accommodation) {
-                    $accommodationOccupancy = AccommodationAssignment::where('accommodation_id', $accommodation->id)
-                        ->activeAtDate($dayDate)
-                        ->count();
+                    $accommodationOccupancy = $accommodationOccupancyMap[$dayDateString][$accommodation->id] ?? 0;
                 }
                 
-                // Get vehicle for this day (exclude return trip assignments)
-                // Use activeAtDate() instead of active() to check the specific day, not today
-                $vehicleAssignment = VehicleAssignment::where('employee_id', $employee->id)
-                    ->where('is_return_trip', false)
-                    ->activeAtDate($dayDate)
-                    ->with('vehicle')
-                    ->first();
-                
+                // Get vehicle for this day (from pre-loaded data)
+                $vehicleAssignment = $vehicleAssignmentsByEmployeeAndDate->get($employee->id)?->get($dayDateString);
                 $vehicle = $vehicleAssignment?->vehicle;
                 
-                // Count how many people are in this vehicle on this day
-                // Use activeAtDate() instead of active() to check the specific day, not today
+                // Get occupancy from pre-calculated map
                 $vehicleOccupancy = 0;
                 if ($vehicle) {
-                    $vehicleOccupancy = VehicleAssignment::where('vehicle_id', $vehicle->id)
-                        ->where('is_return_trip', false)
-                        ->activeAtDate($dayDate)
-                        ->count();
+                    $vehicleOccupancy = $vehicleOccupancyMap[$dayDateString][$vehicle->id] ?? 0;
                 }
                 
                 // Check if employee has ANY assignment on this day (project, vehicle, or accommodation)
@@ -834,25 +955,34 @@ class WeeklyOverviewService
             return collect();
         }
         
+        // EAGER LOAD: Get all vehicle assignments for all employees at once
+        $employeeIdsWithoutProject = $employeesWithoutProject->toArray();
+        
         // Load employees with their assignments and roles
-        $employees = \App\Models\Employee::whereIn('id', $employeesWithoutProject)
+        $employees = \App\Models\Employee::whereIn('id', $employeeIdsWithoutProject)
             ->with('roles')
             ->get();
+        $allVehicleAssignmentsForResources = VehicleAssignment::whereIn('employee_id', $employeeIdsWithoutProject)
+            ->where('is_return_trip', false)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with('vehicle')
+            ->get()
+            ->groupBy('employee_id');
         
-        // Map to include resource info
-        return $employees->map(function($employee) use ($weekStart, $weekEnd) {
-            // Get vehicle assignments for this employee in this week
-            $vehicleAssignments = VehicleAssignment::where('employee_id', $employee->id)
-                ->where('is_return_trip', false)
-                ->overlappingWith($weekStart, $weekEnd)
-                ->with('vehicle')
-                ->get();
+        // EAGER LOAD: Get all accommodation assignments for all employees at once
+        $allAccommodationAssignmentsForResources = AccommodationAssignment::whereIn('employee_id', $employeeIdsWithoutProject)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with('accommodation')
+            ->get()
+            ->groupBy('employee_id');
+        
+        // Map to include resource info (using pre-loaded data)
+        return $employees->map(function($employee) use ($allVehicleAssignmentsForResources, $allAccommodationAssignmentsForResources) {
+            // Get vehicle assignments from pre-loaded data
+            $vehicleAssignments = $allVehicleAssignmentsForResources->get($employee->id) ?? collect();
             
-            // Get accommodation assignments for this employee in this week
-            $accommodationAssignments = AccommodationAssignment::where('employee_id', $employee->id)
-                ->overlappingWith($weekStart, $weekEnd)
-                ->with('accommodation')
-                ->get();
+            // Get accommodation assignments from pre-loaded data
+            $accommodationAssignments = $allAccommodationAssignmentsForResources->get($employee->id) ?? collect();
             
             $vehicles = $vehicleAssignments->pluck('vehicle')->filter()->unique('id');
             $accommodations = $accommodationAssignments->pluck('accommodation')->filter()->unique('id');

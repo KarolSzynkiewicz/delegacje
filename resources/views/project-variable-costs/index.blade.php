@@ -54,9 +54,9 @@
 
                     @if($costs->hasPages())
                         <div class="mt-3">
-                            {{ $costs->links() }}
+                            <x-ui.pagination :paginator="$costs" />
                         </div>
-            @endif
+                    @endif
         @else
             <x-ui.empty-state 
                 icon="folder-x"

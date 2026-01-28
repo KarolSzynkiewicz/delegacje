@@ -39,7 +39,10 @@ class WeeklyStabilityService
         Employee $employee,
         Project $project,
         Carbon $weekStart,
-        Carbon $weekEnd
+        Carbon $weekEnd,
+        ?Collection $preloadedVehicleAssignments = null,
+        ?Collection $preloadedAccommodationAssignments = null,
+        ?Collection $preloadedProjectAssignments = null
     ): array {
         $days = $this->getDaysInWeek($weekStart, $weekEnd);
         $dailyDetails = [];
@@ -50,7 +53,7 @@ class WeeklyStabilityService
         $daysAssigned = 0;
         
         foreach ($days as $day) {
-            $dayData = $this->getDayData($employee, $project, $day);
+            $dayData = $this->getDayData($employee, $project, $day, $preloadedVehicleAssignments, $preloadedAccommodationAssignments, $preloadedProjectAssignments);
             $dailyDetails[] = $dayData;
             
             if ($dayData['is_assigned']) {
@@ -106,20 +109,39 @@ class WeeklyStabilityService
     
     /**
      * Get data for a specific day.
+     * OPTIMIZED: Uses pre-loaded assignments to avoid N+1 queries.
      */
-    protected function getDayData(Employee $employee, Project $project, Carbon $day): array
-    {
-        // Check project assignment
-        $projectAssignment = ProjectAssignment::where('employee_id', $employee->id)
-            ->where('project_id', $project->id)
-            ->where('start_date', '<=', $day)
-            ->where(function ($q) use ($day) {
-                $q->where('end_date', '>=', $day)
-                  ->orWhereNull('end_date');
-            })
-            ->active()
-            ->with('role')
-            ->first();
+    protected function getDayData(
+        Employee $employee, 
+        Project $project, 
+        Carbon $day,
+        ?Collection $preloadedVehicleAssignments = null,
+        ?Collection $preloadedAccommodationAssignments = null,
+        ?Collection $preloadedProjectAssignments = null
+    ): array {
+        // Check project assignment (from pre-loaded assignments if available)
+        $projectAssignment = null;
+        if ($preloadedProjectAssignments) {
+            $projectAssignment = $preloadedProjectAssignments->first(function($assignment) use ($employee, $project, $day) {
+                return $assignment->employee_id === $employee->id
+                    && $assignment->project_id === $project->id
+                    && $assignment->start_date->lte($day)
+                    && ($assignment->end_date === null || $assignment->end_date->gte($day))
+                    && $assignment->is_cancelled === false;
+            });
+        } else {
+            // Fallback to query if pre-loaded data not available
+            $projectAssignment = ProjectAssignment::where('employee_id', $employee->id)
+                ->where('project_id', $project->id)
+                ->where('start_date', '<=', $day)
+                ->where(function ($q) use ($day) {
+                    $q->where('end_date', '>=', $day)
+                      ->orWhereNull('end_date');
+                })
+                ->active()
+                ->with('role')
+                ->first();
+        }
         
         if (!$projectAssignment) {
             return [
@@ -131,28 +153,48 @@ class WeeklyStabilityService
             ];
         }
         
-        // Get vehicle
-        $vehicleAssignment = VehicleAssignment::where('employee_id', $employee->id)
-            ->where('is_return_trip', false)
-            ->where('start_date', '<=', $day)
-            ->where(function ($q) use ($day) {
-                $q->where('end_date', '>=', $day)
-                  ->orWhereNull('end_date');
-            })
-            ->active()
-            ->with('vehicle')
-            ->first();
+        // Get vehicle from pre-loaded data if available
+        $vehicleAssignment = null;
+        if ($preloadedVehicleAssignments) {
+            $vehicleAssignment = $preloadedVehicleAssignments->first(function($assignment) use ($employee, $day) {
+                return $assignment->employee_id === $employee->id
+                    && $assignment->start_date->lte($day)
+                    && ($assignment->end_date === null || $assignment->end_date->gte($day));
+            });
+        } else {
+            // Fallback to query if pre-loaded data not available
+            $vehicleAssignment = VehicleAssignment::where('employee_id', $employee->id)
+                ->where('is_return_trip', false)
+                ->where('start_date', '<=', $day)
+                ->where(function ($q) use ($day) {
+                    $q->where('end_date', '>=', $day)
+                      ->orWhereNull('end_date');
+                })
+                ->active()
+                ->with('vehicle')
+                ->first();
+        }
         
-        // Get accommodation
-        $accommodationAssignment = AccommodationAssignment::where('employee_id', $employee->id)
-            ->where('start_date', '<=', $day)
-            ->where(function ($q) use ($day) {
-                $q->where('end_date', '>=', $day)
-                  ->orWhereNull('end_date');
-            })
-            ->active()
-            ->with('accommodation')
-            ->first();
+        // Get accommodation from pre-loaded data if available
+        $accommodationAssignment = null;
+        if ($preloadedAccommodationAssignments) {
+            $accommodationAssignment = $preloadedAccommodationAssignments->first(function($assignment) use ($employee, $day) {
+                return $assignment->employee_id === $employee->id
+                    && $assignment->start_date->lte($day)
+                    && ($assignment->end_date === null || $assignment->end_date->gte($day));
+            });
+        } else {
+            // Fallback to query if pre-loaded data not available
+            $accommodationAssignment = AccommodationAssignment::where('employee_id', $employee->id)
+                ->where('start_date', '<=', $day)
+                ->where(function ($q) use ($day) {
+                    $q->where('end_date', '>=', $day)
+                      ->orWhereNull('end_date');
+                })
+                ->active()
+                ->with('accommodation')
+                ->first();
+        }
         
         return [
             'date' => $day,
@@ -203,15 +245,65 @@ class WeeklyStabilityService
         
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
-        // Get stability for each employee
+        if ($employeeIds->isEmpty()) {
+            return [
+                'employees' => collect(),
+                'assigned_employees' => collect(),
+                'vehicles' => [],
+                'accommodations' => [],
+                'potential_issues' => [],
+                'requirements_summary' => [],
+                'demands' => collect(),
+                'assignments' => $assignments,
+            ];
+        }
+        
+        // EAGER LOAD: Load all employees at once
+        $employeesCollection = \App\Models\Employee::whereIn('id', $employeeIds)
+            ->with('roles')
+            ->get()
+            ->keyBy('id');
+        
+        // EAGER LOAD: Pre-load all vehicle and accommodation assignments for all employees and all days
+        $allVehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
+            ->where('is_return_trip', false)
+            ->where(function($query) use ($weekStart, $weekEnd) {
+                $query->where(function($q) use ($weekStart, $weekEnd) {
+                    $q->where('start_date', '<=', $weekEnd)
+                      ->where(function($q2) use ($weekStart) {
+                          $q2->whereNull('end_date')
+                             ->orWhere('end_date', '>=', $weekStart);
+                      });
+                });
+            })
+            ->with('vehicle')
+            ->get();
+        
+        $allAccommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
+            ->where(function($query) use ($weekStart, $weekEnd) {
+                $query->where(function($q) use ($weekStart, $weekEnd) {
+                    $q->where('start_date', '<=', $weekEnd)
+                      ->where(function($q2) use ($weekStart) {
+                          $q2->whereNull('end_date')
+                             ->orWhere('end_date', '>=', $weekStart);
+                      });
+                });
+            })
+            ->with('accommodation')
+            ->get();
+        
+        // EAGER LOAD: Pre-load all project assignments for all employees (for getDayData)
+        $allProjectAssignments = $assignments; // Already loaded above
+        
+        // Get stability for each employee (using pre-loaded data)
         $employees = collect();
         foreach ($employeeIds as $employeeId) {
-            $employee = \App\Models\Employee::find($employeeId);
+            $employee = $employeesCollection->get($employeeId);
             if (!$employee) {
                 continue;
             }
             
-            $stability = $this->getEmployeeStability($employee, $project, $weekStart, $weekEnd);
+            $stability = $this->getEmployeeStability($employee, $project, $weekStart, $weekEnd, $allVehicleAssignments, $allAccommodationAssignments, $allProjectAssignments);
             $employees->push([
                 'employee' => $employee,
                 'stability' => $stability,

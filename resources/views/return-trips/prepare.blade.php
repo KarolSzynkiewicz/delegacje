@@ -35,7 +35,7 @@
                         @php
                             // Grupuj przypisania po osobie i typie przypisania, aby uniknąć duplikatów
                             $groupedAssignments = $preparation->assignmentsToShorten->groupBy(function($item) {
-                                $employeeId = $item->assignment->getEmployee()->id;
+                                $employeeId = $item->assignment->employee->id;
                                 $type = match(true) {
                                     $item->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
                                     $item->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
@@ -70,7 +70,7 @@
                                     <tbody>
                                         @foreach($uniqueAssignments as $assignmentToShorten)
                                             @php
-                                                $employee = $assignmentToShorten->assignment->getEmployee();
+                                                $employee = $assignmentToShorten->assignment->employee;
                                                 $type = match(true) {
                                                     $assignmentToShorten->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
                                                     $assignmentToShorten->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
@@ -86,7 +86,7 @@
                                                         $item->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
                                                         default => class_basename($item->assignment),
                                                     };
-                                                    return $item->assignment->getEmployee()->id === $employee->id && $itemType === $type;
+                                                    return $item->assignment->employee->id === $employee->id && $itemType === $type;
                                                 })->count();
                                             @endphp
                                             <tr>

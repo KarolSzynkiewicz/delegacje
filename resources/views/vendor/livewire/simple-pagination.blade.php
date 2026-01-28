@@ -1,0 +1,51 @@
+@php
+if (! isset($scrollTo)) {
+    $scrollTo = 'body';
+}
+
+$scrollIntoViewJsSnippet = ($scrollTo !== false)
+    ? <<<JS
+       (\$el.closest('{$scrollTo}') || document.querySelector('{$scrollTo}')).scrollIntoView()
+    JS
+    : '';
+@endphp
+
+@if ($paginator->hasPages())
+    <nav class="d-flex align-items-center justify-content-between">
+        <div>
+            <p class="small text-muted mb-0">
+                Pokazano <span class="fw-semibold">{{ $paginator->firstItem() }}</span> do <span class="fw-semibold">{{ $paginator->lastItem() }}</span> z <span class="fw-semibold">{{ $paginator->total() }}</span> wyników
+            </p>
+        </div>
+        <div>
+            <ul class="pagination mb-0">
+                @foreach ($elements as $element)
+                    @if (is_string($element))
+                        <li class="page-item disabled" aria-disabled="true"><span class="page-link">{{ $element }}</span></li>
+                    @endif
+
+                    @if (is_array($element))
+                        @foreach ($element as $page => $url)
+                            @if ($page == $paginator->currentPage())
+                                <li class="page-item active" wire:key="paginator-{{ $paginator->getPageName() }}-page-{{ $page }}" aria-current="page">
+                                    <span class="page-link">{{ $page }}</span>
+                                </li>
+                            @else
+                                <li class="page-item" wire:key="paginator-{{ $paginator->getPageName() }}-page-{{ $page }}">
+                                    <button 
+                                        type="button" 
+                                        class="page-link" 
+                                        wire:click="gotoPage({{ $page }}, '{{ $paginator->getPageName() }}')" 
+                                        x-on:click="{{ $scrollIntoViewJsSnippet }}"
+                                    >
+                                        {{ $page }}
+                                    </button>
+                                </li>
+                            @endif
+                        @endforeach
+                    @endif
+                @endforeach
+            </ul>
+        </div>
+    </nav>
+@endif

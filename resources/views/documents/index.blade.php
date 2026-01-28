@@ -70,7 +70,7 @@
 
             @if($documents->hasPages())
                 <div class="mt-3">
-                    {{ $documents->links() }}
+                    <x-ui.pagination :paginator="$documents" />
                 </div>
             @endif
         @else

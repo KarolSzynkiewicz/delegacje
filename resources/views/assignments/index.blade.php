@@ -101,7 +101,7 @@
                 </div>
                 @if($assignments->hasPages())
                     <div class="mt-3">
-                        {{ $assignments->links() }}
+                        <x-ui.pagination :paginator="$assignments" />
                     </div>
                 @endif
             @else

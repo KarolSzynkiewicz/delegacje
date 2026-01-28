@@ -54,6 +54,11 @@ class TimeLogsTable extends Component
         $this->resetPage();
     }
 
+    public function paginationView()
+    {
+        return 'vendor.livewire.simple-pagination';
+    }
+
     public function render()
     {
         $query = TimeLog::with('projectAssignment.employee', 'projectAssignment.project');

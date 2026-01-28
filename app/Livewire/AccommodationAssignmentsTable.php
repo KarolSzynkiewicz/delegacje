@@ -53,6 +53,11 @@ class AccommodationAssignmentsTable extends Component
         $this->resetPage();
     }
 
+    public function paginationView()
+    {
+        return 'vendor.livewire.simple-pagination';
+    }
+
     public function render()
     {
         $query = AccommodationAssignment::with(['employee', 'accommodation'])

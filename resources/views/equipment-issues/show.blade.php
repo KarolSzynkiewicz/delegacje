@@ -11,14 +11,14 @@
                 </x-ui.button>
             </x-slot>
             <x-slot name="right">
-                @if($equipmentIssue->status === 'issued')
+                @if($equipmentIssue->status === 'issued' && $equipmentIssue->equipment->returnable)
                     <x-ui.button 
                         variant="success" 
                         href="{{ route('equipment-issues.return', $equipmentIssue) }}"
                         routeName="equipment-issues.return"
                         action="save"
                     >
-                        Zwróć Sprzęt
+                        Zwróć/Zgłoś Sprzęt
                     </x-ui.button>
                 @endif
             </x-slot>
@@ -63,10 +63,18 @@
                             $badgeVariant = match($equipmentIssue->status) {
                                 'issued' => 'primary',
                                 'returned' => 'success',
+                                'damaged' => 'danger',
+                                'lost' => 'warning',
                                 default => 'accent'
                             };
+                            $statusLabels = [
+                                'issued' => 'Wydany',
+                                'returned' => 'Zwrócony',
+                                'damaged' => 'Uszkodzony',
+                                'lost' => 'Zgubiony',
+                            ];
                         @endphp
-                        <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($equipmentIssue->status) }}</x-ui.badge>
+                        <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabels[$equipmentIssue->status] ?? ucfirst($equipmentIssue->status) }}</x-ui.badge>
                     </div>
                     @if($equipmentIssue->projectAssignment)
                     <div class="col-md-6">

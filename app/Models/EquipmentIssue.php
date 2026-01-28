@@ -72,12 +72,12 @@ class EquipmentIssue extends Model
     }
 
     /**
-     * Mark equipment as returned.
+     * Mark equipment as returned, damaged, or lost.
      */
-    public function markAsReturned(\Carbon\Carbon $returnDate, ?int $returnedBy = null): void
+    public function markAsReturned(\Carbon\Carbon $returnDate, ?int $returnedBy = null, string $status = 'returned'): void
     {
         $this->update([
-            'status' => 'returned',
+            'status' => $status,
             'actual_return_date' => $returnDate,
             'returned_by' => $returnedBy ?? auth()->id(),
         ]);

@@ -45,6 +45,11 @@ class EmployeeDocumentsGrouped extends Component
         $this->resetPage();
     }
 
+    public function paginationView()
+    {
+        return 'vendor.livewire.simple-pagination';
+    }
+
     public function render()
     {
         // Pobierz pracowników z filtrowaniem
