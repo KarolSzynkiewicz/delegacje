@@ -20,6 +20,9 @@ class UpdateAccommodationRequest extends FormRequest
             'postal_code' => ['nullable', 'string', 'max:10'],
             'capacity' => ['required', 'integer', 'min:1'],
             'description' => ['nullable', 'string'],
+            'type' => ['required', 'in:wynajmowany,własny'],
+            'lease_start_date' => ['nullable', 'date', 'required_if:type,wynajmowany'],
+            'lease_end_date' => ['nullable', 'date', 'required_if:type,wynajmowany', 'after_or_equal:lease_start_date'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];
     }

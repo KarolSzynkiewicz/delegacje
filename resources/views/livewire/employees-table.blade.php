@@ -102,13 +102,13 @@
                                         ? 'Przypisany do projektów: ' . $projectsList
                                         : 'Nieprzypisany do żadnego projektu';
                                 @endphp
-                                <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $tooltipText }}">
+                                <x-tooltip title="{{ $tooltipText }}">
                                     @if($hasActiveProjects)
                                         <x-ui.badge variant="danger">Zajęty</x-ui.badge>
                                     @else
                                         <x-ui.badge variant="success">Wolny</x-ui.badge>
                                     @endif
-                                </span>
+                                </x-tooltip>
                             </td>
                             <td class="text-end">
                                 <x-action-buttons
@@ -141,33 +141,3 @@
     </x-ui.card>
 </div>
 
-@push('scripts')
-<script>
-    function initTooltips() {
-        // Destroy existing tooltips first
-        var existingTooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-        existingTooltips.forEach(function(el) {
-            var tooltipInstance = bootstrap.Tooltip.getInstance(el);
-            if (tooltipInstance) {
-                tooltipInstance.dispose();
-            }
-        });
-        
-        // Initialize new tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    }
-    
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', initTooltips);
-    
-    // Re-initialize after Livewire updates
-    document.addEventListener('livewire:init', function() {
-        Livewire.hook('morph.updated', function() {
-            setTimeout(initTooltips, 100);
-        });
-    });
-</script>
-@endpush

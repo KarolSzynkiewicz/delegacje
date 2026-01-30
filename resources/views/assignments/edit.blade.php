@@ -16,6 +16,8 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Przypisanie">
+                <!-- Błędy walidacji na górze -->
+                <x-ui.errors />
                 <form method="POST" action="{{ route('assignments.update', $assignment) }}">
                     @csrf
                     @method('PUT')
@@ -90,7 +92,8 @@
                             @endphp
                                 <option value="{{ $employee->id }}" 
                                         {{ old('employee_id', $assignment->employee_id) == $employee->id ? 'selected' : '' }}
-                                        data-has-issue="{{ $hasRequiredDocIssue ? '1' : '0' }}">
+                                        data-has-issue="{{ $hasRequiredDocIssue ? '1' : '0' }}"
+                                        data-is-available="{{ $isAvailable ? '1' : '0' }}">
                                     {{ $optionText }}
                                 </option>
                             @endforeach

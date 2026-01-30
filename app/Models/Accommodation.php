@@ -27,6 +27,9 @@ class Accommodation extends Model
         'description',
         'image_path',
         'location_id',
+        'type',
+        'lease_start_date',
+        'lease_end_date',
     ];
 
     /**
@@ -40,6 +43,16 @@ class Accommodation extends Model
 
         return asset('storage/' . $this->image_path);
     }
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'lease_start_date' => 'date',
+        'lease_end_date' => 'date',
+    ];
 
     /**
      * Get the location for this accommodation.

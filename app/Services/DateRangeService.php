@@ -212,7 +212,7 @@ class DateRangeService
     /**
      * Validate that there are no overlapping assignments in the given query.
      * 
-     * @param Builder $query The query builder for assignments to check
+     * @param Builder|\Illuminate\Database\Eloquent\Relations\Relation $query The query builder or relation for assignments to check
      * @param CarbonInterface $startDate Start date of the assignment
      * @param CarbonInterface $endDate End date of the assignment
      * @param int|null $excludeAssignmentId Assignment ID to exclude from check (for updates)
@@ -222,13 +222,24 @@ class DateRangeService
      * @throws ValidationException
      */
     public static function validateNoOverlappingAssignments(
-        Builder $query,
+        Builder|\Illuminate\Database\Eloquent\Relations\Relation $query,
         CarbonInterface $startDate,
         CarbonInterface $endDate,
         ?int $excludeAssignmentId = null,
         string $errorKey = 'assignment',
         string $errorMessage = 'Istnieje już przypisanie nakładające się w tym okresie. Nie można tworzyć nakładających się przypisań.'
     ): void {
+        // Jeśli to relacja, pobierz model i utwórz nowy query z warunkami z relacji
+        if ($query instanceof \Illuminate\Database\Eloquent\Relations\Relation) {
+            $model = $query->getRelated();
+            $baseQuery = $query->getQuery();
+            // Utwórz nowy query z modelu
+            $query = $model->newQuery();
+            // Zastosuj warunki z oryginalnego query relacji
+            $query->mergeConstraintsFrom($baseQuery);
+        }
+        
+        // Wywołaj scope overlappingWith na modelu
         $query->overlappingWith($startDate, $endDate);
 
         if ($excludeAssignmentId) {

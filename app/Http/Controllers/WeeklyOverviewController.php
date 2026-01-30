@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Services\WeeklyOverviewService;
 use App\Services\WeeklyStabilityService;
+use App\Services\ExpiringDocumentsService;
 use App\ViewModels\WeeklyProjectSummary;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ class WeeklyOverviewController extends Controller
 {
     public function __construct(
         protected WeeklyOverviewService $weeklyOverviewService,
-        protected WeeklyStabilityService $stabilityService
+        protected WeeklyStabilityService $stabilityService,
+        protected ExpiringDocumentsService $expiringDocumentsService
     ) {}
 
     /**
@@ -78,7 +80,10 @@ class WeeklyOverviewController extends Controller
         // Get employees without project but with vehicle or accommodation
         $employeesWithoutProject = $this->weeklyOverviewService->getEmployeesWithoutProjectButWithResources($weekStart, $weekEnd);
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'departures', 'employeesWithoutProject'));
+        // Get expiring documents, vehicle inspections, and leases for this month
+        $expiringItems = $this->expiringDocumentsService->getExpiringThisMonth();
+        
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'departures', 'employeesWithoutProject', 'expiringItems'));
     }
 
     /**

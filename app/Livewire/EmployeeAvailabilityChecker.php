@@ -10,17 +10,21 @@ class EmployeeAvailabilityChecker extends Component
     public $employeeId;
     public $startDate;
     public $endDate;
+    public $roleId = null;
+    public $projectId = null;
     public $isAvailable = null;
     public $conflicts = [];
     public $availabilityStatus = null;
     public $missingDocuments = [];
     public $rotationDetails = null;
 
-    public function mount($employeeId = null, $startDate = null, $endDate = null)
+    public function mount($employeeId = null, $startDate = null, $endDate = null, $roleId = null, $projectId = null)
     {
         $this->employeeId = $employeeId;
         $this->startDate = $startDate;
         $this->endDate = $endDate;
+        $this->roleId = $roleId;
+        $this->projectId = $projectId;
         
         if ($this->employeeId && $this->startDate) {
             $this->checkAvailability();
@@ -29,7 +33,7 @@ class EmployeeAvailabilityChecker extends Component
 
     public function updated($propertyName)
     {
-        if (in_array($propertyName, ['employeeId', 'startDate', 'endDate'])) {
+        if (in_array($propertyName, ['employeeId', 'startDate', 'endDate', 'roleId', 'projectId'])) {
             $this->checkAvailability();
         }
     }
@@ -55,8 +59,14 @@ class EmployeeAvailabilityChecker extends Component
 
         $endDate = $this->endDate ?: $this->startDate;
         
-        // Pobierz pełny status dostępności z szczegółami
-        $this->availabilityStatus = $employee->getAvailabilityStatus($this->startDate, $endDate);
+        // Pobierz pełny status dostępności z szczegółami (z uwzględnieniem roli i projektu)
+        $this->availabilityStatus = $employee->getAvailabilityStatus(
+            $this->startDate, 
+            $endDate, 
+            null, // excludeAssignmentId
+            $this->roleId ? (int)$this->roleId : null, // roleId
+            $this->projectId ? (int)$this->projectId : null // projectId
+        );
         $this->isAvailable = $this->availabilityStatus['available'] ?? false;
         $this->missingDocuments = $this->availabilityStatus['missing_documents'] ?? [];
         
@@ -64,11 +74,16 @@ class EmployeeAvailabilityChecker extends Component
         $this->rotationDetails = $this->checkRotationDetails($employee, $this->startDate, $endDate);
         
         if (!$this->isAvailable) {
-            $this->conflicts = $employee->assignments()
+            // Pokaż konflikty tylko z INNYCH projektów (jeśli projectId jest podane)
+            $conflictsQuery = $employee->assignments()
                 ->active()
-                ->overlappingWith($this->startDate, $endDate)
-                ->with('project')
-                ->get();
+                ->overlappingWith($this->startDate, $endDate);
+            
+            if ($this->projectId) {
+                $conflictsQuery->where('project_id', '!=', $this->projectId);
+            }
+            
+            $this->conflicts = $conflictsQuery->with('project')->get();
         } else {
             $this->conflicts = [];
         }

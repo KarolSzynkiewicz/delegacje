@@ -30,6 +30,7 @@ class UpdateVehicleRequest extends FormRequest
             'capacity' => ['nullable', 'integer', 'min:1'],
             'technical_condition' => ['required', 'in:excellent,good,fair,poor,workshop'],
             'inspection_valid_to' => ['nullable', 'date'],
+            'insurance_valid_to' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];

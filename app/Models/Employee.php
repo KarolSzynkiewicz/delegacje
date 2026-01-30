@@ -343,11 +343,19 @@ class Employee extends Model
      * Get availability status with reasons for a given date range.
      * Returns array with 'available' boolean and 'reasons' array.
      */
-    public function getAvailabilityStatus($startDate, $endDate, ?int $excludeAssignmentId = null): array
+    public function getAvailabilityStatus($startDate, $endDate, ?int $excludeAssignmentId = null, ?int $roleId = null, ?int $projectId = null): array
     {
         $reasons = [];
         $available = true;
         $missingDocuments = [];
+
+        // 0. Sprawdź czy pracownik ma wybraną rolę (jeśli rola jest podana)
+        if ($roleId !== null) {
+            if (!$this->roles->contains('id', $roleId)) {
+                $available = false;
+                $reasons[] = 'Pracownik nie ma wymaganej roli';
+            }
+        }
 
         // 1. Sprawdź dokumenty - szczegółowo
         // Upewnij się, że relacja jest załadowana
@@ -391,10 +399,16 @@ class Employee extends Model
                 $isValid = false;
                 $problem = '';
                 
+                // Przygotuj przedział ważności dokumentu
+                $docValidFrom = $employeeDoc->valid_from ? $employeeDoc->valid_from->format('Y-m-d') : null;
+                $docValidTo = $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null;
+                
                 if ($employeeDoc->kind === 'bezokresowy') {
                     if ($employeeDoc->valid_from > $endDate) {
                         $isValid = false;
-                        $problem = "Dokument zaczyna się za późno ({$employeeDoc->valid_from->format('Y-m-d')} > {$endDate})";
+                        $problem = $docValidTo 
+                            ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
+                            : "Dokument ważny od: {$docValidFrom}";
                     } else {
                         $isValid = true;
                     }
@@ -402,10 +416,14 @@ class Employee extends Model
                     // Dokument okresowy
                     if ($employeeDoc->valid_from > $startDate) {
                         $isValid = false;
-                        $problem = "Dokument zaczyna się za późno ({$employeeDoc->valid_from->format('Y-m-d')} > {$startDate})";
+                        $problem = $docValidTo 
+                            ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
+                            : "Dokument ważny od: {$docValidFrom}";
                     } elseif ($employeeDoc->valid_to && $employeeDoc->valid_to < $endDate) {
                         $isValid = false;
-                        $problem = "Dokument kończy się za wcześnie ({$employeeDoc->valid_to->format('Y-m-d')} < {$endDate})";
+                        $problem = $docValidFrom 
+                            ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
+                            : "Dokument ważny do: {$docValidTo}";
                     } else {
                         $isValid = true;
                     }
@@ -448,11 +466,17 @@ class Employee extends Model
             $reasons[] = 'Brak rotacji pokrywającej cały okres';
         }
 
-        // 3. Sprawdź konfliktujące przypisania (wykluczając aktualnie edytowane przypisanie)
+        // 3. Sprawdź konfliktujące przypisania do INNYCH projektów (wykluczając aktualnie edytowane przypisanie)
         $query = $this->assignments()
             ->active()
             ->overlappingWith($startDate, $endDate);
         
+        // Jeśli podano projectId, wyklucz przypisania do tego samego projektu (pozwól na edycję)
+        if ($projectId !== null) {
+            $query->where('project_id', '!=', $projectId);
+        }
+        
+        // Wyklucz aktualnie edytowane przypisanie
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);
         }

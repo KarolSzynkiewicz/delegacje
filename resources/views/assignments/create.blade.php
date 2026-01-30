@@ -16,6 +16,8 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Dodaj Przypisanie Pracownika do Projektu">
+                <!-- Błędy walidacji na górze -->
+                <x-ui.errors />
                 <form method="POST" action="{{ route('project-assignments.store') }}" id="assignment-form">
                     @csrf
 
@@ -41,6 +43,47 @@
                         @endif
                     </div>
 
+                    <!-- Data od i data do w jednej linii oraz rola -->
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="date" 
+                                name="start_date" 
+                                id="start-date-input"
+                                label="Data od"
+                                value="{{ old('start_date', $startDate ?? '') }}"
+                                required="true"
+                            />
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="date" 
+                                name="end_date" 
+                                id="end-date-input"
+                                label="Data do"
+                                value="{{ old('end_date', $endDate ?? '') }}"
+                                required="true"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="role_id" 
+                            label="Rola w Projekcie"
+                            required="true"
+                        >
+                            <option value="">Wybierz rolę</option>
+                            @foreach($roles as $role)
+                                <option value="{{ $role->id }}" {{ old('role_id', $roleId ?? null) == $role->id ? 'selected' : '' }}>
+                                    {{ $role->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                    </div>
+
+                    <!-- Pracownik -->
                     <div class="mb-3">
                         <x-ui.input 
                             type="select" 
@@ -95,57 +138,27 @@
                                 @endphp
                                 <option value="{{ $employee->id }}" 
                                         {{ (old('employee_id') == $employee->id || (isset($employeeId) && $employeeId == $employee->id)) ? 'selected' : '' }}
-                                        data-has-issue="{{ $hasRequiredDocIssue ? '1' : '0' }}">
+                                        data-has-issue="{{ $hasRequiredDocIssue ? '1' : '0' }}"
+                                        data-is-available="{{ $isAvailable ? '1' : '0' }}"
+                                        data-role-ids="{{ $employee->roles->pluck('id')->implode(',') }}">
                                     {{ $optionText }}
                                 </option>
                             @endforeach
                         </x-ui.input>
+                    </div>
 
-                        <div id="availability-checker-container" class="mt-3">
-                            <livewire:employee-availability-checker 
-                                wire:key="availability-checker-{{ old('employee_id', $employeeId ?? '') }}-{{ $startDate ?? '' }}-{{ $endDate ?? '' }}"
+                    <!-- Status dostępności -->
+                    <div class="mb-3">
+                        <div id="availability-checker-container">
+                            <livewire:employee-availability-checker
+                                wire:key="availability-checker-{{ old('employee_id', $employeeId ?? '') }}-{{ $startDate ?? '' }}-{{ $endDate ?? '' }}-{{ old('role_id', $roleId ?? '') }}-{{ $project->id ?? '' }}"
                                 :employee-id="old('employee_id', $employeeId ?? null)"
                                 :start-date="$startDate ?? null"
                                 :end-date="$endDate ?? null"
+                                :role-id="old('role_id', $roleId ?? null)"
+                                :project-id="$project->id ?? null"
                             />
                         </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="role_id" 
-                            label="Rola w Projekcie"
-                            required="true"
-                        >
-                            <option value="">Wybierz rolę</option>
-                            @foreach($roles as $role)
-                                <option value="{{ $role->id }}" {{ old('role_id') == $role->id ? 'selected' : '' }}>
-                                    {{ $role->name }}
-                                </option>
-                            @endforeach
-                        </x-ui.input>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="date" 
-                            name="start_date" 
-                            id="start-date-input"
-                            label="Data Rozpoczęcia"
-                            value="{{ old('start_date', $startDate ?? '') }}"
-                            required="true"
-                        />
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="date" 
-                            name="end_date" 
-                            id="end-date-input"
-                            label="Data Zakończenia (opcjonalnie)"
-                            value="{{ old('end_date', $endDate ?? '') }}"
-                        />
                     </div>
 
                     <div class="mb-3">
@@ -197,6 +210,7 @@
     <script>
         function updateLivewireComponent() {
             const select = document.getElementById('employee-select');
+            const roleSelect = document.querySelector('select[name="role_id"]');
             const startInput = document.getElementById('start-date-input');
             const endInput = document.getElementById('end-date-input');
             const container = document.getElementById('availability-checker-container');
@@ -213,6 +227,10 @@
                 component.set('employeeId', select.value || null);
                 component.set('startDate', startInput.value || null);
                 component.set('endDate', endInput.value || null);
+                if (roleSelect) {
+                    component.set('roleId', roleSelect.value || null);
+                }
+                // projectId jest przekazywany przez mount, więc nie trzeba go aktualizować
             }
         }
 
@@ -253,11 +271,77 @@
             }
 
             [startInput, endInput].forEach(input => {
-                input.addEventListener('change', () => { checkDates(); updateLivewireComponent(); });
+                input.addEventListener('change', () => { 
+                    checkDates(); 
+                    updateLivewireComponent();
+                    // Po aktualizacji Livewire, poczekaj chwilę i posortuj (dostępność może się zmienić)
+                    setTimeout(sortEmployeeOptions, 300);
+                });
                 input.addEventListener('input', () => { checkDates(); updateLivewireComponent(); });
             });
 
             if (employeeSelect) employeeSelect.addEventListener('change', updateLivewireComponent);
+            
+            // Funkcja do sortowania pracowników w dropdownie
+            function sortEmployeeOptions() {
+                const roleSelect = document.querySelector('select[name="role_id"]');
+                const employeeSelect = document.getElementById('employee-select');
+                
+                if (!roleSelect || !employeeSelect) return;
+                
+                const selectedRoleId = roleSelect.value;
+                const selectedEmployeeId = employeeSelect.value;
+                
+                // Pobierz wszystkie opcje (oprócz pierwszej "Wybierz pracownika")
+                const options = Array.from(employeeSelect.options).slice(1);
+                
+                // Sortuj opcje
+                options.sort((a, b) => {
+                    const aIsAvailable = a.getAttribute('data-is-available') === '1';
+                    const bIsAvailable = b.getAttribute('data-is-available') === '1';
+                    const aRoleIds = a.getAttribute('data-role-ids') || '';
+                    const bRoleIds = b.getAttribute('data-role-ids') || '';
+                    const aHasRole = selectedRoleId && aRoleIds.split(',').includes(selectedRoleId);
+                    const bHasRole = selectedRoleId && bRoleIds.split(',').includes(selectedRoleId);
+                    
+                    // Priorytet: dostępność (0 = dostępny, 1 = niedostępny), potem rola (0 = ma rolę, 1 = nie ma)
+                    const aScore = (aIsAvailable ? 0 : 100) + (aHasRole ? 0 : 10);
+                    const bScore = (bIsAvailable ? 0 : 100) + (bHasRole ? 0 : 10);
+                    
+                    return aScore - bScore;
+                });
+                
+                // Zapisz pierwszą opcję (placeholder)
+                const placeholder = employeeSelect.options[0];
+                
+                // Wyczyść select
+                employeeSelect.innerHTML = '';
+                employeeSelect.appendChild(placeholder);
+                
+                // Dodaj posortowane opcje
+                options.forEach(option => {
+                    employeeSelect.appendChild(option);
+                });
+                
+                // Przywróć wybraną wartość
+                if (selectedEmployeeId) {
+                    employeeSelect.value = selectedEmployeeId;
+                }
+            }
+            
+            // Aktualizuj komponent Livewire gdy zmienia się rola
+            const roleSelect = document.querySelector('select[name="role_id"]');
+            if (roleSelect) {
+                roleSelect.addEventListener('change', function() {
+                    updateLivewireComponent();
+                    sortEmployeeOptions();
+                });
+                
+                // Sortuj przy załadowaniu strony
+                if (roleSelect.value) {
+                    setTimeout(sortEmployeeOptions, 100);
+                }
+            }
 
             form.addEventListener('submit', function(e) {
                 const checkbox = document.getElementById('confirm-past-date') || document.getElementById('confirm-past-date-dynamic');

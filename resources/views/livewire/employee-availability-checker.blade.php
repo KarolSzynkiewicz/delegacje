@@ -55,16 +55,6 @@
                                                 </div>
                                                 <div class="small text-muted mt-1">
                                                     <span>{{ $doc['problem'] ?? 'Brak dokumentu' }}</span>
-                                                    @if(isset($doc['valid_from']) || isset($doc['valid_to']))
-                                                        <span class="ms-2">
-                                                            @if(isset($doc['valid_from']))
-                                                                Od: {{ $doc['valid_from'] }}
-                                                            @endif
-                                                            @if(isset($doc['valid_to']))
-                                                                Do: {{ $doc['valid_to'] }}
-                                                            @endif
-                                                        </span>
-                                                    @endif
                                                 </div>
                                             </div>
                                             @if(isset($doc['employee_id']))

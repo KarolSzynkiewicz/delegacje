@@ -218,15 +218,15 @@ class ProjectAssignmentService
     /**
      * Get employees with availability status for assignment creation.
      */
-    public function getEmployeesWithAvailabilityStatus(?Carbon $startDate = null, ?Carbon $endDate = null, ?int $excludeAssignmentId = null): \Illuminate\Support\Collection
+    public function getEmployeesWithAvailabilityStatus(?Carbon $startDate = null, ?Carbon $endDate = null, ?int $excludeAssignmentId = null, ?int $roleId = null, ?int $projectId = null): \Illuminate\Support\Collection
     {
         $employees = Employee::with(['roles', 'employeeDocuments.document'])
             ->orderBy('last_name')
             ->get();
 
         if ($startDate && $endDate) {
-            return $employees->map(function ($employee) use ($startDate, $endDate, $excludeAssignmentId) {
-                $status = $employee->getAvailabilityStatus($startDate, $endDate, $excludeAssignmentId);
+            $employees = $employees->map(function ($employee) use ($startDate, $endDate, $excludeAssignmentId, $roleId, $projectId) {
+                $status = $employee->getAvailabilityStatus($startDate, $endDate, $excludeAssignmentId, $roleId, $projectId);
                 // Upewnij się, że missing_documents jest zawsze tablicą
                 if (!isset($status['missing_documents'])) {
                     $status['missing_documents'] = [];
@@ -234,10 +234,24 @@ class ProjectAssignmentService
                 $employee->availability_status = $status;
                 return $employee;
             });
+            
+            // Sortuj pracowników:
+            // 1. Najpierw dostępni, potem niedostępni
+            // 2. W ramach każdej grupy: najpierw ci z wybraną rolą (jeśli rola jest podana)
+            $employees = $employees->sortBy(function ($employee) use ($roleId) {
+                $isAvailable = $employee->availability_status['available'] ?? true;
+                $hasRole = $roleId !== null ? $employee->roles->contains('id', $roleId) : false;
+                
+                // Priorytet: dostępność (0 = dostępny, 1 = niedostępny), potem rola (0 = ma rolę, 1 = nie ma)
+                // Używamy liczby zamiast stringa dla lepszego sortowania
+                return ($isAvailable ? 0 : 100) + ($hasRole ? 0 : 10);
+            })->values();
+            
+            return $employees;
         }
 
         // If no dates, all employees are available
-        return $employees->map(function ($employee) {
+        $employees = $employees->map(function ($employee) {
             $employee->availability_status = [
                 'available' => true, 
                 'reasons' => [],
@@ -245,5 +259,15 @@ class ProjectAssignmentService
             ];
             return $employee;
         });
+        
+        // Sortuj pracowników - najpierw ci z wybraną rolą (jeśli rola jest podana)
+        if ($roleId !== null) {
+            $employees = $employees->sortBy(function ($employee) use ($roleId) {
+                $hasRole = $employee->roles->contains('id', $roleId);
+                return $hasRole ? 0 : 1; // 0 = ma rolę (pierwsze), 1 = nie ma (później)
+            })->values();
+        }
+        
+        return $employees;
     }
 }

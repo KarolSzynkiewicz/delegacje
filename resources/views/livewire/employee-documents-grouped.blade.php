@@ -2,7 +2,7 @@
     <!-- Filtry -->
             <x-ui.card class="mb-4">
                 <div class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <x-ui.input 
                             type="text" 
                             name="searchEmployee" 
@@ -11,7 +11,7 @@
                             placeholder="Imię lub nazwisko..."
                         />
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <x-ui.input 
                             type="select" 
                             name="filterStatus" 
@@ -26,7 +26,7 @@
                             <option value="wygasa_wkrotce">Wygasa wkrótce</option>
                         </x-ui.input>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <x-ui.input 
                             type="select" 
                             name="filterDocument" 
@@ -39,7 +39,19 @@
                             @endforeach
                         </x-ui.input>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
+                    <div class="col-md-2">
+                        <x-ui.input 
+                            type="select" 
+                            name="filterRequired" 
+                            label="Wymagane"
+                            wire:model.live="filterRequired"
+                        >
+                            <option value="">Wszystkie</option>
+                            <option value="required">Wymagane</option>
+                            <option value="not_required">Niewymagane</option>
+                        </x-ui.input>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
                         <x-ui.button variant="ghost" wire:click="resetFilters" class="w-100">
                             Wyczyść filtry
                         </x-ui.button>

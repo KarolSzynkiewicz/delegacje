@@ -61,6 +61,7 @@ class ProjectAssignmentController extends Controller
         $startDate = $request->query('start_date') ?? $request->query('date_from');
         $endDate = $request->query('end_date') ?? $request->query('date_to');
         $employeeId = $request->query('employee_id');
+        $roleId = $request->query('role_id');
         
         // Sprawdź czy daty są w przeszłości
         $isDateInPast = false;
@@ -76,7 +77,13 @@ class ProjectAssignmentController extends Controller
             $isDateInPast = $endDateCarbon->startOfDay()->isPast();
         }
         
-        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDateCarbon, $endDateCarbon);
+        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus(
+            $startDateCarbon, 
+            $endDateCarbon, 
+            null, // excludeAssignmentId
+            $roleId ? (int)$roleId : null, // roleId
+            $projectId ? (int)$projectId : null // projectId
+        );
         $roles = Role::orderBy("name")->get();
         
         // If employee_id is provided, set it in old input for pre-selection
@@ -91,7 +98,12 @@ class ProjectAssignmentController extends Controller
             session()->flash('_old_input.project_id', $projectId);
         }
         
-        return view("assignments.create", compact("project", "projects", "employees", "roles", "startDate", "endDate", "isDateInPast", "employeeId"));
+        // If role_id is provided, set it in old input for pre-selection
+        if ($roleId) {
+            session()->flash('_old_input.role_id', $roleId);
+        }
+        
+        return view("assignments.create", compact("project", "projects", "employees", "roles", "startDate", "endDate", "isDateInPast", "employeeId", "roleId"));
     }
 
     /**
@@ -157,7 +169,13 @@ class ProjectAssignmentController extends Controller
         $endDate = $assignment->end_date;
         
         // Sprawdź dostępność pracowników dla dat przypisania (wykluczając aktualnie edytowane przypisanie)
-        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus($startDate, $endDate, $assignment->id);
+        $employees = $this->assignmentService->getEmployeesWithAvailabilityStatus(
+            $startDate, 
+            $endDate, 
+            $assignment->id, // excludeAssignmentId
+            $assignment->role_id, // roleId
+            $assignment->project_id // projectId
+        );
         
         $roles = Role::orderBy("name")->get();
         

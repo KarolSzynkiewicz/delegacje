@@ -36,6 +36,13 @@ class AccommodationController extends Controller
     {
         
         $validated = $this->processImageUpload($request->validated(), $request, 'accommodations');
+        
+        // Clear lease dates if type is 'własny'
+        if ($validated['type'] === 'własny') {
+            $validated['lease_start_date'] = null;
+            $validated['lease_end_date'] = null;
+        }
+        
         Accommodation::create($validated);
         
         return redirect()->route('accommodations.index')->with('success', 'Akomodacja została dodana.');
@@ -69,6 +76,13 @@ class AccommodationController extends Controller
     {
         
         $validated = $this->processImageUpload($request->validated(), $request, 'accommodations', $accommodation->image_path);
+        
+        // Clear lease dates if type is 'własny'
+        if ($validated['type'] === 'własny') {
+            $validated['lease_start_date'] = null;
+            $validated['lease_end_date'] = null;
+        }
+        
         $accommodation->update($validated);
         
         return redirect()->route('accommodations.show', $accommodation)->with('success', 'Akomodacja została zaktualizowana.');

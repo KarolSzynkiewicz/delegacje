@@ -383,6 +383,10 @@ input[type="week"]::-webkit-datetime-edit-year-field:focus {
     color: var(--danger) !important;
     font-weight: bold;
 }
+
+.form-select option[data-is-available="0"] {
+    color: var(--danger) !important;
+}
 textarea.form-control {
     resize: vertical;
     min-height: 80px;

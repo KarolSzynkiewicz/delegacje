@@ -290,6 +290,37 @@
         </div>
         <hr>
 
+        {{-- x-tooltip --}}
+        <div class="mb-4">
+            <h4 class="fw-semibold">x-tooltip</h4>
+            <p class="text-muted small">Komponent tooltip z żaróweczką - wyświetla wskazówkę na hover. Props: title (domyślnie "Wskazówka"), text (opcjonalny tekst przed żaróweczką)</p>
+            <x-ui.card>
+                <p class="mb-3">
+                    To jest zwykły tekst, a 
+                    <x-tooltip title="Wskazówka" text="tutaj">
+                        Żółta żaróweczka = hint. Tooltip wyskakuje tylko na ten fragment tekstu.
+                    </x-tooltip>
+                    i reszta zdania bez żadnych efektów.
+                </p>
+                <p class="mb-3">
+                    Przykład użycia w badge: 
+                    <span class="badge bg-primary">
+                        Status 
+                        <x-tooltip title="Informacja">
+                            Ten badge pokazuje aktualny status przypisania pracownika do projektu.
+                        </x-tooltip>
+                    </span>
+                </p>
+                <p class="mb-0">
+                    Przykład tylko z żaróweczką (bez tekstu przed): 
+                    <x-tooltip title="Szczegóły">
+                        To jest przykład użycia komponentu bez tekstu przed żaróweczką - tylko ikona.
+                    </x-tooltip>
+                </p>
+            </x-ui.card>
+        </div>
+        <hr>
+
         {{-- x-ui.delete-form --}}
         <div class="mb-4">
             <h4 class="fw-semibold">x-ui.delete-form</h4>
@@ -748,4 +779,44 @@
         <hr>
 
     </div>
+
+    <div class="ui-tooltip">
+        <i class="bi bi-info-circle ui-tooltip-icon"></i>
+    
+        <span style="position:relative; cursor:help; text-decoration:underline dotted; text-underline-offset:3px;">
+            Najedź tutaj
+            <span style="
+                position:absolute;
+                top:130%;
+                left:50%;
+                transform:translateX(-50%);
+                min-width:220px;
+                background:rgba(20,20,20,0.9);
+                color:#fff;
+                padding:10px 14px;
+                border-radius:10px;
+                box-shadow:0 10px 30px rgba(0,0,0,.35);
+                font-size:13px;
+                line-height:1.4;
+                opacity:0;
+                pointer-events:none;
+                transition:opacity .15s ease, transform .15s ease;
+                z-index:999;
+            ">
+                <span style="display:flex; gap:8px; align-items:flex-start;">
+                    <i class="bi bi-info-circle" style="color:#3b82f6; margin-top:2px;"></i>
+                    <span>
+                        To jest wskazówka wyświetlana po najechaniu na tekst.
+                    </span>
+                </span>
+            </span>
+        </span>
+        
+        <style>
+        span:hover > span {
+            opacity:1;
+            transform:translateX(-50%) translateY(4px);
+        }
+        </style>
+
 </x-app-layout>

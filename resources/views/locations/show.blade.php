@@ -58,19 +58,23 @@
             </x-ui.card>
 
             @if($location->projects->count() > 0)
-            <div class="mt-4">
-                <x-ui.card label="Projekty w tej lokalizacji ({{ $location->projects->count() }})">
-                    <ul class="list-group">
-                        @foreach($location->projects as $project)
-                            <li class="list-group-item">
-                                <a href="{{ route('projects.show', $project) }}" class="text-decoration-none">
-                                    {{ $project->name }}
-                                </a>
-                            </li>
-                        @endforeach
-                    </ul>
-                </x-ui.card>
-            </div>
+            <x-ui.card label="Projekty w tej lokalizacji ({{ $location->projects->count() }})" class="mt-4">
+                <ul class="list-group-ui">
+                    @foreach($location->projects as $project)
+                        <li class="list-group-item-ui">
+                            <a href="{{ route('projects.show', $project) }}" class="list-group-item-action-ui d-flex align-items-center justify-content-between text-decoration-none">
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ $project->name }}</div>
+                                    @if($project->client_name)
+                                        <div class="small text-muted mt-1">{{ $project->client_name }}</div>
+                                    @endif
+                                </div>
+                                <i class="bi bi-arrow-right text-muted"></i>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </x-ui.card>
             @endif
         </div>
     </div>

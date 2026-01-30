@@ -25,7 +25,7 @@ class StoreProjectAssignmentRequest extends FormRequest
             'employee_id' => ['required', 'exists:employees,id'],
             'role_id' => ['required', 'exists:roles,id'],
             'start_date' => ['required', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -45,6 +45,7 @@ class StoreProjectAssignmentRequest extends FormRequest
             'role_id.exists' => 'Wybrana rola nie istnieje.',
             'start_date.required' => 'Data rozpoczęcia jest wymagana.',
             'start_date.date' => 'Data rozpoczęcia musi być poprawną datą.',
+            'end_date.required' => 'Data zakończenia jest wymagana.',
             'end_date.date' => 'Data zakończenia musi być poprawną datą.',
             'end_date.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
         ];

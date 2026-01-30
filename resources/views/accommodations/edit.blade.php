@@ -76,6 +76,42 @@
                         />
                     </div>
 
+                    <div x-data="{ type: '{{ old('type', $accommodation->type ?? 'własny') }}' }">
+                        <div class="mb-3">
+                            <x-ui.input 
+                                type="select" 
+                                name="type" 
+                                label="Typ"
+                                required="true"
+                                x-model="type"
+                            >
+                                <option value="własny" {{ old('type', $accommodation->type ?? 'własny') === 'własny' ? 'selected' : '' }}>Własny</option>
+                                <option value="wynajmowany" {{ old('type', $accommodation->type ?? 'własny') === 'wynajmowany' ? 'selected' : '' }}>Wynajmowany</option>
+                            </x-ui.input>
+                        </div>
+
+                        <div class="mb-3" x-show="type === 'wynajmowany'" x-cloak>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <x-ui.input 
+                                        type="date" 
+                                        name="lease_start_date" 
+                                        label="Okres najmu - od"
+                                        value="{{ old('lease_start_date', $accommodation->lease_start_date?->format('Y-m-d')) }}"
+                                    />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.input 
+                                        type="date" 
+                                        name="lease_end_date" 
+                                        label="Okres najmu - do"
+                                        value="{{ old('lease_end_date', $accommodation->lease_end_date?->format('Y-m-d')) }}"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <x-ui.input 
                             type="textarea" 

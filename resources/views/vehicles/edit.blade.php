@@ -89,13 +89,27 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="date" 
-                            name="inspection_valid_to" 
-                            label="Przegląd Ważny Do"
-                            value="{{ old('inspection_valid_to', $vehicle->inspection_valid_to?->format('Y-m-d')) }}"
-                        />
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <x-ui.input 
+                                    type="date" 
+                                    name="inspection_valid_to" 
+                                    label="Przegląd Ważny Do"
+                                    value="{{ old('inspection_valid_to', $vehicle->inspection_valid_to?->format('Y-m-d')) }}"
+                                />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <x-ui.input 
+                                    type="date" 
+                                    name="insurance_valid_to" 
+                                    label="OC Ważne Do"
+                                    value="{{ old('insurance_valid_to', $vehicle->insurance_valid_to?->format('Y-m-d')) }}"
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-3">

@@ -117,9 +117,9 @@
                                         $capacity = $vehicle->capacity ?? 0;
                                         $occupancyText = $capacity > 0 ? "{$currentOccupancy}/{$capacity}" : $currentOccupancy;
                                     @endphp
-                                    <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $tooltipText }}">
+                                    <x-tooltip title="{{ $tooltipText }}">
                                         <x-ui.badge variant="danger">{{ $occupancyText }}</x-ui.badge>
-                                    </span>
+                                    </x-tooltip>
                                 @else
                                     <x-ui.badge variant="success">Wolny</x-ui.badge>
                                 @endif
@@ -159,33 +159,3 @@
     </x-ui.card>
 </div>
 
-@push('scripts')
-<script>
-    function initTooltips() {
-        // Destroy existing tooltips first
-        var existingTooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-        existingTooltips.forEach(function(el) {
-            var tooltipInstance = bootstrap.Tooltip.getInstance(el);
-            if (tooltipInstance) {
-                tooltipInstance.dispose();
-            }
-        });
-        
-        // Initialize new tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    }
-    
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', initTooltips);
-    
-    // Re-initialize after Livewire updates
-    document.addEventListener('livewire:init', function() {
-        Livewire.hook('morph.updated', function() {
-            setTimeout(initTooltips, 100);
-        });
-    });
-</script>
-@endpush

@@ -24,9 +24,17 @@
                     </label>
                     <select name="status" class="form-control" onchange="this.form.submit()">
                         <option value="">Wszystkie statusy</option>
+                        @php
+                            $statusLabels = [
+                                'issued' => 'Wydany',
+                                'returned' => 'Zwrócony',
+                                'damaged' => 'Uszkodzony',
+                                'lost' => 'Zgubiony',
+                            ];
+                        @endphp
                         @foreach($statuses as $status)
                             <option value="{{ $status }}" {{ request('status') === $status ? 'selected' : '' }}>
-                                {{ ucfirst($status) }}
+                                {{ $statusLabels[$status] ?? ucfirst($status) }}
                             </option>
                         @endforeach
                     </select>

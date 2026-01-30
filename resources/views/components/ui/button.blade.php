@@ -57,7 +57,7 @@
 @if(!$hasPermission)
     {{-- Użytkownik nie ma uprawnienia - nie renderuj przycisku --}}
 @elseif($href)
-    <a href="{{ $href }}" {{ $attributes->merge(['class' => $classes]) }}>
+    <a href="{!! $href !!}" {{ $attributes->merge(['class' => $classes]) }}>
         @if($hasIcon && $hasSlotContent)
             <i class="{{ $icon }} me-1"></i>
         @elseif($hasIcon)

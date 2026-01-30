@@ -42,27 +42,27 @@ class ProjectDemandController extends Controller
             ->get();
         
         // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
-        $dateFrom = $request->query('start_date');
-        $dateTo = $request->query('end_date');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
         $projectId = $request->query('project_id');
         
         // Sprawdź czy daty są w przeszłości
         $isDateInPast = false;
-        if ($dateFrom) {
-            $isDateInPast = \Carbon\Carbon::parse($dateFrom)->startOfDay()->isPast();
+        if ($startDate) {
+            $isDateInPast = \Carbon\Carbon::parse($startDate)->startOfDay()->isPast();
         }
         
         // Pobierz istniejące zapotrzebowania dla wybranego projektu w tym okresie (jeśli daty i projekt są podane)
         $existingDemands = collect();
-        $existingDateTo = null;
-        if ($dateFrom && $dateTo && $projectId) {
+        $existingEndDate = null;
+        if ($startDate && $endDate && $projectId) {
             $project = Project::find($projectId);
             if ($project) {
                 $existingDemands = $project->demands()
-                    ->where('start_date', '<=', $dateTo)
-                    ->where(function ($q) use ($dateFrom) {
+                    ->where('start_date', '<=', $endDate)
+                    ->where(function ($q) use ($startDate) {
                         $q->whereNull('end_date')
-                          ->orWhere('end_date', '>=', $dateFrom);
+                          ->orWhere('end_date', '>=', $startDate);
                     })
                     ->with('role')
                     ->get();
@@ -74,13 +74,13 @@ class ProjectDemandController extends Controller
                 
                 if ($demandsWithDateTo->isNotEmpty()) {
                     $latestDateTo = $demandsWithDateTo->max('end_date');
-                    $existingDateTo = $latestDateTo ? $latestDateTo->format('Y-m-d') : null;
+                    $existingEndDate = $latestDateTo ? $latestDateTo->format('Y-m-d') : null;
                 } else {
-                    $uniqueDateFrom = $existingDemands->pluck('start_date')->unique();
-                    if ($uniqueDateFrom->count() === 1 && $uniqueDateFrom->first()->format('Y-m-d') === $dateFrom) {
-                        $existingDateTo = $dateTo;
+                    $uniqueStartDate = $existingDemands->pluck('start_date')->unique();
+                    if ($uniqueStartDate->count() === 1 && $uniqueStartDate->first()->format('Y-m-d') === $startDate) {
+                        $existingEndDate = $endDate;
                     } else {
-                        $existingDateTo = null;
+                        $existingEndDate = null;
                     }
                 }
                 
@@ -88,7 +88,7 @@ class ProjectDemandController extends Controller
             }
         }
         
-        return view("demands.create", compact("projects", "roles", "dateFrom", "dateTo", "projectId", "existingDemands", "existingDateTo", "isDateInPast"));
+        return view("demands.create", compact("projects", "roles", "startDate", "endDate", "projectId", "existingDemands", "existingEndDate", "isDateInPast"));
     }
     
     /**
@@ -147,55 +147,51 @@ class ProjectDemandController extends Controller
             ->get();
         
         // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
-        $dateFrom = $request->query('start_date');
-        $dateTo = $request->query('end_date');
+        // Używamy start_date i end_date zgodnie z konwencją (README.md linia 463)
+        $startDate = $request->query('start_date') ?: $request->input('start_date');
+        $endDate = $request->query('end_date') ?: $request->input('end_date');
         
-        // Sprawdź czy daty są w przeszłości (sprawdzamy tylko dateFrom, bo jeśli dateFrom jest w przyszłości, to dateTo też)
+        // Normalizuj puste stringi do null (ale zachowaj wartości jeśli są)
+        $startDate = ($startDate && trim($startDate) !== '') ? trim($startDate) : null;
+        $endDate = ($endDate && trim($endDate) !== '') ? trim($endDate) : null;
+        
+        // Sprawdź czy daty są w przeszłości (sprawdzamy tylko startDate, bo jeśli startDate jest w przyszłości, to endDate też)
         $isDateInPast = false;
-        if ($dateFrom) {
-            $isDateInPast = \Carbon\Carbon::parse($dateFrom)->startOfDay()->isPast();
+        if ($startDate) {
+            $isDateInPast = \Carbon\Carbon::parse($startDate)->startOfDay()->isPast();
         }
         
         // Pobierz istniejące zapotrzebowania dla tego projektu w tym okresie (jeśli daty są podane)
         $existingDemands = collect();
-        $existingDateTo = null;
-        if ($dateFrom && $dateTo) {
+        $existingEndDate = $endDate; // Domyślnie używaj daty z parametrów
+        
+        if ($startDate && $endDate) {
+            $startDateCarbon = \Carbon\Carbon::parse($startDate);
+            $endDateCarbon = \Carbon\Carbon::parse($endDate);
+            
+            // Użyj metody overlappingWith z traitu HasDateRange
             $existingDemands = $project->demands()
-                ->where('start_date', '<=', $dateTo)
-                ->where(function ($q) use ($dateFrom) {
-                    $q->whereNull('end_date')
-                      ->orWhere('end_date', '>=', $dateFrom);
-                })
+                ->overlappingWith($startDateCarbon, $endDateCarbon)
                 ->with('role')
                 ->get();
             
-            // Znajdź najpóźniejszą datę do z istniejących zapotrzebowań
-            $demandsWithDateTo = $existingDemands->filter(function($d) {
-                return $d->end_date !== null;
-            });
-            
-            if ($demandsWithDateTo->isNotEmpty()) {
-                // Jeśli są zapotrzebowania z end_date, użyj najpóźniejszej
-                $latestDateTo = $demandsWithDateTo->max('end_date');
-                $existingDateTo = $latestDateTo ? $latestDateTo->format('Y-m-d') : null;
-            } else {
-                // Jeśli wszystkie mają end_date = null, sprawdź czy wszystkie mają tę samą start_date
-                // Jeśli tak, użyj end_date z parametrów, w przeciwnym razie zostaw puste
-                $uniqueDateFrom = $existingDemands->pluck('start_date')->unique();
-                if ($uniqueDateFrom->count() === 1 && $uniqueDateFrom->first()->format('Y-m-d') === $dateFrom) {
-                    // Wszystkie zapotrzebowania zaczynają się w tym samym dniu co zakres, użyj end_date z parametrów
-                    $existingDateTo = $dateTo;
-                } else {
-                    // Różne daty, zostaw puste (użytkownik sam zdecyduje)
-                    $existingDateTo = null;
+            // Jeśli są zapotrzebowania, sprawdź czy wszystkie mają te same daty
+            if ($existingDemands->isNotEmpty()) {
+                $uniqueStartDates = $existingDemands->pluck('start_date')->map(fn($d) => $d->format('Y-m-d'))->unique();
+                $uniqueEndDates = $existingDemands->pluck('end_date')->map(fn($d) => $d ? $d->format('Y-m-d') : null)->unique();
+                
+                // Jeśli wszystkie zapotrzebowania mają tę samą start_date i end_date, użyj tych dat
+                if ($uniqueStartDates->count() === 1 && $uniqueEndDates->count() === 1) {
+                    $existingEndDate = $uniqueEndDates->first() ?? $endDate;
                 }
+                // W przeciwnym razie użyj daty z parametrów (już ustawione wyżej)
             }
             
-            // Kluczuj po role_id (jeśli jest wiele dla tej samej roli, weź pierwsze)
-            $existingDemands = $existingDemands->keyBy('role_id');
+            // Klucjuj po role_id (jeśli jest wiele dla tej samej roli, weź najnowsze)
+            $existingDemands = $existingDemands->sortByDesc('created_at')->keyBy('role_id');
         }
         
-        return view("demands.create", compact("project", "projects", "roles", "dateFrom", "dateTo", "existingDemands", "existingDateTo", "isDateInPast"));
+        return view("demands.create", compact("project", "projects", "roles", "startDate", "endDate", "existingDemands", "existingEndDate", "isDateInPast"));
     }
 
     /**

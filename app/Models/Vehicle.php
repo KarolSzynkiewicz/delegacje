@@ -27,6 +27,7 @@ class Vehicle extends Model
         'capacity',
         'technical_condition',
         'inspection_valid_to',
+        'insurance_valid_to',
         'notes',
         'image_path',
         'current_location_id',
@@ -51,6 +52,7 @@ class Vehicle extends Model
      */
     protected $casts = [
         'inspection_valid_to' => 'date',
+        'insurance_valid_to' => 'date',
         'type' => VehicleType::class,
     ];
 

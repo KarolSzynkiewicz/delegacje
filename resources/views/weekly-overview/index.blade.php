@@ -122,25 +122,24 @@
                             $totalNeeded = $reqSummary['total_needed'] ?? 0;
                             $totalAssigned = $reqSummary['total_assigned_max'] ?? $reqSummary['total_assigned'] ?? 0;
                             
-                            $vehicles = collect($weekData['vehicles'] ?? []);
-                            $vehiclesCount = $vehicles->count();
+                            // Licz osoby z autem i domem z przypisanych do projektu
                             $employeesWithoutVehicle = $summary->getEmployeesWithoutVehicle();
-                            $vehiclesNeeded = $employeesWithoutVehicle->count();
+                            $employeesWithVehicle = $totalAssigned - $employeesWithoutVehicle->count();
                             
-                            $accommodations = collect($weekData['accommodations'] ?? []);
-                            $accommodationsCount = $accommodations->count();
                             $employeesWithoutAccommodation = $summary->getEmployeesWithoutAccommodation();
-                            $accommodationsNeeded = $employeesWithoutAccommodation->count();
+                            $employeesWithAccommodation = $totalAssigned - $employeesWithoutAccommodation->count();
                             
                             $peopleProgress = $totalNeeded > 0 ? round(($totalAssigned / $totalNeeded) * 100) : 0;
-                            $vehiclesProgress = ($vehiclesNeeded + $vehiclesCount) > 0 ? round(($vehiclesCount / ($vehiclesNeeded + $vehiclesCount)) * 100) : 0;
-                            $accommodationsProgress = ($accommodationsNeeded + $accommodationsCount) > 0 ? round(($accommodationsCount / ($accommodationsNeeded + $accommodationsCount)) * 100) : 0;
+                            $vehiclesProgress = $totalAssigned > 0 ? round(($employeesWithVehicle / $totalAssigned) * 100) : 0;
+                            $accommodationsProgress = $totalAssigned > 0 ? round(($employeesWithAccommodation / $totalAssigned) * 100) : 0;
                         @endphp
                         
                         <div class="d-flex align-items-center gap-3 ms-auto flex-wrap">
                             <!-- Ludzie -->
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-people text-primary fs-5"></i>
+                                <x-tooltip title="Ilu jest przypisanych do projektu / na ilu było zapotrzebowanie">
+                                    <i class="bi bi-people text-primary fs-5"></i>
+                                </x-tooltip>
                                 <div class="small">
                                     <div class="fw-semibold">{{ $totalAssigned }} / {{ $totalNeeded }}</div>
                                     <div class="mt-1" style="width: 60px;">
@@ -151,9 +150,11 @@
                             
                             <!-- Auta -->
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-car-front text-info fs-5"></i>
+                                <x-tooltip title="Ilu ma przypisane auto / z ilu przypisanych do projektu">
+                                    <i class="bi bi-car-front text-info fs-5"></i>
+                                </x-tooltip>
                                 <div class="small">
-                                    <div class="fw-semibold">{{ $vehiclesCount }} / {{ $vehiclesNeeded + $vehiclesCount }}</div>
+                                    <div class="fw-semibold">{{ $employeesWithVehicle }} / {{ $totalAssigned }}</div>
                                     <div class="mt-1" style="width: 60px;">
                                         <x-ui.progress value="{{ $vehiclesProgress }}" max="100" variant="{{ $vehiclesProgress == 100 ? 'success' : ($vehiclesProgress >= 70 ? 'warning' : 'danger') }}" />
                                     </div>
@@ -162,9 +163,11 @@
                             
                             <!-- Domy -->
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-house text-success fs-5"></i>
+                                <x-tooltip title="Ilu ma przypisany dom / z ilu przypisanych do projektu">
+                                     <i class="bi bi-house text-info fs-5"></i>
+                                </x-tooltip>
                                 <div class="small">
-                                    <div class="fw-semibold">{{ $accommodationsCount }} / {{ $accommodationsNeeded + $accommodationsCount }}</div>
+                                    <div class="fw-semibold">{{ $employeesWithAccommodation }} / {{ $totalAssigned }}</div>
                                     <div class="mt-1" style="width: 60px;">
                                         <x-ui.progress value="{{ $accommodationsProgress }}" max="100" variant="{{ $accommodationsProgress == 100 ? 'success' : ($accommodationsProgress >= 70 ? 'warning' : 'danger') }}" />
                                     </div>
@@ -185,7 +188,20 @@
                 <div class="row g-3 mb-4">
                     <!-- Zapotrzebowanie (1/3) -->
                     <div class="col-md-4">
-                        <x-ui.card label="Zapotrzebowanie">
+                        <x-ui.card>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="card-label">Zapotrzebowanie</span>
+                                <x-ui.button 
+                                    variant="ghost" 
+                                    href="{{ route('projects.demands.create', ['project' => $project, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" 
+                                    class="btn-sm" 
+                                    action="edit"
+                                    title="Edytuj zapotrzebowanie"
+                                >
+                                    <i class="bi bi-pencil"></i>
+                                </x-ui.button>
+                            </div>
+                            
                             @php
                                 $reqSummary = $weekData['requirements_summary'] ?? [];
                                 $totalNeeded = $reqSummary['total_needed'] ?? 0;
@@ -194,79 +210,15 @@
                                 $summary = new \App\ViewModels\WeeklyProjectSummary($weekData);
                             @endphp
                             
-                            <!-- Braki i Nadmiary -->
-                            @php
-                                $hasBraki = $summary->getTotalMissing() > 0 || $summary->getEmployeesWithoutVehicle()->isNotEmpty() || $summary->getEmployeesWithoutAccommodation()->isNotEmpty();
-                                $hasNadmiary = $summary->getTotalExcess() > 0 || $summary->getOvercrowdedAccommodations()->isNotEmpty() || $summary->getOvercrowdedVehicles()->isNotEmpty();
-                            @endphp
-                            
-                            @if($hasBraki || $hasNadmiary)
-                                <div class="mb-3">
-                                    <!-- Braki -->
-                                    @if($hasBraki)
-                                        <x-ui.alert variant="danger" title="Braki" class="mb-2">
-                                            @if($summary->getTotalMissing() > 0)
-                                                <div class="mb-1">
-                                                    <x-ui.badge variant="danger">
-                                                        <i class="bi bi-exclamation-circle"></i> Brakuje {{ $summary->getTotalMissing() }} {{ $summary->getTotalMissing() == 1 ? 'osoby' : 'osób' }}
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
-                                            @if($summary->getEmployeesWithoutVehicle()->isNotEmpty())
-                                                <div class="mb-1">
-                                                    <x-ui.badge variant="danger">
-                                                        <i class="bi bi-exclamation-circle text-white"></i> {{ $summary->getEmployeesWithoutVehicle()->count() }} {{ $summary->getEmployeesWithoutVehicle()->count() == 1 ? 'osobie' : 'osobom' }} brakuje auta
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
-                                            @if($summary->getEmployeesWithoutAccommodation()->isNotEmpty())
-                                                <div class="mb-1">
-                                                    <x-ui.badge variant="danger">
-                                                        <i class="bi bi-exclamation-circle text-white"></i> {{ $summary->getEmployeesWithoutAccommodation()->count() }} {{ $summary->getEmployeesWithoutAccommodation()->count() == 1 ? 'osobie' : 'osobom' }} brakuje domu
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
-                                        </x-ui.alert>
-                                    @endif
-                                    
-                                    <!-- Nadmiary -->
-                                    @if($hasNadmiary)
-                                        <x-ui.alert variant="warning" title="Nadmiary" class="mb-2">
-                                            @if($summary->getTotalExcess() > 0)
-                                                <div class="mb-1">
-                                                    <x-ui.badge variant="warning">
-                                                        <i class="bi bi-exclamation-circle"></i> Nadmiar {{ $summary->getTotalExcess() }} {{ $summary->getTotalExcess() == 1 ? 'osoby' : 'osób' }}
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
-                                            @if($summary->getOvercrowdedVehicles()->isNotEmpty())
-                                                <div class="mb-1">
-                                                    <x-ui.badge variant="warning">
-                                                        <i class="bi bi-exclamation-circle"></i> {{ $summary->getOvercrowdedVehicles()->count() }} {{ $summary->getOvercrowdedVehicles()->count() == 1 ? 'auto' : 'aut' }} przepełnione
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
-                                            @if($summary->getOvercrowdedAccommodations()->isNotEmpty())
-                                                <div class="mb-1">
-                                                    <x-ui.badge variant="warning">
-                                                        <i class="bi bi-exclamation-circle"></i> {{ $summary->getOvercrowdedAccommodations()->count() }} {{ $summary->getOvercrowdedAccommodations()->count() == 1 ? 'dom' : 'domów' }} przepełnionych
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
-                                        </x-ui.alert>
-                                    @endif
-                                </div>
-                            @endif
-                            
                             <!-- Tabelka zapotrzebowania -->
                             @if(!empty($roleDetails))
-                                <div class="table-responsive mb-3">
-                                    <table class="table table-sm mb-0">
+                                <div class="table-responsive mb-0">
+                                    <table class="table table-sm mb-0" style="margin-bottom: 0 !important;">
                                         <thead>
                                             <tr>
-                                                <th class="text-start small fw-bold">Rola</th>
-                                                <th class="text-center small fw-bold">Przypisanych</th>
-                                                <th class="text-center small fw-bold">Potrzebnych</th>
+                                                <th class="text-start small fw-bold" style="padding: 0.5rem;">Rola</th>
+                                                <th class="text-center small fw-bold" style="padding: 0.5rem;">jest</th>
+                                                <th class="text-center small fw-bold" style="padding: 0.5rem;">ma być</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -280,28 +232,61 @@
                                                     $missing = $roleDetail['missing'] ?? 0;
                                                     $isComplete = $isStable && $assigned !== null && $assigned >= $needed;
                                                     $isPartial = $isStable && $assigned !== null && $assigned > 0 && $assigned < $needed;
+                                                    $role = $roleDetail['role'] ?? null;
                                                 @endphp
                                                 <tr>
-                                                    <td class="small">
-                                                        {{ Str::lower($roleDetail['role']->name ?? '-') }}
+                                                    <td class="small" style="padding: 0.25rem;">
+                                                        @if($role)
+                                                            @php
+                                                                $createUrl = route('project-assignments.create', [
+                                                                    'project_id' => $project->id,
+                                                                    'start_date' => $weeks[0]['start']->format('Y-m-d'),
+                                                                    'end_date' => $weeks[0]['end']->format('Y-m-d'),
+                                                                    'role_id' => $role->id
+                                                                ]);
+                                                            @endphp
+                                                            <x-ui.clickable-badge 
+                                                                variant="accent" 
+                                                                :href="$createUrl"
+                                                            >
+                                                                {{ $role->name }}
+                                                            </x-ui.clickable-badge>
+                                                        @else
+                                                            {{ Str::lower($roleDetail['role']->name ?? '-') }}
+                                                        @endif
                                                     </td>
-                                                    <td class="text-center small fw-semibold text-primary">
+                                                    <td class="text-center small fw-semibold text-primary" style="padding: 0.25rem;">
                                                         @if($isStable && $assigned !== null)
                                                             {{ $assigned }}
                                                         @else
                                                             {{ $assignedMin }}-{{ $assignedMax }}
                                                         @endif
                                                     </td>
-                                                    <td class="text-center small fw-semibold {{ $isComplete ? 'text-success' : ($isPartial ? 'text-warning' : 'text-danger') }}">
+                                                    <td class="text-center small fw-semibold {{ $isComplete ? 'text-success' : ($isPartial ? 'text-warning' : 'text-danger') }}" style="padding: 0.25rem;">
                                                         {{ $needed }}
                                                     </td>
                                                 </tr>
+                                                @if($needed > 0)
+                                                    @php
+                                                        $roleProgress = $isStable && $assigned !== null 
+                                                            ? round(($assigned / $needed) * 100) 
+                                                            : ($assignedMax > 0 ? round(($assignedMax / $needed) * 100) : 0);
+                                                        $roleProgressVariant = $roleProgress == 100 ? 'success' : ($roleProgress >= 70 ? 'warning' : 'danger');
+                                                    @endphp
+                                                    <tr>
+                                                        <td colspan="3" style="padding: 0.25rem 0.5rem;">
+                                                            <div style="width: 100%;">
+                                                                <x-ui.progress 
+                                                                    value="{{ min($roleProgress, 100) }}" 
+                                                                    max="100" 
+                                                                    variant="{{ $roleProgressVariant }}"
+                                                                    style="height: 4px;"
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @endif
                                             @endforeach
-                                            <tr class="fw-bold border-top">
-                                                <td class="small">łącznie</td>
-                                                <td class="text-center small">{{ $totalAssigned }}</td>
-                                                <td class="text-center small">{{ $totalNeeded }}</td>
-                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -322,61 +307,6 @@
                                         </div>
                                     @endif
                                 </div>
-                            @endif
-                            
-                            <div>
-                                <x-ui.button variant="ghost" href="{{ route('projects.demands.create', ['project' => $project, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" class="w-100 btn-sm" action="edit">
-                                    Edytuj zapotrzebowanie
-                                </x-ui.button>
-                            </div>
-                            
-                            @if($returnTrips->isNotEmpty())
-                                <x-ui.alert variant="warning" title="Zjazdy w tym tygodniu" class="mt-3">
-                                    <ul class="mb-0 small">
-                                        @foreach($returnTrips as $returnTrip)
-                                            <li class="mb-1">
-                                                <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none">
-                                                    <strong>{{ $returnTrip->event_date->format('d.m.Y') }}</strong>
-                                                    @if($returnTrip->vehicle)
-                                                        - {{ $returnTrip->vehicle->registration_number }}
-                                                    @endif
-                                                    @php
-                                                        $uniqueParticipantsCount = $returnTrip->participants->pluck('employee_id')->unique()->count();
-                                                    @endphp
-                                                    @if($uniqueParticipantsCount > 0)
-                                                        ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
-                                                    @endif
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </x-ui.alert>
-                            @endif
-                            
-                            @if(isset($departures) && $departures->isNotEmpty())
-                                <x-ui.alert variant="warning" title="Wyjazdy w tym tygodniu" class="mt-3">
-                                    <ul class="mb-0 small">
-                                        @foreach($departures as $departure)
-                                            <li class="mb-1">
-                                                <a href="{{ route('departures.show', $departure) }}" class="text-decoration-none">
-                                                    <strong>{{ $departure->event_date->format('d.m.Y') }}</strong>
-                                                    @if($departure->toLocation)
-                                                        - {{ $departure->toLocation->name }}
-                                                    @endif
-                                                    @if($departure->vehicle)
-                                                        - {{ $departure->vehicle->registration_number }}
-                                                    @endif
-                                                    @php
-                                                        $uniqueParticipantsCount = $departure->participants->pluck('employee_id')->unique()->count();
-                                                    @endphp
-                                                    @if($uniqueParticipantsCount > 0)
-                                                        ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
-                                                    @endif
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </x-ui.alert>
                             @endif
                         </x-ui.card>
                     </div>
@@ -456,6 +386,24 @@
                                                         </ul>
                                                     @else
                                                         <p class="small text-muted mb-0">Brak przypisanych osób</p>
+                                                    @endif
+                                                    
+                                                    <!-- Informacja o zjazdzie dla tego auta -->
+                                                    @if(isset($vehicleData['return_trip']) && $vehicleData['return_trip'] !== null)
+                                                        @php
+                                                            $returnTrip = $vehicleData['return_trip'];
+                                                        @endphp
+                                                        <div class="mt-2 pt-2 border-top">
+                                                            <div class="d-flex align-items-center gap-1 small">
+                                                                <i class="bi bi-arrow-return-left text-warning"></i>
+                                                                <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none text-dark fw-semibold">
+                                                                    Zjazd: {{ $returnTrip->event_date->format('d.m.Y') }}
+                                                                    @if($vehicleData['vehicle'])
+                                                                        - {{ $vehicleData['vehicle']->registration_number }}
+                                                                    @endif
+                                                                </a>
+                                                            </div>
+                                                        </div>
                                                     @endif
                                                 </div>
                                             </div>
@@ -648,6 +596,136 @@
                     </div>
                 </div>
 
+                <!-- Karta Alerty -->
+                @if($weekData && $weekData['has_data'])
+                    @php
+                        $summary = new \App\ViewModels\WeeklyProjectSummary($weekData);
+                        $hasBraki = $summary->getTotalMissing() > 0 || $summary->getEmployeesWithoutVehicle()->isNotEmpty() || $summary->getEmployeesWithoutAccommodation()->isNotEmpty();
+                        $hasNadmiary = $summary->getTotalExcess() > 0 || $summary->getOvercrowdedAccommodations()->isNotEmpty() || $summary->getOvercrowdedVehicles()->isNotEmpty();
+                    @endphp
+                    
+                    @if($hasBraki || $hasNadmiary || ($returnTrips->isNotEmpty() ?? false) || (isset($departures) && $departures->isNotEmpty()))
+                        <x-ui.card label="Alerty" class="mt-4 mb-4">
+                            <div class="row g-3">
+                                <!-- Kolumna 1: Braki -->
+                                <div class="col-md-3">
+                                    @if($hasBraki)
+                                        <x-ui.alert variant="danger" title="Braki">
+                                            @if($summary->getTotalMissing() > 0)
+                                                <div class="mb-1 small">
+                                                    Brakuje {{ $summary->getTotalMissing() }} {{ $summary->getTotalMissing() == 1 ? 'osoby' : 'osób' }}
+                                                </div>
+                                            @endif
+                                            @if($summary->getEmployeesWithoutVehicle()->isNotEmpty())
+                                                <div class="mb-1 small">
+                                                    {{ $summary->getEmployeesWithoutVehicle()->count() }} {{ $summary->getEmployeesWithoutVehicle()->count() == 1 ? 'osobie' : 'osobom' }} brakuje auta
+                                                </div>
+                                            @endif
+                                            @if($summary->getEmployeesWithoutAccommodation()->isNotEmpty())
+                                                <div class="mb-1 small">
+                                                    {{ $summary->getEmployeesWithoutAccommodation()->count() }} {{ $summary->getEmployeesWithoutAccommodation()->count() == 1 ? 'osobie' : 'osobom' }} brakuje domu
+                                                </div>
+                                            @endif
+                                        </x-ui.alert>
+                                    @else
+                                        <div class="small text-muted">Brak braków</div>
+                                    @endif
+                                </div>
+                                
+                                <!-- Kolumna 2: Nadmiary -->
+                                <div class="col-md-3">
+                                    @if($hasNadmiary)
+                                        <x-ui.alert variant="warning" title="Nadmiary">
+                                            @if($summary->getTotalExcess() > 0)
+                                                <div class="mb-1 small">
+                                                    Nadmiar {{ $summary->getTotalExcess() }} {{ $summary->getTotalExcess() == 1 ? 'osoby' : 'osób' }}
+                                                </div>
+                                            @endif
+                                            @if($summary->getOvercrowdedVehicles()->isNotEmpty())
+                                                <div class="mb-1 small">
+                                                    {{ $summary->getOvercrowdedVehicles()->count() }} {{ $summary->getOvercrowdedVehicles()->count() == 1 ? 'auto' : 'aut' }} przepełnione
+                                                </div>
+                                            @endif
+                                            @if($summary->getOvercrowdedAccommodations()->isNotEmpty())
+                                                <div class="mb-1 small">
+                                                    {{ $summary->getOvercrowdedAccommodations()->count() }} {{ $summary->getOvercrowdedAccommodations()->count() == 1 ? 'dom' : 'domów' }} przepełnionych
+                                                </div>
+                                            @endif
+                                        </x-ui.alert>
+                                    @else
+                                        <div class="small text-muted">Brak nadmiarów</div>
+                                    @endif
+                                </div>
+                                
+                                <!-- Kolumna 3: Zjazdy -->
+                                <div class="col-md-3">
+                                    @if($returnTrips->isNotEmpty())
+                                        <div class="small">
+                                            <div class="fw-semibold text-warning mb-2">
+                                                <i class="bi bi-arrow-return-left"></i> Zjazdy
+                                            </div>
+                                            <ul class="mb-0 small list-unstyled">
+                                                @foreach($returnTrips as $returnTrip)
+                                                    <li class="mb-1">
+                                                        <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none">
+                                                            <strong>{{ $returnTrip->event_date->format('d.m.Y') }}</strong>
+                                                            @if($returnTrip->vehicle)
+                                                                - {{ $returnTrip->vehicle->registration_number }}
+                                                            @endif
+                                                            @php
+                                                                $uniqueParticipantsCount = $returnTrip->participants->pluck('employee_id')->unique()->count();
+                                                            @endphp
+                                                            @if($uniqueParticipantsCount > 0)
+                                                                ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
+                                                            @endif
+                                                        </a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @else
+                                        <div class="small text-muted">Brak zjazdów</div>
+                                    @endif
+                                </div>
+                                
+                                <!-- Kolumna 4: Wyjazdy -->
+                                <div class="col-md-3">
+                                    @if(isset($departures) && $departures->isNotEmpty())
+                                        <div class="small">
+                                            <div class="fw-semibold text-warning mb-2">
+                                                <i class="bi bi-arrow-right"></i> Wyjazdy
+                                            </div>
+                                            <ul class="mb-0 small list-unstyled">
+                                                @foreach($departures as $departure)
+                                                    <li class="mb-1">
+                                                        <a href="{{ route('departures.show', $departure) }}" class="text-decoration-none">
+                                                            <strong>{{ $departure->event_date->format('d.m.Y') }}</strong>
+                                                            @if($departure->toLocation)
+                                                                - {{ $departure->toLocation->name }}
+                                                            @endif
+                                                            @if($departure->vehicle)
+                                                                - {{ $departure->vehicle->registration_number }}
+                                                            @endif
+                                                            @php
+                                                                $uniqueParticipantsCount = $departure->participants->pluck('employee_id')->unique()->count();
+                                                            @endphp
+                                                            @if($uniqueParticipantsCount > 0)
+                                                                ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
+                                                            @endif
+                                                        </a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @else
+                                        <div class="small text-muted">Brak wyjazdów</div>
+                                    @endif
+                                </div>
+                            </div>
+                        </x-ui.card>
+                    @endif
+                @endif
+
                 <!-- Tabelka z ludźmi -->
                 @if(isset($weekData['assigned_employees']) && $weekData['assigned_employees']->isNotEmpty())
                     <div class="mt-4">
@@ -683,8 +761,12 @@
                                                     <x-ui.badge variant="warning" title="Rola zmienia się w trakcie tygodnia">
                                                         <i class="bi bi-arrow-left-right"></i> Zmienna
                                                     </x-ui.badge>
-                                                @elseif(isset($employeeData['assignment']))
-                                                    <x-ui.clickable-badge variant="accent" route="assignments.show" :routeParams="['project_assignment' => $employeeData['assignment']]">
+                                                @elseif(isset($employeeData['assignment']) && $employeeData['assignment'])
+                                                    @php
+                                                        $assignment = $employeeData['assignment'];
+                                                        $editUrl = route('assignments.edit', ['project_assignment' => $assignment->id ?? $assignment]);
+                                                    @endphp
+                                                    <x-ui.clickable-badge variant="accent" :href="$editUrl">
                                                         {{ $employeeData['role']->name ?? '-' }}
                                                     </x-ui.clickable-badge>
                                                 @else
@@ -695,16 +777,14 @@
                                                 <span class="fw-semibold small">{{ $dateRange }}</span>
                                             </td>
                                             <td>
-                                                @if($employeeData['has_vehicle_in_week'] ?? false)
-                                                    @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
-                                                        <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
-                                                            <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
-                                                        </x-ui.clickable-badge>
-                                                    @else
-                                                        <x-ui.badge variant="success">
-                                                            <i class="bi bi-car-front"></i> Tak
-                                                        </x-ui.badge>
-                                                    @endif
+                                                @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
+                                                    <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
+                                                        <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
+                                                    </x-ui.clickable-badge>
+                                                @elseif($employeeData['has_vehicle_in_week'] ?? false)
+                                                    <x-ui.badge variant="success">
+                                                        <i class="bi bi-car-front"></i> Tak
+                                                    </x-ui.badge>
                                                 @else
                                                     <x-ui.clickable-badge variant="danger" route="vehicle-assignments.create" :routeParams="['employee_id' => $employeeData['employee']->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]">
                                                         <i class="bi bi-x-circle"></i> Brak
@@ -728,23 +808,41 @@
                                                         $rotation = $employeeData['rotation']['rotation'] ?? null;
                                                         $startDate = $employeeData['rotation']['start_date'] ?? ($employeeData['rotation']->start_date ?? null);
                                                         $endDate = $employeeData['rotation']['end_date'] ?? ($employeeData['rotation']->end_date ?? null);
+                                                        
+                                                        // Oblicz liczbę dni
+                                                        $daysCount = null;
+                                                        if ($startDate && $endDate) {
+                                                            $start = \Carbon\Carbon::parse($startDate);
+                                                            $end = \Carbon\Carbon::parse($endDate);
+                                                            $daysCount = $start->diffInDays($end) + 1; // +1 bo wliczamy oba dni
+                                                        } elseif ($startDate) {
+                                                            // Jeśli jest tylko startDate, oblicz do końca tygodnia
+                                                            $start = \Carbon\Carbon::parse($startDate);
+                                                            $weekEnd = $weeks[0]['end'];
+                                                            $daysCount = $start->diffInDays($weekEnd) + 1;
+                                                        } elseif ($endDate) {
+                                                            // Jeśli jest tylko endDate, oblicz od początku tygodnia
+                                                            $end = \Carbon\Carbon::parse($endDate);
+                                                            $weekStart = $weeks[0]['start'];
+                                                            $daysCount = $weekStart->diffInDays($end) + 1;
+                                                        }
                                                     @endphp
                                                     @if($rotation)
                                                         <x-ui.clickable-badge variant="warning" route="employees.rotations.edit" :routeParams="['employee' => $employeeData['employee'], 'rotation' => $rotation]">
                                                             <i class="bi bi-arrow-repeat"></i> 
-                                                            @if($startDate && $endDate)
-                                                                {{ \Carbon\Carbon::parse($startDate)->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
-                                                            @elseif($endDate)
-                                                                {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                            @if($daysCount !== null)
+                                                                {{ $daysCount }} {{ $daysCount == 1 ? 'dzień' : 'dni' }}
+                                                            @else
+                                                                Rotacja
                                                             @endif
                                                         </x-ui.clickable-badge>
                                                     @else
                                                         <x-ui.badge variant="warning">
                                                             <i class="bi bi-arrow-repeat"></i> 
-                                                            @if($startDate && $endDate)
-                                                                {{ \Carbon\Carbon::parse($startDate)->format('d.m.Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
-                                                            @elseif($endDate)
-                                                                {{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}
+                                                            @if($daysCount !== null)
+                                                                {{ $daysCount }} {{ $daysCount == 1 ? 'dzień' : 'dni' }}
+                                                            @else
+                                                                Rotacja
                                                             @endif
                                                         </x-ui.badge>
                                                     @endif
@@ -779,7 +877,7 @@
                 @endphp
                 <div class="mt-4">
                     <x-ui.table-header title="Zadania projektu" titleClass="text-dark">
-                        <x-ui.button variant="primary" href="{{ route('projects.show', $projectData['project']) }}#tasks" action="create" class="btn-sm">
+                        <x-ui.button variant="primary" href="{{ route('projects.show', $projectData['project']) }}?tab=tasks" action="create" class="btn-sm">
                             Dodaj zadanie
                         </x-ui.button>
                     </x-ui.table-header>
@@ -824,14 +922,231 @@
                 <i class="bi bi-exclamation-triangle text-danger"></i>
                 Kończące się dokumenty i ubezpieczenia
             </h2>
-            <div class="row g-3">
-                <!-- TODO: Implementacja wyświetlania kończących się dokumentów -->
-                <div class="col-md-4">
+            
+            @php
+                // Tworzymy listę pojazdów z informacją o typie (przegląd/OC)
+                $vehiclesList = collect();
+                foreach($expiringItems['vehicle_inspections'] as $vehicle) {
+                    $vehiclesList->push([
+                        'vehicle' => $vehicle,
+                        'type' => 'inspection',
+                        'date' => $vehicle->inspection_valid_to
+                    ]);
+                }
+                foreach($expiringItems['vehicle_insurance'] as $vehicle) {
+                    $vehiclesList->push([
+                        'vehicle' => $vehicle,
+                        'type' => 'insurance',
+                        'date' => $vehicle->insurance_valid_to
+                    ]);
+                }
+                $vehiclesList = $vehiclesList->sortBy('date');
+                
+                $hasExpiringItems = ($expiringItems['documents']->isNotEmpty() || 
+                                    $vehiclesList->isNotEmpty() || 
+                                    $expiringItems['accommodations']->isNotEmpty());
+            @endphp
+            
+            @if($hasExpiringItems)
+                <div x-data="{ 
+                    showAllVehicles: false,
+                    showAllAccommodations: false
+                }">
+                    <!-- Sekcja: Dokumenty -->
+                    @if($expiringItems['documents']->isNotEmpty())
+                        <div class="mb-4">
+                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-file-earmark-text text-info"></i>
+                                Dokumenty ({{ $expiringItems['documents']->count() }})
+                            </h3>
+                            <div class="row g-3">
+                                @foreach($expiringItems['documents']->take(6) as $document)
+                                    <div class="col-md-4">
+                                        <x-ui.card>
+                                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h5 class="fw-bold mb-1">{{ $document->employee->full_name }}</h5>
+                                                    <p class="mb-1 text-muted small">{{ $document->document->name ?? 'Dokument' }}</p>
+                                                    @if($document->type)
+                                                        <x-ui.badge variant="info" class="mb-2">{{ $document->type }}</x-ui.badge>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-calendar-event text-warning"></i>
+                                                <span class="small">Ważny do: <strong>{{ $document->valid_to->format('d.m.Y') }}</strong></span>
+                                            </div>
+                                        </x-ui.card>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if($expiringItems['documents']->count() > 6)
+                                <div class="text-center mt-3">
+                                    <x-ui.button variant="outline-secondary" href="{{ route('employee-documents.index', ['filterStatus' => 'wygasa_wkrotce']) }}" class="btn-sm">
+                                        Pokaż więcej ({{ $expiringItems['documents']->count() - 6 }})
+                                    </x-ui.button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                    
+                    <!-- Sekcja: Auta -->
+                    @if($vehiclesList->isNotEmpty())
+                        <div class="mb-4">
+                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-car-front text-warning"></i>
+                                Auta ({{ $vehiclesList->count() }})
+                            </h3>
+                            <div class="row g-3">
+                                @foreach($vehiclesList->take(5) as $item)
+                                    @php
+                                        $vehicle = $item['vehicle'];
+                                        $type = $item['type'];
+                                        $date = $item['date'];
+                                    @endphp
+                                    <div class="col-md-4">
+                                        <x-ui.card>
+                                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
+                                                    <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
+                                                    @if($type === 'inspection')
+                                                        <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
+                                                    @else
+                                                        <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
+                                                <span class="small">
+                                                    @if($type === 'inspection')
+                                                        Przegląd ważny do:
+                                                    @else
+                                                        OC ważne do:
+                                                    @endif
+                                                    <strong>{{ $date->format('d.m.Y') }}</strong>
+                                                </span>
+                                            </div>
+                                        </x-ui.card>
+                                    </div>
+                                @endforeach
+                                
+                                @if($vehiclesList->count() > 5)
+                                    <template x-if="showAllVehicles">
+                                        @foreach($vehiclesList->skip(5) as $item)
+                                            @php
+                                                $vehicle = $item['vehicle'];
+                                                $type = $item['type'];
+                                                $date = $item['date'];
+                                            @endphp
+                                            <div class="col-md-4">
+                                                <x-ui.card>
+                                                    <div class="d-flex align-items-start justify-content-between mb-2">
+                                                        <div class="flex-grow-1">
+                                                            <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
+                                                            <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
+                                                            @if($type === 'inspection')
+                                                                <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
+                                                            @else
+                                                                <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
+                                                        <span class="small">
+                                                            @if($type === 'inspection')
+                                                                Przegląd ważny do:
+                                                            @else
+                                                                OC ważne do:
+                                                            @endif
+                                                            <strong>{{ $date->format('d.m.Y') }}</strong>
+                                                        </span>
+                                                    </div>
+                                                </x-ui.card>
+                                            </div>
+                                        @endforeach
+                                    </template>
+                                @endif
+                            </div>
+                            @if($vehiclesList->count() > 5)
+                                <div class="text-center mt-3">
+                                    <button @click="showAllVehicles = !showAllVehicles" class="btn btn-outline-secondary btn-sm">
+                                        <span x-show="!showAllVehicles">Pokaż więcej ({{ $vehiclesList->count() - 5 }})</span>
+                                        <span x-show="showAllVehicles">Pokaż mniej</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                    
+                    <!-- Sekcja: Mieszkania -->
+                    @if($expiringItems['accommodations']->isNotEmpty())
+                        <div class="mb-4">
+                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-house text-danger"></i>
+                                Mieszkania ({{ $expiringItems['accommodations']->count() }})
+                            </h3>
+                            <div class="row g-3">
+                                @foreach($expiringItems['accommodations']->take(5) as $accommodation)
+                                    <div class="col-md-4">
+                                        <x-ui.card>
+                                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
+                                                    <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
+                                                    <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-calendar-event text-warning"></i>
+                                                <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                            </div>
+                                        </x-ui.card>
+                                    </div>
+                                @endforeach
+                                
+                                @if($expiringItems['accommodations']->count() > 5)
+                                    <template x-if="showAllAccommodations">
+                                        @foreach($expiringItems['accommodations']->skip(5) as $accommodation)
+                                            <div class="col-md-4">
+                                                <x-ui.card>
+                                                    <div class="d-flex align-items-start justify-content-between mb-2">
+                                                        <div class="flex-grow-1">
+                                                            <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
+                                                            <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
+                                                            <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <i class="bi bi-calendar-event text-warning"></i>
+                                                        <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                    </div>
+                                                </x-ui.card>
+                                            </div>
+                                        @endforeach
+                                    </template>
+                                @endif
+                            </div>
+                            @if($expiringItems['accommodations']->count() > 5)
+                                <div class="text-center mt-3">
+                                    <button @click="showAllAccommodations = !showAllAccommodations" class="btn btn-outline-secondary btn-sm">
+                                        <span x-show="!showAllAccommodations">Pokaż więcej ({{ $expiringItems['accommodations']->count() - 5 }})</span>
+                                        <span x-show="showAllAccommodations">Pokaż mniej</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @else
+                <div class="col-12">
                     <x-ui.card>
-                        <p class="fw-medium mb-0">Funkcjonalność w przygotowaniu</p>
+                        <p class="fw-medium mb-0 text-center text-muted">Brak dokumentów, ubezpieczeń ani najmów kończących się w tym miesiącu</p>
                     </x-ui.card>
                 </div>
-            </div>
+            @endif
         </x-ui.card>
     </div>
 
@@ -1027,4 +1342,5 @@
             </div>
         @endif
     @endif
+
 </x-app-layout>

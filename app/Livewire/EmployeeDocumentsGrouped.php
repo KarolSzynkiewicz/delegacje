@@ -15,11 +15,13 @@ class EmployeeDocumentsGrouped extends Component
     public $searchEmployee = '';
     public $filterStatus = '';
     public $filterDocument = '';
+    public $filterRequired = '';
     
     protected $queryString = [
         'searchEmployee' => ['except' => ''],
         'filterStatus' => ['except' => ''],
         'filterDocument' => ['except' => ''],
+        'filterRequired' => ['except' => ''],
     ];
 
     public function updatingSearchEmployee()
@@ -37,11 +39,17 @@ class EmployeeDocumentsGrouped extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterRequired()
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters()
     {
         $this->searchEmployee = '';
         $this->filterStatus = '';
         $this->filterDocument = '';
+        $this->filterRequired = '';
         $this->resetPage();
     }
 
@@ -108,6 +116,17 @@ class EmployeeDocumentsGrouped extends Component
                         continue;
                     }
                     if ($this->filterStatus !== 'brak' && $this->filterStatus !== 'has' && $status !== $this->filterStatus) {
+                        continue;
+                    }
+                }
+                
+                // Filtruj po wymaganych
+                if ($this->filterRequired !== '') {
+                    $isRequired = $document->is_required ?? false;
+                    if ($this->filterRequired === 'required' && !$isRequired) {
+                        continue;
+                    }
+                    if ($this->filterRequired === 'not_required' && $isRequired) {
                         continue;
                     }
                 }
