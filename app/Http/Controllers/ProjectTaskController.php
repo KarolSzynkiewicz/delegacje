@@ -13,6 +13,15 @@ use Illuminate\View\View;
 class ProjectTaskController extends Controller
 {
     /**
+     * Display all tasks (global view).
+     */
+    public function index(): View
+    {
+        // Dane są pobierane przez komponent Livewire TasksTable
+        return view('tasks.index');
+    }
+
+    /**
      * Display the specified task.
      */
     public function show(Project $project, ProjectTask $task): View
@@ -123,6 +132,9 @@ class ProjectTaskController extends Controller
             abort(404);
         }
 
+        // Autoryzacja przez Policy
+        $this->authorize('markInProgress', $task);
+
         $task->markInProgress();
 
         return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako w trakcie.');
@@ -137,6 +149,9 @@ class ProjectTaskController extends Controller
             abort(404);
         }
 
+        // Autoryzacja przez Policy
+        $this->authorize('markCompleted', $task);
+
         $task->markCompleted();
 
         return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako zakończone.');
@@ -150,6 +165,9 @@ class ProjectTaskController extends Controller
         if ($task->project_id !== $project->id) {
             abort(404);
         }
+
+        // Autoryzacja przez Policy
+        $this->authorize('cancel', $task);
 
         $task->cancel();
 

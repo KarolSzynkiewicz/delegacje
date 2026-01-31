@@ -17,6 +17,10 @@ class TimeLogsTable extends Component
     public $projectFilter = '';
     public $dateFrom = '';
     public $dateTo = '';
+    
+    // Optional filter for /mine/* routes
+    public $filterAssignmentIds = null;
+    public $isMineView = false; // Flag to hide project filter in /mine/* views
 
     protected $queryString = [
         'employeeFilter' => ['except' => ''],
@@ -24,6 +28,15 @@ class TimeLogsTable extends Component
         'dateFrom' => ['except' => ''],
         'dateTo' => ['except' => ''],
     ];
+    
+    public function mount()
+    {
+        // Jeśli jesteśmy w widoku /mine/*, wyczyść projectFilter z query string
+        if ($this->filterAssignmentIds && is_array($this->filterAssignmentIds) && !empty($this->filterAssignmentIds)) {
+            $this->isMineView = true;
+            $this->projectFilter = '';
+        }
+    }
 
     public function updatingEmployeeFilter()
     {
@@ -48,7 +61,10 @@ class TimeLogsTable extends Component
     public function clearFilters()
     {
         $this->employeeFilter = '';
-        $this->projectFilter = '';
+        // Nie czyść projectFilter w widoku /mine/* - i tak nie jest używany
+        if (!$this->isMineView) {
+            $this->projectFilter = '';
+        }
         $this->dateFrom = '';
         $this->dateTo = '';
         $this->resetPage();
@@ -62,6 +78,17 @@ class TimeLogsTable extends Component
     public function render()
     {
         $query = TimeLog::with('projectAssignment.employee', 'projectAssignment.project');
+        
+        // Filtrowanie po przypisaniach (dla /mine/*)
+        if ($this->filterAssignmentIds && is_array($this->filterAssignmentIds) && !empty($this->filterAssignmentIds)) {
+            $query->whereIn('project_assignment_id', $this->filterAssignmentIds);
+            // W widoku /mine/* nie filtrujemy po projekcie - użytkownik widzi tylko swoje projekty
+            $this->isMineView = true;
+            // Wyczyść projectFilter jeśli był ustawiony w query string
+            if ($this->projectFilter) {
+                $this->projectFilter = '';
+            }
+        }
 
         // Filtrowanie po pracowniku
         if ($this->employeeFilter) {
@@ -70,8 +97,8 @@ class TimeLogsTable extends Component
             });
         }
 
-        // Filtrowanie po projekcie
-        if ($this->projectFilter) {
+        // Filtrowanie po projekcie (tylko jeśli nie jesteśmy w widoku /mine/*)
+        if ($this->projectFilter && !$this->isMineView) {
             $query->whereHas('projectAssignment', function($q) {
                 $q->where('project_id', $this->projectFilter);
             });

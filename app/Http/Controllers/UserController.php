@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Project;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -69,7 +70,7 @@ class UserController extends Controller
     public function show(User $user): View
     {
         
-        $user->load(['roles', 'permissions']);
+        $user->load(['roles', 'permissions', 'managedProjects']);
         return view('users.show', compact('user'));
     }
 
@@ -80,9 +81,10 @@ class UserController extends Controller
     {
         
         $roles = Role::orderBy('name')->get();
-        $user->load('roles');
+        $projects = Project::orderBy('name')->get();
+        $user->load(['roles', 'managedProjects']);
         
-        return view('users.edit', compact('user', 'roles'));
+        return view('users.edit', compact('user', 'roles', 'projects'));
     }
 
     /**
@@ -96,6 +98,8 @@ class UserController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:user_roles,id',
+            'projects' => 'nullable|array',
+            'projects.*' => 'exists:projects,id',
         ]);
 
         $user->update([
@@ -110,7 +114,14 @@ class UserController extends Controller
             $user->syncRoles([]);
         }
 
-        // Clear menu cache for this user since roles changed
+        // Sync managed projects
+        if (isset($validated['projects'])) {
+            $user->managedProjects()->sync($validated['projects']);
+        } else {
+            $user->managedProjects()->sync([]);
+        }
+
+        // Clear menu cache for this user since roles or projects changed
         app(\App\Services\MenuService::class)->clearMenuCacheForUser($user->id);
 
         return redirect()->route('users.show', $user)->with('success', 'Użytkownik został zaktualizowany.');

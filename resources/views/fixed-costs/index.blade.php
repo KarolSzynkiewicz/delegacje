@@ -73,7 +73,12 @@
                 <div class="mb-4 pb-3 border-top border-bottom">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
                         <div>
-                            <h3 class="fs-5 fw-semibold mb-1">Szablony Kosztów Stałych</h3>
+                            <h3 class="fs-5 fw-semibold mb-1 d-flex align-items-center gap-1">
+                                Szablony Kosztów Stałych
+                                <x-tooltip title="Szablony kosztów stałych to wzorce definiujące powtarzające się wydatki firmy (np. czynsz, ubezpieczenia, abonamenty). Każdy szablon zawiera kwotę, interwał generowania (miesięczny, tygodniowy, roczny), dzień w miesiącu/tygodniu oraz okres obowiązywania. Na podstawie aktywnych szablonów możesz automatycznie generować wpisy księgowe dla wybranych okresów, co ułatwia zarządzanie regularnymi kosztami." direction="bottom">
+                                    <i class="bi bi-info-circle text-primary fs-6"></i>
+                                </x-tooltip>
+                            </h3>
                             <p class="small text-muted mb-0">
                                 Łącznie: <span class="fw-semibold">{{ $templates->total() }}</span> szablonów
                             </p>
@@ -171,7 +176,12 @@
                 <div class="mb-4 pb-3 border-top border-bottom">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
                         <div>
-                            <h3 class="fs-5 fw-semibold mb-1">Koszty Księgowe</h3>
+                            <h3 class="fs-5 fw-semibold mb-1 d-flex align-items-center gap-1">
+                                Koszty Księgowe
+                                <x-tooltip title="Koszty księgowe to faktyczne wpisy kosztów stałych w systemie. Mogą być generowane automatycznie z szablonów (przy użyciu funkcji 'Generuj Koszty Stałe') lub dodawane ręcznie jako koszty niestandardowe. Każdy wpis zawiera kwotę, okres obowiązywania, datę księgowania i opcjonalnie powiązanie z szablonem. Te wpisy są używane do obliczania rzeczywistych kosztów w raportach zysków i strat." direction="bottom">
+                                    <i class="bi bi-info-circle text-primary fs-6"></i>
+                                </x-tooltip>
+                            </h3>
                             <p class="small text-muted mb-0">
                                 Łącznie: <span class="fw-semibold">{{ $entries->total() }}</span> kosztów księgowych
                             </p>

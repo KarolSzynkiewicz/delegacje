@@ -19,6 +19,9 @@ class AssignmentsTable extends Component
     public $status = '';
     public $dateFrom = '';
     public $dateTo = '';
+    
+    // Optional filter for /mine/* routes
+    public $filterProjectIds = null;
 
     protected $queryString = [
         'searchEmployee' => ['except' => ''],
@@ -53,8 +56,14 @@ class AssignmentsTable extends Component
 
     public function render()
     {
-        $query = ProjectAssignment::with(['employee', 'project', 'role'])
-            ->orderBy('start_date', 'asc');
+        $query = ProjectAssignment::with(['employee', 'project', 'role']);
+        
+        // Filtrowanie po projektach (dla /mine/*)
+        if ($this->filterProjectIds && is_array($this->filterProjectIds) && !empty($this->filterProjectIds)) {
+            $query->whereIn('project_id', $this->filterProjectIds);
+        }
+        
+        $query->orderBy('start_date', 'asc');
 
         // Filter by employee
         if ($this->searchEmployee) {

@@ -16,6 +16,10 @@ class ProjectsTable extends Component
     public $locationFilter = '';
     public $sortField = 'name';
     public $sortDirection = 'asc';
+    
+    // Optional filter for /mine/* routes
+    public $filterProjectIds = null;
+    public $isMineView = false; // Flag to use /mine/* routes
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -70,6 +74,12 @@ class ProjectsTable extends Component
     public function render()
     {
         $query = Project::with('location');
+        
+        // Filtrowanie po zarządzanych projektach (dla /mine/*)
+        if ($this->filterProjectIds && is_array($this->filterProjectIds) && !empty($this->filterProjectIds)) {
+            $query->whereIn('id', $this->filterProjectIds);
+            $this->isMineView = true; // Ustaw flagę jeśli filtrujemy
+        }
 
         // Filtrowanie po nazwie/kliencie
         if ($this->search) {

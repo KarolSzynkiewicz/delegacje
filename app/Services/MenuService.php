@@ -28,7 +28,12 @@ class MenuService
                 $menuConfig = config('menu', []);
                 $menuItems = config('menu_items', []);
                 
-                return $this->processMenuConfig($menuConfig, $menuItems, $user);
+                $menu = $this->processMenuConfig($menuConfig, $menuItems, $user);
+                
+                // Wyczyść cache jeśli użytkownik zmienił zarządzane projekty
+                // (cache jest automatycznie czyszczony przy zmianie ról, ale nie przy zmianie projektów)
+                // To jest workaround - w idealnym przypadku powinno być czyszczone przy zmianie project_managers
+                return $menu;
             }
         );
     }
@@ -85,6 +90,20 @@ class MenuService
 
             // Tablica asocjacyjna → dropdown
             if (is_array($item) && isset($item['label']) && isset($item['items'])) {
+                // Sprawdź czy to sekcja "Mój zespół" - ukryj jeśli użytkownik nie jest kierownikiem projektu
+                if ($item['label'] === 'Mój zespół') {
+                    // Admin zawsze widzi sekcję "Moje"
+                    if ($user && !$user->isAdmin()) {
+                        $managedProjectIds = $user->getManagedProjectIds();
+                        if (empty($managedProjectIds)) {
+                            continue; // Pomiń sekcję "Moje" jeśli użytkownik nie zarządza żadnym projektem
+                        }
+                    } elseif (!$user) {
+                        // Jeśli użytkownik nie jest zalogowany, ukryj sekcję "Moje"
+                        continue;
+                    }
+                }
+                
                 $dropdownItems = [];
                 
                 foreach ($item['items'] as $itemKey) {

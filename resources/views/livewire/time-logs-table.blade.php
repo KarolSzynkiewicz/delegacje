@@ -7,7 +7,7 @@
                 <div>
                     <h3 class="fs-5 fw-semibold mb-1">Ewidencja Godzin</h3>
                     <p class="small text-muted mb-0">
-                        @if($employeeFilter || $projectFilter || $dateFrom || $dateTo)
+                        @if($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)
                             Znaleziono: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
                         @else
                             Łącznie: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
@@ -18,7 +18,7 @@
                     variant="ghost" 
                     wire:click="clearFilters" 
                     class="btn-sm"
-                    :disabled="!($employeeFilter || $projectFilter || $dateFrom || $dateTo)"
+                    :disabled="!($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)"
                 >
                     <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                 </x-ui.button>
@@ -40,18 +40,20 @@
                 </select>
             </div>
 
-            <!-- Projekt -->
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label small">
-                    <i class="bi bi-folder me-1"></i> Projekt
-                </label>
-                <select wire:model.live="projectFilter" class="form-control">
-                    <option value="">Wszystkie projekty</option>
-                    @foreach($projects as $project)
-                        <option value="{{ $project->id }}">{{ $project->name }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <!-- Projekt (ukryty w widoku /mine/*) -->
+            @if(!$isMineView)
+                <div class="col-md-6 col-lg-3">
+                    <label class="form-label small">
+                        <i class="bi bi-folder me-1"></i> Projekt
+                    </label>
+                    <select wire:model.live="projectFilter" class="form-control">
+                        <option value="">Wszystkie projekty</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}">{{ $project->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
 
             <!-- Data od -->
             <div class="col-md-6 col-lg-3">
@@ -122,8 +124,8 @@
                     @empty
                         <x-ui.empty-state 
                             icon="inbox"
-                            :message="$employeeFilter || $projectFilter || $dateFrom || $dateTo ? 'Brak wpisów spełniających kryteria wyszukiwania.' : 'Brak wpisów w systemie.'"
-                            :has-filters="$employeeFilter || $projectFilter || $dateFrom || $dateTo"
+                            :message="$employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo ? 'Brak wpisów spełniających kryteria wyszukiwania.' : 'Brak wpisów w systemie.'"
+                            :has-filters="$employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
                             colspan="5"

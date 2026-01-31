@@ -13,6 +13,12 @@ return [
         'label' => 'Przegląd Tygodniowy',
     ],
     
+    'tasks' => [
+        'route' => 'tasks.index',
+        'icon' => 'bi bi-list-check',
+        'label' => 'Zadania',
+    ],
+    
     'projects' => [
         'route' => 'projects.index',
         'icon' => 'bi bi-folder',
@@ -173,5 +179,41 @@ return [
         'route' => 'user-roles.index',
         'icon' => 'bi bi-shield-check',
         'label' => 'Role użytkowników',
+    ],
+    
+    'mine_projects' => [
+        'route' => 'mine.projects.index',
+        'icon' => 'bi bi-folder',
+        'label' => 'Projekty zespołu',
+    ],
+    
+    'mine_time_logs' => [
+        'route' => 'mine.time-logs.index',
+        'icon' => 'bi bi-clock',
+        'label' => 'Ewidencje godzin zespołu',
+    ],
+    
+    'mine_employees' => [
+        'route' => 'mine.employees.index',
+        'icon' => 'bi bi-people',
+        'label' => 'Pracownicy zespołu',
+    ],
+    
+    'mine_assignments' => [
+        'route' => 'mine.assignments.index',
+        'icon' => 'bi bi-person-check',
+        'label' => 'Przypisania zespołu',
+    ],
+    
+    'mine_tasks' => [
+        'route' => 'mine.tasks.index',
+        'icon' => 'bi bi-list-check',
+        'label' => 'Moje zadania',
+    ],
+    
+    'mine_employee_evaluations' => [
+        'route' => 'mine.employee-evaluations.index',
+        'icon' => 'bi bi-star',
+        'label' => 'Oceny pracowników',
     ],
 ];

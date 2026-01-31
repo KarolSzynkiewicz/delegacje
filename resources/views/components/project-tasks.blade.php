@@ -1,6 +1,7 @@
-@props(['project', 'users'])
+@props(['project', 'users', 'isMineView' => false])
 
 <x-ui.card label="Zadania projektu">
+    @if(!$isMineView)
     <form action="{{ route('projects.tasks.store', $project) }}" method="POST" class="mb-4">
         @csrf
         <div class="row g-3">
@@ -58,6 +59,7 @@
             </x-ui.button>
         </div>
     </form>
+    @endif
 
     @php
         $tasks = $project->tasks;
@@ -90,19 +92,19 @@
 
         <div class="tab-content">
             <div class="tab-pane fade show active" id="all-tasks">
-                @include('components.project-tasks-list', ['tasks' => $tasks, 'project' => $project, 'users' => $users])
+                @include('components.project-tasks-list', ['tasks' => $tasks, 'project' => $project, 'users' => $users, 'isMineView' => $isMineView])
             </div>
             <div class="tab-pane fade" id="pending-tasks">
-                @include('components.project-tasks-list', ['tasks' => $pending, 'project' => $project, 'users' => $users])
+                @include('components.project-tasks-list', ['tasks' => $pending, 'project' => $project, 'users' => $users, 'isMineView' => $isMineView])
             </div>
             <div class="tab-pane fade" id="in-progress-tasks">
-                @include('components.project-tasks-list', ['tasks' => $inProgress, 'project' => $project, 'users' => $users])
+                @include('components.project-tasks-list', ['tasks' => $inProgress, 'project' => $project, 'users' => $users, 'isMineView' => $isMineView])
             </div>
             <div class="tab-pane fade" id="completed-tasks">
-                @include('components.project-tasks-list', ['tasks' => $completed, 'project' => $project, 'users' => $users])
+                @include('components.project-tasks-list', ['tasks' => $completed, 'project' => $project, 'users' => $users, 'isMineView' => $isMineView])
             </div>
             <div class="tab-pane fade" id="cancelled-tasks">
-                @include('components.project-tasks-list', ['tasks' => $cancelled, 'project' => $project, 'users' => $users])
+                @include('components.project-tasks-list', ['tasks' => $cancelled, 'project' => $project, 'users' => $users, 'isMineView' => $isMineView])
             </div>
         </div>
     @else

@@ -3,6 +3,20 @@
 return [
     'dashboard',
     'weekly_overview',
+    'tasks',
+    
+    [
+        'label' => 'Mój zespół',
+        'icon' => 'bi bi-people-fill',
+        'items' => [
+            'mine_projects',
+            'mine_tasks',
+            'mine_time_logs',
+            'mine_employees',
+            'mine_assignments',
+            'mine_employee_evaluations',
+        ],
+    ],
     
     [
         'label' => 'Zasoby',

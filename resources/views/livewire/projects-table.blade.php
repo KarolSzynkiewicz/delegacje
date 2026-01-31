@@ -120,11 +120,14 @@
                             </td>
                             <td class="text-end">
                                 <div class="d-flex gap-2 justify-content-end">
-                                    <x-ui.button variant="ghost" href="{{ route('projects.show', $project) }}" class="btn-sm">
+                                    @php
+                                        $showRoute = $isMineView ? 'mine.projects.show' : 'projects.show';
+                                    @endphp
+                                    <x-ui.button variant="ghost" href="{{ route($showRoute, $project) }}" class="btn-sm">
                                         <i class="bi bi-eye"></i>
                                         <span class="d-none d-sm-inline ms-1">Zobacz</span>
                                     </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route('projects.show', $project) }}" class="btn-sm">
+                                    <x-ui.button variant="ghost" href="{{ route($showRoute, $project) }}" class="btn-sm">
                                         <i class="bi bi-people"></i>
                                         <span class="d-none d-sm-inline ms-1">Pracownicy</span>
                                     </x-ui.button>

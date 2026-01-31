@@ -53,19 +53,17 @@ class RoutePermissionService
             return null;
         }
 
-        // For action routes, resource is always the full route name (not from defaults)
-        if ($permissionType === 'action') {
+        // Get resource from route defaults first (for all types)
+        $resource = $route->defaults['resource'] 
+            ?? $route->getAction('defaults')['resource'] 
+            ?? null;
+        
+        // For action routes, if resource is not explicitly set, use full route name
+        if ($permissionType === 'action' && !$resource) {
             $resource = $routeName;
-        } else {
-            // Get resource from route defaults
-            $resource = $route->defaults['resource'] 
-                ?? $route->getAction('defaults')['resource'] 
-                ?? null;
-            
-            // If resource is not explicitly set, try to extract from route name (fallback)
-            if (!$resource) {
-                $resource = $this->extractResourceFromRoute($routeName, $permissionType);
-            }
+        } elseif (!$resource) {
+            // For other types, try to extract from route name (fallback)
+            $resource = $this->extractResourceFromRoute($routeName, $permissionType);
         }
 
         if (!$resource) {
@@ -113,13 +111,16 @@ class RoutePermissionService
                         continue;
                     }
                     
-                    // Get resource from route defaults
+                    // Get resource from route defaults first
                     $resource = $route->defaults['resource'] 
                         ?? $route->getAction('defaults')['resource'] 
                         ?? null;
                     
-                    // If resource is not explicitly set, try to extract from route name (fallback)
-                    if (!$resource) {
+                    // For action routes, if resource is not explicitly set, use full route name
+                    if ($permissionType === 'action' && !$resource) {
+                        $resource = $routeName;
+                    } elseif (!$resource) {
+                        // For other types, try to extract from route name (fallback)
                         $resource = $this->extractResourceFromRoute($routeName, $permissionType);
                     }
                     
@@ -324,6 +325,8 @@ class RoutePermissionService
             'no-role',
             'logout',
             'home',
+            'dashboard', // Dashboard dostępny dla każdego zalogowanego użytkownika
+            'mine.*', // Wykluczone na testy - routes dla /mine/*
         ];
         
         foreach ($excludedRoutes as $pattern) {

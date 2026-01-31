@@ -205,6 +205,9 @@ class TimeLogController extends Controller
                 ->withInput();
         }
 
+        // Autoryzacja przez Policy
+        $this->authorize('bulkUpdate', [\App\Models\TimeLog::class, $entries]);
+        
         $results = $this->timeLogService->bulkUpdateTimeLogs($entries);
 
         $message = 'Zaktualizowano: ' . $results['created'] . ' utworzono, ' . $results['updated'] . ' zaktualizowano, ' . $results['deleted'] . ' usunięto.';

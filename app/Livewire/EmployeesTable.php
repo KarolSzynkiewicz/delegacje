@@ -15,6 +15,10 @@ class EmployeesTable extends Component
     public $roleFilter = '';
     public $sortField = 'last_name';
     public $sortDirection = 'asc';
+    
+    // Optional filter for /mine/* routes
+    public $filterEmployeeIds = null;
+    public $filterProjectIds = null;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -62,6 +66,11 @@ class EmployeesTable extends Component
     public function render()
     {
         $query = Employee::with(['roles', 'assignments.project']);
+        
+        // Filtrowanie po pracownikach (dla /mine/*)
+        if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && !empty($this->filterEmployeeIds)) {
+            $query->whereIn('id', $this->filterEmployeeIds);
+        }
 
         // Filtrowanie po imieniu/nazwisku/emailu
         if ($this->search) {
@@ -93,6 +102,7 @@ class EmployeesTable extends Component
         return view('livewire.employees-table', [
             'employees' => $employees,
             'roles' => $roles,
+            'filterProjectIds' => $this->filterProjectIds,
         ]);
     }
 }

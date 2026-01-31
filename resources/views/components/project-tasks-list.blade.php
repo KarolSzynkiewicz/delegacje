@@ -1,4 +1,4 @@
-@props(['tasks', 'project', 'users'])
+@props(['tasks', 'project', 'users', 'isMineView' => false])
 
 @if($tasks->count() > 0)
     <div class="table-responsive">
@@ -6,7 +6,9 @@
             <thead>
                 <tr>
                     <th>Nazwa</th>
-                    <th>Przypisany do</th>
+                    @if(!$isMineView)
+                        <th>Przypisany do</th>
+                    @endif
                     <th>Status</th>
                     <th>Termin</th>
                     <th class="text-end">Akcje</th>
@@ -21,33 +23,35 @@
                                 <br><small class="text-muted">{{ Str::limit($task->description, 50) }}</small>
                             @endif
                         </td>
-                        <td>
-                            @if($task->assignedTo)
-                                <div class="d-flex align-items-center gap-2">
-                                    @php
-                                        $user = $task->assignedTo;
-                                        $nameParts = explode(' ', $user->name);
-                                        $initials = count($nameParts) >= 2 
-                                            ? strtoupper(substr($nameParts[0], 0, 1) . substr($nameParts[1], 0, 1))
-                                            : strtoupper(substr($user->name, 0, 1));
-                                        $imageUrl = null;
-                                        if (isset($user->image_path) && $user->image_path) {
-                                            $imageUrl = isset($user->image_url) ? $user->image_url : (\Illuminate\Support\Facades\Storage::disk('public')->exists($user->image_path) ? \Illuminate\Support\Facades\Storage::disk('public')->url($user->image_path) : null);
-                                        }
-                                    @endphp
-                                    <x-ui.avatar 
-                                        :image-url="$imageUrl"
-                                        :alt="$user->name"
-                                        :initials="$initials"
-                                        size="32px"
-                                        shape="circle"
-                                    />
-                                    <span>{{ $user->name }}</span>
-                                </div>
-                            @else
-                                <span class="text-muted">Nie przypisane</span>
-                            @endif
-                        </td>
+                        @if(!$isMineView)
+                            <td>
+                                @if($task->assignedTo)
+                                    <div class="d-flex align-items-center gap-2">
+                                        @php
+                                            $user = $task->assignedTo;
+                                            $nameParts = explode(' ', $user->name);
+                                            $initials = count($nameParts) >= 2 
+                                                ? strtoupper(substr($nameParts[0], 0, 1) . substr($nameParts[1], 0, 1))
+                                                : strtoupper(substr($user->name, 0, 1));
+                                            $imageUrl = null;
+                                            if (isset($user->image_path) && $user->image_path) {
+                                                $imageUrl = isset($user->image_url) ? $user->image_url : (\Illuminate\Support\Facades\Storage::disk('public')->exists($user->image_path) ? \Illuminate\Support\Facades\Storage::disk('public')->url($user->image_path) : null);
+                                            }
+                                        @endphp
+                                        <x-ui.avatar 
+                                            :image-url="$imageUrl"
+                                            :alt="$user->name"
+                                            :initials="$initials"
+                                            size="32px"
+                                            shape="circle"
+                                        />
+                                        <span>{{ $user->name }}</span>
+                                    </div>
+                                @else
+                                    <span class="text-muted">Nie przypisane</span>
+                                @endif
+                            </td>
+                        @endif
                         <td>
                             @php
                                 $badgeVariant = match($task->status) {
@@ -67,7 +71,7 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <x-tasks-actions :task="$task" :project="$project" size="sm" gap="1" />
+                            <x-tasks-actions :task="$task" :project="$project" size="sm" gap="1" :isMineView="$isMineView" />
                         </td>
                     </tr>
                 @endforeach

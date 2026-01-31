@@ -71,6 +71,43 @@
                         @enderror
                     </div>
 
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Kierownictwo Projektów</label>
+                        <p class="text-muted small mb-2">Wybierz projekty, którymi użytkownik będzie zarządzał jako kierownik</p>
+                        <div class="border rounded p-3 bg-light" style="max-height: 300px; overflow-y: auto;">
+                            @php
+                                $selectedProjects = old('projects', $user->managedProjects->pluck('id')->toArray());
+                            @endphp
+                            @if($projects->count() > 0)
+                                <div class="d-flex flex-column gap-2">
+                                    @foreach($projects as $project)
+                                        <div class="form-check">
+                                            <input 
+                                                class="form-check-input" 
+                                                type="checkbox" 
+                                                name="projects[]" 
+                                                value="{{ $project->id }}"
+                                                id="project_{{ $project->id }}"
+                                                {{ in_array($project->id, $selectedProjects) ? 'checked' : '' }}
+                                            >
+                                            <label class="form-check-label" for="project_{{ $project->id }}">
+                                                {{ $project->name }}
+                                                @if($project->client)
+                                                    <span class="text-muted small">({{ $project->client }})</span>
+                                                @endif
+                                            </label>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-muted small mb-0">Brak projektów w systemie</p>
+                            @endif
+                        </div>
+                        @error('projects')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center">
                         <x-ui.button 
                             variant="primary" 

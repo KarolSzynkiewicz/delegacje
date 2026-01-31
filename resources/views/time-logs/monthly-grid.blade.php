@@ -1,21 +1,29 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
-            <!-- Przycisk poprzedni miesiąc -->
-            <x-ui.button variant="ghost" href="{{ route('time-logs.monthly-grid', ['month' => $prevMonth]) }}" class="btn-sm">
-                <i class="bi bi-chevron-left"></i>
-                <span>Poprzedni miesiąc</span>
-            </x-ui.button>
+            @php
+                $monthlyGridRoute = isset($isMineRoute) && $isMineRoute ? 'mine.time-logs.monthly-grid' : 'time-logs.monthly-grid';
+            @endphp
+            
+            @if(!($isMineRoute ?? false))
+                <!-- Przycisk poprzedni miesiąc -->
+                <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, ['month' => $prevMonth]) }}" class="btn-sm">
+                    <i class="bi bi-chevron-left"></i>
+                    <span>Poprzedni miesiąc</span>
+                </x-ui.button>
+            @endif
 
             <h2 class="fw-semibold fs-4 mb-0">
-                Ewidencja Godzin – Widok Miesięczny
+                {{ isset($isMineRoute) && $isMineRoute ? 'Ewidencja Godzin Zespołu – Widok Miesięczny' : 'Ewidencja Godzin – Widok Miesięczny' }}
             </h2>
 
-            <!-- Przycisk następny miesiąc -->
-            <x-ui.button variant="primary" href="{{ route('time-logs.monthly-grid', ['month' => $nextMonth]) }}" class="btn-sm">
-                <span>Następny miesiąc</span>
-                <i class="bi bi-chevron-right"></i>
-            </x-ui.button>
+            @if(!($isMineRoute ?? false))
+                <!-- Przycisk następny miesiąc -->
+                <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, ['month' => $nextMonth]) }}" class="btn-sm">
+                    <span>Następny miesiąc</span>
+                    <i class="bi bi-chevron-right"></i>
+                </x-ui.button>
+            @endif
         </div>
     </x-slot>
 

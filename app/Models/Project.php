@@ -113,6 +113,15 @@ class Project extends Model
     }
 
     /**
+     * Get the managers (users) for this project.
+     */
+    public function managers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_managers')
+            ->withTimestamps();
+    }
+
+    /**
      * Scope a query to only include active projects.
      */
     public function scopeActive(Builder $query): Builder

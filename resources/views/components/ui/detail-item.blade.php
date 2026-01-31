@@ -5,8 +5,14 @@
 ])
 
 <div class="{{ $fullWidth ? 'col-12' : 'col-md-6' }} {{ $class }}">
-    @if($label)
-        <dt class="fw-semibold mb-1">{{ $label }}</dt>
+    @if($label || isset($labelSlot))
+        <dt class="fw-semibold mb-1">
+            @if(isset($labelSlot))
+                {{ $labelSlot }}
+            @else
+                {{ $label }}
+            @endif
+        </dt>
     @endif
     <dd>{{ $slot }}</dd>
 </div>

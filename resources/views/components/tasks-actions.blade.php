@@ -4,6 +4,7 @@
     'size' => 'sm',
     'gap' => '1',
     'class' => '',
+    'isMineView' => false,
 ])
 
 @php
@@ -18,6 +19,7 @@
         action="view"
         class="{{ $sizeClass }}"
     />
+    @if(!$isMineView)
     <x-ui.button 
         variant="ghost" 
         href="{{ route('projects.tasks.edit', [$project, $task]) }}"
@@ -25,6 +27,7 @@
         action="edit"
         class="{{ $sizeClass }}"
     />
+    @endif
     
     @if($task->status === \App\Enums\TaskStatus::PENDING)
         <form action="{{ route('projects.tasks.mark-in-progress', [$project, $task]) }}" method="POST" class="d-inline">

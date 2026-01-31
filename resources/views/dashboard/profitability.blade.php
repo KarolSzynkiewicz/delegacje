@@ -62,7 +62,12 @@
                 <div class="row g-3">
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
-                            <div class="text-muted small mb-1">Przychody</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
+                                Przychody
+                                <x-tooltip title="Suma przychodów ze wszystkich aktywnych projektów w wybranym miesiącu. Przychody są obliczane na podstawie zarejestrowanych godzin pracy pomnożonych przez stawki godzinowe dla każdego projektu.">
+                                    <i class="bi bi-cash-coin text-success fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(isset($summary['revenue_by_currency']) && count($summary['revenue_by_currency']) > 0)
                                 @foreach($summary['revenue_by_currency'] as $currency => $amount)
                                     <div class="h4 mb-0 text-success">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
@@ -74,7 +79,12 @@
                     </div>
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
-                            <div class="text-muted small mb-1">Koszty pracy</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
+                                Koszty pracy
+                                <x-tooltip title="Suma kosztów pracy dla wszystkich pracowników przypisanych do projektów w wybranym miesiącu. Obejmuje koszty wynagrodzeń, premii i innych świadczeń związanych z pracą.">
+                                    <i class="bi bi-people text-danger fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(isset($summary['labor_costs_by_currency']) && count($summary['labor_costs_by_currency']) > 0)
                                 @foreach($summary['labor_costs_by_currency'] as $currency => $amount)
                                     <div class="h4 mb-0 text-danger">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
@@ -86,7 +96,12 @@
                     </div>
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
-                            <div class="text-muted small mb-1">Koszty zmienne</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
+                                Koszty zmienne
+                                <x-tooltip title="Suma kosztów zmiennych przypisanych do projektów w wybranym miesiącu. Koszty zmienne to wydatki bezpośrednio związane z realizacją projektów, takie jak materiały, transport, zakwaterowanie itp.">
+                                    <i class="bi bi-arrow-repeat text-warning fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(isset($summary['variable_costs_by_currency']) && count($summary['variable_costs_by_currency']) > 0)
                                 @foreach($summary['variable_costs_by_currency'] as $currency => $amount)
                                     <div class="h4 mb-0 text-warning">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
@@ -98,7 +113,12 @@
                     </div>
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
-                            <div class="text-muted small mb-1">Koszty stałe</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
+                                Koszty stałe
+                                <x-tooltip title="Suma kosztów stałych w wybranym miesiącu. Koszty stałe to wydatki niezależne od poziomu działalności, takie jak czynsze, ubezpieczenia, opłaty administracyjne itp.">
+                                    <i class="bi bi-lock text-info fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(isset($summary['fixed_costs_by_currency']) && count($summary['fixed_costs_by_currency']) > 0)
                                 @foreach($summary['fixed_costs_by_currency'] as $currency => $amount)
                                     <div class="h4 mb-0 text-info">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
@@ -110,7 +130,12 @@
                     </div>
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
-                            <div class="text-muted small mb-1">Łączne koszty</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
+                                Łączne koszty
+                                <x-tooltip title="Suma wszystkich kosztów w wybranym miesiącu: koszty pracy + koszty zmienne + koszty stałe. Reprezentuje całkowite wydatki firmy w danym okresie.">
+                                    <i class="bi bi-calculator text-danger fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @php
                                 $totalCostsByCurrency = [];
                                 foreach ($summary['labor_costs_by_currency'] ?? [] as $currency => $amount) {
@@ -134,7 +159,6 @@
                     </div>
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
-                            <div class="text-muted small mb-1">Marża</div>
                             @php
                                 $marginByCurrency = [];
                                 foreach ($summary['revenue_by_currency'] ?? [] as $currency => $revenue) {
@@ -145,7 +169,14 @@
                                         'percentage' => $revenue > 0 ? ($margin / $revenue) * 100 : 0
                                     ];
                                 }
+                                $marginColor = count($marginByCurrency) > 0 && collect($marginByCurrency)->first()['amount'] >= 0 ? 'text-success' : 'text-danger';
                             @endphp
+                            <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
+                                Marża
+                                <x-tooltip title="Różnica między przychodami a łącznymi kosztami. Pokazuje zysk (wartość dodatnia) lub stratę (wartość ujemna) w wybranym miesiącu. Procent marży pokazuje, jaki procent przychodów stanowi zysk.">
+                                    <i class="bi bi-graph-up-arrow {{ $marginColor }} fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(count($marginByCurrency) > 0)
                                 @foreach($marginByCurrency as $currency => $marginData)
                                     <div class="h4 mb-0 {{ $marginData['amount'] >= 0 ? 'text-success' : 'text-danger' }}">
@@ -186,7 +217,12 @@
 
                     <!-- Przychody -->
                     <div class="mb-3 pb-3 border-bottom">
-                        <h6 class="text-muted small mb-2 fw-bold">PRZYCHODY</h6>
+                        <h6 class="text-muted small mb-2 fw-bold d-flex align-items-center gap-1">
+                            PRZYCHODY
+                            <x-tooltip title="Przychody z tego projektu w wybranym miesiącu. Obliczane na podstawie zarejestrowanych godzin pracy pomnożonych przez stawki godzinowe dla projektu.">
+                                <i class="bi bi-cash-coin text-success fs-6"></i>
+                            </x-tooltip>
+                        </h6>
                         <div class="p-2 bg-light rounded">
                             @php
                                 $revenueCurrency = getDefaultCurrency($projectData['revenue'], $projectData['revenue_currency'] ?? null);
@@ -203,7 +239,12 @@
                         
                         <!-- Koszty pracy -->
                         <div class="mb-2">
-                            <div class="text-muted small mb-1">Praca (łącznie)</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center gap-1">
+                                Praca (łącznie)
+                                <x-tooltip title="Suma kosztów pracy dla wszystkich pracowników przypisanych do tego projektu w wybranym miesiącu. Obejmuje koszty wynagrodzeń, premii i innych świadczeń.">
+                                    <i class="bi bi-people text-danger fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(isset($projectData['labor_costs_by_currency']) && count($projectData['labor_costs_by_currency']) > 0)
                                 @foreach($projectData['labor_costs_by_currency'] as $currency => $cost)
                                     <div class="fw-bold text-danger">
@@ -244,7 +285,12 @@
                         
                         <!-- Koszty zmienne -->
                         <div>
-                            <div class="text-muted small mb-1">Koszty zmienne</div>
+                            <div class="text-muted small mb-1 d-flex align-items-center gap-1">
+                                Koszty zmienne
+                                <x-tooltip title="Suma kosztów zmiennych przypisanych do tego projektu w wybranym miesiącu. Obejmuje wydatki bezpośrednio związane z realizacją projektu, takie jak materiały, transport, zakwaterowanie itp.">
+                                    <i class="bi bi-arrow-repeat text-warning fs-6"></i>
+                                </x-tooltip>
+                            </div>
                             @if(isset($projectData['variable_costs_by_currency']) && count($projectData['variable_costs_by_currency']) > 0)
                                 @foreach($projectData['variable_costs_by_currency'] as $currency => $cost)
                                     <div class="fw-bold text-warning">
@@ -258,16 +304,48 @@
                     </div>
 
                     <x-ui.detail-list>
-                        <x-ui.detail-item label="Liczba pracowników:">
+                        <x-ui.detail-item>
+                            <x-slot name="label">
+                                <span class="d-flex align-items-center gap-1">
+                                    Liczba pracowników:
+                                    <x-tooltip title="Liczba unikalnych pracowników przypisanych do tego projektu w wybranym miesiącu.">
+                                        <i class="bi bi-people text-primary fs-6"></i>
+                                    </x-tooltip>
+                                </span>
+                            </x-slot>
                             {{ $projectData['employee_count'] }}
                         </x-ui.detail-item>
-                        <x-ui.detail-item label="Godziny szacowane:">
+                        <x-ui.detail-item>
+                            <x-slot name="label">
+                                <span class="d-flex align-items-center gap-1">
+                                    Godziny szacowane:
+                                    <x-tooltip title="Planowana liczba godzin pracy dla tego projektu w wybranym miesiącu, określona w harmonogramie lub budżecie projektu.">
+                                        <i class="bi bi-clock text-info fs-6"></i>
+                                    </x-tooltip>
+                                </span>
+                            </x-slot>
                             {{ formatNumber($projectData['estimated_hours']) }}h
                         </x-ui.detail-item>
-                        <x-ui.detail-item label="Godziny rzeczywiste:">
+                        <x-ui.detail-item>
+                            <x-slot name="label">
+                                <span class="d-flex align-items-center gap-1">
+                                    Godziny rzeczywiste:
+                                    <x-tooltip title="Rzeczywista liczba godzin pracy zarejestrowanych przez pracowników w tym projekcie w wybranym miesiącu.">
+                                        <i class="bi bi-clock-history text-success fs-6"></i>
+                                    </x-tooltip>
+                                </span>
+                            </x-slot>
                             {{ formatNumber($projectData['actual_hours']) }}h
                         </x-ui.detail-item>
-                        <x-ui.detail-item label="Wykonanie planu:">
+                        <x-ui.detail-item>
+                            <x-slot name="label">
+                                <span class="d-flex align-items-center gap-1">
+                                    Wykonanie planu:
+                                    <x-tooltip title="Procent wykonania planu godzinowego. Pokazuje, jaki procent planowanych godzin został faktycznie zrealizowany. 100% oznacza pełne wykonanie planu.">
+                                        <i class="bi bi-percent text-primary fs-6"></i>
+                                    </x-tooltip>
+                                </span>
+                            </x-slot>
                             <x-ui.badge variant="{{ $projectData['plan_execution'] >= 100 ? 'success' : ($projectData['plan_execution'] >= 80 ? 'warning' : 'danger') }}">
                                 {{ formatNumber($projectData['plan_execution']) }}%
                             </x-ui.badge>
@@ -304,8 +382,22 @@
                             <thead>
                                 <tr>
                                     <th>Pracownik</th>
-                                    <th class="text-end">Godziny</th>
-                                    <th class="text-end">Przychody</th>
+                                    <th class="text-end">
+                                        <span class="d-flex align-items-center justify-content-end gap-1">
+                                            Godziny
+                                            <x-tooltip title="Łączna liczba godzin pracy zarejestrowanych przez pracownika we wszystkich projektach w wybranym miesiącu.">
+                                                <i class="bi bi-clock text-info fs-6"></i>
+                                            </x-tooltip>
+                                        </span>
+                                    </th>
+                                    <th class="text-end">
+                                        <span class="d-flex align-items-center justify-content-end gap-1">
+                                            Przychody
+                                            <x-tooltip title="Łączne przychody wygenerowane przez pracownika w wybranym miesiącu. Obliczane jako suma godzin pracy pomnożona przez stawki godzinowe dla każdego projektu.">
+                                                <i class="bi bi-cash-coin text-success fs-6"></i>
+                                            </x-tooltip>
+                                        </span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -350,8 +442,22 @@
                             <thead>
                                 <tr>
                                     <th>Pracownik</th>
-                                    <th class="text-end">Dni</th>
-                                    <th class="text-end">Rotacji</th>
+                                    <th class="text-end">
+                                        <span class="d-flex align-items-center justify-content-end gap-1">
+                                            Dni
+                                            <x-tooltip title="Łączna liczba dni spędzonych przez pracownika na rotacjach (wyjazdach służbowych) w wybranym miesiącu.">
+                                                <i class="bi bi-calendar text-info fs-6"></i>
+                                            </x-tooltip>
+                                        </span>
+                                    </th>
+                                    <th class="text-end">
+                                        <span class="d-flex align-items-center justify-content-end gap-1">
+                                            Rotacji
+                                            <x-tooltip title="Liczba rotacji (wyjazdów służbowych) pracownika w wybranym miesiącu.">
+                                                <i class="bi bi-arrow-repeat text-primary fs-6"></i>
+                                            </x-tooltip>
+                                        </span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>

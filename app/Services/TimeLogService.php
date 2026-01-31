@@ -232,9 +232,10 @@ class TimeLogService
      * Get monthly grid data for time logs editing.
      * 
      * @param string $month Format: Y-m (e.g., '2025-01')
+     * @param array|null $projectIds Optional: filter by project IDs (for /mine/* routes)
      * @return array
      */
-    public function getMonthlyGridData(string $month): array
+    public function getMonthlyGridData(string $month, ?array $projectIds = null): array
     {
         $currentDate = Carbon::parse($month . '-01');
         $monthStart = $currentDate->copy()->startOfMonth();
@@ -246,7 +247,7 @@ class TimeLogService
         $nextMonth = $currentDate->copy()->addMonth()->format('Y-m');
 
         // Get all projects with their assignments
-        $projects = Project::with([
+        $projectsQuery = Project::with([
             'assignments.employee',
             'assignments.role',
             'assignments.timeLogs' => function($query) use ($monthStart, $monthEnd) {
@@ -262,14 +263,27 @@ class TimeLogService
                   });
             })
             ->where('is_cancelled', false);
-        })
-        ->orderBy('name')
-        ->get();
+        });
+        
+        // Filter by project IDs if provided (for /mine/* routes)
+        if ($projectIds !== null && !empty($projectIds)) {
+            $projectsQuery->whereIn('id', $projectIds);
+        }
+        
+        $projects = $projectsQuery->orderBy('name')->get();
         
         // Get all time logs for this month (even if assignment was deleted)
-        $allTimeLogs = TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()])
-            ->with(['projectAssignment.project', 'projectAssignment.employee'])
-            ->get();
+        $timeLogsQuery = TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()])
+            ->with(['projectAssignment.project', 'projectAssignment.employee']);
+        
+        // Filter by project IDs if provided (for /mine/* routes)
+        if ($projectIds !== null && !empty($projectIds)) {
+            $timeLogsQuery->whereHas('projectAssignment', function($query) use ($projectIds) {
+                $query->whereIn('project_id', $projectIds);
+            });
+        }
+        
+        $allTimeLogs = $timeLogsQuery->get();
         
         // Create map of time logs by project_id, employee_id and day
         $timeLogsByProjectEmployee = [];

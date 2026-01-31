@@ -36,16 +36,18 @@
                     @php
                         $projectTypeValue = $project->type instanceof \App\Enums\ProjectType ? $project->type->value : ($project->type ?? null);
                     @endphp
-                    @if($projectTypeValue === \App\Enums\ProjectType::HOURLY->value)
-                        <x-ui.detail-item label="Stawka za godzinę:">
-                            {{ $project->hourly_rate ? number_format($project->hourly_rate, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
-                        </x-ui.detail-item>
-                    @elseif($projectTypeValue === \App\Enums\ProjectType::CONTRACT->value)
-                        <x-ui.detail-item label="Kwota kontraktu:">
-                            {{ $project->contract_amount ? number_format($project->contract_amount, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
-                        </x-ui.detail-item>
+                    @if(!$isMineView)
+                        @if($projectTypeValue === \App\Enums\ProjectType::HOURLY->value)
+                            <x-ui.detail-item label="Stawka za godzinę:">
+                                {{ $project->hourly_rate ? number_format($project->hourly_rate, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
+                            </x-ui.detail-item>
+                        @elseif($projectTypeValue === \App\Enums\ProjectType::CONTRACT->value)
+                            <x-ui.detail-item label="Kwota kontraktu:">
+                                {{ $project->contract_amount ? number_format($project->contract_amount, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
+                            </x-ui.detail-item>
+                        @endif
+                        <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</x-ui.detail-item>
                     @endif
-                    <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</x-ui.detail-item>
                     @if($project->location)
                     <x-ui.detail-item label="Lokalizacja:">{{ $project->location->name }}</x-ui.detail-item>
                     @endif
@@ -55,7 +57,7 @@
                 </x-ui.detail-list>
             </x-ui.card>
 
-            @if($project->demands && $project->demands->isNotEmpty())
+            @if(!$isMineView && $project->demands && $project->demands->isNotEmpty())
             <x-ui.card label="Zapotrzebowanie" class="mt-4">
                 @foreach($project->demands as $demand)
                     <dl class="row mb-0">
@@ -80,7 +82,7 @@
     @elseif($activeTab === 'tasks')
         <!-- Zakładka Zadania -->
         <div id="tasks" role="tabpanel">
-            <x-project-tasks :project="$project" :users="$users ?? []" />
+            <x-project-tasks :project="$project" :users="$users ?? []" :isMineView="$isMineView ?? false" />
         </div>
     @elseif($activeTab === 'assignments')
         <!-- Zakładka Przypisani pracownicy -->
@@ -163,6 +165,11 @@
         <!-- Zakładka Komentarze -->
         <div id="comments" role="tabpanel">
             <x-comments :commentable="$project" />
+        </div>
+    @elseif($activeTab === 'evaluations')
+        <!-- Zakładka Oceny pracowników -->
+        <div id="evaluations" role="tabpanel">
+            <x-project-evaluations :project="$project" />
         </div>
     @endif
 </div>

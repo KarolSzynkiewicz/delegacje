@@ -95,20 +95,81 @@
                             </td>
                             <td>
                                 @php
-                                    $currentProjects = $employee->current_projects;
-                                    $hasActiveProjects = $currentProjects->isNotEmpty();
-                                    $projectsList = $currentProjects->pluck('name')->join(', ');
-                                    $tooltipText = $hasActiveProjects 
-                                        ? 'Przypisany do projektów: ' . $projectsList
-                                        : 'Nieprzypisany do żadnego projektu';
+                                    // Jeśli jesteśmy w kontekście /mine/*, pokaż status przypisania do projektów kierownika
+                                    if (isset($filterProjectIds) && is_array($filterProjectIds) && !empty($filterProjectIds)) {
+                                        // Pobierz wszystkie przypisania pracownika do projektów kierownika
+                                        $managerAssignments = $employee->assignments()
+                                            ->whereIn('project_id', $filterProjectIds)
+                                            ->get();
+                                        
+                                        $hasActive = false;
+                                        $hasScheduled = false;
+                                        $hasCompleted = false;
+                                        $hasCancelled = false;
+                                        
+                                        foreach ($managerAssignments as $assignment) {
+                                            if ($assignment->is_cancelled) {
+                                                $hasCancelled = true;
+                                            } elseif ($assignment->isCurrentlyActive()) {
+                                                $hasActive = true;
+                                            } elseif ($assignment->isScheduled()) {
+                                                $hasScheduled = true;
+                                            } elseif ($assignment->isPast()) {
+                                                $hasCompleted = true;
+                                            }
+                                        }
+                                        
+                                        // Priorytet: cancelled > active > scheduled > completed
+                                        if ($hasCancelled) {
+                                            $status = 'cancelled';
+                                            $label = 'Anulowany';
+                                            $variant = 'danger';
+                                        } elseif ($hasActive) {
+                                            $status = 'active';
+                                            $label = 'Aktywny';
+                                            $variant = 'success';
+                                        } elseif ($hasScheduled) {
+                                            $status = 'scheduled';
+                                            $label = 'Zaplanowany';
+                                            $variant = 'info';
+                                        } elseif ($hasCompleted) {
+                                            $status = 'completed';
+                                            $label = 'Historic';
+                                            $variant = 'accent';
+                                        } else {
+                                            $status = null;
+                                        }
+                                        
+                                        if ($status) {
+                                            $projectsList = $managerAssignments->pluck('project.name')->filter()->unique()->join(', ');
+                                            $tooltipText = 'Projekty: ' . $projectsList;
+                                        }
+                                    } else {
+                                        // Domyślna logika dla widoku globalnego
+                                        $currentProjects = $employee->current_projects;
+                                        $hasActiveProjects = $currentProjects->isNotEmpty();
+                                        $projectsList = $currentProjects->pluck('name')->join(', ');
+                                        $tooltipText = $hasActiveProjects 
+                                            ? 'Przypisany do projektów: ' . $projectsList
+                                            : 'Nieprzypisany do żadnego projektu';
+                                        
+                                        if ($hasActiveProjects) {
+                                            $status = 'active';
+                                            $label = 'Zajęty';
+                                            $variant = 'danger';
+                                        } else {
+                                            $status = 'free';
+                                            $label = 'Wolny';
+                                            $variant = 'success';
+                                        }
+                                    }
                                 @endphp
-                                <x-tooltip title="{{ $tooltipText }}">
-                                    @if($hasActiveProjects)
-                                        <x-ui.badge variant="danger">Zajęty</x-ui.badge>
-                                    @else
-                                        <x-ui.badge variant="success">Wolny</x-ui.badge>
-                                    @endif
-                                </x-tooltip>
+                                
+                                @if(isset($status))
+                                    <x-tooltip title="{{ $tooltipText ?? '' }}">
+                                        <x-ui.badge variant="{{ $variant }}">{{ $label }}</x-ui.badge>
+                                    </x-tooltip>
+                                @endif
                             </td>
                             <td class="text-end">
                                 <x-action-buttons

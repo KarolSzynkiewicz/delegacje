@@ -1,9 +1,11 @@
 @props([
     'title' => 'Wskazówka',
+    'direction' => 'top', // top, bottom
 ])
 
 @php
     $tooltipId = 'tooltip-' . uniqid();
+    $isBottom = $direction === 'bottom';
 @endphp
 
 <style>
@@ -16,7 +18,6 @@
 
     .tooltip-box {
         position: absolute;
-        bottom: 140%;
         left: 50%;
         transform: translateX(-50%);
         min-width: 280px;
@@ -29,13 +30,27 @@
         opacity: 0;
         pointer-events: none;
         transition: opacity .15s ease, transform .15s ease;
-        z-index: 1000;
+        z-index: 9999;
     }
 
-    .tooltip-hotspot.active .tooltip-box {
+    .tooltip-box.tooltip-top {
+        bottom: 140%;
+    }
+
+    .tooltip-box.tooltip-bottom {
+        top: 140%;
+    }
+
+    .tooltip-hotspot.active .tooltip-box.tooltip-top {
         opacity: 1;
         pointer-events: auto;
         transform: translateX(-50%) translateY(-4px);
+    }
+
+    .tooltip-hotspot.active .tooltip-box.tooltip-bottom {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(4px);
     }
 
     .tooltip-title {
@@ -52,7 +67,7 @@
 <span class="tooltip-hotspot" id="{{ $tooltipId }}" onclick="event.stopPropagation()">
     {{ $slot }}
     
-    <span class="tooltip-box">
+    <span class="tooltip-box {{ $isBottom ? 'tooltip-bottom' : 'tooltip-top' }}">
         <span style="display: flex; gap: 10px; align-items: flex-start;">
             <i class="bi bi-lightbulb-fill" style="font-size: 18px; color: #facc15;"></i>
             <span>

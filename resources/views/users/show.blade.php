@@ -64,6 +64,32 @@
         </div>
     </div>
 
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <x-ui.card label="Kierownictwo Projektów">
+                @if($user->managedProjects->count() > 0)
+                    <div class="d-flex flex-column gap-2">
+                        @foreach($user->managedProjects as $project)
+                            <div class="d-flex align-items-center justify-content-between p-2 border rounded">
+                                <div>
+                                    <span class="fw-semibold">{{ $project->name }}</span>
+                                    @if($project->client)
+                                        <span class="text-muted small ms-2">({{ $project->client }})</span>
+                                    @endif
+                                </div>
+                                <x-ui.badge variant="info">
+                                    <i class="bi bi-person-check"></i> Kierownik
+                                </x-ui.badge>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-muted small mb-0">Użytkownik nie jest kierownikiem żadnego projektu</p>
+                @endif
+            </x-ui.card>
+        </div>
+    </div>
+
     <x-ui.card label="Uprawnienia">
         @if($user->isAdmin())
             <x-alert type="info" dismissible icon="info-circle" class="mb-3">

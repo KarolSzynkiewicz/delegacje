@@ -177,6 +177,14 @@ class Employee extends Model
     }
 
     /**
+     * Get all evaluations for this employee.
+     */
+    public function evaluations(): HasMany
+    {
+        return $this->hasMany(EmployeeEvaluation::class);
+    }
+
+    /**
      * Get all rotations for this employee.
      */
     public function rotations(): HasMany

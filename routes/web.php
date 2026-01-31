@@ -103,14 +103,26 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->name('projects.files.download');
     
     // Project tasks
+    // Global tasks view
+    Route::get('tasks', [\App\Http\Controllers\ProjectTaskController::class, 'index'])
+        ->name('tasks.index')
+        ->defaults('permission_type', 'view')
+        ->defaults('resource', 'project-tasks');
+    
     Route::resource('projects.tasks', \App\Http\Controllers\ProjectTaskController::class)
         ->except(['index', 'create']);
     Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])
-        ->name('projects.tasks.mark-in-progress');
+        ->name('projects.tasks.mark-in-progress')
+        ->defaults('permission_type', 'action')
+        ->defaults('resource', 'project-tasks');
     Route::post('projects/{project}/tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompleted'])
-        ->name('projects.tasks.mark-completed');
+        ->name('projects.tasks.mark-completed')
+        ->defaults('permission_type', 'action')
+        ->defaults('resource', 'project-tasks');
     Route::post('projects/{project}/tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancel'])
-        ->name('projects.tasks.cancel');
+        ->name('projects.tasks.cancel')
+        ->defaults('permission_type', 'action')
+        ->defaults('resource', 'project-tasks');
     
     // Comments (polymorphic)
     Route::post('comments', [\App\Http\Controllers\CommentController::class, 'store'])
@@ -257,6 +269,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Employee Rates
     Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
     
+    // Employee Evaluations
+    Route::resource('employee-evaluations', \App\Http\Controllers\EmployeeEvaluationController::class);
+    
     // Payroll
     Route::resource('payrolls', \App\Http\Controllers\PayrollController::class);
     
@@ -302,6 +317,18 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/', [ProfileController::class, 'edit'])->name('edit');
         Route::patch('/', [ProfileController::class, 'update'])->name('update');
         Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+    });
+    
+    // Mine routes - projects managed by current user
+    Route::prefix('mine')->name('mine.')->group(function () {
+        Route::get('projects', [\App\Http\Controllers\MineController::class, 'projects'])->name('projects.index');
+        Route::get('projects/{project}', [\App\Http\Controllers\MineController::class, 'show'])->name('projects.show');
+        Route::get('tasks', [\App\Http\Controllers\MineController::class, 'tasks'])->name('tasks.index');
+        Route::get('time-logs', [\App\Http\Controllers\MineController::class, 'timeLogs'])->name('time-logs.index');
+        Route::get('time-logs/monthly-grid', [\App\Http\Controllers\MineController::class, 'monthlyGrid'])->name('time-logs.monthly-grid');
+        Route::get('employees', [\App\Http\Controllers\MineController::class, 'employees'])->name('employees.index');
+        Route::get('assignments', [\App\Http\Controllers\MineController::class, 'assignments'])->name('assignments.index');
+        Route::get('employee-evaluations', [\App\Http\Controllers\MineController::class, 'employeeEvaluations'])->name('employee-evaluations.index');
     });
 });
 
