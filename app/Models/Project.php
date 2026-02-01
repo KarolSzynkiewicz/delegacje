@@ -32,6 +32,8 @@ class Project extends Model
         'hourly_rate',
         'contract_amount',
         'currency',
+        'start_date',
+        'end_date',
     ];
 
     /**
@@ -44,6 +46,8 @@ class Project extends Model
         'type' => ProjectType::class,
         'hourly_rate' => 'decimal:2',
         'contract_amount' => 'decimal:2',
+        'start_date' => 'date',
+        'end_date' => 'date',
     ];
 
     /**

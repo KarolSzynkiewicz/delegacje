@@ -64,7 +64,7 @@
                         <div class="text-center p-3 bg-light rounded">
                             <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
                                 Przychody
-                                <x-tooltip title="Suma przychodów ze wszystkich aktywnych projektów w wybranym miesiącu. Przychody są obliczane na podstawie zarejestrowanych godzin pracy pomnożonych przez stawki godzinowe dla każdego projektu.">
+                                <x-tooltip title="Suma przychodów ze wszystkich aktywnych projektów w wybranym miesiącu. Dla projektów zakontraktowanych: (dni miesiąca pokrywające się z projektem / wszystkie dni projektu) × kwota kontraktu. Dla projektów godzinowych: stawka godzinowa × zarejestrowane godziny.">
                                     <i class="bi bi-cash-coin text-success fs-6"></i>
                                 </x-tooltip>
                             </div>
@@ -209,6 +209,22 @@
                         <div>
                             <h3 class="h6 mb-1">{{ $project->name }}</h3>
                             <p class="text-muted small mb-0">{{ $project->client_name ?? 'Brak klienta' }}</p>
+                            @if($project->type === \App\Enums\ProjectType::CONTRACT && ($project->start_date || $project->end_date))
+                                <p class="text-muted small mb-0 mt-1">
+                                    <i class="bi bi-calendar3"></i>
+                                    @if($project->start_date)
+                                        {{ $project->start_date->format('Y-m-d') }}
+                                    @endif
+                                    @if($project->start_date && $project->end_date)
+                                        -
+                                    @endif
+                                    @if($project->end_date)
+                                        {{ $project->end_date->format('Y-m-d') }}
+                                    @elseif($project->start_date)
+                                        (brak daty końca)
+                                    @endif
+                                </p>
+                            @endif
                         </div>
                         @if($project->type)
                             <x-ui.badge variant="info">{{ $project->type->label() }}</x-ui.badge>
@@ -219,7 +235,7 @@
                     <div class="mb-3 pb-3 border-bottom">
                         <h6 class="text-muted small mb-2 fw-bold d-flex align-items-center gap-1">
                             PRZYCHODY
-                            <x-tooltip title="Przychody z tego projektu w wybranym miesiącu. Obliczane na podstawie zarejestrowanych godzin pracy pomnożonych przez stawki godzinowe dla projektu.">
+                            <x-tooltip title="Przychody z tego projektu w wybranym miesiącu. Dla projektów zakontraktowanych: (dni miesiąca pokrywające się z projektem / wszystkie dni projektu) × kwota kontraktu. Dla projektów godzinowych: stawka godzinowa × zarejestrowane godziny w miesiącu.">
                                 <i class="bi bi-cash-coin text-success fs-6"></i>
                             </x-tooltip>
                         </h6>
@@ -230,6 +246,11 @@
                             <div class="fw-bold text-success fs-5">
                                 {{ formatNumber($projectData['revenue']) }} {{ formatCurrency($revenueCurrency) }}
                             </div>
+                            @if($project->type === \App\Enums\ProjectType::CONTRACT && $project->contract_amount)
+                                <div class="small text-muted mt-1">
+                                    z {{ formatNumber($project->contract_amount) }} {{ formatCurrency($project->currency ?? 'PLN') }} kontraktu
+                                </div>
+                            @endif
                         </div>
                     </div>
 

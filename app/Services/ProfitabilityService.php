@@ -404,30 +404,47 @@ class ProfitabilityService
     {
         if ($project->type === ProjectType::CONTRACT) {
             // Contract projects: calculate proportional amount for the month
-            // If project started/ended in this month, calculate proportion
-            $projectStart = $project->created_at ? Carbon::parse($project->created_at) : $monthStart;
-            $projectEnd = null; // Projects don't have end_date currently
+            // Formula: (days in month that overlap with project / total project days) * contract_amount
             
-            // For contract projects, we calculate monthly proportion
-            // If project spans the entire month, use full amount
-            // Otherwise calculate proportion
-            $daysInMonth = $monthStart->diffInDays($monthEnd) + 1;
-            $projectDaysInMonth = 0;
+            // Use project start_date and end_date if available, otherwise fallback to created_at
+            $projectStart = $project->start_date 
+                ? Carbon::parse($project->start_date) 
+                : ($project->created_at ? Carbon::parse($project->created_at) : $monthStart);
             
-            // Calculate how many days of the project fall in this month
-            $periodStart = $projectStart->gt($monthStart) ? $projectStart : $monthStart;
-            $periodEnd = $projectEnd && $projectEnd->lt($monthEnd) ? $projectEnd : $monthEnd;
+            $projectEnd = $project->end_date 
+                ? Carbon::parse($project->end_date) 
+                : null;
             
-            if ($periodStart->lte($periodEnd)) {
-                $projectDaysInMonth = $periodStart->diffInDays($periodEnd) + 1;
+            // If project has no end_date, we can't calculate proportion - return 0 or full amount?
+            // For now, if no end_date, we'll use the month end as project end for calculation
+            if (!$projectEnd) {
+                // If project has no end date, we can't calculate proper proportion
+                // Return 0 or handle differently - for now return 0
+                return 0;
             }
             
-            if ($projectDaysInMonth > 0 && $daysInMonth > 0) {
-                $proportion = $projectDaysInMonth / $daysInMonth;
-                return (float) ($project->contract_amount ?? 0) * $proportion;
+            // Calculate total project days
+            $totalProjectDays = $projectStart->diffInDays($projectEnd) + 1;
+            
+            if ($totalProjectDays <= 0) {
+                return 0;
             }
             
-            return (float) ($project->contract_amount ?? 0);
+            // Calculate overlap period between project and month
+            $overlapStart = $projectStart->gt($monthStart) ? $projectStart : $monthStart;
+            $overlapEnd = $projectEnd->lt($monthEnd) ? $projectEnd : $monthEnd;
+            
+            // If no overlap, return 0
+            if ($overlapStart->gt($overlapEnd)) {
+                return 0;
+            }
+            
+            // Calculate days in month that overlap with project
+            $daysInMonthOverlap = $overlapStart->diffInDays($overlapEnd) + 1;
+            
+            // Calculate revenue: (days in month overlap / total project days) * contract_amount
+            $proportion = $daysInMonthOverlap / $totalProjectDays;
+            return (float) ($project->contract_amount ?? 0) * $proportion;
         } else {
             // Hourly projects: hourly_rate * actual_hours in the month
             $actualHours = $this->calculateActualHoursForMonth($assignments, $monthStart, $monthEnd);

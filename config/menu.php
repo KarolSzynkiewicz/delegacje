@@ -1,7 +1,6 @@
 <?php
 
 return [
-    'dashboard',
     'weekly_overview',
     'tasks',
     
@@ -47,18 +46,20 @@ return [
             'locations',
             'equipment',
             'equipment_issues',
+            'rotations',
             'return_trips',
             'departures',
         ],
     ],
     
     [
-        'label' => 'Koszty',
+        'label' => 'Finanse',
         'icon' => 'bi bi-cash-stack',
         'items' => [
+            'dashboard',
+            'fixed_costs',
             'project_variable_costs',
             'transport_costs',
-            'fixed_costs',
         ],
     ],
     
@@ -68,14 +69,20 @@ return [
         'items' => [
             'employees',
             'roles',
-            'adjustments',
-            'time_logs',
-            'payrolls',
-            'rotations',
-            'employee_rates',
-            'advances',
             'documents',
             'employee_documents',
+        ],
+    ],
+    
+    [
+        'label' => 'Rozliczenia',
+        'icon' => 'bi bi-calculator',
+        'items' => [
+            'payrolls',
+            'time_logs',
+            'adjustments',
+            'advances',
+            'employee_rates',
         ],
     ],
     

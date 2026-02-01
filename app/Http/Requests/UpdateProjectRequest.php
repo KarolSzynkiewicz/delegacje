@@ -45,6 +45,8 @@ class UpdateProjectRequest extends FormRequest
             $rules['hourly_rate'] = ['nullable'];
             $rules['contract_amount'] = ['nullable', 'numeric', 'min:0'];
             $rules['currency'] = ['nullable', 'string', 'size:3'];
+            $rules['start_date'] = ['nullable', 'date'];
+            $rules['end_date'] = ['nullable', 'date', 'after_or_equal:start_date'];
         }
 
         return $rules;

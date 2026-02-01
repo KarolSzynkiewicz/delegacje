@@ -145,6 +145,24 @@
                                 </div>
                             </div>
                             <div class="row g-3 mt-0">
+                                <div class="col-md-6 mb-3 mb-md-0">
+                                    <x-ui.input 
+                                        type="date" 
+                                        name="start_date" 
+                                        label="Data od"
+                                        value="{{ old('start_date') }}"
+                                    />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.input 
+                                        type="date" 
+                                        name="end_date" 
+                                        label="Data do (opcjonalnie)"
+                                        value="{{ old('end_date') }}"
+                                    />
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-0">
                                 <div class="col-md-8">
                                     <x-ui.input 
                                         type="number" 
