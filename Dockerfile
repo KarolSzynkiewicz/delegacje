@@ -26,11 +26,15 @@ WORKDIR /var/www/html
 # Kopiowanie plików composer
 COPY composer.json composer.lock ./
 
-# Instalacja zależności PHP (bez dev)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+# Instalacja zależności PHP (bez dev, bez skryptów - uruchomimy później)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
 # Kopiowanie reszty plików aplikacji
 COPY . .
+
+# Uruchomienie skryptów composer (package:discover) - wymaga plików aplikacji
+RUN php artisan package:discover --ansi || true
+RUN composer dump-autoload --optimize --classmap-authoritative
 
 # Instalacja zależności Node.js i build assets
 COPY package.json package-lock.json ./
