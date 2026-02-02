@@ -47,6 +47,5 @@ php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
 
-echo "=== Starting services ==="
-# Uruchom supervisord
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+echo "=== Setup completed ==="
+# Setup zakończony - supervisord uruchomi nginx i php-fpm

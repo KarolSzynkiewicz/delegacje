@@ -101,5 +101,5 @@ RUN chown -R www-data:www-data /var/www/html \
 # Port
 EXPOSE 80
 
-# Start script
-CMD ["/usr/local/bin/start.sh"]
+# Start supervisord (który uruchomi setup, nginx i php-fpm)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
