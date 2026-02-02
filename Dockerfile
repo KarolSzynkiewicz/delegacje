@@ -60,7 +60,7 @@ RUN chown -R www-data:www-data /var/www/html \
 # Stage produkcyjny
 FROM php:8.3-fpm-alpine
 
-# Instalacja minimalnych zależności
+# Instalacja minimalnych zależności runtime
 RUN apk add --no-cache \
     libpng \
     libzip \
@@ -69,13 +69,17 @@ RUN apk add --no-cache \
     nginx \
     supervisor
 
-# Instalacja rozszerzeń PHP
+# Instalacja rozszerzeń PHP (z dev dependencies)
 RUN apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS \
     libpng-dev \
     libzip-dev \
     oniguruma-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
-    && apk del .build-deps
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && docker-php-ext-enable pdo_mysql \
+    && apk del .build-deps \
+    && php -m | grep -i pdo_mysql || (echo "ERROR: pdo_mysql not installed!" && exit 1)
 
 # Kopiowanie plików z poprzedniego stage
 COPY --from=base /var/www/html /var/www/html
