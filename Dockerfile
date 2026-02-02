@@ -34,8 +34,10 @@ COPY . .
 RUN test -f .env || cp .env.example .env || touch .env
 
 # Instalacja zależności PHP (bez skryptów - uruchomimy później)
-# Używamy --no-scripts żeby pominąć post-autoload-dump który wymaga artisan
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+# Używamy COMPOSER_NO_SCRIPTS=1 żeby pominąć post-autoload-dump który wymaga artisan
+ENV COMPOSER_NO_SCRIPTS=1
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+ENV COMPOSER_NO_SCRIPTS=
 
 # Uruchomienie package:discover ręcznie (wymaga artisan i plików aplikacji)
 RUN php artisan package:discover --ansi || true
