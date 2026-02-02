@@ -33,11 +33,12 @@ COPY . .
 # Utworzenie minimalnego .env jeśli nie istnieje (dla artisan)
 RUN test -f .env || cp .env.example .env || touch .env
 
+# Utworzenie katalogów cache przed composer install (wymagane przez package:discover)
+RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views \
+    && chmod -R 775 bootstrap/cache storage
+
 # Instalacja zależności PHP (bez skryptów - uruchomimy później)
-# Używamy COMPOSER_NO_SCRIPTS=1 żeby pominąć post-autoload-dump który wymaga artisan
-ENV COMPOSER_NO_SCRIPTS=1
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-ENV COMPOSER_NO_SCRIPTS=
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
 # Uruchomienie package:discover ręcznie (wymaga artisan i plików aplikacji)
 RUN php artisan package:discover --ansi || true
