@@ -1,34 +1,48 @@
 #!/bin/sh
+set -e
 
-# Uruchom migracje jeśli baza jest gotowa
-echo "Waiting for database connection..."
-max_attempts=30
+echo "=== Starting application setup ==="
+
+# Utwórz link do storage jeśli nie istnieje
+echo "Creating storage link..."
+php artisan storage:link || true
+
+# Wyczyść cache przed migracjami
+echo "Clearing cache..."
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
+
+# Uruchom migracje jeśli baza jest gotowa (w tle, żeby nie blokować startu)
+echo "Checking database connection..."
+max_attempts=15
 attempt=0
-until php artisan migrate:status > /dev/null 2>&1; do
-    attempt=$((attempt + 1))
-    if [ $attempt -ge $max_attempts ]; then
-        echo "Database connection timeout after $max_attempts attempts"
+db_ready=false
+
+while [ $attempt -lt $max_attempts ]; do
+    if php artisan migrate:status > /dev/null 2>&1; then
+        echo "Database is ready!"
+        db_ready=true
         break
     fi
+    attempt=$((attempt + 1))
     echo "Database not ready, waiting... (attempt $attempt/$max_attempts)"
     sleep 2
 done
 
-echo "Database is ready!"
+if [ "$db_ready" = true ]; then
+    echo "Running migrations..."
+    php artisan migrate --force || echo "Migration failed, continuing..."
+else
+    echo "Database connection timeout, skipping migrations (will retry on next request)"
+fi
 
-# Uruchom migracje
-php artisan migrate --force
+# Wyczyść i zbuilduj cache po migracjach
+echo "Building cache..."
+php artisan config:cache || true
+php artisan route:cache || true
+php artisan view:cache || true
 
-# Uruchom seedery (opcjonalnie - usuń jeśli nie chcesz seedować przy każdym starcie)
-# php artisan db:seed --force
-
-# Utwórz link do storage jeśli nie istnieje
-php artisan storage:link || true
-
-# Wyczyść cache
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-
+echo "=== Starting services ==="
 # Uruchom supervisord
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
