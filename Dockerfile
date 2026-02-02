@@ -52,8 +52,8 @@ RUN npm ci
 RUN npm run build
 RUN rm -rf node_modules
 
-# Ustawienie uprawnień
-RUN chown -R www-data:www-data /var/www/html \
+# Ustawienie uprawnień (nginx user w Alpine Linux)
+RUN chown -R nginx:nginx /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
@@ -97,8 +97,8 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-# Ustawienie uprawnień
-RUN chown -R www-data:www-data /var/www/html \
+# Ustawienie uprawnień (nginx user w Alpine Linux)
+RUN chown -R nginx:nginx /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
