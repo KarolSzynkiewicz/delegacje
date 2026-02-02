@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+# Przekieruj output do stdout/stderr żeby był widoczny w logach
+exec 1>&1
+exec 2>&2
+
 echo "=== Starting application setup ==="
 
 # Utwórz link do storage jeśli nie istnieje
