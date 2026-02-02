@@ -47,7 +47,14 @@ done
 
 if [ "$db_ready" = true ]; then
     echo "Running migrations..."
-    php artisan migrate --force || echo "Migration failed: $?"
+    if php artisan migrate --force; then
+        echo "Migrations completed successfully!"
+    else
+        migration_exit_code=$?
+        echo "ERROR: Migrations failed with exit code: $migration_exit_code"
+        echo "Application will continue, but database may be in inconsistent state."
+        echo "Check migration logs above for details."
+    fi
 else
     echo "Database connection timeout after $max_attempts attempts"
     echo "DB_HOST: ${DB_HOST:-not set}"

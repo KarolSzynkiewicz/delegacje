@@ -14,14 +14,20 @@ return new class extends Migration
         // This table is replaced by Spatie's model_has_roles
         // Only create if it doesn't exist and Spatie table doesn't exist
         if (!Schema::hasTable('user_user_roles') && !Schema::hasTable('model_has_roles')) {
-            Schema::create('user_user_roles', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-                $table->foreignId('user_role_id')->constrained('user_roles')->onDelete('cascade');
-                $table->timestamps();
-                
-                $table->unique(['user_id', 'user_role_id']);
-            });
+            // Check if user_roles table exists (created by Spatie Permission)
+            if (Schema::hasTable('user_roles')) {
+                Schema::create('user_user_roles', function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+                    $table->foreignId('user_role_id')->constrained('user_roles')->onDelete('cascade');
+                    $table->timestamps();
+                    
+                    $table->unique(['user_id', 'user_role_id']);
+                });
+            } else {
+                // Skip if user_roles table doesn't exist yet (will be created by Spatie migration)
+                // This migration will be skipped silently
+            }
         }
     }
 
