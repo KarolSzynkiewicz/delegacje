@@ -23,20 +23,15 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Ustawienie katalogu roboczego
 WORKDIR /var/www/html
 
-# Kopiowanie plików composer
+# Kopiowanie plików composer (dla cache Docker)
 COPY composer.json composer.lock ./
 
-# Kopiowanie plików potrzebnych do artisan (przed composer install)
-COPY artisan ./
-COPY bootstrap/ bootstrap/
-COPY app/ app/
-COPY config/ config/
+# Kopiowanie WSZYSTKICH plików aplikacji przed composer install
+# (artisan potrzebuje pełnej struktury aplikacji)
+COPY . .
 
 # Instalacja zależności PHP (teraz artisan będzie dostępny dla package:discover)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-
-# Kopiowanie reszty plików aplikacji
-COPY . .
 
 # Regeneracja autoloadera z wszystkimi plikami
 RUN composer dump-autoload --optimize --classmap-authoritative
