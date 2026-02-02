@@ -30,8 +30,14 @@ COPY composer.json composer.lock ./
 # (artisan potrzebuje pełnej struktury aplikacji)
 COPY . .
 
-# Instalacja zależności PHP (teraz artisan będzie dostępny dla package:discover)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+# Utworzenie minimalnego .env jeśli nie istnieje (dla artisan)
+RUN test -f .env || cp .env.example .env || touch .env
+
+# Instalacja zależności PHP (bez skryptów - uruchomimy później)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+
+# Uruchomienie package:discover ręcznie (wymaga artisan i plików aplikacji)
+RUN php artisan package:discover --ansi || true
 
 # Regeneracja autoloadera z wszystkimi plikami
 RUN composer dump-autoload --optimize --classmap-authoritative
