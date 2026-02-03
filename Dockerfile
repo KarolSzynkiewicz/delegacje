@@ -76,15 +76,17 @@ RUN rm -f /etc/nginx/sites-enabled/default \
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Entrypoint (setup + start)
-# CRITICAL: Force rebuild by changing file hash - break Docker cache
-RUN echo "BUILD_TIMESTAMP_$(date +%s)" > /tmp/build-marker.txt
-COPY docker/entrypoint.sh /tmp/entrypoint-tmp.sh
-RUN mv /tmp/entrypoint-tmp.sh /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh && \
-    echo "=== Entrypoint verification ===" && \
+# CRITICAL: Force rebuild - CACHE_BUST changes every build
+ARG CACHE_BUST=1
+RUN echo "CACHE_BUST=${CACHE_BUST}" > /tmp/cache-bust.txt && \
+    echo "Build timestamp: $(date +%s)" >> /tmp/cache-bust.txt && \
+    cat /tmp/cache-bust.txt
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    echo "=== Entrypoint verification (first 8 lines) ===" && \
     head -8 /usr/local/bin/entrypoint.sh && \
-    echo "=== Build marker ===" && \
-    cat /tmp/build-marker.txt
+    echo "=== Cache bust info ===" && \
+    cat /tmp/cache-bust.txt
 
 # Uprawnienia
 RUN chown -R www-data:www-data /var/www/html \
