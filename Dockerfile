@@ -49,8 +49,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Runtime dependencies
 RUN apt-get update && apt-get install -y \
     nginx \
-    supervisor \
-    gettext-base \
     libpng-dev \
     libzip-dev \
     libjpeg-dev \
@@ -69,11 +67,8 @@ COPY docker/nginx.conf /etc/nginx/sites-available/default
 RUN rm -f /etc/nginx/sites-enabled/default \
     && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
-# Konfiguracja PHP-FPM (foreground)
+# Konfiguracja PHP-FPM (daemon mode)
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Supervisor (tylko Nginx + PHP-FPM)
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Entrypoint (setup + start)
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -87,4 +82,4 @@ RUN chown -R www-data:www-data /var/www/html \
 EXPOSE 80
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf", "-n"]
+CMD ["nginx", "-g", "daemon off;"]
