@@ -1,262 +1,290 @@
-# 🚀 Instrukcja Deploymentu - Laravel na Railway
+# Deployment Guide - Railway.app
 
-Ten przewodnik pomoże Ci wdrożyć aplikację Laravel na **Railway** z automatycznym HTTPS (bez potrzeby posiadania domeny).
+## Historia problemów i rozwiązań
 
-## 📋 Wymagania
+### Początkowy stan
+- Aplikacja Laravel z Dockerfile
+- Deployment na Railway.app
+- Problem: "Application failed to respond" / 502 errors
 
-- Konto na GitHub (darmowe)
-- Konto na Railway (darmowe - 500h/miesiąc)
-- Repozytorium GitHub z Twoim kodem
+### Główne problemy i próby naprawy
 
----
+#### Problem 1: Composer install z package:discover
+**Symptom:** `Script @php artisan package:discover --ansi handling the post-autoload-dump event returned with error code 1`
 
-## 🎯 Opcja 1: Railway (Zalecane - Najłatwiejsze)
+**Próby naprawy:**
+- Użycie `--no-scripts` w `composer install`
+- Ręczne uruchomienie `php artisan package:discover` po kopiowaniu plików
+- Tworzenie minimalnego `.env` przed `composer install`
+- Tworzenie katalogów cache przed `composer install`
 
-### Krok 1: Przygotowanie repozytorium
+**Rozwiązanie:** Kopiowanie wszystkich plików aplikacji PRZED `composer install --no-scripts`, potem ręczne uruchomienie `package:discover`.
 
-1. **Upewnij się, że masz wszystkie pliki w repozytorium:**
-   ```bash
-   git add .
-   git commit -m "Add deployment configuration"
-   git push origin main
-   ```
+#### Problem 2: PDO MySQL driver missing
+**Symptom:** `could not find driver (Connection: mysql)`
 
-### Krok 2: Utworzenie konta na Railway
+**Rozwiązanie:** Dodanie `docker-php-ext-enable pdo_mysql` w Dockerfile production stage.
 
-1. Przejdź na [railway.app](https://railway.app)
-2. Kliknij **"Start a New Project"**
-3. Zaloguj się przez **GitHub** (najłatwiej)
-4. Zaakceptuj uprawnienia
+#### Problem 3: Supervisor vs Nginx jako główny proces
+**Początkowy setup:**
+- Supervisor zarządzał Nginx + PHP-FPM
+- Supervisor był PID 1
 
-### Krok 3: Nowy projekt na Railway
+**Problem:** Railway wymaga, żeby główny proces (PID 1) nasłuchiwał na porcie HTTP.
 
-1. Kliknij **"New Project"**
-2. Wybierz **"Deploy from GitHub repo"**
-3. Wybierz swoje repozytorium `delegacje`
-4. Railway automatycznie wykryje `Dockerfile` i zacznie budować
+**Próby naprawy:**
+- Przełączenie z Unix socket na TCP (127.0.0.1:9000) dla PHP-FPM
+- Zmiana uprawnień (nginx:nginx vs www-data:www-data)
+- Przełączenie z Alpine na Ubuntu (prostsze uprawnienia)
 
-### Krok 4: Konfiguracja zmiennych środowiskowych
+**Rozwiązanie:** Usunięcie Supervisora, Nginx jako PID 1, PHP-FPM w tle.
 
-1. W projekcie Railway kliknij na **"Variables"** (lub **"Settings"** → **"Variables"**)
-2. Dodaj następujące zmienne:
+#### Problem 4: Dynamic PORT handling
+**Symptom:** `invalid port in "${PORT:-80}"` - Nginx nie interpretował zmiennej środowiskowej
 
-   ```
-   APP_NAME=Delegacje
-   APP_ENV=production
-   APP_KEY=base64:WYGENERUJ_KLUCZ_PONIZEJ
-   APP_DEBUG=false
-   APP_URL=https://twoja-aplikacja.up.railway.app
-   
-   DB_CONNECTION=mysql
-   DB_HOST=containers-us-west-XXX.railway.app
-   DB_PORT=3306
-   DB_DATABASE=railway
-   DB_USERNAME=root
-   DB_PASSWORD=haslo_z_railway
-   ```
+**Próby naprawy:**
+- `sed` do podmiany PORT
+- `envsubst` (wymaga `gettext-base`)
+- Różne podejścia do escape'owania znaków specjalnych
 
-3. **Wygeneruj APP_KEY:**
-   ```bash
-   php artisan key:generate --show
-   ```
-   Skopiuj wygenerowany klucz i wklej jako `APP_KEY` w Railway.
+**Rozwiązanie:** Użycie `envsubst '${PORT}'` w entrypoint przed startem Nginx.
 
-4. **Dodaj bazę danych MySQL:**
-   - W projekcie Railway kliknij **"New"** → **"Database"** → **"MySQL"**
-   - Railway automatycznie utworzy bazę i doda zmienne `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
-   - Skopiuj te wartości do zmiennych środowiskowych
+#### Problem 5: Przeinżynierowany entrypoint
+**Symptom:** 
+- Entrypoint robił za dużo (migracje, cache, setup)
+- Używał `ps` (nie było `procps` w obrazie)
+- Uruchamiał Nginx wielokrotnie
+- PID 1 kończył się → Railway zabijał kontener
 
-### Krok 5: Konfiguracja domeny (opcjonalne)
+**Błędy w entrypoint:**
+- Migracje w entrypoint (powinny być osobno)
+- `storage:link` przy każdym starcie
+- Cache clear/cache przy każdym starcie
+- Sprawdzanie bazy danych w pętli
+- Użycie `ps` bez zainstalowanego pakietu
+- Uruchamianie Nginx w tle (`&`) zamiast `exec`
 
-Railway automatycznie przypisuje domenę HTTPS:
-- Format: `https://twoja-aplikacja.up.railway.app`
-- **HTTPS działa automatycznie** - nie musisz nic konfigurować!
-
-Jeśli chcesz własną domenę:
-1. W projekcie Railway → **"Settings"** → **"Domains"**
-2. Dodaj swoją domenę
-3. Railway automatycznie skonfiguruje HTTPS przez Let's Encrypt
-
-### Krok 6: Deploy
-
-1. Railway automatycznie rozpocznie build po połączeniu z GitHub
-2. Możesz obserwować logi w zakładce **"Deployments"**
-3. Po zakończeniu builda, aplikacja będzie dostępna pod adresem HTTPS
-
-### Krok 7: Uruchomienie migracji
-
-Po pierwszym deployu, musisz uruchomić migracje:
-
-1. W Railway kliknij na serwis aplikacji
-2. Przejdź do zakładki **"Deployments"**
-3. Kliknij na najnowszy deployment
-4. Otwórz **"View Logs"**
-5. Kliknij **"Run Command"** (lub użyj terminala)
-6. Wpisz:
-   ```bash
-   php artisan migrate --force
-   php artisan db:seed --force
-   ```
-
-### Krok 8: Sprawdzenie działania
-
-1. Otwórz adres URL z Railway (np. `https://twoja-aplikacja.up.railway.app`)
-2. Powinieneś zobaczyć stronę logowania Laravel
-3. Zaloguj się używając:
-   - Email: `test@example.com`
-   - Hasło: `password123`
-
----
-
-## 🔄 Automatyczny Deploy (CI/CD)
-
-Railway automatycznie deployuje każdy push do głównego brancha (main/master).
-
-**Jak to działa:**
-1. Push do GitHub → Railway automatycznie wykrywa zmiany
-2. Railway buduje nowy obraz Docker
-3. Railway deployuje nową wersję
-4. Zero downtime - nowa wersja zastępuje starą
-
-**Aby wyłączyć auto-deploy:**
-- W Railway → **"Settings"** → **"Source"** → wyłącz **"Auto Deploy"**
-
----
-
-## 🛠️ Alternatywa: Render.com
-
-Jeśli Railway nie działa, możesz użyć **Render.com**:
-
-### Krok 1: Utworzenie konta
-1. Przejdź na [render.com](https://render.com)
-2. Zaloguj się przez GitHub
-
-### Krok 2: Nowy Web Service
-1. Kliknij **"New +"** → **"Web Service"**
-2. Połącz repozytorium GitHub
-3. Ustaw:
-   - **Name:** delegacje
-   - **Environment:** Docker
-   - **Region:** Frankfurt (najbliżej Polski)
-   - **Branch:** main
-   - **Root Directory:** (zostaw puste)
-
-### Krok 3: Zmienne środowiskowe
-Dodaj te same zmienne co w Railway (patrz Krok 4 powyżej)
-
-### Krok 4: Dodaj bazę danych
-1. **"New +"** → **"PostgreSQL"** (lub MySQL jeśli dostępne)
-2. Skopiuj dane połączenia do zmiennych środowiskowych
-
-### Krok 5: Deploy
-Render automatycznie zbuduje i wdroży aplikację.
-
----
-
-## 🔧 Rozwiązywanie problemów
-
-### Problem: Błąd "APP_KEY not set"
-**Rozwiązanie:** Upewnij się, że dodałeś `APP_KEY` w zmiennych środowiskowych Railway.
-
-### Problem: Błąd połączenia z bazą danych
-**Rozwiązanie:** 
-- Sprawdź czy dodałeś bazę danych MySQL w Railway
-- Skopiuj dokładnie wartości `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` z bazy danych Railway
-
-### Problem: Błąd 500 po deployu
-**Rozwiązanie:**
-1. Sprawdź logi w Railway → **"Deployments"** → **"View Logs"**
-2. Uruchom migracje: `php artisan migrate --force`
-3. Sprawdź uprawnienia: `php artisan storage:link`
-
-### Problem: Assets nie ładują się (brak CSS/JS)
-**Rozwiązanie:**
-- Upewnij się, że w Dockerfile jest `npm run build`
-- Sprawdź czy pliki w `public/build` są dostępne
-
-### Problem: Błąd "Storage link not found"
-**Rozwiązanie:**
-Uruchom w terminalu Railway:
+**Rozwiązanie:** Minimalny entrypoint:
 ```bash
-php artisan storage:link
+#!/bin/sh
+# Substitute PORT
+export PORT=${PORT:-80}
+envsubst '${PORT}' < /etc/nginx/sites-available/default > /tmp/nginx.conf && mv /tmp/nginx.conf /etc/nginx/sites-available/default
+
+# Start PHP-FPM in background
+php-fpm -D
+
+# Execute Nginx as main process (PID 1)
+exec nginx -g 'daemon off;'
 ```
 
----
+#### Problem 6: Migracja bazy danych
+**Symptom:** `SQLSTATE[HY000]: General error: 1830 Column 'payroll_id' cannot be NOT NULL`
 
-## 📊 Monitorowanie
+**Problem:** Migracja próbuje ustawić `payroll_id` jako NOT NULL, ale istnieją foreign key constraints.
 
-### Logi
-- Railway: **"Deployments"** → wybierz deployment → **"View Logs"**
-- Możesz też użyć: `railway logs` (jeśli masz CLI)
+**Status:** Nie naprawione - migracja jest ignorowana (`|| echo "Migration failed, continuing..."`), ale powinna być naprawiona osobno.
 
-### Metryki
-- Railway pokazuje użycie CPU, RAM, sieci w czasie rzeczywistym
-- Darmowy tier: 500 godzin/miesiąc, $5 kredytu
+### Finalna architektura
 
----
+#### Dockerfile
+- Multi-stage build (build + production)
+- Ubuntu-based (php:8.3-fpm)
+- Nginx + PHP-FPM w jednym kontenerze
+- Nginx jako główny proces (CMD)
 
-## 🔐 Bezpieczeństwo
+#### Entrypoint
+- Minimalny - tylko podmiana PORT i start procesów
+- Brak setupu, migracji, cache
+- PHP-FPM w tle, Nginx jako PID 1
 
-### Zmienne środowiskowe
-**NIGDY nie commituj `.env` do Git!**
+#### Nginx config
+- Nasłuchuje na `0.0.0.0:${PORT}` (podmieniane przez envsubst)
+- Reverse proxy do PHP-FPM na 127.0.0.1:9000
+- Logi do stdout/stderr
 
-Zmienne do ustawienia w Railway:
-- ✅ `APP_KEY` - wygeneruj przez `php artisan key:generate`
-- ✅ `DB_PASSWORD` - skopiuj z Railway Database
-- ✅ `APP_DEBUG=false` - w produkcji zawsze false
-- ✅ `APP_ENV=production`
+#### PHP-FPM config
+- Nasłuchuje na 127.0.0.1:9000 (TCP)
+- Użytkownik www-data
+- Dynamic process management
 
-### HTTPS
-- Railway automatycznie zapewnia HTTPS
-- Certyfikaty są automatycznie odnawiane
-- Nie musisz nic konfigurować!
+### Kluczowe lekcje
 
----
+1. **Railway wymaga PID 1 = proces HTTP**
+   - Główny proces musi nasłuchiwać na `${PORT}`
+   - Supervisor nie działa jako PID 1 dla HTTP
 
-## 💰 Koszty
+2. **Entrypoint powinien być minimalny**
+   - Tylko start procesów
+   - Setup/migracje powinny być osobno (CI/CD, cron, init containers)
 
-### Railway (Darmowy tier)
-- **500 godzin/miesiąc** darmowo
-- **$5 kredytu** miesięcznie
-- Wystarczy dla małych/średnich aplikacji
+3. **PORT jest dynamiczny**
+   - Railway przypisuje losowy port
+   - Musi być podmieniony w konfiguracji przed startem
 
-### Render (Darmowy tier)
-- **750 godzin/miesiąc** darmowo
-- Wolniejszy start (cold start ~30s)
-- Dobry dla projektów testowych
+4. **Static test first**
+   - Najpierw udowodnij, że port jest otwarty (static 200 OK)
+   - Potem dodawaj PHP/Laravel
 
----
+5. **Nie używaj narzędzi, których nie ma**
+   - `ps` wymaga `procps`
+   - W kontenerach minimalnych może nie być standardowych narzędzi
 
-## 🚀 Szybki Start (TL;DR)
+### Obecny stan
 
-1. **Push do GitHub:**
-   ```bash
-   git add .
-   git commit -m "Ready for deployment"
-   git push origin main
-   ```
+**Działa:**
+- ✅ Build przechodzi
+- ✅ Nginx startuje jako PID 1
+- ✅ PORT jest podmieniany
+- ✅ PHP-FPM startuje w tle
 
-2. **Railway:**
-   - Zaloguj się przez GitHub
-   - New Project → Deploy from GitHub
-   - Wybierz repozytorium
-   - Dodaj MySQL Database
-   - Skopiuj zmienne DB do Variables
-   - Dodaj `APP_KEY` (wygeneruj przez `php artisan key:generate`)
-   - Ustaw `APP_URL` na URL z Railway
-   - Po deployu: `php artisan migrate --force`
+**Do naprawy:**
+- ⚠️ Migracja bazy danych (payroll_id NOT NULL)
+- ⚠️ Setup aplikacji (storage:link, cache) - powinno być w CI/CD lub init script
+- ⚠️ Przywrócenie pełnej konfiguracji Laravel (obecnie static 200 OK dla testu)
 
-3. **Gotowe!** Aplikacja działa pod HTTPS 🎉
+### Następne kroki
 
----
+1. **Jeśli static 200 OK działa:**
+   - Przywrócić pełną konfigurację Nginx dla Laravel
+   - Dodać setup aplikacji do CI/CD (nie entrypoint)
 
-## 📞 Wsparcie
+2. **Naprawić migrację:**
+   - Albo `payroll_id` nullable
+   - Albo usunąć `ON DELETE SET NULL` z foreign key
 
-Jeśli masz problemy:
-1. Sprawdź logi w Railway
-2. Sprawdź sekcję "Rozwiązywanie problemów" powyżej
-3. Dokumentacja Railway: [docs.railway.app](https://docs.railway.app)
+3. **Przenieść setup do CI/CD:**
+   - `php artisan storage:link`
+   - `php artisan config:cache`
+   - `php artisan route:cache`
+   - `php artisan view:cache`
 
----
+4. **Migracje:**
+   - Uruchamiać przez Railway CLI: `railway run php artisan migrate --force`
+   - Lub przez init container
+   - Lub przez CI/CD przed deploymentem
 
-**Powodzenia z deploymentem! 🚀**
+### Pliki konfiguracyjne
+
+#### docker/entrypoint.sh
+```bash
+#!/bin/sh
+# Minimal entrypoint - only start PHP-FPM and Nginx
+# Railway needs PID 1 to be Nginx
+
+# Substitute PORT in nginx config
+export PORT=${PORT:-80}
+envsubst '${PORT}' < /etc/nginx/sites-available/default > /tmp/nginx.conf && mv /tmp/nginx.conf /etc/nginx/sites-available/default
+
+# Start PHP-FPM in background
+php-fpm -D
+
+# Execute Nginx as main process (PID 1)
+exec nginx -g 'daemon off;'
+```
+
+#### docker/nginx.conf
+```nginx
+server {
+    listen 0.0.0.0:${PORT};
+    server_name _;
+    
+    access_log /dev/stdout;
+    error_log /dev/stderr;
+    
+    location / {
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+}
+```
+
+#### Dockerfile (kluczowe części)
+```dockerfile
+# Stage 2: Production
+FROM php:8.3-fpm
+
+# Runtime dependencies (nginx, bez supervisor)
+RUN apt-get update && apt-get install -y \
+    nginx \
+    gettext-base \
+    # ... PHP extensions
+
+# Entrypoint
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Railway config
+
+#### railway.json
+```json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+### Environment Variables (Railway)
+
+Wymagane zmienne środowiskowe:
+- `APP_KEY` - klucz aplikacji Laravel
+- `DB_HOST` - host bazy danych
+- `DB_PORT` - port bazy danych
+- `DB_DATABASE` - nazwa bazy danych
+- `DB_USERNAME` - użytkownik bazy danych
+- `DB_PASSWORD` - hasło bazy danych
+- `PORT` - automatycznie ustawiane przez Railway (nie trzeba ręcznie)
+
+### Debugging
+
+#### Sprawdzanie logów
+```bash
+railway logs --service delegacje --tail 200
+```
+
+#### Sprawdzanie procesów w kontenerze
+```bash
+railway run bash -c "ps aux"
+```
+
+#### Sprawdzanie portów
+```bash
+railway run bash -c "ss -tlnp | grep -E '(80|8080)'"
+```
+
+#### Test konfiguracji Nginx
+```bash
+railway run bash -c "nginx -t"
+```
+
+### Źródła problemów
+
+1. **Przeinżynierowanie** - entrypoint robił za dużo
+2. **Brak zrozumienia Railway** - Railway potrzebuje PID 1 = HTTP server
+3. **Narzędzia których nie ma** - używanie `ps` bez `procps`
+4. **Migracje w entrypoint** - powinny być osobno
+5. **Setup w runtime** - powinien być w build/CI/CD
+
+### Podsumowanie
+
+**Co działa:**
+- Minimalny entrypoint
+- Nginx jako PID 1
+- Dynamic PORT handling
+- PHP-FPM w tle
+
+**Co trzeba zrobić:**
+- Naprawić migrację bazy danych
+- Przenieść setup do CI/CD
+- Przywrócić pełną konfigurację Laravel (po potwierdzeniu, że static działa)
