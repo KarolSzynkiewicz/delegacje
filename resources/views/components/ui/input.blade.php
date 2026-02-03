@@ -38,7 +38,7 @@
     <select 
         name="{{ $name }}" 
         id="{{ $inputId }}"
-        {{ $attributes->merge(['class' => $inputClasses]) }}
+        {{ $attributes->merge(['class' => str_replace('form-control', 'form-select', $inputClasses)]) }}
         {{ $required ? 'required' : '' }}
     >
         {{ $slot }}

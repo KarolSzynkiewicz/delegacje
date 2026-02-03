@@ -83,7 +83,12 @@ class WeeklyOverviewController extends Controller
         // Get expiring documents, vehicle inspections, and leases for this month
         $expiringItems = $this->expiringDocumentsService->getExpiringThisMonth();
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'departures', 'employeesWithoutProject', 'expiringItems'));
+        // Get roles, vehicles and accommodations for inline forms
+        $roles = \App\Models\Role::orderBy('name')->get();
+        $vehicles = \App\Models\Vehicle::orderBy('registration_number')->get();
+        $accommodations = \App\Models\Accommodation::orderBy('name')->get();
+        
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'departures', 'employeesWithoutProject', 'expiringItems', 'roles', 'vehicles', 'accommodations'));
     }
 
     /**

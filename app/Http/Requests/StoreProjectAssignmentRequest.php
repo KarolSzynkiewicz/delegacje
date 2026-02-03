@@ -22,6 +22,7 @@ class StoreProjectAssignmentRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'project_id' => ['required', 'exists:projects,id'],
             'employee_id' => ['required', 'exists:employees,id'],
             'role_id' => ['required', 'exists:roles,id'],
             'start_date' => ['required', 'date'],
@@ -39,6 +40,8 @@ class StoreProjectAssignmentRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'project_id.required' => 'Projekt jest wymagany.',
+            'project_id.exists' => 'Wybrany projekt nie istnieje.',
             'employee_id.required' => 'Pracownik jest wymagany.',
             'employee_id.exists' => 'Wybrany pracownik nie istnieje.',
             'role_id.required' => 'Rola jest wymagana.',

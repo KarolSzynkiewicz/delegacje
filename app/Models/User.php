@@ -152,6 +152,7 @@ class User extends Authenticatable
     {
         // Sprawdź tylko dla konkretnych permissions kierownika
         $managerPermissions = [
+            'employee-evaluations.view', // Dla viewAny i view
             'employee-evaluations.create',
             'employee-evaluations.update',
             'employee-evaluations.delete',
@@ -171,6 +172,11 @@ class User extends Authenticatable
 
         // Sprawdź czy user zarządza projektem związanym z tym zasobem
         switch ($permissionName) {
+            case 'employee-evaluations.view':
+                // Jeśli user zarządza jakimkolwiek projektem, może widzieć listę ocen
+                // Szczegółowa autoryzacja dla konkretnej oceny jest w Policy
+                return true; // User zarządza projektami, więc może widzieć listę
+                
             case 'employee-evaluations.create':
                 // Sprawdź employee_id z requestu
                 $employeeId = request()->input('employee_id');

@@ -14,7 +14,7 @@
     
     /* Nasze własne zmienne */
     --bg-body: #0a0f1d;
-    --bg-card: rgba(30, 41, 59, 0.6);
+    --bg-card: rgba(30, 41, 59, 0.5);
     --bg-input: rgba(15, 23, 42, 0.8);
     --primary: #3b82f6;
     --accent: #a855f7;
@@ -1392,10 +1392,6 @@ body.min-vh-100 {
 
 /* Subtelny efekt glassmorphism dla headerów */
 .app-header {
-    background: var(--bg-card) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--glass-border);
     text-align: center !important;
 }
 

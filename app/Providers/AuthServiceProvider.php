@@ -33,6 +33,8 @@ class AuthServiceProvider extends ServiceProvider
 
             // Sprawdź tylko dla konkretnych akcji chronionych przez Policy
             $managerAbilities = [
+                'viewAny' => [\App\Models\EmployeeEvaluation::class],
+                'view' => [\App\Models\EmployeeEvaluation::class],
                 'create' => [\App\Models\EmployeeEvaluation::class],
                 'update' => [\App\Models\EmployeeEvaluation::class],
                 'delete' => [\App\Models\EmployeeEvaluation::class],
@@ -57,6 +59,26 @@ class AuthServiceProvider extends ServiceProvider
 
             // Sprawdź czy user zarządza projektem związanym z tym zasobem
             switch ($ability) {
+                case 'viewAny':
+                    // Dla EmployeeEvaluation - jeśli user zarządza jakimkolwiek projektem, może widzieć listę
+                    if ($modelClass === \App\Models\EmployeeEvaluation::class) {
+                        return true; // User zarządza projektami, więc może widzieć listę ocen
+                    }
+                    break;
+
+                case 'view':
+                    // Dla EmployeeEvaluation - sprawdź employee_id z modelu
+                    if ($modelClass === \App\Models\EmployeeEvaluation::class && isset($arguments[0])) {
+                        $evaluation = $arguments[0];
+                        if ($evaluation instanceof \App\Models\EmployeeEvaluation) {
+                            $hasAccess = \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
+                                ->where('employee_id', $evaluation->employee_id)
+                                ->exists();
+                            return $hasAccess ? true : null;
+                        }
+                    }
+                    break;
+
                 case 'create':
                     // Dla EmployeeEvaluation - sprawdź employee_id z requestu
                     if ($modelClass === \App\Models\EmployeeEvaluation::class) {

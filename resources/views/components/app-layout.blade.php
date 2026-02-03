@@ -23,7 +23,7 @@
             <div class="app-content-wrapper">
                 <!-- Page Heading -->
                 @isset($header)
-                    <header class="bg-white border-bottom shadow-sm">
+                    <header>
                         <div class="container-xxl py-3 px-3 px-md-4 px-lg-5">
                             {{ $header }}
                         </div>

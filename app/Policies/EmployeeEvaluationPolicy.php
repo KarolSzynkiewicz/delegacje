@@ -8,6 +8,41 @@ use App\Models\User;
 class EmployeeEvaluationPolicy
 {
     /**
+     * Determine if the user can view any evaluations.
+     */
+    public function viewAny(User $user): bool
+    {
+        // Admin może widzieć wszystkie oceny
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Kierownik może widzieć oceny jeśli zarządza jakimś projektem
+        $userProjectIds = $user->getManagedProjectIds();
+        return !empty($userProjectIds);
+    }
+
+    /**
+     * Determine if the user can view the evaluation.
+     */
+    public function view(User $user, EmployeeEvaluation $evaluation): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Sprawdź czy employee z oceny jest przypisany do projektu, którym user zarządza
+        $userProjectIds = $user->getManagedProjectIds();
+        if (empty($userProjectIds)) {
+            return false;
+        }
+
+        return \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
+            ->where('employee_id', $evaluation->employee_id)
+            ->exists();
+    }
+
+    /**
      * Determine if the user can create evaluations.
      * 
      * @param User $user

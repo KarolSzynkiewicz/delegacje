@@ -105,6 +105,15 @@ class VehicleAssignmentController extends Controller
                 ->withErrors($e->errors());
         }
 
+        // Jeśli request pochodzi z weekly-overview, przekieruj tam z powrotem
+        $referer = $request->header('referer');
+        if ($referer && str_contains($referer, 'weekly-overview')) {
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            return redirect()
+                ->route('weekly-overview.index', ['start_date' => $startDate->format('Y-m-d')])
+                ->with('success', 'Pojazd został przypisany do pracownika.');
+        }
+        
         return redirect()
             ->route('employees.show', $employee)
             ->with('success', 'Pojazd został przypisany do pracownika.');
