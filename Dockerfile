@@ -1,12 +1,10 @@
-# Prostszy Dockerfile bazujący na Ubuntu (jak Laravel Sail)
-# Multi-stage build dla Laravel Production
-
+# Dockerfile - tylko buduje obraz, nie konfiguruje serwera
 # Stage 1: Build
 FROM php:8.3-fpm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Instalacja zależności systemowych i rozszerzeń PHP
+# Instalacja zależności build
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -23,42 +21,32 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install -j$(nproc) pdo_mysql mbstring exif pcntl bcmath gd zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Instalacja Composer
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Kopiowanie plików composer (dla cache Docker)
+# Kopiowanie i instalacja zależności
 COPY composer.json composer.lock ./
-
-# Kopiowanie WSZYSTKICH plików aplikacji przed composer install
 COPY . .
 
-# Utworzenie minimalnego .env jeśli nie istnieje (dla artisan)
+# Setup dla artisan
 RUN test -f .env || cp .env.example .env || touch .env
-
-# Utworzenie katalogów cache przed composer install
 RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views \
     && chmod -R 775 bootstrap/cache storage
 
-# Instalacja zależności PHP (bez skryptów - uruchomimy później)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
-
-# Uruchomienie package:discover ręcznie
-RUN php artisan package:discover --ansi || true
-
-# Regeneracja autoloadera
-RUN composer dump-autoload --optimize --classmap-authoritative
-
-# Instalacja zależności Node.js i build assets
-RUN npm ci && npm run build && rm -rf node_modules
+# Instalacja zależności
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts \
+    && php artisan package:discover --ansi || true \
+    && composer dump-autoload --optimize --classmap-authoritative \
+    && npm ci && npm run build && rm -rf node_modules
 
 # Stage 2: Production
 FROM php:8.3-fpm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Instalacja runtime dependencies
+# Runtime dependencies
 RUN apt-get update && apt-get install -y \
     nginx \
     supervisor \
@@ -72,35 +60,32 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-enable pdo_mysql \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Kopiowanie plików z build stage
+# Kopiowanie aplikacji
 COPY --from=base /var/www/html /var/www/html
 
-# Konfiguracja Nginx
+# Konfiguracja Nginx (tylko reverse proxy)
 COPY docker/nginx.conf /etc/nginx/sites-available/default
 RUN rm -f /etc/nginx/sites-enabled/default \
     && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
     && echo "daemon off;" >> /etc/nginx/nginx.conf
 
-# Konfiguracja PHP-FPM (Ubuntu używa www-data)
+# Konfiguracja PHP-FPM (foreground)
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 
-# Utworzenie katalogu dla socketu PHP-FPM
-RUN mkdir -p /var/run/php && chown www-data:www-data /var/run/php
-
-# Konfiguracja Supervisor
+# Supervisor (tylko Nginx + PHP-FPM)
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Skrypt startowy
-COPY docker/start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
+# Entrypoint (setup + start)
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Ustawienie uprawnień (Ubuntu używa www-data)
-# Nginx i PHP-FPM działają jako www-data, więc muszą mieć dostęp do plików
+# Uprawnienia
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
+    && mkdir -p /var/run/php && chown www-data:www-data /var/run/php
 
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf", "-n"]
