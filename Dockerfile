@@ -49,6 +49,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Runtime dependencies
 RUN apt-get update && apt-get install -y \
     nginx \
+    gettext-base \
     libpng-dev \
     libzip-dev \
     libjpeg-dev \
