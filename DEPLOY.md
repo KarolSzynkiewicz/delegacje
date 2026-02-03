@@ -98,6 +98,32 @@ exec nginx -g 'daemon off;'
 
 **Status:** BLOKADA PRODUCTION - migracja musi być naprawiona przed deploymentem.
 
+#### Problem 7: envsubst missing (gettext-base)
+**Symptom:** `/usr/local/bin/entrypoint.sh: 7: envsubst: not found`
+
+**Problem:** Entrypoint używał `envsubst` do podmiany PORT, ale pakiet `gettext-base` nie był zainstalowany w obrazie.
+
+**Rozwiązanie:** Dodanie `gettext-base` do Dockerfile w sekcji runtime dependencies.
+
+#### Problem 8: Nginx nie loguje po starcie
+**Symptom:** 
+- W logach widoczne: "Starting Nginx..."
+- Brak dalszych logów z Nginx
+- Aplikacja zwraca 502 Bad Gateway
+
+**Problem:** Nginx startuje, ale:
+- Może nie logować (jeśli nie ma requestów)
+- Może się crashować zaraz po starcie
+- Może nie nasłuchiwać na właściwym porcie
+
+**Próby naprawy:**
+- Dodanie `2>&1` do exec nginx (żeby widzieć błędy)
+- Usunięcie CMD z Dockerfile (entrypoint sam wszystko obsługuje)
+- Dodanie testu konfiguracji Nginx przed startem
+- Dodanie logowania portu przed startem
+
+**Status:** W trakcie debugowania - Nginx startuje (konfiguracja OK), ale brak potwierdzenia, że nasłuchuje i odpowiada.
+
 ### Finalna architektura
 
 #### Dockerfile
@@ -300,12 +326,21 @@ railway run bash -c "nginx -t"
 ### Podsumowanie
 
 **Co działa:**
-- Minimalny entrypoint
-- Nginx jako PID 1
-- Dynamic PORT handling
-- PHP-FPM w tle
+- ✅ Minimalny entrypoint
+- ✅ Nginx jako PID 1 (w planie i zaimplementowane)
+- ✅ PHP-FPM w tle (w planie i zaimplementowane)
+- ✅ Dynamic PORT handling (envsubst działa)
+- ✅ Konfiguracja Nginx jest poprawna (test przechodzi)
+- ✅ PHP-FPM startuje i jest gotowy
+
+**Co nie działa / w trakcie:**
+- ⚠️ Nginx startuje ("Starting Nginx..."), ale brak potwierdzenia, że odpowiada
+- ⚠️ Aplikacja zwraca 502 Bad Gateway
+- ❌ Migracja bazy danych (payroll_id NOT NULL) - BLOKADA PRODUCTION
+- ❌ Setup aplikacji (storage:link, cache) - musi być w CI/CD
 
 **Co trzeba zrobić:**
+- Zdiagnozować, dlaczego Nginx nie odpowiada (może nasłuchuje, ale nie loguje?)
 - Naprawić migrację bazy danych
 - Przenieść setup do CI/CD
-- Przywrócić pełną konfigurację Laravel (po potwierdzeniu, że static działa)
+- Potwierdzić, że Nginx faktycznie nasłuchuje na porcie 8080 i odpowiada na requesty
