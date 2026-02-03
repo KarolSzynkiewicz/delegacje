@@ -47,24 +47,22 @@ return new class extends Migration
         DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
         // Zmień payroll_id na required w advances - użyj bezpośredniego SQL
-        try {
-            // Pobierz nazwę foreign key z bazy danych
-            $result = DB::selectOne("
-                SELECT CONSTRAINT_NAME 
-                FROM information_schema.KEY_COLUMN_USAGE 
-                WHERE TABLE_SCHEMA = DATABASE() 
-                AND TABLE_NAME = 'advances' 
-                AND COLUMN_NAME = 'payroll_id' 
-                AND REFERENCED_TABLE_NAME IS NOT NULL
-                LIMIT 1
-            ");
-            
-            if ($result && isset($result->CONSTRAINT_NAME)) {
-                $fkName = $result->CONSTRAINT_NAME;
-                DB::statement("ALTER TABLE advances DROP FOREIGN KEY `{$fkName}`");
+        // Pobierz wszystkie foreign key constraints dla payroll_id
+        $fkConstraints = DB::select("
+            SELECT CONSTRAINT_NAME 
+            FROM information_schema.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'advances' 
+            AND COLUMN_NAME = 'payroll_id' 
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
+        
+        foreach ($fkConstraints as $fk) {
+            try {
+                DB::statement("ALTER TABLE advances DROP FOREIGN KEY `{$fk->CONSTRAINT_NAME}`");
+            } catch (\Exception $e) {
+                // Ignoruj błędy - foreign key może już nie istnieć
             }
-        } catch (\Exception $e) {
-            // Foreign key może nie istnieć - kontynuuj
         }
         
         // Zmień kolumnę na not null (bez foreign key)
