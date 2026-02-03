@@ -232,13 +232,31 @@ exec nginx -g 'daemon off;'
 server {
     listen 0.0.0.0:${PORT};
     server_name _;
-    
+    root /var/www/html/public;
+    index index.php;
+
     access_log /dev/stdout;
     error_log /dev/stderr;
-    
+
+    charset utf-8;
+
     location / {
-        return 200 "OK\n";
-        add_header Content-Type text/plain;
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_read_timeout 300;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+    }
+
+    location ~ /\. {
+        deny all;
     }
 }
 ```
@@ -259,7 +277,7 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off;"]
+# CMD is not needed - entrypoint handles everything
 ```
 
 ### Railway config
