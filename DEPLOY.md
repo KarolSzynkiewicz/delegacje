@@ -30,14 +30,21 @@
 - Supervisor zarządzał Nginx + PHP-FPM
 - Supervisor był PID 1
 
-**Problem:** Railway wymaga, żeby główny proces (PID 1) nasłuchiwał na porcie HTTP.
+**Problem:** Railway wymaga, żeby kontener nie zakończył się i żeby na zadeklarowanym porcie pojawiła się odpowiedź HTTP.
+
+**WAŻNE:** Railway NIE wymaga, żeby PID 1 był serwerem HTTP. Supervisor może być PID 1 i działać poprawnie, jeśli:
+- Nie forkuje w sposób kończący PID 1
+- Nie uruchamia procesów w tle bez exec
+- Nie kończy się po starcie childrenów
+
+**Problem był w:** sposobie użycia Supervisora, braku kontroli nad lifecycle PID 1.
 
 **Próby naprawy:**
 - Przełączenie z Unix socket na TCP (127.0.0.1:9000) dla PHP-FPM
 - Zmiana uprawnień (nginx:nginx vs www-data:www-data)
 - Przełączenie z Alpine na Ubuntu (prostsze uprawnienia)
 
-**Rozwiązanie:** Usunięcie Supervisora, Nginx jako PID 1, PHP-FPM w tle.
+**Rozwiązanie:** Usunięcie Supervisora, Nginx jako PID 1, PHP-FPM w tle. To była rozsądna decyzja, ale nie jedyna możliwa.
 
 #### Problem 4: Dynamic PORT handling
 **Symptom:** `invalid port in "${PORT:-80}"` - Nginx nie interpretował zmiennej środowiskowej
@@ -57,12 +64,14 @@
 - PID 1 kończył się → Railway zabijał kontener
 
 **Błędy w entrypoint:**
-- Migracje w entrypoint (powinny być osobno)
-- `storage:link` przy każdym starcie
-- Cache clear/cache przy każdym starcie
-- Sprawdzanie bazy danych w pętli
-- Użycie `ps` bez zainstalowanego pakietu
-- Uruchamianie Nginx w tle (`&`) zamiast `exec`
+- Migracje w entrypoint (NIE WOLNO - powinny być osobno)
+- `storage:link` przy każdym starcie (NIE WOLNO - powinno być w build/CI)
+- Cache clear/cache przy każdym starcie (NIE WOLNO - powinno być w build/CI)
+- Sprawdzanie bazy danych w pętli (NIE WOLNO - to nie jest odpowiedzialność runtime)
+- Użycie `ps` bez zainstalowanego pakietu (NIE WOLNO - użyj `/proc/1/status`, `ss`, `pgrep`)
+- Uruchamianie Nginx w tle (`&`) zamiast `exec` (NIE WOLNO - PID 1 musi być głównym procesem)
+
+**Główny problem:** Zbyt wiele odpowiedzialności wrzucone do runtime'u. Runtime ma serwować HTTP. Wszystko inne to procesy przed lub obok.
 
 **Rozwiązanie:** Minimalny entrypoint:
 ```bash
@@ -83,7 +92,11 @@ exec nginx -g 'daemon off;'
 
 **Problem:** Migracja próbuje ustawić `payroll_id` jako NOT NULL, ale istnieją foreign key constraints.
 
-**Status:** Nie naprawione - migracja jest ignorowana (`|| echo "Migration failed, continuing..."`), ale powinna być naprawiona osobno.
+**BŁĄD KRYTYCZNY:** Ignorowanie błędu migracji = brak gwarancji spójności aplikacji.
+
+**ZAKAZ:** Kontener produkcyjny NIE POWINIEN się uruchomić, jeśli migracje nie przeszły. Inaczej aplikacja działa na niespójnym schemacie bazy danych.
+
+**Status:** BLOKADA PRODUCTION - migracja musi być naprawiona przed deploymentem.
 
 ### Finalna architektura
 
@@ -110,24 +123,29 @@ exec nginx -g 'daemon off;'
 
 ### Kluczowe lekcje
 
-1. **Railway wymaga PID 1 = proces HTTP**
-   - Główny proces musi nasłuchiwać na `${PORT}`
-   - Supervisor nie działa jako PID 1 dla HTTP
+1. **Railway wymaga: kontener nie kończy się + port odpowiada HTTP**
+   - Railway NIE wymaga, żeby PID 1 był serwerem HTTP
+   - Supervisor może być PID 1, jeśli nie kończy się po starcie childrenów
+   - Główny proces musi nasłuchiwać na `${PORT}` i odpowiadać HTTP
 
-2. **Entrypoint powinien być minimalny**
-   - Tylko start procesów
-   - Setup/migracje powinny być osobno (CI/CD, cron, init containers)
+2. **Entrypoint powinien być minimalny - ZASADA**
+   - Runtime ma serwować HTTP
+   - Wszystko inne (build, setup, migracje, health) to procesy przed lub obok
+   - Setup/migracje NIE WOLNO w entrypoint - powinny być w CI/CD, cron, init containers
 
 3. **PORT jest dynamiczny**
    - Railway przypisuje losowy port
    - Musi być podmieniony w konfiguracji przed startem
+   - `envsubst` modyfikuje plik runtime'owo (kontener nie jest 100% immutable - OK w Railway)
 
-4. **Static test first**
+4. **Static test first - ZASADA DIAGNOSTYCZNA**
    - Najpierw udowodnij, że port jest otwarty (static 200 OK)
-   - Potem dodawaj PHP/Laravel
+   - Oddziel "czy port żyje" od "czy Laravel działa"
+   - Potem dopiero dodawaj PHP/Laravel
 
 5. **Nie używaj narzędzi, których nie ma**
-   - `ps` wymaga `procps`
+   - `ps` wymaga `procps` - NIE WOLNO używać bez instalacji
+   - Alternatywy: `/proc/1/status`, `ss`, `pgrep`
    - W kontenerach minimalnych może nie być standardowych narzędzi
 
 ### Obecny stan
@@ -138,9 +156,9 @@ exec nginx -g 'daemon off;'
 - ✅ PORT jest podmieniany
 - ✅ PHP-FPM startuje w tle
 
-**Do naprawy:**
-- ⚠️ Migracja bazy danych (payroll_id NOT NULL)
-- ⚠️ Setup aplikacji (storage:link, cache) - powinno być w CI/CD lub init script
+**BLOKADY PRODUCTION:**
+- ❌ Migracja bazy danych (payroll_id NOT NULL) - KONIECZNE przed deploymentem
+- ❌ Setup aplikacji (storage:link, cache) - NIE WOLNO w entrypoint, musi być w CI/CD lub init script
 - ⚠️ Przywrócenie pełnej konfiguracji Laravel (obecnie static 200 OK dla testu)
 
 ### Następne kroki
@@ -255,7 +273,10 @@ railway logs --service delegacje --tail 200
 
 #### Sprawdzanie procesów w kontenerze
 ```bash
-railway run bash -c "ps aux"
+# UWAGA: ps wymaga procps - jeśli nie ma, użyj alternatyw:
+railway run bash -c "ps aux"  # tylko jeśli procps jest zainstalowany
+railway run bash -c "cat /proc/1/status"  # alternatywa bez procps
+railway run bash -c "pgrep -a nginx"  # alternatywa bez procps
 ```
 
 #### Sprawdzanie portów
