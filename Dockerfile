@@ -74,8 +74,12 @@ RUN rm -f /etc/nginx/sites-enabled/default \
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Entrypoint (setup + start)
+# FORCE_REBUILD: Change COPY order to break cache
+RUN echo "Preparing entrypoint..." && date > /tmp/pre-build.txt
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    echo "Entrypoint installed:" && \
+    head -7 /usr/local/bin/entrypoint.sh
 
 # Uprawnienia
 RUN chown -R www-data:www-data /var/www/html \
