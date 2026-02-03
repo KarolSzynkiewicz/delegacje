@@ -75,12 +75,15 @@ COPY --from=base /var/www/html /var/www/html
 
 # Konfiguracja Nginx
 COPY docker/nginx.conf /etc/nginx/sites-available/default
-RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
-    && rm -f /etc/nginx/sites-enabled/default.bak 2>/dev/null || true \
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
     && echo "daemon off;" >> /etc/nginx/nginx.conf
 
 # Konfiguracja PHP-FPM (Ubuntu używa www-data)
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+
+# Utworzenie katalogu dla socketu PHP-FPM
+RUN mkdir -p /var/run/php && chown www-data:www-data /var/run/php
 
 # Konfiguracja Supervisor
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

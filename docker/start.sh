@@ -7,6 +7,11 @@ exec 2>&2
 
 echo "=== Starting application setup ==="
 
+# Utworzenie katalogu dla socketu PHP-FPM jeśli nie istnieje
+echo "Creating PHP-FPM socket directory..."
+mkdir -p /var/run/php
+chown www-data:www-data /var/run/php || true
+
 # Utwórz link do storage jeśli nie istnieje
 echo "Creating storage link..."
 php artisan storage:link || true
