@@ -21,26 +21,33 @@ return new class extends Migration
         
         // Zmień payroll_id na required w adjustments
         Schema::table('adjustments', function (Blueprint $table) {
-            // Usuń foreign key constraint PRZED usunięciem indeksu
-            // Sprawdź różne możliwe nazwy foreign key
-            $foreignKeys = ['adjustments_payroll_id_foreign', 'adjustments_payroll_id_foreign', 'payroll_id'];
-            foreach ($foreignKeys as $fk) {
+            // Najpierw usuń foreign key na employee_id (jeśli używa indeksu)
+            try {
+                $table->dropForeign(['adjustments_employee_id_foreign']);
+            } catch (\Exception $e) {
                 try {
-                    $table->dropForeign([$fk]);
-                    break; // Jeśli udało się usunąć, przerwij
-                } catch (\Exception $e) {
-                    // Spróbuj następną nazwę
-                    continue;
+                    $table->dropForeign(['employee_id']);
+                } catch (\Exception $e2) {
+                    // Foreign key może nie istnieć lub mieć inną nazwę
                 }
             }
             
-            // Usuń indeksy TYLKO jeśli nie są używane przez foreign key
-            // Indeks employee_id_date może być używany przez foreign key employee_id
-            // Nie usuwamy go, jeśli powoduje błąd
+            // Teraz usuń indeks (jeśli nie jest już używany)
             try {
                 $table->dropIndex(['employee_id', 'date']);
             } catch (\Exception $e) {
-                // Indeks może być używany przez foreign key - pomiń
+                // Indeks może nie istnieć lub być używany - pomiń
+            }
+            
+            // Usuń foreign key constraint na payroll_id
+            try {
+                $table->dropForeign(['adjustments_payroll_id_foreign']);
+            } catch (\Exception $e) {
+                try {
+                    $table->dropForeign(['payroll_id']);
+                } catch (\Exception $e2) {
+                    // Foreign key może nie istnieć
+                }
             }
         });
         
@@ -49,28 +56,43 @@ return new class extends Migration
         
         // Dodaj foreign key z powrotem z onDelete('cascade')
         Schema::table('adjustments', function (Blueprint $table) {
+            // Przywróć foreign key na employee_id
+            $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade');
+            // Dodaj foreign key na payroll_id
             $table->foreign('payroll_id')->references('id')->on('payrolls')->onDelete('cascade');
+            // Dodaj indeks z powrotem
             $table->index(['employee_id', 'date']);
         });
         
         // Zmień payroll_id na required w advances
         Schema::table('advances', function (Blueprint $table) {
-            // Usuń foreign key constraint PRZED usunięciem indeksu
-            $foreignKeys = ['advances_payroll_id_foreign', 'advances_payroll_id_foreign', 'payroll_id'];
-            foreach ($foreignKeys as $fk) {
+            // Najpierw usuń foreign key na employee_id (jeśli używa indeksu)
+            try {
+                $table->dropForeign(['advances_employee_id_foreign']);
+            } catch (\Exception $e) {
                 try {
-                    $table->dropForeign([$fk]);
-                    break;
-                } catch (\Exception $e) {
-                    continue;
+                    $table->dropForeign(['employee_id']);
+                } catch (\Exception $e2) {
+                    // Foreign key może nie istnieć lub mieć inną nazwę
                 }
             }
             
-            // Usuń indeksy TYLKO jeśli nie są używane przez foreign key
+            // Teraz usuń indeks (jeśli nie jest już używany)
             try {
                 $table->dropIndex(['employee_id', 'date']);
             } catch (\Exception $e) {
-                // Indeks może być używany przez foreign key - pomiń
+                // Indeks może nie istnieć lub być używany - pomiń
+            }
+            
+            // Usuń foreign key constraint na payroll_id
+            try {
+                $table->dropForeign(['advances_payroll_id_foreign']);
+            } catch (\Exception $e) {
+                try {
+                    $table->dropForeign(['payroll_id']);
+                } catch (\Exception $e2) {
+                    // Foreign key może nie istnieć
+                }
             }
         });
         
@@ -79,7 +101,11 @@ return new class extends Migration
         
         // Dodaj foreign key z powrotem z onDelete('cascade')
         Schema::table('advances', function (Blueprint $table) {
+            // Przywróć foreign key na employee_id
+            $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade');
+            // Dodaj foreign key na payroll_id
             $table->foreign('payroll_id')->references('id')->on('payrolls')->onDelete('cascade');
+            // Dodaj indeks z powrotem
             $table->index(['employee_id', 'date']);
         });
         
