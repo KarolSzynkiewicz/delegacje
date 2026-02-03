@@ -411,24 +411,31 @@ $table->unsignedBigInteger('payroll_id')->nullable()->change();
 
 **UWAGA:** `railway run` wykonuje komendy lokalnie, nie w kontenerze. Użyj jednego z poniższych:
 
-**Opcja 1: Railway Web UI**
-1. Przejdź do Railway Dashboard → Twój projekt → Serwis aplikacji
-2. Kliknij "Deployments" → wybierz najnowszy deployment
-3. Kliknij "View Logs" → "Run Command"
-4. Wpisz: `php artisan migrate --force`
-
-**Opcja 2: Railway CLI w kontenerze (jeśli dostępne)**
+**Opcja 1: Railway SSH (NAJPROSTSZE - bezpośrednio w kontenerze)**
 ```bash
-railway connect
-railway shell
+# Połącz się z kontenerem przez SSH
+railway ssh
+
+# W kontenerze uruchom migracje
 php artisan migrate --force
 ```
 
-**Opcja 3: GitHub Actions (CI/CD)**
+**Opcja 2: Railway Web UI (jeśli dostępne)**
+1. Przejdź do Railway Dashboard → Twój projekt → Serwis aplikacji
+2. Kliknij "Deployments" → wybierz najnowszy deployment
+3. Szukaj "Terminal", "Console" lub "Run Command" (może być w różnych miejscach w zależności od wersji UI)
+4. Wpisz: `php artisan migrate --force`
+
+**Opcja 3: GitHub Actions (CI/CD) - automatyczne**
 Dodaj do `.github/workflows/deploy.yml`:
 ```yaml
 - name: Run migrations
-  run: railway run --service delegacje php artisan migrate --force
+  run: railway ssh -c "php artisan migrate --force"
+```
+
+**Opcja 4: Railway CLI z SSH (jedna komenda)**
+```bash
+railway ssh -c "php artisan migrate --force"
 ```
 
 **WAŻNE:** Kontener nie powinien być "żywy" bez przeszłych migracji. Rozważyć:
