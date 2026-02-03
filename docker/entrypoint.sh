@@ -53,20 +53,29 @@ echo "=== Setup Complete ==="
 # Substitute PORT variable in nginx config (Railway uses dynamic ports)
 # Use PORT if set, otherwise default to 80
 NGINX_PORT=${PORT:-80}
-# Replace the entire listen line with 0.0.0.0 binding
-sed -i "s/listen 0.0.0.0:\${PORT:-80};/listen 0.0.0.0:$NGINX_PORT;/" /etc/nginx/sites-available/default
+echo "PORT environment variable: $PORT"
+echo "Using Nginx port: $NGINX_PORT"
+
+# Use perl for reliable substitution (handles special chars better than sed)
+perl -i -pe "s/listen 0\.0\.0\.0:8080;/listen 0.0.0.0:$NGINX_PORT;/" /etc/nginx/sites-available/default
 echo "Nginx configured to listen on 0.0.0.0:$NGINX_PORT"
 
-# Start PHP-FPM in background (daemon mode)
-echo "Starting PHP-FPM..."
-php-fpm -D
-
-# Wait a moment for PHP-FPM to be ready
-sleep 2
+# Verify the substitution worked
+echo "Verifying Nginx config..."
+grep "listen" /etc/nginx/sites-available/default || echo "WARNING: Could not find listen directive"
 
 # Test Nginx configuration before starting
 echo "Testing Nginx configuration..."
 nginx -t || echo "WARNING: Nginx configuration test failed, but continuing..."
+
+# Start PHP-FPM in background (daemon mode) - only if we're not in static test mode
+if [ -f /var/www/html/public/index.php ]; then
+    echo "Starting PHP-FPM..."
+    php-fpm -D
+    sleep 2
+else
+    echo "Static test mode - skipping PHP-FPM"
+fi
 
 # Execute CMD (nginx as main process)
 echo "Starting Nginx..."
