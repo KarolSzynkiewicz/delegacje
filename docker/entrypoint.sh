@@ -2,10 +2,9 @@
 # Minimal entrypoint - only start PHP-FPM and Nginx
 # Railway needs PID 1 to be Nginx
 
-# Railway routes external traffic to port 80, internal healthcheck to PORT (8080)
-# Listen on both ports to handle both
-echo "Nginx will listen on ports: 80 and 8080 (Railway PORT env var: ${PORT:-not set})"
-grep "listen" /etc/nginx/sites-available/default
+# Railway auto-detected port 9000 - Nginx listens on 9000
+echo "Nginx will listen on port: 9000 (Railway auto-detected this port)"
+grep "listen" /etc/nginx/sites-available/default | head -1
 
 # Test Nginx config
 nginx -t || {

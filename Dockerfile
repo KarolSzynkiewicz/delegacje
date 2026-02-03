@@ -80,9 +80,8 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Railway uses PORT env var for routing
-# We expose the port that Railway will use
-EXPOSE 8080
+# Railway auto-detected port 9000 - Nginx listens on 9000 and proxies to PHP-FPM
+EXPOSE 9000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 # CMD is not needed - entrypoint handles everything
