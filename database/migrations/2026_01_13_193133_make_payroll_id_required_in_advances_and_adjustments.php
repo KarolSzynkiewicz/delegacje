@@ -1,8 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
@@ -13,31 +11,29 @@ return new class extends Migration
     public function up(): void
     {
         // Wyłącz sprawdzanie foreign key constraints podczas migracji
-        Schema::disableForeignKeyConstraints();
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
         
         // Najpierw usuń wszystkie advances i adjustments bez payroll_id (jeśli są)
         DB::table('adjustments')->whereNull('payroll_id')->delete();
         DB::table('advances')->whereNull('payroll_id')->delete();
         
         // Zmień payroll_id na required w adjustments - użyj bezpośredniego SQL
-        try {
-            // Pobierz nazwę foreign key z bazy danych
-            $result = DB::selectOne("
-                SELECT CONSTRAINT_NAME 
-                FROM information_schema.KEY_COLUMN_USAGE 
-                WHERE TABLE_SCHEMA = DATABASE() 
-                AND TABLE_NAME = 'adjustments' 
-                AND COLUMN_NAME = 'payroll_id' 
-                AND REFERENCED_TABLE_NAME IS NOT NULL
-                LIMIT 1
-            ");
-            
-            if ($result && isset($result->CONSTRAINT_NAME)) {
-                $fkName = $result->CONSTRAINT_NAME;
-                DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY `{$fkName}`");
+        // Pobierz wszystkie foreign key constraints TYLKO dla payroll_id
+        $fkConstraints = DB::select("
+            SELECT CONSTRAINT_NAME 
+            FROM information_schema.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'adjustments' 
+            AND COLUMN_NAME = 'payroll_id' 
+            AND REFERENCED_TABLE_NAME = 'payrolls'
+        ");
+        
+        foreach ($fkConstraints as $fk) {
+            try {
+                DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY `{$fk->CONSTRAINT_NAME}`");
+            } catch (\Exception $e) {
+                // Ignoruj błędy - foreign key może już nie istnieć
             }
-        } catch (\Exception $e) {
-            // Foreign key może nie istnieć - kontynuuj
         }
         
         // Zmień kolumnę na not null (bez foreign key)
@@ -47,14 +43,14 @@ return new class extends Migration
         DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
         // Zmień payroll_id na required w advances - użyj bezpośredniego SQL
-        // Pobierz wszystkie foreign key constraints dla payroll_id
+        // Pobierz wszystkie foreign key constraints TYLKO dla payroll_id
         $fkConstraints = DB::select("
             SELECT CONSTRAINT_NAME 
             FROM information_schema.KEY_COLUMN_USAGE 
             WHERE TABLE_SCHEMA = DATABASE() 
             AND TABLE_NAME = 'advances' 
             AND COLUMN_NAME = 'payroll_id' 
-            AND REFERENCED_TABLE_NAME IS NOT NULL
+            AND REFERENCED_TABLE_NAME = 'payrolls'
         ");
         
         foreach ($fkConstraints as $fk) {
@@ -72,7 +68,7 @@ return new class extends Migration
         DB::statement("ALTER TABLE advances ADD CONSTRAINT advances_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
         // Włącz sprawdzanie foreign key constraints
-        Schema::enableForeignKeyConstraints();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     /**
@@ -80,18 +76,26 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::disableForeignKeyConstraints();
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
         
         // adjustments
-        DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY adjustments_payroll_id_foreign");
+        try {
+            DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY adjustments_payroll_id_foreign");
+        } catch (\Exception $e) {
+            // Ignoruj jeśli nie istnieje
+        }
         DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NULL');
         DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL");
         
         // advances
-        DB::statement("ALTER TABLE advances DROP FOREIGN KEY advances_payroll_id_foreign");
+        try {
+            DB::statement("ALTER TABLE advances DROP FOREIGN KEY advances_payroll_id_foreign");
+        } catch (\Exception $e) {
+            // Ignoruj jeśli nie istnieje
+        }
         DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NULL');
         DB::statement("ALTER TABLE advances ADD CONSTRAINT advances_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL");
         
-        Schema::enableForeignKeyConstraints();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 };
