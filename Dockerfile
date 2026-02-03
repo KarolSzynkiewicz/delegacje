@@ -67,10 +67,16 @@ COPY --from=base /var/www/html /var/www/html
 
 # Konfiguracja Nginx (tylko reverse proxy)
 # Railway auto-detected port 9000 - Nginx listens on 9000 and proxies to PHP-FPM
+# CRITICAL: Force rebuild - RUN before COPY to break Docker cache
+RUN echo "CACHE_BUST_NGINX=$(date +%s)" > /tmp/nginx-cache-bust.txt && cat /tmp/nginx-cache-bust.txt
 COPY docker/nginx.conf /etc/nginx/sites-available/default
-RUN echo "Nginx configured for port 9000" && head -3 /etc/nginx/sites-available/default
-RUN rm -f /etc/nginx/sites-enabled/default \
-    && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+RUN echo "=== Nginx config verification ===" && \
+    head -5 /etc/nginx/sites-available/default && \
+    grep -q "listen 0.0.0.0:9000" /etc/nginx/sites-available/default && \
+    echo "✓ Nginx configured for port 9000 on all interfaces (0.0.0.0)" || \
+    echo "✗ ERROR: Nginx not configured for port 9000!" && \
+    rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # Konfiguracja PHP-FPM (daemon mode)
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
