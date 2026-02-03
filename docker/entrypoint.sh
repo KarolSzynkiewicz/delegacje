@@ -6,8 +6,19 @@
 export PORT=${PORT:-80}
 envsubst '${PORT}' < /etc/nginx/sites-available/default > /tmp/nginx.conf && mv /tmp/nginx.conf /etc/nginx/sites-available/default
 
+# Verify PORT substitution worked
+echo "Nginx will listen on port: $PORT"
+grep "listen" /etc/nginx/sites-available/default | head -1
+
+# Test Nginx config
+nginx -t || {
+    echo "ERROR: Nginx config test failed!"
+    exit 1
+}
+
 # Start PHP-FPM in background
 php-fpm -D
 
 # Execute Nginx as main process (PID 1)
+echo "Starting Nginx..."
 exec nginx -g 'daemon off;'
