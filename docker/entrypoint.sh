@@ -3,7 +3,7 @@
 # Railway needs PID 1 to be Nginx
 
 # Railway auto-detected port 9000 - Nginx listens on 9000
-# FORCE_REBUILD: Changed comment to break Docker cache
+# CACHE_BUST: $(date +%s) - Force rebuild
 echo "Nginx will listen on port: 9000 (Railway auto-detected this port)"
 grep "listen" /etc/nginx/sites-available/default | head -1
 
