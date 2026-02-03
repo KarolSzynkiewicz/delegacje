@@ -21,9 +21,9 @@ return new class extends Migration
             $table->string('status')->default('pending'); // pending, in_transit, completed
             $table->timestamps();
 
-            // Indexes
-            $table->index(['logistics_event_id', 'employee_id']);
-            $table->index(['assignment_type', 'assignment_id']); // For polymorphic queries
+            // Indexes - use shorter names to avoid MySQL 64 character limit
+            $table->index(['logistics_event_id', 'employee_id'], 'lep_event_employee_idx');
+            $table->index(['assignment_type', 'assignment_id'], 'lep_assignment_idx'); // For polymorphic queries
         });
         }
     }

@@ -12,9 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fixed_costs', function (Blueprint $table) {
-            $table->date('cost_date')->after('currency');
-            $table->date('start_date')->after('cost_date');
-            $table->date('end_date')->nullable()->after('start_date');
+            // Check if columns don't exist before adding
+            if (!Schema::hasColumn('fixed_costs', 'cost_date')) {
+                $table->date('cost_date')->after('currency');
+            }
+            if (!Schema::hasColumn('fixed_costs', 'start_date')) {
+                $table->date('start_date')->after('cost_date');
+            }
+            if (!Schema::hasColumn('fixed_costs', 'end_date')) {
+                $table->date('end_date')->nullable()->after('start_date');
+            }
         });
     }
 
