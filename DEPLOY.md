@@ -122,7 +122,9 @@ exec nginx -g 'daemon off;'
 - Dodanie testu konfiguracji Nginx przed startem
 - Dodanie logowania portu przed startem
 
-**Status:** W trakcie debugowania - Nginx startuje (konfiguracja OK), ale brak potwierdzenia, że nasłuchuje i odpowiada.
+**Status:** ROZWIĄZANE - Nginx startuje poprawnie i nasłuchuje na 0.0.0.0:8080.
+
+**Wniosek:** Infrastruktura na poziomie systemu/runtime działa poprawnie. Railway widzi kontener jako "uruchomiony". Problem 502 Bad Gateway nie jest po stronie Nginx, tylko po stronie backendu PHP/Laravel.
 
 ### Finalna architektura
 
@@ -341,24 +343,115 @@ railway run bash -c "nginx -t"
 4. **Migracje w entrypoint** - powinny być osobno
 5. **Setup w runtime** - powinien być w build/CI/CD
 
-### Podsumowanie
+### Podsumowanie stanu deploymentu
 
-**Co działa:**
-- ✅ Minimalny entrypoint
-- ✅ Nginx jako PID 1 (w planie i zaimplementowane)
-- ✅ PHP-FPM w tle (w planie i zaimplementowane)
-- ✅ Dynamic PORT handling (envsubst działa)
-- ✅ Konfiguracja Nginx jest poprawna (test przechodzi)
-- ✅ PHP-FPM startuje i jest gotowy
+#### ✅ Co działa (infrastruktura)
 
-**Co nie działa / w trakcie:**
-- ⚠️ Nginx startuje ("Starting Nginx..."), ale brak potwierdzenia, że odpowiada
-- ⚠️ Aplikacja zwraca 502 Bad Gateway
-- ❌ Migracja bazy danych (payroll_id NOT NULL) - BLOKADA PRODUCTION
-- ❌ Setup aplikacji (storage:link, cache) - musi być w CI/CD
+1. **Procesy i porty działają:**
+   - ✅ Nginx startuje poprawnie i nasłuchuje na 0.0.0.0:8080
+   - ✅ PHP-FPM startuje i jest gotowy do obsługi połączeń (ready to handle connections)
+   - ✅ PID 1 jest Nginx (`exec nginx -g 'daemon off;'`) – kontener nie kończy się
+   - ✅ Dynamiczny port `${PORT}` jest podmieniany w konfiguracji nginx przez envsubst
 
-**Co trzeba zrobić:**
-- Zdiagnozować, dlaczego Nginx nie odpowiada (może nasłuchuje, ale nie loguje?)
-- Naprawić migrację bazy danych
-- Przenieść setup do CI/CD
-- Potwierdzić, że Nginx faktycznie nasłuchuje na porcie 8080 i odpowiada na requesty
+2. **Entrypoint działa minimalnie i poprawnie:**
+   - ✅ envsubst podmienia port
+   - ✅ PHP-FPM startuje w tle
+   - ✅ Nginx jest PID 1
+   - ✅ Nie używasz `ps` ani supervisora
+   - ✅ Brak setupu aplikacji w entrypoint (cache, storage:link) → poprawne podejście
+
+3. **Konfiguracja Nginx jest pełna dla Laravel:**
+   - ✅ `root /var/www/html/public;`
+   - ✅ `try_files $uri $uri/ /index.php?$query_string;`
+   - ✅ `fastcgi_pass 127.0.0.1:9000;`
+   - ✅ `fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;`
+
+**Wniosek:** Infrastruktura na poziomie systemu/runtime działa poprawnie. Railway widzi kontener jako "uruchomiony". Problem 502 Bad Gateway **NIE jest po stronie Nginx ani entrypoint**.
+
+#### ❌ Co blokuje produkcję (backend PHP/Laravel)
+
+1. **502 Bad Gateway = backend nie odpowiada:**
+   - Nginx jest gotowy, ale PHP-FPM/Laravel nie odpowiada poprawnie
+   - **Przyczyny:**
+     - Laravel rzuca błąd (np. brak połączenia z bazą danych, migracje nieprzeszły)
+     - Nginx źle konfiguruje fastcgi_pass lub SCRIPT_FILENAME (ale konfiguracja wygląda poprawnie)
+     - PHP-FPM nasłuchuje na złym porcie/socketcie (ale logi pokazują "ready to handle connections")
+
+2. **Migracje bazy danych nie przeszły - BLOKADA PRODUCTION:**
+   - Migracja `2026_01_13_193133_make_payroll_id_required_in_advances_and_adjustments` kończy się błędem:
+     - `SQLSTATE[HY000]: General error: 1830 Column 'payroll_id' cannot be NOT NULL`
+   - W obecnym setupie migracja jest ignorowana (`|| echo "Migration failed, continuing..."`)
+   - **Krytyczny problem:** Laravel działa na niekompletnym schemacie bazy danych
+   - Każdy request, który odwołuje się do tej kolumny, może zwracać 500 → Nginx zwraca 502
+   - **ZAKAZ:** Deployment nie powinien dopuścić kontenera do życia, dopóki migracje nie przeszły
+
+3. **Setup aplikacji Laravel:**
+   - `storage:link` - musi być w CI/CD/init, nie runtime
+   - `config:cache`, `route:cache`, `view:cache` - musi być w CI/CD/init, nie runtime
+   - `.env` musi być kompletne: APP_KEY, DB_* itp.
+
+**Wniosek:** Problem nie jest po stronie Nginx, tylko po stronie backendu PHP/Laravel. Backend wymaga prawidłowego środowiska i pełnych migracji przed deploymentem produkcyjnym.
+
+### Kroki naprawcze (produkcyjne)
+
+#### 1. Naprawić migrację bazy danych (KRYTYCZNE)
+
+**Opcja A:** `payroll_id` nullable
+```php
+$table->unsignedBigInteger('payroll_id')->nullable()->change();
+```
+
+**Opcja B:** Zmienić foreign key constraint
+```php
+// Usunąć ON DELETE SET NULL z foreign key
+// Albo zmienić logikę migracji
+```
+
+**Uruchomić migracje w Railway CLI lub CI/CD:**
+```bash
+railway run php artisan migrate --force
+```
+
+**WAŻNE:** Kontener nie powinien być "żywy" bez przeszłych migracji. Rozważyć:
+- Init container do migracji
+- Healthcheck, który weryfikuje migracje
+- CI/CD pipeline, który blokuje deployment bez migracji
+
+#### 2. Dodać setup do CI/CD (nie runtime)
+
+**W GitHub Actions lub Railway pre-deploy:**
+```bash
+php artisan storage:link
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+**LUB w init container:**
+- Osobny kontener, który wykonuje setup przed startem głównego kontenera
+
+#### 3. Zweryfikować healthcheck Railway
+
+**Tymczasowo `/health` zwracające 200 OK:**
+- Żeby oddzielić problem Nginx od Laravel
+- Sprawdzić, czy Nginx faktycznie odpowiada
+
+**Test curl w kontenerze:**
+```bash
+railway run bash -c "curl -v http://127.0.0.1:8080/health"
+```
+
+#### 4. Przywrócić konfigurację Nginx do Laravel
+
+**Status:** ✅ Konfiguracja Nginx już jest pełna dla Laravel (root /public, fastcgi_pass, try_files)
+
+**Po naprawieniu migracji:**
+- Nginx powinien poprawnie proxy requesty do PHP-FPM
+- Laravel powinien odpowiadać (jeśli migracje przeszły i .env jest kompletne)
+
+### Główne wnioski
+
+1. **Procesy i porty działają** – problem nie leży w Nginx ani entrypoint
+2. **502 → backend PHP/Laravel nie odpowiada poprawnie** (migracje, konfiguracja, DB)
+3. **Migracje są krytyczne** – kontener nie powinien być "żywy" bez nich
+4. **Kolejny krok:** naprawa migracji i weryfikacja, że Laravel odpowiada po naprawieniu migracji
