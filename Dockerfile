@@ -1,4 +1,6 @@
 # Dockerfile - tylko buduje obraz, nie konfiguruje serwera
+# CACHE_BUST: Force rebuild by changing this value
+ARG CACHE_BUST=1
 # Stage 1: Build
 FROM php:8.3-fpm AS base
 
