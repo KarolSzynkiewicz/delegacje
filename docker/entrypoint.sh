@@ -49,5 +49,8 @@ php artisan view:cache || true
 
 echo "=== Setup Complete ==="
 
+# Wait a moment for processes to be ready
+sleep 2
+
 # Execute CMD
 exec "$@"
