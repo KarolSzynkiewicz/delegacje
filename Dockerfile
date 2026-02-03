@@ -64,7 +64,9 @@ RUN apt-get update && apt-get install -y \
 COPY --from=base /var/www/html /var/www/html
 
 # Konfiguracja Nginx (tylko reverse proxy)
+# Railway auto-detected port 9000 - Nginx listens on 9000 and proxies to PHP-FPM
 COPY docker/nginx.conf /etc/nginx/sites-available/default
+RUN echo "Nginx configured for port 9000" && head -3 /etc/nginx/sites-available/default
 RUN rm -f /etc/nginx/sites-enabled/default \
     && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
