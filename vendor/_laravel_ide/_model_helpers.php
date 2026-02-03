@@ -10,6 +10,9 @@ namespace App\Models {
     * @property mixed $image_path
     * @property mixed $description
     * @property int $capacity
+    * @property \Illuminate\Support\Carbon|null $lease_end_date
+    * @property \Illuminate\Support\Carbon|null $lease_start_date
+    * @property mixed $type
     * @property int|null $location_id
     * @property mixed $postal_code
     * @property mixed $city
@@ -30,6 +33,9 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereCity($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation wherePostalCode($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLocationId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereType($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLeaseStartDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLeaseEndDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereCapacity($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereDescription($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereImagePath($value)
@@ -1159,8 +1165,24 @@ namespace App\Models {
    /**
     * App\Models\Comment
     *
+    * @property \Illuminate\Support\Carbon|null $deleted_at
+    * @property \Illuminate\Support\Carbon|null $updated_at
+    * @property \Illuminate\Support\Carbon|null $created_at
+    * @property mixed $body
+    * @property int $user_id
+    * @property int $commentable_id
+    * @property \App\Enums\CommentableType $commentable_type
+    * @property int $id
     * @property-read \App\Models\Comment $commentable
     * @property-read \App\Models\User $user
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereCommentableType($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereCommentableId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereUserId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereBody($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereCreatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereUpdatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment whereDeletedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<Comment>|Comment query()
@@ -2012,6 +2034,7 @@ namespace App\Models {
     * @property mixed $kind
     * @property \Illuminate\Support\Carbon|null $valid_to
     * @property \Illuminate\Support\Carbon $valid_from
+    * @property mixed $type
     * @property int $document_id
     * @property int $employee_id
     * @property int $id
@@ -2021,6 +2044,7 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereId($value)
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereEmployeeId($value)
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereDocumentId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereType($value)
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereValidFrom($value)
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereValidTo($value)
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereKind($value)
@@ -2288,9 +2312,29 @@ namespace App\Models {
    /**
     * App\Models\EmployeeEvaluation
     *
+    * @property \Illuminate\Support\Carbon|null $updated_at
+    * @property \Illuminate\Support\Carbon|null $created_at
+    * @property mixed $notes
+    * @property integer $behavior
+    * @property integer $orderliness
+    * @property integer $skills
+    * @property integer $engagement
+    * @property int $created_by
+    * @property int $employee_id
+    * @property int $id
     * @property-read mixed $average_score
     * @property-read \App\Models\Employee $employee
     * @property-read \App\Models\User $createdBy
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereEmployeeId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereCreatedBy($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereEngagement($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereSkills($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereOrderliness($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereBehavior($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereNotes($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereCreatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation whereUpdatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<EmployeeEvaluation>|EmployeeEvaluation query()
@@ -2845,6 +2889,7 @@ namespace App\Models {
     * @property \Illuminate\Support\Carbon|null $updated_at
     * @property \Illuminate\Support\Carbon|null $created_at
     * @property mixed $notes
+    * @property boolean $returnable
     * @property float|null $unit_cost
     * @property mixed $unit
     * @property integer $min_quantity
@@ -2868,6 +2913,7 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereMinQuantity($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereUnit($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereUnitCost($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereReturnable($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereNotes($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereCreatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Equipment>|Equipment whereUpdatedAt($value)
@@ -3702,7 +3748,29 @@ namespace App\Models {
    /**
     * App\Models\FixedCostEntry
     *
+    * @property \Illuminate\Support\Carbon|null $updated_at
+    * @property \Illuminate\Support\Carbon|null $created_at
+    * @property mixed $notes
+    * @property int|null $template_id
+    * @property \Illuminate\Support\Carbon $accounting_date
+    * @property \Illuminate\Support\Carbon $period_end
+    * @property \Illuminate\Support\Carbon $period_start
+    * @property mixed $currency
+    * @property float $amount
+    * @property mixed $name
+    * @property int $id
     * @property-read \App\Models\FixedCostTemplate $template
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereName($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereAmount($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereCurrency($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry wherePeriodStart($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry wherePeriodEnd($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereAccountingDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereTemplateId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereNotes($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereCreatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry whereUpdatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<FixedCostEntry>|FixedCostEntry query()
@@ -3963,8 +4031,32 @@ namespace App\Models {
    /**
     * App\Models\FixedCostTemplate
     *
+    * @property \Illuminate\Support\Carbon|null $updated_at
+    * @property \Illuminate\Support\Carbon|null $created_at
+    * @property boolean $is_active
+    * @property mixed $notes
+    * @property \Illuminate\Support\Carbon|null $end_date
+    * @property \Illuminate\Support\Carbon|null $start_date
+    * @property integer $interval_day
+    * @property mixed $interval_type
+    * @property mixed $currency
+    * @property float $amount
+    * @property mixed $name
+    * @property int $id
     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\FixedCostEntry> $entries
     * @property-read int|null $entries_count
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereName($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereAmount($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereCurrency($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereIntervalType($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereIntervalDay($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereStartDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereEndDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereNotes($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereIsActive($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereCreatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate whereUpdatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<FixedCostTemplate>|FixedCostTemplate query()
@@ -4808,7 +4900,8 @@ namespace App\Models {
     * @property \Illuminate\Support\Carbon|null $updated_at
     * @property \Illuminate\Support\Carbon|null $created_at
     * @property string $status
-    * @property int $assignment_id
+    * @property \Illuminate\Support\Carbon|null $original_end_date
+    * @property int|null $assignment_id
     * @property mixed $assignment_type
     * @property int $employee_id
     * @property int $logistics_event_id
@@ -4821,6 +4914,7 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereEmployeeId($value)
     * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereAssignmentType($value)
     * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereAssignmentId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereOriginalEndDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereStatus($value)
     * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereCreatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEventParticipant>|LogisticsEventParticipant whereUpdatedAt($value)
@@ -5381,6 +5475,8 @@ namespace App\Models {
     * @property \Illuminate\Support\Carbon|null $created_at
     * @property float|null $budget
     * @property mixed $client_name
+    * @property \Illuminate\Support\Carbon|null $end_date
+    * @property \Illuminate\Support\Carbon|null $start_date
     * @property mixed $currency
     * @property float|null $contract_amount
     * @property float|null $hourly_rate
@@ -5416,6 +5512,8 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereHourlyRate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereContractAmount($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereCurrency($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereStartDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereEndDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereClientName($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereBudget($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Project>|Project whereCreatedAt($value)
@@ -5686,6 +5784,7 @@ namespace App\Models {
     * @property mixed $notes
     * @property string|null $actual_end_date
     * @property string|null $actual_start_date
+    * @property boolean $is_cancelled
     * @property \Illuminate\Support\Carbon|null $end_date
     * @property \Illuminate\Support\Carbon $start_date
     * @property int $role_id
@@ -5704,6 +5803,7 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereRoleId($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereStartDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereEndDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereIsCancelled($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereActualStartDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereActualEndDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereNotes($value)
@@ -6261,9 +6361,27 @@ namespace App\Models {
    /**
     * App\Models\ProjectFile
     *
+    * @property \Illuminate\Support\Carbon|null $updated_at
+    * @property \Illuminate\Support\Carbon|null $created_at
+    * @property int $uploaded_by
+    * @property mixed $mime_type
+    * @property integer|null $file_size
+    * @property mixed $file_path
+    * @property mixed $name
+    * @property int $project_id
+    * @property int $id
     * @property-read mixed $file_url
     * @property-read \App\Models\Project $project
     * @property-read \App\Models\User $uploadedBy
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereProjectId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereName($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereFilePath($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereFileSize($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereMimeType($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereUploadedBy($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereCreatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile whereUpdatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectFile>|ProjectFile query()
@@ -6524,11 +6642,33 @@ namespace App\Models {
    /**
     * App\Models\ProjectTask
     *
+    * @property \Illuminate\Support\Carbon|null $updated_at
+    * @property \Illuminate\Support\Carbon|null $created_at
+    * @property int $created_by
+    * @property \Illuminate\Support\Carbon|null $completed_at
+    * @property \Illuminate\Support\Carbon|null $due_date
+    * @property int|null $assigned_to
+    * @property \App\Enums\TaskStatus $status
+    * @property mixed $description
+    * @property mixed $name
+    * @property int $project_id
+    * @property int $id
     * @property-read \App\Models\Project $project
     * @property-read \App\Models\User $assignedTo
     * @property-read \App\Models\User $createdBy
     * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Comment> $comments
     * @property-read int|null $comments_count
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereProjectId($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereName($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereDescription($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereStatus($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereAssignedTo($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereDueDate($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereCompletedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereCreatedBy($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereCreatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereUpdatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask query()
@@ -8192,11 +8332,11 @@ namespace App\Models {
    /**
     * App\Models\TransportCost
     *
+    * @property mixed $file_path
     * @property \Illuminate\Support\Carbon|null $updated_at
     * @property \Illuminate\Support\Carbon|null $created_at
     * @property int $created_by
     * @property mixed $notes
-    * @property mixed $receipt_number
     * @property mixed $description
     * @property \Illuminate\Support\Carbon $cost_date
     * @property mixed $currency
@@ -8219,11 +8359,11 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereCurrency($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereCostDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereDescription($value)
-    * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereReceiptNumber($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereNotes($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereCreatedBy($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereCreatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereUpdatedAt($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost whereFilePath($value)
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost newModelQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost newQuery()
     * @method static \Illuminate\Database\Eloquent\Builder<TransportCost>|TransportCost query()
@@ -8489,6 +8629,7 @@ namespace App\Models {
     * @property int|null $current_location_id
     * @property mixed $image_path
     * @property mixed $notes
+    * @property \Illuminate\Support\Carbon|null $insurance_valid_to
     * @property \Illuminate\Support\Carbon|null $inspection_valid_to
     * @property mixed $technical_condition
     * @property int|null $capacity
@@ -8515,6 +8656,7 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereCapacity($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereTechnicalCondition($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereInspectionValidTo($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereInsuranceValidTo($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereNotes($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereImagePath($value)
     * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereCurrentLocationId($value)
@@ -8782,6 +8924,7 @@ namespace App\Models {
     *
     * @property \Illuminate\Support\Carbon|null $updated_at
     * @property \Illuminate\Support\Carbon|null $created_at
+    * @property boolean $is_cancelled
     * @property boolean $is_return_trip
     * @property mixed $notes
     * @property string|null $actual_end_date
@@ -8805,6 +8948,7 @@ namespace App\Models {
     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereActualEndDate($value)
     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereNotes($value)
     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereIsReturnTrip($value)
+    * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereIsCancelled($value)
     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereCreatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereUpdatedAt($value)
     * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment newModelQuery()
