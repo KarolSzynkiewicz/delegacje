@@ -11,18 +11,25 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('fixed_costs', function (Blueprint $table) {
-            // Check if columns don't exist before adding
-            if (!Schema::hasColumn('fixed_costs', 'cost_date')) {
-                $table->date('cost_date')->after('currency');
-            }
-            if (!Schema::hasColumn('fixed_costs', 'start_date')) {
-                $table->date('start_date')->after('cost_date');
-            }
-            if (!Schema::hasColumn('fixed_costs', 'end_date')) {
-                $table->date('end_date')->nullable()->after('start_date');
-            }
-        });
+        // Check if columns already exist (they are created in create_fixed_costs_table migration)
+        $hasCostDate = Schema::hasColumn('fixed_costs', 'cost_date');
+        $hasStartDate = Schema::hasColumn('fixed_costs', 'start_date');
+        $hasEndDate = Schema::hasColumn('fixed_costs', 'end_date');
+        
+        // Only add columns if they don't exist
+        if (!$hasCostDate || !$hasStartDate || !$hasEndDate) {
+            Schema::table('fixed_costs', function (Blueprint $table) use ($hasCostDate, $hasStartDate, $hasEndDate) {
+                if (!$hasCostDate) {
+                    $table->date('cost_date')->after('currency');
+                }
+                if (!$hasStartDate) {
+                    $table->date('start_date')->after('cost_date');
+                }
+                if (!$hasEndDate) {
+                    $table->date('end_date')->nullable()->after('start_date');
+                }
+            });
+        }
     }
 
     /**
