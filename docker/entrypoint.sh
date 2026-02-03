@@ -49,6 +49,12 @@ php artisan view:cache || true
 
 echo "=== Setup Complete ==="
 
+# Substitute PORT variable in nginx config if needed
+if [ -n "$PORT" ]; then
+    sed -i "s/\${PORT:-80}/$PORT/g" /etc/nginx/sites-available/default
+    echo "Nginx configured to listen on port $PORT"
+fi
+
 # Wait a moment for processes to be ready
 sleep 2
 
