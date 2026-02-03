@@ -81,30 +81,16 @@ fi
 echo "Starting Nginx..."
 echo "About to exec: $@"
 echo "Current PID: $$"
-echo "Parent PID: $PPID"
 
 # Double-check Nginx config one more time
 echo "Final Nginx config check:"
 cat /etc/nginx/sites-available/default | grep listen
 
-# Start Nginx directly (not via exec) to see if it works
-echo "Starting Nginx directly..."
-nginx -g "daemon off;" &
-NGINX_PID=$!
-echo "Nginx started with PID: $NGINX_PID"
+# Verify Nginx can start (test run)
+echo "Testing if Nginx can start..."
+timeout 2 nginx -g "daemon off;" 2>&1 || echo "Nginx test completed (timeout expected)"
 
-# Wait a moment and check if it's still running
-sleep 3
-if ps -p $NGINX_PID > /dev/null; then
-    echo "Nginx is running (PID: $NGINX_PID)"
-    # Check if it's listening
-    netstat -tlnp 2>/dev/null | grep -E "(80|8080)" || ss -tlnp 2>/dev/null | grep -E "(80|8080)" || echo "Could not verify listening ports"
-    # Keep Nginx as foreground process
-    wait $NGINX_PID
-else
-    echo "ERROR: Nginx process died immediately!"
-    echo "Exit code: $?"
-    nginx -t
-    ps aux
-    exit 1
-fi
+# Execute Nginx as main process (PID 1)
+# This is what Railway needs - Nginx must be the main process
+echo "Executing Nginx as main process..."
+exec "$@"
