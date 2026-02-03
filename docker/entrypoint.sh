@@ -3,6 +3,10 @@ set -e
 
 echo "=== Application Setup ==="
 
+# Create PHP-FPM socket directory
+mkdir -p /var/run/php
+chown www-data:www-data /var/run/php || true
+
 # Storage link
 php artisan storage:link || true
 
