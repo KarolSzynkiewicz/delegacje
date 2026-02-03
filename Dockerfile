@@ -1,93 +1,85 @@
-# Multi-stage build dla Laravel
-FROM php:8.3-fpm-alpine AS base
+# Prostszy Dockerfile bazujący na Ubuntu (jak Laravel Sail)
+# Multi-stage build dla Laravel Production
 
-# Instalacja zależności systemowych
-RUN apk add --no-cache \
+# Stage 1: Build
+FROM php:8.3-fpm AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalacja zależności systemowych i rozszerzeń PHP
+RUN apt-get update && apt-get install -y \
     git \
     curl \
     libpng-dev \
     libzip-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     zip \
     unzip \
-    oniguruma-dev \
-    mysql-client \
     nodejs \
-    npm
-
-# Instalacja rozszerzeń PHP
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+    npm \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Instalacja Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Ustawienie katalogu roboczego
 WORKDIR /var/www/html
 
 # Kopiowanie plików composer (dla cache Docker)
 COPY composer.json composer.lock ./
 
 # Kopiowanie WSZYSTKICH plików aplikacji przed composer install
-# (artisan potrzebuje pełnej struktury aplikacji)
 COPY . .
 
 # Utworzenie minimalnego .env jeśli nie istnieje (dla artisan)
 RUN test -f .env || cp .env.example .env || touch .env
 
-# Utworzenie katalogów cache przed composer install (wymagane przez package:discover)
+# Utworzenie katalogów cache przed composer install
 RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views \
     && chmod -R 775 bootstrap/cache storage
 
 # Instalacja zależności PHP (bez skryptów - uruchomimy później)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
-# Uruchomienie package:discover ręcznie (wymaga artisan i plików aplikacji)
+# Uruchomienie package:discover ręcznie
 RUN php artisan package:discover --ansi || true
 
-# Regeneracja autoloadera z wszystkimi plikami
+# Regeneracja autoloadera
 RUN composer dump-autoload --optimize --classmap-authoritative
 
 # Instalacja zależności Node.js i build assets
-COPY package.json package-lock.json ./
-RUN npm ci
-RUN npm run build
-RUN rm -rf node_modules
+RUN npm ci && npm run build && rm -rf node_modules
 
-# Ustawienie uprawnień (nginx user w Alpine Linux)
-RUN chown -R nginx:nginx /var/www/html \
-    && chmod -R 755 /var/www/html/storage \
-    && chmod -R 755 /var/www/html/bootstrap/cache
+# Stage 2: Production
+FROM php:8.3-fpm
 
-# Stage produkcyjny
-FROM php:8.3-fpm-alpine
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Instalacja minimalnych zależności runtime
-RUN apk add --no-cache \
-    libpng \
-    libzip \
-    oniguruma \
-    mysql-client \
+# Instalacja runtime dependencies
+RUN apt-get update && apt-get install -y \
     nginx \
-    supervisor
-
-# Instalacja rozszerzeń PHP (z dev dependencies)
-RUN apk add --no-cache --virtual .build-deps \
-    $PHPIZE_DEPS \
+    supervisor \
     libpng-dev \
     libzip-dev \
-    oniguruma-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) pdo_mysql mbstring exif pcntl bcmath gd zip \
     && docker-php-ext-enable pdo_mysql \
-    && apk del .build-deps \
-    && php -m | grep -i pdo_mysql || (echo "ERROR: pdo_mysql not installed!" && exit 1)
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Kopiowanie plików z poprzedniego stage
+# Kopiowanie plików z build stage
 COPY --from=base /var/www/html /var/www/html
 
 # Konfiguracja Nginx
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/nginx.conf /etc/nginx/sites-available/default
+RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
+    && rm -f /etc/nginx/sites-enabled/default.bak 2>/dev/null || true \
+    && echo "daemon off;" >> /etc/nginx/nginx.conf
 
-# Konfiguracja PHP-FPM
+# Konfiguracja PHP-FPM (Ubuntu używa www-data)
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Konfiguracja Supervisor
@@ -97,13 +89,11 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-# Ustawienie uprawnień (nginx user w Alpine Linux)
-RUN chown -R nginx:nginx /var/www/html \
+# Ustawienie uprawnień (Ubuntu używa www-data)
+RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
-# Port
 EXPOSE 80
 
-# Start supervisord (który uruchomi setup, nginx i php-fpm)
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
