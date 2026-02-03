@@ -50,9 +50,10 @@ php artisan view:cache || true
 echo "=== Setup Complete ==="
 
 # Substitute PORT variable in nginx config (Railway uses dynamic ports)
-export PORT=${PORT:-80}
-envsubst '${PORT}' < /etc/nginx/sites-available/default > /tmp/nginx.conf && mv /tmp/nginx.conf /etc/nginx/sites-available/default
-echo "Nginx configured to listen on port $PORT"
+# Use PORT if set, otherwise default to 80
+NGINX_PORT=${PORT:-80}
+sed -i "s/\${PORT:-80}/$NGINX_PORT/g" /etc/nginx/sites-available/default
+echo "Nginx configured to listen on port $NGINX_PORT"
 
 # Wait a moment for processes to be ready
 sleep 2
