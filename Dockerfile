@@ -80,9 +80,9 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Railway automatically detects PORT from environment variable
-# The application listens on ${PORT} (set by Railway, typically 8080)
-# EXPOSE is not needed - Railway uses PORT env var for routing
+# Railway uses PORT env var for routing
+# We expose the port that Railway will use
+EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 # CMD is not needed - entrypoint handles everything
