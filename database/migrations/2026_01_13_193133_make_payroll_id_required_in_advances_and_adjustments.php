@@ -23,17 +23,19 @@ return new class extends Migration
         // Użyj bezpośredniego SQL do usunięcia foreign key (bez dotykania indeksów)
         try {
             // Pobierz nazwę foreign key z bazy danych
-            $fkName = DB::selectOne("
+            $result = DB::selectOne("
                 SELECT CONSTRAINT_NAME 
                 FROM information_schema.KEY_COLUMN_USAGE 
                 WHERE TABLE_SCHEMA = DATABASE() 
                 AND TABLE_NAME = 'adjustments' 
                 AND COLUMN_NAME = 'payroll_id' 
                 AND REFERENCED_TABLE_NAME IS NOT NULL
+                LIMIT 1
             ");
             
-            if ($fkName) {
-                DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY `{$fkName->CONSTRAINT_NAME}`");
+            if ($result && isset($result->CONSTRAINT_NAME)) {
+                $fkName = $result->CONSTRAINT_NAME;
+                DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY `{$fkName}`");
             }
         } catch (\Exception $e) {
             // Foreign key może nie istnieć - kontynuuj
@@ -52,17 +54,19 @@ return new class extends Migration
         // Użyj bezpośredniego SQL do usunięcia foreign key (bez dotykania indeksów)
         try {
             // Pobierz nazwę foreign key z bazy danych
-            $fkName = DB::selectOne("
+            $result = DB::selectOne("
                 SELECT CONSTRAINT_NAME 
                 FROM information_schema.KEY_COLUMN_USAGE 
                 WHERE TABLE_SCHEMA = DATABASE() 
                 AND TABLE_NAME = 'advances' 
                 AND COLUMN_NAME = 'payroll_id' 
                 AND REFERENCED_TABLE_NAME IS NOT NULL
+                LIMIT 1
             ");
             
-            if ($fkName) {
-                DB::statement("ALTER TABLE advances DROP FOREIGN KEY `{$fkName->CONSTRAINT_NAME}`");
+            if ($result && isset($result->CONSTRAINT_NAME)) {
+                $fkName = $result->CONSTRAINT_NAME;
+                DB::statement("ALTER TABLE advances DROP FOREIGN KEY `{$fkName}`");
             }
         } catch (\Exception $e) {
             // Foreign key może nie istnieć - kontynuuj
