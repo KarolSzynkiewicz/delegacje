@@ -20,23 +20,24 @@ return new class extends Migration
         DB::table('advances')->whereNull('payroll_id')->delete();
         
         // Zmień payroll_id na required w adjustments
-        Schema::table('adjustments', function (Blueprint $table) {
-            // Usuń foreign key constraint na payroll_id (nie dotykamy employee_id ani indeksów)
-            try {
-                $table->dropForeign(['adjustments_payroll_id_foreign']);
-            } catch (\Exception $e) {
-                try {
-                    $table->dropForeign(['payroll_id']);
-                } catch (\Exception $e2) {
-                    // Foreign key może nie istnieć lub mieć inną nazwę - sprawdź wszystkie możliwe
-                    try {
-                        DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY IF EXISTS adjustments_payroll_id_foreign");
-                    } catch (\Exception $e3) {
-                        // Ignoruj jeśli nie istnieje
-                    }
-                }
+        // Użyj bezpośredniego SQL do usunięcia foreign key (bez dotykania indeksów)
+        try {
+            // Pobierz nazwę foreign key z bazy danych
+            $fkName = DB::selectOne("
+                SELECT CONSTRAINT_NAME 
+                FROM information_schema.KEY_COLUMN_USAGE 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'adjustments' 
+                AND COLUMN_NAME = 'payroll_id' 
+                AND REFERENCED_TABLE_NAME IS NOT NULL
+            ");
+            
+            if ($fkName) {
+                DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY `{$fkName->CONSTRAINT_NAME}`");
             }
-        });
+        } catch (\Exception $e) {
+            // Foreign key może nie istnieć - kontynuuj
+        }
         
         // Zmień kolumnę na not null (bez foreign key)
         DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
@@ -48,23 +49,24 @@ return new class extends Migration
         });
         
         // Zmień payroll_id na required w advances
-        Schema::table('advances', function (Blueprint $table) {
-            // Usuń foreign key constraint na payroll_id (nie dotykamy employee_id ani indeksów)
-            try {
-                $table->dropForeign(['advances_payroll_id_foreign']);
-            } catch (\Exception $e) {
-                try {
-                    $table->dropForeign(['payroll_id']);
-                } catch (\Exception $e2) {
-                    // Foreign key może nie istnieć lub mieć inną nazwę - sprawdź wszystkie możliwe
-                    try {
-                        DB::statement("ALTER TABLE advances DROP FOREIGN KEY IF EXISTS advances_payroll_id_foreign");
-                    } catch (\Exception $e3) {
-                        // Ignoruj jeśli nie istnieje
-                    }
-                }
+        // Użyj bezpośredniego SQL do usunięcia foreign key (bez dotykania indeksów)
+        try {
+            // Pobierz nazwę foreign key z bazy danych
+            $fkName = DB::selectOne("
+                SELECT CONSTRAINT_NAME 
+                FROM information_schema.KEY_COLUMN_USAGE 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'advances' 
+                AND COLUMN_NAME = 'payroll_id' 
+                AND REFERENCED_TABLE_NAME IS NOT NULL
+            ");
+            
+            if ($fkName) {
+                DB::statement("ALTER TABLE advances DROP FOREIGN KEY `{$fkName->CONSTRAINT_NAME}`");
             }
-        });
+        } catch (\Exception $e) {
+            // Foreign key może nie istnieć - kontynuuj
+        }
         
         // Zmień kolumnę na not null (bez foreign key)
         DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
