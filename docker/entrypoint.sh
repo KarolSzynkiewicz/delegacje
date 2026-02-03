@@ -79,4 +79,32 @@ fi
 
 # Execute CMD (nginx as main process)
 echo "Starting Nginx..."
-exec "$@"
+echo "About to exec: $@"
+echo "Current PID: $$"
+echo "Parent PID: $PPID"
+
+# Double-check Nginx config one more time
+echo "Final Nginx config check:"
+cat /etc/nginx/sites-available/default | grep listen
+
+# Start Nginx directly (not via exec) to see if it works
+echo "Starting Nginx directly..."
+nginx -g "daemon off;" &
+NGINX_PID=$!
+echo "Nginx started with PID: $NGINX_PID"
+
+# Wait a moment and check if it's still running
+sleep 3
+if ps -p $NGINX_PID > /dev/null; then
+    echo "Nginx is running (PID: $NGINX_PID)"
+    # Check if it's listening
+    netstat -tlnp 2>/dev/null | grep -E "(80|8080)" || ss -tlnp 2>/dev/null | grep -E "(80|8080)" || echo "Could not verify listening ports"
+    # Keep Nginx as foreground process
+    wait $NGINX_PID
+else
+    echo "ERROR: Nginx process died immediately!"
+    echo "Exit code: $?"
+    nginx -t
+    ps aux
+    exit 1
+fi
