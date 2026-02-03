@@ -21,4 +21,5 @@ php-fpm -D
 
 # Execute Nginx as main process (PID 1)
 echo "Starting Nginx..."
-exec nginx -g 'daemon off;'
+# Use exec to replace shell with Nginx (becomes PID 1)
+exec nginx -g 'daemon off;' 2>&1

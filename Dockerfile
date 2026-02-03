@@ -83,4 +83,4 @@ RUN chown -R www-data:www-data /var/www/html \
 EXPOSE 80
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off;"]
+# CMD is not needed - entrypoint handles everything
