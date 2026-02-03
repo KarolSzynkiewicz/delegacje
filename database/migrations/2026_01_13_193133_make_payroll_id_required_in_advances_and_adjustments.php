@@ -21,23 +21,26 @@ return new class extends Migration
         
         // Zmień payroll_id na required w adjustments
         Schema::table('adjustments', function (Blueprint $table) {
-            // Usuń stare indeksy jeśli istnieją
+            // Usuń foreign key constraint PRZED usunięciem indeksu
+            // Sprawdź różne możliwe nazwy foreign key
+            $foreignKeys = ['adjustments_payroll_id_foreign', 'adjustments_payroll_id_foreign', 'payroll_id'];
+            foreach ($foreignKeys as $fk) {
+                try {
+                    $table->dropForeign([$fk]);
+                    break; // Jeśli udało się usunąć, przerwij
+                } catch (\Exception $e) {
+                    // Spróbuj następną nazwę
+                    continue;
+                }
+            }
+            
+            // Usuń indeksy TYLKO jeśli nie są używane przez foreign key
+            // Indeks employee_id_date może być używany przez foreign key employee_id
+            // Nie usuwamy go, jeśli powoduje błąd
             try {
                 $table->dropIndex(['employee_id', 'date']);
             } catch (\Exception $e) {
-                // Indeks może nie istnieć
-            }
-            
-            // Usuń foreign key constraint - sprawdź czy istnieje
-            try {
-                $table->dropForeign(['adjustments_payroll_id_foreign']);
-            } catch (\Exception $e) {
-                // Może mieć inną nazwę, spróbuj alternatywną
-                try {
-                    $table->dropForeign(['payroll_id']);
-                } catch (\Exception $e2) {
-                    // Foreign key może nie istnieć
-                }
+                // Indeks może być używany przez foreign key - pomiń
             }
         });
         
@@ -52,23 +55,22 @@ return new class extends Migration
         
         // Zmień payroll_id na required w advances
         Schema::table('advances', function (Blueprint $table) {
-            // Usuń stare indeksy jeśli istnieją
+            // Usuń foreign key constraint PRZED usunięciem indeksu
+            $foreignKeys = ['advances_payroll_id_foreign', 'advances_payroll_id_foreign', 'payroll_id'];
+            foreach ($foreignKeys as $fk) {
+                try {
+                    $table->dropForeign([$fk]);
+                    break;
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+            
+            // Usuń indeksy TYLKO jeśli nie są używane przez foreign key
             try {
                 $table->dropIndex(['employee_id', 'date']);
             } catch (\Exception $e) {
-                // Indeks może nie istnieć
-            }
-            
-            // Usuń foreign key constraint - sprawdź czy istnieje
-            try {
-                $table->dropForeign(['advances_payroll_id_foreign']);
-            } catch (\Exception $e) {
-                // Może mieć inną nazwę, spróbuj alternatywną
-                try {
-                    $table->dropForeign(['payroll_id']);
-                } catch (\Exception $e2) {
-                    // Foreign key może nie istnieć
-                }
+                // Indeks może być używany przez foreign key - pomiń
             }
         });
         
