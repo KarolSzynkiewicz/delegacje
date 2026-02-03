@@ -19,8 +19,7 @@ return new class extends Migration
         DB::table('adjustments')->whereNull('payroll_id')->delete();
         DB::table('advances')->whereNull('payroll_id')->delete();
         
-        // Zmień payroll_id na required w adjustments
-        // Użyj bezpośredniego SQL do usunięcia foreign key (bez dotykania indeksów)
+        // Zmień payroll_id na required w adjustments - użyj bezpośredniego SQL
         try {
             // Pobierz nazwę foreign key z bazy danych
             $result = DB::selectOne("
@@ -45,13 +44,9 @@ return new class extends Migration
         DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
         
         // Dodaj foreign key z powrotem z onDelete('cascade')
-        Schema::table('adjustments', function (Blueprint $table) {
-            // Dodaj foreign key na payroll_id (employee_id i indeksy już istnieją)
-            $table->foreign('payroll_id')->references('id')->on('payrolls')->onDelete('cascade');
-        });
+        DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
-        // Zmień payroll_id na required w advances
-        // Użyj bezpośredniego SQL do usunięcia foreign key (bez dotykania indeksów)
+        // Zmień payroll_id na required w advances - użyj bezpośredniego SQL
         try {
             // Pobierz nazwę foreign key z bazy danych
             $result = DB::selectOne("
@@ -76,10 +71,7 @@ return new class extends Migration
         DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
         
         // Dodaj foreign key z powrotem z onDelete('cascade')
-        Schema::table('advances', function (Blueprint $table) {
-            // Dodaj foreign key na payroll_id (employee_id i indeksy już istnieją)
-            $table->foreign('payroll_id')->references('id')->on('payrolls')->onDelete('cascade');
-        });
+        DB::statement("ALTER TABLE advances ADD CONSTRAINT advances_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
         // Włącz sprawdzanie foreign key constraints
         Schema::enableForeignKeyConstraints();
@@ -90,18 +82,18 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('adjustments', function (Blueprint $table) {
-            $table->dropForeign(['payroll_id']);
-            DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NULL');
-            $table->foreign('payroll_id')->references('id')->on('payrolls')->onDelete('set null');
-            $table->index(['employee_id', 'date']);
-        });
+        Schema::disableForeignKeyConstraints();
         
-        Schema::table('advances', function (Blueprint $table) {
-            $table->dropForeign(['payroll_id']);
-            DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NULL');
-            $table->foreign('payroll_id')->references('id')->on('payrolls')->onDelete('set null');
-            $table->index(['employee_id', 'date']);
-        });
+        // adjustments
+        DB::statement("ALTER TABLE adjustments DROP FOREIGN KEY adjustments_payroll_id_foreign");
+        DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NULL');
+        DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL");
+        
+        // advances
+        DB::statement("ALTER TABLE advances DROP FOREIGN KEY advances_payroll_id_foreign");
+        DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NULL');
+        DB::statement("ALTER TABLE advances ADD CONSTRAINT advances_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL");
+        
+        Schema::enableForeignKeyConstraints();
     }
 };
