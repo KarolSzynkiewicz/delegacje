@@ -1,5 +1,6 @@
 #!/bin/sh
-set -e
+# Don't exit on error - we want to continue even if migrations fail
+set +e
 
 echo "=== Application Setup ==="
 
@@ -63,5 +64,10 @@ php-fpm -D
 # Wait a moment for PHP-FPM to be ready
 sleep 2
 
+# Test Nginx configuration before starting
+echo "Testing Nginx configuration..."
+nginx -t || echo "WARNING: Nginx configuration test failed, but continuing..."
+
 # Execute CMD (nginx as main process)
+echo "Starting Nginx..."
 exec "$@"
