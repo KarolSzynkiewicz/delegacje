@@ -66,8 +66,7 @@ COPY --from=base /var/www/html /var/www/html
 # Konfiguracja Nginx (tylko reverse proxy)
 COPY docker/nginx.conf /etc/nginx/sites-available/default
 RUN rm -f /etc/nginx/sites-enabled/default \
-    && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
-    && echo "daemon off;" >> /etc/nginx/nginx.conf
+    && ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # Konfiguracja PHP-FPM (foreground)
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
