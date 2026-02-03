@@ -52,7 +52,9 @@ echo "=== Setup Complete ==="
 # Substitute PORT variable in nginx config (Railway uses dynamic ports)
 # Use PORT if set, otherwise default to 80
 NGINX_PORT=${PORT:-80}
-sed -i "s/\${PORT:-80}/$NGINX_PORT/g" /etc/nginx/sites-available/default
+# Escape special characters for sed
+ESCAPED_PORT=$(echo "$NGINX_PORT" | sed 's/[\/&]/\\&/g')
+sed -i "s/\${PORT:-80}/$ESCAPED_PORT/g" /etc/nginx/sites-available/default
 echo "Nginx configured to listen on port $NGINX_PORT"
 
 # Wait a moment for processes to be ready
