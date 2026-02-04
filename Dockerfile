@@ -6,7 +6,7 @@
 # Build argument to force cache invalidation
 # Set CACHEBUST env var in Railway dashboard to force rebuild
 # Or Railway will use default value 1
-ARG CACHEBUST=1770245697
+ARG CACHEBUST=1770246125
 
 # Stage 1: Build
 FROM php:8.3-fpm AS base
