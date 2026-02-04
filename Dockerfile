@@ -75,7 +75,7 @@ WORKDIR /var/www/html
 # Entrypoint - php artisan serve na $PORT
 # CRITICAL: Force rebuild - change timestamp to break cache
 RUN echo "ENTRYPOINT_BUILD_$(date +%s)" > /tmp/entrypoint-build.txt && cat /tmp/entrypoint-build.txt
-COPY docker/entrypoint-serve.sh /usr/local/bin/entrypoint.sh
+COPY docker/entrypoint-railway.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     echo "=== Entrypoint verification ===" && \
     head -20 /usr/local/bin/entrypoint.sh && \
