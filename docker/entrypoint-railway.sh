@@ -119,5 +119,6 @@ fi
 php artisan storage:link 2>/dev/null || true
 
 # Start server
+# Use --public flag to ensure static files are served from public directory
 echo "✅ Server starting on 0.0.0.0:${PORT:-8000}"
-exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
+exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}" --public=public
