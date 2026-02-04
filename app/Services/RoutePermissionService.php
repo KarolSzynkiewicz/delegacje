@@ -327,6 +327,7 @@ class RoutePermissionService
             'home',
             'dashboard', // Dashboard dostępny dla każdego zalogowanego użytkownika
             'mine.*', // Wykluczone na testy - routes dla /mine/*
+            'health', // Healthcheck endpoint - no auth/permission required
         ];
         
         foreach ($excludedRoutes as $pattern) {
