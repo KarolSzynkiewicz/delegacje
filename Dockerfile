@@ -1,12 +1,12 @@
 # Dockerfile - Laravel on Railway
 # Railway oczekuje jednego procesu HTTP na $PORT
 # Używamy php artisan serve zamiast nginx + php-fpm
-# FORCE_REBUILD: 2026-02-04-17:10:00 - Clear all Docker cache
+# FORCE_REBUILD: 2026-02-04-20:45:00 - FULL REBUILD NO CACHE
 
 # Build argument to force cache invalidation
 # Set CACHEBUST env var in Railway dashboard to force rebuild
 # Or Railway will use default value 1
-ARG CACHEBUST=1
+ARG CACHEBUST=20260204204500
 
 # Stage 1: Build
 FROM php:8.3-fpm AS base
@@ -87,13 +87,15 @@ WORKDIR /var/www/html
 # Entrypoint - php artisan serve na $PORT
 # CRITICAL: Use CACHEBUST to force rebuild when entrypoint changes
 RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt && \
-    echo "Entrypoint timestamp: $(date +%s)" >> /tmp/entrypoint-build.txt
+    echo "Entrypoint timestamp: $(date +%s)" >> /tmp/entrypoint-build.txt && \
+    echo "Full rebuild: $(date)" >> /tmp/entrypoint-build.txt
 COPY docker/entrypoint-railway.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     echo "=== Entrypoint verification ===" && \
     head -5 /usr/local/bin/entrypoint.sh && \
-    echo "=== Entrypoint has debug logging ===" && \
-    grep -q "RAILWAY STARTUP DEBUG" /usr/local/bin/entrypoint.sh && echo "✅ Debug logging present" || echo "❌ Debug logging missing"
+    echo "=== Entrypoint verification: NO config:cache ===" && \
+    grep -q "DO NOT cache config" /usr/local/bin/entrypoint.sh && echo "✅ Entrypoint does NOT cache config" || echo "❌ WARNING: Entrypoint may cache config!" && \
+    ! grep -q "config:cache" /usr/local/bin/entrypoint.sh && echo "✅ Entrypoint does NOT run config:cache" || echo "❌ ERROR: Entrypoint runs config:cache!"
 
 # Uprawnienia (Railway może działać jako root, więc używamy 777 dla storage)
 RUN chown -R www-data:www-data /var/www/html \
