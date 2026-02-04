@@ -14,6 +14,12 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// Healthcheck endpoint for Railway - NO middleware, NO APP_KEY requirement
+// This must be registered BEFORE api middleware group to avoid any middleware
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok'], 200);
+})->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
