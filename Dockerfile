@@ -69,7 +69,7 @@ COPY --from=base /var/www/html /var/www/html
 # Railway auto-detected port 9000 - Nginx listens on 9000 and proxies to PHP-FPM
 # CRITICAL: Force rebuild - RUN before COPY to break Docker cache
 RUN echo "CACHE_BUST_NGINX=$(date +%s)" > /tmp/nginx-cache-bust.txt && cat /tmp/nginx-cache-bust.txt
-COPY docker/nginx.conf /etc/nginx/sites-available/default
+COPY docker/nginx-9000.conf /etc/nginx/sites-available/default
 RUN echo "=== Nginx config verification ===" && \
     head -5 /etc/nginx/sites-available/default && \
     grep -q "listen 0.0.0.0:9000" /etc/nginx/sites-available/default && \
@@ -87,7 +87,7 @@ ARG CACHE_BUST=1
 RUN echo "CACHE_BUST=${CACHE_BUST}" > /tmp/cache-bust.txt && \
     echo "Build timestamp: $(date +%s)" >> /tmp/cache-bust.txt && \
     cat /tmp/cache-bust.txt
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/entrypoint-9000.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     echo "=== Entrypoint verification (first 8 lines) ===" && \
     head -8 /usr/local/bin/entrypoint.sh && \
