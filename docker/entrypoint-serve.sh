@@ -18,11 +18,8 @@ php artisan route:clear
 php artisan view:clear
 php artisan cache:clear
 
-# Verify APP_KEY is accessible after cache clear
-if ! php artisan tinker --execute="echo config('app.key');" 2>/dev/null | grep -q "base64:"; then
-    echo "⚠️ WARNING: APP_KEY not accessible after cache clear"
-    echo "APP_KEY from env: ${APP_KEY:0:20}..."
-fi
+# DO NOT cache config - Railway env vars may change
+# Config cache blocks environment variables from being used
 
 # Optional: Run migrations only if explicitly enabled
 if [ "$RUN_MIGRATIONS" = "true" ]; then

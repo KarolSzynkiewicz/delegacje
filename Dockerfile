@@ -73,8 +73,15 @@ COPY --from=base /var/www/html /var/www/html
 WORKDIR /var/www/html
 
 # Entrypoint - php artisan serve na $PORT
+# CRITICAL: Force rebuild - change timestamp to break cache
+RUN echo "ENTRYPOINT_BUILD_$(date +%s)" > /tmp/entrypoint-build.txt && cat /tmp/entrypoint-build.txt
 COPY docker/entrypoint-serve.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    echo "=== Entrypoint verification ===" && \
+    head -20 /usr/local/bin/entrypoint.sh && \
+    grep -q "Clearing caches" /usr/local/bin/entrypoint.sh && \
+    echo "✓ Entrypoint has cache clearing" || \
+    echo "✗ ERROR: Entrypoint missing cache clearing!"
 
 # Uprawnienia
 RUN chown -R www-data:www-data /var/www/html \
