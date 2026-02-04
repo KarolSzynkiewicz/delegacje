@@ -58,9 +58,16 @@ fi
 # Remove .env file to force Laravel to use Railway environment variables only
 # .env file may contain old/stale APP_KEY from build time
 if [ -f .env ]; then
-    echo "⚠️ Removing .env file to use Railway environment variables only"
+    OLD_ENV_KEY=$(grep "^APP_KEY=" .env | cut -d'=' -f2- | head -1)
+    echo "⚠️ Removing .env file (had APP_KEY: ${OLD_ENV_KEY:0:30}...) to use Railway env vars only"
     rm -f .env
-    echo "✅ .env removed - Laravel will use Railway env vars"
+    echo "✅ .env removed - Laravel will use Railway env vars (${APP_KEY:0:30}...)"
+    # #region agent log - Verification: .env removed
+    LOG_FILE="/tmp/debug.log"
+    echo "{\"id\":\"log_$(date +%s)_env_removed\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:50\",\"message\":\".env file removed\",\"data\":{\"old_env_key_preview\":\"${OLD_ENV_KEY:0:30}...\",\"railway_key_preview\":\"${APP_KEY:0:30}...\"},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+    # #endregion
+else
+    echo "✅ No .env file - Laravel will use Railway env vars only"
 fi
 
 # Fix permissions for storage (Railway may run as different user)
@@ -74,11 +81,19 @@ php artisan route:clear
 php artisan view:clear
 php artisan cache:clear
 
-# #region agent log - Hypothesis C: Check what Laravel sees after config:clear
+# #region agent log - Verification: Check what Laravel sees after .env removal and config:clear
 LOG_FILE="/tmp/debug.log"
 LARAVEL_APP_KEY=$(php artisan tinker --execute="echo config('app.key') ?: 'NULL';" 2>/dev/null | tail -1 | tr -d '\n')
-echo "DEBUG: Laravel config('app.key') after config:clear: ${LARAVEL_APP_KEY:0:30}..."
-echo "{\"id\":\"log_$(date +%s)_laravel_key\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:45\",\"message\":\"Laravel sees APP_KEY\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_APP_KEY:0:30}...\",\"laravel_key_length\":${#LARAVEL_APP_KEY}},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\"}" >> "$LOG_FILE"
+RAILWAY_ENV_KEY=$(echo "$APP_KEY")
+echo "DEBUG: Laravel config('app.key') after .env removal: ${LARAVEL_APP_KEY:0:30}..."
+echo "DEBUG: Railway env var APP_KEY: ${RAILWAY_ENV_KEY:0:30}..."
+if [ "$LARAVEL_APP_KEY" = "$RAILWAY_ENV_KEY" ]; then
+    echo "✅ VERIFIED: Laravel uses Railway env var (keys match)"
+    echo "{\"id\":\"log_$(date +%s)_verified\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:70\",\"message\":\"APP_KEY sync verified\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_APP_KEY:0:30}...\",\"railway_key_preview\":\"${RAILWAY_ENV_KEY:0:30}...\",\"match\":true},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+else
+    echo "❌ WARNING: Laravel key differs from Railway env var"
+    echo "{\"id\":\"log_$(date +%s)_mismatch\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:72\",\"message\":\"APP_KEY mismatch\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_APP_KEY:0:30}...\",\"railway_key_preview\":\"${RAILWAY_ENV_KEY:0:30}...\",\"match\":false},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+fi
 # #endregion
 
 # DO NOT cache config - Railway env vars may change
