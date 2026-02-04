@@ -2,6 +2,9 @@
 # Railway oczekuje jednego procesu HTTP na $PORT
 # Używamy php artisan serve zamiast nginx + php-fpm
 
+# Build argument to force cache invalidation
+ARG CACHEBUST=1
+
 # Stage 1: Build
 FROM php:8.3-fpm AS base
 
@@ -73,8 +76,8 @@ COPY --from=base /var/www/html /var/www/html
 WORKDIR /var/www/html
 
 # Entrypoint - php artisan serve na $PORT
-# CRITICAL: Force rebuild - change timestamp to break cache
-RUN echo "ENTRYPOINT_BUILD_$(date +%s)_FORCE_REBUILD_2026_02_04" > /tmp/entrypoint-build.txt && cat /tmp/entrypoint-build.txt
+# CRITICAL: Use CACHEBUST to force rebuild when entrypoint changes
+RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt && cat /tmp/entrypoint-build.txt
 COPY docker/entrypoint-railway.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     echo "=== Entrypoint verification ===" && \
