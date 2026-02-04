@@ -23,13 +23,13 @@ return new class extends Migration
         // Only add columns if they don't exist (shouldn't happen if create_fixed_costs_table ran first)
         Schema::table('fixed_costs', function (Blueprint $table) {
             if (!Schema::hasColumn('fixed_costs', 'cost_date')) {
-                $table->date('cost_date')->after('currency');
+            $table->date('cost_date')->after('currency');
             }
             if (!Schema::hasColumn('fixed_costs', 'start_date')) {
-                $table->date('start_date')->after('cost_date');
+            $table->date('start_date')->after('cost_date');
             }
             if (!Schema::hasColumn('fixed_costs', 'end_date')) {
-                $table->date('end_date')->nullable()->after('start_date');
+            $table->date('end_date')->nullable()->after('start_date');
             }
         });
     }

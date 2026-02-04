@@ -34,11 +34,11 @@ return new class extends Migration
             } catch (\Exception $e) {
                 // Ignoruj błędy - foreign key może już nie istnieć
             }
-        }
-        
+            }
+            
         // Zmień kolumnę na not null (bez foreign key)
-        DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
-        
+            DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
+            
         // Dodaj foreign key z powrotem z onDelete('cascade')
         DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
@@ -60,15 +60,15 @@ return new class extends Migration
             if (strpos($fkName, 'employee') === false && strpos($fkName, 'payroll') !== false) {
                 try {
                     DB::statement("ALTER TABLE advances DROP FOREIGN KEY `{$fkName}`");
-                } catch (\Exception $e) {
+            } catch (\Exception $e) {
                     // Ignoruj błędy - foreign key może już nie istnieć
                 }
             }
-        }
-        
+            }
+            
         // Zmień kolumnę na not null (bez foreign key)
-        DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
-        
+            DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NOT NULL');
+            
         // Dodaj foreign key z powrotem z onDelete('cascade')
         DB::statement("ALTER TABLE advances ADD CONSTRAINT advances_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE CASCADE");
         
@@ -89,7 +89,7 @@ return new class extends Migration
         } catch (\Exception $e) {
             // Ignoruj jeśli nie istnieje
         }
-        DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NULL');
+            DB::statement('ALTER TABLE adjustments MODIFY payroll_id BIGINT UNSIGNED NULL');
         DB::statement("ALTER TABLE adjustments ADD CONSTRAINT adjustments_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL");
         
         // advances
@@ -98,7 +98,7 @@ return new class extends Migration
         } catch (\Exception $e) {
             // Ignoruj jeśli nie istnieje
         }
-        DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NULL');
+            DB::statement('ALTER TABLE advances MODIFY payroll_id BIGINT UNSIGNED NULL');
         DB::statement("ALTER TABLE advances ADD CONSTRAINT advances_payroll_id_foreign FOREIGN KEY (payroll_id) REFERENCES payrolls(id) ON DELETE SET NULL");
         
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
