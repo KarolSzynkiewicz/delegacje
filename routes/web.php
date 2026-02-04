@@ -28,18 +28,14 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Healthcheck endpoints for Railway
+// Healthcheck endpoint for Railway - always returns 200 OK (fast, no DB queries)
 Route::get('/health', function () {
-    return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
+    return response()->json(['status' => 'ok'], 200);
 });
 
-// Root endpoint for Railway healthcheck (must return 200 OK)
+// Homepage - normal Laravel route (can have auth, middleware, etc.)
 Route::get('/', function () {
-    return response()->json([
-        'status' => 'ok',
-        'app' => 'Laravel',
-        'timestamp' => now()->toIso8601String(),
-    ]);
+    return view('welcome');
 })->name('home');
 
 Route::get('/2', function () {
