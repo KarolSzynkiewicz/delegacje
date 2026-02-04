@@ -14,8 +14,10 @@ if [ -f .env ]; then
     echo "DEBUG: .env file EXISTS"
     ENV_APP_KEY=$(grep "^APP_KEY=" .env | cut -d'=' -f2- | head -1)
     if [ -n "$ENV_APP_KEY" ]; then
-        echo "DEBUG: .env contains APP_KEY: ${ENV_APP_KEY:0:30}..."
-        echo "{\"id\":\"log_$(date +%s)_env_key\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:10\",\"message\":\".env APP_KEY found\",\"data\":{\"env_key_preview\":\"${ENV_APP_KEY:0:30}...\",\"env_key_length\":${#ENV_APP_KEY}},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}" >> "$LOG_FILE"
+        ENV_KEY_PREVIEW=$(echo "$ENV_APP_KEY" | cut -c1-30)
+        echo "DEBUG: .env contains APP_KEY: ${ENV_KEY_PREVIEW}..."
+        ENV_KEY_LEN=$(echo "$ENV_APP_KEY" | wc -c)
+        echo "{\"id\":\"log_$(date +%s)_env_key\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:10\",\"message\":\".env APP_KEY found\",\"data\":{\"env_key_preview\":\"${ENV_KEY_PREVIEW}...\",\"env_key_length\":${ENV_KEY_LEN}},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}" >> "$LOG_FILE"
     else
         echo "DEBUG: .env does NOT contain APP_KEY"
         echo "{\"id\":\"log_$(date +%s)_env_no_key\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:12\",\"message\":\".env exists but no APP_KEY\",\"data\":{},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}" >> "$LOG_FILE"
@@ -25,12 +27,16 @@ else
     echo "{\"id\":\"log_$(date +%s)_env_missing\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:14\",\"message\":\".env file missing\",\"data\":{},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}" >> "$LOG_FILE"
 fi
 
-echo "DEBUG: Railway env var APP_KEY: ${APP_KEY:0:30}..."
-echo "{\"id\":\"log_$(date +%s)_railway_key\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:16\",\"message\":\"Railway env var APP_KEY\",\"data\":{\"railway_key_preview\":\"${APP_KEY:0:30}...\",\"railway_key_length\":${#APP_KEY}},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\"}" >> "$LOG_FILE"
+RAILWAY_KEY_PREVIEW=$(echo "$APP_KEY" | cut -c1-30)
+RAILWAY_KEY_LEN=$(echo "$APP_KEY" | wc -c)
+echo "DEBUG: Railway env var APP_KEY: ${RAILWAY_KEY_PREVIEW}..."
+echo "{\"id\":\"log_$(date +%s)_railway_key\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:16\",\"message\":\"Railway env var APP_KEY\",\"data\":{\"railway_key_preview\":\"${RAILWAY_KEY_PREVIEW}...\",\"railway_key_length\":${RAILWAY_KEY_LEN}},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"C\"}" >> "$LOG_FILE"
 
 if [ -n "$ENV_APP_KEY" ] && [ -n "$APP_KEY" ] && [ "$ENV_APP_KEY" != "$APP_KEY" ]; then
+    ENV_PREVIEW=$(echo "$ENV_APP_KEY" | cut -c1-30)
+    RAILWAY_PREVIEW=$(echo "$APP_KEY" | cut -c1-30)
     echo "DEBUG: CONFLICT! .env APP_KEY differs from Railway APP_KEY"
-    echo "{\"id\":\"log_$(date +%s)_conflict\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:18\",\"message\":\"APP_KEY conflict detected\",\"data\":{\"env_key_preview\":\"${ENV_APP_KEY:0:30}...\",\"railway_key_preview\":\"${APP_KEY:0:30}...\"},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+    echo "{\"id\":\"log_$(date +%s)_conflict\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:18\",\"message\":\"APP_KEY conflict detected\",\"data\":{\"env_key_preview\":\"${ENV_PREVIEW}...\",\"railway_key_preview\":\"${RAILWAY_PREVIEW}...\"},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
 fi
 # #endregion
 
@@ -59,12 +65,14 @@ fi
 # .env file may contain old/stale APP_KEY from build time
 if [ -f .env ]; then
     OLD_ENV_KEY=$(grep "^APP_KEY=" .env | cut -d'=' -f2- | head -1)
-    echo "⚠️ Removing .env file (had APP_KEY: ${OLD_ENV_KEY:0:30}...) to use Railway env vars only"
+    OLD_KEY_PREVIEW=$(echo "$OLD_ENV_KEY" | cut -c1-30)
+    RAILWAY_KEY_PREVIEW=$(echo "$APP_KEY" | cut -c1-30)
+    echo "⚠️ Removing .env file (had APP_KEY: ${OLD_KEY_PREVIEW}...) to use Railway env vars only"
     rm -f .env
-    echo "✅ .env removed - Laravel will use Railway env vars (${APP_KEY:0:30}...)"
+    echo "✅ .env removed - Laravel will use Railway env vars (${RAILWAY_KEY_PREVIEW}...)"
     # #region agent log - Verification: .env removed
     LOG_FILE="/tmp/debug.log"
-    echo "{\"id\":\"log_$(date +%s)_env_removed\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:50\",\"message\":\".env file removed\",\"data\":{\"old_env_key_preview\":\"${OLD_ENV_KEY:0:30}...\",\"railway_key_preview\":\"${APP_KEY:0:30}...\"},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+    echo "{\"id\":\"log_$(date +%s)_env_removed\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:50\",\"message\":\".env file removed\",\"data\":{\"old_env_key_preview\":\"${OLD_KEY_PREVIEW}...\",\"railway_key_preview\":\"${RAILWAY_KEY_PREVIEW}...\"},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
     # #endregion
 else
     echo "✅ No .env file - Laravel will use Railway env vars only"
@@ -85,14 +93,16 @@ php artisan cache:clear
 LOG_FILE="/tmp/debug.log"
 LARAVEL_APP_KEY=$(php artisan tinker --execute="echo config('app.key') ?: 'NULL';" 2>/dev/null | tail -1 | tr -d '\n')
 RAILWAY_ENV_KEY=$(echo "$APP_KEY")
-echo "DEBUG: Laravel config('app.key') after .env removal: ${LARAVEL_APP_KEY:0:30}..."
-echo "DEBUG: Railway env var APP_KEY: ${RAILWAY_ENV_KEY:0:30}..."
+LARAVEL_KEY_PREVIEW=$(echo "$LARAVEL_APP_KEY" | cut -c1-30)
+RAILWAY_KEY_PREVIEW=$(echo "$RAILWAY_ENV_KEY" | cut -c1-30)
+echo "DEBUG: Laravel config('app.key') after .env removal: ${LARAVEL_KEY_PREVIEW}..."
+echo "DEBUG: Railway env var APP_KEY: ${RAILWAY_KEY_PREVIEW}..."
 if [ "$LARAVEL_APP_KEY" = "$RAILWAY_ENV_KEY" ]; then
     echo "✅ VERIFIED: Laravel uses Railway env var (keys match)"
-    echo "{\"id\":\"log_$(date +%s)_verified\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:70\",\"message\":\"APP_KEY sync verified\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_APP_KEY:0:30}...\",\"railway_key_preview\":\"${RAILWAY_ENV_KEY:0:30}...\",\"match\":true},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+    echo "{\"id\":\"log_$(date +%s)_verified\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:70\",\"message\":\"APP_KEY sync verified\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_KEY_PREVIEW}...\",\"railway_key_preview\":\"${RAILWAY_KEY_PREVIEW}...\",\"match\":true},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
 else
     echo "❌ WARNING: Laravel key differs from Railway env var"
-    echo "{\"id\":\"log_$(date +%s)_mismatch\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:72\",\"message\":\"APP_KEY mismatch\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_APP_KEY:0:30}...\",\"railway_key_preview\":\"${RAILWAY_ENV_KEY:0:30}...\",\"match\":false},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
+    echo "{\"id\":\"log_$(date +%s)_mismatch\",\"timestamp\":$(date +%s)000,\"location\":\"entrypoint-railway.sh:72\",\"message\":\"APP_KEY mismatch\",\"data\":{\"laravel_key_preview\":\"${LARAVEL_KEY_PREVIEW}...\",\"railway_key_preview\":\"${RAILWAY_KEY_PREVIEW}...\",\"match\":false},\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"D\"}" >> "$LOG_FILE"
 fi
 # #endregion
 
