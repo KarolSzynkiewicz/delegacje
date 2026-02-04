@@ -1,6 +1,7 @@
-# Dockerfile - tylko buduje obraz, nie konfiguruje serwera
-# CACHE_BUST: Force rebuild by changing this value
-ARG CACHE_BUST=1
+# Dockerfile - Laravel on Railway
+# Railway oczekuje jednego procesu HTTP na $PORT
+# Używamy php artisan serve zamiast nginx + php-fpm
+
 # Stage 1: Build
 FROM php:8.3-fpm AS base
 
@@ -26,32 +27,36 @@ RUN apt-get update && apt-get install -y \
 # Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Setup aplikacji
 WORKDIR /var/www/html
 
-# Kopiowanie i instalacja zależności
+# Kopiowanie plików
 COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+
 COPY . .
 
-# Setup dla artisan
+# Setup .env jeśli nie istnieje
 RUN test -f .env || cp .env.example .env || touch .env
+
+# Tworzenie katalogów storage
 RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views \
     && chmod -R 775 bootstrap/cache storage
 
-# Instalacja zależności
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts \
-    && php artisan package:discover --ansi || true \
-    && composer dump-autoload --optimize --classmap-authoritative \
-    && npm ci && npm run build && rm -rf node_modules
+# Package discover i autoload
+RUN php artisan package:discover --ansi || true \
+    && composer dump-autoload --optimize --classmap-authoritative
+
+# Build frontend
+RUN npm ci && npm run build && rm -rf node_modules
 
 # Stage 2: Production
-FROM php:8.3-fpm
+FROM php:8.3-cli
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Runtime dependencies
+# Runtime dependencies (tylko PHP extensions, bez nginx)
 RUN apt-get update && apt-get install -y \
-    nginx \
-    gettext-base \
     libpng-dev \
     libzip-dev \
     libjpeg-dev \
@@ -65,42 +70,16 @@ RUN apt-get update && apt-get install -y \
 # Kopiowanie aplikacji
 COPY --from=base /var/www/html /var/www/html
 
-# Konfiguracja Nginx (tylko reverse proxy)
-# Railway auto-detected port 9000 - Nginx listens on 9000 and proxies to PHP-FPM
-# CRITICAL: Force rebuild - RUN before COPY to break Docker cache
-RUN echo "CACHE_BUST_NGINX=$(date +%s)" > /tmp/nginx-cache-bust.txt && cat /tmp/nginx-cache-bust.txt
-COPY docker/nginx-9000.conf /etc/nginx/sites-available/default
-RUN echo "=== Nginx config verification ===" && \
-    head -5 /etc/nginx/sites-available/default && \
-    grep -q "listen 0.0.0.0:9000" /etc/nginx/sites-available/default && \
-    echo "✓ Nginx configured for port 9000 on all interfaces (0.0.0.0)" || \
-    echo "✗ ERROR: Nginx not configured for port 9000!" && \
-    rm -f /etc/nginx/sites-enabled/default && \
-    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+WORKDIR /var/www/html
 
-# Konfiguracja PHP-FPM (daemon mode)
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Entrypoint (setup + start)
-# CRITICAL: Force rebuild - CACHE_BUST changes every build
-ARG CACHE_BUST=1
-RUN echo "CACHE_BUST=${CACHE_BUST}" > /tmp/cache-bust.txt && \
-    echo "Build timestamp: $(date +%s)" >> /tmp/cache-bust.txt && \
-    cat /tmp/cache-bust.txt
-COPY docker/entrypoint-9000.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    echo "=== Entrypoint verification (first 8 lines) ===" && \
-    head -8 /usr/local/bin/entrypoint.sh && \
-    echo "=== Cache bust info ===" && \
-    cat /tmp/cache-bust.txt
+# Entrypoint - php artisan serve na $PORT
+COPY docker/entrypoint-serve.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Uprawnienia
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Railway auto-detected port 9000 - Nginx listens on 9000 and proxies to PHP-FPM
-EXPOSE 9000
-
+# Railway używa zmiennej PORT - nie ustawiamy EXPOSE
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-# CMD is not needed - entrypoint handles everything
