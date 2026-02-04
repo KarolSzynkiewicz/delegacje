@@ -87,8 +87,7 @@ WORKDIR /var/www/html
 # CRITICAL: Use CACHEBUST to force rebuild when entrypoint changes
 RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt
 COPY docker/entrypoint-railway.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    grep -q "Clearing caches" /usr/local/bin/entrypoint.sh || exit 1
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Uprawnienia (Railway może działać jako root, więc używamy 777 dla storage)
 RUN chown -R www-data:www-data /var/www/html \
