@@ -1,20 +1,26 @@
 #!/bin/sh
-# Entrypoint dla Railway - php artisan serve
-# Railway oczekuje jednego procesu HTTP na $PORT
-
 set -e
 
-echo "Starting Laravel application on port: ${PORT:-8000}"
+echo "🚀 Starting Laravel on Railway (Port: ${PORT:-8000})"
 
-# Upewnij się, że storage link istnieje
+# Generate APP_KEY if missing
+if [ -z "$APP_KEY" ]; then
+    echo "⚙️ Generating APP_KEY..."
+    php artisan key:generate --force --no-interaction
+fi
+
+# Clear and cache config
+echo "📦 Caching configuration..."
+php artisan config:clear
+php artisan config:cache
+
+# Run migrations (optional - remove if you prefer manual migrations)
+echo "🗄️ Running migrations..."
+php artisan migrate --force --no-interaction || echo "⚠️ Migrations failed (might be intentional)"
+
+# Storage link
 php artisan storage:link || true
 
-# Cache config (opcjonalne, przyspiesza start)
-php artisan config:cache || true
-php artisan route:cache || true
-php artisan view:cache || true
-
-# Uruchom php artisan serve na $PORT (Railway wstrzykuje tę zmienną)
-# --host=0.0.0.0 - nasłuchuj na wszystkich interfejsach (wymagane dla Railway)
-# --port=$PORT - użyj portu z Railway
-exec php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+# Start PHP built-in server
+echo "✅ Starting server on 0.0.0.0:${PORT:-8000}"
+exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
