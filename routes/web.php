@@ -28,6 +28,19 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// TEST ENDPOINT - Debug Railway deployment (remove after testing)
+Route::get('/test', function () {
+    return response()->json([
+        'status' => 'ok',
+        'app_key' => config('app.key') ? 'set' : 'missing',
+        'app_key_length' => config('app.key') ? strlen(config('app.key')) : 0,
+        'env' => config('app.env'),
+        'debug' => config('app.debug'),
+        'app_name' => config('app.name'),
+        'timestamp' => now()->toIso8601String(),
+    ], 200);
+});
+
 // Healthcheck endpoint for Railway - always returns 200 OK (fast, no DB queries)
 Route::get('/health', function () {
     return response()->json(['status' => 'ok'], 200);
