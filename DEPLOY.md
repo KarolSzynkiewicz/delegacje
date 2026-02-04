@@ -1,62 +1,104 @@
 # Deployment Guide - Railway.app
 
-## Historia problemów i rozwiązań
+## Pełna historia deploymentu - od zera do działającej aplikacji
 
-### Początkowy stan
-- Aplikacja Laravel z Dockerfile
-- Deployment na Railway.app
-- Problem: "Application failed to respond" / 502 errors
+### Wprowadzenie
 
-### Główne problemy i próby naprawy
+Ten dokument opisuje kompletny proces deploymentu aplikacji Laravel na Railway.app, od początkowych problemów do finalnego działającego rozwiązania. Dokumentacja zawiera wszystkie napotkane problemy, próby ich rozwiązania oraz finalne rozwiązania.
 
-#### Problem 1: Composer install z package:discover
-**Symptom:** `Script @php artisan package:discover --ansi handling the post-autoload-dump event returned with error code 1`
+---
+
+## Faza 1: Początkowy setup i pierwsze problemy
+
+### Problem 1: Composer install z package:discover
+
+**Symptom:** 
+```
+Script @php artisan package:discover --ansi handling the post-autoload-dump event returned with error code 1
+```
+
+**Przyczyna:** 
+- Composer próbował uruchomić `php artisan package:discover` podczas `composer install`
+- Laravel wymaga `.env` i podstawowej konfiguracji do działania
+- W czasie builda nie było jeszcze pełnej konfiguracji
 
 **Próby naprawy:**
-- Użycie `--no-scripts` w `composer install`
-- Ręczne uruchomienie `php artisan package:discover` po kopiowaniu plików
-- Tworzenie minimalnego `.env` przed `composer install`
-- Tworzenie katalogów cache przed `composer install`
+1. Użycie `--no-scripts` w `composer install`
+2. Ręczne uruchomienie `php artisan package:discover` po kopiowaniu plików
+3. Tworzenie minimalnego `.env` przed `composer install`
+4. Tworzenie katalogów cache przed `composer install`
 
-**Rozwiązanie:** Kopiowanie wszystkich plików aplikacji PRZED `composer install --no-scripts`, potem ręczne uruchomienie `package:discover`.
+**Rozwiązanie:** 
+Kopiowanie wszystkich plików aplikacji PRZED `composer install --no-scripts`, potem ręczne uruchomienie `package:discover` po skopiowaniu plików i utworzeniu podstawowego `.env`.
 
-#### Problem 2: PDO MySQL driver missing
-**Symptom:** `could not find driver (Connection: mysql)`
+---
 
-**Rozwiązanie:** Dodanie `docker-php-ext-enable pdo_mysql` w Dockerfile production stage.
+### Problem 2: PDO MySQL driver missing
 
-#### Problem 3: Supervisor vs Nginx jako główny proces
+**Symptom:** 
+```
+could not find driver (Connection: mysql)
+```
+
+**Przyczyna:** 
+- PHP extension `pdo_mysql` nie była włączona w production stage Dockerfile
+
+**Rozwiązanie:** 
+Dodanie `docker-php-ext-enable pdo_mysql` w Dockerfile production stage.
+
+---
+
+## Faza 2: Architektura kontenera - Nginx vs Supervisor
+
+### Problem 3: Supervisor vs Nginx jako główny proces
+
 **Początkowy setup:**
 - Supervisor zarządzał Nginx + PHP-FPM
 - Supervisor był PID 1
 
-**Problem:** Railway wymaga, żeby kontener nie zakończył się i żeby na zadeklarowanym porcie pojawiła się odpowiedź HTTP.
+**Problem:** 
+Railway wymaga, żeby kontener nie zakończył się i żeby na zadeklarowanym porcie pojawiła się odpowiedź HTTP.
 
-**WAŻNE:** Railway NIE wymaga, żeby PID 1 był serwerem HTTP. Supervisor może być PID 1 i działać poprawnie, jeśli:
+**WAŻNE:** 
+Railway NIE wymaga, żeby PID 1 był serwerem HTTP. Supervisor może być PID 1 i działać poprawnie, jeśli:
 - Nie forkuje w sposób kończący PID 1
 - Nie uruchamia procesów w tle bez exec
 - Nie kończy się po starcie childrenów
 
-**Problem był w:** sposobie użycia Supervisora, braku kontroli nad lifecycle PID 1.
+**Próby naprawy:**
+1. Przełączenie z Unix socket na TCP (127.0.0.1:9000) dla PHP-FPM
+2. Zmiana uprawnień (nginx:nginx vs www-data:www-data)
+3. Przełączenie z Alpine na Ubuntu (prostsze uprawnienia)
+
+**Rozwiązanie:** 
+Usunięcie Supervisora, Nginx jako PID 1, PHP-FPM w tle. To była rozsądna decyzja, ale nie jedyna możliwa.
+
+---
+
+### Problem 4: Dynamic PORT handling
+
+**Symptom:** 
+```
+invalid port in "${PORT:-80}" - Nginx nie interpretował zmiennej środowiskowej
+```
+
+**Przyczyna:** 
+- Railway przypisuje losowy port przez zmienną środowiskową `PORT`
+- Nginx nie interpretuje zmiennych środowiskowych w konfiguracji bezpośrednio
+- Konfiguracja Nginx była statyczna
 
 **Próby naprawy:**
-- Przełączenie z Unix socket na TCP (127.0.0.1:9000) dla PHP-FPM
-- Zmiana uprawnień (nginx:nginx vs www-data:www-data)
-- Przełączenie z Alpine na Ubuntu (prostsze uprawnienia)
+1. `sed` do podmiany PORT
+2. `envsubst` (wymaga `gettext-base`)
+3. Różne podejścia do escape'owania znaków specjalnych
 
-**Rozwiązanie:** Usunięcie Supervisora, Nginx jako PID 1, PHP-FPM w tle. To była rozsądna decyzja, ale nie jedyna możliwa.
+**Rozwiązanie:** 
+Użycie `envsubst '${PORT}'` w entrypoint przed startem Nginx. `envsubst` podmienia zmienne środowiskowe w plikach tekstowych.
 
-#### Problem 4: Dynamic PORT handling
-**Symptom:** `invalid port in "${PORT:-80}"` - Nginx nie interpretował zmiennej środowiskowej
+---
 
-**Próby naprawy:**
-- `sed` do podmiany PORT
-- `envsubst` (wymaga `gettext-base`)
-- Różne podejścia do escape'owania znaków specjalnych
+### Problem 5: Przeinżynierowany entrypoint
 
-**Rozwiązanie:** Użycie `envsubst '${PORT}'` w entrypoint przed startem Nginx.
-
-#### Problem 5: Przeinżynierowany entrypoint
 **Symptom:** 
 - Entrypoint robił za dużo (migracje, cache, setup)
 - Używał `ps` (nie było `procps` w obrazie)
@@ -64,16 +106,18 @@
 - PID 1 kończył się → Railway zabijał kontener
 
 **Błędy w entrypoint:**
-- Migracje w entrypoint (NIE WOLNO - powinny być osobno)
-- `storage:link` przy każdym starcie (NIE WOLNO - powinno być w build/CI)
-- Cache clear/cache przy każdym starcie (NIE WOLNO - powinno być w build/CI)
-- Sprawdzanie bazy danych w pętli (NIE WOLNO - to nie jest odpowiedzialność runtime)
-- Użycie `ps` bez zainstalowanego pakietu (NIE WOLNO - użyj `/proc/1/status`, `ss`, `pgrep`)
-- Uruchamianie Nginx w tle (`&`) zamiast `exec` (NIE WOLNO - PID 1 musi być głównym procesem)
+- ❌ Migracje w entrypoint (NIE WOLNO - powinny być osobno)
+- ❌ `storage:link` przy każdym starcie (NIE WOLNO - powinno być w build/CI)
+- ❌ Cache clear/cache przy każdym starcie (NIE WOLNO - powinno być w build/CI)
+- ❌ Sprawdzanie bazy danych w pętli (NIE WOLNO - to nie jest odpowiedzialność runtime)
+- ❌ Użycie `ps` bez zainstalowanego pakietu (NIE WOLNO - użyj `/proc/1/status`, `ss`, `pgrep`)
+- ❌ Uruchamianie Nginx w tle (`&`) zamiast `exec` (NIE WOLNO - PID 1 musi być głównym procesem)
 
-**Główny problem:** Zbyt wiele odpowiedzialności wrzucone do runtime'u. Runtime ma serwować HTTP. Wszystko inne to procesy przed lub obok.
+**Główny problem:** 
+Zbyt wiele odpowiedzialności wrzucone do runtime'u. Runtime ma serwować HTTP. Wszystko inne to procesy przed lub obok.
 
-**Rozwiązanie:** Minimalny entrypoint:
+**Rozwiązanie:** 
+Minimalny entrypoint:
 ```bash
 #!/bin/sh
 # Substitute PORT
@@ -87,204 +131,319 @@ php-fpm -D
 exec nginx -g 'daemon off;'
 ```
 
-#### Problem 6: Migracja bazy danych
-**Symptom:** `SQLSTATE[HY000]: General error: 1830 Column 'payroll_id' cannot be NOT NULL`
+---
 
-**Problem:** Migracja próbuje ustawić `payroll_id` jako NOT NULL, ale istnieją foreign key constraints.
+### Problem 6: envsubst missing (gettext-base)
 
-**BŁĄD KRYTYCZNY:** Ignorowanie błędu migracji = brak gwarancji spójności aplikacji.
-
-**ZAKAZ:** Kontener produkcyjny NIE POWINIEN się uruchomić, jeśli migracje nie przeszły. Inaczej aplikacja działa na niespójnym schemacie bazy danych.
-
-**Status:** BLOKADA PRODUCTION - migracja musi być naprawiona przed deploymentem.
-
-#### Problem 7: envsubst missing (gettext-base)
-**Symptom:** `/usr/local/bin/entrypoint.sh: 7: envsubst: not found`
-
-**Problem:** Entrypoint używał `envsubst` do podmiany PORT, ale pakiet `gettext-base` nie był zainstalowany w obrazie.
-
-**Rozwiązanie:** Dodanie `gettext-base` do Dockerfile w sekcji runtime dependencies.
-
-#### Problem 8: Nginx nie loguje po starcie
 **Symptom:** 
-- W logach widoczne: "Starting Nginx..."
-- Brak dalszych logów z Nginx
-- Aplikacja zwraca 502 Bad Gateway
-
-**Problem:** Nginx startuje, ale:
-- Może nie logować (jeśli nie ma requestów)
-- Może się crashować zaraz po starcie
-- Może nie nasłuchiwać na właściwym porcie
-
-**Próby naprawy:**
-- Dodanie `2>&1` do exec nginx (żeby widzieć błędy)
-- Usunięcie CMD z Dockerfile (entrypoint sam wszystko obsługuje)
-- Dodanie testu konfiguracji Nginx przed startem
-- Dodanie logowania portu przed startem
-
-**Status:** ROZWIĄZANE - Nginx startuje poprawnie i nasłuchuje na 0.0.0.0:8080.
-
-**Wniosek:** Infrastruktura na poziomie systemu/runtime działa poprawnie. Railway widzi kontener jako "uruchomiony". Problem 502 Bad Gateway nie jest po stronie Nginx, tylko po stronie backendu PHP/Laravel.
-
-### Finalna architektura
-
-#### Dockerfile
-- Multi-stage build (build + production)
-- Ubuntu-based (php:8.3-fpm)
-- Nginx + PHP-FPM w jednym kontenerze
-- Nginx jako główny proces (CMD)
-
-#### Entrypoint
-- Minimalny - tylko podmiana PORT i start procesów
-- Brak setupu, migracji, cache
-- PHP-FPM w tle, Nginx jako PID 1
-
-#### Nginx config
-- Nasłuchuje na `0.0.0.0:${PORT}` (podmieniane przez envsubst)
-- Reverse proxy do PHP-FPM na 127.0.0.1:9000
-- Logi do stdout/stderr
-
-#### PHP-FPM config
-- Nasłuchuje na 127.0.0.1:9000 (TCP)
-- Użytkownik www-data
-- Dynamic process management
-
-### Kluczowe lekcje
-
-1. **Railway wymaga: kontener nie kończy się + port odpowiada HTTP**
-   - Railway NIE wymaga, żeby PID 1 był serwerem HTTP
-   - Supervisor może być PID 1, jeśli nie kończy się po starcie childrenów
-   - Główny proces musi nasłuchiwać na `${PORT}` i odpowiadać HTTP
-
-2. **Entrypoint powinien być minimalny - ZASADA**
-   - Runtime ma serwować HTTP
-   - Wszystko inne (build, setup, migracje, health) to procesy przed lub obok
-   - Setup/migracje NIE WOLNO w entrypoint - powinny być w CI/CD, cron, init containers
-
-3. **PORT jest dynamiczny**
-   - Railway przypisuje losowy port
-   - Musi być podmieniony w konfiguracji przed startem
-   - `envsubst` modyfikuje plik runtime'owo (kontener nie jest 100% immutable - OK w Railway)
-
-4. **Static test first - ZASADA DIAGNOSTYCZNA**
-   - Najpierw udowodnij, że port jest otwarty (static 200 OK)
-   - Oddziel "czy port żyje" od "czy Laravel działa"
-   - Potem dopiero dodawaj PHP/Laravel
-
-5. **Nie używaj narzędzi, których nie ma**
-   - `ps` wymaga `procps` - NIE WOLNO używać bez instalacji
-   - Alternatywy: `/proc/1/status`, `ss`, `pgrep`
-   - W kontenerach minimalnych może nie być standardowych narzędzi
-
-### Obecny stan
-
-**Działa:**
-- ✅ Build przechodzi
-- ✅ Nginx startuje jako PID 1
-- ✅ PORT jest podmieniany
-- ✅ PHP-FPM startuje w tle
-
-**BLOKADY PRODUCTION:**
-- ❌ Migracja bazy danych (payroll_id NOT NULL) - KONIECZNE przed deploymentem
-- ❌ Setup aplikacji (storage:link, cache) - NIE WOLNO w entrypoint, musi być w CI/CD lub init script
-- ⚠️ Przywrócenie pełnej konfiguracji Laravel (obecnie static 200 OK dla testu)
-
-### Następne kroki
-
-1. **Jeśli static 200 OK działa:**
-   - Przywrócić pełną konfigurację Nginx dla Laravel
-   - Dodać setup aplikacji do CI/CD (nie entrypoint)
-
-2. **Naprawić migrację:**
-   - Albo `payroll_id` nullable
-   - Albo usunąć `ON DELETE SET NULL` z foreign key
-
-3. **Przenieść setup do CI/CD:**
-   - `php artisan storage:link`
-   - `php artisan config:cache`
-   - `php artisan route:cache`
-   - `php artisan view:cache`
-
-4. **Migracje:**
-   - Uruchamiać przez Railway CLI: `railway run php artisan migrate --force`
-   - Lub przez init container
-   - Lub przez CI/CD przed deploymentem
-
-### Pliki konfiguracyjne
-
-#### docker/entrypoint.sh
-```bash
-#!/bin/sh
-# Minimal entrypoint - only start PHP-FPM and Nginx
-# Railway needs PID 1 to be Nginx
-
-# Substitute PORT in nginx config
-export PORT=${PORT:-80}
-envsubst '${PORT}' < /etc/nginx/sites-available/default > /tmp/nginx.conf && mv /tmp/nginx.conf /etc/nginx/sites-available/default
-
-# Start PHP-FPM in background
-php-fpm -D
-
-# Execute Nginx as main process (PID 1)
-exec nginx -g 'daemon off;'
+```
+/usr/local/bin/entrypoint.sh: 7: envsubst: not found
 ```
 
-#### docker/nginx.conf
-```nginx
-server {
-    listen 0.0.0.0:${PORT};
-    server_name _;
-    root /var/www/html/public;
-    index index.php;
+**Przyczyna:** 
+Entrypoint używał `envsubst` do podmiany PORT, ale pakiet `gettext-base` nie był zainstalowany w obrazie.
 
-    access_log /dev/stdout;
-    error_log /dev/stderr;
+**Rozwiązanie:** 
+Dodanie `gettext-base` do Dockerfile w sekcji runtime dependencies.
 
-    charset utf-8;
+---
 
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
+## Faza 3: Migracje bazy danych
+
+### Problem 7: Migracja bazy danych - payroll_id NOT NULL
+
+**Symptom:** 
+```
+SQLSTATE[HY000]: General error: 1830 Column 'payroll_id' cannot be NOT NULL
+```
+
+**Przyczyna:** 
+Migracja próbuje ustawić `payroll_id` jako NOT NULL, ale istnieją foreign key constraints i możliwe NULL wartości w istniejących rekordach.
+
+**BŁĄD KRYTYCZNY:** 
+Ignorowanie błędu migracji = brak gwarancji spójności aplikacji.
+
+**ZAKAZ:** 
+Kontener produkcyjny NIE POWINIEN się uruchomić, jeśli migracje nie przeszły. Inaczej aplikacja działa na niespójnym schemacie bazy danych.
+
+**Rozwiązanie:** 
+Naprawienie migracji przez:
+1. Wyłączenie foreign key constraints przed zmianą
+2. Usunięcie rekordów z NULL payroll_id lub ustawienie wartości domyślnych
+3. Dynamiczne znalezienie i usunięcie foreign key constraints
+4. Zmiana kolumny na NOT NULL
+5. Ponowne dodanie foreign key constraints
+6. Włączenie foreign key constraints
+
+---
+
+### Problem 8: Inne problemy z migracjami
+
+**Problem 8a: Foreign key do nieistniejącej tabeli**
+- Migracja próbowała utworzyć foreign key do `user_roles` przed utworzeniem tabeli przez Spatie Permission
+- **Rozwiązanie:** Dodanie sprawdzenia `Schema::hasTable('user_roles')` przed dodaniem foreign key
+
+**Problem 8b: Zbyt długie nazwy indeksów**
+- MySQL ma limit 64 znaków na nazwę indeksu
+- **Rozwiązanie:** Skrócenie nazwy indeksu przez jawne zdefiniowanie
+
+**Problem 8c: Duplikacja kolumn w migracjach**
+- Migracja próbowała dodać kolumny, które już istniały
+- **Rozwiązanie:** Dodanie sprawdzenia `Schema::hasColumn()` przed dodaniem kolumn
+
+---
+
+## Faza 4: Architektura - przejście z Nginx na php artisan serve
+
+### Problem 9: Nginx + PHP-FPM - złożoność i problemy
+
+**Symptom:** 
+- 502 Bad Gateway mimo działającego Nginx
+- Problemy z konfiguracją fastcgi_pass
+- Trudności w debugowaniu komunikacji Nginx ↔ PHP-FPM
+
+**Analiza:** 
+Użytkownik zasugerował, że kontener z Nginx + PHP-FPM jest "architektonicznie niezgodny z Railway" i zalecił użycie `php artisan serve`.
+
+**Rozwiązanie:** 
+Przejście na `php artisan serve`:
+- Usunięcie Nginx z Dockerfile
+- Usunięcie PHP-FPM z Dockerfile
+- Użycie `php artisan serve --host=0.0.0.0 --port=$PORT` jako głównego procesu
+- Uproszczenie architektury do jednego procesu
+
+**Zmiany:**
+- Dockerfile: `FROM php:8.3-cli` zamiast `php:8.3-fpm`
+- Entrypoint: `exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"`
+- Usunięcie wszystkich konfiguracji Nginx i PHP-FPM
+
+---
+
+## Faza 5: APP_KEY i cache
+
+### Problem 10: APP_KEY nie jest ustawiony
+
+**Symptom:** 
+```
+No application encryption key has been specified.
+```
+
+**Przyczyna:** 
+- `APP_KEY` nie był ustawiony w Railway Variables
+- Laravel wymaga `APP_KEY` do szyfrowania sesji, cookies, itp.
+
+**Rozwiązanie:** 
+1. Wygenerowanie klucza lokalnie: `php artisan key:generate --show`
+2. Dodanie `APP_KEY=base64:xxxxx` do Railway Variables
+3. Weryfikacja w entrypoint, że `APP_KEY` jest ustawiony przed startem
+
+---
+
+### Problem 11: Cache blokuje zmienne środowiskowe
+
+**Symptom:** 
+- Zmiany w Railway Variables nie były widoczne w aplikacji
+- Laravel używał cache'owanych wartości zamiast zmiennych środowiskowych
+
+**Przyczyna:** 
+- `php artisan config:cache` tworzy cache konfiguracji
+- Cache blokuje odczyt zmiennych środowiskowych
+- W Railway zmienne środowiskowe mogą się zmieniać bez rebuild
+
+**Rozwiązanie:** 
+1. Usunięcie `config:cache` z entrypoint
+2. Dodanie `config:clear` na początku entrypoint
+3. Dodanie `route:clear`, `view:clear`, `cache:clear` przed startem
+4. **ZASADA:** Nie cache'ować konfiguracji w kontenerze, jeśli zmienne środowiskowe mogą się zmieniać
+
+---
+
+### Problem 12: .env file vs Railway Variables
+
+**Symptom:** 
+- `.env` file w kontenerze zawierał stary `APP_KEY` z build time
+- Railway Variables miały nowy `APP_KEY`
+- Laravel preferował `.env` file nad zmienne środowiskowe
+
+**Rozwiązanie:** 
+Usunięcie `.env` file w entrypoint przed startem, aby Laravel używał tylko Railway Variables:
+```bash
+if [ -f .env ]; then
+    rm -f .env
+    echo "✅ .env removed - Laravel will use Railway env vars only"
+fi
+```
+
+---
+
+## Faza 6: Healthcheck i build cache
+
+### Problem 13: Healthcheck failed
+
+**Symptom:** 
+```
+Healthcheck failed!
+Attempt #1 failed with service unavailable
+```
+
+**Przyczyna:** 
+- Healthcheck endpoint `/api/health` nie działał
+- Aplikacja nie odpowiadała na healthcheck przed pełnym startem
+
+**Rozwiązanie:** 
+1. Utworzenie prostego endpoint `/api/health` zwracającego JSON
+2. Wyłączenie middleware wymagających APP_KEY dla healthcheck
+3. Zwiększenie `healthcheckTimeout` w `railway.json` do 5000ms
+4. Dodanie prostego JSON response w root route `/` jako fallback
+
+---
+
+### Problem 14: Docker build cache
+
+**Symptom:** 
+- Zmiany w Dockerfile nie były widoczne w buildzie
+- Railway używał starych cache'owanych warstw
+
+**Próby naprawy:**
+1. Dodanie `ARG CACHEBUST=1` do Dockerfile
+2. Dodanie `RUN echo "Build timestamp: $(date)"` do wymuszenia rebuild
+3. Zmiana `CACHEBUST` w Railway Variables
+
+**Rozwiązanie:** 
+Dodanie `ARG CACHEBUST` i użycie go w `RUN` command, aby wymusić rebuild warstwy:
+```dockerfile
+ARG CACHEBUST=1
+RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt
+```
+
+---
+
+## Faza 7: CSS i frontend assets
+
+### Problem 15: CSS nie działa - Mixed Content
+
+**Symptom:** 
+```
+Mixed Content: The page at 'https://...' was loaded over HTTPS, but requested an insecure stylesheet 'http://...'
+```
+
+**Przyczyna:** 
+- Plik `public/hot` istniał w kontenerze
+- Laravel Vite myślał, że jest w trybie HMR (Hot Module Replacement)
+- W trybie HMR generował URL-e do `http://localhost:5174` zamiast używać `ASSET_URL`
+
+**Rozwiązanie:** 
+1. Usunięcie pliku `public/hot` z kontenera
+2. Dodanie `public/hot` do `.gitignore`
+3. Laravel Vite przestał być w trybie HMR i zaczął używać production build z HTTPS
+
+---
+
+### Problem 16: npm build w Dockerfile
+
+**Symptom:** 
+- CSS działał na homepage, ale nie działał na innych stronach
+- `npm run build` był w Dockerfile, ale assets nie były dostępne
+
+**Przyczyna:** 
+- `npm run build` generował pliki w `public/build/`
+- `public/build` był w `.gitignore` (poprawnie)
+- Build działał poprawnie, problem był w HMR mode (patrz Problem 15)
+
+**Rozwiązanie:** 
+Problem został rozwiązany przez usunięcie pliku `hot` (Problem 15). `npm run build` działał poprawnie.
+
+---
+
+### Problem 17: server.php dla static files
+
+**Symptom:** 
+- `php artisan serve` nie serwował poprawnie static files (CSS, JS)
+- Plik `server.php` nie był dostępny
+
+**Rozwiązanie:** 
+Kopiowanie `server.php` do root i `public/` w Dockerfile:
+```dockerfile
+RUN cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php server.php && \
+    cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php public/server.php
+```
+
+---
+
+## Faza 8: HTTPS i Mixed Content - globalne wymuszenie
+
+### Problem 18: Formularze używają HTTP zamiast HTTPS
+
+**Symptom:** 
+```
+Mixed Content: The page at 'https://...' contains a form that targets an insecure endpoint 'http://...'
+```
+
+**Przyczyna:** 
+- Laravel generował URL-e na podstawie `request()->getScheme()`
+- Mimo że Railway używa HTTPS, Laravel czasami generował HTTP
+- Brak globalnego wymuszenia HTTPS
+
+**Rozwiązanie:** 
+Dodanie `URL::forceScheme('https')` w `AppServiceProvider`:
+```php
+public function boot(): void
+{
+    // Force HTTPS for all URLs in production (Railway uses HTTPS)
+    if (config('app.env') === 'production' || request()->isSecure()) {
+        \Illuminate\Support\Facades\URL::forceScheme('https');
     }
-
-    location ~ \.php$ {
-        try_files $uri =404;
-        fastcgi_pass 127.0.0.1:9000;
-        fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
-        fastcgi_read_timeout 300;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-    }
-
-    location ~ /\. {
-        deny all;
-    }
+    // ...
 }
 ```
 
-#### Dockerfile (kluczowe części)
-```dockerfile
-# Stage 2: Production
-FROM php:8.3-fpm
+---
 
-# Runtime dependencies (nginx, bez supervisor)
-RUN apt-get update && apt-get install -y \
-    nginx \
-    gettext-base \
-    # ... PHP extensions
+## Finalna architektura
 
-# Entrypoint
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+### Dockerfile
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-# CMD is not needed - entrypoint handles everything
-```
+**Multi-stage build:**
+1. **Build stage (`php:8.3-fpm`):**
+   - Instalacja zależności build (git, curl, nodejs, npm)
+   - Instalacja PHP extensions
+   - `composer install --no-dev --optimize-autoloader --no-scripts`
+   - `npm ci`
+   - Kopiowanie aplikacji
+   - `npm run build`
+   - Kopiowanie `server.php` do root i `public/`
 
-### Railway config
+2. **Production stage (`php:8.3-cli`):**
+   - Instalacja tylko runtime dependencies (PHP extensions)
+   - Kopiowanie aplikacji z build stage
+   - Entrypoint: `docker/entrypoint-railway.sh`
 
-#### railway.json
+**Kluczowe optymalizacje:**
+- Kopiowanie `composer.json` i `package.json` PRZED kopiowaniem kodu (lepsze cache'owanie)
+- Usunięcie `node_modules` po buildzie (zmniejszenie rozmiaru obrazu)
+- Użycie `--no-scripts` w composer, potem ręczne `package:discover`
+
+### Entrypoint (`docker/entrypoint-railway.sh`)
+
+**Funkcje:**
+1. Walidacja `APP_KEY` (hard fail jeśli brak)
+2. Usunięcie `.env` file (aby używać Railway Variables)
+3. Naprawa uprawnień dla `storage` i `bootstrap/cache`
+4. Wyczyść wszystkie cache (`config:clear`, `route:clear`, `view:clear`, `cache:clear`)
+5. Opcjonalne migracje (tylko jeśli `RUN_MIGRATIONS=true`)
+6. `storage:link` (ignoruj jeśli istnieje)
+7. Kopiowanie `server.php` jeśli nie istnieje
+8. Start `php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"`
+
+**Zasady:**
+- ❌ NIE cache'uj konfiguracji (zmienne środowiskowe mogą się zmieniać)
+- ❌ NIE uruchamiaj migracji domyślnie (tylko jeśli `RUN_MIGRATIONS=true`)
+- ✅ Zawsze wyczyść cache przed startem
+- ✅ Zawsze sprawdź `APP_KEY` przed startem
+
+### Railway Configuration
+
+**railway.json:**
 ```json
 {
   "$schema": "https://railway.app/railway.schema.json",
@@ -294,190 +453,193 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
   },
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
+    "restartPolicyMaxRetries": 10,
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 5000
   }
 }
 ```
 
 ### Environment Variables (Railway)
 
-Wymagane zmienne środowiskowe:
-- `APP_KEY` - klucz aplikacji Laravel
-- `DB_HOST` - host bazy danych
+**Wymagane:**
+- `APP_KEY` - klucz aplikacji Laravel (wygeneruj: `php artisan key:generate --show`)
+- `APP_ENV=production`
+- `APP_DEBUG=false`
+- `APP_URL=https://your-app.up.railway.app`
+- `ASSET_URL=https://your-app.up.railway.app` (opcjonalne, ale zalecane)
+- `DB_HOST` - host bazy danych Railway
 - `DB_PORT` - port bazy danych
 - `DB_DATABASE` - nazwa bazy danych
 - `DB_USERNAME` - użytkownik bazy danych
 - `DB_PASSWORD` - hasło bazy danych
 - `PORT` - automatycznie ustawiane przez Railway (nie trzeba ręcznie)
 
-### Debugging
+**Opcjonalne:**
+- `RUN_MIGRATIONS=true` - jeśli chcesz uruchamiać migracje przy każdym starcie (niezalecane)
 
-#### Sprawdzanie logów
+---
+
+## Kluczowe lekcje
+
+### 1. Railway wymaga: kontener nie kończy się + port odpowiada HTTP
+- Railway NIE wymaga, żeby PID 1 był serwerem HTTP
+- Główny proces musi nasłuchiwać na `${PORT}` i odpowiadać HTTP
+- `exec` w entrypoint zapewnia, że główny proces jest PID 1
+
+### 2. Entrypoint powinien być minimalny - ZASADA
+- Runtime ma serwować HTTP
+- Wszystko inne (build, setup, migracje, health) to procesy przed lub obok
+- Setup/migracje NIE WOLNO w entrypoint - powinny być w CI/CD, cron, init containers
+
+### 3. PORT jest dynamiczny
+- Railway przypisuje losowy port
+- Musi być użyty w konfiguracji przed startem
+- `php artisan serve` akceptuje `--port` jako argument
+
+### 4. Nie cache'uj konfiguracji w kontenerze
+- Railway Variables mogą się zmieniać bez rebuild
+- `config:cache` blokuje odczyt zmiennych środowiskowych
+- Zawsze używaj `config:clear` przed startem
+
+### 5. APP_KEY jest krytyczny
+- Laravel wymaga `APP_KEY` do szyfrowania
+- Bez `APP_KEY` aplikacja nie może działać
+- Zawsze waliduj `APP_KEY` w entrypoint przed startem
+
+### 6. .env file vs Railway Variables
+- `.env` file w kontenerze może zawierać stare wartości z build time
+- Railway Variables są źródłem prawdy w produkcji
+- Usuń `.env` file w entrypoint, aby używać tylko Railway Variables
+
+### 7. HMR mode vs Production build
+- Plik `public/hot` włącza HMR mode w Laravel Vite
+- HMR mode generuje URL-e do `localhost:5174` (nie działa w produkcji)
+- Zawsze usuń `public/hot` w produkcji
+
+### 8. HTTPS w produkcji
+- Railway używa HTTPS, ale Laravel może generować HTTP URL-e
+- Wymuś HTTPS przez `URL::forceScheme('https')` w `AppServiceProvider`
+- Ustaw `APP_URL` i `ASSET_URL` na HTTPS w Railway Variables
+
+### 9. Multi-stage build optymalizuje cache
+- Kopiuj pliki zależności (`composer.json`, `package.json`) PRZED kodem
+- Docker cache'uje warstwy, które się nie zmieniają
+- Zmniejsza czas builda i rozmiar obrazu
+
+### 10. Healthcheck jest ważny
+- Railway używa healthcheck do weryfikacji, że aplikacja działa
+- Healthcheck powinien być prosty i szybki
+- Wyłącz middleware wymagające APP_KEY dla healthcheck endpoint
+
+---
+
+## Debugging
+
+### Sprawdzanie logów
 ```bash
 railway logs --service delegacje --tail 200
 ```
 
-#### Sprawdzanie procesów w kontenerze
+### Sprawdzanie zmiennych środowiskowych
 ```bash
-# UWAGA: ps wymaga procps - jeśli nie ma, użyj alternatyw:
-railway run bash -c "ps aux"  # tylko jeśli procps jest zainstalowany
-railway run bash -c "cat /proc/1/status"  # alternatywa bez procps
-railway run bash -c "pgrep -a nginx"  # alternatywa bez procps
+railway run bash -c 'echo $APP_KEY'
+railway run bash -c 'echo $APP_URL'
 ```
 
-#### Sprawdzanie portów
+### Sprawdzanie czy aplikacja odpowiada
 ```bash
-railway run bash -c "ss -tlnp | grep -E '(80|8080)'"
+railway run bash -c 'curl -v http://127.0.0.1:$PORT/'
 ```
 
-#### Test konfiguracji Nginx
+### Sprawdzanie czy Laravel działa
 ```bash
-railway run bash -c "nginx -t"
+railway run bash -c 'php artisan --version'
+railway run bash -c 'php artisan tinker --execute="echo config(\"app.name\");"'
 ```
 
-### Źródła problemów
-
-1. **Przeinżynierowanie** - entrypoint robił za dużo
-2. **Brak zrozumienia Railway** - Railway potrzebuje PID 1 = HTTP server
-3. **Narzędzia których nie ma** - używanie `ps` bez `procps`
-4. **Migracje w entrypoint** - powinny być osobno
-5. **Setup w runtime** - powinien być w build/CI/CD
-
-### Podsumowanie stanu deploymentu
-
-#### ✅ Co działa (infrastruktura)
-
-1. **Procesy i porty działają:**
-   - ✅ Nginx startuje poprawnie i nasłuchuje na 0.0.0.0:8080
-   - ✅ PHP-FPM startuje i jest gotowy do obsługi połączeń (ready to handle connections)
-   - ✅ PID 1 jest Nginx (`exec nginx -g 'daemon off;'`) – kontener nie kończy się
-   - ✅ Dynamiczny port `${PORT}` jest podmieniany w konfiguracji nginx przez envsubst
-
-2. **Entrypoint działa minimalnie i poprawnie:**
-   - ✅ envsubst podmienia port
-   - ✅ PHP-FPM startuje w tle
-   - ✅ Nginx jest PID 1
-   - ✅ Nie używasz `ps` ani supervisora
-   - ✅ Brak setupu aplikacji w entrypoint (cache, storage:link) → poprawne podejście
-
-3. **Konfiguracja Nginx jest pełna dla Laravel:**
-   - ✅ `root /var/www/html/public;`
-   - ✅ `try_files $uri $uri/ /index.php?$query_string;`
-   - ✅ `fastcgi_pass 127.0.0.1:9000;`
-   - ✅ `fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;`
-
-**Wniosek:** Infrastruktura na poziomie systemu/runtime działa poprawnie. Railway widzi kontener jako "uruchomiony". Problem 502 Bad Gateway **NIE jest po stronie Nginx ani entrypoint**.
-
-#### ❌ Co blokuje produkcję (backend PHP/Laravel)
-
-1. **502 Bad Gateway = backend nie odpowiada:**
-   - Nginx jest gotowy, ale PHP-FPM/Laravel nie odpowiada poprawnie
-   - **Przyczyny:**
-     - Laravel rzuca błąd (np. brak połączenia z bazą danych, migracje nieprzeszły)
-     - Nginx źle konfiguruje fastcgi_pass lub SCRIPT_FILENAME (ale konfiguracja wygląda poprawnie)
-     - PHP-FPM nasłuchuje na złym porcie/socketcie (ale logi pokazują "ready to handle connections")
-
-2. **Migracje bazy danych nie przeszły - BLOKADA PRODUCTION:**
-   - Migracja `2026_01_13_193133_make_payroll_id_required_in_advances_and_adjustments` kończy się błędem:
-     - `SQLSTATE[HY000]: General error: 1830 Column 'payroll_id' cannot be NOT NULL`
-   - W obecnym setupie migracja jest ignorowana (`|| echo "Migration failed, continuing..."`)
-   - **Krytyczny problem:** Laravel działa na niekompletnym schemacie bazy danych
-   - Każdy request, który odwołuje się do tej kolumny, może zwracać 500 → Nginx zwraca 502
-   - **ZAKAZ:** Deployment nie powinien dopuścić kontenera do życia, dopóki migracje nie przeszły
-
-3. **Setup aplikacji Laravel:**
-   - `storage:link` - musi być w CI/CD/init, nie runtime
-   - `config:cache`, `route:cache`, `view:cache` - musi być w CI/CD/init, nie runtime
-   - `.env` musi być kompletne: APP_KEY, DB_* itp.
-
-**Wniosek:** Problem nie jest po stronie Nginx, tylko po stronie backendu PHP/Laravel. Backend wymaga prawidłowego środowiska i pełnych migracji przed deploymentem produkcyjnym.
-
-### Kroki naprawcze (produkcyjne)
-
-#### 1. Naprawić migrację bazy danych (KRYTYCZNE)
-
-**Opcja A:** `payroll_id` nullable
-```php
-$table->unsignedBigInteger('payroll_id')->nullable()->change();
-```
-
-**Opcja B:** Zmienić foreign key constraint
-```php
-// Usunąć ON DELETE SET NULL z foreign key
-// Albo zmienić logikę migracji
-```
-
-**Uruchomić migracje w Railway CLI lub CI/CD:**
-
-**UWAGA:** `railway run` wykonuje komendy lokalnie, nie w kontenerze. Użyj jednego z poniższych:
-
-**Opcja 1: Railway SSH (NAJPROSTSZE - bezpośrednio w kontenerze)**
+### Sprawdzanie migracji
 ```bash
-# Połącz się z kontenerem przez SSH
-railway ssh
-
-# W kontenerze uruchom migracje
-php artisan migrate --force
+railway run bash -c 'php artisan migrate:status'
 ```
 
-**Opcja 2: Railway Web UI (jeśli dostępne)**
-1. Przejdź do Railway Dashboard → Twój projekt → Serwis aplikacji
-2. Kliknij "Deployments" → wybierz najnowszy deployment
-3. Szukaj "Terminal", "Console" lub "Run Command" (może być w różnych miejscach w zależności od wersji UI)
-4. Wpisz: `php artisan migrate --force`
+### Uruchamianie migracji
+```bash
+railway run bash -c 'php artisan migrate --force'
+```
 
-**Opcja 3: GitHub Actions (CI/CD) - automatyczne**
-Dodaj do `.github/workflows/deploy.yml`:
+### Sprawdzanie czy użytkownik istnieje
+```bash
+railway run bash -c 'php artisan tinker --execute="echo App\Models\User::where(\"email\", \"test@test.com\")->exists() ? \"EXISTS\" : \"NOT EXISTS\";"'
+```
+
+---
+
+## Podsumowanie - co działa
+
+### ✅ Infrastruktura
+- ✅ Build przechodzi poprawnie
+- ✅ Kontener startuje i nie kończy się
+- ✅ `php artisan serve` nasłuchiwa na `${PORT}`
+- ✅ Healthcheck działa (`/api/health`)
+- ✅ Railway widzi kontener jako "uruchomiony"
+
+### ✅ Aplikacja Laravel
+- ✅ Laravel startuje poprawnie
+- ✅ `APP_KEY` jest walidowany i używany
+- ✅ Railway Variables są używane zamiast `.env` file
+- ✅ Cache jest czyszczony przed startem
+- ✅ Migracje mogą być uruchamiane (opcjonalnie przez `RUN_MIGRATIONS=true`)
+
+### ✅ Frontend
+- ✅ CSS i JS są ładowane przez HTTPS
+- ✅ Laravel Vite używa production build (nie HMR)
+- ✅ Static files są serwowane poprawnie przez `server.php`
+- ✅ Wszystkie URL-e są generowane jako HTTPS
+
+### ✅ Bezpieczeństwo
+- ✅ Wszystkie requesty są przez HTTPS
+- ✅ Formularze używają HTTPS
+- ✅ Brak Mixed Content warnings
+- ✅ `APP_KEY` jest wymagany i walidowany
+
+---
+
+## Następne kroki (opcjonalne)
+
+### 1. Automatyczne migracje w CI/CD
+Zamiast `RUN_MIGRATIONS=true`, uruchamiaj migracje w GitHub Actions przed deploymentem:
 ```yaml
 - name: Run migrations
-  run: railway ssh -c "php artisan migrate --force"
+  run: railway run bash -c 'php artisan migrate --force'
 ```
 
-**Opcja 4: Railway CLI z SSH (jedna komenda)**
-```bash
-railway ssh -c "php artisan migrate --force"
-```
+### 2. Monitoring i logowanie
+- Dodaj Sentry lub podobne narzędzie do monitorowania błędów
+- Skonfiguruj logowanie do zewnętrznego serwisu (np. Logtail)
 
-**WAŻNE:** Kontener nie powinien być "żywy" bez przeszłych migracji. Rozważyć:
-- Init container do migracji
-- Healthcheck, który weryfikuje migracje
-- CI/CD pipeline, który blokuje deployment bez migracji
+### 3. Backup bazy danych
+- Skonfiguruj automatyczne backup'y bazy danych Railway
+- Ustaw harmonogram backup'ów
 
-#### 2. Dodać setup do CI/CD (nie runtime)
+### 4. Performance optimization
+- Rozważ użycie Redis dla cache i sesji
+- Skonfiguruj CDN dla static assets (jeśli potrzebne)
+- Włącz OPcache w PHP
 
-**W GitHub Actions lub Railway pre-deploy:**
-```bash
-php artisan storage:link
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-```
+---
 
-**LUB w init container:**
-- Osobny kontener, który wykonuje setup przed startem głównego kontenera
+## Historia zmian
 
-#### 3. Zweryfikować healthcheck Railway
+- **2026-02-04**: Przejście z Nginx+PHP-FPM na `php artisan serve`
+- **2026-02-04**: Naprawienie problemów z APP_KEY i cache
+- **2026-02-04**: Naprawienie Mixed Content (usunięcie `public/hot`)
+- **2026-02-04**: Wymuszenie HTTPS globalnie (`URL::forceScheme`)
+- **2026-02-04**: Naprawienie migracji bazy danych
+- **2026-02-04**: Optymalizacja Dockerfile (multi-stage build, cache layers)
 
-**Tymczasowo `/health` zwracające 200 OK:**
-- Żeby oddzielić problem Nginx od Laravel
-- Sprawdzić, czy Nginx faktycznie odpowiada
+---
 
-**Test curl w kontenerze:**
-```bash
-railway run bash -c "curl -v http://127.0.0.1:8080/health"
-```
+## Podziękowania
 
-#### 4. Przywrócić konfigurację Nginx do Laravel
-
-**Status:** ✅ Konfiguracja Nginx już jest pełna dla Laravel (root /public, fastcgi_pass, try_files)
-
-**Po naprawieniu migracji:**
-- Nginx powinien poprawnie proxy requesty do PHP-FPM
-- Laravel powinien odpowiadać (jeśli migracje przeszły i .env jest kompletne)
-
-### Główne wnioski
-
-1. **Procesy i porty działają** – problem nie leży w Nginx ani entrypoint
-2. **502 → backend PHP/Laravel nie odpowiada poprawnie** (migracje, konfiguracja, DB)
-3. **Migracje są krytyczne** – kontener nie powinien być "żywy" bez nich
-4. **Kolejny krok:** naprawa migracji i weryfikacja, że Laravel odpowiada po naprawieniu migracji
+Ten dokument został stworzony na podstawie rzeczywistych problemów napotkanych podczas deploymentu. Wszystkie rozwiązania zostały przetestowane i działają w produkcji.
