@@ -2,6 +2,7 @@
 set -e
 
 echo "🚀 Starting Laravel on Railway (Port: ${PORT:-8000})"
+echo "🔧 Entrypoint version: 2026-02-04-railway-v2"
 
 # Validate APP_KEY FIRST - before any config operations
 if [ -z "$APP_KEY" ]; then
