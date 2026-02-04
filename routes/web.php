@@ -42,9 +42,14 @@ Route::get('/test', function () {
 });
 
 // Healthcheck endpoint for Railway - always returns 200 OK (fast, no DB queries)
+// Excluded from middleware to ensure it always works (no auth, no CSRF, no session)
 Route::get('/health', function () {
     return response()->json(['status' => 'ok'], 200);
-});
+})->withoutMiddleware([
+    \App\Http\Middleware\EncryptCookies::class,
+    \App\Http\Middleware\VerifyCsrfToken::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+]);
 
 // Homepage - normal Laravel route (can have auth, middleware, etc.)
 Route::get('/', function () {
