@@ -573,6 +573,53 @@ railway run bash -c 'php artisan migrate --force'
 railway run bash -c 'php artisan tinker --execute="echo App\Models\User::where(\"email\", \"test@test.com\")->exists() ? \"EXISTS\" : \"NOT EXISTS\";"'
 ```
 
+### Tworzenie administratora
+
+**Metoda 1: Przez Railway UI (najprostsze)**
+1. Przejdź do Railway Dashboard → Twój projekt → Serwis aplikacji
+2. Kliknij "Deployments" → wybierz najnowszy deployment
+3. Szukaj "Terminal", "Console" lub "Run Command"
+4. Uruchom: `php artisan user:create-admin someone@someone.someone --password=password123`
+
+**Metoda 2: Przez Railway CLI (jeśli dostępne)**
+```bash
+railway run php artisan user:create-admin someone@someone.someone --password=password123
+```
+
+**Metoda 3: Przez tinkera (ręcznie)**
+1. Otwórz Railway UI → Terminal/Console
+2. Uruchom: `php artisan tinker`
+3. Skopiuj i wklej kod z pliku `create_admin.php`:
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+
+$email = 'someone@someone.someone';
+$password = 'password123';
+
+$user = User::updateOrCreate(
+    ['email' => $email],
+    [
+        'name' => 'Administrator',
+        'password' => Hash::make($password),
+        'email_verified_at' => now(),
+    ]
+);
+
+$adminRole = Role::firstOrCreate(
+    ['name' => 'administrator'],
+    ['guard_name' => 'web']
+);
+
+if (!$user->hasRole('administrator')) {
+    $user->assignRole('administrator');
+}
+
+echo "✅ Admin user created: {$user->email}\n";
+echo "✅ Password: {$password}\n";
+```
+
 ---
 
 
