@@ -48,6 +48,9 @@ RUN npm ci --prefer-offline --no-audit
 # OPTIMIZATION: Copy source code LAST (changes most frequently)
 COPY . .
 
+# Copy server.php to public/ for php artisan serve to handle static files correctly
+RUN cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php public/server.php
+
 # Setup .env jeśli nie istnieje
 RUN test -f .env || cp .env.example .env || touch .env
 
