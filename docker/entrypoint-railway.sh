@@ -118,6 +118,17 @@ fi
 # Storage link (ignore if exists)
 php artisan storage:link 2>/dev/null || true
 
+# Ensure server.php exists for static file serving
+# php artisan serve uses server.php to handle static files correctly
+if [ ! -f server.php ]; then
+    echo "📋 Copying server.php to root for static file serving..."
+    cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php server.php
+fi
+if [ ! -f public/server.php ]; then
+    echo "📋 Copying server.php to public/ for static file serving..."
+    cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php public/server.php
+fi
+
 # Start server
 # php artisan serve automatically serves from public/ directory
 # exec ensures this process becomes PID 1 and Railway can track it
