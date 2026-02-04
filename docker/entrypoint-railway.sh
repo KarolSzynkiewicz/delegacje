@@ -1,5 +1,17 @@
 #!/bin/sh
-set -e
+set -ex  # 'x' for debug output
+
+echo "=== RAILWAY STARTUP DEBUG ==="
+echo "PORT: ${PORT}"
+echo "APP_KEY: ${APP_KEY:+SET}${APP_KEY:-NOT SET}"
+echo "APP_KEY length: ${#APP_KEY}"
+echo "APP_ENV: ${APP_ENV}"
+echo "APP_DEBUG: ${APP_DEBUG}"
+
+# Pre-flight checks
+echo "🔍 Pre-flight checks..."
+php -v || { echo "❌ PHP not found!"; exit 1; }
+php artisan --version || { echo "❌ Artisan not found!"; exit 1; }
 
 echo "🚀 Starting Laravel on Railway (Port: ${PORT:-8000})"
 echo "🔧 Entrypoint version: 2026-02-04-railway-v2"
