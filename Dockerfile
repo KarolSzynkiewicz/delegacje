@@ -85,9 +85,14 @@ WORKDIR /var/www/html
 
 # Entrypoint - php artisan serve na $PORT
 # CRITICAL: Use CACHEBUST to force rebuild when entrypoint changes
-RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt
+RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt && \
+    echo "Entrypoint timestamp: $(date +%s)" >> /tmp/entrypoint-build.txt
 COPY docker/entrypoint-railway.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    echo "=== Entrypoint verification ===" && \
+    head -5 /usr/local/bin/entrypoint.sh && \
+    echo "=== Entrypoint has debug logging ===" && \
+    grep -q "RAILWAY STARTUP DEBUG" /usr/local/bin/entrypoint.sh && echo "✅ Debug logging present" || echo "❌ Debug logging missing"
 
 # Uprawnienia (Railway może działać jako root, więc używamy 777 dla storage)
 RUN chown -R www-data:www-data /var/www/html \
