@@ -20,6 +20,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force HTTPS for all URLs in production (Railway uses HTTPS)
+        if (config('app.env') === 'production' || request()->isSecure()) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Custom morph map for assignment models and User (for Spatie Permission)
         // This ensures polymorphic assignments only point to valid assignment models
         // User is included because Spatie Permission uses morphedByMany for User model
