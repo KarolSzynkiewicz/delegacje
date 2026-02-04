@@ -1,6 +1,7 @@
 # Dockerfile - Laravel on Railway
 # Railway oczekuje jednego procesu HTTP na $PORT
 # Używamy php artisan serve zamiast nginx + php-fpm
+# FORCE_REBUILD: 2026-02-04-17:10:00 - Clear all Docker cache
 
 # Build argument to force cache invalidation
 # Set CACHEBUST env var in Railway dashboard to force rebuild
