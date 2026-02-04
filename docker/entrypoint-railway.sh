@@ -55,6 +55,14 @@ if [ -z "$APP_KEY" ]; then
     exit 1
 fi
 
+# Remove .env file to force Laravel to use Railway environment variables only
+# .env file may contain old/stale APP_KEY from build time
+if [ -f .env ]; then
+    echo "⚠️ Removing .env file to use Railway environment variables only"
+    rm -f .env
+    echo "✅ .env removed - Laravel will use Railway env vars"
+fi
+
 # Fix permissions for storage (Railway may run as different user)
 echo "🔧 Fixing permissions..."
 chmod -R 777 storage bootstrap/cache 2>/dev/null || true
