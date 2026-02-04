@@ -575,7 +575,6 @@ railway run bash -c 'php artisan tinker --execute="echo App\Models\User::where(\
 
 ---
 
-## Podsumowanie - co działa
 
 ### ✅ Infrastruktura
 - ✅ Build przechodzi poprawnie
