@@ -12,6 +12,10 @@ if [ -z "$APP_KEY" ]; then
     exit 1
 fi
 
+# Fix permissions for storage (Railway may run as different user)
+echo "🔧 Fixing permissions..."
+chmod -R 777 storage bootstrap/cache 2>/dev/null || true
+
 # Clear ALL caches FIRST (don't cache in container - env vars may change)
 echo "🧹 Clearing all caches..."
 php artisan config:clear

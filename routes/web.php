@@ -28,12 +28,18 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// Healthcheck endpoints for Railway
 Route::get('/health', function () {
-    return response()->json(['status' => 'ok', 'timestamp' => now()]);
+    return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
 });
 
+// Root endpoint for Railway healthcheck (must return 200 OK)
 Route::get('/', function () {
-    return view('welcome');
+    return response()->json([
+        'status' => 'ok',
+        'app' => 'Laravel',
+        'timestamp' => now()->toIso8601String(),
+    ]);
 })->name('home');
 
 Route::get('/2', function () {

@@ -35,10 +35,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Setup aplikacji
 WORKDIR /var/www/html
 
-# Kopiowanie plików
+# OPTIMIZATION: Copy dependency files FIRST for better caching
+# Dependencies change less frequently than source code
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
+# OPTIMIZATION: Copy package files before source code
+COPY package.json package-lock.json ./
+RUN npm ci --prefer-offline --no-audit
+
+# OPTIMIZATION: Copy source code LAST (changes most frequently)
 COPY . .
 
 # Setup .env jeśli nie istnieje
@@ -52,8 +58,8 @@ RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions 
 RUN php artisan package:discover --ansi || true \
     && composer dump-autoload --optimize --classmap-authoritative
 
-# Build frontend
-RUN npm ci && npm run build && rm -rf node_modules
+# Build frontend (node_modules already installed above)
+RUN npm run build && rm -rf node_modules
 
 # Stage 2: Production
 FROM php:8.3-cli
@@ -79,19 +85,15 @@ WORKDIR /var/www/html
 
 # Entrypoint - php artisan serve na $PORT
 # CRITICAL: Use CACHEBUST to force rebuild when entrypoint changes
-RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt && cat /tmp/entrypoint-build.txt
+RUN echo "Build cache bust: ${CACHEBUST}" > /tmp/entrypoint-build.txt
 COPY docker/entrypoint-railway.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    echo "=== Entrypoint verification ===" && \
-    head -20 /usr/local/bin/entrypoint.sh && \
-    grep -q "Clearing caches" /usr/local/bin/entrypoint.sh && \
-    echo "✓ Entrypoint has cache clearing" || \
-    echo "✗ ERROR: Entrypoint missing cache clearing!"
+    grep -q "Clearing caches" /usr/local/bin/entrypoint.sh || exit 1
 
-# Uprawnienia
+# Uprawnienia (Railway może działać jako root, więc używamy 777 dla storage)
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+    && chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Railway używa zmiennej PORT - nie ustawiamy EXPOSE
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
