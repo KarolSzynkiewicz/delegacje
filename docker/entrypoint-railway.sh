@@ -4,11 +4,16 @@ set -e
 echo "🚀 Starting Laravel on Railway (Port: ${PORT:-8000})"
 echo "🔧 Entrypoint version: 2026-02-04-railway-v2"
 
-# Validate APP_KEY FIRST - before any config operations
+# Validate APP_KEY FIRST - before any config operations (HARD FAIL if missing)
 if [ -z "$APP_KEY" ]; then
-    echo "❌ ERROR: APP_KEY not set in Railway environment variables!"
-    echo "Run locally: php artisan key:generate --show"
-    echo "Then add APP_KEY to Railway dashboard"
+    echo "❌ ERROR: APP_KEY environment variable is not set!"
+    echo ""
+    echo "Generate locally with: php artisan key:generate --show"
+    echo "Then add to Railway Variables: APP_KEY=base64:xxxxx"
+    echo ""
+    echo "Example:"
+    echo "  APP_KEY=base64:ALdMPGMday9FaJ1OseM4DPksFmy7A2W0R8Zgtky4OSI="
+    echo ""
     exit 1
 fi
 
