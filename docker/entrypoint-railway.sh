@@ -120,7 +120,6 @@ php artisan storage:link 2>/dev/null || true
 
 # Start server
 # php artisan serve automatically serves from public/ directory
-# Wait a moment for server to be ready before healthcheck
+# exec ensures this process becomes PID 1 and Railway can track it
 echo "✅ Server starting on 0.0.0.0:${PORT:-8000}"
-sleep 2
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
