@@ -109,5 +109,6 @@ RUN chown -R www-data:www-data /var/www/html \
 RUN mkdir -p /var/run/php && chown www-data:www-data /var/run/php
 
 # Railway uses $PORT environment variable
+# Use entrypoint-nginx.sh, not entrypoint-railway.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf", "-n"]
