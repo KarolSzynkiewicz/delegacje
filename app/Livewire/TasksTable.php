@@ -47,45 +47,54 @@ class TasksTable extends Component
 
     public function render()
     {
-        $query = ProjectTask::with(['project', 'assignedTo', 'createdBy']);
-        
-        // Filtrowanie po projektach (dla /mine/*)
-        if ($this->filterProjectIds && is_array($this->filterProjectIds) && !empty($this->filterProjectIds)) {
-            $query->whereIn('project_id', $this->filterProjectIds);
-        }
-        
-        // Filtrowanie po przypisanym użytkowniku
-        if ($this->assignedToUserId) {
-            $query->where('assigned_to', $this->assignedToUserId);
-        }
-        
-        $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
+        try {
+            $query = ProjectTask::with(['project', 'assignedTo', 'createdBy']);
+            
+            // Filtrowanie po projektach (dla /mine/*)
+            if ($this->filterProjectIds && is_array($this->filterProjectIds) && !empty($this->filterProjectIds)) {
+                $query->whereIn('project_id', $this->filterProjectIds);
+            }
+            
+            // Filtrowanie po przypisanym użytkowniku
+            if ($this->assignedToUserId) {
+                $query->where('assigned_to', $this->assignedToUserId);
+            }
+            
+            $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
 
-        // Filter by project (including tasks without project)
-        if ($this->searchProject) {
-            if (strtolower($this->searchProject) === 'brak projektu' || strtolower($this->searchProject) === 'bez projektu') {
-                $query->whereNull('project_id');
-            } else {
-                $query->whereHas('project', function ($q) {
-                    $q->where('name', 'like', '%' . $this->searchProject . '%');
+            // Filter by project (including tasks without project)
+            if ($this->searchProject) {
+                $searchLower = strtolower($this->searchProject);
+                if ($searchLower === 'brak projektu' || $searchLower === 'bez projektu') {
+                    $query->whereNull('project_id');
+                } else {
+                    $query->whereHas('project', function ($q) {
+                        $q->where('name', 'like', '%' . $this->searchProject . '%');
+                    });
+                }
+            }
+
+            // Filter by task name
+            if ($this->searchTask) {
+                $query->where(function ($q) {
+                    $q->where('name', 'like', '%' . $this->searchTask . '%')
+                      ->orWhere('description', 'like', '%' . $this->searchTask . '%');
                 });
             }
-        }
 
-        // Filter by task name
-        if ($this->searchTask) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->searchTask . '%')
-                  ->orWhere('description', 'like', '%' . $this->searchTask . '%');
-            });
-        }
+            // Filter by status
+            if ($this->status) {
+                $query->where('status', $this->status);
+            }
 
-        // Filter by status
-        if ($this->status) {
-            $query->where('status', $this->status);
+            $tasks = $query->paginate(20);
+        } catch (\Exception $e) {
+            // Fallback - zwróć puste wyniki zamiast błędu
+            \Log::error('TasksTable render error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            $tasks = ProjectTask::whereRaw('1 = 0')->paginate(20);
         }
-
-        $tasks = $query->paginate(20);
 
         $projects = Project::orderBy('name')->get();
         $statuses = [
