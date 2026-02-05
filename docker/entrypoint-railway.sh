@@ -205,17 +205,19 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force --no-interaction
 fi
 
-# Storage link (only if not using Railway Volume)
-# If Railway Volume is mounted, symlink is already created above
-if [ ! -d "/data" ] || [ ! -w "/data" ]; then
-    echo "🔗 Creating storage symlink (no Railway Volume detected)..."
-    php artisan storage:link 2>/dev/null || true
+# Storage link - zawsze utwórz public/storage symlink (dla asset serving)
+# Nawet jeśli używamy Railway Volume, public/storage musi wskazywać na storage/app/public
+echo "🔗 Creating public/storage symlink..."
+php artisan storage:link 2>/dev/null || true
+
+# Verify public/storage symlink
+if [ -L "public/storage" ]; then
+    echo "✅ public/storage symlink created"
+    # Sprawdź czy symlink wskazuje na właściwe miejsce
+    STORAGE_LINK_TARGET=$(readlink -f public/storage 2>/dev/null || readlink public/storage)
+    echo "   public/storage -> $STORAGE_LINK_TARGET"
 else
-    echo "⏭️ Skipping storage:link (Railway Volume symlink already created)"
-    # Ensure public/storage symlink exists (for asset serving)
-    if [ ! -L "public/storage" ]; then
-        php artisan storage:link 2>/dev/null || true
-    fi
+    echo "⚠️ WARNING: public/storage symlink not created"
 fi
 
 # Ensure server.php exists for static file serving
