@@ -116,51 +116,64 @@ class EmployeeDocumentController extends Controller
      */
     public function update(Request $request, EmployeeDocument $employeeDocument): RedirectResponse
     {
-        $employee = $employeeDocument->employee;
+        try {
+            $employee = $employeeDocument->employee;
 
-        $validated = $request->validate([
-            'document_id' => 'required|exists:documents,id',
-            'valid_from' => 'required|date',
-            'valid_to' => 'nullable|date|after_or_equal:valid_from',
-            'is_okresowy' => 'nullable|boolean',
-            'notes' => 'nullable|string',
-            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
-            'remove_file' => 'nullable|boolean',
-        ]);
+            $validated = $request->validate([
+                'document_id' => 'required|exists:documents,id',
+                'valid_from' => 'required|date',
+                'valid_to' => 'nullable|date|after_or_equal:valid_from',
+                'is_okresowy' => 'nullable|boolean',
+                'notes' => 'nullable|string',
+                'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
+                'remove_file' => 'nullable|boolean',
+            ]);
 
-        // Ustaw kind na podstawie checkboxa
-        $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
-        unset($validated['is_okresowy']);
+            // Ustaw kind na podstawie checkboxa
+            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
+            unset($validated['is_okresowy']);
 
-        // Jeśli dokument jest bezokresowy, ustaw valid_to na null
-        if ($validated['kind'] === 'bezokresowy') {
-            $validated['valid_to'] = null;
-        }
-
-        // Usuń plik jeśli zaznaczono checkbox
-        if ($request->has('remove_file') && $request->boolean('remove_file') && $employeeDocument->file_path) {
-            Storage::disk('public')->delete($employeeDocument->file_path);
-            $validated['file_path'] = null;
-        }
-
-        // Upload nowego pliku jeśli został przesłany
-        if ($request->hasFile('file')) {
-            // Usuń stary plik jeśli istnieje
-            if ($employeeDocument->file_path) {
-                Storage::disk('public')->delete($employeeDocument->file_path);
+            // Jeśli dokument jest bezokresowy, ustaw valid_to na null
+            if ($validated['kind'] === 'bezokresowy') {
+                $validated['valid_to'] = null;
             }
-            
-            $file = $request->file('file');
-            $fileName = 'employee_documents/' . $employee->id . '/' . time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('public', $fileName);
-            $validated['file_path'] = str_replace('public/', '', $filePath);
+
+            // Usuń plik jeśli zaznaczono checkbox
+            if ($request->has('remove_file') && $request->boolean('remove_file') && $employeeDocument->file_path) {
+                Storage::disk('public')->delete($employeeDocument->file_path);
+                $validated['file_path'] = null;
+            }
+
+            // Upload nowego pliku jeśli został przesłany
+            if ($request->hasFile('file')) {
+                // Usuń stary plik jeśli istnieje
+                if ($employeeDocument->file_path) {
+                    Storage::disk('public')->delete($employeeDocument->file_path);
+                }
+                
+                $file = $request->file('file');
+                $fileName = 'employee_documents/' . $employee->id . '/' . time() . '_' . $file->getClientOriginalName();
+                $filePath = $file->storeAs('public', $fileName);
+                $validated['file_path'] = str_replace('public/', '', $filePath);
+            }
+
+            unset($validated['remove_file']);
+            $employeeDocument->update($validated);
+
+            return redirect()->route('employees.show', $employee)
+                ->with('success', 'Dokument został zaktualizowany.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // ValidationException automatycznie przekierowuje z błędami, ale możemy to obsłużyć jawnie
+            return redirect()
+                ->route('employee-documents.edit', $employeeDocument)
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('employee-documents.edit', $employeeDocument)
+                ->with('error', 'Wystąpił błąd podczas aktualizacji dokumentu: ' . $e->getMessage())
+                ->withInput();
         }
-
-        unset($validated['remove_file']);
-        $employeeDocument->update($validated);
-
-        return redirect()->route('employees.show', $employee)
-            ->with('success', 'Dokument został zaktualizowany.');
     }
 
     /**

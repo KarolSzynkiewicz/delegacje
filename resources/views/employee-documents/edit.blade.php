@@ -13,7 +13,7 @@
                     <x-ui.card>
                         <x-ui.errors />
 
-                        <form action="{{ route('employees.employee-documents.update', [$employee, $employeeDocument]) }}" method="POST" enctype="multipart/form-data">
+                        <form action="{{ route('employee-documents.update', $employeeDocument) }}" method="POST" enctype="multipart/form-data">
                             @csrf
                             @method('PUT')
 
