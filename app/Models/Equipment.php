@@ -60,14 +60,24 @@ class Equipment extends Model
 
     /**
      * Get available quantity (in stock - issued).
+     * Note: Equipment marked as 'damaged' or 'lost' is not returned to stock.
      */
     public function getAvailableQuantityAttribute(): int
     {
+        // Count only equipment that is currently issued (not returned, damaged, or lost)
         $issued = $this->issues()
             ->where('status', 'issued')
             ->sum('quantity_issued');
+        
+        // Also count equipment marked as damaged or lost (it's not available)
+        $damagedOrLost = $this->issues()
+            ->whereIn('status', ['damaged', 'lost'])
+            ->sum('quantity_issued');
 
-        return max(0, $this->quantity_in_stock - $issued);
+        // Total unavailable = currently issued + damaged + lost
+        $unavailable = $issued + $damagedOrLost;
+
+        return max(0, $this->quantity_in_stock - $unavailable);
     }
 
     /**

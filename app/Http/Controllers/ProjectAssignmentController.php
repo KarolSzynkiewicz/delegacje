@@ -222,47 +222,64 @@ class ProjectAssignmentController extends Controller
      */
     public function destroy(ProjectAssignment $assignment): RedirectResponse
     {
-        $reasons = [];
-        
-        // Sprawdź czy są zaksiegowane godziny dla tego przypisania
-        $hasTimeLogs = \App\Models\TimeLog::where('project_assignment_id', $assignment->id)->exists();
-        if ($hasTimeLogs) {
-            $reasons[] = "są już zaksiegowane godziny pracy dla tego przypisania";
-        }
-        
-        // Sprawdź czy przypisanie jest powiązane z zjazdem (LogisticsEventParticipant)
-        $hasLogisticsEvents = \App\Models\LogisticsEventParticipant::where('assignment_type', 'project_assignment')
-            ->where('assignment_id', $assignment->id)
-            ->exists();
-        if ($hasLogisticsEvents) {
-            $reasons[] = "przypisanie jest powiązane z zjazdem lub wyjazdem";
-        }
-        
-        // Sprawdź czy są powiązane problemy z wyposażeniem (EquipmentIssue)
-        $hasEquipmentIssues = \App\Models\EquipmentIssue::where('project_assignment_id', $assignment->id)->exists();
-        if ($hasEquipmentIssues) {
-            $reasons[] = "są powiązane problemy z wyposażeniem";
-        }
-        
-        if (!empty($reasons)) {
-            $message = "Nie można usunąć przypisania, ponieważ " . implode(", ", $reasons) . ".";
+        try {
+            $reasons = [];
+            
+            // Sprawdź czy są zaksiegowane godziny dla tego przypisania
+            $hasTimeLogs = \App\Models\TimeLog::where('project_assignment_id', $assignment->id)->exists();
             if ($hasTimeLogs) {
-                $message .= " Najpierw usuń lub edytuj wpisy czasu pracy.";
+                $reasons[] = "są już zaksiegowane godziny pracy dla tego przypisania";
             }
+            
+            // Sprawdź czy przypisanie jest powiązane z zjazdem (LogisticsEventParticipant)
+            $hasLogisticsEvents = \App\Models\LogisticsEventParticipant::where('assignment_type', 'project_assignment')
+                ->where('assignment_id', $assignment->id)
+                ->exists();
             if ($hasLogisticsEvents) {
-                $message .= " Najpierw usuń lub edytuj powiązane zjazdy/wyjazdy.";
+                $reasons[] = "przypisanie jest powiązane z zjazdem lub wyjazdem";
+            }
+            
+            // Sprawdź czy są powiązane problemy z wyposażeniem (EquipmentIssue)
+            $hasEquipmentIssues = \App\Models\EquipmentIssue::where('project_assignment_id', $assignment->id)->exists();
+            if ($hasEquipmentIssues) {
+                $reasons[] = "są powiązane problemy z wyposażeniem";
+            }
+            
+            if (!empty($reasons)) {
+                $message = "Nie można usunąć przypisania, ponieważ " . implode(", ", $reasons) . ".";
+                if ($hasTimeLogs) {
+                    $message .= " Najpierw usuń lub edytuj wpisy czasu pracy.";
+                }
+                if ($hasLogisticsEvents) {
+                    $message .= " Najpierw usuń lub edytuj powiązane zjazdy/wyjazdy.";
+                }
+                
+                return redirect()
+                    ->route("projects.show", $assignment->project_id)
+                    ->with("error", $message);
+            }
+            
+            $projectId = $assignment->project_id;
+            $assignment->delete();
+
+            return redirect()
+                ->route("projects.show", $projectId)
+                ->with("success", "Przypisanie zostało usunięte.");
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Foreign key constraint violation
+            if ($e->getCode() == 23000) {
+                return redirect()
+                    ->route("projects.show", $assignment->project_id)
+                    ->with("error", "Nie można usunąć przypisania, ponieważ są powiązane rekordy (np. godziny pracy, zjazdy, wyposażenie). Najpierw usuń lub edytuj powiązane dane.");
             }
             
             return redirect()
                 ->route("projects.show", $assignment->project_id)
-                ->with("error", $message);
+                ->with("error", "Wystąpił błąd podczas usuwania przypisania: " . $e->getMessage());
+        } catch (\Exception $e) {
+            return redirect()
+                ->route("projects.show", $assignment->project_id)
+                ->with("error", "Wystąpił błąd podczas usuwania przypisania: " . $e->getMessage());
         }
-        
-        $projectId = $assignment->project_id;
-        $assignment->delete();
-
-        return redirect()
-            ->route("projects.show", $projectId)
-            ->with("success", "Przypisanie zostało usunięte.");
     }
 }

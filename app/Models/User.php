@@ -105,10 +105,11 @@ class User extends Authenticatable
 
     /**
      * Check if user is a manager.
+     * User is a manager if they manage at least one project (regardless of role).
      */
     public function isManager(): bool
     {
-        return $this->hasRole('kierownik');
+        return !empty($this->getManagedProjectIds());
     }
 
     /**

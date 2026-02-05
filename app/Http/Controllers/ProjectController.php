@@ -80,11 +80,44 @@ class ProjectController extends Controller
      */
     public function destroy(Project $project): RedirectResponse
     {
-        $project->delete();
+        try {
+            // Sprawdź powiązane rekordy przed usunięciem
+            $assignmentsCount = $project->assignments()->count();
+            $demandsCount = $project->demands()->count();
+            $tasksCount = $project->tasks()->count();
+            $filesCount = $project->files()->count();
+            $commentsCount = $project->comments()->count();
+            $variableCostsCount = $project->variableCosts()->count();
+            
+            // Sprawdź time logs przez assignments
+            $timeLogsCount = \App\Models\TimeLog::whereHas('projectAssignment', function($query) use ($project) {
+                $query->where('project_id', $project->id);
+            })->count();
+            
+            $project->delete();
 
-        // Wyczyść cache dla dropdowna projektów
-        Cache::forget('active_projects_dropdown');
+            // Wyczyść cache dla dropdowna projektów
+            Cache::forget('active_projects_dropdown');
 
-        return redirect()->route('projects.index')->with('success', 'Projekt został usunięty.');
+            $message = "Projekt został usunięty.";
+            if ($assignmentsCount > 0 || $demandsCount > 0 || $tasksCount > 0 || 
+                $filesCount > 0 || $commentsCount > 0 || $variableCostsCount > 0 || $timeLogsCount > 0) {
+                $message .= " Usunięto również: ";
+                $deleted = [];
+                if ($assignmentsCount > 0) $deleted[] = "{$assignmentsCount} przypisania pracowników";
+                if ($timeLogsCount > 0) $deleted[] = "{$timeLogsCount} wpisów czasu pracy";
+                if ($demandsCount > 0) $deleted[] = "{$demandsCount} zapotrzebowań";
+                if ($tasksCount > 0) $deleted[] = "{$tasksCount} zadań";
+                if ($filesCount > 0) $deleted[] = "{$filesCount} plików";
+                if ($commentsCount > 0) $deleted[] = "{$commentsCount} komentarzy";
+                if ($variableCostsCount > 0) $deleted[] = "{$variableCostsCount} kosztów zmiennych";
+                $message .= implode(", ", $deleted) . ".";
+            }
+
+            return redirect()->route('projects.index')->with('success', $message);
+        } catch (\Exception $e) {
+            return redirect()->route('projects.index')
+                ->with('error', 'Wystąpił błąd podczas usuwania projektu: ' . $e->getMessage());
+        }
     }
 }

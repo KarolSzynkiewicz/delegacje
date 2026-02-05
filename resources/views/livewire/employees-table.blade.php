@@ -176,6 +176,18 @@
                                 viewRoute="{{ route('employees.show', $employee) }}"
                                 editRoute="{{ route('employees.edit', $employee) }}"
                                 deleteRoute="{{ route('employees.destroy', $employee) }}"
+                                deleteMessage="⚠️ UWAGA: Usunięcie pracownika spowoduje kaskadowe usunięcie wszystkich powiązanych danych:
+• Wszystkie przypisania do projektów
+• Wszystkie wpisy czasu pracy
+• Wszystkie przypisania do aut i domów
+• Wszystkie rekordy płac
+• Wszystkie zaliczki
+• Wszystkie kary i nagrody
+• Wszystkie oceny
+• Wszystkie rotacje
+• Wszystkie dokumenty
+
+Czy na pewno chcesz usunąć tego pracownika?"
                             />
                             </td>
                         </tr>
