@@ -94,7 +94,7 @@ class ProjectTaskController extends Controller
                 $projectId = null;
             }
 
-            $task = ProjectTask::create([
+            $taskData = [
                 'project_id' => $projectId, // nullable
                 'name' => $request->input('name'),
                 'description' => $request->input('description'),
@@ -102,15 +102,39 @@ class ProjectTaskController extends Controller
                 'assigned_to' => $request->input('assigned_to') ?: null,
                 'due_date' => $request->input('due_date') ?: null,
                 'created_by' => auth()->id(),
-            ]);
+            ];
+            
+            \Log::info('Creating task', ['data' => $taskData]);
+            
+            $task = ProjectTask::create($taskData);
+            
+            \Log::info('Task created', ['task_id' => $task->id, 'project_id' => $task->project_id]);
 
             // Jeśli status to COMPLETED, ustaw completed_at
             if ($status === TaskStatus::COMPLETED && !$task->completed_at) {
                 $task->update(['completed_at' => now()]);
             }
 
-            return redirect()->route('tasks.index')->with('success', 'Zadanie zostało utworzone.');
+            $message = 'Zadanie "' . $task->name . '" zostało utworzone.';
+            if ($task->project) {
+                $message .= ' Przypisane do projektu: ' . $task->project->name;
+            } else {
+                $message .= ' (bez projektu)';
+            }
+
+            return redirect()->route('tasks.index')
+                ->with('success', $message)
+                ->with('task_created', true); // Flag to close modal via JS
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('tasks.index')
+                ->withErrors($e->errors())
+                ->withInput();
         } catch (\Exception $e) {
+            \Log::error('Task creation error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'input' => $request->except(['_token'])
+            ]);
+            
             return redirect()->route('tasks.index')
                 ->with('error', 'Wystąpił błąd podczas tworzenia zadania: ' . $e->getMessage())
                 ->withInput();

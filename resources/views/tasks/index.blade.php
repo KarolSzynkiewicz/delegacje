@@ -13,8 +13,21 @@
         </x-ui.page-header>
     </x-slot>
 
+    <!-- Komunikaty sukcesu/błędu -->
+    @if(session('success'))
+        <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
+
+    @if(session('error'))
+        <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-3">
+            {{ session('error') }}
+        </x-ui.alert>
+    @endif
+
     <!-- Modal do dodawania zadań -->
-    <x-modal name="add-task-modal" :show="$errors->any()" focusable>
+    <x-modal name="add-task-modal" :show="$errors->any() || session('error')" focusable>
         <div class="p-4">
             <h2 class="h5 mb-4">Dodaj nowe zadanie</h2>
             
@@ -98,4 +111,13 @@
     </x-modal>
 
     <livewire:tasks-table :assignedToUserId="auth()->id()" />
+
+    @push('scripts')
+    <script>
+        // Zamknij modal po sukcesie
+        @if(session('task_created'))
+            window.dispatchEvent(new CustomEvent('close-modal', { detail: 'add-task-modal' }));
+        @endif
+    </script>
+    @endpush
 </x-app-layout>
