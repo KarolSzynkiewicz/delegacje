@@ -78,10 +78,12 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure PHP-FPM to use unix socket
-RUN sed -i 's/listen = 127.0.0.1:9000/listen = \/var\/run\/php\/php8.3-fpm.sock/' /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i 's/;listen.owner = www-data/listen.owner = www-data/' /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i 's/;listen.group = www-data/listen.group = www-data/' /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i 's/;listen.mode = 0660/listen.mode = 0660/' /usr/local/etc/php-fpm.d/www.conf
+# Create socket directory first, then configure PHP-FPM
+RUN mkdir -p /var/run/php && \
+    sed -i 's/listen = 127.0.0.1:9000/listen = \/var\/run\/php\/php8.3-fpm.sock/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/;listen.owner = www-data/listen.owner = www-data/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/;listen.group = www-data/listen.group = www-data/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/;listen.mode = 0660/listen.mode = 0660/' /usr/local/etc/php-fpm.d/www.conf
 
 # Copy application from build stage
 COPY --from=base /var/www/html /var/www/html
