@@ -125,6 +125,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->defaults('permission_type', 'view')
         ->defaults('resource', 'project-tasks');
     
+    // Global tasks store (without project requirement)
+    Route::post('tasks', [\App\Http\Controllers\ProjectTaskController::class, 'storeGlobal'])
+        ->name('tasks.store')
+        ->defaults('permission_type', 'create')
+        ->defaults('resource', 'project-tasks');
+    
     Route::resource('projects.tasks', \App\Http\Controllers\ProjectTaskController::class)
         ->except(['index', 'create']);
     Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])

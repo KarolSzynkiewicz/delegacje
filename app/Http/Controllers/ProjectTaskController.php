@@ -79,6 +79,33 @@ class ProjectTaskController extends Controller
     }
 
     /**
+     * Store a newly created task (global - without project requirement).
+     */
+    public function storeGlobal(StoreProjectTaskRequest $request): RedirectResponse
+    {
+        $status = $request->input('status') 
+            ? TaskStatus::from($request->input('status')) 
+            : TaskStatus::PENDING;
+
+        $task = ProjectTask::create([
+            'project_id' => $request->input('project_id'), // nullable
+            'name' => $request->input('name'),
+            'description' => $request->input('description'),
+            'status' => $status,
+            'assigned_to' => $request->input('assigned_to'),
+            'due_date' => $request->input('due_date'),
+            'created_by' => auth()->id(),
+        ]);
+
+        // Jeśli status to COMPLETED, ustaw completed_at
+        if ($status === TaskStatus::COMPLETED && !$task->completed_at) {
+            $task->update(['completed_at' => now()]);
+        }
+
+        return redirect()->route('tasks.index')->with('success', 'Zadanie zostało utworzone.');
+    }
+
+    /**
      * Update the specified resource in storage.
      */
     public function update(UpdateProjectTaskRequest $request, Project $project, ProjectTask $task): RedirectResponse

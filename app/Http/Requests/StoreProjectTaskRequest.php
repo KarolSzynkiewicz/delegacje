@@ -22,6 +22,7 @@ class StoreProjectTaskRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'project_id' => ['nullable', 'exists:projects,id'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'assigned_to' => ['nullable', 'exists:users,id'],

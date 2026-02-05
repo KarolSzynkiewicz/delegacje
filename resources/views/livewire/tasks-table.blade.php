@@ -53,9 +53,13 @@
                                 @endif
                             </td>
                             <td>
-                                <a href="{{ $isMineView ? route('mine.projects.show', $task->project) : route('projects.show', $task->project) }}" class="text-decoration-none">
-                                    {{ $task->project->name }}
-                                </a>
+                                @if($task->project)
+                                    <a href="{{ $isMineView ? route('mine.projects.show', $task->project) : route('projects.show', $task->project) }}" class="text-decoration-none">
+                                        {{ $task->project->name }}
+                                    </a>
+                                @else
+                                    <span class="text-muted fst-italic">Brak projektu</span>
+                                @endif
                             </td>
                             <td>
                                 @php
@@ -78,7 +82,7 @@
                             <td>
                                 <x-tasks-actions 
                                     :task="$task" 
-                                    :project="$task->project" 
+                                    :project="$task->project ?? null" 
                                     size="sm" 
                                     gap="1" 
                                     :isMineView="$isMineView ?? false" 

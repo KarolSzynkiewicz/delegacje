@@ -61,11 +61,15 @@ class TasksTable extends Component
         
         $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
 
-        // Filter by project
+        // Filter by project (including tasks without project)
         if ($this->searchProject) {
-            $query->whereHas('project', function ($q) {
-                $q->where('name', 'like', '%' . $this->searchProject . '%');
-            });
+            if (strtolower($this->searchProject) === 'brak projektu' || strtolower($this->searchProject) === 'bez projektu') {
+                $query->whereNull('project_id');
+            } else {
+                $query->whereHas('project', function ($q) {
+                    $q->where('name', 'like', '%' . $this->searchProject . '%');
+                });
+            }
         }
 
         // Filter by task name
