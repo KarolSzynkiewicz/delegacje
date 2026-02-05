@@ -64,6 +64,9 @@ class EmployeeDocumentController extends Controller
             $validated['valid_to'] = null;
         }
 
+        // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
+        $validated['type'] = null;
+
         // Upload pliku jeśli został przesłany
         if ($request->hasFile('file')) {
             $file = $request->file('file');
