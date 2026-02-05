@@ -110,7 +110,7 @@
         </div>
     </x-modal>
 
-    <livewire:tasks-table :assignedToUserId="auth()->id()" />
+    <livewire:tasks-table />
 
     @push('scripts')
     <script>
