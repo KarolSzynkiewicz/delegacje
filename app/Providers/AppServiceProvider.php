@@ -25,6 +25,12 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 
+        // Auto-configure secure session cookies for HTTPS
+        // This is critical for Railway where APP_URL is HTTPS but SESSION_SECURE_COOKIE might not be set
+        if (config('app.env') === 'production' || str_starts_with(config('app.url', ''), 'https://')) {
+            config(['session.secure' => true]);
+        }
+
         // Custom morph map for assignment models and User (for Spatie Permission)
         // This ensures polymorphic assignments only point to valid assignment models
         // User is included because Spatie Permission uses morphedByMany for User model
