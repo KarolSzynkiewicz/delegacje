@@ -161,12 +161,19 @@
                         <div class="text-center p-3 bg-light rounded">
                             @php
                                 $marginByCurrency = [];
-                                foreach ($summary['revenue_by_currency'] ?? [] as $currency => $revenue) {
+                                // Get all currencies from both revenue and costs
+                                $allCurrencies = array_unique(array_merge(
+                                    array_keys($summary['revenue_by_currency'] ?? []),
+                                    array_keys($totalCostsByCurrency ?? [])
+                                ));
+                                
+                                foreach ($allCurrencies as $currency) {
+                                    $revenue = $summary['revenue_by_currency'][$currency] ?? 0;
                                     $costs = $totalCostsByCurrency[$currency] ?? 0;
                                     $margin = $revenue - $costs;
                                     $marginByCurrency[$currency] = [
                                         'amount' => $margin,
-                                        'percentage' => $revenue > 0 ? ($margin / $revenue) * 100 : 0
+                                        'percentage' => $revenue > 0 ? ($margin / $revenue) * 100 : ($costs > 0 ? -100 : 0)
                                     ];
                                 }
                                 $marginColor = count($marginByCurrency) > 0 && collect($marginByCurrency)->first()['amount'] >= 0 ? 'text-success' : 'text-danger';
