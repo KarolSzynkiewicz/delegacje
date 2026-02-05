@@ -42,43 +42,62 @@ class EmployeeDocumentController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'document_id' => 'required|exists:documents,id',
-            'valid_from' => 'required|date',
-            'valid_to' => 'nullable|date|after_or_equal:valid_from',
-            'is_okresowy' => 'nullable|boolean',
-            'notes' => 'nullable|string',
-            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
-        ]);
+        try {
+            $validated = $request->validate([
+                'employee_id' => 'required|exists:employees,id',
+                'document_id' => 'required|exists:documents,id',
+                'valid_from' => 'required|date',
+                'valid_to' => 'nullable|date|after_or_equal:valid_from',
+                'is_okresowy' => 'nullable|boolean',
+                'notes' => 'nullable|string',
+                'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
+            ]);
 
-        $employee = Employee::findOrFail($validated['employee_id']);
-        unset($validated['employee_id']);
+            $employee = Employee::findOrFail($validated['employee_id']);
+            unset($validated['employee_id']);
 
-        // Ustaw kind na podstawie checkboxa
-        $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
-        unset($validated['is_okresowy']);
+            // Ustaw kind na podstawie checkboxa
+            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
+            unset($validated['is_okresowy']);
 
-        // Jeśli dokument jest bezokresowy, ustaw valid_to na null
-        if ($validated['kind'] === 'bezokresowy') {
-            $validated['valid_to'] = null;
+            // Jeśli dokument jest bezokresowy, ustaw valid_to na null
+            if ($validated['kind'] === 'bezokresowy') {
+                $validated['valid_to'] = null;
+            }
+
+            // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
+            $validated['type'] = null;
+
+            // Upload pliku jeśli został przesłany
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $fileName = 'employee_documents/' . $employee->id . '/' . time() . '_' . $file->getClientOriginalName();
+                $filePath = $file->storeAs('public', $fileName);
+                $validated['file_path'] = str_replace('public/', '', $filePath);
+            }
+
+            $employee->employeeDocuments()->create($validated);
+
+            return redirect()->route('employees.show', $employee)
+                ->with('success', 'Dokument został dodany.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // ValidationException automatycznie przekierowuje z błędami, ale możemy to obsłużyć jawnie
+            return redirect()
+                ->route('employee-documents.create', [
+                    'employee_id' => $request->input('employee_id'),
+                    'document_id' => $request->input('document_id'),
+                ])
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('employee-documents.create', [
+                    'employee_id' => $request->input('employee_id'),
+                    'document_id' => $request->input('document_id'),
+                ])
+                ->with('error', 'Wystąpił błąd podczas dodawania dokumentu: ' . $e->getMessage())
+                ->withInput();
         }
-
-        // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
-        $validated['type'] = null;
-
-        // Upload pliku jeśli został przesłany
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $fileName = 'employee_documents/' . $employee->id . '/' . time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('public', $fileName);
-            $validated['file_path'] = str_replace('public/', '', $filePath);
-        }
-
-        $employee->employeeDocuments()->create($validated);
-
-        return redirect()->route('employees.show', $employee)
-            ->with('success', 'Dokument został dodany.');
     }
 
     /**
