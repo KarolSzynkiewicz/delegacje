@@ -1,25 +1,36 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Zadania</h2>
-        </div>
+        <x-ui.page-header title="Zadania">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    x-data=""
+                    x-on:click.prevent="$dispatch('open-modal', 'add-task-modal')"
+                >
+                    <i class="bi bi-plus-circle me-1"></i> Dodaj Zadanie
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <!-- Formularz inline do dodawania zadań -->
-    <x-ui.card class="mb-4">
-        <h5 class="card-title mb-3">Dodaj nowe zadanie</h5>
-        <form action="{{ route('tasks.store') }}" method="POST">
-            @csrf
-            <div class="row g-3">
-                <div class="col-md-4">
+    <!-- Modal do dodawania zadań -->
+    <x-modal name="add-task-modal" :show="$errors->any()" focusable>
+        <div class="p-4">
+            <h2 class="h5 mb-4">Dodaj nowe zadanie</h2>
+            
+            <form action="{{ route('tasks.store') }}" method="POST">
+                @csrf
+                <div class="mb-3">
                     <x-ui.input 
                         type="text" 
                         name="name" 
                         label="Nazwa zadania"
                         required
+                        value="{{ old('name') }}"
                     />
                 </div>
-                <div class="col-md-3">
+                
+                <div class="mb-3">
                     <x-ui.input 
                         type="select" 
                         name="project_id" 
@@ -33,7 +44,8 @@
                         @endforeach
                     </x-ui.input>
                 </div>
-                <div class="col-md-3">
+                
+                <div class="mb-3">
                     <x-ui.input 
                         type="select" 
                         name="assigned_to" 
@@ -47,7 +59,8 @@
                         @endforeach
                     </x-ui.input>
                 </div>
-                <div class="col-md-2">
+                
+                <div class="mb-3">
                     <x-ui.input 
                         type="date" 
                         name="due_date" 
@@ -55,24 +68,34 @@
                         value="{{ old('due_date') }}"
                     />
                 </div>
-                <div class="col-md-12">
+                
+                <div class="mb-3">
                     <x-ui.input 
                         type="textarea" 
                         name="description" 
                         label="Opis"
-                        rows="2"
+                        rows="3"
                         value="{{ old('description') }}"
                     />
                 </div>
-                <div class="col-md-12">
+                
+                <x-ui.errors />
+                
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <x-ui.button 
+                        type="button" 
+                        variant="ghost"
+                        x-on:click="$dispatch('close-modal', 'add-task-modal')"
+                    >
+                        Anuluj
+                    </x-ui.button>
                     <x-ui.button type="submit" variant="primary">
                         <i class="bi bi-plus-circle me-1"></i> Dodaj Zadanie
                     </x-ui.button>
                 </div>
-            </div>
-        </form>
-        <x-ui.errors />
-    </x-ui.card>
+            </form>
+        </div>
+    </x-modal>
 
     <livewire:tasks-table :assignedToUserId="auth()->id()" />
 </x-app-layout>
