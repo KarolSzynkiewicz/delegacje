@@ -94,24 +94,40 @@ if [ -d "/data" ] && [ -w "/data" ]; then
              /data/storage/framework/views \
              /data/storage/logs
     
-    # Copy existing storage to volume if volume is empty
-    if [ ! -d "/data/storage/app/public/employees" ] || [ -z "$(ls -A /data/storage/app/public/employees 2>/dev/null)" ]; then
-        echo "📋 Copying existing storage to Railway Volume..."
-        cp -r storage/app/public/* /data/storage/app/public/ 2>/dev/null || true
+    # Copy existing storage to volume if volume is empty (only on first run)
+    if [ ! -f "/data/storage/.volume-initialized" ]; then
+        echo "📋 Initializing Railway Volume with existing storage..."
+        if [ -d "storage/app/public" ] && [ "$(ls -A storage/app/public 2>/dev/null)" ]; then
+            cp -r storage/app/public/* /data/storage/app/public/ 2>/dev/null || true
+        fi
+        touch /data/storage/.volume-initialized
+        echo "✅ Volume initialized"
+    fi
+    
+    # Remove existing symlink or directory if exists
+    if [ -L "storage/app/public" ] || [ -d "storage/app/public" ]; then
+        echo "🔗 Removing existing storage/app/public..."
+        rm -rf storage/app/public
     fi
     
     # Create symlink from container storage to volume
-    if [ ! -L "storage/app/public" ]; then
-        echo "🔗 Linking storage/app/public to Railway Volume..."
-        rm -rf storage/app/public
-        ln -sf /data/storage/app/public storage/app/public
+    echo "🔗 Creating symlink: storage/app/public -> /data/storage/app/public"
+    ln -sf /data/storage/app/public storage/app/public
+    
+    # Verify symlink was created
+    if [ -L "storage/app/public" ]; then
+        echo "✅ Symlink created successfully"
+        ls -la storage/app/public | head -3
+    else
+        echo "❌ WARNING: Failed to create symlink!"
     fi
     
     # Fix permissions for volume
     chmod -R 777 /data/storage 2>/dev/null || true
     echo "✅ Railway Volume configured for persistent storage"
 else
-    echo "⚠️ Railway Volume not detected - using ephemeral storage (files will be lost on redeploy)"
+    echo "⚠️ Railway Volume not detected at /data - using ephemeral storage (files will be lost on redeploy)"
+    echo "   To enable persistent storage, add a Railway Volume with mount path: /data"
 fi
 
 # Fix permissions for storage (Railway may run as different user)
@@ -151,8 +167,18 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force --no-interaction
 fi
 
-# Storage link (ignore if exists)
-php artisan storage:link 2>/dev/null || true
+# Storage link (only if not using Railway Volume)
+# If Railway Volume is mounted, symlink is already created above
+if [ ! -d "/data" ] || [ ! -w "/data" ]; then
+    echo "🔗 Creating storage symlink (no Railway Volume detected)..."
+    php artisan storage:link 2>/dev/null || true
+else
+    echo "⏭️ Skipping storage:link (Railway Volume symlink already created)"
+    # Ensure public/storage symlink exists (for asset serving)
+    if [ ! -L "public/storage" ]; then
+        php artisan storage:link 2>/dev/null || true
+    fi
+fi
 
 # Ensure server.php exists for static file serving
 # php artisan serve uses server.php to handle static files correctly
