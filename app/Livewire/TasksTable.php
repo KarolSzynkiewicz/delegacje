@@ -90,22 +90,10 @@ class TasksTable extends Component
             
             $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
             
+            // ✅ NAPRAWIONE: Eager loading PRZED paginacją (zapobiega N+1 query)
+            $query->with(['project', 'assignedTo', 'createdBy']);
+            
             $tasks = $query->paginate(20);
-            
-            // Debug: loguj liczbę zadań
-            \Log::info('TasksTable render', [
-                'total_tasks' => $tasks->total(),
-                'current_page_tasks' => $tasks->count(),
-                'filters' => [
-                    'searchProject' => $this->searchProject,
-                    'searchTask' => $this->searchTask,
-                    'status' => $this->status,
-                    'assignedToUserId' => $this->assignedToUserId,
-                ]
-            ]);
-            
-            // Załaduj relacje (project może być null)
-            $tasks->load(['project', 'assignedTo', 'createdBy']);
         } catch (\Exception $e) {
             \Log::error('TasksTable render error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
@@ -116,7 +104,9 @@ class TasksTable extends Component
             $tasks = ProjectTask::whereRaw('1 = 0')->paginate(20);
         }
 
-        $projects = Project::orderBy('name')->get();
+        // ✅ OPTYMALIZACJA: Ładuj projekty tylko jeśli są potrzebne (dla filtrowania)
+        // Jeśli nie ma filtrowania po projekcie, nie ładuj wszystkich projektów
+        $projects = $this->searchProject ? Project::orderBy('name')->get() : collect([]);
         $statuses = [
             'pending' => 'Oczekujące',
             'in_progress' => 'W trakcie',

@@ -205,19 +205,40 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force --no-interaction
 fi
 
-# Storage link - zawsze utwórz public/storage symlink (dla asset serving)
-# Nawet jeśli używamy Railway Volume, public/storage musi wskazywać na storage/app/public
-echo "🔗 Creating public/storage symlink..."
-php artisan storage:link 2>/dev/null || true
+# Storage link - OPTYMALIZACJA dla Railway Volume
+# Jeśli używamy Railway Volume, public/storage powinien wskazywać BEZPOŚREDNIO na /data
+# aby uniknąć podwójnego symlinku (public/storage -> storage/app/public -> /data/...)
+if [ -d "/data" ] && [ -w "/data" ]; then
+    echo "🔗 Creating public/storage symlink (direct to Railway Volume)..."
+    # Usuń istniejący symlink/katalog
+    rm -rf public/storage
+    # Utwórz symlink bezpośrednio do Railway Volume
+    ln -sf /data/storage/app/public public/storage
+    echo "✅ public/storage -> /data/storage/app/public (direct)"
+else
+    echo "🔗 Creating public/storage symlink (standard)..."
+    php artisan storage:link 2>/dev/null || true
+    if [ -L "public/storage" ]; then
+        echo "✅ public/storage symlink created (standard)"
+    else
+        echo "⚠️ WARNING: public/storage symlink not created"
+    fi
+fi
 
 # Verify public/storage symlink
 if [ -L "public/storage" ]; then
-    echo "✅ public/storage symlink created"
-    # Sprawdź czy symlink wskazuje na właściwe miejsce
     STORAGE_LINK_TARGET=$(readlink -f public/storage 2>/dev/null || readlink public/storage)
-    echo "   public/storage -> $STORAGE_LINK_TARGET"
-else
-    echo "⚠️ WARNING: public/storage symlink not created"
+    echo "   Verified: public/storage -> $STORAGE_LINK_TARGET"
+    
+    # Test czy pliki są dostępne przez symlink
+    if [ -d "$STORAGE_LINK_TARGET" ]; then
+        echo "   ✅ Storage directory is accessible"
+        # Sprawdź czy można odczytać pliki
+        TEST_FILE_COUNT=$(find "$STORAGE_LINK_TARGET" -type f 2>/dev/null | wc -l)
+        echo "   📁 Found $TEST_FILE_COUNT files in storage"
+    else
+        echo "   ⚠️ WARNING: Storage directory not accessible at $STORAGE_LINK_TARGET"
+    fi
 fi
 
 # Ensure server.php exists for static file serving
