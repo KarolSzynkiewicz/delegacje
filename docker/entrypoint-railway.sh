@@ -112,20 +112,42 @@ if [ -d "/data" ] && [ -w "/data" ]; then
     
     # Create symlink from container storage to volume
     echo "🔗 Creating symlink: storage/app/public -> /data/storage/app/public"
+    # Upewnij się, że katalog docelowy istnieje
+    mkdir -p /data/storage/app/public
+    # Usuń istniejący katalog/symlink jeśli istnieje
+    rm -rf storage/app/public
+    # Utwórz symlink
     ln -sf /data/storage/app/public storage/app/public
     
     # Verify symlink was created
     if [ -L "storage/app/public" ]; then
         echo "✅ Symlink created successfully"
-        SYMLINK_TARGET=$(readlink -f storage/app/public)
+        SYMLINK_TARGET=$(readlink -f storage/app/public 2>/dev/null || readlink storage/app/public)
         echo "   Symlink points to: $SYMLINK_TARGET"
         if [ "$SYMLINK_TARGET" = "/data/storage/app/public" ]; then
             echo "   ✅ Symlink target is correct"
         else
-            echo "   ⚠️ WARNING: Symlink target is incorrect!"
+            echo "   ⚠️ WARNING: Symlink target is incorrect! Expected: /data/storage/app/public"
+        fi
+        
+        # Test czy można zapisać plik przez symlink
+        TEST_FILE="storage/app/public/.symlink-test-$(date +%s)"
+        if touch "$TEST_FILE" 2>/dev/null; then
+            rm -f "$TEST_FILE"
+            echo "   ✅ Write test through symlink: SUCCESS"
+        else
+            echo "   ❌ Write test through symlink: FAILED"
         fi
     else
         echo "❌ WARNING: Failed to create symlink!"
+        echo "   Attempting to create directory instead..."
+        mkdir -p storage/app/public
+        # Fallback: użyj bind mount jeśli symlink nie działa
+        if mount --bind /data/storage/app/public storage/app/public 2>/dev/null; then
+            echo "   ✅ Using bind mount as fallback"
+        else
+            echo "   ⚠️ Bind mount also failed - using local storage"
+        fi
     fi
     
     # Fix permissions for volume

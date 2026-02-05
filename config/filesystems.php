@@ -38,10 +38,11 @@ return [
 
         'public' => [
             'driver' => 'local',
-            // Use Railway volume if available (/data), otherwise use default storage
+            // Use Railway volume directly if available, otherwise use default storage
             // Railway volumes are mounted at /data by default
-            // Entrypoint creates symlink from storage/app/public to /data/storage/app/public
-            'root' => storage_path('app/public'),
+            'root' => (is_dir('/data') && is_writable('/data')) 
+                ? '/data/storage/app/public' 
+                : storage_path('app/public'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
             'throw' => false,
