@@ -117,13 +117,29 @@ if [ -d "/data" ] && [ -w "/data" ]; then
     # Verify symlink was created
     if [ -L "storage/app/public" ]; then
         echo "✅ Symlink created successfully"
-        ls -la storage/app/public | head -3
+        SYMLINK_TARGET=$(readlink -f storage/app/public)
+        echo "   Symlink points to: $SYMLINK_TARGET"
+        if [ "$SYMLINK_TARGET" = "/data/storage/app/public" ]; then
+            echo "   ✅ Symlink target is correct"
+        else
+            echo "   ⚠️ WARNING: Symlink target is incorrect!"
+        fi
     else
         echo "❌ WARNING: Failed to create symlink!"
     fi
     
     # Fix permissions for volume
     chmod -R 777 /data/storage 2>/dev/null || true
+    
+    # Test write access to volume
+    TEST_FILE="/data/storage/.write-test-$(date +%s)"
+    if touch "$TEST_FILE" 2>/dev/null; then
+        rm -f "$TEST_FILE"
+        echo "✅ Write access to volume verified"
+    else
+        echo "❌ WARNING: Cannot write to volume!"
+    fi
+    
     echo "✅ Railway Volume configured for persistent storage"
 else
     echo "⚠️ Railway Volume not detected at /data - using ephemeral storage (files will be lost on redeploy)"
