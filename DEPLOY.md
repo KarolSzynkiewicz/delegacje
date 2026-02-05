@@ -478,6 +478,29 @@ public function boot(): void
 **Opcjonalne:**
 - `RUN_MIGRATIONS=true` - jeśli chcesz uruchamiać migracje przy każdym starcie (niezalecane)
 
+### Railway Volume (Persistent Storage)
+
+**Problem:** Storage jest efemeryczne - po każdym deploycie kontener jest odtwarzany i pliki (zdjęcia, uploady) znikają.
+
+**Rozwiązanie:** Użyj Railway Volume dla trwałego storage.
+
+**Konfiguracja w Railway Dashboard:**
+1. Przejdź do Railway Dashboard → Twój projekt → Serwis aplikacji
+2. Kliknij "Settings" → "Volumes"
+3. Dodaj nowy Volume:
+   - **Name:** `storage` (lub dowolna nazwa)
+   - **Mount Path:** `/data`
+4. Zapisz zmiany
+
+**Jak to działa:**
+- Entrypoint automatycznie wykrywa volume w `/data`
+- Tworzy strukturę katalogów w volume
+- Kopiuje istniejące pliki do volume (tylko przy pierwszym uruchomieniu)
+- Tworzy symlink `storage/app/public` → `/data/storage/app/public`
+- Wszystkie nowe pliki są zapisywane w volume (trwałe)
+
+**Uwaga:** Jeśli volume nie jest zamontowane, aplikacja działa normalnie, ale pliki będą tracone przy każdym deploycie.
+
 ---
 
 ## Kluczowe lekcje

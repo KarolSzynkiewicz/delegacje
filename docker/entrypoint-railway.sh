@@ -78,6 +78,42 @@ else
     echo "✅ No .env file - Laravel will use Railway env vars only"
 fi
 
+# Setup Railway Volume for persistent storage (if mounted)
+# Railway volumes are typically mounted at /data
+if [ -d "/data" ] && [ -w "/data" ]; then
+    echo "📦 Railway Volume detected at /data"
+    
+    # Create storage directory structure in volume if it doesn't exist
+    mkdir -p /data/storage/app/public/employees \
+             /data/storage/app/public/users \
+             /data/storage/app/public/vehicles \
+             /data/storage/app/public/accommodations \
+             /data/storage/app/public/employee_documents \
+             /data/storage/framework/cache \
+             /data/storage/framework/sessions \
+             /data/storage/framework/views \
+             /data/storage/logs
+    
+    # Copy existing storage to volume if volume is empty
+    if [ ! -d "/data/storage/app/public/employees" ] || [ -z "$(ls -A /data/storage/app/public/employees 2>/dev/null)" ]; then
+        echo "📋 Copying existing storage to Railway Volume..."
+        cp -r storage/app/public/* /data/storage/app/public/ 2>/dev/null || true
+    fi
+    
+    # Create symlink from container storage to volume
+    if [ ! -L "storage/app/public" ]; then
+        echo "🔗 Linking storage/app/public to Railway Volume..."
+        rm -rf storage/app/public
+        ln -sf /data/storage/app/public storage/app/public
+    fi
+    
+    # Fix permissions for volume
+    chmod -R 777 /data/storage 2>/dev/null || true
+    echo "✅ Railway Volume configured for persistent storage"
+else
+    echo "⚠️ Railway Volume not detected - using ephemeral storage (files will be lost on redeploy)"
+fi
+
 # Fix permissions for storage (Railway may run as different user)
 echo "🔧 Fixing permissions..."
 chmod -R 777 storage bootstrap/cache 2>/dev/null || true
