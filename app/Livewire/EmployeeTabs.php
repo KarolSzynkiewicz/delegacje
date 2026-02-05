@@ -34,6 +34,7 @@ class EmployeeTabs extends Component
             'employee-rates' => ['label' => 'Stawki', 'permission' => 'employee-rates.view', 'icon' => 'bi bi-currency-dollar'],
             'advances' => ['label' => 'Zaliczki', 'permission' => 'advances.view', 'icon' => 'bi bi-wallet2'],
             'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
+            'evaluations' => ['label' => 'Oceny', 'permission' => 'employee-evaluations.view', 'icon' => 'bi bi-star-fill'],
             'adjustments' => ['label' => 'Kary i nagrody', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
         ];
 
@@ -78,6 +79,7 @@ class EmployeeTabs extends Component
                 ->with(['projectAssignment.project', 'projectAssignment.role'])
                 ->orderBy('start_time', 'desc')
                 ->get(),
+            'evaluations' => $this->employee->evaluations()->with('createdBy')->orderBy('created_at', 'desc')->get(),
             'adjustments' => $this->employee->adjustments()->orderBy('date', 'desc')->get(),
             default => null,
         };
@@ -96,6 +98,7 @@ class EmployeeTabs extends Component
             'accommodationAssignments',
             'payrolls',
             'advances',
+            'evaluations',
             'adjustments'
         ]);
         
@@ -123,6 +126,7 @@ class EmployeeTabs extends Component
                 'employee-rates' => $employeeRatesCount,
                 'advances' => $this->employee->advances_count ?? 0,
                 'time-logs' => $timeLogsCount,
+                'evaluations' => $this->employee->evaluations_count ?? 0,
                 'adjustments' => $this->employee->adjustments_count ?? 0,
                 default => null,
             };

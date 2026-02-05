@@ -22,10 +22,11 @@ class EmployeeEvaluationController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('employee-evaluations.create', compact('employees'));
+        $selectedEmployeeId = $request->query('employee_id');
+        return view('employee-evaluations.create', compact('employees', 'selectedEmployeeId'));
     }
 
     /**

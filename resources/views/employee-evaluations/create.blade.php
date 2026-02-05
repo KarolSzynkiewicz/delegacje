@@ -16,7 +16,7 @@
                         <select name="employee_id" class="form-control @error('employee_id') is-invalid @enderror" required>
                             <option value="">Wybierz pracownika</option>
                             @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}" {{ old('employee_id') == $employee->id ? 'selected' : '' }}>
+                                <option value="{{ $employee->id }}" {{ old('employee_id', $selectedEmployeeId ?? null) == $employee->id ? 'selected' : '' }}>
                                     {{ $employee->full_name }}
                                 </option>
                             @endforeach

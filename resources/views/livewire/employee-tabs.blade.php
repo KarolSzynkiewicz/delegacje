@@ -650,6 +650,98 @@
                 </div>
             </div>
         </div>
+    @elseif($activeTab === 'evaluations')
+        <!-- Zakładka Oceny -->
+        <div id="evaluations" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Oceny Pracownika">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employee-evaluations.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Ocenę</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($tabData && $tabData->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Zaangażowanie</th>
+                                            <th>Umiejętności</th>
+                                            <th>Porządek</th>
+                                            <th>Zachowanie</th>
+                                            <th>Średnia</th>
+                                            <th>Ocenił</th>
+                                            <th>Notatki</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($tabData as $evaluation)
+                                            <tr>
+                                                <td>{{ $evaluation->created_at->format('Y-m-d') }}</td>
+                                                <td>
+                                                    <x-ui.badge variant="{{ $evaluation->engagement >= 7 ? 'success' : ($evaluation->engagement >= 5 ? 'warning' : 'danger') }}">
+                                                        {{ $evaluation->engagement }}/10
+                                                    </x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <x-ui.badge variant="{{ $evaluation->skills >= 7 ? 'success' : ($evaluation->skills >= 5 ? 'warning' : 'danger') }}">
+                                                        {{ $evaluation->skills }}/10
+                                                    </x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <x-ui.badge variant="{{ $evaluation->orderliness >= 7 ? 'success' : ($evaluation->orderliness >= 5 ? 'warning' : 'danger') }}">
+                                                        {{ $evaluation->orderliness }}/10
+                                                    </x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <x-ui.badge variant="{{ $evaluation->behavior >= 7 ? 'success' : ($evaluation->behavior >= 5 ? 'warning' : 'danger') }}">
+                                                        {{ $evaluation->behavior }}/10
+                                                    </x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <strong>{{ number_format($evaluation->average_score, 2, ',', ' ') }}/10</strong>
+                                                </td>
+                                                <td>
+                                                    @if($evaluation->createdBy)
+                                                        {{ $evaluation->createdBy->name }}
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if($evaluation->notes)
+                                                        <span class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ $evaluation->notes }}">
+                                                            {{ Str::limit($evaluation->notes, 50) }}
+                                                        </span>
+                                                    @else
+                                                        <span class="text-muted">-</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('employee-evaluations.show', $evaluation) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    @can('update', $evaluation)
+                                                        <x-ui.button variant="ghost" href="{{ route('employee-evaluations.edit', $evaluation) }}" class="btn-sm">
+                                                            <i class="bi bi-pencil"></i> Edytuj
+                                                        </x-ui.button>
+                                                    @endcan
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak ocen dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
     @elseif($activeTab === 'adjustments')
         <!-- Zakładka Kary i Nagrody -->
         <div id="adjustments" role="tabpanel">
