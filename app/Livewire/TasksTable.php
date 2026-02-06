@@ -14,6 +14,7 @@ class TasksTable extends Component
     public $searchProject = '';
     public $searchTask = '';
     public $status = ''; // 'active', 'closed', or specific status
+    public $myTasksOnly = false; // Toggle for filtering only my tasks
     public $sortField = 'due_date';
     public $sortDirection = 'asc';
     
@@ -26,10 +27,11 @@ class TasksTable extends Component
         'searchProject' => ['except' => ''],
         'searchTask' => ['except' => ''],
         'status' => ['except' => ''],
+        'myTasksOnly' => ['except' => false],
         'sortField' => ['except' => 'due_date'],
         'sortDirection' => ['except' => 'asc'],
     ];
-    protected $updatesQueryString = ['searchProject', 'searchTask', 'status', 'sortField', 'sortDirection'];
+    protected $updatesQueryString = ['searchProject', 'searchTask', 'status', 'myTasksOnly', 'sortField', 'sortDirection'];
 
     public function updating($name, $value)
     {
@@ -41,6 +43,7 @@ class TasksTable extends Component
         $this->searchProject = '';
         $this->searchTask = '';
         $this->status = '';
+        $this->myTasksOnly = false;
         $this->sortField = 'due_date';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -79,6 +82,11 @@ class TasksTable extends Component
             // Jeśli chcesz zobaczyć wszystkie zadania, nie ustawiaj assignedToUserId
             if ($this->assignedToUserId) {
                 $query->where('assigned_to', $this->assignedToUserId);
+            }
+            
+            // Filtrowanie "Moje zadania" - tylko zadania przypisane do zalogowanego użytkownika
+            if ($this->myTasksOnly) {
+                $query->where('assigned_to', auth()->id());
             }
             
             // Filter by project (including tasks without project)

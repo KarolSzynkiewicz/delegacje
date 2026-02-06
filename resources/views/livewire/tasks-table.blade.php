@@ -19,20 +19,29 @@
             </div>
 
             <div class="col-md-4">
-                <div class="btn-group" role="group">
+                <div class="d-flex gap-2 flex-wrap">
+                    <div class="btn-group" role="group">
+                        <button 
+                            type="button"
+                            wire:click="$set('status', '')"
+                            class="btn btn-sm {{ $status === '' ? 'btn-primary' : 'btn-outline-primary' }}"
+                        >
+                            Aktywne
+                        </button>
+                        <button 
+                            type="button"
+                            wire:click="$set('status', 'closed')"
+                            class="btn btn-sm {{ $status === 'closed' ? 'btn-primary' : 'btn-outline-primary' }}"
+                        >
+                            Zamknięte
+                        </button>
+                    </div>
                     <button 
                         type="button"
-                        wire:click="$set('status', '')"
-                        class="btn btn-sm {{ $status === '' ? 'btn-primary' : 'btn-outline-primary' }}"
+                        wire:click="$set('myTasksOnly', !$myTasksOnly)"
+                        class="btn btn-sm {{ $myTasksOnly ? 'btn-primary' : 'btn-outline-primary' }}"
                     >
-                        Aktywne
-                    </button>
-                    <button 
-                        type="button"
-                        wire:click="$set('status', 'closed')"
-                        class="btn btn-sm {{ $status === 'closed' ? 'btn-primary' : 'btn-outline-primary' }}"
-                    >
-                        Zamknięte
+                        <i class="bi bi-person-check me-1"></i>Moje zadania
                     </button>
                 </div>
             </div>
