@@ -110,7 +110,7 @@
                                 
                                 <!-- Mini karta: Badge + Opis -->
                                 <div class="col-md-6">
-                                    <div class="card bg-light">
+                                    
                                         <div class="card-body p-3">
                                             <!-- Badge: Status + Projekt -->
                                             <div class="d-flex gap-2 mb-2 flex-wrap">
@@ -133,11 +133,12 @@
                                                 </div>
                                             @endif
                                         </div>
-                                    </div>
+                                    
                                 </div>
                             </div>
                             
                             <!-- GŁÓWNY WIERSZ 2: Detale w Bootstrap row -->
+                            <hr>
                             <div class="row g-3">
                                 <!-- Utworzył -->
                                 <div class="col-md-3">
