@@ -14,6 +14,8 @@ class TasksTable extends Component
     public $searchProject = '';
     public $searchTask = '';
     public $status = ''; // 'active', 'closed', or specific status
+    public $sortField = 'due_date';
+    public $sortDirection = 'asc';
     
     // Optional filters for /mine/* routes
     public $filterProjectIds = null;
@@ -24,8 +26,10 @@ class TasksTable extends Component
         'searchProject' => ['except' => ''],
         'searchTask' => ['except' => ''],
         'status' => ['except' => ''],
+        'sortField' => ['except' => 'due_date'],
+        'sortDirection' => ['except' => 'asc'],
     ];
-    protected $updatesQueryString = ['searchProject', 'searchTask', 'status'];
+    protected $updatesQueryString = ['searchProject', 'searchTask', 'status', 'sortField', 'sortDirection'];
 
     public function updating($name, $value)
     {
@@ -37,6 +41,20 @@ class TasksTable extends Component
         $this->searchProject = '';
         $this->searchTask = '';
         $this->status = '';
+        $this->sortField = 'due_date';
+        $this->sortDirection = 'asc';
+        $this->resetPage();
+    }
+
+    public function sortBy($field)
+    {
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+        
         $this->resetPage();
     }
 
@@ -98,7 +116,28 @@ class TasksTable extends Component
                 $query->whereIn('status', [\App\Enums\TaskStatus::PENDING, \App\Enums\TaskStatus::IN_PROGRESS]);
             }
             
-            $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');
+            // Apply sorting
+            // Handle special cases for related fields
+            if ($this->sortField === 'assigned_to') {
+                $query->leftJoin('users as assigned_user', 'project_tasks.assigned_to', '=', 'assigned_user.id')
+                      ->orderBy('assigned_user.name', $this->sortDirection)
+                      ->select('project_tasks.*');
+            } elseif ($this->sortField === 'created_by') {
+                $query->leftJoin('users as creator_user', 'project_tasks.created_by', '=', 'creator_user.id')
+                      ->orderBy('creator_user.name', $this->sortDirection)
+                      ->select('project_tasks.*');
+            } elseif ($this->sortField === 'project') {
+                $query->leftJoin('projects', 'project_tasks.project_id', '=', 'projects.id')
+                      ->orderBy('projects.name', $this->sortDirection)
+                      ->select('project_tasks.*');
+            } else {
+                $query->orderBy($this->sortField, $this->sortDirection);
+            }
+            
+            // Secondary sort by created_at if not primary sort
+            if ($this->sortField !== 'created_at') {
+                $query->orderBy('created_at', 'desc');
+            }
             
             // ✅ NAPRAWIONE: Eager loading PRZED paginacją (zapobiega N+1 query)
             $query->with(['project', 'assignedTo', 'createdBy']);

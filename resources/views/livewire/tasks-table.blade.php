@@ -44,10 +44,49 @@
             <table class="table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Zadanie</th>
-                        <th>Projekt</th>
+                        <th style="cursor: pointer;" wire:click="sortBy('name')">
+                            Zadanie
+                            @if($sortField === 'name')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('project')">
+                            Projekt
+                            @if($sortField === 'project')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
                         <th>Status</th>
-                        <th>Termin</th>
+                        <th style="cursor: pointer;" wire:click="sortBy('due_date')">
+                            Termin
+                            @if($sortField === 'due_date')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('assigned_to')">
+                            Przypisany
+                            @if($sortField === 'assigned_to')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('created_at')">
+                            Data utworzenia
+                            @if($sortField === 'created_at')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('updated_at')">
+                            Ostatnia modyfikacja
+                            @if($sortField === 'updated_at')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('created_by')">
+                            Stworzył
+                            @if($sortField === 'created_by')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
                         <th>Akcje</th>
                     </tr>
                 </thead>
@@ -88,6 +127,40 @@
                                     <span class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
                                         {{ $task->due_date->format('d.m.Y') }}
                                     </span>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($task->assignedTo)
+                                    {{ $task->assignedTo->name }}
+                                @else
+                                    <span class="text-muted">Nie przypisane</span>
+                                @endif
+                            </td>
+                            <td>
+                                @php
+                                    $createdAt = \Carbon\Carbon::parse($task->created_at);
+                                @endphp
+                                <div>
+                                    <span class="fw-semibold">{{ $createdAt->format('d.m.Y') }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ $createdAt->format('H:i') }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                @php
+                                    $updatedAt = \Carbon\Carbon::parse($task->updated_at);
+                                @endphp
+                                <div>
+                                    <span class="fw-semibold">{{ $updatedAt->format('d.m.Y') }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ $updatedAt->format('H:i') }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                @if($task->createdBy)
+                                    {{ $task->createdBy->name }}
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
