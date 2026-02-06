@@ -38,7 +38,7 @@
                     </div>
                     <button 
                         type="button"
-                        wire:click="$set('myTasksOnly', !$myTasksOnly)"
+                        wire:click="toggleMyTasks"
                         class="btn btn-sm {{ $myTasksOnly ? 'btn-primary' : 'btn-outline-primary' }}"
                     >
                         <i class="bi bi-person-check me-1"></i>Moje zadania

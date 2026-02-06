@@ -38,6 +38,12 @@ class TasksTable extends Component
         $this->resetPage();
     }
     
+    public function toggleMyTasks()
+    {
+        $this->myTasksOnly = !$this->myTasksOnly;
+        $this->resetPage();
+    }
+    
     public function updatedMyTasksOnly($value)
     {
         $this->resetPage();
