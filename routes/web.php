@@ -146,6 +146,20 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->defaults('permission_type', 'action')
         ->defaults('resource', 'project-tasks');
     
+    // Global task actions (for tasks without project)
+    Route::post('tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgressGlobal'])
+        ->name('tasks.mark-in-progress')
+        ->defaults('permission_type', 'action')
+        ->defaults('resource', 'project-tasks');
+    Route::post('tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompletedGlobal'])
+        ->name('tasks.mark-completed')
+        ->defaults('permission_type', 'action')
+        ->defaults('resource', 'project-tasks');
+    Route::post('tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancelGlobal'])
+        ->name('tasks.cancel')
+        ->defaults('permission_type', 'action')
+        ->defaults('resource', 'project-tasks');
+    
     // Comments (polymorphic)
     Route::post('comments', [\App\Http\Controllers\CommentController::class, 'store'])
         ->name('comments.store');

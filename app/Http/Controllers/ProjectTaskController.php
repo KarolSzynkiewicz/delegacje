@@ -238,6 +238,45 @@ class ProjectTaskController extends Controller
     }
 
     /**
+     * Mark task as in progress (global - without project requirement).
+     */
+    public function markInProgressGlobal(ProjectTask $task): RedirectResponse
+    {
+        // Autoryzacja przez Policy
+        $this->authorize('markInProgress', $task);
+
+        $task->markInProgress();
+
+        return redirect()->route('tasks.index')->with('success', 'Zadanie zostało oznaczone jako w trakcie.');
+    }
+
+    /**
+     * Mark task as completed (global - without project requirement).
+     */
+    public function markCompletedGlobal(ProjectTask $task): RedirectResponse
+    {
+        // Autoryzacja przez Policy
+        $this->authorize('markCompleted', $task);
+
+        $task->markCompleted();
+
+        return redirect()->route('tasks.index')->with('success', 'Zadanie zostało oznaczone jako zakończone.');
+    }
+
+    /**
+     * Cancel the task (global - without project requirement).
+     */
+    public function cancelGlobal(ProjectTask $task): RedirectResponse
+    {
+        // Autoryzacja przez Policy
+        $this->authorize('cancel', $task);
+
+        $task->cancel();
+
+        return redirect()->route('tasks.index')->with('success', 'Zadanie zostało anulowane.');
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(Project $project, ProjectTask $task): RedirectResponse
