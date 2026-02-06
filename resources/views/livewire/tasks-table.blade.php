@@ -44,19 +44,34 @@
             <table class="table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="cursor: pointer; width: 35%;" wire:click="sortBy('name')" class="ps-3">
-                            Zadanie
+                        <th style="cursor: pointer;" wire:click="sortBy('name')" class="ps-3 d-none d-md-table-cell" style="width: 35%;">
+                            <i class="bi bi-list-task me-1"></i> Zadanie
                             @if($sortField === 'name')
                                 <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                             @endif
                         </th>
-                        <th style="cursor: pointer; width: 35%;" wire:click="sortBy('due_date')">
-                            Metadane
+                        <th class="d-md-none ps-3" style="width: 100%;">Zadanie</th>
+                        <th style="cursor: pointer;" wire:click="sortBy('created_at')" class="d-none d-lg-table-cell" style="width: 20%;">
+                            <i class="bi bi-calendar-plus me-1"></i> Utworzono
+                            @if($sortField === 'created_at')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('updated_at')" class="d-none d-lg-table-cell" style="width: 20%;">
+                            <i class="bi bi-pencil-square me-1"></i> Zmodyfikowano
+                            @if($sortField === 'updated_at')
+                                <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </th>
+                        <th style="cursor: pointer;" wire:click="sortBy('due_date')" class="d-none d-lg-table-cell" style="width: 15%;">
+                            <i class="bi bi-calendar-event me-1"></i> Deadline
                             @if($sortField === 'due_date')
                                 <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                             @endif
                         </th>
-                        <th style="width: 30%;" class="pe-3">Status & Akcje</th>
+                        <th class="pe-3 d-none d-md-table-cell" style="width: 10%;">
+                            <i class="bi bi-gear me-1"></i> Akcje
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -71,7 +86,8 @@
                             };
                             $createdAt = \Carbon\Carbon::parse($task->created_at);
                             $updatedAt = \Carbon\Carbon::parse($task->updated_at);
-                            $isOverdue = $task->due_date && $task->due_date->isPast() && !in_array($task->status, [\App\Enums\TaskStatus::COMPLETED, \App\Enums\TaskStatus::CANCELLED]);
+                            $dueDate = $task->due_date ? \Carbon\Carbon::parse($task->due_date) : null;
+                            $isOverdue = $dueDate && $dueDate->isPast() && !in_array($task->status, [\App\Enums\TaskStatus::COMPLETED, \App\Enums\TaskStatus::CANCELLED]);
                         @endphp
                         <tr wire:key="task-{{ $task->id }}" class="border-bottom">
                             <!-- COL 1: Informacje podstawowe (blok identyfikacyjny) -->
@@ -81,11 +97,11 @@
                                     <div class="mb-2">
                                         @if($task->project)
                                             <span class="badge bg-secondary text-uppercase small">
-                                                {{ $task->project->name }}
+                                                <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
                                             </span>
                                         @else
                                             <span class="badge bg-light text-dark text-uppercase small">
-                                                Brak projektu
+                                                <i class="bi bi-x-circle me-1"></i>Brak projektu
                                             </span>
                                         @endif
                                     </div>
@@ -101,140 +117,164 @@
                                             {{ Str::limit($task->description, 150) }}
                                         </div>
                                     @endif
-                                </div>
-                            </td>
-                            
-                            <!-- COL 2: Metadane (grid wewnętrzny 2 kolumny) -->
-                            <td class="py-3">
-                                <div class="row g-3">
-                                    <!-- Lewy sub-column (col1/2) -->
-                                    <div class="col-6">
-                                        <!-- Termin -->
-                                        <div class="mb-3">
-                                            <small class="text-muted d-block mb-1">Termin</small>
-                                            @if($task->due_date)
-                                                <span class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
-                                                    {{ $task->due_date->format('d.m.Y') }}
-                                                </span>
-                                            @else
-                                                <span class="text-muted">-</span>
-                                            @endif
-                                        </div>
-                                        
-                                        <!-- Zmodyfikowano -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">Zmodyfikowano</small>
-                                            <span>{{ $updatedAt->format('d.m.Y H:i') }}</span>
-                                        </div>
-                                    </div>
                                     
-                                    <!-- Prawy sub-column (col2/2) -->
-                                    <div class="col-6">
-                                        <!-- Przypisany -->
-                                        <div class="mb-3">
-                                            <small class="text-muted d-block mb-1">Przypisany</small>
-                                            @if($task->assignedTo)
-                                                <span>{{ $task->assignedTo->name }}</span>
-                                            @else
-                                                <span class="text-muted">Nie przypisane</span>
-                                            @endif
-                                        </div>
-                                        
-                                        <!-- Stworzył -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">Stworzył</small>
-                                            @if($task->createdBy)
-                                                <span>{{ $task->createdBy->name }}</span>
-                                            @else
-                                                <span class="text-muted">-</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                            
-                            <!-- COL 3: Status + akcje (grid wewnętrzny 3 kolumny, 2 rzędy) -->
-                            <td class="pe-3 py-3">
-                                <div class="row g-2">
-                                    <!-- Row 1: Status, Action button, Cancel button -->
-                                    <div class="col-12">
-                                        <div class="row g-2">
-                                            <!-- col1/3: Status -->
-                                            <div class="col-4">
-                                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
+                                    <!-- Mobile: Metadane i akcje -->
+                                    <div class="d-md-none mt-3">
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-6">
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-calendar-plus me-1"></i>Utworzono
+                                                </small>
+                                                <div>
+                                                    <span class="fw-semibold">{{ $createdAt->format('d.m.Y') }}</span>
+                                                    <br>
+                                                    <small class="text-muted">({{ $createdAt->diffForHumans() }})</small>
+                                                </div>
                                             </div>
-                                            
-                                            <!-- col2/3: Action button -->
-                                            <div class="col-4">
-                                                @if($hasProject && $task->status === \App\Enums\TaskStatus::PENDING)
-                                                    <form action="{{ route('projects.tasks.mark-in-progress', [$task->project, $task]) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-info w-100" title="Rozpocznij">
-                                                            <i class="bi bi-play-circle"></i>
-                                                        </button>
-                                                    </form>
-                                                @elseif($hasProject && $task->status === \App\Enums\TaskStatus::IN_PROGRESS)
-                                                    <form action="{{ route('projects.tasks.mark-completed', [$task->project, $task]) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-success w-100" title="Zakończ">
-                                                            <i class="bi bi-check-circle"></i>
-                                                        </button>
-                                                    </form>
-                                                @else
-                                                    <span class="text-muted small">-</span>
-                                                @endif
-                                            </div>
-                                            
-                                            <!-- col3/3: Cancel button -->
-                                            <div class="col-4">
-                                                @if($hasProject && $task->status !== \App\Enums\TaskStatus::CANCELLED && $task->status !== \App\Enums\TaskStatus::COMPLETED)
-                                                    <form action="{{ route('projects.tasks.cancel', [$task->project, $task]) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-danger w-100" title="Anuluj">
-                                                            <i class="bi bi-x-circle"></i>
-                                                        </button>
-                                                    </form>
-                                                @else
-                                                    <span class="text-muted small">-</span>
-                                                @endif
+                                            <div class="col-6">
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-pencil-square me-1"></i>Zmodyfikowano
+                                                </small>
+                                                <div>
+                                                    <span class="fw-semibold">{{ $updatedAt->format('d.m.Y') }}</span>
+                                                    <br>
+                                                    <small class="text-muted">({{ $updatedAt->diffForHumans() }})</small>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    
-                                    <!-- Row 2: Utworzono, Ikona oka, Ikona ołówka -->
-                                    <div class="col-12">
-                                        <div class="row g-2">
-                                            <!-- col1/3: Utworzono -->
-                                            <div class="col-4">
-                                                <small class="text-muted d-block">{{ $createdAt->format('d.m.Y') }}</small>
+                                        @if($dueDate)
+                                            <div class="mb-2">
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-calendar-event me-1"></i>Deadline
+                                                </small>
+                                                <div>
+                                                    <span class="fw-semibold {{ $isOverdue ? 'text-danger' : '' }}">{{ $dueDate->format('d.m.Y') }}</span>
+                                                    <br>
+                                                    <small class="text-muted">({{ $dueDate->diffForHumans() }})</small>
+                                                </div>
                                             </div>
-                                            
-                                            <!-- col2/3: Ikona oka (podgląd) -->
-                                            <div class="col-4">
-                                                @if($hasProject)
-                                                    <a href="{{ route('projects.tasks.show', [$task->project, $task]) }}" 
-                                                       class="btn btn-sm btn-outline-secondary w-100" 
-                                                       title="Podgląd">
-                                                        <i class="bi bi-eye"></i>
-                                                    </a>
-                                                @else
-                                                    <span class="text-muted small">-</span>
-                                                @endif
-                                            </div>
-                                            
-                                            <!-- col3/3: Ikona ołówka (edycja) -->
-                                            <div class="col-4">
-                                                @if($hasProject && !$isMineView)
+                                        @endif
+                                        <div class="d-flex gap-2 mt-2">
+                                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
+                                            @if($hasProject)
+                                                <a href="{{ route('projects.tasks.show', [$task->project, $task]) }}" 
+                                                   class="btn btn-sm btn-outline-secondary" 
+                                                   title="Podgląd">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                @if(!$isMineView)
                                                     <a href="{{ route('projects.tasks.edit', [$task->project, $task]) }}" 
-                                                       class="btn btn-sm btn-outline-primary w-100" 
+                                                       class="btn btn-sm btn-outline-primary" 
                                                        title="Edytuj">
                                                         <i class="bi bi-pencil"></i>
                                                     </a>
-                                                @else
-                                                    <span class="text-muted small">-</span>
                                                 @endif
-                                            </div>
+                                            @endif
                                         </div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- COL 2: Utworzono (desktop) -->
+                            <td class="py-3 d-none d-lg-table-cell">
+                                <div>
+                                    <small class="text-muted d-block mb-1">
+                                        <i class="bi bi-calendar-plus me-1"></i>Utworzono
+                                    </small>
+                                    <div>
+                                        <span class="fw-semibold">{{ $createdAt->format('d.m.Y') }}</span>
+                                        <br>
+                                        <small class="text-muted">({{ $createdAt->diffForHumans() }})</small>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- COL 3: Zmodyfikowano (desktop) -->
+                            <td class="py-3 d-none d-lg-table-cell">
+                                <div>
+                                    <small class="text-muted d-block mb-1">
+                                        <i class="bi bi-pencil-square me-1"></i>Zmodyfikowano
+                                    </small>
+                                    <div>
+                                        <span class="fw-semibold">{{ $updatedAt->format('d.m.Y') }}</span>
+                                        <br>
+                                        <small class="text-muted">({{ $updatedAt->diffForHumans() }})</small>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- COL 4: Deadline (desktop) -->
+                            <td class="py-3 d-none d-lg-table-cell">
+                                @if($dueDate)
+                                    <div>
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="bi bi-calendar-event me-1"></i>Deadline
+                                        </small>
+                                        <div>
+                                            <span class="fw-semibold {{ $isOverdue ? 'text-danger' : '' }}">{{ $dueDate->format('d.m.Y') }}</span>
+                                            <br>
+                                            <small class="text-muted">({{ $dueDate->diffForHumans() }})</small>
+                                        </div>
+                                    </div>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+                            
+                            <!-- COL 5: Status + akcje (desktop) -->
+                            <td class="pe-3 py-3 d-none d-md-table-cell">
+                                <div class="d-flex flex-column gap-2">
+                                    <!-- Status badge -->
+                                    <div>
+                                        <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
+                                    </div>
+                                    
+                                    <!-- Action buttons -->
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        @if($hasProject && $task->status === \App\Enums\TaskStatus::PENDING)
+                                            <form action="{{ route('projects.tasks.mark-in-progress', [$task->project, $task]) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-info" title="Rozpocznij">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                            </form>
+                                        @elseif($hasProject && $task->status === \App\Enums\TaskStatus::IN_PROGRESS)
+                                            <form action="{{ route('projects.tasks.mark-completed', [$task->project, $task]) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-success" title="Zakończ">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                        
+                                        @if($hasProject && $task->status !== \App\Enums\TaskStatus::CANCELLED && $task->status !== \App\Enums\TaskStatus::COMPLETED)
+                                            <form action="{{ route('projects.tasks.cancel', [$task->project, $task]) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Anuluj">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                        
+                                        @if($hasProject)
+                                            <a href="{{ route('projects.tasks.show', [$task->project, $task]) }}" 
+                                               class="btn btn-sm btn-outline-secondary" 
+                                               title="Podgląd">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            @if(!$isMineView)
+                                                <a href="{{ route('projects.tasks.edit', [$task->project, $task]) }}" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Edytuj">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            @endif
+                                        @else
+                                            <!-- Dla zadań bez projektu - podstawowe akcje -->
+                                            <span class="text-muted small" title="Zadania bez projektu nie mają dostępnych akcji">
+                                                <i class="bi bi-info-circle"></i>
+                                            </span>
+                                        @endif
                                     </div>
                                 </div>
                             </td>
