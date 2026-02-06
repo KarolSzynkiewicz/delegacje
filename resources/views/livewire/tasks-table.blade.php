@@ -127,7 +127,7 @@
                                 
                                 <!-- Prawa strona: Badge (Status, Projekt, Due Date) -->
                                 <div class="col-md-6">
-                                    <div class="d-flex flex-column gap-2">
+                                    <div class="d-flex gap-3 flex-wrap align-items-end">
                                         <!-- Status -->
                                         <div>
                                             <small class="text-muted d-block mb-1">
