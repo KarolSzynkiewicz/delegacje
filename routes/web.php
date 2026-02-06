@@ -160,6 +160,20 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->defaults('permission_type', 'action')
         ->defaults('resource', 'project-tasks');
     
+    // Global task views (for tasks without project)
+    Route::get('tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'showGlobal'])
+        ->name('tasks.show')
+        ->defaults('permission_type', 'view')
+        ->defaults('resource', 'project-tasks');
+    Route::get('tasks/{task}/edit', [\App\Http\Controllers\ProjectTaskController::class, 'editGlobal'])
+        ->name('tasks.edit')
+        ->defaults('permission_type', 'edit')
+        ->defaults('resource', 'project-tasks');
+    Route::put('tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'updateGlobal'])
+        ->name('tasks.update')
+        ->defaults('permission_type', 'edit')
+        ->defaults('resource', 'project-tasks');
+    
     // Comments (polymorphic)
     Route::post('comments', [\App\Http\Controllers\CommentController::class, 'store'])
         ->name('comments.store');

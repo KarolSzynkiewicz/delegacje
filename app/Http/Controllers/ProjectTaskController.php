@@ -277,6 +277,69 @@ class ProjectTaskController extends Controller
     }
 
     /**
+     * Display the specified task (global - without project requirement).
+     */
+    public function showGlobal(ProjectTask $task): View
+    {
+        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user']);
+        $users = \App\Models\User::orderBy('name')->get();
+        
+        return view('tasks.show', compact('task', 'users'));
+    }
+
+    /**
+     * Show the form for editing the specified task (global - without project requirement).
+     */
+    public function editGlobal(ProjectTask $task): View
+    {
+        $task->load(['assignedTo', 'createdBy', 'project']);
+        $users = \App\Models\User::orderBy('name')->get();
+        
+        return view('tasks.edit', compact('task', 'users'));
+    }
+
+    /**
+     * Update the specified task (global - without project requirement).
+     */
+    public function updateGlobal(UpdateProjectTaskRequest $request, ProjectTask $task): RedirectResponse
+    {
+        $oldStatus = $task->status;
+        $newStatus = $request->input('status') 
+            ? TaskStatus::from($request->input('status')) 
+            : $task->status;
+
+        // Aktualizuj podstawowe pola
+        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'project_id']));
+
+        // Jeśli status się zmienił, użyj metod domenowych lub zaktualizuj bezpośrednio
+        if ($newStatus !== $oldStatus) {
+            // Jeśli zmiana na COMPLETED, użyj metody domenowej
+            if ($newStatus === TaskStatus::COMPLETED && $oldStatus !== TaskStatus::COMPLETED) {
+                $task->markCompleted();
+            }
+            // Jeśli zmiana na CANCELLED, użyj metody domenowej
+            elseif ($newStatus === TaskStatus::CANCELLED && $oldStatus !== TaskStatus::CANCELLED) {
+                $task->cancel();
+            }
+            // Jeśli zmiana na IN_PROGRESS, użyj metody domenowej
+            elseif ($newStatus === TaskStatus::IN_PROGRESS && $oldStatus === TaskStatus::PENDING) {
+                $task->markInProgress();
+            }
+            // W innych przypadkach zaktualizuj bezpośrednio
+            else {
+                $updateData = ['status' => $newStatus];
+                // Jeśli zmiana z COMPLETED na inny status, wyczyść completed_at
+                if ($oldStatus === TaskStatus::COMPLETED && $newStatus !== TaskStatus::COMPLETED) {
+                    $updateData['completed_at'] = null;
+                }
+                $task->update($updateData);
+            }
+        }
+
+        return redirect()->route('tasks.index')->with('success', 'Zadanie zostało zaktualizowane.');
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(Project $project, ProjectTask $task): RedirectResponse

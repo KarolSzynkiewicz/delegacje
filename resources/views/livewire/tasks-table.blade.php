@@ -256,6 +256,19 @@
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
                                             @endif
+                                        @else
+                                            <a href="{{ route('tasks.show', $task) }}" 
+                                               class="btn btn-sm btn-outline-secondary" 
+                                               title="Podgląd">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            @if(!$isMineView)
+                                                <a href="{{ route('tasks.edit', $task) }}" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Edytuj">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            @endif
                                         @endif
                                     </div>
                                 </div>
