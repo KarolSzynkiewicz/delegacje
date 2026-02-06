@@ -37,6 +37,11 @@ class TasksTable extends Component
     {
         $this->resetPage();
     }
+    
+    public function updatedMyTasksOnly($value)
+    {
+        $this->resetPage();
+    }
 
     public function clearFilters()
     {
