@@ -224,6 +224,98 @@
         </div>
         <hr>
 
+        {{-- x-ui.person --}}
+        <div class="mb-4">
+            <h4 class="fw-semibold">x-ui.person</h4>
+            <p class="text-muted small">Kompaktowy element z avatarem, imieniem i emailem. Props: user, showEmail, avatarSize, avatarShape, link, nameClass, emailClass</p>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <x-ui.card>
+                        <h6 class="mb-3">Bez linku (domyślnie)</h6>
+                        @if(auth()->check())
+                            <x-ui.person :user="auth()->user()" />
+                        @else
+                            <x-ui.person :user="(object)['name' => 'Jan Kowalski', 'email' => 'jan.kowalski@example.com']" />
+                        @endif
+                    </x-ui.card>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <x-ui.card>
+                        <h6 class="mb-3">Z linkiem</h6>
+                        @if(auth()->check())
+                            <x-ui.person :user="auth()->user()" :link="true" />
+                        @else
+                            <x-ui.person :user="(object)['id' => 1, 'name' => 'Anna Nowak', 'email' => 'anna.nowak@example.com']" :link="true" />
+                        @endif
+                    </x-ui.card>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <x-ui.card>
+                        <h6 class="mb-3">Bez emaila</h6>
+                        @if(auth()->check())
+                            <x-ui.person :user="auth()->user()" :show-email="false" />
+                        @else
+                            <x-ui.person :user="(object)['name' => 'Piotr Wiśniewski']" :show-email="false" />
+                        @endif
+                    </x-ui.card>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <x-ui.card>
+                        <h6 class="mb-3">Mniejszy avatar (32px)</h6>
+                        @if(auth()->check())
+                            <x-ui.person :user="auth()->user()" avatar-size="32px" />
+                        @else
+                            <x-ui.person :user="(object)['name' => 'Maria Zielińska', 'email' => 'maria.zielinska@example.com']" avatar-size="32px" />
+                        @endif
+                    </x-ui.card>
+                </div>
+            </div>
+            <div class="mb-3">
+                <x-ui.card>
+                    <h6 class="mb-3">W tabeli (przykład użycia)</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Użytkownik</th>
+                                    <th>Rola</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        @if(auth()->check())
+                                            <x-ui.person :user="auth()->user()" avatar-size="32px" />
+                                        @else
+                                            <x-ui.person :user="(object)['name' => 'Jan Kowalski', 'email' => 'jan.kowalski@example.com']" avatar-size="32px" />
+                                        @endif
+                                    </td>
+                                    <td><x-ui.badge variant="info">Admin</x-ui.badge></td>
+                                    <td><x-ui.badge variant="success">Aktywny</x-ui.badge></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <x-ui.person :user="(object)['name' => 'Anna Nowak', 'email' => 'anna.nowak@example.com']" avatar-size="32px" />
+                                    </td>
+                                    <td><x-ui.badge variant="accent">Manager</x-ui.badge></td>
+                                    <td><x-ui.badge variant="success">Aktywny</x-ui.badge></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <x-ui.person :user="(object)['name' => 'Piotr Wiśniewski', 'email' => 'piotr.wisniewski@example.com']" avatar-size="32px" />
+                                    </td>
+                                    <td><x-ui.badge variant="warning">User</x-ui.badge></td>
+                                    <td><x-ui.badge variant="danger">Nieaktywny</x-ui.badge></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </x-ui.card>
+            </div>
+        </div>
+        <hr>
+
         {{-- x-ui.progress --}}
         <div class="mb-4">
             <h4 class="fw-semibold">x-ui.progress</h4>
