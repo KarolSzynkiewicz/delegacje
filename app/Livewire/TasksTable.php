@@ -77,14 +77,15 @@ class TasksTable extends Component
                 $query->whereIn('project_id', $this->filterProjectIds);
             }
             
-            // Filtrowanie po przypisanym użytkowniku (tylko jeśli ustawione)
+            // Filtrowanie po przypisanym użytkowniku (tylko jeśli ustawione i myTasksOnly nie jest aktywne)
             // UWAGA: Jeśli assignedToUserId jest ustawione, pokazuje tylko zadania przypisane do tego użytkownika
             // Jeśli chcesz zobaczyć wszystkie zadania, nie ustawiaj assignedToUserId
-            if ($this->assignedToUserId) {
+            if ($this->assignedToUserId && !$this->myTasksOnly) {
                 $query->where('assigned_to', $this->assignedToUserId);
             }
             
             // Filtrowanie "Moje zadania" - tylko zadania przypisane do zalogowanego użytkownika
+            // Ma priorytet nad assignedToUserId jeśli oba są ustawione
             if ($this->myTasksOnly) {
                 $query->where('assigned_to', auth()->id());
             }
