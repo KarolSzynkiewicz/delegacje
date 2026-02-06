@@ -13,7 +13,7 @@ class TasksTable extends Component
 
     public $searchProject = '';
     public $searchTask = '';
-    public $status = '';
+    public $status = ''; // 'active', 'closed', or specific status
     
     // Optional filters for /mine/* routes
     public $filterProjectIds = null;
@@ -84,8 +84,18 @@ class TasksTable extends Component
             }
 
             // Filter by status
-            if ($this->status) {
+            // 'active' = pending + in_progress (domyślnie)
+            // 'closed' = completed + cancelled
+            // konkretny status = dokładny status
+            if ($this->status === 'active') {
+                $query->whereIn('status', [\App\Enums\TaskStatus::PENDING, \App\Enums\TaskStatus::IN_PROGRESS]);
+            } elseif ($this->status === 'closed') {
+                $query->whereIn('status', [\App\Enums\TaskStatus::COMPLETED, \App\Enums\TaskStatus::CANCELLED]);
+            } elseif ($this->status) {
                 $query->where('status', $this->status);
+            } else {
+                // Domyślnie pokazuj tylko aktywne (pending + in_progress)
+                $query->whereIn('status', [\App\Enums\TaskStatus::PENDING, \App\Enums\TaskStatus::IN_PROGRESS]);
             }
             
             $query->orderBy('due_date', 'asc')->orderBy('created_at', 'desc');

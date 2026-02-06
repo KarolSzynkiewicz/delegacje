@@ -19,14 +19,22 @@
             </div>
 
             <div class="col-md-4">
-                <select 
-                    wire:model.live="status" 
-                    class="form-control form-select-sm">
-                    <option value="">Wszystkie statusy</option>
-                    @foreach($statuses as $statusValue => $statusLabel)
-                        <option value="{{ $statusValue }}">{{ $statusLabel }}</option>
-                    @endforeach
-                </select>
+                <div class="btn-group" role="group">
+                    <button 
+                        type="button"
+                        wire:click="$set('status', '')"
+                        class="btn btn-sm {{ $status === '' ? 'btn-primary' : 'btn-outline-primary' }}"
+                    >
+                        Aktywne
+                    </button>
+                    <button 
+                        type="button"
+                        wire:click="$set('status', 'closed')"
+                        class="btn btn-sm {{ $status === 'closed' ? 'btn-primary' : 'btn-outline-primary' }}"
+                    >
+                        Zamknięte
+                    </button>
+                </div>
             </div>
         </div>
     </x-ui.card>
@@ -74,7 +82,12 @@
                             </td>
                             <td>
                                 @if($task->due_date)
-                                    {{ $task->due_date->format('d.m.Y') }}
+                                    @php
+                                        $isOverdue = $task->due_date->isPast() && !in_array($task->status, [\App\Enums\TaskStatus::COMPLETED, \App\Enums\TaskStatus::CANCELLED]);
+                                    @endphp
+                                    <span class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
+                                        {{ $task->due_date->format('d.m.Y') }}
+                                    </span>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
