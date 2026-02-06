@@ -101,39 +101,84 @@
                 <div class="col-12" wire:key="task-{{ $task->id }}">
                     <div class="card">
                         <div class="card-body">
-                            <!-- GŁÓWNY WIERSZ 1: Tytuł + Mini karta (badge + opis) -->
+                            <!-- GŁÓWNY WIERSZ 1: Tytuł + Opis (lewa) + Badge (Status, Projekt, Due Date) (prawa) -->
                             <div class="row g-3 mb-3">
-                                <!-- Tytuł zadania -->
+                                <!-- Lewa strona: Tytuł + Opis -->
                                 <div class="col-md-6">
-                                    <h5 class="card-title mb-0 fw-bold">{{ $task->name }}</h5>
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="bi bi-list-task me-1"></i>Nazwa zadania
+                                        </small>
+                                        <h5 class="card-title mb-0 fw-bold">{{ $task->name }}</h5>
+                                    </div>
+                                    
+                                    <!-- Opis pod tytułem -->
+                                    @if($task->description)
+                                        <div class="mt-3">
+                                            <small class="text-muted d-block mb-1">
+                                                <i class="bi bi-card-text me-1"></i>Opis
+                                            </small>
+                                            <div class="text-muted small">
+                                                {{ Str::limit($task->description, 200) }}
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                                 
-                                <!-- Mini karta: Badge + Opis -->
+                                <!-- Prawa strona: Badge (Status, Projekt, Due Date) -->
                                 <div class="col-md-6">
-                                    
-                                        <div class="card-body p-3">
-                                            <!-- Badge: Status + Projekt -->
-                                            <div class="d-flex gap-2 mb-2 flex-wrap">
-                                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
-                                                @if($task->project)
-                                                    <span class="badge bg-secondary">
-                                                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge bg-light text-dark">
-                                                        <i class="bi bi-x-circle me-1"></i>Brak projektu
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            
-                                            <!-- Opis -->
-                                            @if($task->description)
-                                                <div class="text-muted small">
-                                                    {{ Str::limit($task->description, 200) }}
-                                                </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        <!-- Status -->
+                                        <div>
+                                            <small class="text-muted d-block mb-1">
+                                                <i class="bi bi-flag me-1"></i>Status
+                                            </small>
+                                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
+                                        </div>
+                                        
+                                        <!-- Projekt -->
+                                        <div>
+                                            <small class="text-muted d-block mb-1">
+                                                <i class="bi bi-folder me-1"></i>Projekt
+                                            </small>
+                                            @if($task->project)
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
+                                                </span>
+                                            @else
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="bi bi-x-circle me-1"></i>Brak projektu
+                                                </span>
                                             @endif
                                         </div>
-                                    
+                                        
+                                        <!-- Due Date Badge -->
+                                        @if($task->due_date)
+                                            @php
+                                                $dueDate = \Carbon\Carbon::parse($task->due_date);
+                                                $now = \Carbon\Carbon::now();
+                                                $isPast = $dueDate->isPast();
+                                                $isToday = $dueDate->isToday();
+                                                $daysDiff = $now->diffInDays($dueDate, false); // false = signed difference
+                                                
+                                                // Określ kolor badge
+                                                $dueDateBadgeVariant = 'info'; // Niebieski - domyślnie
+                                                if ($isPast || $isToday) {
+                                                    $dueDateBadgeVariant = 'danger'; // Czerwony - dzisiaj lub w przeszłości
+                                                } elseif ($daysDiff <= 3) {
+                                                    $dueDateBadgeVariant = 'warning'; // Żółty - w ciągu najbliższych 3 dni
+                                                }
+                                            @endphp
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-calendar-event me-1"></i>Termin wykonania
+                                                </small>
+                                                <span class="badge bg-{{ $dueDateBadgeVariant }}">
+                                                    <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
                             
