@@ -31,9 +31,34 @@
                     <!-- Kolumna 2: Username, Email, Wybierz plik, Zapisz zdjęcie -->
                     <div class="col">
                         <div class="d-flex flex-column gap-3">
+                            <!-- Update Name -->
                             <div>
-                                <h3 class="fs-5 fw-semibold mb-0">{{ $user->name }}</h3>
+                                <h3 class="fs-5 fw-semibold mb-2">{{ __('Dane użytkownika') }}</h3>
+                                <form method="post" action="{{ route('profile.update') }}" class="mb-3">
+                                    @csrf
+                                    @method('patch')
+                                    <input type="hidden" name="email" value="{{ $user->email }}" />
+                                    
+                                    <div class="mb-3">
+                                        <x-ui.input 
+                                            type="text" 
+                                            name="name" 
+                                            label="Nazwa użytkownika"
+                                            :value="old('name', $user->name)"
+                                            required
+                                        />
+                                        <x-input-error class="mt-2" :messages="$errors->get('name')" />
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-center gap-2">
+                                        <x-primary-button class="btn-sm">{{ __('Zapisz nazwę') }}</x-primary-button>
+                                        @if (session('status') === 'profile-updated')
+                                            <span class="text-success small">{{ __('Zapisano') }}</span>
+                                        @endif
+                                    </div>
+                                </form>
                             </div>
+                            
                             <div>
                                 <span class="text-muted">
                                     <i class="bi bi-envelope me-1"></i>
@@ -43,6 +68,7 @@
                             
                             <!-- Update Photo -->
                             <div class="mt-2">
+                                <h3 class="fs-5 fw-semibold mb-2">{{ __('Zdjęcie profilowe') }}</h3>
                                 <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="d-inline">
                                     @csrf
                                     @method('patch')
