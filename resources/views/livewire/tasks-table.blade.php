@@ -182,9 +182,9 @@
                                                 <small class="text-muted d-block mb-1">
                                                     <i class="bi bi-calendar-event me-1"></i>Termin wykonania
                                                 </small>
-                                                <span class="badge bg-{{ $dueDateBadgeVariant }}">
-                                                    <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
-                                                </span>
+                                                <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
+                                                    <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }} ({{ $dueDate->diffForHumans() }})
+                                                </x-ui.badge>
                                             </div>
                                         @endif
                                     </div>
@@ -201,7 +201,7 @@
                                     </small>
                                     <div>
                                         @if($task->createdBy)
-                                            <span class="fw-semibold">{{ $task->createdBy->name }}</span>
+                                            <x-ui.person :user="$task->createdBy" avatar-size="32px" :show-email="false" />
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif
@@ -215,9 +215,8 @@
                                     </small>
                                     <div>
                                         @if($task->createdBy)
-                                            <span class="fw-semibold">{{ $task->createdBy->name }}</span>
-                                            <br>
-                                            <small class="text-muted">{{ $updatedAt->diffForHumans() }}</small>
+                                            <x-ui.person :user="$task->createdBy" avatar-size="32px" :show-email="false" />
+                                            <small class="text-muted d-block mt-1">{{ $updatedAt->diffForHumans() }}</small>
                                         @else
                                             <span class="text-muted">-</span>
                                             <br>
@@ -233,7 +232,7 @@
                                     </small>
                                     <div>
                                         @if($task->assignedTo)
-                                            <span class="fw-semibold">{{ $task->assignedTo->name }}</span>
+                                            <x-ui.person :user="$task->assignedTo" avatar-size="32px" :show-email="false" />
                                         @else
                                             <span class="text-muted">Nie przypisane</span>
                                         @endif
