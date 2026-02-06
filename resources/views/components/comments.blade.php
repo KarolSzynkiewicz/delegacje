@@ -25,9 +25,14 @@
         </div>
     </form>
 
-    @if($commentable->comments->count() > 0)
+    @php
+        // Ensure comments are loaded with user relationship
+        $comments = $commentable->comments()->with('user')->orderBy('created_at', 'desc')->get();
+    @endphp
+    
+    @if($comments->count() > 0)
         <div class="comments-list">
-            @foreach($commentable->comments->sortByDesc('created_at') as $comment)
+            @foreach($comments as $comment)
                 <div class="card mb-3">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
