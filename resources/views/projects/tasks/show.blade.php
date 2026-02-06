@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('projects.show.tasks', $project) }}"
+                    href="{{ route('projects.show', $project) }}?tab=tasks"
                     action="back"
                 >
                     Powrót
