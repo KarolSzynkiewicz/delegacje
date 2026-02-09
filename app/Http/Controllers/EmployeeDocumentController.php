@@ -76,29 +76,34 @@ class EmployeeDocumentController extends Controller
                     $file = $request->file('file');
                     $directory = 'employee_documents/' . $employee->id;
                     
+                    $storageRoot = Storage::disk('public')->path('');
                     Log::info('EmployeeDocument: Starting file upload', [
                         'employee_id' => $employee->id,
                         'directory' => $directory,
                         'file_name' => $file->getClientOriginalName(),
                         'file_size' => $file->getSize(),
-                        'storage_root' => Storage::disk('public')->path(''),
+                        'storage_root' => $storageRoot,
                     ]);
                     
                     // Upewnij się, że katalog istnieje (ważne dla Railway)
                     $directoryCreated = Storage::disk('public')->makeDirectory($directory);
+                    $fullPath = Storage::disk('public')->path($directory);
+                    $dirExists = Storage::disk('public')->exists($directory);
+                    $isWritable = is_writable($fullPath);
+                    $perms = file_exists($fullPath) ? substr(sprintf('%o', fileperms($fullPath)), -4) : 'N/A';
+                    
                     Log::info('EmployeeDocument: Directory creation', [
                         'directory' => $directory,
                         'created' => $directoryCreated,
-                        'exists' => Storage::disk('public')->exists($directory),
+                        'exists' => $dirExists,
                     ]);
                     
                     // Sprawdź czy katalog jest zapisywalny
-                    $fullPath = Storage::disk('public')->path($directory);
-                    if (!is_writable($fullPath)) {
+                    if (!$isWritable) {
                         Log::error('EmployeeDocument: Directory is not writable', [
                             'directory' => $directory,
                             'full_path' => $fullPath,
-                            'permissions' => substr(sprintf('%o', fileperms($fullPath)), -4),
+                            'permissions' => $perms,
                         ]);
                         throw new \Exception('Katalog nie jest zapisywalny. Sprawdź uprawnienia.');
                     }
@@ -114,17 +119,21 @@ class EmployeeDocumentController extends Controller
                     }
                     
                     // Sprawdź czy plik faktycznie istnieje
-                    if (!Storage::disk('public')->exists($filePath)) {
+                    $fileExists = Storage::disk('public')->exists($filePath);
+                    $fullFilePath = Storage::disk('public')->path($filePath);
+                    
+                    if (!$fileExists) {
                         Log::error('EmployeeDocument: File does not exist after upload', [
                             'file_path' => $filePath,
-                            'full_path' => Storage::disk('public')->path($filePath),
+                            'full_path' => $fullFilePath,
                         ]);
                         throw new \Exception('Plik nie został zapisany poprawnie.');
                     }
                     
+                    $fileSize = Storage::disk('public')->size($filePath);
                     Log::info('EmployeeDocument: File uploaded successfully', [
                         'file_path' => $filePath,
-                        'file_size' => Storage::disk('public')->size($filePath),
+                        'file_size' => $fileSize,
                     ]);
                     
                     $validated['file_path'] = $filePath;
@@ -138,7 +147,7 @@ class EmployeeDocumentController extends Controller
                 }
             }
 
-            $employee->employeeDocuments()->create($validated);
+            $employeeDocument = $employee->employeeDocuments()->create($validated);
 
             return redirect()->route('employees.show', $employee)
                 ->with('success', 'Dokument został dodany.');
