@@ -224,7 +224,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     
     // Download route for employee documents (with authorization)
     Route::get('employee-documents/{employeeDocument}/download', [EmployeeDocumentController::class, 'download'])
-        ->name('employee-documents.download');
+        ->name('employee-documents.download')
+        ->defaults('permission_type', 'view')
+        ->defaults('resource', 'employee-documents');
     
     // Rotations (global routes)
     Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
@@ -239,7 +241,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->parameters(['rotations' => 'rotation']);
     
     // Employee Documents (dokumenty pracowników - globalna lista)
-    Route::get('employee-documents', [EmployeeDocumentController::class, 'index'])->name('employee-documents.index');
+    Route::get('employee-documents', [EmployeeDocumentController::class, 'index'])
+        ->name('employee-documents.index')
+        ->defaults('permission_type', 'view')
+        ->defaults('resource', 'employee-documents');
     
     // Documents (słownik dokumentów)
     Route::resource('documents', \App\Http\Controllers\DocumentController::class);

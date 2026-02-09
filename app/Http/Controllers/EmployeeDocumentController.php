@@ -304,7 +304,7 @@ class EmployeeDocumentController extends Controller
     public function download(EmployeeDocument $employeeDocument): StreamedResponse
     {
         // Sprawdź uprawnienia - użytkownik musi mieć dostęp do dokumentów pracowników
-        if (!auth()->user()->can('employee-documents.view')) {
+        if (!auth()->user()->hasPermission('employee-documents.view')) {
             abort(403, 'Nie masz uprawnień do pobierania tego dokumentu.');
         }
         
