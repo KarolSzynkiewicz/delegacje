@@ -44,42 +44,16 @@ class EmployeeDocumentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         // #region agent log
-        $logFile = storage_path('logs/debug.log');
-        $logDir = dirname($logFile);
-        if (!is_dir($logDir)) {
-            @mkdir($logDir, 0755, true);
-        }
-        @file_put_contents($logFile, json_encode([
-            'id' => 'log_' . time() . '_controller_entry',
-            'timestamp' => time() * 1000,
-            'location' => 'EmployeeDocumentController.php:45',
-            'message' => 'Store method called - request reached controller',
-            'data' => [
-                'has_file' => $request->hasFile('file'),
-                'employee_id' => $request->input('employee_id'),
-                'document_id' => $request->input('document_id'),
-                'user_id' => auth()->id(),
-            ],
-            'runId' => 'run1',
-            'hypothesisId' => 'A'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
+        \Log::info('EmployeeDocument::store - Entry', [
+            'has_file' => $request->hasFile('file'),
+            'employee_id' => $request->input('employee_id'),
+            'document_id' => $request->input('document_id'),
+            'user_id' => auth()->id(),
+            'env' => app()->environment(),
+        ]);
         // #endregion
 
         try {
-            // #region agent log
-            @file_put_contents($logFile, json_encode([
-                'id' => 'log_' . time() . '_validation_start',
-                'timestamp' => time() * 1000,
-                'location' => 'EmployeeDocumentController.php:47',
-                'message' => 'Starting validation',
-                'data' => [
-                    'request_data' => $request->except(['_token', 'file']),
-                ],
-                'runId' => 'run1',
-                'hypothesisId' => 'E'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
-            // #endregion
-
             $validated = $request->validate([
                 'employee_id' => 'required|exists:employees,id',
                 'document_id' => 'required|exists:documents,id',
@@ -90,17 +64,9 @@ class EmployeeDocumentController extends Controller
                 'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
             ]);
 
-            // #region agent log
-            @file_put_contents($logFile, json_encode([
-                'id' => 'log_' . time() . '_validation_passed',
-                'timestamp' => time() * 1000,
-                'location' => 'EmployeeDocumentController.php:57',
-                'message' => 'Validation passed',
-                'data' => ['validated_keys' => array_keys($validated)],
-                'runId' => 'run1',
-                'hypothesisId' => 'E'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
-            // #endregion
+            \Log::info('EmployeeDocument::store - Validation passed', [
+                'validated_keys' => array_keys($validated),
+            ]);
 
             $employee = Employee::findOrFail($validated['employee_id']);
             unset($validated['employee_id']);
@@ -259,21 +225,9 @@ class EmployeeDocumentController extends Controller
             return redirect()->route('employees.show', $employee)
                 ->with('success', 'Dokument został dodany.');
         } catch (\Illuminate\Validation\ValidationException $e) {
-            // #region agent log
-            $logFile = storage_path('logs/debug.log');
-            @file_put_contents($logFile, json_encode([
-                'id' => 'log_' . time() . '_validation_error',
-                'timestamp' => time() * 1000,
-                'location' => 'EmployeeDocumentController.php:92',
-                'message' => 'Validation exception caught',
-                'data' => [
-                    'errors' => $e->errors(),
-                ],
-                'runId' => 'run1',
-                'hypothesisId' => 'E'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
-            // #endregion
-            // ValidationException automatycznie przekierowuje z błędami, ale możemy to obsłużyć jawnie
+            \Log::error('EmployeeDocument::store - Validation error', [
+                'errors' => $e->errors(),
+            ]);
             return redirect()
                 ->route('employee-documents.create', [
                     'employee_id' => $request->input('employee_id'),
@@ -282,21 +236,12 @@ class EmployeeDocumentController extends Controller
                 ->withErrors($e->errors())
                 ->withInput();
         } catch (\Exception $e) {
-            // #region agent log
-            $logFile = storage_path('logs/debug.log');
-            @file_put_contents($logFile, json_encode([
-                'id' => 'log_' . time() . '_exception',
-                'timestamp' => time() * 1000,
-                'location' => 'EmployeeDocumentController.php:101',
-                'message' => 'Exception caught',
-                'data' => [
-                    'message' => $e->getMessage(),
-                    'trace' => substr($e->getTraceAsString(), 0, 500),
-                ],
-                'runId' => 'run1',
-                'hypothesisId' => 'B,C'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
-            // #endregion
+            \Log::error('EmployeeDocument::store - Exception', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => explode("\n", $e->getTraceAsString()),
+            ]);
             return redirect()
                 ->route('employee-documents.create', [
                     'employee_id' => $request->input('employee_id'),
