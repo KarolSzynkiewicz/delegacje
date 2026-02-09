@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class EmployeeDocumentController extends Controller
 {
@@ -70,15 +71,70 @@ class EmployeeDocumentController extends Controller
 
             // Upload pliku jeśli został przesłany
             if ($request->hasFile('file')) {
-                $file = $request->file('file');
-                $directory = 'employee_documents/' . $employee->id;
-                
-                // Upewnij się, że katalog istnieje (ważne dla Railway)
-                Storage::disk('public')->makeDirectory($directory);
-                
-                $fileName = time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs($directory, $fileName, 'public');
-                $validated['file_path'] = $filePath;
+                try {
+                    $file = $request->file('file');
+                    $directory = 'employee_documents/' . $employee->id;
+                    
+                    Log::info('EmployeeDocument: Starting file upload', [
+                        'employee_id' => $employee->id,
+                        'directory' => $directory,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_size' => $file->getSize(),
+                        'storage_root' => Storage::disk('public')->path(''),
+                    ]);
+                    
+                    // Upewnij się, że katalog istnieje (ważne dla Railway)
+                    $directoryCreated = Storage::disk('public')->makeDirectory($directory);
+                    Log::info('EmployeeDocument: Directory creation', [
+                        'directory' => $directory,
+                        'created' => $directoryCreated,
+                        'exists' => Storage::disk('public')->exists($directory),
+                    ]);
+                    
+                    // Sprawdź czy katalog jest zapisywalny
+                    $fullPath = Storage::disk('public')->path($directory);
+                    if (!is_writable($fullPath)) {
+                        Log::error('EmployeeDocument: Directory is not writable', [
+                            'directory' => $directory,
+                            'full_path' => $fullPath,
+                            'permissions' => substr(sprintf('%o', fileperms($fullPath)), -4),
+                        ]);
+                        throw new \Exception('Katalog nie jest zapisywalny. Sprawdź uprawnienia.');
+                    }
+                    
+                    $fileName = time() . '_' . $file->getClientOriginalName();
+                    
+                    // Użyj Storage::putFileAs zamiast storeAs() - bardziej niezawodne na Railway
+                    $filePath = Storage::disk('public')->putFileAs($directory, $file, $fileName);
+                    
+                    if (!$filePath) {
+                        Log::error('EmployeeDocument: File upload failed - putFileAs returned false');
+                        throw new \Exception('Nie udało się zapisać pliku.');
+                    }
+                    
+                    // Sprawdź czy plik faktycznie istnieje
+                    if (!Storage::disk('public')->exists($filePath)) {
+                        Log::error('EmployeeDocument: File does not exist after upload', [
+                            'file_path' => $filePath,
+                            'full_path' => Storage::disk('public')->path($filePath),
+                        ]);
+                        throw new \Exception('Plik nie został zapisany poprawnie.');
+                    }
+                    
+                    Log::info('EmployeeDocument: File uploaded successfully', [
+                        'file_path' => $filePath,
+                        'file_size' => Storage::disk('public')->size($filePath),
+                    ]);
+                    
+                    $validated['file_path'] = $filePath;
+                } catch (\Exception $fileException) {
+                    Log::error('EmployeeDocument: File upload error', [
+                        'error' => $fileException->getMessage(),
+                        'trace' => $fileException->getTraceAsString(),
+                        'employee_id' => $employee->id,
+                    ]);
+                    throw new \Exception('Błąd podczas zapisywania pliku: ' . $fileException->getMessage());
+                }
             }
 
             $employee->employeeDocuments()->create($validated);
@@ -95,6 +151,13 @@ class EmployeeDocumentController extends Controller
                 ->withErrors($e->errors())
                 ->withInput();
         } catch (\Exception $e) {
+            Log::error('EmployeeDocument: Store error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'employee_id' => $request->input('employee_id'),
+                'document_id' => $request->input('document_id'),
+            ]);
+            
             return redirect()
                 ->route('employee-documents.create', [
                     'employee_id' => $request->input('employee_id'),
@@ -151,20 +214,52 @@ class EmployeeDocumentController extends Controller
 
             // Upload nowego pliku jeśli został przesłany
             if ($request->hasFile('file')) {
-                // Usuń stary plik jeśli istnieje
-                if ($employeeDocument->file_path) {
-                    Storage::disk('public')->delete($employeeDocument->file_path);
+                try {
+                    // Usuń stary plik jeśli istnieje
+                    if ($employeeDocument->file_path) {
+                        Storage::disk('public')->delete($employeeDocument->file_path);
+                    }
+                    
+                    $file = $request->file('file');
+                    $directory = 'employee_documents/' . $employee->id;
+                    
+                    Log::info('EmployeeDocument: Starting file update', [
+                        'employee_id' => $employee->id,
+                        'document_id' => $employeeDocument->id,
+                        'directory' => $directory,
+                        'file_name' => $file->getClientOriginalName(),
+                    ]);
+                    
+                    // Upewnij się, że katalog istnieje (ważne dla Railway)
+                    Storage::disk('public')->makeDirectory($directory);
+                    
+                    // Sprawdź czy katalog jest zapisywalny
+                    $fullPath = Storage::disk('public')->path($directory);
+                    if (!is_writable($fullPath)) {
+                        throw new \Exception('Katalog nie jest zapisywalny. Sprawdź uprawnienia.');
+                    }
+                    
+                    $fileName = time() . '_' . $file->getClientOriginalName();
+                    
+                    // Użyj Storage::putFileAs zamiast storeAs() - bardziej niezawodne na Railway
+                    $filePath = Storage::disk('public')->putFileAs($directory, $file, $fileName);
+                    
+                    if (!$filePath || !Storage::disk('public')->exists($filePath)) {
+                        Log::error('EmployeeDocument: File update failed', [
+                            'file_path' => $filePath,
+                        ]);
+                        throw new \Exception('Nie udało się zapisać pliku.');
+                    }
+                    
+                    $validated['file_path'] = $filePath;
+                } catch (\Exception $fileException) {
+                    Log::error('EmployeeDocument: File update error', [
+                        'error' => $fileException->getMessage(),
+                        'employee_id' => $employee->id,
+                        'document_id' => $employeeDocument->id,
+                    ]);
+                    throw new \Exception('Błąd podczas zapisywania pliku: ' . $fileException->getMessage());
                 }
-                
-                $file = $request->file('file');
-                $directory = 'employee_documents/' . $employee->id;
-                
-                // Upewnij się, że katalog istnieje (ważne dla Railway)
-                Storage::disk('public')->makeDirectory($directory);
-                
-                $fileName = time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs($directory, $fileName, 'public');
-                $validated['file_path'] = $filePath;
             }
 
             unset($validated['remove_file']);
@@ -179,6 +274,12 @@ class EmployeeDocumentController extends Controller
                 ->withErrors($e->errors())
                 ->withInput();
         } catch (\Exception $e) {
+            Log::error('EmployeeDocument: Update error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'document_id' => $employeeDocument->id,
+            ]);
+            
             return redirect()
                 ->route('employee-documents.edit', $employeeDocument)
                 ->with('error', 'Wystąpił błąd podczas aktualizacji dokumentu: ' . $e->getMessage())
