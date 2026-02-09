@@ -11,9 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('employee_documents', function (Blueprint $table) {
-            $table->dropColumn('type');
-        });
+        // Sprawdź czy kolumna istnieje przed usunięciem
+        if (Schema::hasColumn('employee_documents', 'type')) {
+            Schema::table('employee_documents', function (Blueprint $table) {
+                $table->dropColumn('type');
+            });
+        }
     }
 
     /**
