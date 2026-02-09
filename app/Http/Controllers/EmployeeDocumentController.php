@@ -71,9 +71,14 @@ class EmployeeDocumentController extends Controller
             // Upload pliku jeśli został przesłany
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
-                $fileName = 'employee_documents/' . $employee->id . '/' . time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs('public', $fileName);
-                $validated['file_path'] = str_replace('public/', '', $filePath);
+                $directory = 'employee_documents/' . $employee->id;
+                
+                // Upewnij się, że katalog istnieje (ważne dla Railway)
+                Storage::disk('public')->makeDirectory($directory);
+                
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $filePath = $file->storeAs($directory, $fileName, 'public');
+                $validated['file_path'] = $filePath;
             }
 
             $employee->employeeDocuments()->create($validated);
@@ -152,9 +157,14 @@ class EmployeeDocumentController extends Controller
                 }
                 
                 $file = $request->file('file');
-                $fileName = 'employee_documents/' . $employee->id . '/' . time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs('public', $fileName);
-                $validated['file_path'] = str_replace('public/', '', $filePath);
+                $directory = 'employee_documents/' . $employee->id;
+                
+                // Upewnij się, że katalog istnieje (ważne dla Railway)
+                Storage::disk('public')->makeDirectory($directory);
+                
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $filePath = $file->storeAs($directory, $fileName, 'public');
+                $validated['file_path'] = $filePath;
             }
 
             unset($validated['remove_file']);
