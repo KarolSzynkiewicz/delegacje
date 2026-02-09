@@ -21,10 +21,14 @@ class CheckResourcePermission
     public function handle(Request $request, Closure $next): Response
     {
         // #region agent log
-        $logFile = '/home/karol/delegacje/.cursor/debug.log';
+        $logFile = storage_path('logs/debug.log');
+        $logDir = dirname($logFile);
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0755, true);
+        }
         $routeName = $request->route()?->getName();
         if ($routeName === 'employee-documents.store') {
-            file_put_contents($logFile, json_encode([
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_middleware_entry',
                 'timestamp' => time() * 1000,
                 'location' => 'CheckResourcePermission.php:21',
@@ -37,7 +41,7 @@ class CheckResourcePermission
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'A'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
         }
         // #endregion
 
@@ -60,7 +64,7 @@ class CheckResourcePermission
                     'data' => ['user_id' => $user->id],
                     'runId' => 'run1',
                     'hypothesisId' => 'A'
-                ]) . "\n", FILE_APPEND);
+                ]) . "\n", FILE_APPEND | LOCK_EX);
             }
             // #endregion
             return $next($request);
@@ -80,7 +84,7 @@ class CheckResourcePermission
         if ($routeName === 'employee-documents.store') {
             $routeDefaults = $route->defaults ?? [];
             $routeActionDefaults = $route->getAction('defaults') ?? [];
-            file_put_contents($logFile, json_encode([
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_permission_check',
                 'timestamp' => time() * 1000,
                 'location' => 'CheckResourcePermission.php:43',
@@ -94,7 +98,7 @@ class CheckResourcePermission
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'A,D'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
         }
         // #endregion
 
@@ -121,7 +125,7 @@ class CheckResourcePermission
                     ],
                     'runId' => 'run1',
                     'hypothesisId' => 'A,D'
-                ]) . "\n", FILE_APPEND);
+                ]) . "\n", FILE_APPEND | LOCK_EX);
             }
             // #endregion
             if (app()->environment('local', 'testing')) {
@@ -151,7 +155,7 @@ class CheckResourcePermission
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'A'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
         }
         // #endregion
         if (!$hasPermission) {
@@ -168,7 +172,7 @@ class CheckResourcePermission
                 'data' => [],
                 'runId' => 'run1',
                 'hypothesisId' => 'A'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
         }
         // #endregion
 

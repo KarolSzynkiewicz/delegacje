@@ -44,8 +44,12 @@ class EmployeeDocumentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         // #region agent log
-        $logFile = '/home/karol/delegacje/.cursor/debug.log';
-        file_put_contents($logFile, json_encode([
+        $logFile = storage_path('logs/debug.log');
+        $logDir = dirname($logFile);
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0755, true);
+        }
+        @file_put_contents($logFile, json_encode([
             'id' => 'log_' . time() . '_controller_entry',
             'timestamp' => time() * 1000,
             'location' => 'EmployeeDocumentController.php:45',
@@ -58,12 +62,12 @@ class EmployeeDocumentController extends Controller
             ],
             'runId' => 'run1',
             'hypothesisId' => 'A'
-        ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
         // #endregion
 
         try {
             // #region agent log
-            file_put_contents($logFile, json_encode([
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_validation_start',
                 'timestamp' => time() * 1000,
                 'location' => 'EmployeeDocumentController.php:47',
@@ -73,7 +77,7 @@ class EmployeeDocumentController extends Controller
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'E'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
             // #endregion
 
             $validated = $request->validate([
@@ -87,7 +91,7 @@ class EmployeeDocumentController extends Controller
             ]);
 
             // #region agent log
-            file_put_contents($logFile, json_encode([
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_validation_passed',
                 'timestamp' => time() * 1000,
                 'location' => 'EmployeeDocumentController.php:57',
@@ -95,7 +99,7 @@ class EmployeeDocumentController extends Controller
                 'data' => ['validated_keys' => array_keys($validated)],
                 'runId' => 'run1',
                 'hypothesisId' => 'E'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
             // #endregion
 
             $employee = Employee::findOrFail($validated['employee_id']);
@@ -221,7 +225,7 @@ class EmployeeDocumentController extends Controller
             }
 
             // #region agent log
-            file_put_contents($logFile, json_encode([
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_creating_model',
                 'timestamp' => time() * 1000,
                 'location' => 'EmployeeDocumentController.php:88',
@@ -232,13 +236,13 @@ class EmployeeDocumentController extends Controller
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'B'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
             // #endregion
 
             $employeeDocument = $employee->employeeDocuments()->create($validated);
 
             // #region agent log
-            file_put_contents($logFile, json_encode([
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_success',
                 'timestamp' => time() * 1000,
                 'location' => 'EmployeeDocumentController.php:90',
@@ -249,7 +253,7 @@ class EmployeeDocumentController extends Controller
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'B'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
             // #endregion
 
             return redirect()->route('employees.show', $employee)
@@ -267,7 +271,7 @@ class EmployeeDocumentController extends Controller
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'E'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
             // #endregion
             // ValidationException automatycznie przekierowuje z błędami, ale możemy to obsłużyć jawnie
             return redirect()
@@ -291,7 +295,7 @@ class EmployeeDocumentController extends Controller
                 ],
                 'runId' => 'run1',
                 'hypothesisId' => 'B,C'
-            ]) . "\n", FILE_APPEND);
+            ]) . "\n", FILE_APPEND | LOCK_EX);
             // #endregion
             return redirect()
                 ->route('employee-documents.create', [
