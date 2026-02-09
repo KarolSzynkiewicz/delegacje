@@ -44,36 +44,71 @@ class EmployeeDocumentController extends Controller
      */
     public function store(StoreEmployeeDocumentRequest $request): RedirectResponse
     {
-        $employee = Employee::findOrFail($request->input('employee_id'));
-        
-        $validated = $request->validated();
-        unset($validated['employee_id']);
+        \Log::info('EmployeeDocument::store START', [
+            'employee_id' => $request->input('employee_id'),
+            'document_id' => $request->input('document_id'),
+            'has_file' => $request->hasFile('file'),
+            'user_id' => auth()->id(),
+            'env' => app()->environment(),
+        ]);
 
-        // Ustaw kind na podstawie checkboxa
-        $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
-        unset($validated['is_okresowy']);
+        try {
+            $employee = Employee::findOrFail($request->input('employee_id'));
+            \Log::info('Employee found', ['employee' => $employee->id]);
+            
+            $validated = $request->validated();
+            \Log::info('Validation passed', ['keys' => array_keys($validated)]);
+            
+            unset($validated['employee_id']);
 
-        // Jeśli dokument jest bezokresowy, ustaw valid_to na null
-        if ($validated['kind'] === 'bezokresowy') {
-            $validated['valid_to'] = null;
+            // Ustaw kind na podstawie checkboxa
+            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
+            unset($validated['is_okresowy']);
+
+            // Jeśli dokument jest bezokresowy, ustaw valid_to na null
+            if ($validated['kind'] === 'bezokresowy') {
+                $validated['valid_to'] = null;
+            }
+
+            // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
+            $validated['type'] = null;
+
+            \Log::info('Data prepared', ['data' => $validated]);
+
+            // Upload pliku jeśli został przesłany
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $directory = 'employee_documents/' . $employee->id;
+                \Log::info('File upload starting', ['directory' => $directory]);
+                
+                $filePath = $file->store($directory, 'public');
+                \Log::info('File uploaded', ['path' => $filePath]);
+
+                $validated['file_path'] = $filePath;
+            }
+
+            \Log::info('Creating EmployeeDocument', ['employee_id' => $employee->id]);
+            $doc = $employee->employeeDocuments()->create($validated);
+            \Log::info('EmployeeDocument created successfully', ['id' => $doc->id]);
+
+            return redirect()->route('employees.show', $employee)
+                ->with('success', 'Dokument został dodany.');
+        } catch (\Exception $e) {
+            \Log::error('EmployeeDocument::store ERROR', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return redirect()
+                ->route('employee-documents.create', [
+                    'employee_id' => $request->input('employee_id'),
+                    'document_id' => $request->input('document_id'),
+                ])
+                ->with('error', 'Błąd: ' . $e->getMessage())
+                ->withInput();
         }
-
-        // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
-        $validated['type'] = null;
-
-        // Upload pliku jeśli został przesłany
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $directory = 'employee_documents/' . $employee->id;
-            $filePath = $file->store($directory, 'public');
-
-            $validated['file_path'] = $filePath;
-        }
-
-        $employee->employeeDocuments()->create($validated);
-
-        return redirect()->route('employees.show', $employee)
-            ->with('success', 'Dokument został dodany.');
     }
 
     /**
