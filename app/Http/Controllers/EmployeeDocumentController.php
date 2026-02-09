@@ -124,7 +124,7 @@ class EmployeeDocumentController extends Controller
                 $storageConfigRoot = config('filesystems.disks.public.root');
                 $dataExists = is_dir('/data');
                 $dataWritable = is_writable('/data');
-                file_put_contents($logFile, json_encode([
+                @file_put_contents($logFile, json_encode([
                     'id' => 'log_' . time() . '_file_upload_start',
                     'timestamp' => time() * 1000,
                     'location' => 'EmployeeDocumentController.php:73',
@@ -148,7 +148,7 @@ class EmployeeDocumentController extends Controller
                 // #region agent log
                 $fullDirectoryPath = Storage::disk('public')->path($directory);
                 $directoryExists = Storage::disk('public')->exists($directory);
-                file_put_contents($logFile, json_encode([
+                @file_put_contents($logFile, json_encode([
                     'id' => 'log_' . time() . '_directory_check',
                     'timestamp' => time() * 1000,
                     'location' => 'EmployeeDocumentController.php:79',
@@ -169,7 +169,7 @@ class EmployeeDocumentController extends Controller
                 $filePath = $file->store($directory, 'public');
                 
                 // #region agent log
-                file_put_contents($logFile, json_encode([
+                @file_put_contents($logFile, json_encode([
                     'id' => 'log_' . time() . '_store_result',
                     'timestamp' => time() * 1000,
                     'location' => 'EmployeeDocumentController.php:80',
@@ -186,7 +186,7 @@ class EmployeeDocumentController extends Controller
                 
                 if (!$filePath) {
                     // #region agent log
-                    file_put_contents($logFile, json_encode([
+                    @file_put_contents($logFile, json_encode([
                         'id' => 'log_' . time() . '_store_failed',
                         'timestamp' => time() * 1000,
                         'location' => 'EmployeeDocumentController.php:82',
@@ -205,7 +205,7 @@ class EmployeeDocumentController extends Controller
                 // #region agent log
                 $fileExists = Storage::disk('public')->exists($filePath);
                 $fullFilePath = Storage::disk('public')->path($filePath);
-                file_put_contents($logFile, json_encode([
+                @file_put_contents($logFile, json_encode([
                     'id' => 'log_' . time() . '_file_after_upload',
                     'timestamp' => time() * 1000,
                     'location' => 'EmployeeDocumentController.php:85',
