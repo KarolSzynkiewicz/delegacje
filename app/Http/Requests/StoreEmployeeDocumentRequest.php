@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Support\Facades\Log;
 
 class StoreEmployeeDocumentRequest extends FormRequest
 {
@@ -52,5 +54,20 @@ class StoreEmployeeDocumentRequest extends FormRequest
             'file.mimes' => 'Dozwolone typy plików: PDF, DOC, DOCX, XLS, XLSX, ODT, TXT.',
             'file.max' => 'Plik nie może być większy niż 10MB.',
         ];
+    }
+
+    /**
+     * Handle a failed validation attempt.
+     */
+    protected function failedValidation(Validator $validator)
+    {
+        Log::error('StoreEmployeeDocumentRequest: Validation failed', [
+            'errors' => $validator->errors()->all(),
+            'input' => $this->except(['_token', 'file']),
+            'employee_id' => $this->input('employee_id'),
+            'document_id' => $this->input('document_id'),
+        ]);
+
+        parent::failedValidation($validator);
     }
 }
