@@ -44,7 +44,8 @@ class EmployeeDocumentController extends Controller
      */
     public function store(StoreEmployeeDocumentRequest $request): RedirectResponse
     {
-        \Log::info('EmployeeDocument::store START', [
+        // JEŚLI DOTARLIŚMY TUTAJ - WALIDACJA PRZESZŁA!
+        \Log::info('EmployeeDocument::store - KONTROLER WYWOŁANY (walidacja OK)', [
             'employee_id' => $request->input('employee_id'),
             'document_id' => $request->input('document_id'),
             'has_file' => $request->hasFile('file'),
@@ -57,7 +58,7 @@ class EmployeeDocumentController extends Controller
             \Log::info('Employee found', ['employee' => $employee->id]);
             
             $validated = $request->validated();
-            \Log::info('Validation passed', ['keys' => array_keys($validated)]);
+            \Log::info('Validation data retrieved', ['keys' => array_keys($validated)]);
             
             unset($validated['employee_id']);
 
@@ -73,7 +74,7 @@ class EmployeeDocumentController extends Controller
             // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
             $validated['type'] = null;
 
-            \Log::info('Data prepared', ['data' => $validated]);
+            \Log::info('Data prepared for insert', ['data' => $validated]);
 
             // Upload pliku jeśli został przesłany
             if ($request->hasFile('file')) {
@@ -87,14 +88,15 @@ class EmployeeDocumentController extends Controller
                 $validated['file_path'] = $filePath;
             }
 
-            \Log::info('Creating EmployeeDocument', ['employee_id' => $employee->id]);
+            \Log::info('Creating EmployeeDocument record', ['employee_id' => $employee->id]);
             $doc = $employee->employeeDocuments()->create($validated);
-            \Log::info('EmployeeDocument created successfully', ['id' => $doc->id]);
+            \Log::info('✅ EmployeeDocument created successfully!', ['id' => $doc->id]);
 
             return redirect()->route('employees.show', $employee)
-                ->with('success', 'Dokument został dodany.');
+                ->with('success', 'Dokument został dodany pomyślnie!');
+                
         } catch (\Exception $e) {
-            \Log::error('EmployeeDocument::store ERROR', [
+            \Log::error('❌ EmployeeDocument::store - EXCEPTION IN CONTROLLER', [
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -106,7 +108,7 @@ class EmployeeDocumentController extends Controller
                     'employee_id' => $request->input('employee_id'),
                     'document_id' => $request->input('document_id'),
                 ])
-                ->with('error', 'Błąd: ' . $e->getMessage())
+                ->with('error', '❌ Błąd w kontrolerze: ' . $e->getMessage())
                 ->withInput();
         }
     }
