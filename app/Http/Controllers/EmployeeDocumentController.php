@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeDocumentController extends Controller
@@ -75,9 +76,67 @@ class EmployeeDocumentController extends Controller
                 $directory = 'employee_documents/' . $employee->id;
                 $fileName = time() . '_' . $file->getClientOriginalName();
                 
+                // Debug: Sprawdź konfigurację storage
+                $storageRoot = Storage::disk('public')->path('');
+                $storageDriver = config('filesystems.disks.public.driver');
+                $storageConfigRoot = config('filesystems.disks.public.root');
+                $dataExists = is_dir('/data');
+                $dataWritable = is_writable('/data');
+                
+                Log::info('EmployeeDocument: Storage debug', [
+                    'storage_root' => $storageRoot,
+                    'storage_driver' => $storageDriver,
+                    'config_root' => $storageConfigRoot,
+                    '/data exists' => $dataExists,
+                    '/data writable' => $dataWritable,
+                    'directory' => $directory,
+                    'file_name' => $fileName,
+                ]);
+                
+                // Sprawdź czy katalog docelowy istnieje
+                $fullDirectoryPath = Storage::disk('public')->path($directory);
+                $directoryExists = Storage::disk('public')->exists($directory);
+                
+                Log::info('EmployeeDocument: Directory check', [
+                    'directory' => $directory,
+                    'full_path' => $fullDirectoryPath,
+                    'exists' => $directoryExists,
+                    'parent_writable' => is_writable(dirname($fullDirectoryPath)),
+                ]);
+                
                 // Użyj storeAs() - tak samo jak w ImageService dla zdjęć employees/users
                 // Automatycznie tworzy katalogi jeśli nie istnieją
                 $filePath = $file->storeAs($directory, $fileName, 'public');
+                
+                if (!$filePath) {
+                    Log::error('EmployeeDocument: storeAs returned false', [
+                        'directory' => $directory,
+                        'file_name' => $fileName,
+                        'storage_root' => $storageRoot,
+                    ]);
+                    throw new \Exception('Nie udało się zapisać pliku. storeAs() zwróciło false.');
+                }
+                
+                // Sprawdź czy plik faktycznie istnieje
+                $fileExists = Storage::disk('public')->exists($filePath);
+                $fullFilePath = Storage::disk('public')->path($filePath);
+                
+                Log::info('EmployeeDocument: File upload result', [
+                    'file_path' => $filePath,
+                    'full_path' => $fullFilePath,
+                    'exists' => $fileExists,
+                    'file_size' => $fileExists ? Storage::disk('public')->size($filePath) : null,
+                ]);
+                
+                if (!$fileExists) {
+                    Log::error('EmployeeDocument: File does not exist after upload', [
+                        'file_path' => $filePath,
+                        'full_path' => $fullFilePath,
+                        'storage_root' => $storageRoot,
+                    ]);
+                    throw new \Exception('Plik nie został zapisany. Ścieżka: ' . $filePath);
+                }
+                
                 $validated['file_path'] = $filePath;
             }
 
