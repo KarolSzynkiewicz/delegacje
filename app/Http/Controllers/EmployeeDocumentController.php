@@ -260,8 +260,8 @@ class EmployeeDocumentController extends Controller
                 ->with('success', 'Dokument został dodany.');
         } catch (\Illuminate\Validation\ValidationException $e) {
             // #region agent log
-            $logFile = '/home/karol/delegacje/.cursor/debug.log';
-            file_put_contents($logFile, json_encode([
+            $logFile = storage_path('logs/debug.log');
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_validation_error',
                 'timestamp' => time() * 1000,
                 'location' => 'EmployeeDocumentController.php:92',
@@ -283,8 +283,8 @@ class EmployeeDocumentController extends Controller
                 ->withInput();
         } catch (\Exception $e) {
             // #region agent log
-            $logFile = '/home/karol/delegacje/.cursor/debug.log';
-            file_put_contents($logFile, json_encode([
+            $logFile = storage_path('logs/debug.log');
+            @file_put_contents($logFile, json_encode([
                 'id' => 'log_' . time() . '_exception',
                 'timestamp' => time() * 1000,
                 'location' => 'EmployeeDocumentController.php:101',
