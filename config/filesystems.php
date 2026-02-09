@@ -38,11 +38,9 @@ return [
 
         'public' => [
             'driver' => 'local',
-            // Use Railway volume directly if available, otherwise use default storage
-            // Railway volumes are mounted at /data by default
-            'root' => (is_dir('/data') && is_writable('/data')) 
-                ? '/data/storage/app/public' 
-                : storage_path('app/public'),
+            // Use storage_path() - entrypoint creates symlink storage/app/public -> /data/storage/app/public
+            // This way it works both on Railway (with volume) and localhost (without volume)
+            'root' => storage_path('app/public'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
             'throw' => false,
