@@ -71,8 +71,8 @@ class EmployeeDocumentController extends Controller
                 $validated['valid_to'] = null;
             }
 
-            // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
-            $validated['type'] = null;
+            // NIE ustawiamy 'type' - pole nie jest używane i na Railway nie jest nullable
+            // W przyszłości: dodaj RUN_MIGRATIONS=true do Railway aby migracja 2026_02_09_164059 mogła się wykonać
 
             \Log::info('Data prepared for insert', ['data' => $validated]);
 
