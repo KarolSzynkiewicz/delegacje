@@ -179,6 +179,16 @@ php artisan route:clear
 php artisan view:clear
 php artisan cache:clear
 
+# Clear bootstrap cache files (compiled config, routes, services)
+echo "🧹 Clearing bootstrap cache..."
+rm -rf bootstrap/cache/*.php 2>/dev/null || true
+
+# Clear OPcache if available (PHP may cache compiled code)
+if [ -n "$(php -r 'if (function_exists("opcache_reset")) { echo "opcache"; }')" ]; then
+    echo "🧹 Clearing OPcache..."
+    php -r "if (function_exists('opcache_reset')) { opcache_reset(); }" 2>/dev/null || true
+fi
+
 # #region agent log - Verification: Check what Laravel sees after .env removal and config:clear
 LOG_FILE="/tmp/debug.log"
 LARAVEL_APP_KEY=$(php artisan tinker --execute="echo config('app.key') ?: 'NULL';" 2>/dev/null | tail -1 | tr -d '\n')
