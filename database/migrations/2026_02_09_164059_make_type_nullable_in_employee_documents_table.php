@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('employee_documents', function (Blueprint $table) {
-            $table->string('type')->nullable()->after('document_id');
+            // Zmień kolumnę type na nullable - pole nie jest obecnie używane
+            $table->string('type')->nullable()->change();
         });
     }
 
@@ -22,7 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('employee_documents', function (Blueprint $table) {
-            $table->dropColumn('type');
+            // Przywróć NOT NULL (tylko jeśli wszystkie rekordy mają wartość)
+            $table->string('type')->nullable(false)->change();
         });
     }
 };
