@@ -75,11 +75,11 @@ class EmployeeDocument extends Model
     }
 
     /**
-     * Get the file URL.
+     * Get the file download URL (secure route, not direct file access).
      */
     public function getFileUrlAttribute(): ?string
     {
-        return $this->file_path ? asset('storage/' . $this->file_path) : null;
+        return $this->file_path ? route('employee-documents.download', $this) : null;
     }
 
     /**

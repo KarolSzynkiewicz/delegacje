@@ -222,6 +222,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->except(['index', 'show'])
         ->parameters(['employee-documents' => 'employeeDocument']);
     
+    // Download route for employee documents (with authorization)
+    Route::get('employee-documents/{employeeDocument}/download', [EmployeeDocumentController::class, 'download'])
+        ->name('employee-documents.download');
+    
     // Rotations (global routes)
     Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
     Route::get('rotations/create', [RotationController::class, 'createGlobal'])->name('rotations.create');

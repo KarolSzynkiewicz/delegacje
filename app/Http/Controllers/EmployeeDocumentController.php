@@ -10,6 +10,7 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeDocumentController extends Controller
 {
@@ -285,6 +286,30 @@ class EmployeeDocumentController extends Controller
                 ->with('error', 'Wystąpił błąd podczas aktualizacji dokumentu: ' . $e->getMessage())
                 ->withInput();
         }
+    }
+
+    /**
+     * Download the specified employee document file.
+     * Pliki są w public storage, ale dostęp jest kontrolowany przez autoryzację.
+     */
+    public function download(EmployeeDocument $employeeDocument): StreamedResponse
+    {
+        // Sprawdź uprawnienia - użytkownik musi mieć dostęp do dokumentów pracowników
+        if (!auth()->user()->can('employee-documents.view')) {
+            abort(403, 'Nie masz uprawnień do pobierania tego dokumentu.');
+        }
+        
+        if (!$employeeDocument->file_path) {
+            abort(404, 'Plik nie został znaleziony.');
+        }
+        
+        if (!Storage::disk('public')->exists($employeeDocument->file_path)) {
+            abort(404, 'Plik nie istnieje na serwerze.');
+        }
+        
+        $fileName = ($employeeDocument->document->name ?? 'document') . '_' . basename($employeeDocument->file_path);
+        
+        return Storage::disk('public')->download($employeeDocument->file_path, $fileName);
     }
 
     /**
