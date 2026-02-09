@@ -218,9 +218,31 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Employee tabs - usunięte, teraz przez Livewire EmployeeTabs z query string
     
     // Employee documents - globalne resource route z query params
-    Route::resource('employee-documents', EmployeeDocumentController::class)
-        ->except(['index', 'show'])
-        ->parameters(['employee-documents' => 'employeeDocument']);
+    // Używamy osobnych route'ów zamiast resource() żeby mieć pełną kontrolę nad defaults
+    Route::get('employee-documents/create', [EmployeeDocumentController::class, 'create'])
+        ->name('employee-documents.create')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'employee-documents');
+    Route::post('employee-documents', [EmployeeDocumentController::class, 'store'])
+        ->name('employee-documents.store')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'employee-documents');
+    Route::get('employee-documents/{employeeDocument}/edit', [EmployeeDocumentController::class, 'edit'])
+        ->name('employee-documents.edit')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'employee-documents');
+    Route::put('employee-documents/{employeeDocument}', [EmployeeDocumentController::class, 'update'])
+        ->name('employee-documents.update')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'employee-documents');
+    Route::patch('employee-documents/{employeeDocument}', [EmployeeDocumentController::class, 'update'])
+        ->name('employee-documents.update')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'employee-documents');
+    Route::delete('employee-documents/{employeeDocument}', [EmployeeDocumentController::class, 'destroy'])
+        ->name('employee-documents.destroy')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'employee-documents');
     
     // Download route for employee documents (with authorization)
     Route::get('employee-documents/{employeeDocument}/download', [EmployeeDocumentController::class, 'download'])
