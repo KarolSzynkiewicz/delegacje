@@ -420,23 +420,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('no-role');
 });
 
-// TEMPORARY DEBUG ENDPOINT - REMOVE AFTER FIX
-Route::get('/debug-validation-errors', function () {
-    if (!auth()->check() || !auth()->user()->isAdmin()) {
-        abort(403, 'Admin only');
-    }
-    
-    $errors = session()->get('errors');
-    $oldInput = session()->get('_old_input');
-    
-    return response()->json([
-        'has_errors' => $errors ? true : false,
-        'errors' => $errors ? $errors->all() : null,
-        'old_input' => $oldInput,
-        'last_50_log_lines' => file_exists(storage_path('logs/laravel.log')) 
-            ? array_slice(file(storage_path('logs/laravel.log')), -50) 
-            : 'Log file not found',
-    ]);
-})->middleware(['auth']);
-
 require __DIR__.'/auth.php';

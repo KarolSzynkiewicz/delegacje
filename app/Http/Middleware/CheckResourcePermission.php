@@ -30,10 +30,6 @@ class CheckResourcePermission
 
         // Admin always has access
         if ($user->isAdmin()) {
-            Log::info('CheckResourcePermission: Admin bypass', [
-                'route' => $routeName,
-                'user_id' => $user->id,
-            ]);
             return $next($request);
         }
 
@@ -46,12 +42,6 @@ class CheckResourcePermission
 
         // Get permission for route using RoutePermissionService
         $permissionName = $this->routePermissionService->getPermissionForRouteObject($route);
-
-        Log::info('CheckResourcePermission: Permission check', [
-            'route' => $routeName,
-            'permission' => $permissionName,
-            'user_id' => $user->id,
-        ]);
 
         // If we can't determine permission, check if route is excluded
         if (!$permissionName) {

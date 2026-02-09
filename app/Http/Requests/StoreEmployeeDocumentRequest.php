@@ -61,34 +61,11 @@ class StoreEmployeeDocumentRequest extends FormRequest
      */
     protected function failedValidation(Validator $validator)
     {
-        // Bardzo agresywne logowanie
-        $errorData = [
-            'errors' => $validator->errors()->all(),
-            'messages' => $validator->errors()->messages(),
-            'input' => $this->except(['_token', 'file']),
+        Log::warning('EmployeeDocument validation failed', [
+            'errors' => $validator->errors()->messages(),
             'employee_id' => $this->input('employee_id'),
-            'document_id' => $this->input('document_id'),
-            'url' => $this->url(),
-            'method' => $this->method(),
-        ];
+        ]);
         
-        Log::error('StoreEmployeeDocumentRequest: Validation FAILED', $errorData);
-        Log::channel('stack')->error('VALIDATION FAILED - EmployeeDocument', $errorData);
-        
-        // Dodaj flash message żeby użytkownik wiedział co się dzieje
-        session()->flash('error', 'Błąd walidacji: ' . implode(', ', $validator->errors()->all()));
-
         parent::failedValidation($validator);
-    }
-    
-    /**
-     * Get the error messages for the defined validation rules.
-     */
-    protected function failedAuthorization()
-    {
-        Log::error('StoreEmployeeDocumentRequest: Authorization FAILED');
-        session()->flash('error', 'Brak uprawnień do dodania dokumentu pracownika.');
-        
-        parent::failedAuthorization();
     }
 }

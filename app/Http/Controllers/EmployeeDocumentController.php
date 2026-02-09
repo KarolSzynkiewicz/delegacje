@@ -44,26 +44,16 @@ class EmployeeDocumentController extends Controller
      */
     public function store(StoreEmployeeDocumentRequest $request): RedirectResponse
     {
-        // JEŚLI DOTARLIŚMY TUTAJ - WALIDACJA PRZESZŁA!
-        \Log::info('EmployeeDocument::store - KONTROLER WYWOŁANY (walidacja OK)', [
-            'employee_id' => $request->input('employee_id'),
-            'document_id' => $request->input('document_id'),
-            'has_file' => $request->hasFile('file'),
-            'user_id' => auth()->id(),
-            'env' => app()->environment(),
-        ]);
-
         try {
             $employee = Employee::findOrFail($request->input('employee_id'));
-            \Log::info('Employee found', ['employee' => $employee->id]);
             
             $validated = $request->validated();
-            \Log::info('Validation data retrieved', ['keys' => array_keys($validated)]);
-            
             unset($validated['employee_id']);
 
             // Ustaw kind na podstawie checkboxa
-            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
+            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') 
+                ? 'okresowy' 
+                : 'bezokresowy';
             unset($validated['is_okresowy']);
 
             // Jeśli dokument jest bezokresowy, ustaw valid_to na null
@@ -71,45 +61,27 @@ class EmployeeDocumentController extends Controller
                 $validated['valid_to'] = null;
             }
 
-            // NIE ustawiamy 'type' - pole nie jest używane i na Railway nie jest nullable
-            // W przyszłości: dodaj RUN_MIGRATIONS=true do Railway aby migracja 2026_02_09_164059 mogła się wykonać
-
-            \Log::info('Data prepared for insert', ['data' => $validated]);
-
             // Upload pliku jeśli został przesłany
             if ($request->hasFile('file')) {
                 $file = $request->file('file');
                 $directory = 'employee_documents/' . $employee->id;
-                \Log::info('File upload starting', ['directory' => $directory]);
-                
-                $filePath = $file->store($directory, 'public');
-                \Log::info('File uploaded', ['path' => $filePath]);
-
-                $validated['file_path'] = $filePath;
+                $validated['file_path'] = $file->store($directory, 'public');
             }
 
-            \Log::info('Creating EmployeeDocument record', ['employee_id' => $employee->id]);
-            $doc = $employee->employeeDocuments()->create($validated);
-            \Log::info('✅ EmployeeDocument created successfully!', ['id' => $doc->id]);
+            $employee->employeeDocuments()->create($validated);
 
             return redirect()->route('employees.show', $employee)
                 ->with('success', 'Dokument został dodany pomyślnie!');
                 
         } catch (\Exception $e) {
-            \Log::error('❌ EmployeeDocument::store - EXCEPTION IN CONTROLLER', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
+            \Log::error('EmployeeDocument::store failed', [
+                'error' => $e->getMessage(),
+                'employee_id' => $request->input('employee_id'),
             ]);
             
-            return redirect()
-                ->route('employee-documents.create', [
-                    'employee_id' => $request->input('employee_id'),
-                    'document_id' => $request->input('document_id'),
-                ])
-                ->with('error', '❌ Błąd w kontrolerze: ' . $e->getMessage())
-                ->withInput();
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Nie udało się dodać dokumentu. Spróbuj ponownie.');
         }
     }
 
