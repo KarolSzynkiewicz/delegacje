@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
 use App\Models\Document;
+use App\Http\Requests\StoreEmployeeDocumentRequest;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -41,215 +42,38 @@ class EmployeeDocumentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreEmployeeDocumentRequest $request): RedirectResponse
     {
-        // #region agent log
-        \Log::info('EmployeeDocument::store - Entry', [
-            'has_file' => $request->hasFile('file'),
-            'employee_id' => $request->input('employee_id'),
-            'document_id' => $request->input('document_id'),
-            'user_id' => auth()->id(),
-            'env' => app()->environment(),
-        ]);
-        // #endregion
+        $employee = Employee::findOrFail($request->input('employee_id'));
+        
+        $validated = $request->validated();
+        unset($validated['employee_id']);
 
-        try {
-            $validated = $request->validate([
-                'employee_id' => 'required|exists:employees,id',
-                'document_id' => 'required|exists:documents,id',
-                'valid_from' => 'required|date',
-                'valid_to' => 'nullable|date|after_or_equal:valid_from',
-                'is_okresowy' => 'nullable|boolean',
-                'notes' => 'nullable|string',
-                'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
-            ]);
+        // Ustaw kind na podstawie checkboxa
+        $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
+        unset($validated['is_okresowy']);
 
-            \Log::info('EmployeeDocument::store - Validation passed', [
-                'validated_keys' => array_keys($validated),
-            ]);
-
-            $employee = Employee::findOrFail($validated['employee_id']);
-            unset($validated['employee_id']);
-
-            // Ustaw kind na podstawie checkboxa
-            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
-            unset($validated['is_okresowy']);
-
-            // Jeśli dokument jest bezokresowy, ustaw valid_to na null
-            if ($validated['kind'] === 'bezokresowy') {
-                $validated['valid_to'] = null;
-            }
-
-            // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
-            $validated['type'] = null;
-
-            // Upload pliku jeśli został przesłany
-            if ($request->hasFile('file')) {
-                // #region agent log
-                $storageRoot = Storage::disk('public')->path('');
-                $storageConfigRoot = config('filesystems.disks.public.root');
-                $dataExists = is_dir('/data');
-                $dataWritable = is_writable('/data');
-                @file_put_contents($logFile, json_encode([
-                    'id' => 'log_' . time() . '_file_upload_start',
-                    'timestamp' => time() * 1000,
-                    'location' => 'EmployeeDocumentController.php:73',
-                    'message' => 'File upload starting - storage check',
-                    'data' => [
-                        'storage_root' => $storageRoot,
-                        'config_root' => $storageConfigRoot,
-                        '/data exists' => $dataExists,
-                        '/data writable' => $dataWritable,
-                        'file_name' => $request->file('file')->getClientOriginalName(),
-                        'file_size' => $request->file('file')->getSize(),
-                    ],
-                    'runId' => 'run1',
-                    'hypothesisId' => 'B,C'
-                ]) . "\n", FILE_APPEND);
-                // #endregion
-
-                $file = $request->file('file');
-                $directory = 'employee_documents/' . $employee->id;
-                
-                // #region agent log
-                $fullDirectoryPath = Storage::disk('public')->path($directory);
-                $directoryExists = Storage::disk('public')->exists($directory);
-                @file_put_contents($logFile, json_encode([
-                    'id' => 'log_' . time() . '_directory_check',
-                    'timestamp' => time() * 1000,
-                    'location' => 'EmployeeDocumentController.php:79',
-                    'message' => 'Directory check before upload',
-                    'data' => [
-                        'directory' => $directory,
-                        'full_path' => $fullDirectoryPath,
-                        'exists' => $directoryExists,
-                        'parent_writable' => is_writable(dirname($fullDirectoryPath)),
-                    ],
-                    'runId' => 'run1',
-                    'hypothesisId' => 'B'
-                ]) . "\n", FILE_APPEND);
-                // #endregion
-                
-                // Użyj store() - tak samo jak w ProjectFileController (działa na Railway)
-                // Automatycznie generuje unikalną nazwę pliku i tworzy katalogi
-                $filePath = $file->store($directory, 'public');
-                
-                // #region agent log
-                @file_put_contents($logFile, json_encode([
-                    'id' => 'log_' . time() . '_store_result',
-                    'timestamp' => time() * 1000,
-                    'location' => 'EmployeeDocumentController.php:80',
-                    'message' => 'store() result',
-                    'data' => [
-                        'file_path' => $filePath,
-                        'file_path_is_false' => ($filePath === false),
-                        'directory' => $directory,
-                    ],
-                    'runId' => 'run1',
-                    'hypothesisId' => 'B'
-                ]) . "\n", FILE_APPEND);
-                // #endregion
-                
-                if (!$filePath) {
-                    // #region agent log
-                    @file_put_contents($logFile, json_encode([
-                        'id' => 'log_' . time() . '_store_failed',
-                        'timestamp' => time() * 1000,
-                        'location' => 'EmployeeDocumentController.php:82',
-                        'message' => 'store() returned false - upload failed',
-                        'data' => [
-                            'directory' => $directory,
-                            'storage_root' => $storageRoot,
-                        ],
-                        'runId' => 'run1',
-                        'hypothesisId' => 'B'
-                    ]) . "\n", FILE_APPEND);
-                    // #endregion
-                    throw new \Exception('Nie udało się zapisać pliku.');
-                }
-                
-                // #region agent log
-                $fileExists = Storage::disk('public')->exists($filePath);
-                $fullFilePath = Storage::disk('public')->path($filePath);
-                @file_put_contents($logFile, json_encode([
-                    'id' => 'log_' . time() . '_file_after_upload',
-                    'timestamp' => time() * 1000,
-                    'location' => 'EmployeeDocumentController.php:85',
-                    'message' => 'File check after upload',
-                    'data' => [
-                        'file_path' => $filePath,
-                        'full_path' => $fullFilePath,
-                        'exists' => $fileExists,
-                        'file_size' => $fileExists ? Storage::disk('public')->size($filePath) : null,
-                    ],
-                    'runId' => 'run1',
-                    'hypothesisId' => 'B'
-                ]) . "\n", FILE_APPEND);
-                // #endregion
-                
-                $validated['file_path'] = $filePath;
-            }
-
-            // #region agent log
-            @file_put_contents($logFile, json_encode([
-                'id' => 'log_' . time() . '_creating_model',
-                'timestamp' => time() * 1000,
-                'location' => 'EmployeeDocumentController.php:88',
-                'message' => 'Creating EmployeeDocument model',
-                'data' => [
-                    'employee_id' => $employee->id,
-                    'has_file_path' => isset($validated['file_path']),
-                ],
-                'runId' => 'run1',
-                'hypothesisId' => 'B'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
-            // #endregion
-
-            $employeeDocument = $employee->employeeDocuments()->create($validated);
-
-            // #region agent log
-            @file_put_contents($logFile, json_encode([
-                'id' => 'log_' . time() . '_success',
-                'timestamp' => time() * 1000,
-                'location' => 'EmployeeDocumentController.php:90',
-                'message' => 'EmployeeDocument created successfully',
-                'data' => [
-                    'document_id' => $employeeDocument->id,
-                    'file_path' => $employeeDocument->file_path,
-                ],
-                'runId' => 'run1',
-                'hypothesisId' => 'B'
-            ]) . "\n", FILE_APPEND | LOCK_EX);
-            // #endregion
-
-            return redirect()->route('employees.show', $employee)
-                ->with('success', 'Dokument został dodany.');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('EmployeeDocument::store - Validation error', [
-                'errors' => $e->errors(),
-            ]);
-            return redirect()
-                ->route('employee-documents.create', [
-                    'employee_id' => $request->input('employee_id'),
-                    'document_id' => $request->input('document_id'),
-                ])
-                ->withErrors($e->errors())
-                ->withInput();
-        } catch (\Exception $e) {
-            \Log::error('EmployeeDocument::store - Exception', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => explode("\n", $e->getTraceAsString()),
-            ]);
-            return redirect()
-                ->route('employee-documents.create', [
-                    'employee_id' => $request->input('employee_id'),
-                    'document_id' => $request->input('document_id'),
-                ])
-                ->with('error', 'Wystąpił błąd podczas dodawania dokumentu: ' . $e->getMessage())
-                ->withInput();
+        // Jeśli dokument jest bezokresowy, ustaw valid_to na null
+        if ($validated['kind'] === 'bezokresowy') {
+            $validated['valid_to'] = null;
         }
+
+        // Ustaw type - pole wymagane przez bazę danych (może być null jeśli nieużywane)
+        $validated['type'] = null;
+
+        // Upload pliku jeśli został przesłany
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $directory = 'employee_documents/' . $employee->id;
+            $filePath = $file->store($directory, 'public');
+
+            $validated['file_path'] = $filePath;
+        }
+
+        $employee->employeeDocuments()->create($validated);
+
+        return redirect()->route('employees.show', $employee)
+            ->with('success', 'Dokument został dodany.');
     }
 
     /**
