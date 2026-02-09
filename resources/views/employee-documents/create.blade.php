@@ -9,6 +9,19 @@
         <div class="container-xxl">
             <div class="row justify-content-center">
                 <div class="col-md-8">
+                    <!-- Flash Messages -->
+                    @if(session('success'))
+                        <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+                            {{ session('success') }}
+                        </x-ui.alert>
+                    @endif
+
+                    @if(session('error'))
+                        <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-3">
+                            {{ session('error') }}
+                        </x-ui.alert>
+                    @endif
+
                     <x-ui.card>
                         <x-ui.errors />
 
