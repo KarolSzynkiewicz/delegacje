@@ -61,12 +61,21 @@ class StoreEmployeeDocumentRequest extends FormRequest
      */
     protected function failedValidation(Validator $validator)
     {
-        Log::error('StoreEmployeeDocumentRequest: Validation failed', [
+        // Bardzo agresywne logowanie - zapisz do pliku I do log
+        $errorData = [
             'errors' => $validator->errors()->all(),
+            'messages' => $validator->errors()->messages(),
             'input' => $this->except(['_token', 'file']),
             'employee_id' => $this->input('employee_id'),
             'document_id' => $this->input('document_id'),
-        ]);
+            'url' => $this->url(),
+            'method' => $this->method(),
+        ];
+        
+        Log::error('StoreEmployeeDocumentRequest: Validation FAILED', $errorData);
+        
+        // Dodatkowo zapisz do emergency log
+        Log::channel('stack')->error('VALIDATION FAILED - EmployeeDocument', $errorData);
 
         parent::failedValidation($validator);
     }
