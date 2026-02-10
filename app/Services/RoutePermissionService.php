@@ -258,11 +258,14 @@ class RoutePermissionService
             // - "weekly-overview.index" -> "weekly-overview" (remove action)
             if (count($parts) === 1) {
                 // No dots - route name is the resource (e.g., "dashboard")
-                return $routeName;
+                // Map "tasks" to "project-tasks" (unify tasks and project-tasks)
+                return $routeName === 'tasks' ? 'project-tasks' : $routeName;
             }
             // Has dots - remove last part (action)
             array_pop($parts);
-            return implode('.', $parts) ?: null;
+            $resource = implode('.', $parts);
+            // Map "tasks" to "project-tasks" (unify tasks and project-tasks)
+            return $resource === 'tasks' ? 'project-tasks' : ($resource ?: null);
         }
         
         // For resource routes: remove the last part (action) to get resource
@@ -272,6 +275,11 @@ class RoutePermissionService
         // e.g., "projects.assignments.index" -> "assignments"
         // e.g., "vehicle-assignments.show" -> "vehicle-assignments"
         $resource = implode('.', $parts);
+        
+        // Map "tasks" to "project-tasks" (unify tasks and project-tasks)
+        if ($resource === 'tasks') {
+            $resource = 'project-tasks';
+        }
         
         // For nested resources, take the last part
         // e.g., "employees.vehicles" -> "vehicles"
@@ -398,9 +406,9 @@ class RoutePermissionService
             'return-trips' => 'Zjazdy',
             'comments' => 'Komentarze',
             'project-files' => 'Pliki projektów',
-            'project-tasks' => 'Zadania projektów',
+            'project-tasks' => 'Zadania',
             'files' => 'Pliki',
-            'tasks' => 'Zadania',
+            'tasks' => 'Zadania', // Mapowane na project-tasks w extractResourceFromRoute
         ];
         
         return $labels[$resource] ?? ucfirst(str_replace('-', ' ', $resource));

@@ -122,17 +122,33 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Global tasks view
     Route::get('tasks', [\App\Http\Controllers\ProjectTaskController::class, 'index'])
         ->name('tasks.index')
-        ->defaults('permission_type', 'view')
+        ->defaults('permission_type', 'resource')
         ->defaults('resource', 'project-tasks');
     
     // Global tasks store (without project requirement)
     Route::post('tasks', [\App\Http\Controllers\ProjectTaskController::class, 'storeGlobal'])
         ->name('tasks.store')
-        ->defaults('permission_type', 'create')
+        ->defaults('permission_type', 'resource')
         ->defaults('resource', 'project-tasks');
     
-    Route::resource('projects.tasks', \App\Http\Controllers\ProjectTaskController::class)
-        ->except(['index', 'create']);
+    // Projects.tasks routes (explicit routes with defaults instead of resource)
+    Route::get('projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'show'])
+        ->name('projects.tasks.show')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'project-tasks');
+    Route::get('projects/{project}/tasks/{task}/edit', [\App\Http\Controllers\ProjectTaskController::class, 'edit'])
+        ->name('projects.tasks.edit')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'project-tasks');
+    Route::match(['put', 'patch'], 'projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'update'])
+        ->name('projects.tasks.update')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'project-tasks');
+    Route::delete('projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'destroy'])
+        ->name('projects.tasks.destroy')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'project-tasks');
+    
     Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])
         ->name('projects.tasks.mark-in-progress')
         ->defaults('permission_type', 'action')
@@ -163,15 +179,15 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Global task views (for tasks without project)
     Route::get('tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'showGlobal'])
         ->name('tasks.show')
-        ->defaults('permission_type', 'view')
+        ->defaults('permission_type', 'resource')
         ->defaults('resource', 'project-tasks');
     Route::get('tasks/{task}/edit', [\App\Http\Controllers\ProjectTaskController::class, 'editGlobal'])
         ->name('tasks.edit')
-        ->defaults('permission_type', 'edit')
+        ->defaults('permission_type', 'resource')
         ->defaults('resource', 'project-tasks');
     Route::put('tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'updateGlobal'])
         ->name('tasks.update')
-        ->defaults('permission_type', 'edit')
+        ->defaults('permission_type', 'resource')
         ->defaults('resource', 'project-tasks');
     
     // Comments (polymorphic)

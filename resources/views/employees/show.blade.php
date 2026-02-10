@@ -7,6 +7,18 @@
     </x-slot>
 
     <div class="container-xxl">
+        @if(session('success'))
+            <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+                {{ session('success') }}
+            </x-ui.alert>
+        @endif
+
+        @if(session('error'))
+            <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-3">
+                {{ session('error') }}
+            </x-ui.alert>
+        @endif
+
         <div class="row">
             <div class="col-md-12">
                 <livewire:employee-tabs :employee="$employee" />

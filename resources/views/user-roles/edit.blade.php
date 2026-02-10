@@ -83,22 +83,34 @@
                                         'type' => $type,
                                         'permissions' => ['C' => null, 'R' => null, 'U' => null, 'D' => null]
                                     ];
+                                } else {
+                                    // If resource already exists, use the highest type (resource > action > view)
+                                    // This ensures that if we have both 'view' and 'resource' types for same resource,
+                                    // we use 'resource' which allows full CRUD
+                                    $existingType = $groupedPermissions[$resource]['type'];
+                                    $typePriority = ['resource' => 3, 'action' => 2, 'view' => 1];
+                                    if (($typePriority[$type] ?? 0) > ($typePriority[$existingType] ?? 0)) {
+                                        $groupedPermissions[$resource]['type'] = $type;
+                                    }
                                 }
                                 
-                                // Map actions to CRUD columns based on type
+                                // Map actions to CRUD columns
+                                // Use the resource type (not individual permission type) to determine which columns to show
+                                $resourceType = $groupedPermissions[$resource]['type'];
                                 $crud = null;
-                                if ($type === 'view') {
+                                
+                                if ($resourceType === 'view') {
                                     // VIEW: only .view -> R (Czytaj)
                                     if ($action === 'view') {
                                         $crud = 'R';
                                     }
-                                } elseif ($type === 'action') {
+                                } elseif ($resourceType === 'action') {
                                     // ACTION: only .update -> U (Edycja)
                                     if ($action === 'update') {
                                         $crud = 'U';
                                     }
                                 } else {
-                                    // RESOURCE: full CRUD
+                                    // RESOURCE: full CRUD - map all actions
                                     $crudMap = [
                                         'view' => 'R',
                                         'create' => 'C',
