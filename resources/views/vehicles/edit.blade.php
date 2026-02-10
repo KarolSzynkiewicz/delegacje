@@ -90,7 +90,7 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <x-ui.input 
                                     type="date" 
@@ -100,13 +100,23 @@
                                 />
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <x-ui.input 
                                     type="date" 
                                     name="insurance_valid_to" 
                                     label="OC Ważne Do"
                                     value="{{ old('insurance_valid_to', $vehicle->insurance_valid_to?->format('Y-m-d')) }}"
+                                />
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <x-ui.input 
+                                    type="date" 
+                                    name="ac_wazne_do" 
+                                    label="AC Ważne Do"
+                                    value="{{ old('ac_wazne_do', $vehicle->ac_wazne_do?->format('Y-m-d')) }}"
                                 />
                             </div>
                         </div>

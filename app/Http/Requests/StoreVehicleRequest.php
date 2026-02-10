@@ -29,6 +29,7 @@ class StoreVehicleRequest extends FormRequest
             'technical_condition' => ['required', 'in:excellent,good,fair,poor,workshop'],
             'inspection_valid_to' => ['nullable', 'date'],
             'insurance_valid_to' => ['nullable', 'date'],
+            'ac_wazne_do' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];

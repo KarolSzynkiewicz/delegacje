@@ -46,7 +46,7 @@
                                 {{ $project->contract_amount ? number_format($project->contract_amount, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
                             </x-ui.detail-item>
                         @endif
-                        <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' PLN' : '-' }}</x-ui.detail-item>
+                        <x-ui.detail-item label="Budżet:">{{ $project->budget ? number_format($project->budget, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}</x-ui.detail-item>
                     @endif
                     @if($project->location)
                     <x-ui.detail-item label="Lokalizacja:">{{ $project->location->name }}</x-ui.detail-item>

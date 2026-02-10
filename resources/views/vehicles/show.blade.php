@@ -86,6 +86,33 @@
                     </div>
                 </div>
 
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h5>OC Ważne Do</h5>
+                        <p>
+                            @if ($vehicle->insurance_valid_to)
+                                <x-ui.badge variant="{{ $vehicle->insurance_valid_to < now() ? 'danger' : 'success' }}">
+                                    {{ $vehicle->insurance_valid_to->format('Y-m-d') }}
+                                </x-ui.badge>
+                            @else
+                                -
+                            @endif
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>AC Ważne Do</h5>
+                        <p>
+                            @if ($vehicle->ac_wazne_do)
+                                <x-ui.badge variant="{{ $vehicle->ac_wazne_do < now() ? 'danger' : 'success' }}">
+                                    {{ $vehicle->ac_wazne_do->format('Y-m-d') }}
+                                </x-ui.badge>
+                            @else
+                                -
+                            @endif
+                        </p>
+                    </div>
+                </div>
+
                 @if ($vehicle->notes)
                     <div class="mb-3">
                         <h5>Notatki</h5>
