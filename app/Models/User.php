@@ -78,10 +78,14 @@ class User extends Authenticatable
     /**
      * Check if user manages a specific project.
      */
-    public function managesProject(int $projectId): bool
+    public function managesProject(?int $projectId): bool
     {
         if ($this->isAdmin()) {
             return true;
+        }
+        
+        if (!$projectId) {
+            return false;
         }
         
         return $this->managedProjects()->where('project_id', $projectId)->exists();
