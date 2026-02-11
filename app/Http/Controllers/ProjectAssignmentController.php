@@ -214,7 +214,7 @@ class ProjectAssignmentController extends Controller
                 ->with("success", "Przypisanie zostało zaktualizowane.");
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()
-                ->route("assignments.edit", $assignment)
+                ->route("assignments.edit", ['project_assignment' => $assignment])
                 ->withErrors($e->errors())
                 ->withInput();
         }

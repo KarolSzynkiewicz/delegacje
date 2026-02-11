@@ -764,7 +764,9 @@
                                                 @elseif(isset($employeeData['assignment']) && $employeeData['assignment'])
                                                     @php
                                                         $assignment = $employeeData['assignment'];
-                                                        $editUrl = route('assignments.edit', ['project_assignment' => $assignment->id ?? $assignment]);
+                                                        // Upewnij się, że używamy ID jeśli assignment jest obiektem
+                                                        $assignmentId = is_object($assignment) ? $assignment->id : $assignment;
+                                                        $editUrl = route('assignments.edit', ['project_assignment' => $assignmentId]);
                                                     @endphp
                                                     <x-ui.clickable-badge variant="accent" :href="$editUrl">
                                                         {{ $employeeData['role']->name ?? '-' }}
