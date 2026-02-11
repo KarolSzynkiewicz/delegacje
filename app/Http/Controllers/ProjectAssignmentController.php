@@ -210,11 +210,11 @@ class ProjectAssignmentController extends Controller
             );
 
             return redirect()
-                ->route("projects.show", $assignment->project_id)
+                ->route("project-assignments.index")
                 ->with("success", "Przypisanie zostało zaktualizowane.");
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()
-                ->route("assignments.edit", ['project_assignment' => $assignment->id ?? $assignment])
+                ->route("project-assignments.edit", $assignment)
                 ->withErrors($e->errors())
                 ->withInput();
         }
@@ -258,30 +258,29 @@ class ProjectAssignmentController extends Controller
                 }
                 
                 return redirect()
-                    ->route("projects.show", $assignment->project_id)
+                    ->route("project-assignments.index")
                     ->with("error", $message);
             }
             
-            $projectId = $assignment->project_id;
             $assignment->delete();
 
             return redirect()
-                ->route("projects.show", $projectId)
+                ->route("project-assignments.index")
                 ->with("success", "Przypisanie zostało usunięte.");
         } catch (\Illuminate\Database\QueryException $e) {
             // Foreign key constraint violation
             if ($e->getCode() == 23000) {
                 return redirect()
-                    ->route("projects.show", $assignment->project_id)
+                    ->route("project-assignments.index")
                     ->with("error", "Nie można usunąć przypisania, ponieważ są powiązane rekordy (np. godziny pracy, zjazdy, wyposażenie). Najpierw usuń lub edytuj powiązane dane.");
             }
             
             return redirect()
-                ->route("projects.show", $assignment->project_id)
+                ->route("project-assignments.index")
                 ->with("error", "Wystąpił błąd podczas usuwania przypisania: " . $e->getMessage());
         } catch (\Exception $e) {
             return redirect()
-                ->route("projects.show", $assignment->project_id)
+                ->route("project-assignments.index")
                 ->with("error", "Wystąpił błąd podczas usuwania przypisania: " . $e->getMessage());
         }
     }
