@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('employees.show', $employee) }}"
+                    href="{{ $employee ? route('employees.show', $employee) : route('employees.index') }}"
                     action="back"
                 >
                     Powrót
@@ -99,7 +99,7 @@
                         </x-ui.button>
                         <x-ui.button 
                             variant="ghost" 
-                            href="{{ route('employees.show', $employee) }}"
+                            href="{{ $employee ? route('employees.show', $employee) : route('employees.index') }}"
                             action="cancel"
                         >
                             Anuluj

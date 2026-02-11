@@ -41,7 +41,7 @@ return [
     
     [
         'label' => 'Logistyka',
-        'icon' => 'bi bi-truck',
+        'icon' => 'bi bi-tools',
         'items' => [
             'locations',
             'equipment',
