@@ -92,6 +92,7 @@ return [
         'items' => [
             'users',
             'user_roles',
+            'system_actions',
         ],
     ],
 ];

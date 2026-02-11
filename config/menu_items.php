@@ -181,6 +181,12 @@ return [
         'label' => 'Role użytkowników',
     ],
     
+    'system_actions' => [
+        'route' => 'system-actions.index',
+        'icon' => 'bi bi-gear',
+        'label' => 'Akcje systemowe',
+    ],
+    
     'mine_projects' => [
         'route' => 'mine.projects.index',
         'icon' => 'bi bi-folder',

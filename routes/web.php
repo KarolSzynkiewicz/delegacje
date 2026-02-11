@@ -58,6 +58,21 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // IMPORTANT: Action routes MUST be defined BEFORE resource routes to avoid route conflicts
     // Laravel matches routes in order, so specific routes (like /prepare) must come before parameterized routes (like /{id})
     Route::group(['defaults' => ['permission_type' => 'action']], function () {
+        // System actions
+        Route::post('/system-actions/clear-cache', function () {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+                \Illuminate\Support\Facades\Artisan::call('permission:cache-reset');
+                \Illuminate\Support\Facades\Cache::flush();
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', 'Wszystkie cache zostały wyczyszczone pomyślnie!');
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd: ' . $e->getMessage());
+            }
+        })->name('system-actions.clear-cache')
+          ->defaults('resource', 'system-actions');
         // Return Trips Actions - MUST BE BEFORE resource routes to avoid route conflict
         Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
             ->name('return-trips.prepare-form')
@@ -385,6 +400,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/dashboard', function () {
             return view('dashboard');
         })->name('dashboard');
+        
+        Route::get('/system-actions', function () {
+            return view('system-actions');
+        })->name('system-actions.index');
         
         // Redirect old route to new one
         Route::get('/dashboard/profitability', function () {
