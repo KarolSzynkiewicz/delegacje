@@ -216,7 +216,7 @@
                     <div class="mb-4">
                         <x-ui.table-header title="Przypisania do projektów">
                             <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
+                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
                             </x-slot>
                         </x-ui.table-header>
                         @if($tabData && $tabData->count() > 0)
@@ -266,7 +266,7 @@
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('assignments.show', ['project_assignment' => $assignment]) }}" class="btn-sm">
+                                                    <x-ui.button variant="ghost" href="{{ route('project-assignments.show', $assignment) }}" class="btn-sm">
                                                         <i class="bi bi-eye"></i> Szczegóły
                                                     </x-ui.button>
                                                 </td>
@@ -282,8 +282,8 @@
                             >
                                 <x-ui.button 
                                     variant="primary" 
-                                    href="{{ route('assignments.create', ['employee_id' => $employee->id]) }}"
-                                    routeName="assignments.create"
+                                    href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}"
+                                    routeName="project-assignments.create"
                                     action="create"
                                 >
                                     Dodaj przypisanie

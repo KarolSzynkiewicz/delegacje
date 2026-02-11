@@ -101,9 +101,9 @@
                                 </td>
                                 <td>
                                     <x-action-buttons
-                                        viewRoute="{{ route('assignments.show', ['project_assignment' => $assignment]) }}"
-                                        editRoute="{{ route('assignments.edit', ['project_assignment' => $assignment]) }}"
-                                        deleteRoute="{{ route('assignments.destroy', ['project_assignment' => $assignment]) }}"
+                                        viewRoute="{{ route('project-assignments.show', $assignment) }}"
+                                        editRoute="{{ route('project-assignments.edit', $assignment) }}"
+                                        deleteRoute="{{ route('project-assignments.destroy', $assignment) }}"
                                         deleteMessage="Czy na pewno chcesz usunąć to przypisanie?"
                                     />
                                 </td>

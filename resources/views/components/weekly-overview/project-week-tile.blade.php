@@ -108,7 +108,7 @@
                                                             <i class="bi bi-arrow-left-right"></i> Zmienna
                                                         </x-ui.badge>
                                                     @elseif(isset($employeeData['assignment']))
-                                                        <a href="{{ route('assignments.show', ['project_assignment' => $employeeData['assignment']]) }}" class="text-decoration-none">
+                                                        <a href="{{ route('project-assignments.show', $employeeData['assignment']) }}" class="text-decoration-none">
                                                             <x-ui.badge variant="accent">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
                                                         </a>
                                                     @else
@@ -175,12 +175,12 @@
                             </div>
                             <div class="mt-2">
                                 @if(isset($weekData['week']) && isset($weekData['week']['start']) && isset($weekData['week']['end']))
-                                    <x-ui.button variant="primary" href="{{ route('assignments.create', ['project_id' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="w-100 btn-sm">
+                                    <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         {{ $weekData['assigned_employees']->count() > 0 ? 'Dodaj' : 'Przypisz' }}
                                     </x-ui.button>
                                 @else
-                                    <x-ui.button variant="primary" href="{{ route('assignments.create', ['project_id' => $project->id]) }}" class="w-100 btn-sm">
+                                    <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         {{ $weekData['assigned_employees']->count() > 0 ? 'Dodaj' : 'Przypisz' }}
                                     </x-ui.button>
@@ -192,12 +192,12 @@
                             </div>
                             <div class="mt-2">
                                 @if(isset($weekData['week']) && isset($weekData['week']['start']) && isset($weekData['week']['end']))
-                                    <x-ui.button variant="primary" href="{{ route('assignments.create', ['project_id' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="w-100 btn-sm">
+                                    <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weekData['week']['start']->format('Y-m-d'), 'date_to' => $weekData['week']['end']->format('Y-m-d')]) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         Przypisz osoby
                                     </x-ui.button>
                                 @else
-                                    <x-ui.button variant="primary" href="{{ route('assignments.create', ['project_id' => $project->id]) }}" class="w-100 btn-sm">
+                                    <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}" class="w-100 btn-sm">
                                         <i class="bi bi-plus"></i>
                                         Przypisz osoby
                                     </x-ui.button>

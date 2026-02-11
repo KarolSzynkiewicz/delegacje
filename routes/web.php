@@ -215,37 +215,13 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::get('project-demands', [ProjectDemandController::class, 'all'])
         ->name('project-demands.index');
 
-    // Project assignments - resource routes with explicit defaults
-    // Note: Route::resource()->names() doesn't inherit group defaults, so we set them explicitly
-    Route::get('project-assignments/create', [ProjectAssignmentController::class, 'create'])
-        ->name('assignments.create')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'assignments');
-    Route::post('project-assignments', [ProjectAssignmentController::class, 'store'])
-        ->name('assignments.store')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'assignments');
-    Route::get('project-assignments/{project_assignment}', [ProjectAssignmentController::class, 'show'])
-        ->name('assignments.show')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'assignments');
-    Route::get('project-assignments/{project_assignment}/edit', [ProjectAssignmentController::class, 'edit'])
-        ->name('assignments.edit')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'assignments');
-    Route::match(['put', 'patch'], 'project-assignments/{project_assignment}', [ProjectAssignmentController::class, 'update'])
-        ->name('assignments.update')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'assignments');
-    Route::delete('project-assignments/{project_assignment}', [ProjectAssignmentController::class, 'destroy'])
-        ->name('assignments.destroy')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'assignments');
+    // Project assignments - standard resource route (inherits permission_type from group)
+    Route::resource('project-assignments', ProjectAssignmentController::class)
+        ->except(['index']);
     
     // Global route for all assignments (without project context)
     Route::get('project-assignments', [ProjectAssignmentController::class, 'all'])
-        ->name('project-assignments.index')
-        ->defaults('resource', 'assignments');
+        ->name('project-assignments.index');
 
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);

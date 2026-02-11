@@ -339,7 +339,7 @@
                                                                                     @php
                                                                                         $assignmentId = is_object($projectAssignment) ? $projectAssignment->id : $projectAssignment;
                                                                                     @endphp
-                                                                                    <a href="{{ route('assignments.edit', ['project_assignment' => $assignmentId]) }}" class="text-decoration-none text-primary">
+                                                                                    <a href="{{ route('project-assignments.edit', $assignmentId) }}" class="text-decoration-none text-primary">
                                                                                         <span class="d-none d-lg-inline">{{ $roleName !== 'Brak roli' ? Str::limit($roleName, 12) : Str::limit($dayData['project']->name, 12) }}</span>
                                                                                     </a>
                                                                                 @else

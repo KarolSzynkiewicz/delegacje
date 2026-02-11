@@ -7,8 +7,8 @@
                 @isset($project)
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('assignments.create', ['project_id' => $project->id]) }}"
-                        routeName="assignments.create"
+                        href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}"
+                        routeName="project-assignments.create"
                         action="create"
                     >
                         Przypisz Pracownika
@@ -16,8 +16,8 @@
                 @else
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('assignments.create') }}"
-                        routeName="assignments.create"
+                        href="{{ route('project-assignments.create') }}"
+                        routeName="project-assignments.create"
                         action="create"
                     >
                         Dodaj przypisanie
@@ -88,9 +88,9 @@
                                     </td>
                                     <td>
                                         <x-action-buttons
-                                            viewRoute="{{ route('assignments.show', ['project_assignment' => $assignment]) }}"
-                                            editRoute="{{ route('assignments.edit', ['project_assignment' => $assignment]) }}"
-                                            deleteRoute="{{ route('assignments.destroy', ['project_assignment' => $assignment]) }}"
+                                            viewRoute="{{ route('project-assignments.show', $assignment) }}"
+                                            editRoute="{{ route('project-assignments.edit', $assignment) }}"
+                                            deleteRoute="{{ route('project-assignments.destroy', $assignment) }}"
                                             deleteMessage="Czy na pewno chcesz usunąć to przypisanie?"
                                         />
                                     </td>
@@ -111,8 +111,8 @@
                 >
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('assignments.create', ['project_id' => $project->id]) }}"
-                        routeName="assignments.create"
+                        href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}"
+                        routeName="project-assignments.create"
                         action="create"
                     >
                         Przypisz pierwszego pracownika
