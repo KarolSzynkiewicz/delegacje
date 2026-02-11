@@ -8,7 +8,7 @@
                     <x-ui.button 
                         variant="primary" 
                         href="{{ route('assignments.create', ['project_id' => $project->id]) }}"
-                        routeName="project-assignments.create"
+                        routeName="assignments.create"
                         action="create"
                     >
                         Przypisz Pracownika
@@ -112,7 +112,7 @@
                     <x-ui.button 
                         variant="primary" 
                         href="{{ route('assignments.create', ['project_id' => $project->id]) }}"
-                        routeName="project-assignments.create"
+                        routeName="assignments.create"
                         action="create"
                     >
                         Przypisz pierwszego pracownika
