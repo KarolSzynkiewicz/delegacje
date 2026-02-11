@@ -17,8 +17,13 @@ use Illuminate\Support\Facades\Route;
 // Healthcheck endpoint for Railway - NO middleware, NO APP_KEY requirement
 // This must be registered BEFORE api middleware group to avoid any middleware
 // Explicitly exclude from ALL middleware to ensure fast response
+// Returns 200 OK status for Railway health checks
 Route::get('/health', function () {
-    return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()], 200);
+    return response()->json([
+        'status' => 'ok', 
+        'timestamp' => now()->toIso8601String(),
+        'app' => 'Delegacje',
+    ], 200);
 })->withoutMiddleware([
     \Illuminate\Routing\Middleware\ThrottleRequests::class,
     \Illuminate\Routing\Middleware\SubstituteBindings::class,
