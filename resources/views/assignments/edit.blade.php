@@ -13,6 +13,18 @@
         </x-ui.page-header>
     </x-slot>
 
+    @if (session('success'))
+        <x-ui.alert variant="success" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
+
+    @if (session('error'))
+        <x-ui.alert variant="danger" dismissible class="mb-3">
+            {{ session('error') }}
+        </x-ui.alert>
+    @endif
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Edytuj Przypisanie">
