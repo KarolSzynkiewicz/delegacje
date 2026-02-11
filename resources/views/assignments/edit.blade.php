@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('assignments.show', $assignment) }}"
+                    href="{{ route('assignments.show', ['project_assignment' => $assignment]) }}"
                     action="back"
                 >
                     Powrót
@@ -18,7 +18,7 @@
             <x-ui.card label="Edytuj Przypisanie">
                 <!-- Błędy walidacji na górze -->
                 <x-ui.errors />
-                <form method="POST" action="{{ route('assignments.update', $assignment) }}">
+                <form method="POST" action="{{ route('assignments.update', ['project_assignment' => $assignment]) }}">
                     @csrf
                     @method('PUT')
 
