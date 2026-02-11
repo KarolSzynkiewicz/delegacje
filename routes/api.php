@@ -24,6 +24,46 @@ Route::get('/health', function () {
     \Illuminate\Routing\Middleware\SubstituteBindings::class,
 ]);
 
+// Clear cache endpoint (protected by simple token)
+Route::get('/clear-cache/{token}', function ($token) {
+    // Simple token check
+    if ($token !== 'delegate-clear-2024') {
+        abort(403, 'Invalid token');
+    }
+    
+    try {
+        // Clear all caches
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        \Illuminate\Support\Facades\Artisan::call('permission:cache-reset');
+        \Illuminate\Support\Facades\Artisan::call('view:clear');
+        \Illuminate\Support\Facades\Artisan::call('route:clear');
+        
+        // Clear specific caches
+        \Illuminate\Support\Facades\Cache::flush();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'All caches cleared successfully',
+            'timestamp' => now()->toIso8601String(),
+            'cleared' => [
+                'optimize',
+                'permissions',
+                'views',
+                'routes',
+                'cache',
+            ],
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+})->withoutMiddleware([
+    \Illuminate\Routing\Middleware\ThrottleRequests::class,
+    \Illuminate\Routing\Middleware\SubstituteBindings::class,
+]);
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
