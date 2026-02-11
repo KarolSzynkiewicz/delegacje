@@ -618,6 +618,7 @@ class WeeklyOverviewService
                 'role' => $primaryRole,
                 'role_stable' => $isRoleStable,
                 'accommodation' => $accommodationAssignment?->accommodation,
+                'accommodation_assignment' => $accommodationAssignment, // Full assignment for link
                 'vehicle' => $vehicleAssignment?->vehicle,
                 'vehicle_assignment' => $vehicleAssignment,
                 'has_vehicle_in_week' => $hasVehicleInWeek,

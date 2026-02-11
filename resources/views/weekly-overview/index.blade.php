@@ -795,7 +795,7 @@
                                             </td>
                                             <td>
                                                 @if(isset($employeeData['accommodation']) && $employeeData['accommodation'])
-                                                    <x-ui.clickable-badge variant="info" route="accommodations.show" :routeParams="['accommodation' => $employeeData['accommodation']]">
+                                                    <x-ui.clickable-badge variant="info" route="accommodation-assignments.show" :routeParams="['accommodation_assignment' => $employeeData['accommodation_assignment']]">
                                                         <i class="bi bi-house"></i> {{ $employeeData['accommodation']->name }}
                                                     </x-ui.clickable-badge>
                                                 @else
