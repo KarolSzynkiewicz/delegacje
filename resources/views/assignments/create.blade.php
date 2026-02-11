@@ -18,7 +18,7 @@
             <x-ui.card label="Dodaj Przypisanie Pracownika do Projektu">
                 <!-- Błędy walidacji na górze -->
                 <x-ui.errors />
-                <form method="POST" action="{{ route('project-assignments.store') }}" id="assignment-form">
+                <form method="POST" action="{{ route('assignments.store') }}" id="assignment-form">
                     @csrf
 
                     <div class="mb-3">

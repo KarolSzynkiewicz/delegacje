@@ -62,7 +62,7 @@ class ProjectAssignmentTest extends TestCase
 
         $response = $this->actingAs($this->user)
             ->from(route('assignments.create', ['project_id' => $project->id]))
-            ->post(route('project-assignments.store'), [
+            ->post(route('assignments.store'), [
                 'project_id' => $project->id,
                 'employee_id' => $employee->id,
                 'role_id' => $role->id,
@@ -130,7 +130,7 @@ class ProjectAssignmentTest extends TestCase
         ]);
 
         // Try to create overlapping assignment
-        $response = $this->actingAs($this->user)->post(route('project-assignments.store'), [
+        $response = $this->actingAs($this->user)->post(route('assignments.store'), [
             'project_id' => $project2->id,
             'employee_id' => $employee->id,
             'role_id' => $role->id,

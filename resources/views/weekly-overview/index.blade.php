@@ -1295,7 +1295,7 @@
                                     @if(isset($allProjects) && $allProjects->isNotEmpty())
                                         <div class="mb-3 pb-3 border-bottom">
                                             <h6 class="small fw-bold mb-2 text-white"><i class="bi bi-person-check"></i> Przypisz do projektu</h6>
-                                            <form method="POST" action="{{ route('project-assignments.store') }}" class="mb-0">
+                                            <form method="POST" action="{{ route('assignments.store') }}" class="mb-0">
                                                 @csrf
                                                 <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                                                 <input type="hidden" name="start_date" value="{{ $weeks[0]['start']->format('Y-m-d') }}">
