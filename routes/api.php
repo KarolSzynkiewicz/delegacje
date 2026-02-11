@@ -24,7 +24,39 @@ Route::get('/health', function () {
     \Illuminate\Routing\Middleware\SubstituteBindings::class,
 ]);
 
-// Clear cache endpoint (protected by simple token)
+// Clear permissions cache endpoint (light & fast - protected by simple token)
+Route::get('/clear-permissions/{token}', function ($token) {
+    // Simple token check
+    if ($token !== 'delegate-clear-2024') {
+        abort(403, 'Invalid token');
+    }
+    
+    try {
+        // Clear only permissions and routes - fast and safe
+        \Illuminate\Support\Facades\Artisan::call('permission:cache-reset');
+        \Illuminate\Support\Facades\Artisan::call('route:clear');
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Permissions and routes cache cleared successfully',
+            'timestamp' => now()->toIso8601String(),
+            'cleared' => [
+                'permissions',
+                'routes',
+            ],
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+})->withoutMiddleware([
+    \Illuminate\Routing\Middleware\ThrottleRequests::class,
+    \Illuminate\Routing\Middleware\SubstituteBindings::class,
+]);
+
+// Clear cache endpoint - full (protected by simple token)
 Route::get('/clear-cache/{token}', function ($token) {
     // Simple token check
     if ($token !== 'delegate-clear-2024') {

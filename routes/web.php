@@ -58,7 +58,22 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // IMPORTANT: Action routes MUST be defined BEFORE resource routes to avoid route conflicts
     // Laravel matches routes in order, so specific routes (like /prepare) must come before parameterized routes (like /{id})
     Route::group(['defaults' => ['permission_type' => 'action']], function () {
-        // System actions
+        // System actions - light cache clear (permissions + routes only)
+        Route::post('/system-actions/clear-permissions', function () {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('permission:cache-reset');
+                \Illuminate\Support\Facades\Artisan::call('route:clear');
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', 'Cache uprawnień i route zostały odświeżone!');
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd: ' . $e->getMessage());
+            }
+        })->name('system-actions.clear-permissions')
+          ->defaults('resource', 'system-actions');
+        
+        // System actions - full cache clear
         Route::post('/system-actions/clear-cache', function () {
             try {
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');

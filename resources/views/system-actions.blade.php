@@ -23,6 +23,31 @@
                         Zarządzaj cache aplikacji. Czyszczenie cache może pomóc rozwiązać problemy z uprawnieniami, widokami i route.
                     </p>
 
+                    <!-- Lekkie czyszczenie - tylko uprawnienia i route -->
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-arrow-clockwise text-primary"></i>
+                                    Odśwież uprawnienia i route
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    <strong>Zalecane:</strong> Usuwa cache uprawnień i route. Szybkie i bezpieczne.
+                                </p>
+                            </div>
+                            <form method="POST" action="{{ route('system-actions.clear-permissions') }}" class="ms-3">
+                                @csrf
+                                <x-ui.button 
+                                    variant="primary" 
+                                    type="submit"
+                                >
+                                    <i class="bi bi-arrow-clockwise"></i> Odśwież
+                                </x-ui.button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Pełne czyszczenie - wszystko -->
                     <div class="border rounded p-3">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
@@ -31,7 +56,7 @@
                                     Wyczyść wszystkie cache
                                 </h5>
                                 <p class="text-muted mb-0 small">
-                                    Usuwa cache: optimize, permissions, views, routes, cache aplikacji.
+                                    Usuwa wszystkie cache: optimize, permissions, views, routes, cache aplikacji. Może chwilowo spowolnić aplikację.
                                 </p>
                             </div>
                             <form method="POST" action="{{ route('system-actions.clear-cache') }}" class="ms-3">
@@ -39,7 +64,7 @@
                                 <x-ui.button 
                                     variant="danger" 
                                     type="submit"
-                                    onclick="return confirm('Czy na pewno chcesz wyczyścić wszystkie cache?')"
+                                    onclick="return confirm('Czy na pewno chcesz wyczyścić wszystkie cache? Aplikacja może być chwilowo wolniejsza.')"
                                 >
                                     <i class="bi bi-trash"></i> Wyczyść
                                 </x-ui.button>
