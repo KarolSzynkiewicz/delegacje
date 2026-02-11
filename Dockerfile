@@ -26,6 +26,10 @@ RUN npm ci --prefer-offline --no-audit
 # Copy application source
 COPY . .
 
+# Setup storage directories (BEFORE package:discover!)
+RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views \
+    && chmod -R 775 bootstrap/cache storage
+
 # Copy server.php for php artisan serve static file handling
 RUN cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php server.php && \
     cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php public/server.php
@@ -34,10 +38,6 @@ RUN cp vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php s
 RUN php artisan package:discover --ansi || true && \
     composer dump-autoload --optimize --classmap-authoritative && \
     npm run build && rm -rf node_modules
-
-# Setup storage directories
-RUN mkdir -p bootstrap/cache storage/framework/cache storage/framework/sessions storage/framework/views \
-    && chmod -R 775 bootstrap/cache storage
 
 # Production stage
 FROM php:8.3-cli
