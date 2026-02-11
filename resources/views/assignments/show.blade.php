@@ -13,7 +13,7 @@
             <x-slot name="right">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('assignments.edit', $assignment) }}"
+                    href="{{ route('assignments.edit', ['project_assignment' => $assignment]) }}"
                     routeName="assignments.edit"
                     action="edit"
                 >

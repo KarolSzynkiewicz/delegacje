@@ -336,7 +336,7 @@
                                                                             <div class="text-primary fw-semibold" title="{{ $projectTitle }}">
                                                                                 <i class="bi bi-briefcase-fill"></i>
                                                                                 @if($projectAssignment)
-                                                                                    <a href="{{ route('assignments.edit', $projectAssignment) }}" class="text-decoration-none text-primary">
+                                                                                    <a href="{{ route('assignments.edit', ['project_assignment' => $projectAssignment]) }}" class="text-decoration-none text-primary">
                                                                                         <span class="d-none d-lg-inline">{{ $roleName !== 'Brak roli' ? Str::limit($roleName, 12) : Str::limit($dayData['project']->name, 12) }}</span>
                                                                                     </a>
                                                                                 @else

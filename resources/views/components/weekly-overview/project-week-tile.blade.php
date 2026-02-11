@@ -108,7 +108,7 @@
                                                             <i class="bi bi-arrow-left-right"></i> Zmienna
                                                         </x-ui.badge>
                                                     @elseif(isset($employeeData['assignment']))
-                                                        <a href="{{ route('assignments.show', $employeeData['assignment']) }}" class="text-decoration-none">
+                                                        <a href="{{ route('assignments.show', ['project_assignment' => $employeeData['assignment']]) }}" class="text-decoration-none">
                                                             <x-ui.badge variant="accent">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
                                                         </a>
                                                     @else

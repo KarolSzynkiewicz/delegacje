@@ -266,7 +266,7 @@
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('assignments.show', $assignment) }}" class="btn-sm">
+                                                    <x-ui.button variant="ghost" href="{{ route('assignments.show', ['project_assignment' => $assignment]) }}" class="btn-sm">
                                                         <i class="bi bi-eye"></i> Szczegóły
                                                     </x-ui.button>
                                                 </td>

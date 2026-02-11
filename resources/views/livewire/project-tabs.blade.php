@@ -143,7 +143,7 @@
                                         <td>
                                             <x-ui.button 
                                                 variant="ghost" 
-                                                href="{{ route('assignments.show', $assignment) }}"
+                                                href="{{ route('assignments.show', ['project_assignment' => $assignment]) }}"
                                                 routeName="assignments.show"
                                                 action="view"
                                             />
