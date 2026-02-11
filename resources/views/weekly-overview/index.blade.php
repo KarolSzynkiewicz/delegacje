@@ -238,7 +238,7 @@
                                                     <td class="small" style="padding: 0.25rem;">
                                                         @if($role)
                                                             @php
-                                                                $createUrl = route('project-assignments.create', [
+                                                                $createUrl = route('assignments.create', [
                                                                     'project_id' => $project->id,
                                                                     'start_date' => $weeks[0]['start']->format('Y-m-d'),
                                                                     'end_date' => $weeks[0]['end']->format('Y-m-d'),
@@ -730,7 +730,7 @@
                 @if(isset($weekData['assigned_employees']) && $weekData['assigned_employees']->isNotEmpty())
                     <div class="mt-4">
                         <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
-                            <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                            <x-ui.button variant="primary" href="{{ route('assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
                                 Przypisz osoby
                             </x-ui.button>
                         </x-ui.table-header>
@@ -861,7 +861,7 @@
                 @else
                     <div class="mt-4">
                         <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
-                            <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                            <x-ui.button variant="primary" href="{{ route('assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
                                 Przypisz osoby
                             </x-ui.button>
                         </x-ui.table-header>
@@ -1216,7 +1216,7 @@
                                             <ul class="dropdown-menu" style="background-color: var(--bg-card); opacity: 1; z-index: 9999; position: absolute;">
                                                 @foreach($allProjects as $project)
                                                     <li>
-                                                        <a class="dropdown-item" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
+                                                        <a class="dropdown-item" href="{{ route('assignments.create', ['project_id' => $project->id, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
                                                             {{ $project->name }}
                                                         </a>
                                                     </li>

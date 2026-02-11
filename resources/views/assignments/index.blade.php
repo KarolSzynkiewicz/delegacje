@@ -7,7 +7,7 @@
                 @isset($project)
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}"
+                        href="{{ route('assignments.create', ['project_id' => $project->id]) }}"
                         routeName="project-assignments.create"
                         action="create"
                     >
@@ -16,8 +16,8 @@
                 @else
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('project-assignments.create') }}"
-                        routeName="project-assignments.create"
+                        href="{{ route('assignments.create') }}"
+                        routeName="assignments.create"
                         action="create"
                     >
                         Dodaj przypisanie
@@ -111,7 +111,7 @@
                 >
                     <x-ui.button 
                         variant="primary" 
-                        href="{{ route('project-assignments.create', ['project_id' => $project->id]) }}"
+                        href="{{ route('assignments.create', ['project_id' => $project->id]) }}"
                         routeName="project-assignments.create"
                         action="create"
                     >

@@ -61,7 +61,7 @@ class ProjectAssignmentTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->from(route('project-assignments.create', ['project_id' => $project->id]))
+            ->from(route('assignments.create', ['project_id' => $project->id]))
             ->post(route('project-assignments.store'), [
                 'project_id' => $project->id,
                 'employee_id' => $employee->id,

@@ -216,7 +216,7 @@
                     <div class="mb-4">
                         <x-ui.table-header title="Przypisania do projektów">
                             <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
+                                <x-ui.button variant="primary" href="{{ route('assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
                             </x-slot>
                         </x-ui.table-header>
                         @if($tabData && $tabData->count() > 0)
@@ -282,8 +282,8 @@
                             >
                                 <x-ui.button 
                                     variant="primary" 
-                                    href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}"
-                                    routeName="project-assignments.create"
+                                    href="{{ route('assignments.create', ['employee_id' => $employee->id]) }}"
+                                    routeName="assignments.create"
                                     action="create"
                                 >
                                     Dodaj przypisanie
