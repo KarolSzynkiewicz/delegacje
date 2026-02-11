@@ -64,3 +64,4 @@ COPY --from=base /var/www/html /var/www/html
 RUN chmod -R 777 storage bootstrap/cache
 
 ENTRYPOINT ["/entrypoint.sh"]
+# Dummy comment to bust Railway cache - 1770846603
