@@ -103,10 +103,10 @@
                         {{-- Szczegóły dostępności - wyświetlane bezpośrednio pod dropdownem --}}
                         <div id="availability-checker-container" class="mt-3">
                             <livewire:employee-availability-checker 
-                                wire:key="availability-checker-{{ old('employee_id', $assignment->employee_id) }}-{{ $startDate }}-{{ $endDate }}"
+                                wire:key="availability-checker-{{ old('employee_id', $assignment->employee_id) }}-{{ $startDate ? $startDate->format('Y-m-d') : '' }}-{{ $endDate ? $endDate->format('Y-m-d') : '' }}"
                                 :employee-id="old('employee_id', $assignment->employee_id)"
-                                :start-date="$startDate"
-                                :end-date="$endDate"
+                                :start-date="$startDate ? $startDate->format('Y-m-d') : null"
+                                :end-date="$endDate ? $endDate->format('Y-m-d') : null"
                             />
                         </div>
                         @endif
@@ -133,7 +133,7 @@
                             name="start_date" 
                             id="start-date-input"
                             label="Data Rozpoczęcia"
-                            value="{{ old('start_date', $assignment->start_date->format('Y-m-d')) }}"
+                            value="{{ old('start_date', $assignment->start_date ? $assignment->start_date->format('Y-m-d') : '') }}"
                             required="true"
                         />
                     </div>

@@ -162,6 +162,9 @@ class ProjectAssignmentController extends Controller
      */
     public function edit(ProjectAssignment $assignment): View
     {
+        // Load relationships to avoid N+1 queries
+        $assignment->load("employee", "project", "role");
+        
         $projects = Project::orderBy("name")->get();
         
         // Pobierz daty z przypisania do sprawdzenia dostępności

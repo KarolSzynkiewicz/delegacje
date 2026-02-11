@@ -132,6 +132,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->defaults('resource', 'project-tasks');
     
     // Projects.tasks routes (explicit routes with defaults instead of resource)
+    Route::post('projects/{project}/tasks', [\App\Http\Controllers\ProjectTaskController::class, 'store'])
+        ->name('projects.tasks.store')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'project-tasks');
     Route::get('projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'show'])
         ->name('projects.tasks.show')
         ->defaults('permission_type', 'resource')

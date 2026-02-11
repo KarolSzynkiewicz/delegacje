@@ -1,6 +1,12 @@
 @props(['project', 'users', 'isMineView' => false])
 
 <x-ui.card label="Zadania projektu">
+    @if(session('success'))
+        <x-alert type="success" :message="session('success')" />
+    @endif
+    @if(session('error'))
+        <x-alert type="danger" :message="session('error')" />
+    @endif
     @if(!$isMineView)
     <form action="{{ route('projects.tasks.store', $project) }}" method="POST" class="mb-4">
         @csrf
