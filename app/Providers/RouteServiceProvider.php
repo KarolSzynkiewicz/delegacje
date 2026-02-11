@@ -70,6 +70,11 @@ class RouteServiceProvider extends ServiceProvider
             return \App\Models\ProjectTask::findOrFail($value);
         });
 
+        // Route model binding for ProjectAssignment (project_assignment parameter)
+        Route::bind('project_assignment', function ($value) {
+            return \App\Models\ProjectAssignment::findOrFail($value);
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')
