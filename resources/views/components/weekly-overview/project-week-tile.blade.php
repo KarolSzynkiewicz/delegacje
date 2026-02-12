@@ -153,16 +153,30 @@
                                                     @if($employeeData['rotation'] ?? null)
                                                         @php
                                                             $rotationId = $employeeData['rotation']['id'] ?? null;
-                                                            $daysLeft = $employeeData['rotation']['days_left'] ?? 0;
+                                                            $daysLeft = $employeeData['rotation']['days_left'] ?? null;
                                                             $employee = $employeeData['employee'];
                                                         @endphp
-                                                        @if($rotationId)
-                                                            <a href="{{ route('employees.rotations.show', ['employee' => $employee->id, 'rotation' => $rotationId]) }}" 
-                                                               class="text-decoration-none {{ $daysLeft >= 0 ? 'text-primary' : 'text-danger' }} fw-semibold">
-                                                                {{ $daysLeft }}
-                                                            </a>
+                                                        @if($daysLeft !== null)
+                                                            @if($rotationId)
+                                                                <a href="{{ route('employees.rotations.show', ['employee' => $employee->id, 'rotation' => $rotationId]) }}" 
+                                                                   class="text-decoration-none {{ $daysLeft >= 0 ? 'text-primary' : 'text-danger' }} fw-semibold">
+                                                                    @if($daysLeft >= 0)
+                                                                        {{ $daysLeft }} {{ $daysLeft == 1 ? 'dzień' : 'dni' }}
+                                                                    @else
+                                                                        {{ abs($daysLeft) }} {{ abs($daysLeft) == 1 ? 'dzień' : 'dni' }} temu
+                                                                    @endif
+                                                                </a>
+                                                            @else
+                                                                <span class="{{ $daysLeft >= 0 ? 'text-primary' : 'text-danger' }} fw-semibold">
+                                                                    @if($daysLeft >= 0)
+                                                                        {{ $daysLeft }} {{ $daysLeft == 1 ? 'dzień' : 'dni' }}
+                                                                    @else
+                                                                        {{ abs($daysLeft) }} {{ abs($daysLeft) == 1 ? 'dzień' : 'dni' }} temu
+                                                                    @endif
+                                                                </span>
+                                                            @endif
                                                         @else
-                                                            <span class="{{ $daysLeft >= 0 ? 'text-primary' : 'text-danger' }} fw-semibold">{{ $daysLeft }}</span>
+                                                            <span class="text-muted fst-italic">Brak rotacji</span>
                                                         @endif
                                                     @else
                                                         <span class="text-muted fst-italic">Brak rotacji</span>

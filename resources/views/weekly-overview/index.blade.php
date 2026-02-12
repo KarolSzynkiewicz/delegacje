@@ -808,44 +808,33 @@
                                                 @if(isset($employeeData['rotation']) && $employeeData['rotation'])
                                                     @php
                                                         $rotation = $employeeData['rotation']['rotation'] ?? null;
-                                                        $startDate = $employeeData['rotation']['start_date'] ?? ($employeeData['rotation']->start_date ?? null);
-                                                        $endDate = $employeeData['rotation']['end_date'] ?? ($employeeData['rotation']->end_date ?? null);
-                                                        
-                                                        // Oblicz liczbę dni
-                                                        $daysCount = null;
-                                                        if ($startDate && $endDate) {
-                                                            $start = \Carbon\Carbon::parse($startDate);
-                                                            $end = \Carbon\Carbon::parse($endDate);
-                                                            $daysCount = $start->diffInDays($end) + 1; // +1 bo wliczamy oba dni
-                                                        } elseif ($startDate) {
-                                                            // Jeśli jest tylko startDate, oblicz do końca tygodnia
-                                                            $start = \Carbon\Carbon::parse($startDate);
-                                                            $weekEnd = $weeks[0]['end'];
-                                                            $daysCount = $start->diffInDays($weekEnd) + 1;
-                                                        } elseif ($endDate) {
-                                                            // Jeśli jest tylko endDate, oblicz od początku tygodnia
-                                                            $end = \Carbon\Carbon::parse($endDate);
-                                                            $weekStart = $weeks[0]['start'];
-                                                            $daysCount = $weekStart->diffInDays($end) + 1;
-                                                        }
+                                                        $rotationId = $employeeData['rotation']['id'] ?? null;
+                                                        $daysLeft = $employeeData['rotation']['days_left'] ?? null;
+                                                        $employee = $employeeData['employee'];
                                                     @endphp
-                                                    @if($rotation)
-                                                        <x-ui.clickable-badge variant="warning" route="employees.rotations.edit" :routeParams="['employee' => $employeeData['employee'], 'rotation' => $rotation]">
-                                                            <i class="bi bi-arrow-repeat"></i> 
-                                                            @if($daysCount !== null)
-                                                                {{ $daysCount }} {{ $daysCount == 1 ? 'dzień' : 'dni' }}
-                                                            @else
-                                                                Rotacja
-                                                            @endif
-                                                        </x-ui.clickable-badge>
+                                                    @if($rotation && $daysLeft !== null)
+                                                        @if($rotationId)
+                                                            <x-ui.clickable-badge variant="warning" route="employees.rotations.edit" :routeParams="['employee' => $employee, 'rotation' => $rotation]">
+                                                                <i class="bi bi-arrow-repeat"></i> 
+                                                                @if($daysLeft >= 0)
+                                                                    {{ $daysLeft }} {{ $daysLeft == 1 ? 'dzień' : 'dni' }}
+                                                                @else
+                                                                    {{ abs($daysLeft) }} {{ abs($daysLeft) == 1 ? 'dzień' : 'dni' }} temu
+                                                                @endif
+                                                            </x-ui.clickable-badge>
+                                                        @else
+                                                            <x-ui.badge variant="warning">
+                                                                <i class="bi bi-arrow-repeat"></i> 
+                                                                @if($daysLeft >= 0)
+                                                                    {{ $daysLeft }} {{ $daysLeft == 1 ? 'dzień' : 'dni' }}
+                                                                @else
+                                                                    {{ abs($daysLeft) }} {{ abs($daysLeft) == 1 ? 'dzień' : 'dni' }} temu
+                                                                @endif
+                                                            </x-ui.badge>
+                                                        @endif
                                                     @else
                                                         <x-ui.badge variant="warning">
-                                                            <i class="bi bi-arrow-repeat"></i> 
-                                                            @if($daysCount !== null)
-                                                                {{ $daysCount }} {{ $daysCount == 1 ? 'dzień' : 'dni' }}
-                                                            @else
-                                                                Rotacja
-                                                            @endif
+                                                            <i class="bi bi-arrow-repeat"></i> Rotacja
                                                         </x-ui.badge>
                                                     @endif
                                                 @else

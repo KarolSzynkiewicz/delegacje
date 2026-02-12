@@ -586,7 +586,8 @@ class WeeklyOverviewService
             $rotationInfo = null;
             
             if ($activeRotation) {
-                $daysLeft = now()->diffInDays($activeRotation->end_date, false);
+                // Oblicz ile dni zostało do końca rotacji (ujemne jeśli już się skończyła)
+                $daysLeft = now()->startOfDay()->diffInDays($activeRotation->end_date->startOfDay(), true);
                 $rotationInfo = [
                     'id' => $activeRotation->id,
                     'rotation' => $activeRotation, // Przekaż cały obiekt dla łatwego dostępu
