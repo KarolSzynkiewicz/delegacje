@@ -36,6 +36,12 @@ Aplikacja oferuje następujące moduły:
 | **Projekty** | Tworzenie i zarządzanie projektami. | Nazwa, Opis, Zapotrzebowanie na role. |
 | **Przypisania** | Przypisywanie pracowników do projektów z walidacją dostępności. | Pracownik, Projekt, Rola, Daty, Status. |
 | **Widok Tygodniowy** | Tygodniowy przegląd wszystkich projektów, pracowników i zasobów. | Projekty, Pracownicy, Pojazdy, Mieszkania, Zapotrzebowanie. |
+| **Rozliczenia (Payroll)** | Generowanie list płac dla pracowników na podstawie godzin i stawek. | Okres, Godziny, Stawka godzinowa, Waluta, Status. |
+| **Koszty Stałe** | Zarządzanie kosztami stałymi firmy (szablony i wpisy). | Nazwa, Kwota, Okres, Waluta, Kategoria. |
+| **Koszty Zmienne** | Zarządzanie kosztami zmiennymi projektów. | Projekt, Kwota, Data, Waluta, Opis. |
+| **Dashboard Finansowy** | Analiza rentowności firmy i projektów. | Przychody, Koszty, Marża, Rentowność. |
+| **Magazyn** | Zarządzanie sprzętem i wydaniami dla pracowników. | Sprzęt, Ilość, Pracownik, Data wydania/zwrotu. |
+| **Wyjazdy i Powroty** | Zarządzanie wyjazdami pracowników do projektów i powrotami. | Data, Pracownicy, Pojazd, Lokalizacja, Status. |
 | **Raporty** | Generowanie raportów z delegacji (w rozwoju). | Typy raportów, eksport PDF/Excel. |
 
 ---
@@ -176,6 +182,513 @@ Jeśli któryś warunek nie jest spełniony, zobaczysz komunikat błędu z dokł
 - **Edytuj zapotrzebowanie** - kliknij przycisk "Edytuj" w sekcji zapotrzebowania
 - **Dodaj pracownika** - kliknij "Dodaj" w sekcji osób
 - **Przypisz auto/dom** - kliknij przycisk "Auto" lub "Dom" przy pracowniku bez przypisania
+
+---
+
+## 💰 Rozliczenia i Listy Płac (Payroll)
+
+System automatycznie generuje listy płac dla pracowników na podstawie zarejestrowanych godzin pracy i stawek godzinowych.
+
+### Generowanie Listy Płac dla Pojedynczego Pracownika
+
+1. Z Dashboard kliknij **"Rozliczenia"** (Payroll)
+2. Kliknij **"Dodaj Listę Płac"**
+3. Wybierz **Pracownika** z listy
+4. Wprowadź:
+   - **Okres od** i **Okres do** (daty rozliczenia)
+   - **Uwagi** (opcjonalnie)
+5. Kliknij **"Generuj"**
+
+System automatycznie:
+- ✅ Znajduje wszystkie TimeLogs (zarejestrowane godziny) dla pracownika w danym okresie
+- ✅ Oblicza kwotę na podstawie stawek godzinowych (EmployeeRate) dla każdego projektu
+- ✅ Uwzględnia różne waluty (PLN, EUR, USD)
+- ✅ Tworzy niezmienny snapshot listy płac (nie można jej przeliczyć po utworzeniu)
+- ✅ Uwzględnia zaliczki (Advances) i korekty (Adjustments)
+
+### Generowanie List Płac dla Wszystkich Pracowników Jednym Guzikiem
+
+1. Z Dashboard kliknij **"Rozliczenia"** (Payroll)
+2. Kliknij **"Generuj dla Wszystkich"**
+3. Wprowadź:
+   - **Okres od** i **Okres do**
+   - **Uwagi** (opcjonalnie)
+4. Kliknij **"Generuj"**
+
+System automatycznie:
+- ✅ Znajduje wszystkich pracowników, którzy mają zarejestrowane godziny w danym okresie
+- ✅ Generuje listy płac dla każdego z nich
+- ✅ Pomija pracowników, dla których lista płac już istnieje (zapobiega duplikatom)
+- ✅ Wyświetla podsumowanie: ile wygenerowano, ile pominięto, ewentualne błędy
+
+**Statusy List Płac:**
+- **Szkic (Draft)** - lista wygenerowana, można dodawać zaliczki i korekty
+- **Zatwierdzona (Approved)** - lista zatwierdzona do wypłaty
+- **Wypłacona (Paid)** - lista już wypłacona
+
+---
+
+## 💼 Koszty Stałe i Zmienne
+
+### Koszty Stałe Firmy
+
+Koszty stałe to regularne wydatki firmy niezależne od projektów (np. czynsz, media, ubezpieczenia).
+
+**Zarządzanie Szablonami Kosztów Stałych:**
+
+1. Z Dashboard kliknij **"Koszty Stałe"**
+2. Kliknij **"Dodaj Szablon"**
+3. Wypełnij:
+   - **Nazwa** (np. "Czynsz biura")
+   - **Kwota** i **Waluta**
+   - **Okres** (Miesięczny, Kwartalny, Roczny)
+   - **Kategoria** (opcjonalnie)
+4. Kliknij **"Zapisz"**
+
+**Generowanie Wpisów z Szablonów:**
+
+1. W widoku kosztów stałych kliknij **"Generuj Wpisy"**
+2. Wybierz **Szablon** i **Miesiąc**
+3. Kliknij **"Generuj"**
+
+System automatycznie tworzy wpis kosztu stałego dla wybranego miesiąca na podstawie szablonu.
+
+**Ręczne Dodawanie Wpisów:**
+
+1. Kliknij **"Dodaj Wpis"**
+2. Wybierz szablon lub wprowadź dane ręcznie
+3. Wprowadź **Kwotę**, **Data od**, **Data do**
+4. Kliknij **"Zapisz"**
+
+### Koszty Zmienne Projektów
+
+Koszty zmienne to wydatki bezpośrednio związane z realizacją konkretnego projektu (np. materiały, transport, zakwaterowanie).
+
+**Dodawanie Kosztu Zmiennego:**
+
+1. Z Dashboard kliknij **"Projekty"** → wybierz projekt
+2. Przejdź do zakładki **"Koszty Zmienne"**
+3. Kliknij **"Dodaj Koszt"**
+4. Wypełnij:
+   - **Kwota** i **Waluta**
+   - **Data**
+   - **Opis** (np. "Transport materiałów")
+   - **Kategoria** (opcjonalnie)
+5. Kliknij **"Zapisz"**
+
+Koszty zmienne są uwzględniane w analizie rentowności projektu.
+
+---
+
+## 📊 Dashboard Finansowy - Analiza Rentowności
+
+Dashboard finansowy pokazuje rentowność firmy i poszczególnych projektów.
+
+### Dostęp do Dashboardu Finansowego
+
+1. Z Dashboard kliknij **"Dashboard Finansowy"** (lub **"Rentowność"**)
+2. Wybierz **Miesiąc** do analizy (użyj przycisków "Poprzedni Miesiąc" / "Następny Miesiąc")
+
+### Co Pokazuje Dashboard:
+
+**Podsumowanie Firma:**
+- **Przychody** - suma przychodów ze wszystkich aktywnych projektów
+- **Koszty Pracy** - koszty wynagrodzeń pracowników (z payroll)
+- **Koszty Zmienne** - suma kosztów zmiennych wszystkich projektów
+- **Całkowite Koszty** - suma kosztów pracy i zmiennych
+- **Marża** - przychody minus koszty
+- **Marża %** - procent marży (rentowność)
+
+**Tabela Projektów:**
+Dla każdego aktywnego projektu pokazuje:
+- **Przychody** - obliczone na podstawie typu projektu i stawek
+- **Koszty Pracy** - suma wynagrodzeń pracowników przypisanych do projektu
+- **Koszty Zmienne** - suma kosztów zmiennych projektu
+- **Marża** i **Marża %**
+- **Liczba Pracowników**
+- **Godziny** - szacowane vs rzeczywiste
+- **Wykonanie Planu** - procent realizacji planu godzinowego
+
+**Top Pracownicy:**
+Lista 10 pracowników z najwyższymi przychodami w danym miesiącu.
+
+**Najdłuższe Rotacje:**
+Lista 10 pracowników z najdłuższymi aktywnymi rotacjami.
+
+### Jak Obliczane są Przychody:
+
+- **Projekty typu "Hourly"** - przychody = suma godzin × stawka godzinowa projektu
+- **Projekty typu "Fixed"** - przychody = stała kwota projektu
+- **Projekty typu "Revenue Share"** - przychody = procent od przychodów projektu
+
+---
+
+## 📦 Magazyn i Wydania Sprzętu
+
+System zarządza sprzętem BHP i narzędziami wydawanymi pracownikom.
+
+### Zarządzanie Sprzętem
+
+1. Z Dashboard kliknij **"Magazyn"** (Equipment)
+2. Kliknij **"Dodaj Sprzęt"**
+3. Wypełnij:
+   - **Nazwa** (np. "Kask ochronny", "Buty BHP")
+   - **Kategoria** (np. "Ochrona", "Narzędzia")
+   - **Ilość w magazynie**
+   - **Minimalna ilość** (próg niskiego stanu)
+   - **Jednostka** (szt, kg, m, etc.)
+   - **Koszt jednostkowy** (opcjonalnie)
+   - **Zwrotny** - czy sprzęt jest zwracany (checkbox)
+4. Kliknij **"Zapisz"**
+
+**Filtrowanie:**
+- Po nazwie (wyszukiwanie)
+- Po kategorii
+- Po statusie (Niski stan / OK)
+
+### Wydanie Sprzętu Pracownikowi
+
+1. W widoku magazynu kliknij **"Wydania"** lub przejdź do profilu pracownika → zakładka **"Sprzęt"**
+2. Kliknij **"Dodaj Wydanie"**
+3. Wybierz:
+   - **Sprzęt** z listy
+   - **Pracownik**
+   - **Ilość** (system sprawdza dostępność)
+   - **Data wydania**
+   - **Oczekiwana data zwrotu** (opcjonalnie)
+   - **Przypisanie do projektu** (opcjonalnie)
+   - **Uwagi**
+4. Kliknij **"Zapisz"**
+
+System automatycznie:
+- ✅ Sprawdza dostępność sprzętu w magazynie
+- ✅ Zmniejsza stan magazynu o wydaną ilość
+- ✅ Tworzy rekord wydania ze statusem "Wydane"
+
+### Zwrot Sprzętu
+
+1. W widoku wydań znajdź wydanie do zwrotu
+2. Kliknij **"Zwróć"**
+3. Wybierz:
+   - **Data zwrotu**
+   - **Status zwrotu:**
+     - **Zwrócone** - sprzęt wrócił do magazynu (zwiększa stan)
+     - **Uszkodzone** - sprzęt uszkodzony (nie wraca do magazynu)
+     - **Zgubione** - sprzęt zgubiony (nie wraca do magazynu)
+4. Kliknij **"Zapisz"**
+
+**Wymagania Sprzętu dla Ról:**
+Możesz zdefiniować, które role wymagają jakiego sprzętu:
+1. W widoku sprzętu kliknij **"Wymagania"**
+2. Dodaj rolę i wymaganą ilość
+3. System może automatycznie przypominać o wydaniu wymaganego sprzętu
+
+---
+
+## 🚗 Wyjazdy i Powroty (Logistyka)
+
+System zarządza wyjazdami pracowników do projektów i ich powrotami do bazy.
+
+### Wyjazdy (Departures)
+
+Wyjazdy to operacje logistyczne, które przenoszą pracowników z bazy do lokalizacji projektu.
+
+**Dodawanie Wyjazdu:**
+
+1. Z Dashboard kliknij **"Wyjazdy"** (lub z widoku tygodniowego)
+2. Kliknij **"Dodaj Wyjazd"**
+3. Wypełnij:
+   - **Data wyjazdu**
+   - **Lokalizacja docelowa** (gdzie jadą pracownicy)
+   - **Pracownicy** (można wybrać wielu)
+   - **Pojazd** (opcjonalnie)
+   - **Uwagi**
+4. Kliknij **"Zapisz"**
+
+**Statusy Wyjazdów:**
+- **Zaplanowane** - wyjazd zaplanowany, można edytować i anulować
+- **Zrealizowane** - wyjazd zrealizowany
+- **Anulowane** - wyjazd anulowany (nie można edytować)
+
+**Anulowanie Wyjazdu:**
+
+1. W widoku wyjazdu kliknij **"Anuluj"**
+2. Potwierdź anulowanie
+
+**Uwaga:** Można anulować tylko wyjazdy ze statusem "Zaplanowane".
+
+### Powroty (Return Trips / Zjazdy)
+
+Powroty to operacje logistyczne, które przywożą pracowników z projektów z powrotem do bazy.
+
+**Dodawanie Powrotu:**
+
+1. Z Dashboard kliknij **"Powroty"** (lub z widoku tygodniowego)
+2. Kliknij **"Dodaj Powrót"**
+3. Wypełnij:
+   - **Data powrotu**
+   - **Pracownicy** (można wybrać wielu)
+   - **Pojazd powrotny** (opcjonalnie)
+   - **Uwagi**
+4. Kliknij **"Przygotuj"** (preview) lub **"Zapisz"** (bezpośrednio)
+
+**System automatycznie:**
+
+✅ **Skraca przypisania** - ustawia `end_date` wszystkich aktywnych przypisań pracowników na datę powrotu
+- Przypisania do projektów (ProjectAssignment)
+- Przypisania pojazdów (VehicleAssignment)
+- Przypisania mieszkań (AccommodationAssignment)
+
+✅ **Zapisuje oryginalne daty** - przed skróceniem zapisuje oryginalne `end_date` w tabeli uczestników (LogisticsEventParticipant)
+
+✅ **Tworzy przypisanie pojazdu powrotnego** - jeśli wybrano pojazd, tworzy nowe przypisanie pojazdu dla pracowników na trasie powrotnej
+
+✅ **Aktualizuje lokalizację pojazdu** - jeśli pojazd był przypisany, aktualizuje jego lokalizację na bazę
+
+**Anulowanie Powrotu:**
+
+1. W widoku powrotu kliknij **"Anuluj"**
+2. System automatycznie:
+   - ✅ **Przywraca oryginalne daty** - przywraca `end_date` wszystkich skróconych przypisań do oryginalnych wartości
+   - ✅ **Usuwa przypisania pojazdu powrotnego** - usuwa przypisania pojazdu utworzone dla powrotu
+   - ✅ **Ustawia status na "Anulowane"**
+
+**Uwaga:** Można anulować tylko powroty ze statusem "Planowany".
+
+**Edycja Powrotu:**
+
+1. W widoku powrotu kliknij **"Edytuj"**
+2. System automatycznie:
+   - ✅ **Cofa zmiany** - przywraca oryginalne daty przypisań
+   - ✅ **Usuwa stare uczestnictwa** - usuwa uczestników z wydarzenia
+3. Wprowadź nowe dane i kliknij **"Zapisz"**
+4. System ponownie wykonuje operacje skracania przypisań z nowymi danymi
+
+**Widok Tygodniowy - Wyjazdy i Powroty:**
+
+W widoku tygodniowym zobaczysz:
+- **Wyjazdy** - lista wyjazdów w danym tygodniu
+- **Powroty** - lista powrotów w danym tygodniu
+- Pracownicy bez przypisania do projektu (gotowi do wyjazdu)
+
+---
+
+## ⏰ Ewidencja Godzin Pracy (Time Logs) - Widok Miesięczny
+
+System oferuje zaawansowany widok miesięczny do wprowadzania i przeglądania godzin pracy pracowników.
+
+### Jak Działa Widok Miesięczny:
+
+1. Z Dashboard kliknij **"Ewidencja Godzin"** → **"Widok Miesięczny"**
+2. Wybierz **Miesiąc** do edycji (użyj przycisków "Poprzedni Miesiąc" / "Następny Miesiąc")
+
+### Kluczowe Funkcje:
+
+**Grupowanie po Projektach:**
+- Tabela jest zorganizowana hierarchicznie: **Projekt → Pracownicy**
+- Każdy projekt ma nagłówek z nazwą i lokalizacją
+- Pod każdym projektem widzisz listę pracowników przypisanych do tego projektu
+
+**Filtrowanie Pracowników:**
+- ✅ **Wyświetla tylko pracowników, którzy mieli przypisania w danym miesiącu**
+- Pracownicy bez przypisań w danym miesiącu nie są pokazywani
+- System automatycznie znajduje wszystkie aktywne przypisania w danym miesiącu
+
+**Wizualne Oznaczenia:**
+- **Pola edytowalne** (białe) - dni, w których pracownik był przypisany do projektu
+- **Pola wyszarzone** (disabled) - dni, w których pracownik **nie był przypisany**
+- **Weekendy** - oznaczone innym kolorem dla łatwej identyfikacji
+- **Wypełnione godziny** - pola z wprowadzonymi godzinami są wyróżnione
+
+**Bulk Update (Masowa Edycja):**
+- Możesz wprowadzić godziny dla wielu pracowników i dni jednocześnie
+- Wypełnij pola godzin w tabeli
+- Kliknij **"Zapisz"** - system zapisze wszystkie zmiany w jednej transakcji
+- System automatycznie tworzy nowe TimeLogs lub aktualizuje istniejące
+
+**Walidacja:**
+- System sprawdza, czy data jest w zakresie przypisania
+- Nie można wprowadzić godzin dla dni, w których pracownik nie był przypisany
+- Godziny są walidowane (np. maksymalna liczba godzin dziennie)
+
+**Dla Kierowników Projektów:**
+- Kierownicy widzą tylko projekty, którymi zarządzają
+- Dostęp przez **"Moje Projekty"** → **"Ewidencja Godzin Zespołu"**
+- Te same funkcje co administratorzy, ale ograniczone do swoich projektów
+
+---
+
+## 👔 Kierownik Projektu - Specjalne Uprawnienia
+
+Projekty mogą mieć przypisanych **kierowników** (użytkowników), którzy mają ograniczony zestaw uprawnień do zarządzania swoimi projektami.
+
+### Przypisywanie Kierownika do Projektu:
+
+1. Z Dashboard kliknij **"Projekty"** → wybierz projekt
+2. W sekcji **"Kierownicy"** kliknij **"Dodaj Kierownika"**
+3. Wybierz użytkownika z listy
+4. Kliknij **"Zapisz"**
+
+### Uprawnienia Kierownika:
+
+Kierownik projektu może:
+
+✅ **Wyświetlać podstawowe dane projektu:**
+- Nazwa, opis, lokalizacja
+- Zapotrzebowanie na role
+- Status projektu
+
+✅ **Widzieć pracowników w projekcie:**
+- Lista wszystkich pracowników przypisanych do projektu
+- Role pracowników w projekcie
+- Okresy przypisań
+
+✅ **Wpisywać godziny pracy:**
+- Dostęp do widoku miesięcznego Time Logs dla swojego projektu
+- Może wprowadzać i edytować godziny pracy pracowników
+- Bulk update (masowa edycja) godzin
+
+✅ **Oceniać pracowników:**
+- Może tworzyć, edytować i usuwać oceny pracowników przypisanych do projektu
+- Oceny są powiązane z konkretnym pracownikiem i projektem
+- System sprawdza, czy pracownik jest przypisany do projektu kierownika
+
+✅ **Zarządzać zadaniami projektowymi:**
+- Może zmieniać status zadań (W toku, Zakończone, Anulowane)
+- Może oznaczać zadania jako wykonane
+
+**Ograniczenia:**
+- ❌ Nie może edytować danych projektu (nazwa, opis, lokalizacja)
+- ❌ Nie może dodawać/usuwać przypisań pracowników
+- ❌ Nie może zarządzać zapotrzebowaniem
+- ❌ Nie ma dostępu do innych projektów (tylko te, którymi zarządza)
+
+### Widok "Moje Projekty":
+
+Kierownicy mają dostęp do sekcji **"Moje Projekty"** w menu, która zawiera:
+- **Lista projektów** - tylko projekty, którymi zarządza
+- **Ewidencja Godzin Zespołu** - widok miesięczny godzin dla swoich projektów
+- **Oceny Pracowników** - oceny pracowników z jego projektów
+- **Zadania** - zadania z jego projektów
+
+---
+
+## 💵 Zaliczki i Korekty (Advances & Adjustments)
+
+System umożliwia zarządzanie zaliczkami i korektami do list płac.
+
+### Zaliczki (Advances)
+
+Zaliczki to przedpłaty wypłacane pracownikom przed rozliczeniem listy płac.
+
+**Dodawanie Zaliczki:**
+
+1. Z Dashboard kliknij **"Zaliczki"**
+2. Kliknij **"Dodaj Zaliczkę"**
+3. Wybierz:
+   - **Lista Płac** (payroll) - zaliczka jest przypisana do konkretnej listy płac
+   - **Kwota** i **Waluta**
+   - **Data** wypłaty
+   - **Oprocentowanie** (opcjonalnie):
+     - Zaznacz **"Oprocentowana"** jeśli zaliczka jest oprocentowana
+     - Wprowadź **Stawkę oprocentowania** (np. 5% = 5.00)
+4. Kliknij **"Zapisz"**
+
+**Automatyczne Obliczanie:**
+- System automatycznie oblicza **kwotę do odliczenia** (zaliczka + odsetki jeśli oprocentowana)
+- Zaliczki są automatycznie uwzględniane w **adjustments_amount** listy płac
+- Lista płac jest automatycznie przeliczana po dodaniu/edycji/usunięciu zaliczki
+
+### Korekty (Adjustments)
+
+Korekty to dodatkowe kwoty dodawane lub odejmowane od listy płac (np. premie, kary, inne dopłaty).
+
+**Dodawanie Korekty:**
+
+1. Z Dashboard kliknij **"Korekty"** (lub z widoku listy płac)
+2. Kliknij **"Dodaj Korektę"**
+3. Wybierz:
+   - **Lista Płac** (payroll)
+   - **Kwota** (dodatnia = dopłata, ujemna = odliczenie)
+   - **Waluta**
+   - **Data**
+   - **Opis** (np. "Premia za jakość", "Kara za spóźnienie")
+4. Kliknij **"Zapisz"**
+
+**Automatyczne Obliczanie:**
+- Korekty są automatycznie uwzględniane w **adjustments_amount** listy płac
+- Lista płac jest automatycznie przeliczana po dodaniu/edycji/usunięciu korekty
+
+**Statusy List Płac:**
+- **Szkic (Draft)** - można dodawać/edytować/usunąć zaliczki i korekty
+- **Zatwierdzona (Approved)** - lista zatwierdzona, korekty zablokowane
+- **Wypłacona (Paid)** - lista wypłacona, korekty zablokowane
+
+---
+
+## 📋 Zadania Projektowe (Project Tasks)
+
+System umożliwia zarządzanie zadaniami w projektach.
+
+### Dodawanie Zadania:
+
+1. Z Dashboard kliknij **"Projekty"** → wybierz projekt
+2. Przejdź do zakładki **"Zadania"**
+3. Kliknij **"Dodaj Zadanie"**
+4. Wypełnij:
+   - **Tytuł** zadania
+   - **Opis** (opcjonalnie)
+   - **Przypisany do** (pracownik z projektu)
+   - **Termin** (opcjonalnie)
+   - **Priorytet** (Niski, Średni, Wysoki)
+5. Kliknij **"Zapisz"**
+
+### Statusy Zadań:
+
+- **Nowe** - zadanie utworzone, nie rozpoczęte
+- **W toku** - zadanie w trakcie realizacji
+- **Zakończone** - zadanie ukończone
+- **Anulowane** - zadanie anulowane
+
+### Zarządzanie Zadaniami:
+
+- **Oznacz jako "W toku"** - zmienia status na "W toku"
+- **Oznacz jako "Zakończone"** - zmienia status na "Zakończone"
+- **Anuluj** - anuluje zadanie
+- **Edytuj** - edytuje szczegóły zadania
+- **Usuń** - usuwa zadanie
+
+**Dla Kierowników:**
+- Kierownicy mogą zmieniać statusy zadań w swoich projektach
+- Mogą oznaczać zadania jako wykonane lub anulowane
+
+---
+
+## 📁 Pliki Projektowe (Project Files)
+
+System umożliwia przechowywanie plików związanych z projektami.
+
+### Dodawanie Pliku do Projektu:
+
+1. Z Dashboard kliknij **"Projekty"** → wybierz projekt
+2. Przejdź do zakładki **"Pliki"**
+3. Kliknij **"Dodaj Plik"**
+4. Wybierz plik z dysku
+5. Wprowadź:
+   - **Nazwa** (opcjonalnie - domyślnie nazwa pliku)
+   - **Opis** (opcjonalnie)
+6. Kliknij **"Zapisz"**
+
+**Informacje o Pliku:**
+- System automatycznie zapisuje:
+  - Rozmiar pliku
+  - Typ MIME
+  - Kto przesłał plik
+  - Data przesłania
+
+**Pobieranie Plików:**
+- Kliknij na nazwę pliku, aby go pobrać
+- Pliki są przechowywane w bezpiecznym miejscu na serwerze
 
 ---
 
