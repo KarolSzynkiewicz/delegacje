@@ -468,11 +468,11 @@
                     <div class="col-md-4">
                         <x-ui.card label="Domy w projekcie">
                             @php
-                                $accommodations = collect($weekData['accommodations'] ?? []);
+                                $projectAccommodations = collect($weekData['accommodations'] ?? []);
                             @endphp
-                            @if($accommodations->isNotEmpty())
+                            @if($projectAccommodations->isNotEmpty())
                                 <div class="d-flex flex-column gap-2">
-                                    @foreach($accommodations->take(6) as $accommodationData)
+                                    @foreach($projectAccommodations->take(6) as $accommodationData)
                                         @php
                                             $accommodation = $accommodationData['accommodation'];
                                             $usagePercentage = $accommodationData['usage_percentage'] ?? 0;
@@ -584,9 +584,9 @@
                                         </x-ui.card>
                                     @endforeach
                                 </div>
-                                @if($accommodations->count() > 6)
+                                @if($projectAccommodations->count() > 6)
                                     <div class="text-center mt-2">
-                                        <x-ui.badge variant="info">+{{ $accommodations->count() - 6 }} więcej</x-ui.badge>
+                                        <x-ui.badge variant="info">+{{ $projectAccommodations->count() - 6 }} więcej</x-ui.badge>
                                     </div>
                                 @endif
                             @else
