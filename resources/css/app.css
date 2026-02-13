@@ -226,37 +226,33 @@ body {
 
 /* Style dla form-select-sm - taka sama wysokość jak form-control-sm */
 .form-select-sm {
-    padding: 0.25rem 2rem 0.25rem 0.5rem !important; /* lewe/prawe wyrównanie jak w Twoim kodzie */
-    font-size: 0.875rem !important; /* tak jak form-control-sm */
-    line-height: 1.5 !important; /* wyrównanie tekstu w pionie */
-    height: calc(1.5rem + 0.5rem); /* przybliżona wysokość, można dopracować */
+    padding: 0.25rem 2rem 0.25rem 0.5rem !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    height: calc(1.5rem + 0.5rem);
     background-color: var(--bg-input) !important;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
     background-repeat: no-repeat;
     background-position: right 0.5rem center !important;
     background-size: 14px 14px !important;
-    color: #ffffff !important;
+    color: white !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     border: 1px solid var(--glass-border) !important;
     border-radius: 12px !important;
     box-sizing: border-box !important;
-    -webkit-text-fill-color: #ffffff !important;
-    opacity: 1 !important;
 }
 
 .form-select-sm:focus {
-    color: #ffffff !important;
-    -webkit-text-fill-color: #ffffff !important;
+    color: white !important;
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
-    opacity: 1 !important;
 }
 
 .form-select-sm option {
-    background: #0f172a !important;
-    color: #f1f5f9 !important;
+    background: #0f172a;
+    color: white;
     padding: 6px;
 }
 
@@ -370,76 +366,25 @@ input[type="week"]::-webkit-datetime-edit-year-field:focus {
     background-position: right 12px center;
     background-size: 16px 16px;
     padding: 12px 40px 12px 16px !important;
-    color: #ffffff !important;
+    color: white !important;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
     border: 1px solid var(--glass-border) !important;
     border-radius: 12px;
     line-height: 1.5;
-    -webkit-text-fill-color: #ffffff !important;
-    opacity: 1 !important;
 }
 .form-select:focus {
     background-color: var(--bg-input) !important;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 16px 16px;
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2) !important;
-    color: #ffffff !important;
+    color: white !important;
     outline: none;
-    -webkit-text-fill-color: #ffffff !important;
-    opacity: 1 !important;
 }
 .form-select option {
-    background: #0f172a !important;
-    color: #f1f5f9 !important;
+    background: #0f172a;
+    color: white;
     padding: 8px;
-}
-
-.form-select option:checked {
-    background: rgba(59, 130, 246, 0.3) !important;
-    color: #ffffff !important;
-    font-weight: 600;
-}
-
-.form-select option:hover {
-    background: rgba(59, 130, 246, 0.2) !important;
-    color: #f1f5f9 !important;
-}
-
-.form-select option[data-has-issue="1"] {
-    color: var(--danger) !important;
-    font-weight: bold;
-}
-
-.form-select option[data-is-available="0"] {
-    color: var(--danger) !important;
-}
-
-/* Upewnij się że tekst w select jest widoczny po wyborze - wszystkie stany */
-.form-select,
-.form-select:valid,
-.form-select:invalid,
-.form-select:active,
-.form-select:enabled,
-.form-select:not(:disabled),
-.form-select-sm,
-.form-select-sm:valid,
-.form-select-sm:invalid,
-.form-select-sm:active,
-.form-select-sm:enabled,
-.form-select-sm:not(:disabled),
-.form-select:not(:placeholder-shown),
-.form-select-sm:not(:placeholder-shown),
-select.form-select,
-select.form-select-sm,
-select[class*="form-select"] {
-    color: #ffffff !important;
-    -webkit-text-fill-color: #ffffff !important;
-    opacity: 1 !important;
 }
 textarea.form-control {
     resize: vertical;

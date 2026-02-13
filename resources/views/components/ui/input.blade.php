@@ -35,34 +35,14 @@
         {{ $required ? 'required' : '' }}
     >{{ $value ?? old($name) }}</textarea>
 @elseif($type === 'select')
-    <div x-data="{ 
-        selectedText: '',
-        updateSelected() {
-            const select = $refs.selectEl;
-            const selectedOption = select.options[select.selectedIndex];
-            this.selectedText = selectedOption ? selectedOption.text : '';
-            // Force white color after selection
-            select.style.color = '#f1f5f9';
-            select.style.webkitTextFillColor = '#f1f5f9';
-        }
-    }" x-init="updateSelected(); $refs.selectEl.style.color = '#f1f5f9'; $refs.selectEl.style.webkitTextFillColor = '#f1f5f9';">
-        <select 
-            name="{{ $name }}" 
-            id="{{ $inputId }}"
-            {{ $attributes->merge(['class' => str_replace('form-control', 'form-select', $inputClasses)]) }}
-            {{ $required ? 'required' : '' }}
-            style="color: #f1f5f9 !important; -webkit-text-fill-color: #f1f5f9 !important;"
-            x-ref="selectEl"
-            @change="updateSelected()"
-        >
-            {{ $slot }}
-        </select>
-        <div x-show="selectedText && selectedText !== 'Wybierz projekt' && selectedText !== 'Wybierz rolę' && selectedText !== 'Wybierz pojazd' && selectedText !== 'Wybierz mieszkanie' && !selectedText.includes('--')" 
-             class="mt-1 small text-white-50" 
-             style="color: #94a3b8 !important; font-size: 0.8rem;">
-            <i class="bi bi-check-circle-fill text-success"></i> Wybrano: <span class="text-white fw-semibold" x-text="selectedText"></span>
-        </div>
-    </div>
+    <select 
+        name="{{ $name }}" 
+        id="{{ $inputId }}"
+        {{ $attributes->merge(['class' => str_replace('form-control', 'form-select', $inputClasses)]) }}
+        {{ $required ? 'required' : '' }}
+    >
+        {{ $slot }}
+    </select>
 @elseif($type === 'checkbox')
     @php
         // Dla checkboxów, sprawdzamy czy value jest true/checked
