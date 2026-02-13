@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectDemandController;
 use App\Http\Controllers\ProjectAssignmentController;
+use App\Http\Controllers\BulkAssignmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\AccommodationController;
@@ -252,6 +253,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Global route for all assignments (without project context)
     Route::get('project-assignments', [ProjectAssignmentController::class, 'all'])
         ->name('project-assignments.index');
+    
+    // Bulk assignment (project + vehicle + accommodation in one go)
+    Route::post('bulk-assignments', [\App\Http\Controllers\BulkAssignmentController::class, 'store'])
+        ->name('bulk-assignments.store')
+        ->defaults('permission_type', 'resource')
+        ->defaults('resource', 'project-assignments');
 
     // Employees + assignments + documents
     Route::resource('employees', EmployeeController::class);

@@ -1284,119 +1284,106 @@
                                             @endif
                                         </div>
                                     </div>
-                                    <!-- Formularz przypisania projektu -->
+                                    <!-- Wspólny formularz przypisania -->
                                     @if(isset($allProjects) && $allProjects->isNotEmpty())
-                                        <div class="mb-3 pb-3 border-bottom">
-                                            <h6 class="small fw-bold mb-2 text-white"><i class="bi bi-person-check"></i> Przypisz do projektu</h6>
-                                            <form method="POST" action="{{ route('project-assignments.store') }}" class="mb-0">
+                                        <div>
+                                            <h6 class="small fw-bold mb-2 text-white"><i class="bi bi-plus-circle"></i> Przypisz pracownika</h6>
+                                            <form method="POST" action="{{ route('bulk-assignments.store') }}" class="mb-0">
                                                 @csrf
                                                 <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                                                 <input type="hidden" name="start_date" value="{{ $weeks[0]['start']->format('Y-m-d') }}">
                                                 <input type="hidden" name="end_date" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
                                                 
-                                                <div class="row g-2 mb-2">
-                                                    <div class="col-12">
-                                                        <x-ui.input 
-                                                            type="select" 
-                                                            name="project_id" 
-                                                            required="true"
-                                                            class="form-select-sm"
-                                                        >
-                                                            <option value="">Wybierz projekt</option>
-                                                            @foreach($allProjects as $project)
-                                                                <option value="{{ $project->id }}">{{ $project->name }}</option>
-                                                            @endforeach
-                                                        </x-ui.input>
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <x-ui.input 
-                                                            type="select" 
-                                                            name="role_id" 
-                                                            required="true"
-                                                            class="form-select-sm"
-                                                        >
-                                                            <option value="">Wybierz rolę</option>
-                                                            @foreach($roles as $role)
-                                                                <option value="{{ $role->id }}">{{ $role->name }}</option>
-                                                            @endforeach
-                                                        </x-ui.input>
+                                                <!-- Projekt (wymagany) -->
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-semibold mb-1">
+                                                        <i class="bi bi-person-check"></i> Projekt
+                                                    </label>
+                                                    <div class="row g-2">
+                                                        <div class="col-12">
+                                                            <x-ui.input 
+                                                                type="select" 
+                                                                name="project_id" 
+                                                                required="true"
+                                                                class="form-select-sm"
+                                                            >
+                                                                <option value="">Wybierz projekt</option>
+                                                                @foreach($allProjects as $project)
+                                                                    <option value="{{ $project->id }}">{{ $project->name }}</option>
+                                                                @endforeach
+                                                            </x-ui.input>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <x-ui.input 
+                                                                type="select" 
+                                                                name="role_id" 
+                                                                required="true"
+                                                                class="form-select-sm"
+                                                            >
+                                                                <option value="">Wybierz rolę</option>
+                                                                @foreach($roles as $role)
+                                                                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                                                @endforeach
+                                                            </x-ui.input>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <x-ui.button variant="primary" size="sm" type="submit" class="w-100">
-                                                    <i class="bi bi-save"></i> Zapisz przypisanie
+                                                
+                                                <!-- Auto (opcjonalne) -->
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-semibold mb-1">
+                                                        <i class="bi bi-car-front"></i> Auto <span class="text-muted">(opcjonalnie)</span>
+                                                    </label>
+                                                    <div class="row g-2">
+                                                        <div class="col-12">
+                                                            <x-ui.input 
+                                                                type="select" 
+                                                                name="vehicle_id" 
+                                                                class="form-select-sm"
+                                                            >
+                                                                <option value="">-- Nie przypisuj --</option>
+                                                                @foreach($vehicles as $vehicle)
+                                                                    <option value="{{ $vehicle->id }}">{{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}</option>
+                                                                @endforeach
+                                                            </x-ui.input>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <x-ui.input 
+                                                                type="select" 
+                                                                name="position" 
+                                                                class="form-select-sm"
+                                                            >
+                                                                <option value="passenger">Pasażer</option>
+                                                                <option value="driver">Kierowca</option>
+                                                            </x-ui.input>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Mieszkanie (opcjonalne) -->
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-semibold mb-1">
+                                                        <i class="bi bi-house"></i> Mieszkanie <span class="text-muted">(opcjonalnie)</span>
+                                                    </label>
+                                                    <x-ui.input 
+                                                        type="select" 
+                                                        name="accommodation_id" 
+                                                        class="form-select-sm"
+                                                    >
+                                                        <option value="">-- Nie przypisuj --</option>
+                                                        @foreach($accommodations as $accommodation)
+                                                            <option value="{{ $accommodation->id }}">{{ $accommodation->name }} ({{ $accommodation->capacity }} miejsc)</option>
+                                                        @endforeach
+                                                    </x-ui.input>
+                                                </div>
+                                                
+                                                <!-- Jeden guzik zapisz -->
+                                                <x-ui.button variant="success" size="sm" type="submit" class="w-100">
+                                                    <i class="bi bi-save"></i> Zapisz wszystkie przypisania
                                                 </x-ui.button>
                                             </form>
                                         </div>
                                     @endif
-                                    
-                                    <!-- Formularz przypisania auta -->
-                                    <div class="mb-3 pb-3 border-bottom">
-                                        <h6 class="small fw-bold mb-2 text-white"><i class="bi bi-car-front"></i> Przypisz auto</h6>
-                                        <form method="POST" action="{{ route('vehicle-assignments.store') }}" class="mb-0">
-                                            @csrf
-                                            <input type="hidden" name="employee_id" value="{{ $employee->id }}">
-                                            <input type="hidden" name="start_date" value="{{ $weeks[0]['start']->format('Y-m-d') }}">
-                                            <input type="hidden" name="end_date" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
-                                            
-                                            <div class="row g-2 mb-2">
-                                                <div class="col-12">
-                                                    <x-ui.input 
-                                                        type="select" 
-                                                        name="vehicle_id" 
-                                                        required="true"
-                                                        class="form-select-sm"
-                                                    >
-                                                        <option value="">Wybierz pojazd</option>
-                                                        @foreach($vehicles as $vehicle)
-                                                            <option value="{{ $vehicle->id }}">{{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}</option>
-                                                        @endforeach
-                                                    </x-ui.input>
-                                                </div>
-                                                <div class="col-12">
-                                                    <x-ui.input 
-                                                        type="select" 
-                                                        name="position" 
-                                                        required="true"
-                                                        class="form-select-sm"
-                                                    >
-                                                        <option value="passenger">Pasażer</option>
-                                                        <option value="driver">Kierowca</option>
-                                                    </x-ui.input>
-                                                </div>
-                                            </div>
-                                            <x-ui.button variant="info" size="sm" type="submit" class="w-100">
-                                                <i class="bi bi-save"></i> Zapisz przypisanie
-                                            </x-ui.button>
-                                        </form>
-                                    </div>
-                                    
-                                    <!-- Formularz przypisania mieszkania -->
-                                    <div>
-                                        <h6 class="small fw-bold mb-2 text-white"><i class="bi bi-house"></i> Przypisz mieszkanie</h6>
-                                        <form method="POST" action="{{ route('accommodation-assignments.store') }}" class="mb-0">
-                                            @csrf
-                                            <input type="hidden" name="employee_id" value="{{ $employee->id }}">
-                                            <input type="hidden" name="start_date" value="{{ $weeks[0]['start']->format('Y-m-d') }}">
-                                            <input type="hidden" name="end_date" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
-                                            
-                                            <div class="mb-2">
-                                                <x-ui.input 
-                                                    type="select" 
-                                                    name="accommodation_id" 
-                                                    required="true"
-                                                    class="form-select-sm"
-                                                >
-                                                    <option value="">Wybierz mieszkanie</option>
-                                                    @foreach($accommodations as $accommodation)
-                                                        <option value="{{ $accommodation->id }}">{{ $accommodation->name }} ({{ $accommodation->capacity }} miejsc)</option>
-                                                    @endforeach
-                                                </x-ui.input>
-                                            </div>
-                                            <x-ui.button variant="success" size="sm" type="submit" class="w-100">
-                                                <i class="bi bi-save"></i> Zapisz przypisanie
-                                            </x-ui.button>
-                                        </form>
-                                    </div>
                                 </x-ui.card>
                             </div>
                         @endforeach
