@@ -379,6 +379,12 @@ input[type="week"]::-webkit-datetime-edit-year-field:focus {
     padding: 8px;
 }
 
+.form-select option:checked,
+.form-select option:hover {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: var(--text-main) !important;
+}
+
 .form-select option[data-has-issue="1"] {
     color: var(--danger) !important;
     font-weight: bold;
@@ -386,6 +392,12 @@ input[type="week"]::-webkit-datetime-edit-year-field:focus {
 
 .form-select option[data-is-available="0"] {
     color: var(--danger) !important;
+}
+
+/* Upewnij się że tekst w select jest widoczny po wyborze */
+.form-select:valid,
+.form-select-sm:valid {
+    color: white !important;
 }
 textarea.form-control {
     resize: vertical;

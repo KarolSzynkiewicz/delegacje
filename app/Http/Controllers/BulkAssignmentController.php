@@ -3,12 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\Project;
+use App\Models\Role;
+use App\Models\Vehicle;
+use App\Models\Accommodation;
+use App\Enums\VehiclePosition;
+use App\Services\ProjectAssignmentService;
+use App\Services\VehicleAssignmentService;
+use App\Services\AccommodationAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class BulkAssignmentController extends Controller
 {
+    public function __construct(
+        protected ProjectAssignmentService $projectAssignmentService,
+        protected VehicleAssignmentService $vehicleAssignmentService,
+        protected AccommodationAssignmentService $accommodationAssignmentService
+    ) {}
+
     /**
      * Store bulk assignment (project + vehicle + accommodation).
      * 
@@ -16,6 +30,12 @@ class BulkAssignmentController extends Controller
      * - Middleware checks: create.project-assignments (always required)
      * - Controller checks: create.vehicle-assignments (if vehicle_id provided)
      * - Controller checks: create.accommodation-assignments (if accommodation_id provided)
+     * 
+     * Validation:
+     * - Uses the same services as individual controllers
+     * - ProjectAssignmentService: validates role, documents, availability, demand
+     * - VehicleAssignmentService: validates driver availability, overlap
+     * - AccommodationAssignmentService: validates capacity, overlap
      */
     public function store(Request $request)
     {
@@ -28,6 +48,7 @@ class BulkAssignmentController extends Controller
             'vehicle_id' => 'nullable|exists:vehicles,id',
             'position' => 'nullable|in:driver,passenger',
             'accommodation_id' => 'nullable|exists:accommodations,id',
+            'notes' => 'nullable|string',
         ]);
 
         $user = $request->user();
@@ -47,49 +68,72 @@ class BulkAssignmentController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($validated) {
-                $employee = Employee::findOrFail($validated['employee_id']);
+            // Load models
+            $employee = Employee::findOrFail($validated['employee_id']);
+            $project = Project::findOrFail($validated['project_id']);
+            $role = Role::findOrFail($validated['role_id']);
+            $startDate = \Carbon\Carbon::parse($validated['start_date']);
+            $endDate = \Carbon\Carbon::parse($validated['end_date']);
 
-                // Przypisz do projektu (zawsze)
-                $employee->assignments()->create([
-                    'project_id' => $validated['project_id'],
-                    'role_id' => $validated['role_id'],
-                    'start_date' => $validated['start_date'],
-                    'end_date' => $validated['end_date'],
-                ]);
+            DB::transaction(function () use ($employee, $project, $role, $startDate, $endDate, $validated) {
+                // 1. Przypisz do projektu (zawsze) - z pełną walidacją
+                $this->projectAssignmentService->createAssignment(
+                    $project,
+                    $employee,
+                    $role,
+                    $startDate,
+                    $endDate,
+                    $validated['notes'] ?? null
+                );
 
-                // Przypisz auto (jeśli wybrano)
+                // 2. Przypisz auto (jeśli wybrano) - z pełną walidacją
                 if (!empty($validated['vehicle_id'])) {
-                    $employee->vehicleAssignments()->create([
-                        'vehicle_id' => $validated['vehicle_id'],
-                        'position' => $validated['position'] ?? 'passenger',
-                        'start_date' => $validated['start_date'],
-                        'end_date' => $validated['end_date'],
-                    ]);
+                    $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
+                    $position = VehiclePosition::from($validated['position'] ?? 'passenger');
+                    
+                    $this->vehicleAssignmentService->createAssignment(
+                        $employee,
+                        $vehicle,
+                        $position,
+                        $startDate,
+                        $endDate,
+                        $validated['notes'] ?? null
+                    );
                 }
 
-                // Przypisz mieszkanie (jeśli wybrano)
+                // 3. Przypisz mieszkanie (jeśli wybrano) - z pełną walidacją
                 if (!empty($validated['accommodation_id'])) {
-                    $employee->accommodationAssignments()->create([
-                        'accommodation_id' => $validated['accommodation_id'],
-                        'start_date' => $validated['start_date'],
-                        'end_date' => $validated['end_date'],
-                    ]);
+                    $accommodation = Accommodation::findOrFail($validated['accommodation_id']);
+                    
+                    $this->accommodationAssignmentService->createAssignment(
+                        $employee,
+                        $accommodation,
+                        $startDate,
+                        $endDate,
+                        $validated['notes'] ?? null
+                    );
                 }
             });
 
-            return redirect()->route('weekly-overview.index')
+            return redirect()->route('weekly-overview.index', ['start_date' => $startDate->format('Y-m-d')])
                 ->with('success', 'Pracownik został przypisany pomyślnie!');
+                
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Validation errors from services - return with user-friendly messages
+            return redirect()->back()
+                ->withInput()
+                ->withErrors($e->errors());
                 
         } catch (\Exception $e) {
             Log::error('BulkAssignment::store - Exception', [
                 'message' => $e->getMessage(),
                 'employee_id' => $validated['employee_id'],
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Nie udało się utworzyć przypisań. Spróbuj ponownie.');
+                ->with('error', 'Nie udało się utworzyć przypisań: ' . $e->getMessage());
         }
     }
 }
