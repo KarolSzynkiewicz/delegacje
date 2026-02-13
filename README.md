@@ -1,21 +1,34 @@
-# Stocznia - System Zarządzania Logistyką i Delegowaniem Pracowników
+# Stocznia - Kompleksowy System ERP dla Firm Delegujących Pracowników
 
-**Stocznia** to aplikacja webowa stworzona w oparciu o framework **Laravel**, zaprojektowana do zarządzania kluczowymi aspektami logistyki i zasobów ludzkich w firmie delegującej pracowników.
+**Stocznia** to zaawansowana aplikacja webowa stworzona w oparciu o framework **Laravel**, która rewolucjonizuje zarządzanie logistyką, zasobami ludzkimi i finansami w firmach delegujących pracowników. System łączy w sobie pełną funkcjonalność ERP z intuicyjnym interfejsem użytkownika, oferując kompleksowe rozwiązanie dla zarządzania projektami, pracownikami, pojazdami, akomodacjami, rozliczeniami i analityką finansową.
 
-## 🔐 System Autoryzacji
+**Dlaczego Stocznia?**
+- 🚀 **Kompleksowe rozwiązanie** - wszystko w jednym miejscu: od planowania projektów po generowanie list płac
+- 💰 **Pełna kontrola finansowa** - dashboard rentowności, koszty stałe i zmienne, analiza marży
+- 👥 **Zaawansowane zarządzanie personelem** - rotacje, dokumenty, oceny, stawki godzinowe
+- 🚗 **Inteligentna logistyka** - wyjazdy, powroty, przypisania pojazdów i mieszkań z automatycznym czyszczeniem konfliktów
+- 📊 **Widok miesięczny godzin** - zaawansowany widok z grupowaniem po projektach i bulk update
+- 🔐 **Pełny RBAC** - dynamiczna tabela uprawnień dostosowana do potrzeb biznesowych
+- ⚡ **Wydajność** - cache'owanie, optymalizacja zapytań, szybkie działanie nawet przy dużych ilościach danych
 
-Aplikacja wykorzystuje **dynamiczny system autoryzacji** oparty na **Spatie Laravel Permission**. Zamiast tradycyjnych Policy, system używa middleware do automatycznego sprawdzania uprawnień na podstawie route i metody HTTP.
+## 🔐 System Autoryzacji - Pełny RBAC
+
+Aplikacja wykorzystuje **pełny system RBAC (Role-Based Access Control)** z dynamiczną tabelą uprawnień, który możesz konfigurować zgodnie z potrzebami biznesowymi.
 
 **Kluczowe cechy:**
-- ✅ Dynamiczne sprawdzanie uprawnień przez middleware
-- ✅ Zarządzanie uprawnieniami przez UI (tabelka w edycji roli)
-- ✅ Cache uprawnień (24h) dla wydajności
-- ✅ Cache mapowań route → permission (1h)
-- ✅ Cache menu per user (1h)
-- ✅ Centralizacja logiki w `RoutePermissionService`
-- ✅ Administratorzy mają pełny dostęp
-- ✅ Brak potrzeby pisania Policy dla każdego modelu
-- ✅ Route są jedynym źródłem prawdy dla uprawnień
+- ✅ **Dynamiczna tabela uprawnień** - zarządzanie dostępem do zasobów przez intuicyjną tabelkę w UI
+- ✅ **Pełny RBAC** - role, uprawnienia, hierarchia dostępu
+- ✅ **Automatyczne generowanie uprawnień** - system automatycznie tworzy uprawnienia z route
+- ✅ **Elastyczna konfiguracja** - dostosuj uprawnienia do struktury organizacji
+- ✅ **Wydajność** - cache uprawnień (24h) i mapowań route (1h)
+- ✅ **Bezpieczeństwo** - middleware automatycznie sprawdza uprawnienia dla każdego requestu
+- ✅ **Zero konfiguracji** - nowe route automatycznie pojawiają się w tabelce uprawnień
+
+**Jak to działa:**
+1. System automatycznie generuje listę uprawnień z route aplikacji
+2. W tabelce ról zaznaczasz, które uprawnienia ma dana rola
+3. Przypisujesz role do użytkowników
+4. System automatycznie sprawdza uprawnienia przy każdym requestcie
 
 **Szczegółowa dokumentacja:** Zobacz [authorization.readme.md](authorization.readme.md) dla pełnego opisu działania systemu autoryzacji.
 
@@ -36,12 +49,20 @@ Aplikacja oferuje następujące moduły:
 | **Projekty** | Tworzenie i zarządzanie projektami. | Nazwa, Opis, Zapotrzebowanie na role. |
 | **Przypisania** | Przypisywanie pracowników do projektów z walidacją dostępności. | Pracownik, Projekt, Rola, Daty, Status. |
 | **Widok Tygodniowy** | Tygodniowy przegląd wszystkich projektów, pracowników i zasobów. | Projekty, Pracownicy, Pojazdy, Mieszkania, Zapotrzebowanie. |
+| **Ewidencja Godzin - Widok Miesięczny** | Zaawansowany widok miesięczny do wprowadzania godzin pracy z grupowaniem po projektach. | Projekt, Pracownik, Dzień, Godziny, Bulk update. |
 | **Rozliczenia (Payroll)** | Generowanie list płac dla pracowników na podstawie godzin i stawek. | Okres, Godziny, Stawka godzinowa, Waluta, Status. |
+| **Stawki Pracowników** | Zarządzanie stawkami godzinowymi pracowników dla różnych projektów. | Pracownik, Projekt, Stawka, Waluta, Okres. |
 | **Koszty Stałe** | Zarządzanie kosztami stałymi firmy (szablony i wpisy). | Nazwa, Kwota, Okres, Waluta, Kategoria. |
 | **Koszty Zmienne** | Zarządzanie kosztami zmiennymi projektów. | Projekt, Kwota, Data, Waluta, Opis. |
+| **Koszty Transportu** | Zarządzanie kosztami transportu między lokalizacjami. | Trasa, Koszt, Waluta, Data. |
 | **Dashboard Finansowy** | Analiza rentowności firmy i projektów. | Przychody, Koszty, Marża, Rentowność. |
 | **Magazyn** | Zarządzanie sprzętem i wydaniami dla pracowników. | Sprzęt, Ilość, Pracownik, Data wydania/zwrotu. |
 | **Wyjazdy i Powroty** | Zarządzanie wyjazdami pracowników do projektów i powrotami. | Data, Pracownicy, Pojazd, Lokalizacja, Status. |
+| **Zadania Projektowe** | Zarządzanie zadaniami w projektach z przypisaniem do pracowników. | Zadanie, Projekt, Pracownik, Status, Termin. |
+| **Oceny Pracowników** | System oceniania pracowników przez kierowników projektów. | Pracownik, Projekt, Ocena, Uwagi, Data. |
+| **Użytkownicy Systemu** | Zarządzanie użytkownikami systemu i ich rolami. | Użytkownik, Email, Role, Uprawnienia. |
+| **Role i Uprawnienia** | Pełny RBAC - zarządzanie rolami i uprawnieniami użytkowników. | Rola, Uprawnienia, Dynamiczna tabela. |
+| **Akcje Systemowe** | Narzędzia administracyjne (czyszczenie cache, odświeżanie uprawnień). | Cache, Uprawnienia, Optymalizacja. |
 | **Raporty** | Generowanie raportów z delegacji (w rozwoju). | Typy raportów, eksport PDF/Excel. |
 
 ---
@@ -473,9 +494,9 @@ W widoku tygodniowym zobaczysz:
 
 ---
 
-## ⏰ Ewidencja Godzin Pracy (Time Logs) - Widok Miesięczny
+## ⏰ Ewidencja Godzin Pracy - Widok Miesięczny
 
-System oferuje zaawansowany widok miesięczny do wprowadzania i przeglądania godzin pracy pracowników.
+**Zaawansowany widok miesięczny** do wprowadzania i przeglądania godzin pracy pracowników z inteligentnym grupowaniem i masową edycją.
 
 ### Jak Działa Widok Miesięczny:
 
@@ -484,34 +505,35 @@ System oferuje zaawansowany widok miesięczny do wprowadzania i przeglądania go
 
 ### Kluczowe Funkcje:
 
-**Grupowanie po Projektach:**
+**🎯 Inteligentne Grupowanie po Projektach:**
 - Tabela jest zorganizowana hierarchicznie: **Projekt → Pracownicy**
 - Każdy projekt ma nagłówek z nazwą i lokalizacją
 - Pod każdym projektem widzisz listę pracowników przypisanych do tego projektu
+- **Zero bałaganu** - wszystko uporządkowane i łatwe do znalezienia
 
-**Filtrowanie Pracowników:**
+**🔍 Automatyczne Filtrowanie:**
 - ✅ **Wyświetla tylko pracowników, którzy mieli przypisania w danym miesiącu**
-- Pracownicy bez przypisań w danym miesiącu nie są pokazywani
-- System automatycznie znajduje wszystkie aktywne przypisania w danym miesiącu
+- Pracownicy bez przypisań nie zaśmiecają widoku
+- System automatycznie znajduje wszystkie aktywne przypisania
 
-**Wizualne Oznaczenia:**
-- **Pola edytowalne** (białe) - dni, w których pracownik był przypisany do projektu
-- **Pola wyszarzone** (disabled) - dni, w których pracownik **nie był przypisany**
+**👁️ Wizualne Oznaczenia:**
+- **Pola edytowalne** (białe) - dni, w których pracownik był przypisany
+- **Pola wyszarzone** (disabled) - dni, w których pracownik **nie był przypisany** (nie można wprowadzić godzin)
 - **Weekendy** - oznaczone innym kolorem dla łatwej identyfikacji
 - **Wypełnione godziny** - pola z wprowadzonymi godzinami są wyróżnione
 
-**Bulk Update (Masowa Edycja):**
-- Możesz wprowadzić godziny dla wielu pracowników i dni jednocześnie
+**⚡ Bulk Update (Masowa Edycja):**
+- Wprowadź godziny dla wielu pracowników i dni **jednym razem**
 - Wypełnij pola godzin w tabeli
 - Kliknij **"Zapisz"** - system zapisze wszystkie zmiany w jednej transakcji
-- System automatycznie tworzy nowe TimeLogs lub aktualizuje istniejące
+- **Oszczędność czasu** - nie musisz zapisywać każdego dnia osobno
 
-**Walidacja:**
+**🛡️ Inteligentna Walidacja:**
 - System sprawdza, czy data jest w zakresie przypisania
 - Nie można wprowadzić godzin dla dni, w których pracownik nie był przypisany
 - Godziny są walidowane (np. maksymalna liczba godzin dziennie)
 
-**Dla Kierowników Projektów:**
+**👔 Dla Kierowników Projektów:**
 - Kierownicy widzą tylko projekty, którymi zarządzają
 - Dostęp przez **"Moje Projekty"** → **"Ewidencja Godzin Zespołu"**
 - Te same funkcje co administratorzy, ale ograniczone do swoich projektów
@@ -1055,3 +1077,48 @@ Jeśli napotkasz problemy:
 ---
 
 **Rekomendowane:** Użyj Docker z Laravel Sail dla najlepszego doświadczenia deweloperskiego! 🚢
+
+---
+
+## 🌟 Dlaczego Stocznia to Najlepsze Rozwiązanie?
+
+### 💼 Kompleksowość
+**Wszystko w jednym miejscu** - od planowania projektów, przez zarządzanie pracownikami, aż po generowanie list płac i analizę rentowności. Nie potrzebujesz wielu systemów - Stocznia obsługuje cały proces biznesowy.
+
+### 🎯 Inteligentna Automatyzacja
+- **Automatyczne generowanie list płac** dla wszystkich pracowników jednym kliknięciem
+- **Automatyczne czyszczenie przypisań** przy wyjazdach i powrotach
+- **Automatyczne sprawdzanie dostępności** pracowników przed przypisaniem
+- **Automatyczne generowanie uprawnień** z route - zero konfiguracji
+
+### 📊 Zaawansowana Analityka
+- **Dashboard finansowy** z analizą rentowności projektów i firmy
+- **Widok miesięczny godzin** z grupowaniem po projektach
+- **Top pracownicy** według przychodów
+- **Najdłuższe rotacje** - identyfikacja kluczowych pracowników
+
+### 🔐 Bezpieczeństwo i Elastyczność
+- **Pełny RBAC** - dynamiczna tabela uprawnień dostosowana do potrzeb
+- **Kierownicy projektów** - dedykowane uprawnienia dla zarządzania zespołem
+- **Walidacja na każdym kroku** - system zapobiega błędom przed ich wystąpieniem
+
+### ⚡ Wydajność
+- **Cache'owanie** - uprawnienia (24h), route (1h), menu (1h)
+- **Optymalizacja zapytań** - eager loading, brak N+1 queries
+- **Szybkie działanie** nawet przy dużych ilościach danych
+
+### 🎨 Intuicyjny Interfejs
+- **Widok tygodniowy** - główny hub zarządzania
+- **Widok miesięczny godzin** - zaawansowany, ale prosty w użyciu
+- **Skróty klawiszowe** - Ctrl+Strzałka do szybkiej nawigacji
+- **Responsywny design** - działa na wszystkich urządzeniach
+
+### 🚀 Skalowalność
+- **Nowe route = automatycznie w tabelce uprawnień**
+- **Nowe projekty = automatycznie w widoku tygodniowym**
+- **Nowi pracownicy = automatycznie w systemie**
+- **Zero konfiguracji** - system adaptuje się do zmian
+
+---
+
+**Stocznia to nie tylko system - to kompletne rozwiązanie ERP dla firm delegujących pracowników.** 🎯

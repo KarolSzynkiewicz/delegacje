@@ -46,7 +46,7 @@ class EmployeeDocumentController extends Controller
     {
         try {
             $employee = Employee::findOrFail($request->input('employee_id'));
-            
+
             $validated = $request->validated();
             unset($validated['employee_id']);
 
@@ -76,7 +76,7 @@ class EmployeeDocumentController extends Controller
         } catch (\Exception $e) {
             \Log::error('EmployeeDocument::store failed', [
                 'error' => $e->getMessage(),
-                'employee_id' => $request->input('employee_id'),
+                    'employee_id' => $request->input('employee_id'),
             ]);
             
             return redirect()->back()

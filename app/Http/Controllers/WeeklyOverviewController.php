@@ -56,7 +56,7 @@ class WeeklyOverviewController extends Controller
         $departures = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::DEPARTURE)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
             ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
-            ->with(['participants.employee.roles', 'vehicle', 'toLocation'])
+            ->with(['participants.employee', 'vehicle', 'toLocation'])
             ->orderBy('event_date')
             ->get();
         

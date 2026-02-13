@@ -707,7 +707,11 @@
                                                                 - {{ $departure->vehicle->registration_number }}
                                                             @endif
                                                             @php
-                                                                $uniqueParticipantsCount = $departure->participants->pluck('employee_id')->unique()->count();
+                                                                $uniqueParticipantsCount = $departure->participants
+                                                                    ->filter(fn($p) => $p->employee !== null)
+                                                                    ->pluck('employee_id')
+                                                                    ->unique()
+                                                                    ->count();
                                                             @endphp
                                                             @if($uniqueParticipantsCount > 0)
                                                                 ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
