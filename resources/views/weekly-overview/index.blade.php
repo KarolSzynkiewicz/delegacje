@@ -1154,8 +1154,8 @@
                     @foreach($employeesWithoutProject as $employeeData)
                         @php
                             $employee = $employeeData['employee'];
-                            $vehicles = $employeeData['vehicles'];
-                            $accommodations = $employeeData['accommodations'];
+                            $employeeVehicles = $employeeData['vehicles'];
+                            $employeeAccommodations = $employeeData['accommodations'];
                         @endphp
                         <div class="col-md-6 col-lg-4">
                             <x-ui.card>
@@ -1172,22 +1172,22 @@
                                     </div>
                                 @endif
                                 <div class="small">
-                                    @if($vehicles->isNotEmpty())
+                                    @if($employeeVehicles->isNotEmpty())
                                         <div class="mb-1">
                                             <i class="bi bi-car-front text-primary"></i>
                                             <span class="text-muted">Auto:</span>
-                                            @foreach($vehicles as $vehicle)
+                                            @foreach($employeeVehicles as $vehicle)
                                                 <a href="{{ route('vehicles.show', $vehicle) }}" class="text-decoration-none">
                                                     {{ $vehicle->name }}
                                                 </a>@if(!$loop->last), @endif
                                             @endforeach
                                         </div>
                                     @endif
-                                    @if($accommodations->isNotEmpty())
+                                    @if($employeeAccommodations->isNotEmpty())
                                         <div>
                                             <i class="bi bi-house text-success"></i>
                                             <span class="text-muted">Dom:</span>
-                                            @foreach($accommodations as $accommodation)
+                                            @foreach($employeeAccommodations as $accommodation)
                                                 <a href="{{ route('accommodations.show', $accommodation) }}" class="text-decoration-none">
                                                     {{ $accommodation->name }}
                                                 </a>@if(!$loop->last), @endif
