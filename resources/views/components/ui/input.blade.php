@@ -41,14 +41,17 @@
             const select = $refs.selectEl;
             const selectedOption = select.options[select.selectedIndex];
             this.selectedText = selectedOption ? selectedOption.text : '';
+            // Force white color after selection
+            select.style.color = '#f1f5f9';
+            select.style.webkitTextFillColor = '#f1f5f9';
         }
-    }" x-init="updateSelected()">
+    }" x-init="updateSelected(); $refs.selectEl.style.color = '#f1f5f9'; $refs.selectEl.style.webkitTextFillColor = '#f1f5f9';">
         <select 
             name="{{ $name }}" 
             id="{{ $inputId }}"
             {{ $attributes->merge(['class' => str_replace('form-control', 'form-select', $inputClasses)]) }}
             {{ $required ? 'required' : '' }}
-            style="color: white !important;"
+            style="color: #f1f5f9 !important; -webkit-text-fill-color: #f1f5f9 !important;"
             x-ref="selectEl"
             @change="updateSelected()"
         >
