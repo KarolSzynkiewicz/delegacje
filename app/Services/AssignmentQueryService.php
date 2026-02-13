@@ -130,7 +130,9 @@ class AssignmentQueryService
         // Filter employees who are available
         return $allEmployees->filter(function (Employee $employee) use ($date) {
             // 1. Check if employee is NOT assigned to any project at the given date
+            // IMPORTANT: Exclude cancelled assignments
             $hasProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
+                ->where('is_cancelled', false)
                 ->activeAtDate($date)
                 ->exists();
             
@@ -139,9 +141,19 @@ class AssignmentQueryService
             }
 
             // 2. Check if employee has active rotation at the given date
-            $hasActiveRotation = $employee->rotations()
-                ->activeAtDate($date)
-                ->exists();
+            // Use eager loaded relations if available, otherwise query
+            $hasActiveRotation = false;
+            if ($employee->relationLoaded('rotations')) {
+                // Use eager loaded rotations
+                $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($date) {
+                    return $rotation->isActiveAt($date);
+                })->isNotEmpty();
+            } else {
+                // Fallback to query
+                $hasActiveRotation = $employee->rotations()
+                    ->activeAtDate($date)
+                    ->exists();
+            }
             
             if (!$hasActiveRotation) {
                 return false;
@@ -149,6 +161,11 @@ class AssignmentQueryService
 
             // 3. Check if employee has all required documents active at the given date
             // Use a single date for document check (departure is a single date event)
+            // Ensure documents are loaded
+            if (!$employee->relationLoaded('employeeDocuments')) {
+                $employee->load('employeeDocuments.document');
+            }
+            
             if (!$employee->hasAllDocumentsActiveInDateRange($date, $date)) {
                 return false;
             }

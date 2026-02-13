@@ -320,24 +320,45 @@ class Employee extends Model
 
         // Dla każdego wymaganego dokumentu sprawdź czy pracownik ma aktywny dokument w okresie
         foreach ($requiredDocuments as $documentTypeId) {
-            $hasActiveDocument = $this->employeeDocuments()
-                ->where('document_id', $documentTypeId)
-                ->where(function ($q) use ($startDate, $endDate) {
-                    $q->where(function ($q2) use ($startDate, $endDate) {
-                        // Dokument bezokresowy - zawsze aktywny jeśli valid_from <= endDate
-                        $q2->where('kind', 'bezokresowy')
-                           ->where('valid_from', '<=', $endDate);
-                    })->orWhere(function ($q2) use ($startDate, $endDate) {
-                        // Dokument okresowy - musi być aktywny w całym zakresie
-                        $q2->where('kind', 'okresowy')
-                           ->where('valid_from', '<=', $startDate)
-                           ->where(function ($q3) use ($endDate) {
-                               $q3->whereNull('valid_to')
-                                  ->orWhere('valid_to', '>=', $endDate);
-                           });
-                    });
-                })
-                ->exists();
+            $hasActiveDocument = false;
+            
+            // Use eager loaded relations if available, otherwise query
+            if ($this->relationLoaded('employeeDocuments')) {
+                // Use eager loaded employeeDocuments
+                $hasActiveDocument = $this->employeeDocuments
+                    ->where('document_id', $documentTypeId)
+                    ->filter(function ($doc) use ($startDate, $endDate) {
+                        // Sprawdź czy dokument jest aktywny w zakresie
+                        if ($doc->kind === 'bezokresowy') {
+                            return $doc->valid_from && $doc->valid_from->lte($endDate);
+                        } else {
+                            // Dokument okresowy - musi być aktywny w całym zakresie
+                            return $doc->valid_from && $doc->valid_from->lte($startDate) &&
+                                   (!$doc->valid_to || $doc->valid_to->gte($endDate));
+                        }
+                    })
+                    ->isNotEmpty();
+            } else {
+                // Fallback to query
+                $hasActiveDocument = $this->employeeDocuments()
+                    ->where('document_id', $documentTypeId)
+                    ->where(function ($q) use ($startDate, $endDate) {
+                        $q->where(function ($q2) use ($startDate, $endDate) {
+                            // Dokument bezokresowy - zawsze aktywny jeśli valid_from <= endDate
+                            $q2->where('kind', 'bezokresowy')
+                               ->where('valid_from', '<=', $endDate);
+                        })->orWhere(function ($q2) use ($startDate, $endDate) {
+                            // Dokument okresowy - musi być aktywny w całym zakresie
+                            $q2->where('kind', 'okresowy')
+                               ->where('valid_from', '<=', $startDate)
+                               ->where(function ($q3) use ($endDate) {
+                                   $q3->whereNull('valid_to')
+                                      ->orWhere('valid_to', '>=', $endDate);
+                               });
+                        });
+                    })
+                    ->exists();
+            }
 
             if (!$hasActiveDocument) {
                 return false;
