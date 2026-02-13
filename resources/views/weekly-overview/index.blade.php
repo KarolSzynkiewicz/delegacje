@@ -61,7 +61,7 @@
                     }
                 }
                 
-                foreach ($accommodations as $accommodationData) {
+                foreach ($projectAccommodations as $accommodationData) {
                     if (isset($accommodationData['assignments'])) {
                         $allEmployeeIds = $allEmployeeIds->merge(collect($accommodationData['assignments'])->pluck('employee_id'));
                     }
