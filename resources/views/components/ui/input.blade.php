@@ -35,14 +35,31 @@
         {{ $required ? 'required' : '' }}
     >{{ $value ?? old($name) }}</textarea>
 @elseif($type === 'select')
-    <select 
-        name="{{ $name }}" 
-        id="{{ $inputId }}"
-        {{ $attributes->merge(['class' => str_replace('form-control', 'form-select', $inputClasses)]) }}
-        {{ $required ? 'required' : '' }}
-    >
-        {{ $slot }}
-    </select>
+    <div x-data="{ 
+        selectedText: '',
+        updateSelected() {
+            const select = $refs.selectEl;
+            const selectedOption = select.options[select.selectedIndex];
+            this.selectedText = selectedOption ? selectedOption.text : '';
+        }
+    }" x-init="updateSelected()">
+        <select 
+            name="{{ $name }}" 
+            id="{{ $inputId }}"
+            {{ $attributes->merge(['class' => str_replace('form-control', 'form-select', $inputClasses)]) }}
+            {{ $required ? 'required' : '' }}
+            style="color: white !important;"
+            x-ref="selectEl"
+            @change="updateSelected()"
+        >
+            {{ $slot }}
+        </select>
+        <div x-show="selectedText && selectedText !== 'Wybierz projekt' && selectedText !== 'Wybierz rolę' && selectedText !== 'Wybierz pojazd' && selectedText !== 'Wybierz mieszkanie' && !selectedText.includes('--')" 
+             class="mt-1 small text-white-50" 
+             style="color: #94a3b8 !important; font-size: 0.8rem;">
+            <i class="bi bi-check-circle-fill text-success"></i> Wybrano: <span class="text-white fw-semibold" x-text="selectedText"></span>
+        </div>
+    </div>
 @elseif($type === 'checkbox')
     @php
         // Dla checkboxów, sprawdzamy czy value jest true/checked
