@@ -52,10 +52,10 @@
         foreach ($projects as $projectData) {
             $weekData = $projectData['weeks_data'][0] ?? null;
             if ($weekData) {
-                $vehicles = collect($weekData['vehicles'] ?? []);
-                $accommodations = collect($weekData['accommodations'] ?? []);
+                $projectVehicles = collect($weekData['vehicles'] ?? []);
+                $projectAccommodations = collect($weekData['accommodations'] ?? []);
                 
-                foreach ($vehicles as $vehicleData) {
+                foreach ($projectVehicles as $vehicleData) {
                     if (isset($vehicleData['assignments'])) {
                         $allEmployeeIds = $allEmployeeIds->merge(collect($vehicleData['assignments'])->pluck('employee_id'));
                     }
@@ -315,11 +315,11 @@
                     <div class="col-md-4">
                         <x-ui.card label="Auta w projekcie">
                             @php
-                                $vehicles = collect($weekData['vehicles'] ?? []);
+                                $projectVehicles = collect($weekData['vehicles'] ?? []);
                             @endphp
-                            @if($vehicles->isNotEmpty())
+                            @if($projectVehicles->isNotEmpty())
                                 <div class="d-flex flex-column gap-2">
-                                    @foreach($vehicles->take(6) as $vehicleData)
+                                    @foreach($projectVehicles->take(6) as $vehicleData)
                                         @php
                                             $usagePercentage = $vehicleData['usage_percentage'] ?? 0;
                                             $progressVariant = $usagePercentage == 100 ? 'success' : ($usagePercentage >= 70 ? 'warning' : 'danger');
@@ -453,9 +453,9 @@
                                         </x-ui.card>
                                     @endforeach
                                 </div>
-                                @if($vehicles->count() > 6)
+                                @if($projectVehicles->count() > 6)
                                     <div class="text-center mt-2">
-                                        <x-ui.badge variant="info">+{{ $vehicles->count() - 6 }} więcej</x-ui.badge>
+                                        <x-ui.badge variant="info">+{{ $projectVehicles->count() - 6 }} więcej</x-ui.badge>
                                     </div>
                                 @endif
                             @else
