@@ -1301,30 +1301,20 @@
                                                     </label>
                                                     <div class="row g-2">
                                                         <div class="col-12">
-                                                            <x-ui.input 
-                                                                type="select" 
-                                                                name="project_id" 
-                                                                required="true"
-                                                                class="form-select-sm"
-                                                            >
+                                                            <select name="project_id" required class="form-select form-select-sm">
                                                                 <option value="">Wybierz projekt</option>
                                                                 @foreach($allProjects as $project)
                                                                     <option value="{{ $project->id }}">{{ $project->name }}</option>
                                                                 @endforeach
-                                                            </x-ui.input>
+                                                            </select>
                                                         </div>
                                                         <div class="col-12">
-                                                            <x-ui.input 
-                                                                type="select" 
-                                                                name="role_id" 
-                                                                required="true"
-                                                                class="form-select-sm"
-                                                            >
+                                                            <select name="role_id" required class="form-select form-select-sm">
                                                                 <option value="">Wybierz rolę</option>
                                                                 @foreach($roles as $role)
                                                                     <option value="{{ $role->id }}">{{ $role->name }}</option>
                                                                 @endforeach
-                                                            </x-ui.input>
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1336,26 +1326,18 @@
                                                     </label>
                                                     <div class="row g-2">
                                                         <div class="col-12">
-                                                            <x-ui.input 
-                                                                type="select" 
-                                                                name="vehicle_id" 
-                                                                class="form-select-sm"
-                                                            >
+                                                            <select name="vehicle_id" class="form-select form-select-sm">
                                                                 <option value="">-- Nie przypisuj --</option>
                                                                 @foreach($vehicles as $vehicle)
                                                                     <option value="{{ $vehicle->id }}">{{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}</option>
                                                                 @endforeach
-                                                            </x-ui.input>
+                                                            </select>
                                                         </div>
                                                         <div class="col-12">
-                                                            <x-ui.input 
-                                                                type="select" 
-                                                                name="position" 
-                                                                class="form-select-sm"
-                                                            >
+                                                            <select name="position" class="form-select form-select-sm">
                                                                 <option value="passenger">Pasażer</option>
                                                                 <option value="driver">Kierowca</option>
-                                                            </x-ui.input>
+                                                            </select>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1365,16 +1347,12 @@
                                                     <label class="form-label small fw-semibold mb-1">
                                                         <i class="bi bi-house"></i> Mieszkanie <span class="text-muted">(opcjonalnie)</span>
                                                     </label>
-                                                    <x-ui.input 
-                                                        type="select" 
-                                                        name="accommodation_id" 
-                                                        class="form-select-sm"
-                                                    >
+                                                    <select name="accommodation_id" class="form-select form-select-sm">
                                                         <option value="">-- Nie przypisuj --</option>
                                                         @foreach($accommodations as $accommodation)
                                                             <option value="{{ $accommodation->id }}">{{ $accommodation->name }} ({{ $accommodation->capacity }} miejsc)</option>
                                                         @endforeach
-                                                    </x-ui.input>
+                                                    </select>
                                                 </div>
                                                 
                                                 <!-- Jeden guzik zapisz -->
