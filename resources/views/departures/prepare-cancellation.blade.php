@@ -27,7 +27,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <p class="mb-1"><strong>Data wyjazdu:</strong> {{ $departure->event_date->format('d.m.Y') }}</p>
-                            <p class="mb-1"><strong>Data przybycia:</strong> {{ $departure->end_date->format('d.m.Y') }}</p>
+                            <p class="mb-1"><strong>Data przybycia:</strong> {{ $departure->end_date?->format('d.m.Y') ?? 'Brak' }}</p>
                             <p class="mb-1"><strong>Z:</strong> {{ $departure->fromLocation->name }}</p>
                             <p class="mb-0"><strong>Do:</strong> {{ $departure->toLocation->name }}</p>
                         </div>

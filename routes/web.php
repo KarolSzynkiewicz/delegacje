@@ -125,6 +125,21 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         })->name('system-actions.run-migrations')
           ->defaults('resource', 'system-actions');
         
+        // System actions - fix old departures without end_date
+        Route::post('/system-actions/fix-departure-dates', function () {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('fix:departure-end-dates');
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', 'Naprawiono daty wyjazdów! ' . $output);
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd naprawy dat: ' . $e->getMessage());
+            }
+        })->name('system-actions.fix-departure-dates')
+          ->defaults('resource', 'system-actions');
+        
         // System actions - toggle debug mode (temporary via cache)
         Route::post('/system-actions/debug-on', function () {
             try {

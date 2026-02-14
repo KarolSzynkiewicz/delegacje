@@ -1329,7 +1329,7 @@
                                     <div class="small mb-3">
                                         <div class="text-muted mb-1">
                                             <i class="bi bi-calendar-check text-success"></i> 
-                                            <strong>Data przybycia:</strong> {{ $departure->end_date->format('d.m.Y') }}
+                                            <strong>Data przybycia:</strong> {{ $departure->end_date?->format('d.m.Y') ?? 'Brak' }}
                                         </div>
                                         @if($departure->toLocation)
                                             <div class="text-muted">
@@ -1379,7 +1379,7 @@
                                                 <div class="row g-2 mb-2">
                                                     <div class="col-6">
                                                         <label class="form-label small mb-1">Projekt: Od <span class="text-danger">*</span></label>
-                                                        <input type="date" name="project_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date->format('Y-m-d') }}">
+                                                        <input type="date" name="project_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date?->format('Y-m-d') ?? $weeks[0]['start']->format('Y-m-d') }}">
                                                     </div>
                                                     <div class="col-6">
                                                         <label class="form-label small mb-1">Projekt: Do <span class="text-danger">*</span></label>
@@ -1413,7 +1413,7 @@
                                                 <div class="row g-2 mb-2">
                                                     <div class="col-6">
                                                         <label class="form-label small mb-1">Pojazd: Od <span class="text-danger">*</span></label>
-                                                        <input type="date" name="vehicle_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date->format('Y-m-d') }}">
+                                                        <input type="date" name="vehicle_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date?->format('Y-m-d') ?? $weeks[0]['start']->format('Y-m-d') }}">
                                                     </div>
                                                     <div class="col-6">
                                                         <label class="form-label small mb-1">Pojazd: Do <span class="text-danger">*</span></label>
@@ -1439,7 +1439,7 @@
                                                 <div class="row g-2 mb-2">
                                                     <div class="col-6">
                                                         <label class="form-label small mb-1">Zakwaterowanie: Od <span class="text-danger">*</span></label>
-                                                        <input type="date" name="accommodation_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date->format('Y-m-d') }}">
+                                                        <input type="date" name="accommodation_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date?->format('Y-m-d') ?? $weeks[0]['start']->format('Y-m-d') }}">
                                                     </div>
                                                     <div class="col-6">
                                                         <label class="form-label small mb-1">Zakwaterowanie: Do <span class="text-danger">*</span></label>

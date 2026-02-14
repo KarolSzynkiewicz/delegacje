@@ -61,8 +61,8 @@
                     </x-tooltip>
                 </h6>
                 <p class="fw-semibold">
-                    {{ $departure->end_date->format('Y-m-d H:i') }}
-                    @if($departure->getDurationInDays() > 0)
+                    {{ $departure->end_date?->format('Y-m-d H:i') ?? 'Brak daty przybycia' }}
+                    @if($departure->end_date && $departure->getDurationInDays() > 0)
                         <small class="text-muted">({{ $departure->getDurationInDays() }} dni)</small>
                     @endif
                 </p>
