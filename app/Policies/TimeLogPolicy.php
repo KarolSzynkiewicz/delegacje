@@ -8,6 +8,39 @@ use App\Models\User;
 class TimeLogPolicy
 {
     /**
+     * Determine if the user can view any time logs.
+     */
+    public function viewAny(User $user): bool
+    {
+        // Administrator widzi wszystkie
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Kierownik widzi time-logi ze swoich projektów
+        return $user->getManagedProjectIds()->isNotEmpty();
+    }
+
+    /**
+     * Determine if the user can view the time log.
+     */
+    public function view(User $user, TimeLog $timeLog): bool
+    {
+        // Administrator widzi wszystkie
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $assignment = $timeLog->projectAssignment;
+        if (!$assignment) {
+            return false;
+        }
+
+        // Kierownik widzi tylko time-logi ze swoich projektów
+        return $user->managesProject($assignment->project_id);
+    }
+
+    /**
      * Determine if the user can create time logs.
      */
     public function create(User $user, ?int $assignmentId = null): bool
@@ -48,6 +81,15 @@ class TimeLogPolicy
         }
 
         return $user->managesProject($assignment->project_id);
+    }
+
+    /**
+     * Determine if the user can delete the time log.
+     */
+    public function delete(User $user, TimeLog $timeLog): bool
+    {
+        // Tylko admin może usuwać
+        return $user->isAdmin();
     }
 
     /**

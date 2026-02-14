@@ -79,6 +79,14 @@ class TimeLogsTable extends Component
     {
         $query = TimeLog::with('projectAssignment.employee', 'projectAssignment.project');
         
+        // Filtruj dla kierownika - tylko time-logi z jego projektów
+        if (!auth()->user()->isAdmin()) {
+            $userProjectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $query->whereHas('projectAssignment', function($q) use ($userProjectIds) {
+                $q->whereIn('project_id', $userProjectIds);
+            });
+        }
+        
         // Filtrowanie po przypisaniach (dla /mine/*)
         if ($this->filterAssignmentIds && is_array($this->filterAssignmentIds) && !empty($this->filterAssignmentIds)) {
             $query->whereIn('project_assignment_id', $this->filterAssignmentIds);
@@ -159,7 +167,14 @@ class TimeLogsTable extends Component
         }
         
         $employees = $employeesQuery->orderBy('last_name')->orderBy('first_name')->get();
-        $projects = Project::orderBy('name')->get();
+        
+        // Filtruj projekty dla kierownika
+        $projectsQuery = Project::query();
+        if (!auth()->user()->isAdmin()) {
+            $userProjectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $projectsQuery->whereIn('id', $userProjectIds);
+        }
+        $projects = $projectsQuery->orderBy('name')->get();
 
         return view('livewire.time-logs-table', compact('timeLogs', 'employees', 'projects'));
     }

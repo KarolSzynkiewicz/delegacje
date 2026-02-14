@@ -21,6 +21,7 @@ class TimeLogController extends Controller
     public function __construct(TimeLogService $timeLogService)
     {
         $this->timeLogService = $timeLogService;
+        $this->authorizeResource(TimeLog::class, 'timeLog');
     }
 
     /**
@@ -37,11 +38,17 @@ class TimeLogController extends Controller
     public function create(): View
     {
         // Get active assignments (based on dates) that are not cancelled
-        $assignments = ProjectAssignment::with('employee', 'project', 'role')
+        $assignmentsQuery = ProjectAssignment::with('employee', 'project', 'role')
             ->active()
-            ->where('is_cancelled', false)
-            ->orderBy('start_date', 'desc')
-            ->get();
+            ->where('is_cancelled', false);
+        
+        // Filtruj dla kierownika - tylko jego projekty
+        if (!auth()->user()->isAdmin()) {
+            $projectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $assignmentsQuery->whereIn('project_id', $projectIds);
+        }
+        
+        $assignments = $assignmentsQuery->orderBy('start_date', 'desc')->get();
         
         return view('time-logs.create', compact('assignments'));
     }
@@ -91,11 +98,17 @@ class TimeLogController extends Controller
     public function edit(TimeLog $timeLog): View
     {
         // Get active assignments (based on dates) that are not cancelled
-        $assignments = ProjectAssignment::with('employee', 'project', 'role')
+        $assignmentsQuery = ProjectAssignment::with('employee', 'project', 'role')
             ->active()
-            ->where('is_cancelled', false)
-            ->orderBy('start_date', 'desc')
-            ->get();
+            ->where('is_cancelled', false);
+        
+        // Filtruj dla kierownika - tylko jego projekty
+        if (!auth()->user()->isAdmin()) {
+            $projectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $assignmentsQuery->whereIn('project_id', $projectIds);
+        }
+        
+        $assignments = $assignmentsQuery->orderBy('start_date', 'desc')->get();
         
         return view('time-logs.edit', compact('timeLog', 'assignments'));
     }
@@ -145,6 +158,14 @@ class TimeLogController extends Controller
      */
     public function byAssignment(ProjectAssignment $assignment): View
     {
+        // Autoryzuj dostęp - kierownik może widzieć tylko swoje projekty
+        $this->authorize('viewAny', TimeLog::class);
+        
+        // Sprawdź czy użytkownik ma dostęp do tego projektu
+        if (!auth()->user()->isAdmin() && !auth()->user()->managesProject($assignment->project_id)) {
+            abort(403, 'Nie masz uprawnień do tego projektu.');
+        }
+        
         $timeLogs = $assignment->timeLogs()
             ->orderBy('start_time', 'desc')
             ->get();
@@ -157,8 +178,18 @@ class TimeLogController extends Controller
      */
     public function monthlyGrid(Request $request): View
     {
+        // Autoryzuj dostęp - kierownik może widzieć tylko swoje projekty
+        $this->authorize('viewAny', TimeLog::class);
+        
         $month = $request->query('month', Carbon::now()->format('Y-m'));
-        $data = $this->timeLogService->getMonthlyGridData($month);
+        
+        // Filtruj projekty dla kierownika
+        $projectIds = null;
+        if (!auth()->user()->isAdmin()) {
+            $projectIds = auth()->user()->getManagedProjectIds()->toArray();
+        }
+        
+        $data = $this->timeLogService->getMonthlyGridData($month, $projectIds);
 
         return view('time-logs.monthly-grid', $data);
     }
