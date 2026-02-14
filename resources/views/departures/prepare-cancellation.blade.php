@@ -174,9 +174,11 @@
                                             </td>
                                             <td>
                                                 {{ $assignment->accommodation->name }}
-                                                <small class="text-muted d-block">
-                                                    {{ $assignment->accommodation->location->name }}
-                                                </small>
+                                                @if($assignment->accommodation->location)
+                                                    <small class="text-muted d-block">
+                                                        {{ $assignment->accommodation->location->name }}
+                                                    </small>
+                                                @endif
                                             </td>
                                             <td>{{ $assignment->start_date->format('d.m.Y') }}</td>
                                             <td>{{ $assignment->end_date ? $assignment->end_date->format('d.m.Y') : 'Bezterminowo' }}</td>
