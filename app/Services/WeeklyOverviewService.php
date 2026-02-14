@@ -991,6 +991,8 @@ class WeeklyOverviewService
             
             return [
                 'employee' => $employee,
+                'vehicle_assignments' => $vehicleAssignments,
+                'accommodation_assignments' => $accommodationAssignments,
                 'vehicles' => $vehicles,
                 'accommodations' => $accommodations,
                 'has_vehicle' => $vehicles->isNotEmpty(),

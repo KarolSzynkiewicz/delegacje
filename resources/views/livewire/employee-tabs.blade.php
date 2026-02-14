@@ -47,6 +47,48 @@
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h5>
+                                <i class="bi bi-geo-alt me-1"></i> Aktualna lokalizacja
+                            </h5>
+                            <p>
+                                @php
+                                    $locationTracker = app(\App\Services\LocationTrackingService::class);
+                                    $currentLocation = $locationTracker->forEmployee($employee);
+                                    $currentProjects = $employee->current_projects;
+                                    $projectsList = $currentProjects->pluck('name')->join(', ');
+                                    
+                                    // Check if in transit
+                                    $inTransit = \App\Models\LogisticsEvent::isEmployeeInTransit($employee, now());
+                                @endphp
+                                
+                                @if($inTransit)
+                                    <x-tooltip title="Pracownik jest w trakcie wyjazdu/powrotu">
+                                        <x-ui.badge variant="warning">✈️ W podróży</x-ui.badge>
+                                    </x-tooltip>
+                                @elseif(!$currentLocation)
+                                    <x-tooltip title="Pracownik nie ma przypisanej lokalizacji">
+                                        <x-ui.badge variant="accent">❓ Brak lokalizacji</x-ui.badge>
+                                    </x-tooltip>
+                                @elseif($currentLocation->is_base)
+                                    <x-tooltip title="Pracownik jest w bazie: {{ $currentLocation->name }}">
+                                        <x-ui.badge variant="success">🏠 {{ $currentLocation->name }}</x-ui.badge>
+                                    </x-tooltip>
+                                @else
+                                    <x-tooltip title="{{ $projectsList ? 'Przypisany do: ' . $projectsList . ' w lokalizacji ' . $currentLocation->name : 'W lokalizacji: ' . $currentLocation->name }}">
+                                        <x-ui.badge variant="info">🏢 {{ $currentLocation->name }}</x-ui.badge>
+                                    </x-tooltip>
+                                    @if($projectsList)
+                                        <div class="small text-muted mt-1">
+                                            Projekt: {{ $projectsList }}
+                                        </div>
+                                    @endif
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+
                     @if ($employee->notes)
                         <div class="mb-3">
                             <h5>Notatki</h5>

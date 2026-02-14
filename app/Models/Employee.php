@@ -51,6 +51,14 @@ class Employee extends Model
     }
 
     /**
+     * Get the employee's project assignments (alias for assignments()).
+     */
+    public function projectAssignments(): HasMany
+    {
+        return $this->hasMany(ProjectAssignment::class);
+    }
+
+    /**
      * Get the projects assigned to this employee (M:N relationship).
      */
     public function projects(): BelongsToMany
@@ -515,6 +523,35 @@ class Employee extends Model
         if ($hasConflictingAssignments) {
             $available = false;
             $reasons[] = 'Już przypisany do innego projektu w tym okresie';
+        }
+
+        // 4. Sprawdź lokalizację i wymagania logistyczne (wyjazdy)
+        if ($projectId !== null && $available) {
+            $project = \App\Models\Project::find($projectId);
+            
+            if ($project && $project->location_id) {
+                try {
+                    $validator = app(\App\Services\EmployeeLocationValidator::class);
+                    $validator->validateForAssignment($this, $project, \Carbon\Carbon::parse($startDate));
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    // Extract user-friendly message from validation exception
+                    $errors = $e->errors();
+                    
+                    if (isset($errors['employee_id'])) {
+                        $available = false;
+                        $message = $errors['employee_id'][0];
+                        
+                        // Make message more concise for availability status
+                        if (str_contains($message, 'w bazie') && str_contains($message, 'Najpierw utwórz wyjazd')) {
+                            $reasons[] = 'Wymaga wyjazdu do lokalizacji: ' . $project->location->name;
+                        } elseif (str_contains($message, 'w trakcie podróży')) {
+                            $reasons[] = 'W podróży w dniu rozpoczęcia przypisania';
+                        } else {
+                            $reasons[] = 'Nieodpowiednia lokalizacja dla tego projektu';
+                        }
+                    }
+                }
+            }
         }
 
         return [

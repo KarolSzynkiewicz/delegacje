@@ -52,24 +52,36 @@ class WeeklyOverviewController extends Controller
             ->orderBy('event_date')
             ->get();
         
-        // Get departures (wyjazdy) for the week (exclude CANCELLED)
-        $departures = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::DEPARTURE)
+        // Get ALL departures for the week (exclude CANCELLED) - for alerts section
+        $allDepartures = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::DEPARTURE)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
             ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
-            ->with(['participants.employee', 'vehicle', 'toLocation'])
+            ->with([
+                'participants.employee.projectAssignments' => function($query) {
+                    $query->where('is_cancelled', false)
+                          ->select('id', 'employee_id', 'logistics_event_id', 'is_cancelled');
+                },
+                'vehicle', 
+                'toLocation'
+            ])
             ->orderBy('event_date')
             ->get();
         
-        // Filter out employees who already have project assignments in this week
-        $employeesWithProjects = \App\Models\ProjectAssignment::where('is_cancelled', false)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->pluck('employee_id')
-            ->unique();
-        
-        // Filter departures to exclude participants who already have project assignments
-        $departures = $departures->map(function($departure) use ($employeesWithProjects) {
-            $filteredParticipants = $departure->participants->filter(function($participant) use ($employeesWithProjects) {
-                return $participant->employee && !$employeesWithProjects->contains($participant->employee_id);
+        // Filter departures to show only those with unassigned participants
+        // Now optimized - no N+1! projectAssignments are already loaded
+        $departures = $allDepartures->map(function($departure) {
+            // Filter participants who don't have a project assignment from this logistics event
+            $filteredParticipants = $departure->participants->filter(function($participant) use ($departure) {
+                if (!$participant->employee) {
+                    return false;
+                }
+                
+                // Check in already loaded collection - NO QUERY!
+                $hasAssignment = $participant->employee->projectAssignments
+                    ->where('logistics_event_id', $departure->id)
+                    ->isNotEmpty();
+                
+                return !$hasAssignment;
             });
             $departure->setRelation('participants', $filteredParticipants);
             return $departure;
@@ -88,7 +100,7 @@ class WeeklyOverviewController extends Controller
         $vehicles = \App\Models\Vehicle::orderBy('registration_number')->get();
         $accommodations = \App\Models\Accommodation::orderBy('name')->get();
         
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'departures', 'employeesWithoutProject', 'expiringItems', 'roles', 'vehicles', 'accommodations'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'expiringItems', 'roles', 'vehicles', 'accommodations'));
     }
 
     /**

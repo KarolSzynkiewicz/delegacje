@@ -309,14 +309,17 @@ namespace App\Models {
 	 * @property mixed $status
 	 * @property \Illuminate\Support\Carbon|null $end_date
 	 * @property \Illuminate\Support\Carbon $start_date
+	 * @property int|null $logistics_event_id
 	 * @property int $accommodation_id
 	 * @property int $employee_id
 	 * @property int $id
 	 * @property-read \App\Models\Employee $employee
 	 * @property-read \App\Models\Accommodation $accommodation
+	 * @property-read \App\Models\LogisticsEvent $logisticsEvent
 	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereEmployeeId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereAccommodationId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereLogisticsEventId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereStartDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereEndDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<AccommodationAssignment>|AccommodationAssignment whereStatus($value)
@@ -1736,6 +1739,8 @@ namespace App\Models {
 	 * @property-read int|null $roles_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ProjectAssignment> $assignments
 	 * @property-read int|null $assignments_count
+	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ProjectAssignment> $projectAssignments
+	 * @property-read int|null $projectAssignments_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project> $projects
 	 * @property-read int|null $projects_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VehicleAssignment> $vehicleAssignments
@@ -2034,7 +2039,6 @@ namespace App\Models {
 	 * @property mixed $kind
 	 * @property \Illuminate\Support\Carbon|null $valid_to
 	 * @property \Illuminate\Support\Carbon $valid_from
-	 * @property mixed $type
 	 * @property int $document_id
 	 * @property int $employee_id
 	 * @property int $id
@@ -2044,7 +2048,6 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereEmployeeId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereDocumentId($value)
-	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereType($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereValidFrom($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereValidTo($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<EmployeeDocument>|EmployeeDocument whereKind($value)
@@ -4324,6 +4327,7 @@ namespace App\Models {
 	 * @property mixed $email
 	 * @property mixed $phone
 	 * @property mixed $contact_person
+	 * @property \App\Enums\EuropeanCountry|null $country
 	 * @property mixed $postal_code
 	 * @property mixed $city
 	 * @property mixed $address
@@ -4336,6 +4340,7 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereAddress($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereCity($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location wherePostalCode($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereCountry($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereContactPerson($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location wherePhone($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereEmail($value)
@@ -4614,6 +4619,7 @@ namespace App\Models {
 	 * @property int|null $transport_id
 	 * @property int|null $vehicle_id
 	 * @property boolean $has_transport
+	 * @property \Illuminate\Support\Carbon|null $end_date
 	 * @property \Illuminate\Support\Carbon $event_date
 	 * @property \App\Enums\LogisticsEventType $type
 	 * @property int $id
@@ -4624,9 +4630,18 @@ namespace App\Models {
 	 * @property-read \App\Models\User $creator
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LogisticsEventParticipant> $participants
 	 * @property-read int|null $participants_count
+	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ProjectAssignment> $projectAssignments
+	 * @property-read int|null $projectAssignments_count
+	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VehicleAssignment> $vehicleAssignments
+	 * @property-read int|null $vehicleAssignments_count
+	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AccommodationAssignment> $accommodationAssignments
+	 * @property-read int|null $accommodationAssignments_count
+	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Comment> $comments
+	 * @property-read int|null $comments_count
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereType($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereEventDate($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereEndDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereHasTransport($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereVehicleId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereTransportId($value)
@@ -4640,6 +4655,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent newModelQuery()
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent newQuery()
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent query()
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent inTransitOn(\App\Models\Employee $employee, \Carbon\Carbon $date) {@see App\Models\LogisticsEvent::scopeInTransitOn()}
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent plannedDeparturesTo(\App\Models\Employee $employee, int $locationId) {@see App\Models\LogisticsEvent::scopePlannedDeparturesTo()}
 	 * @method static mixed select($columns)
 	 * @method static mixed selectSub($query, $as)
 	 * @method static mixed selectRaw($expression, array $bindings)
@@ -5787,6 +5804,7 @@ namespace App\Models {
 	 * @property boolean $is_cancelled
 	 * @property \Illuminate\Support\Carbon|null $end_date
 	 * @property \Illuminate\Support\Carbon $start_date
+	 * @property int|null $logistics_event_id
 	 * @property int $role_id
 	 * @property int $employee_id
 	 * @property int $project_id
@@ -5795,12 +5813,14 @@ namespace App\Models {
 	 * @property-read \App\Models\Project $project
 	 * @property-read \App\Models\Employee $employee
 	 * @property-read \App\Models\Role $role
+	 * @property-read \App\Models\LogisticsEvent $logisticsEvent
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\TimeLog> $timeLogs
 	 * @property-read int|null $timeLogs_count
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereProjectId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereEmployeeId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereRoleId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereLogisticsEventId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereStartDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereEndDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereIsCancelled($value)
@@ -8629,6 +8649,7 @@ namespace App\Models {
 	 * @property int|null $current_location_id
 	 * @property mixed $image_path
 	 * @property mixed $notes
+	 * @property \Illuminate\Support\Carbon|null $ac_wazne_do
 	 * @property \Illuminate\Support\Carbon|null $insurance_valid_to
 	 * @property \Illuminate\Support\Carbon|null $inspection_valid_to
 	 * @property mixed $technical_condition
@@ -8657,6 +8678,7 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereTechnicalCondition($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereInspectionValidTo($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereInsuranceValidTo($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereAcWazneDo($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereNotes($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereImagePath($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereCurrentLocationId($value)
@@ -8932,15 +8954,18 @@ namespace App\Models {
 	 * @property \Illuminate\Support\Carbon|null $end_date
 	 * @property \Illuminate\Support\Carbon $start_date
 	 * @property \App\Enums\VehiclePosition $position
+	 * @property int|null $logistics_event_id
 	 * @property int $vehicle_id
 	 * @property int $employee_id
 	 * @property int $id
 	 * @property-read mixed $status
 	 * @property-read \App\Models\Employee $employee
 	 * @property-read \App\Models\Vehicle $vehicle
+	 * @property-read \App\Models\LogisticsEvent $logisticsEvent
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereEmployeeId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereVehicleId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereLogisticsEventId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment wherePosition($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereStartDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereEndDate($value)

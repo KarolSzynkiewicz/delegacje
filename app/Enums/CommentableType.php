@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\Vehicle;
 use App\Models\Accommodation;
+use App\Models\LogisticsEvent;
 use Illuminate\Database\Eloquent\Model;
 
 enum CommentableType: string
@@ -14,6 +15,7 @@ enum CommentableType: string
     case PROJECT_TASK = 'project_task';
     case VEHICLE = 'vehicle';
     case ACCOMMODATION = 'accommodation';
+    case LOGISTICS_EVENT = 'logistics_event';
 
     public function modelClass(): string
     {
@@ -22,6 +24,7 @@ enum CommentableType: string
             self::PROJECT_TASK => ProjectTask::class,
             self::VEHICLE => Vehicle::class,
             self::ACCOMMODATION => Accommodation::class,
+            self::LOGISTICS_EVENT => LogisticsEvent::class,
         };
     }
 
@@ -32,6 +35,7 @@ enum CommentableType: string
             ProjectTask::class => self::PROJECT_TASK,
             Vehicle::class => self::VEHICLE,
             Accommodation::class => self::ACCOMMODATION,
+            LogisticsEvent::class => self::LOGISTICS_EVENT,
             default => throw new \InvalidArgumentException("Model " . $model::class . " is not commentable"),
         };
     }

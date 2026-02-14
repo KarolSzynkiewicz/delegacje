@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
+use App\Traits\HasComments;
 
 /**
  * LogisticsEvent - fakt biznesowy (co, kiedy, kto, gdzie)
@@ -17,11 +18,12 @@ use App\Enums\LogisticsEventStatus;
  */
 class LogisticsEvent extends Model
 {
-    use HasFactory;
+    use HasFactory, HasComments;
 
     protected $fillable = [
         'type',
         'event_date',
+        'end_date',
         'has_transport',
         'vehicle_id',
         'transport_id',
@@ -34,6 +36,7 @@ class LogisticsEvent extends Model
 
     protected $casts = [
         'event_date' => 'datetime',
+        'end_date' => 'datetime',
         'has_transport' => 'boolean',
         'type' => LogisticsEventType::class,
         'status' => LogisticsEventStatus::class,
@@ -85,5 +88,158 @@ class LogisticsEvent extends Model
     public function participants(): HasMany
     {
         return $this->hasMany(LogisticsEventParticipant::class);
+    }
+
+    /**
+     * Get project assignments created from this logistics event.
+     */
+    public function projectAssignments(): HasMany
+    {
+        return $this->hasMany(ProjectAssignment::class);
+    }
+
+    /**
+     * Get vehicle assignments created from this logistics event.
+     */
+    public function vehicleAssignments(): HasMany
+    {
+        return $this->hasMany(VehicleAssignment::class);
+    }
+
+    /**
+     * Get accommodation assignments created from this logistics event.
+     */
+    public function accommodationAssignments(): HasMany
+    {
+        return $this->hasMany(AccommodationAssignment::class);
+    }
+
+    /**
+     * Get the duration of the trip in days.
+     */
+    public function getDurationInDays(): int
+    {
+        if (!$this->end_date) {
+            return 0;
+        }
+        return $this->event_date->diffInDays($this->end_date);
+    }
+
+    /**
+     * Get visual status based on dates (for display purposes).
+     * 
+     * Returns: 'oczekuje', 'w trakcie', 'zakończone', 'anulowany'
+     */
+    public function getVisualStatus(): string
+    {
+        if ($this->status === LogisticsEventStatus::CANCELLED) {
+            return 'anulowany';
+        }
+
+        $now = now()->startOfDay(); // Compare dates only, not time
+        $eventDate = $this->event_date->startOfDay();
+        $endDate = $this->end_date ? $this->end_date->startOfDay() : $eventDate;
+
+        // If trip hasn't started yet (event_date is in the future)
+        if ($eventDate->gt($now)) {
+            return 'oczekuje';
+        }
+
+        // If trip has ended (end_date is in the past)
+        if ($endDate->lt($now)) {
+            return 'zakończone';
+        }
+
+        // Trip is happening now (event_date <= now <= end_date)
+        return 'w trakcie';
+    }
+
+    /**
+     * Get the effective end date (use end_date if available, otherwise event_date).
+     */
+    public function getEffectiveEndDate(): \Carbon\Carbon
+    {
+        return $this->end_date ?? $this->event_date;
+    }
+
+    /**
+     * Scope: Get events where employee is in transit on given date.
+     * 
+     * In transit = between event_date (inclusive) and end_date (exclusive)
+     * On arrival date (end_date), employee is already at destination.
+     */
+    public function scopeInTransitOn($query, Employee $employee, \Carbon\Carbon $date)
+    {
+        $dateNormalized = $date->copy()->startOfDay();
+        
+        return $query->where(function($q) {
+                $q->where('type', LogisticsEventType::DEPARTURE)
+                  ->orWhere('type', LogisticsEventType::RETURN);
+            })
+            ->whereHas('participants', fn($q) => $q->where('employee_id', $employee->id))
+            ->where('event_date', '<=', $dateNormalized)
+            ->where('end_date', '>', $dateNormalized)
+            ->whereIn('status', [
+                LogisticsEventStatus::PLANNED,
+                LogisticsEventStatus::COMPLETED
+            ]);
+    }
+
+    /**
+     * Check if employee is in transit on given date.
+     */
+    public static function isEmployeeInTransit(Employee $employee, \Carbon\Carbon $date): bool
+    {
+        return static::inTransitOn($employee, $date)->exists();
+    }
+
+    /**
+     * Scope: Get PLANNED departures for employee to specific location.
+     */
+    public function scopePlannedDeparturesTo($query, Employee $employee, int $locationId)
+    {
+        return $query->where('type', LogisticsEventType::DEPARTURE)
+            ->where('to_location_id', $locationId)
+            ->where('status', LogisticsEventStatus::PLANNED)
+            ->whereHas('participants', fn($q) => $q->where('employee_id', $employee->id));
+    }
+
+    /**
+     * Get count of participants with project assignments from this logistics event.
+     */
+    public function getAssignedParticipantsCount(): int
+    {
+        return $this->participants()
+            ->whereHas('employee.projectAssignments', function ($query) {
+                $query->where('logistics_event_id', $this->id)
+                    ->where('is_cancelled', false);
+            })
+            ->count();
+    }
+
+    /**
+     * Get total participants count.
+     */
+    public function getTotalParticipantsCount(): int
+    {
+        return $this->participants()->count();
+    }
+
+    /**
+     * Check if all participants are assigned to projects.
+     */
+    public function allParticipantsAssigned(): bool
+    {
+        return $this->getAssignedParticipantsCount() === $this->getTotalParticipantsCount();
+    }
+
+    /**
+     * Update completion status based on participant assignments.
+     */
+    public function updateCompletionStatus(): void
+    {
+        if ($this->allParticipantsAssigned() && $this->status === LogisticsEventStatus::PLANNED) {
+            $this->update(['status' => LogisticsEventStatus::COMPLETED]);
+        }
     }
 }

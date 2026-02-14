@@ -28,6 +28,7 @@ class ProjectAssignment extends Model
         'end_date',
         'notes',
         'is_cancelled',
+        'logistics_event_id',
     ];
 
     /**
@@ -63,6 +64,14 @@ class ProjectAssignment extends Model
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Get the logistics event that created this assignment.
+     */
+    public function logisticsEvent(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsEvent::class);
     }
 
     /**

@@ -18,15 +18,15 @@ class ProjectDemandFactory extends Factory
      */
     public function definition(): array
     {
-        $dateFrom = fake()->dateTimeBetween('-1 year', 'now');
-        $dateTo = fake()->dateTimeBetween($dateFrom, '+1 year');
+        $startDate = fake()->dateTimeBetween('-1 year', 'now');
+        $endDate = fake()->dateTimeBetween($startDate, '+1 year');
 
         return [
             'project_id' => Project::factory(),
             'role_id' => Role::factory(),
             'required_count' => fake()->numberBetween(1, 10),
-            'date_from' => $dateFrom,
-            'date_to' => $dateTo,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'notes' => fake()->optional()->sentence(),
         ];
     }

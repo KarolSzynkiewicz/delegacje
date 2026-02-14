@@ -10,15 +10,19 @@ use Carbon\Carbon;
 class DepartureEmployeeSelector extends Component
 {
     public $departureDate;
+    public $endDate;
     public $selectedEmployeeIds = [];
     public $employees = [];
+    public $editMode = false;
 
     protected $listeners = ['dateChanged' => 'updateEmployees'];
 
-    public function mount($departureDate = null, $selectedEmployeeIds = [])
+    public function mount($departureDate = null, $selectedEmployeeIds = [], $endDate = null)
     {
         $this->departureDate = $departureDate ?? date('Y-m-d');
+        $this->endDate = $endDate;
         $this->selectedEmployeeIds = $selectedEmployeeIds;
+        $this->editMode = !empty($selectedEmployeeIds);
         $this->updateEmployees();
     }
 
@@ -37,7 +41,9 @@ class DepartureEmployeeSelector extends Component
 
         try {
             $date = Carbon::parse($this->departureDate);
-            $this->employees = app(AssignmentQueryService::class)
+            
+            // Get available employees (not assigned to projects)
+            $availableEmployees = app(AssignmentQueryService::class)
                 ->getAvailableEmployeesForDeparture($date)
                 ->map(function ($employee) use ($date) {
                     // Load rotation info
@@ -51,8 +57,36 @@ class DepartureEmployeeSelector extends Component
                             'end_date' => $rotation->end_date ? $rotation->end_date->format('Y-m-d') : null,
                         ] : null,
                     ];
-                })
-                ->toArray();
+                });
+            
+            // In edit mode, also include currently selected employees
+            if ($this->editMode && !empty($this->selectedEmployeeIds)) {
+                $selectedEmployees = Employee::whereIn('id', $this->selectedEmployeeIds)
+                    ->get()
+                    ->map(function ($employee) use ($date) {
+                        $rotation = $employee->getActiveRotationForDate($date);
+                        
+                        return [
+                            'id' => $employee->id,
+                            'full_name' => $employee->full_name . ' (obecnie wybrany)',
+                            'rotation' => $rotation ? [
+                                'start_date' => $rotation->start_date->format('Y-m-d'),
+                                'end_date' => $rotation->end_date ? $rotation->end_date->format('Y-m-d') : null,
+                            ] : null,
+                        ];
+                    });
+                
+                // Merge selected with available (remove duplicates)
+                $allEmployees = $selectedEmployees->merge(
+                    $availableEmployees->filter(function($emp) {
+                        return !in_array($emp['id'], $this->selectedEmployeeIds);
+                    })
+                );
+                
+                $this->employees = $allEmployees->toArray();
+            } else {
+                $this->employees = $availableEmployees->toArray();
+            }
         } catch (\Exception $e) {
             $this->employees = [];
         }

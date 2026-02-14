@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
+use App\Models\LogisticsEvent;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -47,6 +48,43 @@ class LocationTrackingService
             now()->addMinutes(5),
             fn() => $this->calculateEmployeeLocation($employee)
         );
+    }
+
+    /**
+     * Get the location of an employee on a specific date.
+     * 
+     * Returns:
+     * - Location object if employee has active assignment or is at home
+     * - "W PODRÓŻY" string if employee is traveling (between departure and arrival)
+     * 
+     * @param Employee $employee
+     * @param \Carbon\Carbon $date
+     * @return Location|string|null
+     */
+    public function forEmployeeOnDate(Employee $employee, \Carbon\Carbon $date): Location|string|null
+    {
+        // Check if employee is in transit using scope
+        if (LogisticsEvent::isEmployeeInTransit($employee, $date)) {
+            return "W PODRÓŻY";
+        }
+
+        // Check for project assignment on that date
+        $projectAssignment = $employee->assignments()
+            ->where('is_cancelled', false)
+            ->where('start_date', '<=', $date)
+            ->where(function ($q) use ($date) {
+                $q->whereNull('end_date')
+                  ->orWhere('end_date', '>=', $date);
+            })
+            ->with('project.location')
+            ->first();
+
+        if ($projectAssignment && $projectAssignment->project?->location) {
+            return $projectAssignment->project->location;
+        }
+
+        // No assignment - employee is at home/base
+        return Location::getBase();
     }
 
     /**

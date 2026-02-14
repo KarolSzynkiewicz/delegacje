@@ -7,11 +7,16 @@ use App\Models\Project;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Services\DateRangeService;
+use App\Services\EmployeeLocationValidator;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class ProjectAssignmentService
 {
+    public function __construct(
+        protected EmployeeLocationValidator $locationValidator
+    ) {}
+    
     /**
      * Create a new project assignment with business logic validation.
      */
@@ -21,7 +26,8 @@ class ProjectAssignmentService
         Role $role,
         Carbon $startDate,
         ?Carbon $endDate = null,
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $logisticsEventId = null
     ): ProjectAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
@@ -34,6 +40,9 @@ class ProjectAssignmentService
         // Validate employee availability (checks ALL projects, including same project - prevents overlaps)
         $this->validateEmployeeAvailability($employee, $startDate, $endDate);
 
+        // Validate employee location and logistics (extracted to separate service)
+        $this->locationValidator->validateForAssignment($employee, $project, $startDate);
+
         // Validate project demand
         $this->validateProjectDemand($project, $role->id, $startDate, $endDate);
 
@@ -43,6 +52,7 @@ class ProjectAssignmentService
             'start_date' => $startDate,
             'end_date' => $endDate,
             'notes' => $notes,
+            'logistics_event_id' => $logisticsEventId,
         ]);
     }
 
@@ -68,6 +78,9 @@ class ProjectAssignmentService
 
         // Validate employee availability (excluding current assignment)
         $this->validateEmployeeAvailability($employee, $startDate, $endDate, $assignment->id);
+
+        // Validate employee location and logistics (extracted to separate service)
+        $this->locationValidator->validateForAssignment($employee, $project, $startDate);
 
         // Validate project demand
         $this->validateProjectDemand($project, $role->id, $startDate, $endDate);

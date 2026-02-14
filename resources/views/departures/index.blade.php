@@ -55,18 +55,16 @@
                                 <x-ui.badge variant="{{ $badgeVariant }}">{{ $departure->status->label() }}</x-ui.badge>
                             </td>
                             <td class="text-end">
-                                <div class="d-flex gap-2 justify-content-end">
-                                    <x-ui.button variant="ghost" href="{{ route('departures.show', $departure) }}" class="btn-sm">
-                                        <i class="bi bi-eye"></i>
-                                        <span class="d-none d-sm-inline ms-1">Zobacz</span>
+                                @if($departure->status === \App\Enums\LogisticsEventStatus::PLANNED || $departure->status === \App\Enums\LogisticsEventStatus::COMPLETED)
+                                    <x-ui.button variant="ghost" href="{{ route('departures.edit', $departure) }}" class="btn-sm">
+                                        <i class="bi bi-pencil"></i>
+                                        <span class="d-none d-sm-inline ms-1">Edytuj</span>
                                     </x-ui.button>
-                                    @if($departure->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
-                                        <x-ui.button variant="ghost" href="{{ route('departures.edit', $departure) }}" class="btn-sm">
-                                            <i class="bi bi-pencil"></i>
-                                            <span class="d-none d-sm-inline ms-1">Edytuj</span>
-                                        </x-ui.button>
-                                    @endif
-                                </div>
+                                @endif
+                                <x-ui.button variant="ghost" href="{{ route('departures.show', $departure) }}" class="btn-sm">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="d-none d-sm-inline ms-1">Zobacz</span>
+                                </x-ui.button>
                             </td>
                         </tr>
                     @empty

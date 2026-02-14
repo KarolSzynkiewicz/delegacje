@@ -1,4 +1,6 @@
 <x-app-layout>
+ 
+    
     <x-slot name="header">
         <x-ui.page-header title="Przegląd tygodniowy">
             <x-slot name="left">
@@ -9,7 +11,7 @@
                 @endif
             </x-slot>
             <x-slot name="right">
-                <select id="project-search" class="form-select form-select-sm" style="width: 200px;" onchange="(function() { const baseUrl = '{{ route('weekly-overview.index') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
+                <select id="project-search" class="form-select form-select" style="width: 200px;" onchange="(function() { const baseUrl = '{{ route('weekly-overview.index') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
                     <option value="">Wszystkie projekty</option>
                     @foreach($allProjects as $project)
                         <option value="{{ $project->id }}" {{ $projectId && $projectId == $project->id ? 'selected' : '' }}>
@@ -20,6 +22,29 @@
             </x-slot>
         </x-ui.page-header>
     </x-slot>
+
+    <!-- Komunikaty sukcesu/błędu -->
+    @if(session('success'))
+        <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
+
+    @if(session('error'))
+        <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-3">
+            {{ session('error') }}
+        </x-ui.alert>
+    @endif
+
+    @if($errors->any())
+        <x-ui.alert variant="danger" title="Błędy walidacji" dismissible class="mb-3">
+            <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
 
     <!-- Nawigacja między tygodniami -->
     <div class="mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
@@ -604,7 +629,7 @@
                         $hasNadmiary = $summary->getTotalExcess() > 0 || $summary->getOvercrowdedAccommodations()->isNotEmpty() || $summary->getOvercrowdedVehicles()->isNotEmpty();
                     @endphp
                     
-                    @if($hasBraki || $hasNadmiary || ($returnTrips->isNotEmpty() ?? false) || (isset($departures) && $departures->isNotEmpty()))
+                    @if($hasBraki || $hasNadmiary || ($returnTrips->isNotEmpty() ?? false) || (isset($allDepartures) && $allDepartures->isNotEmpty()))
                         <x-ui.card label="Alerty" class="mt-4 mb-4">
                             <div class="row g-3">
                                 <!-- Kolumna 1: Braki -->
@@ -690,32 +715,51 @@
                                 
                                 <!-- Kolumna 4: Wyjazdy -->
                                 <div class="col-md-3">
-                                    @if(isset($departures) && $departures->isNotEmpty())
+                                    @if(isset($allDepartures) && $allDepartures->isNotEmpty())
                                         <div class="small">
                                             <div class="fw-semibold text-warning mb-2">
                                                 <i class="bi bi-arrow-right"></i> Wyjazdy
                                             </div>
                                             <ul class="mb-0 small list-unstyled">
-                                                @foreach($departures as $departure)
-                                                    <li class="mb-1">
-                                                        <a href="{{ route('departures.show', $departure) }}" class="text-decoration-none">
-                                                            <strong>{{ $departure->event_date->format('d.m.Y') }}</strong>
+                                                @foreach($allDepartures as $departure)
+                                                    @php
+                                                        $uniqueParticipants = $departure->participants
+                                                            ->filter(fn($p) => $p->employee !== null);
+                                                        $participantsCount = $uniqueParticipants->count();
+                                                        $participantNames = $uniqueParticipants
+                                                            ->map(fn($p) => $p->employee->full_name)
+                                                            ->join(', ');
+                                                        $visualStatus = $departure->getVisualStatus();
+                                                        $dayOfWeek = $departure->event_date->locale('pl')->isoFormat('dd');
+                                                    @endphp
+                                                    <li class="mb-2">
+                                                        <a href="{{ route('departures.show', $departure) }}" class="text-decoration-none d-flex align-items-center gap-1 flex-wrap">
+                                                            <i class="bi bi-calendar-week"></i>
+                                                            <span class="text-uppercase">{{ $dayOfWeek }}</span>
+                                                            
                                                             @if($departure->toLocation)
-                                                                - {{ $departure->toLocation->name }}
+                                                                <i class="bi bi-flag"></i>
+                                                                <span>{{ $departure->toLocation->name }}</span>
                                                             @endif
+                                                            
+                                                            <span class="text-muted">|</span>
+                                                            
+                                                            @if($participantsCount > 0)
+                                                                <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $participantNames }}">
+                                                                    {{ $participantsCount }} os.
+                                                                </span>
+                                                            @endif
+                                                            
                                                             @if($departure->vehicle)
-                                                                - {{ $departure->vehicle->registration_number }}
+                                                                <span class="text-muted">|</span>
+                                                                <i class="bi bi-car-front"></i>
+                                                                <span>{{ $departure->vehicle->registration_number }}</span>
                                                             @endif
-                                                            @php
-                                                                $uniqueParticipantsCount = $departure->participants
-                                                                    ->filter(fn($p) => $p->employee !== null)
-                                                                    ->pluck('employee_id')
-                                                                    ->unique()
-                                                                    ->count();
-                                                            @endphp
-                                                            @if($uniqueParticipantsCount > 0)
-                                                                ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }})
-                                                            @endif
+                                                            
+                                                            <span class="text-muted">|</span>
+                                                            <small class="badge badge-sm {{ $visualStatus === 'oczekuje' ? 'badge-primary' : ($visualStatus === 'w trakcie' ? 'badge-warning' : 'badge-success') }}">
+                                                                {{ $visualStatus }}
+                                                            </small>
                                                         </a>
                                                     </li>
                                                 @endforeach
@@ -1154,8 +1198,8 @@
                     @foreach($employeesWithoutProject as $employeeData)
                         @php
                             $employee = $employeeData['employee'];
-                            $employeeVehicles = $employeeData['vehicles'];
-                            $employeeAccommodations = $employeeData['accommodations'];
+                            $vehicleAssignments = $employeeData['vehicle_assignments'];
+                            $accommodationAssignments = $employeeData['accommodation_assignments'];
                         @endphp
                         <div class="col-md-6 col-lg-4">
                             <x-ui.card>
@@ -1172,25 +1216,32 @@
                                     </div>
                                 @endif
                                 <div class="small">
-                                    @if($employeeVehicles->isNotEmpty())
+                                    @if($vehicleAssignments->isNotEmpty())
                                         <div class="mb-1">
                                             <i class="bi bi-car-front text-primary"></i>
                                             <span class="text-muted">Auto:</span>
-                                            @foreach($employeeVehicles as $vehicle)
-                                                <a href="{{ route('vehicles.show', $vehicle) }}" class="text-decoration-none">
-                                                    {{ $vehicle->name }}
-                                                </a>@if(!$loop->last), @endif
+                                            @foreach($vehicleAssignments as $assignment)
+                                                @if($assignment->vehicle)
+                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                        {{ $assignment->vehicle->registration_number }}
+                                                        @if($assignment->vehicle->brand || $assignment->vehicle->model)
+                                                            ({{ $assignment->vehicle->brand }} {{ $assignment->vehicle->model }})
+                                                        @endif
+                                                    </a>@if(!$loop->last), @endif
+                                                @endif
                                             @endforeach
                                         </div>
                                     @endif
-                                    @if($employeeAccommodations->isNotEmpty())
+                                    @if($accommodationAssignments->isNotEmpty())
                                         <div>
                                             <i class="bi bi-house text-success"></i>
                                             <span class="text-muted">Dom:</span>
-                                            @foreach($employeeAccommodations as $accommodation)
-                                                <a href="{{ route('accommodations.show', $accommodation) }}" class="text-decoration-none">
-                                                    {{ $accommodation->name }}
-                                                </a>@if(!$loop->last), @endif
+                                            @foreach($accommodationAssignments as $assignment)
+                                                @if($assignment->accommodation)
+                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                        {{ $assignment->accommodation->name }}
+                                                    </a>@if(!$loop->last), @endif
+                                                @endif
                                             @endforeach
                                         </div>
                                     @endif
@@ -1275,14 +1326,17 @@
                                             </div>
                                         </div>
                                     @endif
-                                    <div class="small mb-2">
-                                        <div class="text-muted">
-                                            <i class="bi bi-calendar-event"></i> 
-                                            {{ $departure->event_date->format('d.m.Y') }}
-                                            @if($departure->toLocation)
-                                                - {{ $departure->toLocation->name }}
-                                            @endif
+                                    <div class="small mb-3">
+                                        <div class="text-muted mb-1">
+                                            <i class="bi bi-calendar-check text-success"></i> 
+                                            <strong>Data przybycia:</strong> {{ $departure->end_date->format('d.m.Y') }}
                                         </div>
+                                        @if($departure->toLocation)
+                                            <div class="text-muted">
+                                                <i class="bi bi-geo-alt text-primary"></i> 
+                                                <strong>Lokalizacja:</strong> {{ $departure->toLocation->name }}
+                                            </div>
+                                        @endif
                                     </div>
                                     <!-- Wspólny formularz przypisania -->
                                     @if(isset($allProjects) && $allProjects->isNotEmpty())
@@ -1291,72 +1345,110 @@
                                             <form method="POST" action="{{ route('bulk-assignments.store') }}" class="mb-0">
                                                 @csrf
                                                 <input type="hidden" name="employee_id" value="{{ $employee->id }}">
-                                                <input type="hidden" name="start_date" value="{{ $weeks[0]['start']->format('Y-m-d') }}">
-                                                <input type="hidden" name="end_date" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
+                                                <input type="hidden" name="logistics_event_id" value="{{ $departure->id }}">
+                                                
+                                                <!-- Daty przypisania -->
+                                                <div class="alert alert-info small mb-2 p-2">
+                                                    <i class="bi bi-info-circle"></i> <strong>Przypisanie kompleksowe:</strong> Każdy przyjazd wymaga przypisania projektu, pojazdu i zakwaterowania.
+                                                    Możesz ustawić różne daty dla każdego z nich. Np. przyjazd w sobotę (auto+dom), praca od poniedziałku.
+                                                </div>
                                                 
                                                 <!-- Projekt (wymagany) -->
-                                                <div class="mb-3 pb-3 border-bottom">
-                                                    <label class="form-label small fw-semibold mb-1">
-                                                        <i class="bi bi-person-check"></i> Projekt
+                                                <div class="mb-2">
+                                                    <label class="form-label small mb-1 fw-bold">
+                                                        <i class="bi bi-briefcase"></i> Projekt <span class="text-danger">*</span>
                                                     </label>
-                                                    <div class="row g-2">
-                                                        <div class="col-12">
-                                                            <select name="project_id" required class="form-select form-select-sm">
-                                                                <option value="">Wybierz projekt</option>
-                                                                @foreach($allProjects as $project)
-                                                                    <option value="{{ $project->id }}">{{ $project->name }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-12">
-                                                            <select name="role_id" required class="form-select form-select-sm">
-                                                                <option value="">Wybierz rolę</option>
-                                                                @foreach($roles as $role)
-                                                                    <option value="{{ $role->id }}">{{ $role->name }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
+                                                    <select name="project_id" required class="form-select form-select">
+                                                        <option value="">Wybierz projekt</option>
+                                                        @foreach($allProjects as $project)
+                                                            <option value="{{ $project->id }}">{{ $project->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="mb-2">
+                                                    <label class="form-label small mb-1">Rola <span class="text-danger">*</span></label>
+                                                    <select name="role_id" required class="form-select form-select">
+                                                        <option value="">Wybierz rolę</option>
+                                                        @foreach($roles as $role)
+                                                            <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small mb-1">Projekt: Od <span class="text-danger">*</span></label>
+                                                        <input type="date" name="project_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date->format('Y-m-d') }}">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small mb-1">Projekt: Do <span class="text-danger">*</span></label>
+                                                        <input type="date" name="project_end_date" required class="form-control form-control-sm" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
                                                     </div>
                                                 </div>
                                                 
-                                                <!-- Auto (opcjonalne) -->
-                                                <div class="mb-3 pb-3 border-bottom">
-                                                    <label class="form-label small fw-semibold mb-1">
-                                                        <i class="bi bi-car-front"></i> Auto <span class="text-muted">(opcjonalnie)</span>
+                                                <hr class="my-2">
+                                                
+                                                <!-- Auto (wymagane) -->
+                                                <div class="mb-2">
+                                                    <label class="form-label small mb-1 fw-bold">
+                                                        <i class="bi bi-truck"></i> Pojazd <span class="text-danger">*</span>
                                                     </label>
-                                                    <div class="row g-2">
-                                                        <div class="col-12">
-                                                            <select name="vehicle_id" class="form-select form-select-sm">
-                                                                <option value="">-- Nie przypisuj --</option>
-                                                                @foreach($vehicles as $vehicle)
-                                                                    <option value="{{ $vehicle->id }}">{{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-12">
-                                                            <select name="position" class="form-select form-select-sm">
-                                                                <option value="passenger">Pasażer</option>
-                                                                <option value="driver">Kierowca</option>
-                                                            </select>
-                                                        </div>
+                                                    <select name="vehicle_id" required class="form-select">
+                                                        <option value="">Wybierz pojazd</option>
+                                                        @foreach($vehicles as $vehicle)
+                                                            <option value="{{ $vehicle->id }}">{{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="mb-2">
+                                                    <label class="form-label small mb-1">Pozycja <span class="text-danger">*</span></label>
+                                                    <select name="position" required class="form-select">
+                                                        <option value="passenger">Pasażer</option>
+                                                        <option value="driver">Kierowca</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small mb-1">Pojazd: Od <span class="text-danger">*</span></label>
+                                                        <input type="date" name="vehicle_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date->format('Y-m-d') }}">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small mb-1">Pojazd: Do <span class="text-danger">*</span></label>
+                                                        <input type="date" name="vehicle_end_date" required class="form-control form-control-sm" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
                                                     </div>
                                                 </div>
                                                 
-                                                <!-- Mieszkanie (opcjonalne) -->
-                                                <div class="mb-3">
-                                                    <label class="form-label small fw-semibold mb-1">
-                                                        <i class="bi bi-house"></i> Mieszkanie <span class="text-muted">(opcjonalnie)</span>
+                                                <hr class="my-2">
+                                                
+                                                <!-- Zakwaterowanie (wymagane) -->
+                                                <div class="mb-2">
+                                                    <label class="form-label small mb-1 fw-bold">
+                                                        <i class="bi bi-house"></i> Zakwaterowanie <span class="text-danger">*</span>
                                                     </label>
-                                                    <select name="accommodation_id" class="form-select form-select-sm">
-                                                        <option value="">-- Nie przypisuj --</option>
+                                                    <select name="accommodation_id" required class="form-select">
+                                                        <option value="">Wybierz zakwaterowanie</option>
                                                         @foreach($accommodations as $accommodation)
                                                             <option value="{{ $accommodation->id }}">{{ $accommodation->name }} ({{ $accommodation->capacity }} miejsc)</option>
                                                         @endforeach
                                                     </select>
                                                 </div>
                                                 
+                                                <div class="row g-2 mb-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small mb-1">Zakwaterowanie: Od <span class="text-danger">*</span></label>
+                                                        <input type="date" name="accommodation_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date->format('Y-m-d') }}">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small mb-1">Zakwaterowanie: Do <span class="text-danger">*</span></label>
+                                                        <input type="date" name="accommodation_end_date" required class="form-control form-control-sm" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
+                                                    </div>
+                                                </div>
+                                                
                                                 <!-- Jeden guzik zapisz -->
-                                                <x-ui.button variant="success" size="sm" type="submit" class="w-100">
+                                                <x-ui.button variant="success" size="sm" type="submit" class="w-100 mt-2">
                                                     <i class="bi bi-save"></i> Zapisz wszystkie przypisania
                                                 </x-ui.button>
                                             </form>
@@ -1370,5 +1462,17 @@
             </div>
         @endif
     @endif
+
+    @push('scripts')
+    <script>
+        // Initialize Bootstrap tooltips
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+    @endpush
 
 </x-app-layout>

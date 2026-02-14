@@ -30,6 +30,7 @@ class VehicleAssignment extends Model
         'notes',
         'is_return_trip',
         'is_cancelled',
+        'logistics_event_id',
     ];
 
     /**
@@ -59,6 +60,14 @@ class VehicleAssignment extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    /**
+     * Get the logistics event that created this assignment.
+     */
+    public function logisticsEvent(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsEvent::class);
     }
 
     public function getStatusAttribute($value): AssignmentStatus

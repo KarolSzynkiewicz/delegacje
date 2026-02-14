@@ -28,7 +28,6 @@ class ProjectAssignmentFactory extends Factory
             'role_id' => Role::factory(),
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'status' => fake()->randomElement(['pending', 'active', 'completed', 'cancelled']),
             'notes' => fake()->optional()->sentence(),
         ];
     }

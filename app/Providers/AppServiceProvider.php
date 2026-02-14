@@ -44,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
             'project_task' => \App\Models\ProjectTask::class,
             'vehicle' => \App\Models\Vehicle::class,
             'accommodation' => \App\Models\Accommodation::class,
+            'logistics_event' => \App\Models\LogisticsEvent::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
     }

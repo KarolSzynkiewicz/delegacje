@@ -21,7 +21,8 @@ class AccommodationAssignmentService
         Accommodation $accommodation,
         Carbon $startDate,
         ?Carbon $endDate = null,
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $logisticsEventId = null
     ): AccommodationAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
@@ -36,6 +37,7 @@ class AccommodationAssignmentService
             'start_date' => $startDate,
             'end_date' => $endDate,
             'notes' => $notes,
+            'logistics_event_id' => $logisticsEventId,
         ]);
     }
 

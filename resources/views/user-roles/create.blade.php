@@ -42,73 +42,55 @@
                         <label class="form-label fw-semibold mb-3">Uprawnienia</label>
                         
                         @php
-                            // Get selected permissions by name (from route permissions)
+                            // Pobierz wybrane uprawnienia (z old() po błędzie walidacji)
                             $selectedPermissions = old('permissions', []);
                             
-                            // Get permissions from routes (already filtered to exclude viewAny)
-                            $allPermissions = $routePermissions;
-                            
-                            // Use RoutePermissionService to get resource labels (single source of truth)
-                            $routePermissionService = app(\App\Services\RoutePermissionService::class);
-                            
+                            // Grupuj uprawnienia z bazy po resource
                             $groupedPermissions = [];
+                            
                             foreach ($allPermissions as $permission) {
-                                // Permission is now an array from RoutePermissionService
-                                $permissionName = $permission['name'];
-                                $type = $permission['type'];
-                                $resource = $permission['resource'];
-                                $action = $permission['action'];
+                                // Parsuj nazwę: projects.view → resource: projects, action: view
+                                $parts = explode('.', $permission->name);
                                 
-                                // Skip viewAny - should not appear, but filter just in case
-                                if (str_ends_with($permissionName, '.viewAny')) {
+                                if (count($parts) !== 2) {
+                                    continue; // Skip invalid format
+                                }
+                                
+                                $resource = $parts[0];
+                                $action = $parts[1];
+                                
+                                // Skip viewAny (nie wyświetlamy w UI)
+                                if ($action === 'viewAny') {
                                     continue;
                                 }
                                 
+                                // Inicjalizuj grupę jeśli nie istnieje
                                 if (!isset($groupedPermissions[$resource])) {
-                                    // Get Polish name from RoutePermissionService (single source of truth)
-                                    $resourceName = $routePermissionService->getResourceLabel($resource);
+                                    // Generuj polską nazwę z resource name
+                                    $resourceLabel = ucfirst(str_replace(['-', '_'], ' ', $resource));
+                                    
                                     $groupedPermissions[$resource] = [
-                                        'name' => $resourceName,
-                                        'type' => $type,
-                                        'permissions' => ['C' => null, 'R' => null, 'U' => null, 'D' => null]
+                                        'name' => $resourceLabel,
+                                        'permissions' => [
+                                            'create' => null,
+                                            'view' => null,
+                                            'update' => null,
+                                            'delete' => null
+                                        ]
                                     ];
                                 }
                                 
-                                // Map actions to CRUD columns based on type
-                                $crud = null;
-                                if ($type === 'view') {
-                                    // VIEW: only .view -> R (Czytaj)
-                                    if ($action === 'view') {
-                                        $crud = 'R';
-                                    }
-                                } elseif ($type === 'action') {
-                                    // ACTION: only .update -> U (Edycja)
-                                    if ($action === 'update') {
-                                        $crud = 'U';
-                                    }
-                                } else {
-                                    // RESOURCE: full CRUD
-                                    $crudMap = [
-                                        'view' => 'R',
-                                        'create' => 'C',
-                                        'update' => 'U',
-                                        'delete' => 'D',
-                                    ];
-                                    $crud = $crudMap[$action] ?? null;
-                                }
-                                
-                                if ($crud) {
-                                    $groupedPermissions[$resource]['permissions'][$crud] = [
-                                        'name' => $permissionName,
-                                        'checked' => in_array($permissionName, $selectedPermissions)
+                                // Dodaj uprawnienie do odpowiedniej kolumny
+                                if (in_array($action, ['create', 'view', 'update', 'delete'])) {
+                                    $groupedPermissions[$resource]['permissions'][$action] = [
+                                        'name' => $permission->name,
+                                        'checked' => in_array($permission->name, $selectedPermissions)
                                     ];
                                 }
                             }
                             
-                            // Sortuj zasoby alfabetycznie po polskiej nazwie
-                            uasort($groupedPermissions, function($a, $b) {
-                                return strcmp($a['name'], $b['name']);
-                            });
+                            // Sortuj alfabetycznie po nazwie zasobu
+                            ksort($groupedPermissions);
                         @endphp
 
                         <div class="table-responsive">
@@ -124,25 +106,12 @@
                                 </thead>
                                 <tbody>
                                     @foreach($groupedPermissions as $resource => $data)
-                                        @php
-                                            $type = $data['type'] ?? 'resource';
-                                        @endphp
                                         <tr>
                                             <td class="fw-medium">{{ $data['name'] }}</td>
-                                            @foreach(['C', 'R', 'U', 'D'] as $action)
-                                                @php
-                                                    // Determine if this column should be shown/active based on type
-                                                    $shouldShow = false;
-                                                    if ($type === 'view' && $action === 'R') {
-                                                        $shouldShow = true; // VIEW: only Czytaj
-                                                    } elseif ($type === 'action' && $action === 'U') {
-                                                        $shouldShow = true; // ACTION: only Edycja
-                                                    } elseif ($type === 'resource') {
-                                                        $shouldShow = true; // RESOURCE: all columns
-                                                    }
-                                                @endphp
-                                                <td class="text-center {{ !$shouldShow ? 'text-muted' : '' }}">
-                                                    @if($data['permissions'][$action] && $shouldShow)
+                                            
+                                            @foreach(['create', 'view', 'update', 'delete'] as $action)
+                                                <td class="text-center">
+                                                    @if($data['permissions'][$action])
                                                         <div class="form-check d-inline-block">
                                                             <input 
                                                                 type="checkbox" 
@@ -152,7 +121,6 @@
                                                                 {{ $data['permissions'][$action]['checked'] ? 'checked' : '' }}
                                                                 class="form-check-input"
                                                             >
-                                                            <label class="form-check-label" for="perm-{{ md5($data['permissions'][$action]['name']) }}"></label>
                                                         </div>
                                                     @else
                                                         <span class="text-muted">-</span>

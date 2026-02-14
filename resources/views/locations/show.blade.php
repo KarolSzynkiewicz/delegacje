@@ -35,6 +35,9 @@
                     @if($location->postal_code)
                     <x-ui.detail-item label="Kod pocztowy">{{ $location->postal_code }}</x-ui.detail-item>
                     @endif
+                    @if($location->country)
+                    <x-ui.detail-item label="Kraj">{{ $location->country->labelWithFlag() }}</x-ui.detail-item>
+                    @endif
                     <x-ui.detail-item label="Baza">
                         @if($location->is_base)
                             <x-ui.badge variant="success">Tak - Lokalizacja jest bazą</x-ui.badge>

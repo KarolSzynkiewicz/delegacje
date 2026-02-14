@@ -7,11 +7,15 @@ use App\Models\VehicleAssignment;
 use App\Models\Employee;
 use App\Enums\VehiclePosition;
 use App\Services\DateRangeService;
+use App\Services\LogisticsEventService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class VehicleAssignmentService
 {
+    public function __construct(
+        protected LogisticsEventService $logisticsEventService
+    ) {}
     /**
      * Create a vehicle assignment with availability validation.
      * Multiple people can be assigned to the same vehicle, but only one driver per period.
@@ -24,7 +28,8 @@ class VehicleAssignmentService
         VehiclePosition $position,
         Carbon $startDate,
         ?Carbon $endDate = null,
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $logisticsEventId = null
     ): VehicleAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
@@ -44,6 +49,7 @@ class VehicleAssignmentService
             'end_date' => $endDate,
             'notes' => $notes,
             'is_return_trip' => false, // Always false for manual assignments
+            'logistics_event_id' => $logisticsEventId,
         ]);
     }
 
@@ -111,11 +117,13 @@ class VehicleAssignmentService
 
     /**
      * Validate that there's only one driver per vehicle in date range.
+     * Also checks if vehicle is not used by logistics events (departures/returns).
      *
      * @throws ValidationException
      */
     protected function validateDriverAvailability(Vehicle $vehicle, Carbon $startDate, Carbon $endDate, ?int $excludeAssignmentId = null): void
     {
+        // Check if vehicle already has a driver assigned
         $query = $vehicle->assignments()
             ->where('position', VehiclePosition::DRIVER->value)
             ->where('is_return_trip', false) // Exclude return trip assignments
@@ -132,5 +140,8 @@ class VehicleAssignmentService
                 'position' => 'Pojazd ma już przypisanego kierowcę w tym okresie.'
             ]);
         }
+
+        // Check if vehicle is used by logistics event (departure/return)
+        $this->logisticsEventService->validateVehicleAvailability($vehicle, $startDate, $endDate);
     }
 }

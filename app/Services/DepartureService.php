@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\Vehicle;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
+use App\Services\LogisticsEventService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -19,13 +20,17 @@ use Carbon\Carbon;
  */
 class DepartureService
 {
+    public function __construct(
+        protected LogisticsEventService $logisticsEventService
+    ) {}
     /**
      * Commit the departure (create the logistics event).
      * 
      * Creates a LogisticsEvent of type DEPARTURE with participants.
      * 
      * @param array $employeeIds
-     * @param Carbon $departureDate
+     * @param Carbon $departureDate Start of the trip
+     * @param Carbon $endDate End of the trip (when employees arrive at destination) - REQUIRED
      * @param int $toLocationId
      * @param int|null $vehicleId
      * @param string|null $notes
@@ -36,6 +41,7 @@ class DepartureService
     public function commitDeparture(
         array $employeeIds,
         Carbon $departureDate,
+        Carbon $endDate,
         int $toLocationId,
         ?int $vehicleId = null,
         ?string $notes = null,
@@ -43,14 +49,26 @@ class DepartureService
         ?LogisticsEventStatus $status = null
     ): LogisticsEvent {
         $baseLocation = Location::getBase();
+        
+        // Validate vehicle availability if vehicle is provided
+        if ($vehicleId) {
+            $vehicle = Vehicle::find($vehicleId);
+            $this->logisticsEventService->validateVehicleAvailability(
+                $vehicle,
+                $departureDate,
+                $endDate,
+                $existingEvent?->id
+            );
+        }
 
-        return DB::transaction(function () use ($employeeIds, $departureDate, $toLocationId, $vehicleId, $notes, $baseLocation, $existingEvent, $status) {
+        return DB::transaction(function () use ($employeeIds, $departureDate, $endDate, $toLocationId, $vehicleId, $notes, $baseLocation, $existingEvent, $status) {
             // Create or update LogisticsEvent as domain fact
             if ($existingEvent) {
                 // Update existing event
                 $event = $existingEvent;
                 $updateData = [
                     'event_date' => $departureDate,
+                    'end_date' => $endDate,
                     'vehicle_id' => $vehicleId,
                     'from_location_id' => $baseLocation->id,
                     'to_location_id' => $toLocationId,
@@ -71,6 +89,7 @@ class DepartureService
                 $event = LogisticsEvent::create([
                     'type' => LogisticsEventType::DEPARTURE,
                     'event_date' => $departureDate,
+                    'end_date' => $endDate,
                     'has_transport' => false,
                     'vehicle_id' => $vehicleId,
                     'transport_id' => null,

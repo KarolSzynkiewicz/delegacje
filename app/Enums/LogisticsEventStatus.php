@@ -12,10 +12,10 @@ enum LogisticsEventStatus: string
     public function label(): string
     {
         return match($this) {
-            self::PLANNED => 'Zaplanowane',
-            self::IN_PROGRESS => 'W trakcie',
-            self::COMPLETED => 'Zakończone',
-            self::CANCELLED => 'Anulowane',
+            self::PLANNED => 'Oczekuje na przypisanie',
+            self::IN_PROGRESS => 'W trakcie', // Deprecated - do not use
+            self::COMPLETED => 'Przypisany',
+            self::CANCELLED => 'Anulowany',
         };
     }
 

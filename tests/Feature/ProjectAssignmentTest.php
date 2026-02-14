@@ -37,27 +37,34 @@ class ProjectAssignmentTest extends TestCase
 
     public function test_can_create_project_assignment()
     {
+        // Create base location
+        $baseLocation = \App\Models\Location::factory()->create(['is_base' => true]);
+        
         $employee = Employee::factory()->create();
-        $project = Project::factory()->create();
+        // Create project in BASE location (to avoid departure requirement)
+        $project = Project::factory()->create(['location_id' => $baseLocation->id]);
         $role = Role::factory()->create();
         
         // Attach role to employee
         $employee->roles()->attach($role);
         
+        $startDate = now();
+        $endDate = now()->addMonths(3);
+        
         // Create rotation for employee (required for assignment) - must cover entire assignment period
         Rotation::create([
             'employee_id' => $employee->id,
-            'start_date' => now()->subYear()->format('Y-m-d'),
-            'end_date' => now()->addYears(11)->format('Y-m-d'), // Extended to cover default end_date
+            'start_date' => $startDate->copy()->subMonth()->format('Y-m-d'),
+            'end_date' => $endDate->copy()->addMonth()->format('Y-m-d'),
         ]);
         
-        // Create project demand (required for assignment)
+        // Create project demand (required for assignment) - must cover assignment period
         ProjectDemand::create([
             'project_id' => $project->id,
             'role_id' => $role->id,
             'required_count' => 1,
-            'date_from' => now()->subYear()->format('Y-m-d'),
-            'date_to' => now()->addYears(11)->format('Y-m-d'),
+            'start_date' => $startDate->copy()->subMonth()->format('Y-m-d'),
+            'end_date' => $endDate->copy()->addMonth()->format('Y-m-d'),
         ]);
 
         $response = $this->actingAs($this->user)
@@ -66,9 +73,8 @@ class ProjectAssignmentTest extends TestCase
                 'project_id' => $project->id,
                 'employee_id' => $employee->id,
                 'role_id' => $role->id,
-                'start_date' => now()->format('Y-m-d'),
-                'end_date' => now()->addYear()->format('Y-m-d'), // Explicit end_date
-                'status' => 'active',
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
             ]);
 
         // Check if there are validation errors
@@ -87,9 +93,13 @@ class ProjectAssignmentTest extends TestCase
 
     public function test_employee_availability_validation()
     {
+        // Create base location
+        $baseLocation = \App\Models\Location::factory()->create(['is_base' => true]);
+        
         $employee = Employee::factory()->create();
-        $project1 = Project::factory()->create();
-        $project2 = Project::factory()->create();
+        // Both projects in BASE to avoid departure logic
+        $project1 = Project::factory()->create(['location_id' => $baseLocation->id]);
+        $project2 = Project::factory()->create(['location_id' => $baseLocation->id]);
         $role = Role::factory()->create();
         
         // Attach role to employee
@@ -107,16 +117,16 @@ class ProjectAssignmentTest extends TestCase
             'project_id' => $project1->id,
             'role_id' => $role->id,
             'required_count' => 1,
-            'date_from' => '2024-12-01',
-            'date_to' => '2025-12-31',
+            'start_date' => '2024-12-01',
+            'end_date' => '2025-12-31',
         ]);
         
         ProjectDemand::create([
             'project_id' => $project2->id,
             'role_id' => $role->id,
             'required_count' => 1,
-            'date_from' => '2024-12-01',
-            'date_to' => '2025-12-31',
+            'start_date' => '2024-12-01',
+            'end_date' => '2025-12-31',
         ]);
 
         // Create first assignment
@@ -126,7 +136,6 @@ class ProjectAssignmentTest extends TestCase
             'role_id' => $role->id,
             'start_date' => '2025-01-01',
             'end_date' => '2025-01-31',
-            'status' => 'active',
         ]);
 
         // Try to create overlapping assignment
@@ -136,7 +145,6 @@ class ProjectAssignmentTest extends TestCase
             'role_id' => $role->id,
             'start_date' => '2025-01-15',
             'end_date' => '2025-02-15',
-            'status' => 'active',
         ]);
 
         $response->assertSessionHasErrors('employee_id');

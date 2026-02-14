@@ -25,22 +25,23 @@ class UserRoleController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(RoutePermissionService $routePermissionService): View
+    public function create(): View
     {
-        // Get permissions from routes instead of database
-        $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
-        return view('user-roles.create', compact('routePermissions'));
+        // Pobierz WSZYSTKIE uprawnienia z bazy (Spatie) zamiast z routes
+        $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
+        
+        return view('user-roles.create', compact('allPermissions'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, RoutePermissionService $routePermissionService): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name',
             'permissions' => 'nullable|array',
-            'permissions.*' => 'string', // Permission names instead of IDs
+            'permissions.*' => 'exists:permissions,name', // Musi istnieć w bazie!
         ]);
 
         $role = Role::create([
@@ -48,33 +49,9 @@ class UserRoleController extends Controller
             'guard_name' => 'web',
         ]);
 
+        // Synchronizuj uprawnienia - bez firstOrCreate
         if (isset($validated['permissions'])) {
-            // Get all permissions from routes
-            $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
-            
-            // Create missing permissions and collect Permission models
-            $permissions = collect();
-            foreach ($validated['permissions'] as $permissionName) {
-                // Find in route permissions to get type
-                $routePerm = $routePermissions->firstWhere('name', $permissionName);
-                
-                if ($routePerm) {
-                    // Create permission if it doesn't exist
-                    $permission = Permission::firstOrCreate(
-                        ['name' => $permissionName, 'guard_name' => 'web'],
-                        ['type' => $routePerm['type']]
-                    );
-                    
-                    // Update type if it changed
-                    if ($permission->type !== $routePerm['type']) {
-                        $permission->update(['type' => $routePerm['type']]);
-                    }
-                    
-                    $permissions->push($permission);
-                }
-            }
-            
-            $role->syncPermissions($permissions);
+            $role->syncPermissions($validated['permissions']);
         }
 
         // Clear menu cache for all users since permissions changed
@@ -96,57 +73,33 @@ class UserRoleController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Role $userRole, RoutePermissionService $routePermissionService): View
+    public function edit(Role $userRole): View
     {
-        // Get permissions from routes instead of database
-        $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
+        // Pobierz WSZYSTKIE uprawnienia z bazy (Spatie) zamiast z routes
+        $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
         $userRole->load('permissions');
         
-        return view('user-roles.edit', compact('userRole', 'routePermissions'));
+        return view('user-roles.edit', compact('userRole', 'allPermissions'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Role $userRole, RoutePermissionService $routePermissionService): RedirectResponse
+    public function update(Request $request, Role $userRole): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:user_roles,name,' . $userRole->id,
             'permissions' => 'nullable|array',
-            'permissions.*' => 'string', // Permission names instead of IDs
+            'permissions.*' => 'exists:permissions,name', // Musi istnieć w bazie!
         ]);
 
         $userRole->update([
             'name' => $validated['name'],
         ]);
 
+        // Synchronizuj uprawnienia - bez firstOrCreate
         if (isset($validated['permissions'])) {
-            // Get all permissions from routes
-            $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
-            
-            // Create missing permissions and collect Permission models
-            $permissions = collect();
-            foreach ($validated['permissions'] as $permissionName) {
-                // Find in route permissions to get type
-                $routePerm = $routePermissions->firstWhere('name', $permissionName);
-                
-                if ($routePerm) {
-                    // Create permission if it doesn't exist
-                    $permission = Permission::firstOrCreate(
-                        ['name' => $permissionName, 'guard_name' => 'web'],
-                        ['type' => $routePerm['type']]
-                    );
-                    
-                    // Update type if it changed
-                    if ($permission->type !== $routePerm['type']) {
-                        $permission->update(['type' => $routePerm['type']]);
-                    }
-                    
-                    $permissions->push($permission);
-                }
-            }
-            
-            $userRole->syncPermissions($permissions);
+            $userRole->syncPermissions($validated['permissions']);
         } else {
             $userRole->syncPermissions([]);
         }
@@ -176,7 +129,7 @@ class UserRoleController extends Controller
     /**
      * Update permissions for a role via AJAX.
      */
-    public function updatePermissions(Request $request, Role $userRole, RoutePermissionService $routePermissionService): \Illuminate\Http\JsonResponse
+    public function updatePermissions(Request $request, Role $userRole): \Illuminate\Http\JsonResponse
     {
         // Administrator nie może mieć zmienianych uprawnień
         if ($userRole->name === 'administrator') {
@@ -188,36 +141,12 @@ class UserRoleController extends Controller
 
         $validated = $request->validate([
             'permissions' => 'nullable|array',
-            'permissions.*' => 'string', // Permission names instead of IDs
+            'permissions.*' => 'exists:permissions,name', // Musi istnieć w bazie!
         ]);
 
+        // Synchronizuj uprawnienia - bez firstOrCreate
         if (isset($validated['permissions'])) {
-            // Get all permissions from routes
-            $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
-            
-            // Create missing permissions and collect Permission models
-            $permissions = collect();
-            foreach ($validated['permissions'] as $permissionName) {
-                // Find in route permissions to get type
-                $routePerm = $routePermissions->firstWhere('name', $permissionName);
-                
-                if ($routePerm) {
-                    // Create permission if it doesn't exist
-                    $permission = Permission::firstOrCreate(
-                        ['name' => $permissionName, 'guard_name' => 'web'],
-                        ['type' => $routePerm['type']]
-                    );
-                    
-                    // Update type if it changed
-                    if ($permission->type !== $routePerm['type']) {
-                        $permission->update(['type' => $routePerm['type']]);
-                    }
-                    
-                    $permissions->push($permission);
-                }
-            }
-            
-            $userRole->syncPermissions($permissions);
+            $userRole->syncPermissions($validated['permissions']);
         } else {
             $userRole->syncPermissions([]);
         }

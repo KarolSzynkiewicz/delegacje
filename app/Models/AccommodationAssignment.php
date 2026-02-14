@@ -25,6 +25,7 @@ class AccommodationAssignment extends Model
         'start_date',
         'end_date',
         'notes',
+        'logistics_event_id',
     ];
 
     /**
@@ -51,6 +52,14 @@ class AccommodationAssignment extends Model
     public function accommodation(): BelongsTo
     {
         return $this->belongsTo(Accommodation::class);
+    }
+
+    /**
+     * Get the logistics event that created this assignment.
+     */
+    public function logisticsEvent(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsEvent::class);
     }
 
 }

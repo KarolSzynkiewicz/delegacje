@@ -34,14 +34,27 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <x-input-label for="city" value="Miasto" />
                                 <x-text-input id="city" name="city" type="text" class="mt-1" :value="old('city')" />
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <x-input-label for="postal_code" value="Kod pocztowy" />
                                 <x-text-input id="postal_code" name="postal_code" type="text" class="mt-1" :value="old('postal_code')" />
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <x-input-label for="country" value="Kraj" />
+                                <select id="country" name="country" class="form-select mt-1">
+                                    <option value="">-- Wybierz kraj --</option>
+                                    @foreach(\App\Enums\EuropeanCountry::sorted() as $country)
+                                        <option value="{{ $country->value }}" {{ old('country') === $country->value ? 'selected' : '' }}>
+                                            {{ $country->labelWithFlag() }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('country')" class="mt-2" />
                             </div>
                         </div>
 

@@ -3,18 +3,18 @@
     <x-ui.card class="mb-4">
         <!-- Statystyki -->
         <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div>
                     <h3 class="fs-5 fw-semibold mb-1">Pracownicy</h3>
                     <p class="small text-muted mb-0">
-                        @if($search || $roleFilter)
+                        @if($search || $roleFilter || $locationFilter || $rotationFilter)
                             Znaleziono: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
                         @else
                             Łącznie: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
                         @endif
                     </p>
                 </div>
-                @if($search || $roleFilter)
+                @if($search || $roleFilter || $locationFilter || $rotationFilter)
                     <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
                         <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                     </x-ui.button>
@@ -25,20 +25,17 @@
         <!-- Filtry -->
         <div class="row g-3">
             <!-- Wyszukiwanie -->
-            <div class="col-md-6">
+            <div class="col-md-3">
                 <label class="form-label small">
                     <i class="bi bi-search me-1"></i> Szukaj
                 </label>
-                <div class="position-relative">
-                    <input type="text" wire:model.live.debounce.300ms="search" 
-                        placeholder="Imię, nazwisko lub email..."
-                        class="form-control ps-5">
-                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                </div>
+                <input type="text" wire:model.live.debounce.300ms="search" 
+                    placeholder="Imię, nazwisko lub email..."
+                    class="form-control">
             </div>
 
             <!-- Rola -->
-            <div class="col-md-6">
+            <div class="col-md-3">
                 <label class="form-label small">
                     <i class="bi bi-person-badge me-1"></i> Rola
                 </label>
@@ -47,6 +44,31 @@
                     @foreach($roles as $role)
                         <option value="{{ $role->id }}">{{ $role->name }}</option>
                     @endforeach
+                </select>
+            </div>
+
+            <!-- Lokalizacja -->
+            <div class="col-md-3">
+                <label class="form-label small">
+                    <i class="bi bi-geo-alt me-1"></i> Lokalizacja
+                </label>
+                <select wire:model.live="locationFilter" class="form-control">
+                    <option value="">Wszystkie lokalizacje</option>
+                    <option value="base">Baza</option>
+                    <option value="field">W terenie</option>
+                    <option value="transit">W podróży</option>
+                </select>
+            </div>
+
+            <!-- Rotacja -->
+            <div class="col-md-3">
+                <label class="form-label small">
+                    <i class="bi bi-arrow-repeat me-1"></i> Rotacja
+                </label>
+                <select wire:model.live="rotationFilter" class="form-control">
+                    <option value="">Wszystkie</option>
+                    <option value="active">Aktywna</option>
+                    <option value="inactive">Nieaktywna</option>
                 </select>
             </div>
         </div>
@@ -65,7 +87,8 @@
                             Email
                         </x-livewire.sortable-header>
                         <th class="text-start">Rola</th>
-                        <th class="text-start">Status</th>
+                        <th class="text-start">Lokalizacja</th>
+                        <th class="text-start">Rotacja</th>
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
@@ -145,22 +168,41 @@
                                             $tooltipText = 'Projekty: ' . $projectsList;
                                         }
                                     } else {
-                                        // Domyślna logika dla widoku globalnego
-                                        $currentProjects = $employee->current_projects;
-                                        $hasActiveProjects = $currentProjects->isNotEmpty();
-                                        $projectsList = $currentProjects->pluck('name')->join(', ');
-                                        $tooltipText = $hasActiveProjects 
-                                            ? 'Przypisany do projektów: ' . $projectsList
-                                            : 'Nieprzypisany do żadnego projektu';
+                                        // Domyślna logika - pokaż lokalizację pracownika
+                                        $locationTracker = app(\App\Services\LocationTrackingService::class);
+                                        $currentLocation = $locationTracker->forEmployee($employee);
                                         
-                                        if ($hasActiveProjects) {
-                                            $status = 'active';
-                                            $label = 'Zajęty';
-                                            $variant = 'danger';
-                                        } else {
-                                            $status = 'free';
-                                            $label = 'Wolny';
+                                        $currentProjects = $employee->current_projects;
+                                        $projectsList = $currentProjects->pluck('name')->join(', ');
+                                        
+                                        // Check if in transit (use model method)
+                                        $inTransit = \App\Models\LogisticsEvent::isEmployeeInTransit($employee, now());
+                                        
+                                        if ($inTransit) {
+                                            $status = 'transit';
+                                            $label = '✈️ W podróży';
+                                            $variant = 'warning';
+                                            $tooltipText = 'Pracownik jest w trakcie wyjazdu/powrotu';
+                                        } elseif (!$currentLocation) {
+                                            // Brak lokalizacji - nieprzypisany
+                                            $status = 'no-location';
+                                            $label = '❓ Brak lokalizacji';
+                                            $variant = 'accent';
+                                            $tooltipText = 'Pracownik nie ma przypisanej lokalizacji';
+                                        } elseif ($currentLocation->is_base) {
+                                            // W bazie
+                                            $status = 'base';
+                                            $label = '🏠 Baza';
                                             $variant = 'success';
+                                            $tooltipText = 'Pracownik jest w bazie: ' . $currentLocation->name;
+                                        } else {
+                                            // W terenie - na projekcie
+                                            $status = 'field';
+                                            $label = '🏢 ' . $currentLocation->name;
+                                            $variant = 'info';
+                                            $tooltipText = $projectsList 
+                                                ? 'Przypisany do: ' . $projectsList . ' w lokalizacji ' . $currentLocation->name
+                                                : 'W lokalizacji: ' . $currentLocation->name;
                                         }
                                     }
                                 @endphp
@@ -168,6 +210,39 @@
                                 @if(isset($status))
                                     <x-tooltip title="{{ $tooltipText ?? '' }}">
                                         <x-ui.badge variant="{{ $variant }}">{{ $label }}</x-ui.badge>
+                                    </x-tooltip>
+                                @endif
+                            </td>
+                            <td>
+                                @php
+                                    // Check if employee has active rotation using eager-loaded collection
+                                    $today = now();
+                                    $activeRotation = $employee->rotations->filter(function($rotation) use ($today) {
+                                        $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
+                                        $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
+                                        
+                                        if (!$startDate) {
+                                            return false;
+                                        }
+                                        
+                                        return $startDate->lte($today) 
+                                            && ($endDate === null || $endDate->gte($today));
+                                    })->first();
+                                    
+                                    $hasActiveRotation = $activeRotation !== null;
+                                @endphp
+                                
+                                @if($hasActiveRotation && $activeRotation)
+                                    <x-tooltip title="Rotacja od {{ $activeRotation->start_date->format('d.m.Y') }} do {{ $activeRotation->end_date ? $activeRotation->end_date->format('d.m.Y') : 'brak daty końca' }}">
+                                        <x-ui.badge variant="success">
+                                            <i class="bi bi-check-circle me-1"></i>Aktywna
+                                        </x-ui.badge>
+                                    </x-tooltip>
+                                @else
+                                    <x-tooltip title="Pracownik nie ma aktywnej rotacji">
+                                        <x-ui.badge variant="danger">
+                                            <i class="bi bi-x-circle me-1"></i>Nieaktywna
+                                        </x-ui.badge>
                                     </x-tooltip>
                                 @endif
                             </td>
@@ -194,11 +269,11 @@ Czy na pewno chcesz usunąć tego pracownika?"
                     @empty
                         <x-ui.empty-state 
                             icon="people"
-                            :message="$search || $roleFilter ? 'Brak pracowników spełniających kryteria wyszukiwania' : 'Brak pracowników'"
-                            :has-filters="$search || $roleFilter"
+                            :message="$search || $roleFilter || $locationFilter || $rotationFilter ? 'Brak pracowników spełniających kryteria wyszukiwania' : 'Brak pracowników'"
+                            :has-filters="$search || $roleFilter || $locationFilter || $rotationFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="6"
+                            colspan="7"
                         />
                     @endforelse
                 </tbody>

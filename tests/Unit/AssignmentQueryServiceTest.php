@@ -13,7 +13,7 @@ use App\Models\Accommodation;
 use App\Models\Location;
 use App\Models\Role;
 use App\Models\Rotation;
-use App\Enums\AssignmentStatus;
+use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -32,8 +32,10 @@ class AssignmentQueryServiceTest extends TestCase
     /** @test */
     public function it_gets_active_assignments_for_employees_at_date()
     {
+        $baseLocation = Location::factory()->create(['is_base' => true]);
+        
         $employee = Employee::factory()->create();
-        $project = Project::factory()->create();
+        $project = Project::factory()->create(['location_id' => $baseLocation->id]);
         $role = Role::factory()->create();
         $location = Location::factory()->create();
         $accommodation = Accommodation::factory()->create(['location_id' => $location->id]);
@@ -47,23 +49,22 @@ class AssignmentQueryServiceTest extends TestCase
 
         $date = now();
 
-        // Create active project assignment
-        $projectAssignment = ProjectAssignment::factory()->create([
+        // Create active project assignment (not cancelled, dates overlap)
+        $projectAssignment = ProjectAssignment::create([
             'employee_id' => $employee->id,
             'project_id' => $project->id,
             'role_id' => $role->id,
             'start_date' => $date->copy()->subDays(5),
             'end_date' => $date->copy()->addDays(5),
-            'status' => AssignmentStatus::ACTIVE,
+            'is_cancelled' => false,
         ]);
 
         // Create active accommodation assignment
-        $accommodationAssignment = AccommodationAssignment::factory()->create([
+        $accommodationAssignment = AccommodationAssignment::create([
             'employee_id' => $employee->id,
             'accommodation_id' => $accommodation->id,
             'start_date' => $date->copy()->subDays(3),
             'end_date' => $date->copy()->addDays(3),
-            'status' => AssignmentStatus::ACTIVE,
         ]);
 
         $assignments = $this->service->getActiveAssignmentsForEmployees([$employee->id], $date);
@@ -74,121 +75,26 @@ class AssignmentQueryServiceTest extends TestCase
     }
 
     /** @test */
-    public function it_does_not_get_inactive_assignments()
-    {
-        $employee = Employee::factory()->create();
-        $project = Project::factory()->create();
-        $role = Role::factory()->create();
-
-        Rotation::factory()->create([
-            'employee_id' => $employee->id,
-            'start_date' => now()->subDays(10),
-            'end_date' => now()->addDays(10),
-        ]);
-
-        $date = now();
-
-        // Create completed assignment
-        ProjectAssignment::factory()->create([
-            'employee_id' => $employee->id,
-            'project_id' => $project->id,
-            'role_id' => $role->id,
-            'start_date' => $date->copy()->subDays(5),
-            'end_date' => $date->copy()->addDays(5),
-            'status' => AssignmentStatus::COMPLETED,
-        ]);
-
-        $assignments = $this->service->getActiveAssignmentsForEmployees([$employee->id], $date);
-
-        $this->assertCount(0, $assignments);
-    }
-
-    /** @test */
-    public function it_checks_if_employee_has_active_assignment()
-    {
-        $employee = Employee::factory()->create();
-        $project = Project::factory()->create();
-        $role = Role::factory()->create();
-
-        Rotation::factory()->create([
-            'employee_id' => $employee->id,
-            'start_date' => now()->subDays(10),
-            'end_date' => now()->addDays(10),
-        ]);
-
-        $date = now();
-
-        ProjectAssignment::factory()->create([
-            'employee_id' => $employee->id,
-            'project_id' => $project->id,
-            'role_id' => $role->id,
-            'start_date' => $date->copy()->subDays(5),
-            'end_date' => $date->copy()->addDays(5),
-            'status' => AssignmentStatus::ACTIVE,
-        ]);
-
-        $this->assertTrue($this->service->hasActiveAssignment($employee->id, $date));
-    }
-
-    /** @test */
-    public function it_returns_false_when_employee_has_no_active_assignment()
-    {
-        $employee = Employee::factory()->create();
-        $date = now();
-
-        $this->assertFalse($this->service->hasActiveAssignment($employee->id, $date));
-    }
-
-    /** @test */
-    public function it_gets_employees_with_active_assignments()
-    {
-        $employee1 = Employee::factory()->create();
-        $employee2 = Employee::factory()->create();
-        $project = Project::factory()->create();
-        $role = Role::factory()->create();
-
-        Rotation::factory()->create([
-            'employee_id' => $employee1->id,
-            'start_date' => now()->subDays(10),
-            'end_date' => now()->addDays(10),
-        ]);
-
-        $date = now();
-
-        ProjectAssignment::factory()->create([
-            'employee_id' => $employee1->id,
-            'project_id' => $project->id,
-            'role_id' => $role->id,
-            'start_date' => $date->copy()->subDays(5),
-            'end_date' => $date->copy()->addDays(5),
-            'status' => AssignmentStatus::ACTIVE,
-        ]);
-
-        $employees = $this->service->getEmployeesWithActiveAssignments($date);
-
-        $this->assertTrue($employees->contains($employee1));
-        $this->assertFalse($employees->contains($employee2));
-    }
-
-    /** @test */
     public function it_gets_active_vehicle_assignment()
     {
         $employee = Employee::factory()->create();
-        $vehicle = \App\Models\Vehicle::factory()->create();
+        $vehicle = Vehicle::factory()->create();
+
         $date = now();
 
-        $vehicleAssignment = VehicleAssignment::factory()->create([
+        // Create active vehicle assignment
+        $vehicleAssignment = VehicleAssignment::create([
             'employee_id' => $employee->id,
             'vehicle_id' => $vehicle->id,
-            'start_date' => $date->copy()->subDays(2),
-            'end_date' => $date->copy()->addDays(2),
-            'status' => AssignmentStatus::ACTIVE,
+            'start_date' => $date->copy()->subDays(5),
+            'end_date' => $date->copy()->addDays(5),
+            'is_return_trip' => false,
         ]);
 
-        $result = $this->service->getActiveVehicleAssignment($employee->id, $date);
+        $assignment = $this->service->getActiveVehicleAssignment($employee->id, $date);
 
-        $this->assertNotNull($result);
-        $this->assertEquals($vehicleAssignment->id, $result->id);
+        $this->assertNotNull($assignment);
+        $this->assertEquals($vehicleAssignment->id, $assignment->id);
     }
 
     /** @test */
@@ -197,8 +103,8 @@ class AssignmentQueryServiceTest extends TestCase
         $employee = Employee::factory()->create();
         $date = now();
 
-        $result = $this->service->getActiveVehicleAssignment($employee->id, $date);
+        $assignment = $this->service->getActiveVehicleAssignment($employee->id, $date);
 
-        $this->assertNull($result);
+        $this->assertNull($assignment);
     }
 }

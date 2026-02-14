@@ -20,6 +20,7 @@ class Location extends Model
         'address',
         'city',
         'postal_code',
+        'country',
         'contact_person',
         'phone',
         'email',
@@ -29,6 +30,7 @@ class Location extends Model
 
     protected $casts = [
         'is_base' => 'boolean',
+        'country' => \App\Enums\EuropeanCountry::class,
     ];
 
     /**

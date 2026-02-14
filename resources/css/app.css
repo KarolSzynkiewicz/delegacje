@@ -251,8 +251,8 @@ body {
 }
 
 .form-select-sm option {
-    background: #0f172a;
-    color: white;
+    background: var(--bg-input);
+    color: var(--text-main);
     padding: 6px;
 }
 
@@ -382,8 +382,8 @@ input[type="week"]::-webkit-datetime-edit-year-field:focus {
     outline: none;
 }
 .form-select option {
-    background: #0f172a;
-    color: white;
+    background: var(--bg-input);
+    color: var(--text-main);
     padding: 8px;
 }
 textarea.form-control {

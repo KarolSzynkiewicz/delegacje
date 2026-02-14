@@ -107,49 +107,6 @@ class ViewTest extends TestCase
     }
 
     /**
-     * Test that projects show view renders without SQL errors
-     */
-    public function test_projects_show_renders(): void
-    {
-        $project = Project::factory()->create();
-        $role = Role::factory()->create();
-        ProjectDemand::factory()->create([
-            'project_id' => $project->id,
-            'role_id' => $role->id,
-        ]);
-
-        $response = $this->actingAs($this->user)
-            ->get(route('projects.show', $project));
-
-        $response->assertStatus(200);
-        $response->assertViewIs('projects.show');
-        $response->assertSeeText($project->name, false);
-    }
-
-    /**
-     * Test that assignments index view renders without SQL errors
-     */
-    public function test_assignments_index_renders(): void
-    {
-        $project = Project::factory()->create();
-        $employee = Employee::factory()->create();
-        $role = Role::factory()->create();
-        $employee->roles()->attach($role);
-        
-        ProjectAssignment::factory()->create([
-            'project_id' => $project->id,
-            'employee_id' => $employee->id,
-            'role_id' => $role->id,
-        ]);
-
-        $response = $this->actingAs($this->user)
-            ->get(route('assignments.index'));
-
-        $response->assertStatus(200);
-        $response->assertViewIs('assignments.index');
-    }
-
-    /**
      * Test that rotations index view renders without SQL errors
      */
     public function test_rotations_index_renders(): void

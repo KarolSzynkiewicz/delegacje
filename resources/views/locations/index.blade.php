@@ -29,6 +29,7 @@
                             <th>Nazwa</th>
                             <th>Adres</th>
                             <th>Miasto</th>
+                            <th>Kraj</th>
                             <th>Baza</th>
                             <th>Kontakt</th>
                             <th>Akcje</th>
@@ -40,6 +41,7 @@
                                 <td class="fw-medium">{{ $location->name }}</td>
                                 <td>{{ $location->address }}</td>
                                 <td>{{ $location->city ?? '-' }}</td>
+                                <td>{{ $location->country ? $location->country->labelWithFlag() : '-' }}</td>
                                 <td>
                                     @if($location->is_base)
                                         <x-ui.badge variant="success">Baza</x-ui.badge>

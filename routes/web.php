@@ -102,6 +102,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('departures/{departure}/cancel', [\App\Http\Controllers\DepartureController::class, 'cancel'])
             ->name('departures.cancel')
             ->defaults('resource', 'departures');
+        Route::get('departures/{departure}/prepare-cancellation', [\App\Http\Controllers\DepartureController::class, 'prepareCancellation'])
+            ->name('departures.prepare-cancellation')
+            ->defaults('resource', 'departures');
         
         // Equipment Issues Actions
         Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])
