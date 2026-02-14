@@ -44,7 +44,7 @@ class TimeLogController extends Controller
         
         // Filtruj dla kierownika - tylko jego projekty
         if (!auth()->user()->isAdmin()) {
-            $projectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $projectIds = auth()->user()->getManagedProjectIds();
             $assignmentsQuery->whereIn('project_id', $projectIds);
         }
         
@@ -104,7 +104,7 @@ class TimeLogController extends Controller
         
         // Filtruj dla kierownika - tylko jego projekty
         if (!auth()->user()->isAdmin()) {
-            $projectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $projectIds = auth()->user()->getManagedProjectIds();
             $assignmentsQuery->whereIn('project_id', $projectIds);
         }
         
@@ -186,7 +186,7 @@ class TimeLogController extends Controller
         // Filtruj projekty dla kierownika
         $projectIds = null;
         if (!auth()->user()->isAdmin()) {
-            $projectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $projectIds = auth()->user()->getManagedProjectIds();
         }
         
         $data = $this->timeLogService->getMonthlyGridData($month, $projectIds);

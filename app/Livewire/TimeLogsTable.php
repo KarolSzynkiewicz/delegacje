@@ -81,7 +81,7 @@ class TimeLogsTable extends Component
         
         // Filtruj dla kierownika - tylko time-logi z jego projektów
         if (!auth()->user()->isAdmin()) {
-            $userProjectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $userProjectIds = auth()->user()->getManagedProjectIds();
             $query->whereHas('projectAssignment', function($q) use ($userProjectIds) {
                 $q->whereIn('project_id', $userProjectIds);
             });
@@ -171,7 +171,7 @@ class TimeLogsTable extends Component
         // Filtruj projekty dla kierownika
         $projectsQuery = Project::query();
         if (!auth()->user()->isAdmin()) {
-            $userProjectIds = auth()->user()->getManagedProjectIds()->toArray();
+            $userProjectIds = auth()->user()->getManagedProjectIds();
             $projectsQuery->whereIn('id', $userProjectIds);
         }
         $projects = $projectsQuery->orderBy('name')->get();
