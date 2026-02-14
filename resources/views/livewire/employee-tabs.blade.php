@@ -641,9 +641,11 @@
                 <div class="card-body">
                     <div class="mb-4">
                         <x-ui.table-header title="Ewidencja Godzin">
-                            <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('time-logs.create') }}" class="btn-sm">Dodaj Wpis</x-ui.button>
-                            </x-slot>
+                            @if(auth()->user()->isAdmin())
+                                <x-slot name="actions">
+                                    <x-ui.button variant="primary" href="{{ route('time-logs.create') }}" class="btn-sm">Dodaj Wpis</x-ui.button>
+                                </x-slot>
+                            @endif
                         </x-ui.table-header>
                         @if($tabData && $tabData->count() > 0)
                             <div class="table-responsive">
