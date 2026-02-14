@@ -20,8 +20,33 @@
             <div class="col-lg-8">
                 <x-ui.card label="Cache i Optymalizacja">
                     <p class="text-muted mb-4">
-                        Zarządzaj cache aplikacji. Czyszczenie cache może pomóc rozwiązać problemy z uprawnieniami, widokami i route.
+                        Zarządzaj cache aplikacji i uprawnieniami. Czyszczenie cache może pomóc rozwiązać problemy z uprawnieniami, widokami i route.
                     </p>
+
+                    <!-- Synchronizacja uprawnień -->
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-shield-check text-success"></i>
+                                    Synchronizuj uprawnienia
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    <strong>⚡ Produkcja:</strong> Synchronizuje uprawnienia z routes do bazy danych. 
+                                    <strong>Użyj po każdym deploy!</strong>
+                                </p>
+                            </div>
+                            <form method="POST" action="{{ route('system-actions.sync-permissions') }}" class="ms-3">
+                                @csrf
+                                <x-ui.button 
+                                    variant="success" 
+                                    type="submit"
+                                >
+                                    <i class="bi bi-shield-check"></i> Synchronizuj
+                                </x-ui.button>
+                            </form>
+                        </div>
+                    </div>
 
                     <!-- Lekkie czyszczenie - tylko uprawnienia i route -->
                     <div class="border rounded p-3 mb-3">

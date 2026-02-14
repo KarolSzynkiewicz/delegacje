@@ -74,6 +74,37 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         })->name('system-actions.clear-permissions')
           ->defaults('resource', 'system-actions');
         
+        // System actions - sync permissions from routes to database
+        Route::post('/system-actions/sync-permissions', function () {
+            try {
+                $service = app(\App\Services\RoutePermissionService::class);
+                $routePerms = $service->getAllPermissionsFromRoutes();
+                
+                $created = 0;
+                $existing = 0;
+                
+                foreach ($routePerms as $perm) {
+                    $p = \Spatie\Permission\Models\Permission::firstOrCreate([
+                        'name' => $perm['name'],
+                        'guard_name' => 'web',
+                    ]);
+                    
+                    if ($p->wasRecentlyCreated) {
+                        $created++;
+                    } else {
+                        $existing++;
+                    }
+                }
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', "Synchronizacja zakończona! Utworzono: {$created}, Istniało już: {$existing}");
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd synchronizacji: ' . $e->getMessage());
+            }
+        })->name('system-actions.sync-permissions')
+          ->defaults('resource', 'system-actions');
+        
         // System actions - full cache clear
         Route::post('/system-actions/clear-cache', function () {
             try {
