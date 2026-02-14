@@ -48,6 +48,32 @@
                         </div>
                     </div>
 
+                    <!-- Uruchom migracje -->
+                    <div class="border rounded p-3 mb-3 bg-warning bg-opacity-10">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-database text-warning"></i>
+                                    Uruchom migracje
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    <strong>🔧 Produkcja:</strong> Uruchamia pending migracje bazy danych. 
+                                    <strong>Użyj po deploy ze zmianami w bazie!</strong>
+                                </p>
+                            </div>
+                            <form method="POST" action="{{ route('system-actions.run-migrations') }}" class="ms-3">
+                                @csrf
+                                <x-ui.button 
+                                    variant="warning" 
+                                    type="submit"
+                                    onclick="return confirm('Czy na pewno chcesz uruchomić migracje bazy danych?')"
+                                >
+                                    <i class="bi bi-database"></i> Uruchom
+                                </x-ui.button>
+                            </form>
+                        </div>
+                    </div>
+
                     <!-- Lekkie czyszczenie - tylko uprawnienia i route -->
                     <div class="border rounded p-3 mb-3">
                         <div class="d-flex justify-content-between align-items-start">

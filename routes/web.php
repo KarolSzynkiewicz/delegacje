@@ -105,6 +105,26 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         })->name('system-actions.sync-permissions')
           ->defaults('resource', 'system-actions');
         
+        // System actions - run migrations
+        Route::post('/system-actions/run-migrations', function () {
+            try {
+                // Uruchom migracje z --force (wymaga na produkcji)
+                \Illuminate\Support\Facades\Artisan::call('migrate', [
+                    '--force' => true,
+                    '--no-interaction' => true,
+                ]);
+                
+                $output = \Illuminate\Support\Facades\Artisan::output();
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', 'Migracje uruchomione pomyślnie! ' . ($output ?: 'Brak nowych migracji do uruchomienia.'));
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd podczas uruchamiania migracji: ' . $e->getMessage());
+            }
+        })->name('system-actions.run-migrations')
+          ->defaults('resource', 'system-actions');
+        
         // System actions - full cache clear
         Route::post('/system-actions/clear-cache', function () {
             try {
