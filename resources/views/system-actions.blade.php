@@ -74,6 +74,51 @@
                         </div>
                     </div>
 
+                    <!-- Debug Mode Toggle -->
+                    <div class="border rounded p-3 mb-3 bg-danger bg-opacity-10">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-bug text-danger"></i>
+                                    Debug Mode
+                                    @if(\Illuminate\Support\Facades\Cache::get('force_debug_mode', false))
+                                        <x-ui.badge variant="danger">AKTYWNY</x-ui.badge>
+                                    @else
+                                        <x-ui.badge variant="secondary">WYŁĄCZONY</x-ui.badge>
+                                    @endif
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    <strong>🐛 Debugowanie:</strong> Włącz aby zobaczyć szczegółowe błędy na produkcji (na 1h). 
+                                    <strong class="text-danger">Wyłącz po debugowaniu!</strong>
+                                </p>
+                            </div>
+                            <div class="ms-3 d-flex gap-2">
+                                @if(\Illuminate\Support\Facades\Cache::get('force_debug_mode', false))
+                                    <form method="POST" action="{{ route('system-actions.debug-off') }}">
+                                        @csrf
+                                        <x-ui.button 
+                                            variant="secondary" 
+                                            type="submit"
+                                        >
+                                            <i class="bi bi-x-circle"></i> Wyłącz
+                                        </x-ui.button>
+                                    </form>
+                                @else
+                                    <form method="POST" action="{{ route('system-actions.debug-on') }}">
+                                        @csrf
+                                        <x-ui.button 
+                                            variant="danger" 
+                                            type="submit"
+                                            onclick="return confirm('Włączyć debug mode na 1 godzinę? Błędy będą widoczne publicznie!')"
+                                        >
+                                            <i class="bi bi-bug"></i> Włącz
+                                        </x-ui.button>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Lekkie czyszczenie - tylko uprawnienia i route -->
                     <div class="border rounded p-3 mb-3">
                         <div class="d-flex justify-content-between align-items-start">

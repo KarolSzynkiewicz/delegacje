@@ -20,6 +20,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force debug mode if enabled via cache (for production debugging)
+        if (\Illuminate\Support\Facades\Cache::get('force_debug_mode', false)) {
+            config(['app.debug' => true]);
+        }
+        
         // Force HTTPS for all URLs in production (Railway uses HTTPS)
         if (config('app.env') === 'production' || request()->isSecure()) {
             \Illuminate\Support\Facades\URL::forceScheme('https');

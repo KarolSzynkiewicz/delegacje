@@ -125,6 +125,33 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         })->name('system-actions.run-migrations')
           ->defaults('resource', 'system-actions');
         
+        // System actions - toggle debug mode (temporary via cache)
+        Route::post('/system-actions/debug-on', function () {
+            try {
+                \Illuminate\Support\Facades\Cache::put('force_debug_mode', true, now()->addHour());
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', '🐛 Debug mode WŁĄCZONY na 1 godzinę! Odśwież stronę aby zobaczyć szczegółowe błędy.');
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd: ' . $e->getMessage());
+            }
+        })->name('system-actions.debug-on')
+          ->defaults('resource', 'system-actions');
+        
+        Route::post('/system-actions/debug-off', function () {
+            try {
+                \Illuminate\Support\Facades\Cache::forget('force_debug_mode');
+                
+                return redirect()->route('system-actions.index')
+                    ->with('success', '✅ Debug mode WYŁĄCZONY! Błędy znów ukryte.');
+            } catch (\Exception $e) {
+                return redirect()->route('system-actions.index')
+                    ->with('error', 'Błąd: ' . $e->getMessage());
+            }
+        })->name('system-actions.debug-off')
+          ->defaults('resource', 'system-actions');
+        
         // System actions - full cache clear
         Route::post('/system-actions/clear-cache', function () {
             try {
