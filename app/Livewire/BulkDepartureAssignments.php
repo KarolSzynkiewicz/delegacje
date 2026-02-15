@@ -8,10 +8,15 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\Vehicle;
 use App\Models\Accommodation;
+use App\Models\LogisticsEvent;
 use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\AccommodationAssignmentService;
+use App\Enums\LogisticsEventType;
+use App\Enums\LogisticsEventStatus;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class BulkDepartureAssignments extends Component
@@ -386,15 +391,107 @@ class BulkDepartureAssignments extends Component
         
         // If there are validation errors, don't proceed
         if (!empty($this->validationErrors)) {
-            $this->dispatch('validation-failed');
+            $this->dispatch('show-toast', [
+                'message' => 'Napraw błędy walidacji przed zapisaniem',
+                'type' => 'error'
+            ]);
             return;
         }
         
-        // Dispatch event to parent with assignments data
-        $this->dispatch('assignments-validated', assignments: $this->assignments);
+        // Get departure data from session
+        $departureData = session('pending_departure');
         
-        // Redirect to controller endpoint
-        return redirect()->route('departures.store-with-assignments')->with('assignments', $this->assignments);
+        if (!$departureData) {
+            return redirect()
+                ->route('departures.create')
+                ->with('error', 'Brak danych wyjazdu. Rozpocznij proces od początku.');
+        }
+        
+        try {
+            DB::beginTransaction();
+            
+            // 1. Create departure (logistics event)
+            $departure = LogisticsEvent::create([
+                'type' => LogisticsEventType::DEPARTURE,
+                'event_date' => Carbon::parse($departureData['event_date']),
+                'end_date' => Carbon::parse($departureData['end_date']),
+                'from_location_id' => $departureData['from_location_id'],
+                'to_location_id' => $departureData['to_location_id'],
+                'vehicle_id' => $departureData['vehicle_id'] ?? null,
+                'status' => LogisticsEventStatus::PLANNED,
+                'notes' => $departureData['notes'] ?? null,
+                'has_transport' => !empty($departureData['vehicle_id']),
+            ]);
+
+            // 2. Add participants to departure
+            foreach ($departureData['participants'] as $employeeId) {
+                $departure->participants()->create([
+                    'employee_id' => $employeeId,
+                ]);
+            }
+
+            // 3. Create all assignments for each participant
+            foreach ($this->assignments as $employeeId => $assignmentData) {
+                $employee = Employee::findOrFail($employeeId);
+
+                // Project assignment
+                $project = Project::findOrFail($assignmentData['project_id']);
+                $role = Role::findOrFail($assignmentData['role_id']);
+
+                $this->projectAssignmentService->createAssignment(
+                    $project,
+                    $employee,
+                    $role,
+                    Carbon::parse($assignmentData['project_start_date']),
+                    Carbon::parse($assignmentData['project_end_date']),
+                    null, // notes
+                    $departure->id // Link to departure!
+                );
+
+                // Vehicle assignment
+                $vehicle = Vehicle::findOrFail($assignmentData['vehicle_id']);
+                
+                $this->vehicleAssignmentService->createAssignment(
+                    $vehicle,
+                    $employee,
+                    $assignmentData['position'],
+                    Carbon::parse($assignmentData['vehicle_start_date']),
+                    Carbon::parse($assignmentData['vehicle_end_date'])
+                );
+
+                // Accommodation assignment
+                $accommodation = Accommodation::findOrFail($assignmentData['accommodation_id']);
+                
+                $this->accommodationAssignmentService->createAssignment(
+                    $employee,
+                    $accommodation,
+                    Carbon::parse($assignmentData['accommodation_start_date']),
+                    Carbon::parse($assignmentData['accommodation_end_date'])
+                );
+            }
+
+            DB::commit();
+            session()->forget('pending_departure');
+
+            return redirect()
+                ->route('weekly-overview.index', [
+                    'start_date' => Carbon::parse($departureData['end_date'])->startOfWeek()->format('Y-m-d')
+                ])
+                ->with('success', "Wyjazd oraz wszystkie przypisania zostały utworzone! ({$departure->participants->count()} pracowników)");
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            
+            Log::error('Error creating departure with assignments', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->dispatch('show-toast', [
+                'message' => 'Wystąpił błąd: ' . $e->getMessage(),
+                'type' => 'error'
+            ]);
+        }
     }
     
     public function render()

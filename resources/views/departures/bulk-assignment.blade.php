@@ -47,37 +47,14 @@
             </div>
         </x-ui.card>
 
-        <form method="POST" action="{{ route('departures.store-with-assignments') }}">
-            @csrf
-
-            @livewire('bulk-departure-assignments', [
-                'employeeIds' => $employees->pluck('id')->toArray(),
-                'arrivalDate' => $arrivalDate->format('Y-m-d'),
-                'weekEnd' => $weekEnd->format('Y-m-d'),
-                'projectIds' => $projects->pluck('id')->toArray(),
-                'roleIds' => $roles->pluck('id')->toArray(),
-                'vehicleIds' => $vehicles->pluck('id')->toArray(),
-                'accommodationIds' => $accommodations->pluck('id')->toArray()
-            ])
-
-            <div class="mt-4 d-flex justify-content-between align-items-center gap-2 sticky-bottom bg-white p-3 border-top">
-                <form method="GET" action="{{ route('departures.create') }}" class="d-inline">
-                    <x-ui.button 
-                        variant="secondary" 
-                        type="submit"
-                    >
-                        ← Wróć do kroku 1
-                    </x-ui.button>
-                </form>
-                
-                <x-ui.button 
-                    variant="success" 
-                    type="submit"
-                    class="btn-lg"
-                >
-                    <i class="bi bi-save"></i> Zapisz wyjazd + wszystkie przypisania
-                </x-ui.button>
-            </div>
-        </form>
+        @livewire('bulk-departure-assignments', [
+            'employeeIds' => $employees->pluck('id')->toArray(),
+            'arrivalDate' => $arrivalDate->format('Y-m-d'),
+            'weekEnd' => $weekEnd->format('Y-m-d'),
+            'projectIds' => $projects->pluck('id')->toArray(),
+            'roleIds' => $roles->pluck('id')->toArray(),
+            'vehicleIds' => $vehicles->pluck('id')->toArray(),
+            'accommodationIds' => $accommodations->pluck('id')->toArray()
+        ])
     </div>
 </x-app-layout>

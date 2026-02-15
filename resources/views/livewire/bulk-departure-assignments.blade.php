@@ -21,32 +21,6 @@
                 const toast = new bootstrap.Toast(toastEl);
                 toast.show();
             });
-            
-            // Update hidden inputs whenever assignments change
-            Livewire.hook('morph.updated', () => {
-                updateHiddenInputs();
-            });
-            
-            function updateHiddenInputs() {
-                const assignments = @this.assignments;
-                const container = document.getElementById('hidden-inputs-container');
-                if (!container || !assignments) return;
-                
-                container.innerHTML = '';
-                
-                Object.keys(assignments).forEach(employeeId => {
-                    Object.keys(assignments[employeeId]).forEach(key => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = `assignments[${employeeId}][${key}]`;
-                        input.value = assignments[employeeId][key] || '';
-                        container.appendChild(input);
-                    });
-                });
-            }
-            
-            // Initial sync
-            setTimeout(updateHiddenInputs, 100);
         });
     </script>
 
@@ -330,6 +304,19 @@
         </table>
     </div>
     
-    <!-- Hidden inputs dla submita formularza -->
-    <div id="hidden-inputs-container"></div>
+    <!-- Action buttons -->
+    <div class="mt-4 d-flex justify-content-between align-items-center gap-2 sticky-bottom bg-white p-3 border-top">
+        <a href="{{ route('departures.create') }}" class="btn btn-secondary">
+            ← Wróć do kroku 1
+        </a>
+        
+        <button 
+            type="button" 
+            wire:click="submitAssignments"
+            class="btn btn-success btn-lg"
+            @if(count($validationErrors) > 0) disabled @endif
+        >
+            <i class="bi bi-save"></i> Zapisz wyjazd + wszystkie przypisania
+        </button>
+    </div>
 </div>
