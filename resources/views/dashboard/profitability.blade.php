@@ -6,15 +6,28 @@
         return rtrim(rtrim($formatted, '0'), '.');
     }
     
-    // Helper function to format currency symbol
+    // Helper function to format currency symbol with colors
     function formatCurrency($currency) {
-        return match(strtoupper($currency)) {
+        $symbol = match(strtoupper($currency)) {
             'EUR' => '€',
             'USD' => '$',
             'GBP' => '£',
             'PLN' => 'zł',
             default => $currency,
         };
+        
+        // Add colors for EUR and PLN
+        $color = match(strtoupper($currency)) {
+            'EUR' => 'text-primary', // Blue for EUR
+            'PLN' => 'text-success', // Green for PLN
+            default => '',
+        };
+        
+        if ($color) {
+            return '<span class="' . $color . ' fw-bold">' . $symbol . '</span>';
+        }
+        
+        return $symbol;
     }
     
     // Helper function to get default currency (EUR if zero, otherwise use provided)
@@ -70,10 +83,10 @@
                             </div>
                             @if(isset($summary['revenue_by_currency']) && count($summary['revenue_by_currency']) > 0)
                                 @foreach($summary['revenue_by_currency'] as $currency => $amount)
-                                    <div class="h4 mb-0 text-success">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
+                                    <div class="h4 mb-0 text-success">{{ formatNumber($amount) }} {!! formatCurrency($currency) !!}</div>
                                 @endforeach
                             @else
-                                <div class="h4 mb-0 text-success">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="h4 mb-0 text-success">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -87,10 +100,10 @@
                             </div>
                             @if(isset($summary['labor_costs_by_currency']) && count($summary['labor_costs_by_currency']) > 0)
                                 @foreach($summary['labor_costs_by_currency'] as $currency => $amount)
-                                    <div class="h4 mb-0 text-danger">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
+                                    <div class="h4 mb-0 text-danger">{{ formatNumber($amount) }} {!! formatCurrency($currency) !!}</div>
                                 @endforeach
                             @else
-                                <div class="h4 mb-0 text-danger">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="h4 mb-0 text-danger">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -104,10 +117,10 @@
                             </div>
                             @if(isset($summary['variable_costs_by_currency']) && count($summary['variable_costs_by_currency']) > 0)
                                 @foreach($summary['variable_costs_by_currency'] as $currency => $amount)
-                                    <div class="h4 mb-0 text-warning">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
+                                    <div class="h4 mb-0 text-warning">{{ formatNumber($amount) }} {!! formatCurrency($currency) !!}</div>
                                 @endforeach
                             @else
-                                <div class="h4 mb-0 text-warning">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="h4 mb-0 text-warning">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -121,10 +134,10 @@
                             </div>
                             @if(isset($summary['fixed_costs_by_currency']) && count($summary['fixed_costs_by_currency']) > 0)
                                 @foreach($summary['fixed_costs_by_currency'] as $currency => $amount)
-                                    <div class="h4 mb-0 text-info">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
+                                    <div class="h4 mb-0 text-info">{{ formatNumber($amount) }} {!! formatCurrency($currency) !!}</div>
                                 @endforeach
                             @else
-                                <div class="h4 mb-0 text-info">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="h4 mb-0 text-info">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -150,10 +163,10 @@
                             @endphp
                             @if(count($totalCostsByCurrency) > 0)
                                 @foreach($totalCostsByCurrency as $currency => $amount)
-                                    <div class="h4 mb-0 text-danger">{{ formatNumber($amount) }} {{ formatCurrency($currency) }}</div>
+                                    <div class="h4 mb-0 text-danger">{{ formatNumber($amount) }} {!! formatCurrency($currency) !!}</div>
                                 @endforeach
                             @else
-                                <div class="h4 mb-0 text-danger">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="h4 mb-0 text-danger">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -187,12 +200,12 @@
                             @if(count($marginByCurrency) > 0)
                                 @foreach($marginByCurrency as $currency => $marginData)
                                     <div class="h4 mb-0 {{ $marginData['amount'] >= 0 ? 'text-success' : 'text-danger' }}">
-                                        {{ formatNumber($marginData['amount']) }} {{ formatCurrency($currency) }}
+                                        {{ formatNumber($marginData['amount']) }} {!! formatCurrency($currency) !!}
                                     </div>
                                     <div class="small text-muted">({{ formatNumber($marginData['percentage']) }}%)</div>
                                 @endforeach
                             @else
-                                <div class="h4 mb-0 text-success">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="h4 mb-0 text-success">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -220,13 +233,13 @@
                                 <p class="text-muted small mb-0 mt-1">
                                     <i class="bi bi-calendar3"></i>
                                     @if($project->start_date)
-                                        {{ $project->start_date->format('Y-m-d') }}
+                                        {{ $project->start_date->format('Y-m-d') !!}
                                     @endif
                                     @if($project->start_date && $project->end_date)
                                         -
                                     @endif
                                     @if($project->end_date)
-                                        {{ $project->end_date->format('Y-m-d') }}
+                                        {{ $project->end_date->format('Y-m-d') !!}
                                     @elseif($project->start_date)
                                         (brak daty końca)
                                     @endif
@@ -234,7 +247,7 @@
                             @endif
                         </div>
                         @if($project->type)
-                            <x-ui.badge variant="info">{{ $project->type->label() }}</x-ui.badge>
+                            <x-ui.badge variant="info">{{ $project->type->label() !!}</x-ui.badge>
                         @endif
                     </div>
 
@@ -251,11 +264,11 @@
                                 $revenueCurrency = getDefaultCurrency($projectData['revenue'], $projectData['revenue_currency'] ?? null);
                             @endphp
                             <div class="fw-bold text-success fs-5">
-                                {{ formatNumber($projectData['revenue']) }} {{ formatCurrency($revenueCurrency) }}
+                                {{ formatNumber($projectData['revenue']) }} {!! formatCurrency($revenueCurrency) !!}
                             </div>
                             @if($project->type === \App\Enums\ProjectType::CONTRACT && $project->contract_amount)
                                 <div class="small text-muted mt-1">
-                                    z {{ formatNumber($project->contract_amount) }} {{ formatCurrency($project->currency ?? 'PLN') }} kontraktu
+                                    z {{ formatNumber($project->contract_amount) }} {!! formatCurrency($project->currency ?? 'PLN') !!} kontraktu
                                 </div>
                             @endif
                         </div>
@@ -276,18 +289,18 @@
                             @if(isset($projectData['labor_costs_by_currency']) && count($projectData['labor_costs_by_currency']) > 0)
                                 @foreach($projectData['labor_costs_by_currency'] as $currency => $cost)
                                     <div class="fw-bold text-danger">
-                                        {{ formatNumber($cost) }} {{ formatCurrency($currency) }}
+                                        {{ formatNumber($cost) }} {!! formatCurrency($currency) !!}
                                     </div>
                                 @endforeach
                             @else
-                                <div class="fw-bold text-danger">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="fw-bold text-danger">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                             
                             @if(isset($projectData['paid_labor_costs_by_currency']) && count($projectData['paid_labor_costs_by_currency']) > 0)
                                 <div class="small text-muted mt-1">
                                     <div class="text-success">✓ Wypłacone:</div>
                                     @foreach($projectData['paid_labor_costs_by_currency'] as $currency => $cost)
-                                        <div class="text-success ms-2">{{ formatNumber($cost) }} {{ formatCurrency($currency) }}</div>
+                                        <div class="text-success ms-2">{{ formatNumber($cost) }} {!! formatCurrency($currency) !!}</div>
                                     @endforeach
                                 </div>
                                 @php
@@ -304,7 +317,7 @@
                                     <div class="small text-muted mt-1">
                                         <div class="text-warning">○ Niewypłacone:</div>
                                         @foreach($unpaidByCurrency as $currency => $cost)
-                                            <div class="text-warning ms-2">{{ formatNumber($cost) }} {{ formatCurrency($currency) }}</div>
+                                            <div class="text-warning ms-2">{{ formatNumber($cost) }} {!! formatCurrency($currency) !!}</div>
                                         @endforeach
                                     </div>
                                 @endif
@@ -322,11 +335,11 @@
                             @if(isset($projectData['variable_costs_by_currency']) && count($projectData['variable_costs_by_currency']) > 0)
                                 @foreach($projectData['variable_costs_by_currency'] as $currency => $cost)
                                     <div class="fw-bold text-warning">
-                                        {{ formatNumber($cost) }} {{ formatCurrency($currency) }}
+                                        {{ formatNumber($cost) }} {!! formatCurrency($currency) !!}
                                     </div>
                                 @endforeach
                             @else
-                                <div class="fw-bold text-warning">0 {{ formatCurrency('EUR') }}</div>
+                                <div class="fw-bold text-warning">0 {!! formatCurrency('EUR') !!}</div>
                             @endif
                         </div>
                     </div>
@@ -374,14 +387,14 @@
                                     </x-tooltip>
                                 </span>
                             </x-slot>
-                            <x-ui.badge variant="{{ $projectData['plan_execution'] >= 100 ? 'success' : ($projectData['plan_execution'] >= 80 ? 'warning' : 'danger') }}">
+                            <x-ui.badge variant="{{ $projectData['plan_execution'] >= 100 ? 'success' : ($projectData['plan_execution'] >= 80 ? 'warning' : 'danger') !!}">
                                 {{ formatNumber($projectData['plan_execution']) }}%
                             </x-ui.badge>
                         </x-ui.detail-item>
                     </x-ui.detail-list>
 
                     <div class="mt-3 pt-3 border-top">
-                        <x-ui.button variant="ghost" href="{{ route('projects.show', $project) }}" class="btn-sm">
+                        <x-ui.button variant="ghost" href="{{ route('projects.show', $project) !!}" class="btn-sm">
                             <i class="bi bi-eye me-1"></i> Szczegóły
                         </x-ui.button>
                     </div>
@@ -432,7 +445,7 @@
                                 @foreach($topEmployees as $employeeData)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $employeeData['employee']) }}" class="text-decoration-none">
+                                            <a href="{{ route('employees.show', $employeeData['employee']) !!}" class="text-decoration-none">
                                                 {{ $employeeData['employee']->full_name }}
                                             </a>
                                         </td>
@@ -440,11 +453,11 @@
                                         <td class="text-end">
                                             @if(isset($employeeData['total_revenue_by_currency']) && count($employeeData['total_revenue_by_currency']) > 0)
                                                 @foreach($employeeData['total_revenue_by_currency'] as $currency => $revenue)
-                                                    <strong>{{ formatNumber($revenue) }} {{ formatCurrency($currency) }}</strong>
+                                                    <strong>{{ formatNumber($revenue) }} {!! formatCurrency($currency) !!}</strong>
                                                     @if(!$loop->last)<br>@endif
                                                 @endforeach
                                             @else
-                                                <strong>0 {{ formatCurrency('EUR') }}</strong>
+                                                <strong>0 {!! formatCurrency('EUR') !!}</strong>
                                             @endif
                                         </td>
                                     </tr>
@@ -492,7 +505,7 @@
                                 @foreach($longestRotations as $rotationData)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $rotationData['employee']) }}" class="text-decoration-none">
+                                            <a href="{{ route('employees.show', $rotationData['employee']) !!}" class="text-decoration-none">
                                                 {{ $rotationData['employee']->full_name }}
                                             </a>
                                         </td>

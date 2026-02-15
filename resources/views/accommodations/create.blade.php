@@ -34,6 +34,22 @@
 
                     <div class="mb-3">
                         <x-ui.input 
+                            type="select" 
+                            name="location_id" 
+                            label="Lokalizacja"
+                            required="true"
+                        >
+                            <option value="">Wybierz lokalizację</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}" {{ old('location_id') == $location->id ? 'selected' : '' }}>
+                                    {{ $location->name }} ({{ $location->address }})
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
                             type="text" 
                             name="address" 
                             label="Adres"

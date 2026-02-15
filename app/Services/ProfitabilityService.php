@@ -502,11 +502,13 @@ class ProfitabilityService
     protected function calculateActualHoursForMonth($assignments, Carbon $monthStart, Carbon $monthEnd): float
     {
         $totalHours = 0;
+        $monthStartCopy = $monthStart->copy()->startOfDay();
+        $monthEndCopy = $monthEnd->copy()->endOfDay();
 
         foreach ($assignments as $assignment) {
-            $monthTimeLogs = $assignment->timeLogs->filter(function ($timeLog) use ($monthStart, $monthEnd) {
+            $monthTimeLogs = $assignment->timeLogs->filter(function ($timeLog) use ($monthStartCopy, $monthEndCopy) {
                 $logDate = Carbon::parse($timeLog->start_time);
-                return $logDate->gte($monthStart->startOfDay()) && $logDate->lte($monthEnd->endOfDay());
+                return $logDate->gte($monthStartCopy) && $logDate->lte($monthEndCopy);
             });
             
             $totalHours += $monthTimeLogs->sum('hours_worked');
