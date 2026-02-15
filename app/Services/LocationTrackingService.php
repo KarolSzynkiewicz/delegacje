@@ -11,7 +11,6 @@ use App\Models\AccommodationAssignment;
 use App\Models\LogisticsEvent;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
-use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 /**
@@ -49,22 +48,6 @@ class LocationTrackingService
      * @return array
      */
     public function getLocationStatus(Employee $employee, Carbon $date): array
-    {
-        return Cache::remember(
-            "employee_location_status_{$employee->id}_{$date->format('Y-m-d')}",
-            now()->addMinutes(5),
-            fn() => $this->calculateLocationStatus($employee, $date)
-        );
-    }
-
-    /**
-     * Calculate location status for employee on date.
-     * 
-     * @param Employee $employee
-     * @param Carbon $date
-     * @return array
-     */
-    protected function calculateLocationStatus(Employee $employee, Carbon $date): array
     {
         // 1. Sync outside_base flag (ensure it's current)
         $this->syncOutsideBaseFlag($employee, $date);

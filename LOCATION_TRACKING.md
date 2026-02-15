@@ -217,25 +217,24 @@ if ($hasActiveProject || $hasActiveAccommodation) {
 
 ### Aktualizacja flagi
 
-#### Lazy Evaluation (podstawowy mechanizm):
+#### Lazy Evaluation (jedyny mechanizm):
 ```php
 // LocationTrackingService::syncOutsideBaseFlag()
 // Wywoływane za każdym razem przy getLocationStatus()
 // Przelicza flagę on-demand na podstawie aktualnego stanu
+// Bez cache - zawsze aktualne dane
 ```
 
-#### Event Listeners (cache invalidation):
-```php
-// AppServiceProvider::boot()
-// Czyści cache przy zmianach:
-- LogisticsEvent::saved/deleted
-- ProjectAssignment::saved/deleted
-- AccommodationAssignment::saved/deleted
-```
+**Dlaczego bez cache?**
+- ✅ **Zawsze aktualne dane** - brak ryzyka nieświeżego cache
+- ✅ **Prostszy kod** - brak zarządzania invalidacją
+- ✅ **Mniej bugów** - eliminacja całej kategorii problemów
+- ✅ **Wystarczająca wydajność** - ~3-7ms na zapytanie
+- ✅ **KISS principle** - prostsze = lepsze
 
 #### Manualny trigger:
 ```php
-// Np. po anulowaniu wyjazdu
+// Np. po anulowaniu wyjazdu (opcjonalnie)
 $locationTracker = app(LocationTrackingService::class);
 $locationTracker->syncOutsideBaseFlag($employee, now());
 ```
@@ -848,9 +847,10 @@ Znaczenie: Wyjazd został anulowany, pracownik zostaje w bazie
 
 1. **Wyjazdy zawsze z przypisaniami** - dwuetapowy proces wymusza spójność
 2. **Anulowane wyjazdy są ignorowane** - tylko `PLANNED` i `COMPLETED` liczą się w logice
-3. **Flaga `outside_base` aktualizowana automatycznie** - lazy evaluation + cache
+3. **Flaga `outside_base` aktualizowana automatycznie** - lazy evaluation bez cache
 4. **Historyczność** - można sprawdzić stan na dowolną datę
 5. **Powroty wyświetlane po dacie przyjazdu** - `end_date`, nie `event_date`
+6. **Brak cache = zawsze aktualne dane** - performance ~3-7ms (wystarczające)
 
 ### 🔧 Główne komponenty:
 
