@@ -66,6 +66,99 @@
         </x-ui.button>
     </div>
 
+    <!-- Sekcja: Wyjazdy wymagające przypisań (legacy - stare wyjazdy bez przypisań) -->
+    @if(isset($allDepartures) && $allDepartures->isNotEmpty())
+        @php
+            $locationTracker = app(\App\Services\LocationTrackingService::class);
+            
+            // Zbierz pracowników bez przypisań
+            $employeesNeedingAssignments = collect();
+            foreach ($allDepartures as $departure) {
+                $arrivalDate = $departure->end_date;
+                
+                if ($arrivalDate) {
+                    foreach ($departure->participants as $participant) {
+                        if ($participant->employee) {
+                            $locationStatus = $locationTracker->getLocationStatus($participant->employee, $arrivalDate);
+                            
+                            // Jeśli nie ma lokalizacji projektu
+                            if (!$locationStatus['project_location']) {
+                                $key = $participant->employee->id . '_' . $departure->id;
+                                if (!$employeesNeedingAssignments->has($key)) {
+                                    $employeesNeedingAssignments->put($key, [
+                                        'employee' => $participant->employee,
+                                        'departure' => $departure,
+                                        'arrival_date' => $arrivalDate,
+                                    ]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        @endphp
+        
+        @if($employeesNeedingAssignments->isNotEmpty())
+            <div class="mb-4">
+                <x-ui.alert variant="danger" title="⚠️ Wyjazdy bez przypisań">
+                    <p class="mb-3">
+                        <strong>Uwaga!</strong> Następujący pracownicy mają wyjazdy, ale brak im przypisań do projektu/domu/auta.
+                        To prawdopodobnie stare wyjazdy utworzone przed implementacją dwuetapowego formularza.
+                    </p>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Pracownik</th>
+                                    <th>Wyjazd</th>
+                                    <th>Data przybycia</th>
+                                    <th>Lokalizacja</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($employeesNeedingAssignments as $data)
+                                    <tr>
+                                        <td>
+                                            <x-employee-cell :employee="$data['employee']" />
+                                        </td>
+                                        <td>
+                                            <a href="{{ route('departures.show', $data['departure']) }}" class="text-decoration-none">
+                                                Wyjazd #{{ $data['departure']->id }}
+                                            </a>
+                                        </td>
+                                        <td>{{ $data['arrival_date']->format('d.m.Y') }}</td>
+                                        <td>{{ $data['departure']->toLocation->name }}</td>
+                                        <td>
+                                            <x-ui.button 
+                                                variant="primary" 
+                                                size="sm"
+                                                href="{{ route('project-assignments.create', [
+                                                    'employee_id' => $data['employee']->id,
+                                                    'start_date' => $data['arrival_date']->format('Y-m-d')
+                                                ]) }}"
+                                            >
+                                                Przypisz ręcznie
+                                            </x-ui.button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Wskazówka:</strong> To są stare wyjazdy bez przypisań. Nowe wyjazdy tworzone przez 
+                        <a href="{{ route('departures.create') }}" class="alert-link">formularz dwuetapowy</a> 
+                        automatycznie zawierają wszystkie przypisania.
+                    </div>
+                </x-ui.alert>
+            </div>
+        @endif
+    @endif
+
     <!-- Projekty -->
     @php
         // Pre-load all project assignments for all employees in vehicles/accommodations to avoid N+1 queries
@@ -422,7 +515,7 @@
                                                             <div class="d-flex align-items-center gap-1 small">
                                                                 <i class="bi bi-arrow-return-left text-warning"></i>
                                                                 <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none text-dark fw-semibold">
-                                                                    Zjazd: {{ $returnTrip->event_date->format('d.m.Y') }}
+                                                                    Zjazd: {{ ($returnTrip->end_date ?? $returnTrip->event_date)->format('d.m.Y') }}
                                                                     @if($vehicleData['vehicle'])
                                                                         - {{ $vehicleData['vehicle']->registration_number }}
                                                                     @endif
@@ -693,7 +786,7 @@
                                                 @foreach($returnTrips as $returnTrip)
                                                     <li class="mb-1">
                                                         <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none">
-                                                            <strong>{{ $returnTrip->event_date->format('d.m.Y') }}</strong>
+                                                            <strong>{{ ($returnTrip->end_date ?? $returnTrip->event_date)->format('d.m.Y') }}</strong>
                                                             @if($returnTrip->vehicle)
                                                                 - {{ $returnTrip->vehicle->registration_number }}
                                                             @endif
@@ -1283,184 +1376,6 @@
                 </div>
             </x-ui.alert>
         </div>
-    @endif
-
-    <!-- Sekcja: Przyjazdy w tym tygodniu -->
-    @if(isset($departures) && $departures->isNotEmpty())
-        @php
-            // Zbierz wszystkich unikalnych uczestników wyjazdów
-            $departureEmployees = collect();
-            foreach ($departures as $departure) {
-                foreach ($departure->participants as $participant) {
-                    if ($participant->employee && !$departureEmployees->contains('id', $participant->employee->id)) {
-                        $departureEmployees->push([
-                            'employee' => $participant->employee,
-                            'departure' => $departure,
-                        ]);
-                    }
-                }
-            }
-        @endphp
-        
-        @if($departureEmployees->isNotEmpty())
-            <div class="mt-4">
-                <x-ui.alert variant="warning" title="Przyjazdy w tym tygodniu">
-                    <p class="mb-3">Następujący pracownicy przyjeżdżają w tym tygodniu i wymagają przypisania do projektu, mieszkania lub auta:</p>
-                    <div class="row g-3">
-                        @foreach($departureEmployees as $departureEmployeeData)
-                            @php
-                                $employee = $departureEmployeeData['employee'];
-                                $departure = $departureEmployeeData['departure'];
-                            @endphp
-                            <div class="col-md-6 col-lg-4">
-                                <x-ui.card>
-                                    <div class="d-flex align-items-center gap-2 mb-2">
-                                        <x-employee-cell :employee="$employee" />
-                                    </div>
-                                    @if($employee->roles->count() > 0)
-                                        <div class="mb-2">
-                                            <div class="d-flex flex-wrap gap-1">
-                                                @foreach($employee->roles as $role)
-                                                    <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-                                    <div class="small mb-3">
-                                        <div class="text-muted mb-1">
-                                            <i class="bi bi-calendar-check text-success"></i> 
-                                            <strong>Data przybycia:</strong> {{ $departure->end_date?->format('d.m.Y') ?? 'Brak' }}
-                                        </div>
-                                        @if($departure->toLocation)
-                                            <div class="text-muted">
-                                                <i class="bi bi-geo-alt text-primary"></i> 
-                                                <strong>Lokalizacja:</strong> {{ $departure->toLocation->name }}
-                                            </div>
-                                        @endif
-                                    </div>
-                                    <!-- Wspólny formularz przypisania -->
-                                    @if(isset($allProjects) && $allProjects->isNotEmpty())
-                                        <div>
-                                            <h6 class="small fw-bold mb-2 text-white"><i class="bi bi-plus-circle"></i> Przypisz pracownika</h6>
-                                            <form method="POST" action="{{ route('bulk-assignments.store') }}" class="mb-0">
-                                                @csrf
-                                                <input type="hidden" name="employee_id" value="{{ $employee->id }}">
-                                                <input type="hidden" name="logistics_event_id" value="{{ $departure->id }}">
-                                                
-                                                <!-- Daty przypisania -->
-                                                <div class="alert alert-info small mb-2 p-2">
-                                                    <i class="bi bi-info-circle"></i> <strong>Przypisanie kompleksowe:</strong> Każdy przyjazd wymaga przypisania projektu, pojazdu i zakwaterowania.
-                                                    Możesz ustawić różne daty dla każdego z nich. Np. przyjazd w sobotę (auto+dom), praca od poniedziałku.
-                                                </div>
-                                                
-                                                <!-- Projekt (wymagany) -->
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1 fw-bold">
-                                                        <i class="bi bi-briefcase"></i> Projekt <span class="text-danger">*</span>
-                                                    </label>
-                                                    <select name="project_id" required class="form-select form-select">
-                                                        <option value="">Wybierz projekt</option>
-                                                        @foreach($allProjects as $project)
-                                                            <option value="{{ $project->id }}">{{ $project->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                                
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Rola <span class="text-danger">*</span></label>
-                                                    <select name="role_id" required class="form-select form-select">
-                                                        <option value="">Wybierz rolę</option>
-                                                        @foreach($roles as $role)
-                                                            <option value="{{ $role->id }}">{{ $role->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                                
-                                                <div class="row g-2 mb-2">
-                                                    <div class="col-6">
-                                                        <label class="form-label small mb-1">Projekt: Od <span class="text-danger">*</span></label>
-                                                        <input type="date" name="project_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date?->format('Y-m-d') ?? $weeks[0]['start']->format('Y-m-d') }}">
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="form-label small mb-1">Projekt: Do <span class="text-danger">*</span></label>
-                                                        <input type="date" name="project_end_date" required class="form-control form-control-sm" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
-                                                    </div>
-                                                </div>
-                                                
-                                                <hr class="my-2">
-                                                
-                                                <!-- Auto (wymagane) -->
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1 fw-bold">
-                                                        <i class="bi bi-truck"></i> Pojazd <span class="text-danger">*</span>
-                                                    </label>
-                                                    <select name="vehicle_id" required class="form-select">
-                                                        <option value="">Wybierz pojazd</option>
-                                                        @foreach($vehicles as $vehicle)
-                                                            <option value="{{ $vehicle->id }}">{{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                                
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1">Pozycja <span class="text-danger">*</span></label>
-                                                    <select name="position" required class="form-select">
-                                                        <option value="passenger">Pasażer</option>
-                                                        <option value="driver">Kierowca</option>
-                                                    </select>
-                                                </div>
-                                                
-                                                <div class="row g-2 mb-2">
-                                                    <div class="col-6">
-                                                        <label class="form-label small mb-1">Pojazd: Od <span class="text-danger">*</span></label>
-                                                        <input type="date" name="vehicle_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date?->format('Y-m-d') ?? $weeks[0]['start']->format('Y-m-d') }}">
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="form-label small mb-1">Pojazd: Do <span class="text-danger">*</span></label>
-                                                        <input type="date" name="vehicle_end_date" required class="form-control form-control-sm" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
-                                                    </div>
-                                                </div>
-                                                
-                                                <hr class="my-2">
-                                                
-                                                <!-- Zakwaterowanie (wymagane) -->
-                                                <div class="mb-2">
-                                                    <label class="form-label small mb-1 fw-bold">
-                                                        <i class="bi bi-house"></i> Zakwaterowanie <span class="text-danger">*</span>
-                                                    </label>
-                                                    <select name="accommodation_id" required class="form-select">
-                                                        <option value="">Wybierz zakwaterowanie</option>
-                                                        @foreach($accommodations as $accommodation)
-                                                            <option value="{{ $accommodation->id }}">{{ $accommodation->name }} ({{ $accommodation->capacity }} miejsc)</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                                
-                                                <div class="row g-2 mb-2">
-                                                    <div class="col-6">
-                                                        <label class="form-label small mb-1">Zakwaterowanie: Od <span class="text-danger">*</span></label>
-                                                        <input type="date" name="accommodation_start_date" required class="form-control form-control-sm" value="{{ $departure->end_date?->format('Y-m-d') ?? $weeks[0]['start']->format('Y-m-d') }}">
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="form-label small mb-1">Zakwaterowanie: Do <span class="text-danger">*</span></label>
-                                                        <input type="date" name="accommodation_end_date" required class="form-control form-control-sm" value="{{ $weeks[0]['end']->format('Y-m-d') }}">
-                                                    </div>
-                                                </div>
-                                                
-                                                <!-- Jeden guzik zapisz -->
-                                                <x-ui.button variant="success" size="sm" type="submit" class="w-100 mt-2">
-                                                    <i class="bi bi-save"></i> Zapisz wszystkie przypisania
-                                                </x-ui.button>
-                                            </form>
-                                        </div>
-                                    @endif
-                                </x-ui.card>
-                            </div>
-                        @endforeach
-                    </div>
-                </x-ui.alert>
-            </div>
-        @endif
     @endif
 
     @push('scripts')

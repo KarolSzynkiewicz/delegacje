@@ -52,5 +52,25 @@ class AppServiceProvider extends ServiceProvider
             'logistics_event' => \App\Models\LogisticsEvent::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
+
+        // Register automatic outside_base flag updates
+        // Note: syncOutsideBaseFlag in LocationTrackingService already handles this lazily,
+        // but we can optionally add eager updates here for better performance
+        
+        // Clear location cache when assignments change
+        \App\Models\ProjectAssignment::saved(function ($assignment) {
+            \Illuminate\Support\Facades\Cache::forget("employee_location_status_{$assignment->employee_id}_" . now()->format('Y-m-d'));
+        });
+        
+        \App\Models\AccommodationAssignment::saved(function ($assignment) {
+            \Illuminate\Support\Facades\Cache::forget("employee_location_status_{$assignment->employee_id}_" . now()->format('Y-m-d'));
+        });
+        
+        \App\Models\LogisticsEvent::saved(function ($event) {
+            // Clear cache for all participants
+            foreach ($event->participants as $participant) {
+                \Illuminate\Support\Facades\Cache::forget("employee_location_status_{$participant->employee_id}_*");
+            }
+        });
     }
 }

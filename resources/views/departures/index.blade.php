@@ -20,6 +20,7 @@
                 <thead>
                     <tr>
                         <th class="text-start">Data wyjazdu</th>
+                        <th class="text-start">Data dojazdu</th>
                         <th class="text-start">Z</th>
                         <th class="text-start">Do</th>
                         <th class="text-start">Pojazd</th>
@@ -31,7 +32,14 @@
                 <tbody>
                     @forelse ($departures as $departure)
                         <tr>
-                            <td>{{ $departure->event_date->format('Y-m-d H:i') }}</td>
+                            <td>{{ $departure->event_date->format('d.m.Y') }}</td>
+                            <td>
+                                @if($departure->end_date)
+                                    {{ $departure->end_date->format('d.m.Y') }}
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
                             <td>{{ $departure->fromLocation->name }}</td>
                             <td>{{ $departure->toLocation->name }}</td>
                             <td>
@@ -72,7 +80,7 @@
                             icon="airplane"
                             message="Brak wyjazdów"
                             :in-table="true"
-                            colspan="7"
+                            colspan="8"
                         />
                     @endforelse
                 </tbody>

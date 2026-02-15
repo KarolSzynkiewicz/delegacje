@@ -23,7 +23,18 @@ class Employee extends Model
         'email',
         'phone',
         'notes',
-        'image_path'
+        'image_path',
+        'outside_base',
+        'last_departure_id',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'outside_base' => 'boolean',
     ];
 
     /**
@@ -174,6 +185,14 @@ class Employee extends Model
     public function getCurrentLocation(): ?Location
     {
         return app(\App\Services\LocationTrackingService::class)->forEmployee($this);
+    }
+
+    /**
+     * Get the last departure event that set outside_base flag.
+     */
+    public function lastDeparture(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsEvent::class, 'last_departure_id');
     }
 
     /**

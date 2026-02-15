@@ -199,6 +199,14 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('departures.prepare-cancellation')
             ->defaults('resource', 'departures');
         
+        // Two-step departure creation with bulk assignments
+        Route::post('departures/prepare-bulk-assignment', [\App\Http\Controllers\DepartureController::class, 'prepareBulkAssignment'])
+            ->name('departures.prepare-bulk-assignment')
+            ->defaults('resource', 'departures');
+        Route::post('departures/store-with-assignments', [\App\Http\Controllers\DepartureController::class, 'storeWithAssignments'])
+            ->name('departures.store-with-assignments')
+            ->defaults('resource', 'departures');
+        
         // Equipment Issues Actions
         Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])
             ->name('equipment-issues.return')

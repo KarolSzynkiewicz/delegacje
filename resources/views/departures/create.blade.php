@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Utwórz Wyjazd">
+        <x-ui.page-header title="Utwórz Wyjazd (Krok 1/2)">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -27,10 +27,10 @@
                 </x-ui.alert>
             @endif
 
-            <x-ui.card label="Utwórz Nowy Wyjazd">
+            <x-ui.card label="Krok 1: Wybierz uczestników i podstawowe informacje">
                 <x-ui.errors />
 
-                <form method="POST" action="{{ route('departures.store') }}">
+                <form method="POST" action="{{ route('departures.prepare-bulk-assignment') }}">
                     @csrf
 
                     <div class="mb-3">
@@ -92,7 +92,7 @@
                             type="submit"
                             action="save"
                         >
-                            Utwórz Wyjazd
+                            Dalej → Przypisz do projektów (Krok 2/2)
                         </x-ui.button>
                     </div>
                 </form>

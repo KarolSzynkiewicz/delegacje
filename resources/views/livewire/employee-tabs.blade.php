@@ -55,35 +55,54 @@
                             <p>
                                 @php
                                     $locationTracker = app(\App\Services\LocationTrackingService::class);
-                                    $currentLocation = $locationTracker->forEmployee($employee);
+                                    $locationStatus = $locationTracker->getLocationStatus($employee, now());
                                     $currentProjects = $employee->current_projects;
                                     $projectsList = $currentProjects->pluck('name')->join(', ');
-                                    
-                                    // Check if in transit
-                                    $inTransit = \App\Models\LogisticsEvent::isEmployeeInTransit($employee, now());
                                 @endphp
                                 
-                                @if($inTransit)
+                                @if($locationStatus['in_transit'])
                                     <x-tooltip title="Pracownik jest w trakcie wyjazdu/powrotu">
-                                        <x-ui.badge variant="warning">✈️ W podróży</x-ui.badge>
+                                        <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
                                     </x-tooltip>
-                                @elseif(!$currentLocation)
-                                    <x-tooltip title="Pracownik nie ma przypisanej lokalizacji">
-                                        <x-ui.badge variant="accent">❓ Brak lokalizacji</x-ui.badge>
+                                @elseif(!$locationStatus['outside_base'])
+                                    <x-tooltip title="Pracownik jest w bazie">
+                                        <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
                                     </x-tooltip>
-                                @elseif($currentLocation->is_base)
-                                    <x-tooltip title="Pracownik jest w bazie: {{ $currentLocation->name }}">
-                                        <x-ui.badge variant="success">🏠 {{ $currentLocation->name }}</x-ui.badge>
-                                    </x-tooltip>
-                                @else
-                                    <x-tooltip title="{{ $projectsList ? 'Przypisany do: ' . $projectsList . ' w lokalizacji ' . $currentLocation->name : 'W lokalizacji: ' . $currentLocation->name }}">
-                                        <x-ui.badge variant="info">🏢 {{ $currentLocation->name }}</x-ui.badge>
+                                @elseif($locationStatus['accommodation_location'] && $locationStatus['project_location'])
+                                    @php
+                                        $accomName = $locationStatus['accommodation_location']->name;
+                                        $projName = $locationStatus['project_location']->name;
+                                    @endphp
+                                    <x-tooltip title="Mieszka: {{ $accomName }}, Pracuje: {{ $projName }}{{ $projectsList ? ' (' . $projectsList . ')' : '' }}">
+                                        @if($accomName === $projName)
+                                            <x-ui.badge variant="info">🏡🏢 {{ $accomName }}</x-ui.badge>
+                                        @else
+                                            <x-ui.badge variant="info">🏡 {{ $accomName }}</x-ui.badge>
+                                            <x-ui.badge variant="info">🏢 {{ $projName }}</x-ui.badge>
+                                        @endif
                                     </x-tooltip>
                                     @if($projectsList)
                                         <div class="small text-muted mt-1">
                                             Projekt: {{ $projectsList }}
                                         </div>
                                     @endif
+                                @elseif($locationStatus['accommodation_location'])
+                                    <x-tooltip title="Mieszka w: {{ $locationStatus['accommodation_location']->name }}">
+                                        <x-ui.badge variant="info">🏡 {{ $locationStatus['accommodation_location']->name }}</x-ui.badge>
+                                    </x-tooltip>
+                                @elseif($locationStatus['project_location'])
+                                    <x-tooltip title="{{ $projectsList ? 'Projekt: ' . $projectsList . ' w ' . $locationStatus['project_location']->name : 'Pracuje w: ' . $locationStatus['project_location']->name }}">
+                                        <x-ui.badge variant="info">🏢 {{ $locationStatus['project_location']->name }}</x-ui.badge>
+                                    </x-tooltip>
+                                    @if($projectsList)
+                                        <div class="small text-muted mt-1">
+                                            Projekt: {{ $projectsList }}
+                                        </div>
+                                    @endif
+                                @else
+                                    <x-tooltip title="Pracownik jest poza bazą, oczekuje na przypisania">
+                                        <x-ui.badge variant="accent">⏳ Poza bazą</x-ui.badge>
+                                    </x-tooltip>
                                 @endif
                             </p>
                         </div>

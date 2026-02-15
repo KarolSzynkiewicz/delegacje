@@ -43,19 +43,23 @@ class WeeklyOverviewController extends Controller
         $users = \App\Models\User::orderBy('name')->get();
         
         // Get return trips (zjazdy) for the week (exclude CANCELLED)
+        // Use end_date (arrival date) instead of event_date (departure date)
         $weekStart = $weeks[0]['start'];
         $weekEnd = $weeks[0]['end'];
         $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->with(['participants.employee', 'vehicle'])
-            ->orderBy('event_date')
+            ->orderBy('end_date')
             ->get();
         
-        // Get ALL departures for the week (exclude CANCELLED) - for alerts section
+        // Get ALL departures for the week (exclude CANCELLED) - for arrivals section
+        // Use end_date (arrival date) to show arrivals in the correct week
         $allDepartures = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::DEPARTURE)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->with([
                 'participants.employee.projectAssignments' => function($query) {
                     $query->where('is_cancelled', false)
@@ -64,7 +68,7 @@ class WeeklyOverviewController extends Controller
                 'vehicle', 
                 'toLocation'
             ])
-            ->orderBy('event_date')
+            ->orderBy('end_date')
             ->get();
         
         // Filter departures to show only those with unassigned participants
@@ -95,12 +99,7 @@ class WeeklyOverviewController extends Controller
         // Get expiring documents, vehicle inspections, and leases for this month
         $expiringItems = $this->expiringDocumentsService->getExpiringThisMonth();
         
-        // Get roles, vehicles and accommodations for inline forms
-        $roles = \App\Models\Role::orderBy('name')->get();
-        $vehicles = \App\Models\Vehicle::orderBy('registration_number')->get();
-        $accommodations = \App\Models\Accommodation::orderBy('name')->get();
-        
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'expiringItems', 'roles', 'vehicles', 'accommodations'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'expiringItems'));
     }
 
     /**

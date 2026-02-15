@@ -15,6 +15,7 @@ class EmployeesTable extends Component
     public $roleFilter = '';
     public $locationFilter = '';
     public $rotationFilter = '';
+    public $statusDate = ''; // Nowy filtr daty
     public $sortField = 'last_name';
     public $sortDirection = 'asc';
     
@@ -27,6 +28,7 @@ class EmployeesTable extends Component
         'roleFilter' => ['except' => ''],
         'locationFilter' => ['except' => ''],
         'rotationFilter' => ['except' => ''],
+        'statusDate' => ['except' => ''],
         'sortField' => ['except' => 'last_name'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -51,12 +53,18 @@ class EmployeesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingStatusDate()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->search = '';
         $this->roleFilter = '';
         $this->locationFilter = '';
         $this->rotationFilter = '';
+        $this->statusDate = '';
         $this->sortField = 'last_name';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -112,25 +120,27 @@ class EmployeesTable extends Component
             $query->orderBy($this->sortField, $this->sortDirection);
         }
 
+        // Determine date for status check
+        $checkDate = $this->statusDate ? \Carbon\Carbon::parse($this->statusDate) : now();
+
         // Get base query results (without location/rotation filters)
         if ($this->locationFilter || $this->rotationFilter) {
             // For these filters, we need to get all employees first, then filter
             $allEmployees = $query->get();
             $locationTracker = app(\App\Services\LocationTrackingService::class);
-            $today = now();
             
-            $filteredEmployees = $allEmployees->filter(function ($employee) use ($locationTracker, $today) {
-                // Location filter
+            $filteredEmployees = $allEmployees->filter(function ($employee) use ($locationTracker, $checkDate) {
+                // Location filter using new model
                 if ($this->locationFilter) {
-                    $location = $locationTracker->forEmployeeOnDate($employee, $today);
+                    $status = $locationTracker->getLocationStatus($employee, $checkDate);
                     
                     $locationMatch = false;
                     if ($this->locationFilter === 'base') {
-                        $locationMatch = $location instanceof \App\Models\Location && $location->is_base;
+                        $locationMatch = !$status['outside_base'];
                     } elseif ($this->locationFilter === 'transit') {
-                        $locationMatch = $location === "W PODRÓŻY";
+                        $locationMatch = $status['in_transit'];
                     } elseif ($this->locationFilter === 'field') {
-                        $locationMatch = $location instanceof \App\Models\Location && !$location->is_base;
+                        $locationMatch = $status['outside_base'] && !$status['in_transit'];
                     }
                     
                     if (!$locationMatch) {
@@ -141,7 +151,7 @@ class EmployeesTable extends Component
                 // Rotation filter
                 if ($this->rotationFilter) {
                     // Check loaded rotations collection for active rotation
-                    $hasActiveRotation = $employee->rotations->filter(function($rotation) use ($today) {
+                    $hasActiveRotation = $employee->rotations->filter(function($rotation) use ($checkDate) {
                         $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
                         $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
                         
@@ -149,8 +159,8 @@ class EmployeesTable extends Component
                             return false;
                         }
                         
-                        return $startDate->lte($today) 
-                            && ($endDate === null || $endDate->gte($today));
+                        return $startDate->lte($checkDate) 
+                            && ($endDate === null || $endDate->gte($checkDate));
                     })->isNotEmpty();
                     
                     $rotationMatch = false;
@@ -190,6 +200,7 @@ class EmployeesTable extends Component
             'employees' => $employees,
             'roles' => $roles,
             'filterProjectIds' => $this->filterProjectIds,
+            'checkDate' => $checkDate, // Przekaż datę do widoku
         ]);
     }
 }

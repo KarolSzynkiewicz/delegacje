@@ -9,7 +9,9 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\LogisticsEvent;
+use App\Enums\LogisticsEventType;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 /**
  * Service for tracking current location of employees, vehicles, and assignments.
@@ -21,54 +23,173 @@ use Illuminate\Support\Facades\Cache;
  * - Multiple calls with same data → same result
  * - No heuristics dependent on if-order
  * 
- * Priority rules for employee location (all based on date ranges):
- * 1. VehicleAssignment that is currently active → vehicle's current_location_id
- * 2. AccommodationAssignment that is currently active → accommodation's location_id
- * 3. ProjectAssignment that is currently active → project's location_id
- * 4. No active assignments → base (Location::getBase())
+ * NEW MODEL (2026-02-15):
+ * Employee location is determined by:
+ * 1. in_transit (LogisticsEvent between event_date and end_date)
+ * 2. accommodation_location (AccommodationAssignment active on date)
+ * 3. project_location (ProjectAssignment active on date)
+ * 4. outside_base flag (Employee.outside_base)
  * 
- * In case of conflicts (e.g., active project + active vehicle):
- * Priority: VehicleAssignment > AccommodationAssignment > ProjectAssignment
+ * Function getLocationStatus() returns all 4 pieces of information.
  */
 class LocationTrackingService
 {
     /**
-     * Get the current location of an employee.
+     * Get complete location status for employee on specific date.
      * 
-     * DETERMINISTIC: Same employee state → always same location
-     * IDEMPOTENT: Multiple calls → same result
+     * Returns array with:
+     * - accommodation_location: Location|null (where employee lives during project)
+     * - project_location: Location|null (where employee works)
+     * - in_transit: bool (is traveling between locations)
+     * - outside_base: bool (is outside base location)
      * 
      * @param Employee $employee
-     * @return Location|null
+     * @param Carbon $date
+     * @return array
      */
-    public function forEmployee(Employee $employee): ?Location
+    public function getLocationStatus(Employee $employee, Carbon $date): array
     {
         return Cache::remember(
-            "employee_location_{$employee->id}",
+            "employee_location_status_{$employee->id}_{$date->format('Y-m-d')}",
             now()->addMinutes(5),
-            fn() => $this->calculateEmployeeLocation($employee)
+            fn() => $this->calculateLocationStatus($employee, $date)
         );
     }
 
     /**
-     * Get the location of an employee on a specific date.
-     * 
-     * Returns:
-     * - Location object if employee has active assignment or is at home
-     * - "W PODRÓŻY" string if employee is traveling (between departure and arrival)
+     * Calculate location status for employee on date.
      * 
      * @param Employee $employee
-     * @param \Carbon\Carbon $date
-     * @return Location|string|null
+     * @param Carbon $date
+     * @return array
      */
-    public function forEmployeeOnDate(Employee $employee, \Carbon\Carbon $date): Location|string|null
+    protected function calculateLocationStatus(Employee $employee, Carbon $date): array
     {
-        // Check if employee is in transit using scope
-        if (LogisticsEvent::isEmployeeInTransit($employee, $date)) {
-            return "W PODRÓŻY";
-        }
+        // 1. Sync outside_base flag (ensure it's current)
+        $this->syncOutsideBaseFlag($employee, $date);
+        
+        // 2. Check if in transit
+        $inTransit = LogisticsEvent::isEmployeeInTransit($employee, $date);
+        
+        // 3. Get accommodation location
+        $accommodationLocation = $this->getAccommodationLocationOnDate($employee, $date);
+        
+        // 4. Get project location
+        $projectLocation = $this->getProjectLocationOnDate($employee, $date);
+        
+        return [
+            'accommodation_location' => $accommodationLocation,
+            'project_location' => $projectLocation,
+            'in_transit' => $inTransit,
+            'outside_base' => (bool) $employee->outside_base,
+        ];
+    }
 
-        // Check for project assignment on that date
+    /**
+     * Sync outside_base flag based on logistics events and assignments.
+     * Ensures flag is always accurate for given date.
+     * 
+     * @param Employee $employee
+     * @param Carbon $date
+     * @return void
+     */
+    protected function syncOutsideBaseFlag(Employee $employee, Carbon $date): void
+    {
+        $shouldBeOutside = false;
+        
+        // Check last logistics event up to this date
+        $lastEvent = LogisticsEvent::whereHas('participants', 
+            fn($q) => $q->where('employee_id', $employee->id)
+        )
+        ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN])
+        ->where(function($q) use ($date) {
+            // Events that started or ended by this date
+            $q->where('event_date', '<=', $date)
+              ->orWhere('end_date', '<=', $date);
+        })
+        ->orderBy('event_date', 'desc')
+        ->orderBy('end_date', 'desc')
+        ->first();
+        
+        if ($lastEvent) {
+            // DEPARTURE event_date <= date → outside_base = true
+            if ($lastEvent->type === LogisticsEventType::DEPARTURE && 
+                $lastEvent->event_date->lte($date)) {
+                $shouldBeOutside = true;
+            }
+            
+            // RETURN end_date <= date → outside_base = false
+            // (Return overrides departure)
+            if ($lastEvent->type === LogisticsEventType::RETURN && 
+                $lastEvent->end_date && 
+                $lastEvent->end_date->lte($date)) {
+                $shouldBeOutside = false;
+            }
+        }
+        
+        // Check active assignments (can force outside_base = true)
+        if (!$shouldBeOutside) {
+            $hasActiveProject = $employee->assignments()
+                ->where('is_cancelled', false)
+                ->where('start_date', '<=', $date)
+                ->where(function ($q) use ($date) {
+                    $q->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $date);
+                })
+                ->exists();
+            
+            if (!$hasActiveProject) {
+                $hasActiveAccommodation = $employee->accommodationAssignments()
+                    ->where('start_date', '<=', $date)
+                    ->where(function ($q) use ($date) {
+                        $q->whereNull('end_date')
+                          ->orWhere('end_date', '>=', $date);
+                    })
+                    ->exists();
+                
+                $shouldBeOutside = $hasActiveAccommodation;
+            } else {
+                $shouldBeOutside = true;
+            }
+        }
+        
+        // Update flag if changed (quietly - no events)
+        if ($employee->outside_base !== $shouldBeOutside) {
+            $employee->outside_base = $shouldBeOutside;
+            $employee->saveQuietly();
+        }
+    }
+
+    /**
+     * Get accommodation location on specific date.
+     * 
+     * @param Employee $employee
+     * @param Carbon $date
+     * @return Location|null
+     */
+    protected function getAccommodationLocationOnDate(Employee $employee, Carbon $date): ?Location
+    {
+        $accommodationAssignment = $employee->accommodationAssignments()
+            ->where('start_date', '<=', $date)
+            ->where(function ($q) use ($date) {
+                $q->whereNull('end_date')
+                  ->orWhere('end_date', '>=', $date);
+            })
+            ->with('accommodation.location')
+            ->first();
+        
+        return $accommodationAssignment?->accommodation?->location;
+    }
+
+    /**
+     * Get project location on specific date.
+     * 
+     * @param Employee $employee
+     * @param Carbon $date
+     * @return Location|null
+     */
+    protected function getProjectLocationOnDate(Employee $employee, Carbon $date): ?Location
+    {
         $projectAssignment = $employee->assignments()
             ->where('is_cancelled', false)
             ->where('start_date', '<=', $date)
@@ -78,13 +199,83 @@ class LocationTrackingService
             })
             ->with('project.location')
             ->first();
-
-        if ($projectAssignment && $projectAssignment->project?->location) {
-            return $projectAssignment->project->location;
+        
+        return $projectAssignment?->project?->location;
+    }
+    /**
+     * Get the current location of an employee.
+     * 
+     * DEPRECATED: Use getLocationStatus() for full context.
+     * This method returns simplified location for backward compatibility.
+     * 
+     * Priority:
+     * 1. In transit → null (can't determine single location)
+     * 2. Accommodation → accommodation.location
+     * 3. Project → project.location
+     * 4. Base
+     * 
+     * @param Employee $employee
+     * @return Location|null
+     */
+    public function forEmployee(Employee $employee): ?Location
+    {
+        $status = $this->getLocationStatus($employee, now());
+        
+        // Priority: accommodation > project > base
+        if ($status['accommodation_location']) {
+            return $status['accommodation_location'];
         }
+        
+        if ($status['project_location']) {
+            return $status['project_location'];
+        }
+        
+        if (!$status['outside_base']) {
+            return Location::getBase();
+        }
+        
+        // Outside base but no assignments yet
+        return null;
+    }
 
-        // No assignment - employee is at home/base
-        return Location::getBase();
+    /**
+     * Get the location of an employee on a specific date.
+     * 
+     * DEPRECATED: Use getLocationStatus() for full context.
+     * 
+     * Returns:
+     * - Location object if employee has active assignment or is at base
+     * - "W PODRÓŻY" string if employee is traveling (between departure and arrival)
+     * - null if outside base without assignments
+     * 
+     * @param Employee $employee
+     * @param \Carbon\Carbon $date
+     * @return Location|string|null
+     */
+    public function forEmployeeOnDate(Employee $employee, \Carbon\Carbon $date): Location|string|null
+    {
+        $status = $this->getLocationStatus($employee, $date);
+        
+        // In transit
+        if ($status['in_transit']) {
+            return "W PODRÓŻY";
+        }
+        
+        // Priority: accommodation > project > base
+        if ($status['accommodation_location']) {
+            return $status['accommodation_location'];
+        }
+        
+        if ($status['project_location']) {
+            return $status['project_location'];
+        }
+        
+        if (!$status['outside_base']) {
+            return Location::getBase();
+        }
+        
+        // Outside base but no assignments yet
+        return null;
     }
 
     /**
@@ -95,108 +286,12 @@ class LocationTrackingService
      */
     public function forVehicle(Vehicle $vehicle): ?Location
     {
-        return Cache::remember(
-            "vehicle_location_{$vehicle->id}",
-            now()->addMinutes(5),
-            fn() => $this->calculateVehicleLocation($vehicle)
-        );
-    }
-
-    /**
-     * Get the location for a specific assignment.
-     * 
-     * @param ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment
-     * @return Location|null
-     */
-    public function forAssignment(ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment): ?Location
-    {
-        // ProjectAssignment → project's location
-        if ($assignment instanceof ProjectAssignment) {
-            return $assignment->project?->location;
-        }
-
-        // VehicleAssignment → vehicle's current_location_id (if currently active)
-        if ($assignment instanceof VehicleAssignment) {
-            if ($assignment->isCurrentlyActive()) {
-                return $assignment->vehicle?->currentLocation;
-            }
-        }
-
-        // AccommodationAssignment → accommodation's location_id
-        if ($assignment instanceof AccommodationAssignment) {
-            return $assignment->accommodation?->location;
-        }
-
-        return null;
-    }
-
-    /**
-     * Calculate employee location based on priority rules.
-     * 
-     * PRIORITY ORDER (strict, no heuristics):
-     * 1. VehicleAssignment IN_TRANSIT → vehicle location
-     * 2. AccommodationAssignment ACTIVE → accommodation location
-     * 3. ProjectAssignment ACTIVE → project location
-     * 4. Default → base
-     * 
-     * @param Employee $employee
-     * @return Location|null
-     */
-    private function calculateEmployeeLocation(Employee $employee): ?Location
-    {
-        // Priority 1: VehicleAssignment that is currently active
-        // Note: Status-based filtering removed - we use date-based filtering only
-        $vehicleAssignment = $employee->vehicleAssignments()
-            ->where('start_date', '<=', now())
-            ->where(function ($q) {
-                $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now());
-            })
-            ->with('vehicle.currentLocation')
-            ->first();
-
-        if ($vehicleAssignment && $vehicleAssignment->vehicle?->currentLocation) {
-            return $vehicleAssignment->vehicle->currentLocation;
-        }
-
-        // Priority 2: AccommodationAssignment that is currently active (date-based)
-        $accommodationAssignment = $employee->accommodationAssignments()
-            ->active()
-            ->with('accommodation.location')
-            ->first();
-
-        if ($accommodationAssignment && $accommodationAssignment->accommodation?->location) {
-            return $accommodationAssignment->accommodation->location;
-        }
-
-        // Priority 3: ProjectAssignment that is currently active (date-based)
-        $projectAssignment = $employee->assignments()
-            ->active()
-            ->with('project.location')
-            ->first();
-
-        if ($projectAssignment && $projectAssignment->project?->location) {
-            return $projectAssignment->project->location;
-        }
-
-        // Priority 4: Default → base
-        return Location::getBase();
-    }
-
-    /**
-     * Calculate vehicle location.
-     * 
-     * @param Vehicle $vehicle
-     * @return Location|null
-     */
-    private function calculateVehicleLocation(Vehicle $vehicle): ?Location
-    {
         // If vehicle has current_location_id, use it
         if ($vehicle->current_location_id) {
             return $vehicle->currentLocation;
         }
 
-        // Otherwise, check active assignment and infer location
+        // Otherwise, check active assignment and infer location from employee
         $activeAssignment = $vehicle->assignments()
             ->active()
             ->where(function ($q) {

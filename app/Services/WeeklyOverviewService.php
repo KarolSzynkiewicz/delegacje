@@ -374,10 +374,12 @@ class WeeklyOverviewService
             ->groupBy('vehicle_id');
         
         // Get return trips (zjazdy) for these vehicles in this week (exclude CANCELLED)
+        // Use end_date (arrival date) instead of event_date (departure date)
         $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
             ->whereIn('vehicle_id', $vehicleIds)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->with(['participants.employee', 'vehicle'])
             ->get()
             ->groupBy('vehicle_id');
@@ -483,9 +485,11 @@ class WeeklyOverviewService
             ->groupBy('employee_id');
         
         // Get return trips for employees in this week to check if they're returning (exclude CANCELLED)
+        // Use end_date (arrival date) instead of event_date (departure date)
         $returnTripsForEmployees = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->whereHas('participants', function ($q) use ($employeeIds) {
                 $q->whereIn('employee_id', $employeeIds);
             })
@@ -663,9 +667,11 @@ class WeeklyOverviewService
         $employeeIds = $assignments->pluck('employee_id')->unique();
         
         // Get return trips for employees in this week (exclude CANCELLED)
+        // Use end_date (arrival date) instead of event_date (departure date)
         $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->whereHas('participants', function ($q) use ($employeeIds) {
                 $q->whereIn('employee_id', $employeeIds);
             })
@@ -677,11 +683,12 @@ class WeeklyOverviewService
         foreach ($returnTrips as $returnTrip) {
             foreach ($returnTrip->participants as $participant) {
                 $employeeId = $participant->employee_id;
-                $eventDate = $returnTrip->event_date->format('Y-m-d');
+                // Use end_date (arrival date) instead of event_date (departure date)
+                $arrivalDate = $returnTrip->end_date ? $returnTrip->end_date->format('Y-m-d') : $returnTrip->event_date->format('Y-m-d');
                 if (!$returnTripsByEmployeeAndDate->has($employeeId)) {
                     $returnTripsByEmployeeAndDate->put($employeeId, collect());
                 }
-                $returnTripsByEmployeeAndDate->get($employeeId)->put($eventDate, $returnTrip);
+                $returnTripsByEmployeeAndDate->get($employeeId)->put($arrivalDate, $returnTrip);
             }
         }
         
