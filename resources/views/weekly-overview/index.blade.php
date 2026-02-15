@@ -66,99 +66,6 @@
         </x-ui.button>
     </div>
 
-    <!-- Sekcja: Wyjazdy wymagające przypisań (legacy - stare wyjazdy bez przypisań) -->
-    @if(isset($allDepartures) && $allDepartures->isNotEmpty())
-        @php
-            $locationTracker = app(\App\Services\LocationTrackingService::class);
-            
-            // Zbierz pracowników bez przypisań
-            $employeesNeedingAssignments = collect();
-            foreach ($allDepartures as $departure) {
-                $arrivalDate = $departure->end_date;
-                
-                if ($arrivalDate) {
-                    foreach ($departure->participants as $participant) {
-                        if ($participant->employee) {
-                            $locationStatus = $locationTracker->getLocationStatus($participant->employee, $arrivalDate);
-                            
-                            // Jeśli nie ma lokalizacji projektu
-                            if (!$locationStatus['project_location']) {
-                                $key = $participant->employee->id . '_' . $departure->id;
-                                if (!$employeesNeedingAssignments->has($key)) {
-                                    $employeesNeedingAssignments->put($key, [
-                                        'employee' => $participant->employee,
-                                        'departure' => $departure,
-                                        'arrival_date' => $arrivalDate,
-                                    ]);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        @endphp
-        
-        @if($employeesNeedingAssignments->isNotEmpty())
-            <div class="mb-4">
-                <x-ui.alert variant="danger" title="⚠️ Wyjazdy bez przypisań">
-                    <p class="mb-3">
-                        <strong>Uwaga!</strong> Następujący pracownicy mają wyjazdy, ale brak im przypisań do projektu/domu/auta.
-                        To prawdopodobnie stare wyjazdy utworzone przed implementacją dwuetapowego formularza.
-                    </p>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Pracownik</th>
-                                    <th>Wyjazd</th>
-                                    <th>Data przybycia</th>
-                                    <th>Lokalizacja</th>
-                                    <th>Akcje</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($employeesNeedingAssignments as $data)
-                                    <tr>
-                                        <td>
-                                            <x-employee-cell :employee="$data['employee']" />
-                                        </td>
-                                        <td>
-                                            <a href="{{ route('departures.show', $data['departure']) }}" class="text-decoration-none">
-                                                Wyjazd #{{ $data['departure']->id }}
-                                            </a>
-                                        </td>
-                                        <td>{{ $data['arrival_date']->format('d.m.Y') }}</td>
-                                        <td>{{ $data['departure']->toLocation->name }}</td>
-                                        <td>
-                                            <x-ui.button 
-                                                variant="primary" 
-                                                size="sm"
-                                                href="{{ route('project-assignments.create', [
-                                                    'employee_id' => $data['employee']->id,
-                                                    'start_date' => $data['arrival_date']->format('Y-m-d')
-                                                ]) }}"
-                                            >
-                                                Przypisz ręcznie
-                                            </x-ui.button>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="alert alert-info mt-3 mb-0">
-                        <i class="bi bi-info-circle"></i> 
-                        <strong>Wskazówka:</strong> To są stare wyjazdy bez przypisań. Nowe wyjazdy tworzone przez 
-                        <a href="{{ route('departures.create') }}" class="alert-link">formularz dwuetapowy</a> 
-                        automatycznie zawierają wszystkie przypisania.
-                    </div>
-                </x-ui.alert>
-            </div>
-        @endif
-    @endif
-
     <!-- Projekty -->
     @php
         // Pre-load all project assignments for all employees in vehicles/accommodations to avoid N+1 queries
@@ -722,7 +629,7 @@
                         $hasNadmiary = $summary->getTotalExcess() > 0 || $summary->getOvercrowdedAccommodations()->isNotEmpty() || $summary->getOvercrowdedVehicles()->isNotEmpty();
                     @endphp
                     
-                    @if($hasBraki || $hasNadmiary || ($returnTrips->isNotEmpty() ?? false) || (isset($allDepartures) && $allDepartures->isNotEmpty()))
+                    @if($hasBraki || $hasNadmiary || $returnTrips->isNotEmpty() || (isset($allDepartures) && $allDepartures->isNotEmpty()))
                         <x-ui.card label="Alerty" class="mt-4 mb-4">
                             <div class="row g-3">
                                 <!-- Kolumna 1: Braki -->
@@ -786,7 +693,7 @@
                                                 @foreach($returnTrips as $returnTrip)
                                                     <li class="mb-1">
                                                         <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none">
-                                                            <strong>{{ ($returnTrip->end_date ?? $returnTrip->event_date)->format('d.m.Y') }}</strong>
+                                                            <strong>{{ $returnTrip->event_date->format('d.m.Y') }}</strong>
                                                             @if($returnTrip->vehicle)
                                                                 - {{ $returnTrip->vehicle->registration_number }}
                                                             @endif

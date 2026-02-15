@@ -43,15 +43,14 @@ class WeeklyOverviewController extends Controller
         $users = \App\Models\User::orderBy('name')->get();
         
         // Get return trips (zjazdy) for the week (exclude CANCELLED)
-        // Use end_date (arrival date) instead of event_date (departure date)
+        // Use event_date (when return starts) - end_date may be NULL
         $weekStart = $weeks[0]['start'];
         $weekEnd = $weeks[0]['end'];
         $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->with(['participants.employee', 'vehicle'])
-            ->orderBy('end_date')
+            ->orderBy('event_date')
             ->get();
         
         // Get ALL departures for the week (exclude CANCELLED) - for arrivals section
