@@ -135,12 +135,29 @@
                             
                             <!-- Status (Baza/W podróży/Poza bazą) -->
                             <td class="text-center">
+                                @php
+                                    // Build detailed tooltip explaining the logic
+                                    $statusExplanation = '';
+                                    if($locationStatus['in_transit']) {
+                                        $statusExplanation = "🚗 W PODRÓŻY\n\nPracownik jest między datą wyjazdu a datą przyjazdu.\n\nLogika:\n1. Sprawdzamy aktywne wyjazdy (DEPARTURE) gdzie dzisiaj jest między event_date a end_date\n2. Status: W PODRÓŻY = tak";
+                                    } elseif(!$locationStatus['outside_base']) {
+                                        $statusExplanation = "🏠 W BAZIE\n\nPracownik jest w bazie firmy.\n\nLogika:\n1. Ostatni wyjazd (PLANNED/COMPLETED) został zakończony powrotem (RETURN)\n   LUB nie było żadnych aktywnych wyjazdów\n2. Brak aktywnych przypisań do projektów\n3. Brak aktywnych przypisań do domów\n\n❗ Anulowane wyjazdy (CANCELLED) są ignorowane";
+                                    } else {
+                                        $statusExplanation = "📍 POZA BAZĄ\n\nPracownik jest poza bazą na projekcie/w domu.\n\nLogika:\n1. Ostatni wyjazd (PLANNED/COMPLETED) nie został jeszcze zakończony powrotem\n   LUB\n2. Ma aktywne przypisanie do projektu\n   LUB\n3. Ma aktywne przypisanie do domu\n\n❗ Anulowane wyjazdy (CANCELLED) są ignorowane\n❗ Jeśli anulowano wyjazd i usunięto przypisania → status zmienia się na 'W bazie'";
+                                    }
+                                @endphp
                                 @if($locationStatus['in_transit'])
-                                    <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
+                                    <x-tooltip :title="$statusExplanation">
+                                        <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
+                                    </x-tooltip>
                                 @elseif(!$locationStatus['outside_base'])
-                                    <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
+                                    <x-tooltip :title="$statusExplanation">
+                                        <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
+                                    </x-tooltip>
                                 @else
-                                    <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
+                                    <x-tooltip :title="$statusExplanation">
+                                        <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
+                                    </x-tooltip>
                                 @endif
                             </td>
                             
