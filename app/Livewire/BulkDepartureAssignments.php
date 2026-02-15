@@ -8,7 +8,11 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\Vehicle;
 use App\Models\Accommodation;
+use App\Services\ProjectAssignmentService;
+use App\Services\VehicleAssignmentService;
+use App\Services\AccommodationAssignmentService;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class BulkDepartureAssignments extends Component
 {
@@ -24,6 +28,20 @@ class BulkDepartureAssignments extends Component
     
     public $assignments = [];
     public $validationErrors = [];
+    
+    protected $projectAssignmentService;
+    protected $vehicleAssignmentService;
+    protected $accommodationAssignmentService;
+    
+    public function boot(
+        ProjectAssignmentService $projectAssignmentService,
+        VehicleAssignmentService $vehicleAssignmentService,
+        AccommodationAssignmentService $accommodationAssignmentService
+    ) {
+        $this->projectAssignmentService = $projectAssignmentService;
+        $this->vehicleAssignmentService = $vehicleAssignmentService;
+        $this->accommodationAssignmentService = $accommodationAssignmentService;
+    }
     
     public function mount($employeeIds, $arrivalDate, $weekEnd, $projectIds, $roleIds, $vehicleIds, $accommodationIds)
     {
@@ -68,7 +86,7 @@ class BulkDepartureAssignments extends Component
         $this->validationErrors = [];
         
         // Load employees for validation
-        $employees = Employee::with('roles')->findMany($this->employeeIds);
+        $employees = Employee::with(['roles', 'rotations', 'employeeDocuments'])->findMany($this->employeeIds);
         
         // Track vehicle usage in this form (for driver conflicts)
         $vehicleDrivers = []; // [vehicle_id => [employee_id, ...]]
@@ -105,51 +123,117 @@ class BulkDepartureAssignments extends Component
             }
         }
         
-        // Second pass: validate each assignment
+        // Second pass: validate each assignment using proper services
         foreach ($employees as $employee) {
             $assignment = $this->assignments[$employee->id];
             $errors = [];
             
-            // Validate project
+            // ===== VALIDATE PROJECT ASSIGNMENT =====
             if (empty($assignment['project_id'])) {
                 $errors[] = "PROJEKT: Nie wybrano projektu";
             } elseif (empty($assignment['role_id'])) {
                 $errors[] = "PROJEKT: Nie wybrano roli";
             } else {
-                $role = Role::find($assignment['role_id']);
-                if ($role && !$employee->roles->contains('id', $role->id)) {
-                    $errors[] = "PROJEKT: Pracownik nie ma roli {$role->name}";
-                }
-                
-                $startDate = Carbon::parse($assignment['project_start_date']);
-                $endDate = Carbon::parse($assignment['project_end_date']);
-                
-                if ($endDate->lt($startDate)) {
-                    $errors[] = "PROJEKT: Data końca przed datą początku";
-                }
-                
-                // Check overlaps
-                $overlaps = $employee->assignments()
-                    ->where('is_cancelled', false)
-                    ->where(function($q) use ($startDate, $endDate) {
-                        $q->whereBetween('start_date', [$startDate, $endDate])
-                          ->orWhereBetween('end_date', [$startDate, $endDate])
-                          ->orWhere(function($q2) use ($startDate, $endDate) {
-                              $q2->where('start_date', '<=', $startDate)
-                                 ->where(function($q3) use ($endDate) {
-                                     $q3->whereNull('end_date')
-                                        ->orWhere('end_date', '>=', $endDate);
-                                 });
-                          });
-                    })
-                    ->exists();
-                
-                if ($overlaps) {
-                    $errors[] = "PROJEKT: Nakładające się przypisanie";
+                try {
+                    $project = Project::find($assignment['project_id']);
+                    $role = Role::find($assignment['role_id']);
+                    $startDate = Carbon::parse($assignment['project_start_date']);
+                    $endDate = Carbon::parse($assignment['project_end_date']);
+                    
+                    if ($endDate->lt($startDate)) {
+                        $errors[] = "PROJEKT: Data końca przed datą początku";
+                    }
+                    
+                    // Validate using ProjectAssignmentService (this includes ALL validations)
+                    // We use a try-catch to capture validation errors
+                    if ($project && $role) {
+                        // Check role
+                        if (!$employee->hasRole($role->id)) {
+                            $errors[] = "PROJEKT: Brak roli {$role->name}";
+                        }
+                        
+                        // Check rotation coverage
+                        if (!$employee->hasActiveRotationInDateRange($startDate, $endDate)) {
+                            $errors[] = "PROJEKT: Brak rotacji na cały okres";
+                        }
+                        
+                        // Check documents
+                        $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
+                        if ($hasIsRequiredColumn) {
+                            $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
+                            
+                            if ($requiredDocuments->isNotEmpty()) {
+                                $missingDocuments = [];
+                                
+                                foreach ($requiredDocuments as $document) {
+                                    $hasActiveDocument = $employee->employeeDocuments()
+                                        ->where('document_id', $document->id)
+                                        ->where(function ($q) use ($startDate, $endDate) {
+                                            $q->where(function ($q2) use ($startDate, $endDate) {
+                                                $q2->where('kind', 'bezokresowy')
+                                                   ->where('valid_from', '<=', $endDate);
+                                            })->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                $q2->where('kind', 'okresowy')
+                                                   ->where('valid_from', '<=', $startDate)
+                                                   ->where(function ($q3) use ($endDate) {
+                                                       $q3->whereNull('valid_to')
+                                                          ->orWhere('valid_to', '>=', $endDate);
+                                                   });
+                                            });
+                                        })
+                                        ->exists();
+                                    
+                                    if (!$hasActiveDocument) {
+                                        $missingDocuments[] = $document->name;
+                                    }
+                                }
+                                
+                                if (!empty($missingDocuments)) {
+                                    $errors[] = "PROJEKT: Brak dokumentów: " . implode(', ', $missingDocuments);
+                                }
+                            }
+                        }
+                        
+                        // Check overlapping assignments
+                        $overlaps = $employee->assignments()
+                            ->where('is_cancelled', false)
+                            ->where(function($q) use ($startDate, $endDate) {
+                                $q->whereBetween('start_date', [$startDate, $endDate])
+                                  ->orWhereBetween('end_date', [$startDate, $endDate])
+                                  ->orWhere(function($q2) use ($startDate, $endDate) {
+                                      $q2->where('start_date', '<=', $startDate)
+                                         ->where(function($q3) use ($endDate) {
+                                             $q3->whereNull('end_date')
+                                                ->orWhere('end_date', '>=', $endDate);
+                                         });
+                                  });
+                            })
+                            ->exists();
+                        
+                        if ($overlaps) {
+                            $errors[] = "PROJEKT: Nakładające się przypisanie";
+                        }
+                        
+                        // Check project dates (start/end)
+                        if ($project->start_date && $startDate->lt(Carbon::parse($project->start_date))) {
+                            $errors[] = "PROJEKT: Przed startem projektu ({$project->start_date->format('d.m.Y')})";
+                        }
+                        
+                        if ($project->end_date && $endDate->gt(Carbon::parse($project->end_date))) {
+                            $errors[] = "PROJEKT: Po końcu projektu ({$project->end_date->format('d.m.Y')})";
+                        }
+                        
+                        // Check project demand
+                        if (!$project->hasDemandForRoleInDateRange($role->id, $startDate, $endDate)) {
+                            $errors[] = "PROJEKT: Brak zapotrzebowania na rolę";
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "PROJEKT: " . $e->getMessage();
                 }
             }
             
-            // Validate vehicle
+            // ===== VALIDATE VEHICLE ASSIGNMENT =====
             if (empty($assignment['vehicle_id'])) {
                 $errors[] = "AUTO: Nie wybrano pojazdu";
             } else {
@@ -175,7 +259,7 @@ class BulkDepartureAssignments extends Component
                 }
             }
             
-            // Validate accommodation
+            // ===== VALIDATE ACCOMMODATION ASSIGNMENT =====
             if (empty($assignment['accommodation_id'])) {
                 $errors[] = "DOM: Nie wybrano zakwaterowania";
             } else {
@@ -192,6 +276,14 @@ class BulkDepartureAssignments extends Component
                 // Check accommodation capacity
                 if ($accommodation && $accommodationUsage[$accommodationId] > $accommodation->capacity) {
                     $errors[] = "DOM: Przekroczona pojemność ({$accommodationUsage[$accommodationId]}/{$accommodation->capacity})";
+                }
+                
+                // Check if accommodation is rented and lease hasn't ended
+                if ($accommodation && $accommodation->is_rented && $accommodation->lease_end_date) {
+                    $leaseEnd = Carbon::parse($accommodation->lease_end_date);
+                    if ($endDate->gt($leaseEnd)) {
+                        $errors[] = "DOM: Najem kończy się {$leaseEnd->format('d.m.Y')}";
+                    }
                 }
             }
             
@@ -282,6 +374,27 @@ class BulkDepartureAssignments extends Component
         
         $this->validateAllAssignments();
         $this->dispatch('assignment-copied', message: "Skopiowano zakwaterowanie do {$copiedCount} pracowników");
+    }
+    
+    /**
+     * Submit all assignments - this will be called from the parent view.
+     */
+    public function submitAssignments()
+    {
+        // Final validation
+        $this->validateAllAssignments();
+        
+        // If there are validation errors, don't proceed
+        if (!empty($this->validationErrors)) {
+            $this->dispatch('validation-failed');
+            return;
+        }
+        
+        // Dispatch event to parent with assignments data
+        $this->dispatch('assignments-validated', assignments: $this->assignments);
+        
+        // Redirect to controller endpoint
+        return redirect()->route('departures.store-with-assignments')->with('assignments', $this->assignments);
     }
     
     public function render()

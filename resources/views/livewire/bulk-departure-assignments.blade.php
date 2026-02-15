@@ -21,6 +21,32 @@
                 const toast = new bootstrap.Toast(toastEl);
                 toast.show();
             });
+            
+            // Update hidden inputs whenever assignments change
+            Livewire.hook('morph.updated', () => {
+                updateHiddenInputs();
+            });
+            
+            function updateHiddenInputs() {
+                const assignments = @this.assignments;
+                const container = document.getElementById('hidden-inputs-container');
+                if (!container || !assignments) return;
+                
+                container.innerHTML = '';
+                
+                Object.keys(assignments).forEach(employeeId => {
+                    Object.keys(assignments[employeeId]).forEach(key => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = `assignments[${employeeId}][${key}]`;
+                        input.value = assignments[employeeId][key] || '';
+                        container.appendChild(input);
+                    });
+                });
+            }
+            
+            // Initial sync
+            setTimeout(updateHiddenInputs, 100);
         });
     </script>
 
@@ -305,9 +331,5 @@
     </div>
     
     <!-- Hidden inputs dla submita formularza -->
-    @foreach($employees as $employee)
-        @foreach($assignments[$employee->id] as $key => $value)
-            <input type="hidden" name="assignments[{{ $employee->id }}][{{ $key }}]" value="{{ $value }}">
-        @endforeach
-    @endforeach
+    <div id="hidden-inputs-container"></div>
 </div>
