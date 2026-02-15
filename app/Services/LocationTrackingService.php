@@ -104,11 +104,12 @@ class LocationTrackingService
     {
         $shouldBeOutside = false;
         
-        // Check last logistics event up to this date
+        // Check last logistics event up to this date (ignore cancelled events)
         $lastEvent = LogisticsEvent::whereHas('participants', 
             fn($q) => $q->where('employee_id', $employee->id)
         )
         ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN])
+        ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
         ->where(function($q) use ($date) {
             // Events that started or ended by this date
             $q->where('event_date', '<=', $date)
