@@ -1,4 +1,29 @@
 <div>
+    <!-- Toast notification -->
+    <div id="copy-toast" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+        <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toast-message">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span></span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('assignment-copied', (event) => {
+                const toastEl = document.querySelector('#copy-toast .toast');
+                const messageEl = document.querySelector('#toast-message span');
+                messageEl.textContent = event.message;
+                const toast = new bootstrap.Toast(toastEl);
+                toast.show();
+            });
+        });
+    </script>
+
     <!-- Walidator na górze -->
     @if(count($validationErrors) > 0)
         <div class="alert alert-danger mb-4">
@@ -69,7 +94,19 @@
             <tbody>
                 <!-- PROJEKT -->
                 <tr class="table-primary section-header">
-                    <td colspan="{{ count($employees) + 1 }}"><strong>🏢 PROJEKT</strong></td>
+                    <td colspan="{{ count($employees) + 1 }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>🏢 PROJEKT</strong>
+                            <button 
+                                type="button" 
+                                wire:click="copyProjectFromFirst" 
+                                class="btn btn-sm btn-outline-light"
+                                title="Skopiuj dane z pierwszego pracownika do wszystkich"
+                            >
+                                <i class="bi bi-arrow-right"></i> Kopiuj z pierwszego
+                            </button>
+                        </div>
+                    </td>
                 </tr>
                 <tr class="section-project-row">
                     <td><strong>Projekt</strong></td>
@@ -134,7 +171,19 @@
 
                 <!-- AUTO -->
                 <tr class="table-warning section-header">
-                    <td colspan="{{ count($employees) + 1 }}"><strong>🚗 AUTO</strong></td>
+                    <td colspan="{{ count($employees) + 1 }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>🚗 AUTO</strong>
+                            <button 
+                                type="button" 
+                                wire:click="copyVehicleFromFirst" 
+                                class="btn btn-sm btn-outline-dark"
+                                title="Skopiuj dane z pierwszego pracownika do wszystkich"
+                            >
+                                <i class="bi bi-arrow-right"></i> Kopiuj z pierwszego
+                            </button>
+                        </div>
+                    </td>
                 </tr>
                 <tr class="section-vehicle-row">
                     <td><strong>Pojazd</strong></td>
@@ -195,7 +244,19 @@
 
                 <!-- DOM -->
                 <tr class="table-success section-header">
-                    <td colspan="{{ count($employees) + 1 }}"><strong>🏡 DOM</strong></td>
+                    <td colspan="{{ count($employees) + 1 }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>🏡 DOM</strong>
+                            <button 
+                                type="button" 
+                                wire:click="copyAccommodationFromFirst" 
+                                class="btn btn-sm btn-outline-light"
+                                title="Skopiuj dane z pierwszego pracownika do wszystkich"
+                            >
+                                <i class="bi bi-arrow-right"></i> Kopiuj z pierwszego
+                            </button>
+                        </div>
+                    </td>
                 </tr>
                 <tr class="section-accommodation-row">
                     <td><strong>Zakwaterowanie</strong></td>

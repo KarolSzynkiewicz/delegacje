@@ -204,6 +204,86 @@ class BulkDepartureAssignments extends Component
         }
     }
     
+    /**
+     * Copy project assignment from first employee to all others.
+     */
+    public function copyProjectFromFirst()
+    {
+        if (empty($this->employeeIds)) {
+            return;
+        }
+        
+        $firstEmployeeId = $this->employeeIds[0];
+        $firstAssignment = $this->assignments[$firstEmployeeId];
+        
+        $copiedCount = 0;
+        foreach ($this->employeeIds as $employeeId) {
+            if ($employeeId !== $firstEmployeeId) {
+                $this->assignments[$employeeId]['project_id'] = $firstAssignment['project_id'];
+                $this->assignments[$employeeId]['role_id'] = $firstAssignment['role_id'];
+                $this->assignments[$employeeId]['project_start_date'] = $firstAssignment['project_start_date'];
+                $this->assignments[$employeeId]['project_end_date'] = $firstAssignment['project_end_date'];
+                $copiedCount++;
+            }
+        }
+        
+        $this->validateAllAssignments();
+        $this->dispatch('assignment-copied', message: "Skopiowano projekt do {$copiedCount} pracowników");
+    }
+    
+    /**
+     * Copy vehicle assignment from first employee to all others.
+     */
+    public function copyVehicleFromFirst()
+    {
+        if (empty($this->employeeIds)) {
+            return;
+        }
+        
+        $firstEmployeeId = $this->employeeIds[0];
+        $firstAssignment = $this->assignments[$firstEmployeeId];
+        
+        $copiedCount = 0;
+        foreach ($this->employeeIds as $employeeId) {
+            if ($employeeId !== $firstEmployeeId) {
+                $this->assignments[$employeeId]['vehicle_id'] = $firstAssignment['vehicle_id'];
+                $this->assignments[$employeeId]['position'] = $firstAssignment['position'];
+                $this->assignments[$employeeId]['vehicle_start_date'] = $firstAssignment['vehicle_start_date'];
+                $this->assignments[$employeeId]['vehicle_end_date'] = $firstAssignment['vehicle_end_date'];
+                $copiedCount++;
+            }
+        }
+        
+        $this->validateAllAssignments();
+        $this->dispatch('assignment-copied', message: "Skopiowano pojazd do {$copiedCount} pracowników");
+    }
+    
+    /**
+     * Copy accommodation assignment from first employee to all others.
+     */
+    public function copyAccommodationFromFirst()
+    {
+        if (empty($this->employeeIds)) {
+            return;
+        }
+        
+        $firstEmployeeId = $this->employeeIds[0];
+        $firstAssignment = $this->assignments[$firstEmployeeId];
+        
+        $copiedCount = 0;
+        foreach ($this->employeeIds as $employeeId) {
+            if ($employeeId !== $firstEmployeeId) {
+                $this->assignments[$employeeId]['accommodation_id'] = $firstAssignment['accommodation_id'];
+                $this->assignments[$employeeId]['accommodation_start_date'] = $firstAssignment['accommodation_start_date'];
+                $this->assignments[$employeeId]['accommodation_end_date'] = $firstAssignment['accommodation_end_date'];
+                $copiedCount++;
+            }
+        }
+        
+        $this->validateAllAssignments();
+        $this->dispatch('assignment-copied', message: "Skopiowano zakwaterowanie do {$copiedCount} pracowników");
+    }
+    
     public function render()
     {
         // Load collections fresh for each render (not stored in state)
