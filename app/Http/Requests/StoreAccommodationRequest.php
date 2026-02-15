@@ -15,6 +15,7 @@ class StoreAccommodationRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'location_id' => ['required', 'exists:locations,id'],
             'address' => ['required', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:10'],
@@ -24,6 +25,14 @@ class StoreAccommodationRequest extends FormRequest
             'lease_start_date' => ['nullable', 'date', 'required_if:type,wynajmowany'],
             'lease_end_date' => ['nullable', 'date', 'required_if:type,wynajmowany', 'after_or_equal:lease_start_date'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+        ];
+    }
+    
+    public function messages(): array
+    {
+        return [
+            'location_id.required' => 'Lokalizacja jest wymagana.',
+            'location_id.exists' => 'Wybrana lokalizacja nie istnieje.',
         ];
     }
 }
