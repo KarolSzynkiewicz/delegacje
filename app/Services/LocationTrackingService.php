@@ -93,7 +93,14 @@ class LocationTrackingService
      * @param Carbon $date
      * @return void
      */
-    protected function syncOutsideBaseFlag(Employee $employee, Carbon $date): void
+    /**
+     * Synchronize the outside_base flag for an employee on a specific date.
+     * 
+     * @param Employee $employee
+     * @param Carbon $date
+     * @return void
+     */
+    public function syncOutsideBaseFlag(Employee $employee, Carbon $date): void
     {
         $shouldBeOutside = false;
         

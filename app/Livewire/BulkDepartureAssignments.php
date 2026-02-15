@@ -14,6 +14,7 @@ use App\Services\VehicleAssignmentService;
 use App\Services\AccommodationAssignmentService;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
+use App\Enums\VehiclePosition;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -33,20 +34,6 @@ class BulkDepartureAssignments extends Component
     
     public $assignments = [];
     public $validationErrors = [];
-    
-    protected $projectAssignmentService;
-    protected $vehicleAssignmentService;
-    protected $accommodationAssignmentService;
-    
-    public function boot(
-        ProjectAssignmentService $projectAssignmentService,
-        VehicleAssignmentService $vehicleAssignmentService,
-        AccommodationAssignmentService $accommodationAssignmentService
-    ) {
-        $this->projectAssignmentService = $projectAssignmentService;
-        $this->vehicleAssignmentService = $vehicleAssignmentService;
-        $this->accommodationAssignmentService = $accommodationAssignmentService;
-    }
     
     public function mount($employeeIds, $arrivalDate, $weekEnd, $projectIds, $roleIds, $vehicleIds, $accommodationIds)
     {
@@ -144,9 +131,15 @@ class BulkDepartureAssignments extends Component
                     $role = Role::find($assignment['role_id']);
                     $startDate = Carbon::parse($assignment['project_start_date']);
                     $endDate = Carbon::parse($assignment['project_end_date']);
+                    $arrivalDate = Carbon::parse($this->arrivalDate);
                     
                     if ($endDate->lt($startDate)) {
                         $errors[] = "PROJEKT: Data końca przed datą początku";
+                    }
+                    
+                    // Check if start date is before arrival date
+                    if ($startDate->lt($arrivalDate)) {
+                        $errors[] = "PROJEKT: Start przed przyjazdem ({$arrivalDate->format('d.m.Y')})";
                     }
                     
                     // Validate using ProjectAssignmentService (this includes ALL validations)
@@ -247,9 +240,15 @@ class BulkDepartureAssignments extends Component
                 
                 $startDate = Carbon::parse($assignment['vehicle_start_date']);
                 $endDate = Carbon::parse($assignment['vehicle_end_date']);
+                $arrivalDate = Carbon::parse($this->arrivalDate);
                 
                 if ($endDate->lt($startDate)) {
                     $errors[] = "AUTO: Data końca przed datą początku";
+                }
+                
+                // Check if start date is before arrival date
+                if ($startDate->lt($arrivalDate)) {
+                    $errors[] = "AUTO: Start przed przyjazdem ({$arrivalDate->format('d.m.Y')})";
                 }
                 
                 // Check if multiple drivers in same vehicle
@@ -273,9 +272,15 @@ class BulkDepartureAssignments extends Component
                 
                 $startDate = Carbon::parse($assignment['accommodation_start_date']);
                 $endDate = Carbon::parse($assignment['accommodation_end_date']);
+                $arrivalDate = Carbon::parse($this->arrivalDate);
                 
                 if ($endDate->lt($startDate)) {
                     $errors[] = "DOM: Data końca przed datą początku";
+                }
+                
+                // Check if start date is before arrival date
+                if ($startDate->lt($arrivalDate)) {
+                    $errors[] = "DOM: Start przed przyjazdem ({$arrivalDate->format('d.m.Y')})";
                 }
                 
                 // Check accommodation capacity
@@ -391,10 +396,7 @@ class BulkDepartureAssignments extends Component
         
         // If there are validation errors, don't proceed
         if (!empty($this->validationErrors)) {
-            $this->dispatch('show-toast', [
-                'message' => 'Napraw błędy walidacji przed zapisaniem',
-                'type' => 'error'
-            ]);
+            session()->flash('error', 'Napraw błędy walidacji przed zapisaniem');
             return;
         }
         
@@ -402,9 +404,8 @@ class BulkDepartureAssignments extends Component
         $departureData = session('pending_departure');
         
         if (!$departureData) {
-            return redirect()
-                ->route('departures.create')
-                ->with('error', 'Brak danych wyjazdu. Rozpocznij proces od początku.');
+            session()->flash('error', 'Brak danych wyjazdu. Rozpocznij proces od początku.');
+            return redirect()->route('departures.create');
         }
         
         try {
@@ -421,6 +422,7 @@ class BulkDepartureAssignments extends Component
                 'status' => LogisticsEventStatus::PLANNED,
                 'notes' => $departureData['notes'] ?? null,
                 'has_transport' => !empty($departureData['vehicle_id']),
+                'created_by' => auth()->id(),
             ]);
 
             // 2. Add participants to departure
@@ -431,6 +433,10 @@ class BulkDepartureAssignments extends Component
             }
 
             // 3. Create all assignments for each participant
+            $projectAssignmentService = app(ProjectAssignmentService::class);
+            $vehicleAssignmentService = app(VehicleAssignmentService::class);
+            $accommodationAssignmentService = app(AccommodationAssignmentService::class);
+            
             foreach ($this->assignments as $employeeId => $assignmentData) {
                 $employee = Employee::findOrFail($employeeId);
 
@@ -438,7 +444,7 @@ class BulkDepartureAssignments extends Component
                 $project = Project::findOrFail($assignmentData['project_id']);
                 $role = Role::findOrFail($assignmentData['role_id']);
 
-                $this->projectAssignmentService->createAssignment(
+                $projectAssignmentService->createAssignment(
                     $project,
                     $employee,
                     $role,
@@ -451,33 +457,37 @@ class BulkDepartureAssignments extends Component
                 // Vehicle assignment
                 $vehicle = Vehicle::findOrFail($assignmentData['vehicle_id']);
                 
-                $this->vehicleAssignmentService->createAssignment(
-                    $vehicle,
+                $vehicleAssignmentService->createAssignment(
                     $employee,
-                    $assignmentData['position'],
+                    $vehicle,
+                    VehiclePosition::from($assignmentData['position']),
                     Carbon::parse($assignmentData['vehicle_start_date']),
-                    Carbon::parse($assignmentData['vehicle_end_date'])
+                    Carbon::parse($assignmentData['vehicle_end_date']),
+                    null, // notes
+                    $departure->id // Link to departure
                 );
 
                 // Accommodation assignment
                 $accommodation = Accommodation::findOrFail($assignmentData['accommodation_id']);
                 
-                $this->accommodationAssignmentService->createAssignment(
+                $accommodationAssignmentService->createAssignment(
                     $employee,
                     $accommodation,
                     Carbon::parse($assignmentData['accommodation_start_date']),
-                    Carbon::parse($assignmentData['accommodation_end_date'])
+                    Carbon::parse($assignmentData['accommodation_end_date']),
+                    null, // notes
+                    $departure->id // Link to departure
                 );
             }
 
             DB::commit();
             session()->forget('pending_departure');
 
-            return redirect()
-                ->route('weekly-overview.index', [
-                    'start_date' => Carbon::parse($departureData['end_date'])->startOfWeek()->format('Y-m-d')
-                ])
-                ->with('success', "Wyjazd oraz wszystkie przypisania zostały utworzone! ({$departure->participants->count()} pracowników)");
+            session()->flash('success', "Wyjazd oraz wszystkie przypisania zostały utworzone! ({$departure->participants->count()} pracowników)");
+            
+            return redirect()->route('weekly-overview.index', [
+                'start_date' => Carbon::parse($departureData['end_date'])->startOfWeek()->format('Y-m-d')
+            ]);
 
         } catch (\Exception $e) {
             DB::rollback();
@@ -487,10 +497,7 @@ class BulkDepartureAssignments extends Component
                 'trace' => $e->getTraceAsString()
             ]);
 
-            $this->dispatch('show-toast', [
-                'message' => 'Wystąpił błąd: ' . $e->getMessage(),
-                'type' => 'error'
-            ]);
+            session()->flash('error', 'Wystąpił błąd: ' . $e->getMessage());
         }
     }
     

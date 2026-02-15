@@ -267,6 +267,9 @@ class DepartureController extends Controller
 
         try {
             $cancelledCounts = DB::transaction(function () use ($departure) {
+                // Get participants before cancellation
+                $participants = $departure->participants()->with('employee')->get();
+                
                 // SIMPLE! Use direct relationships - we know exactly which assignments belong to this departure
                 $projectAssignments = $departure->projectAssignments()->where('is_cancelled', false)->get();
                 $vehicleAssignments = $departure->vehicleAssignments()->where('is_cancelled', false)->get();
@@ -283,12 +286,19 @@ class DepartureController extends Controller
                 $cancelledVehicleCount = $vehicleAssignments->each->delete()->count();
                 $cancelledAccommodationCount = $accommodationAssignments->each->delete()->count();
                 
+                // Update outside_base flag for all participants
+                $locationTracker = app(\App\Services\LocationTrackingService::class);
+                foreach ($participants as $participant) {
+                    $locationTracker->syncOutsideBaseFlag($participant->employee, now());
+                }
+                
                 // Log the cancellation
                 Log::info('Departure cancelled - related assignments deleted', [
                     'departure_id' => $departure->id,
                     'deleted_project_assignments' => $cancelledProjectCount,
                     'deleted_vehicle_assignments' => $cancelledVehicleCount,
                     'deleted_accommodation_assignments' => $cancelledAccommodationCount,
+                    'participants_updated' => $participants->count(),
                 ]);
                 
                 return [

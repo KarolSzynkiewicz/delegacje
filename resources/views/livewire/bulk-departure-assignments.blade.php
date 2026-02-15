@@ -313,10 +313,17 @@
         <button 
             type="button" 
             wire:click="submitAssignments"
+            wire:loading.attr="disabled"
             class="btn btn-success btn-lg"
             @if(count($validationErrors) > 0) disabled @endif
         >
-            <i class="bi bi-save"></i> Zapisz wyjazd + wszystkie przypisania
+            <span wire:loading.remove wire:target="submitAssignments">
+                <i class="bi bi-save"></i> Zapisz wyjazd + wszystkie przypisania
+            </span>
+            <span wire:loading wire:target="submitAssignments">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Zapisuję...
+            </span>
         </button>
     </div>
 </div>
