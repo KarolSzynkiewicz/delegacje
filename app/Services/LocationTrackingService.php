@@ -10,6 +10,7 @@ use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\LogisticsEvent;
 use App\Enums\LogisticsEventType;
+use App\Enums\LogisticsEventStatus;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
