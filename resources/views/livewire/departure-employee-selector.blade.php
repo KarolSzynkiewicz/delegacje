@@ -12,7 +12,6 @@
                 wire:model.live="departureDate" 
                 name="departure_date"
                 class="form-control"
-                min="{{ date('Y-m-d') }}"
                 required
             >
             <small class="form-text text-muted">Wybierz datę, aby zobaczyć dostępnych pracowników</small>
@@ -26,9 +25,9 @@
             </label>
             <input 
                 type="date" 
+                wire:model.live="endDate"
                 name="end_date"
                 class="form-control"
-                value="{{ old('end_date', $endDate ?? '') }}"
                 min="{{ $departureDate }}"
                 required
             >
@@ -80,6 +79,17 @@
     @else
         <div class="alert alert-warning">
             <i class="bi bi-exclamation-triangle"></i> Wybierz datę wyjazdu, aby zobaczyć dostępnych pracowników.
+        </div>
+    @endif
+
+    @if($this->isDateInPast)
+        <div class="mb-3">
+            <div class="form-check form-check-inline">
+                <input type="checkbox" class="form-check-input" id="confirm-past-date" name="confirm_past_date">
+                <label class="form-check-label small text-muted" for="confirm-past-date">
+                    Data w przeszłości
+                </label>
+            </div>
         </div>
     @endif
 </div>

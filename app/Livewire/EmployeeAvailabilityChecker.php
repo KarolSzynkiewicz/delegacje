@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Employee;
 use Livewire\Component;
+use Carbon\Carbon;
 
 class EmployeeAvailabilityChecker extends Component
 {
@@ -158,6 +159,29 @@ class EmployeeAvailabilityChecker extends Component
                 ];
             })->toArray()
         ];
+    }
+
+    public function getIsDateInPastProperty()
+    {
+        $today = Carbon::today();
+        
+        if ($this->startDate) {
+            $start = Carbon::parse($this->startDate)->startOfDay();
+            // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
+            if ($start->lt($today)) {
+                return true;
+            }
+        }
+        
+        if ($this->endDate) {
+            $end = Carbon::parse($this->endDate)->startOfDay();
+            // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
+            if ($end->lt($today)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     public function render()

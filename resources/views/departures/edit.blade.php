@@ -103,7 +103,7 @@
                         <textarea name="notes" rows="3" class="form-control">{{ old('notes', $departure->notes) }}</textarea>
                     </div>
 
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center">
                         <x-ui.button 
                             variant="ghost" 
                             href="{{ route('departures.show', $departure) }}"
@@ -126,24 +126,16 @@
 
     @push('scripts')
     <script>
-        // Sync Livewire departureDate with hidden input
-        document.addEventListener('livewire:init', () => {
-            Livewire.hook('morph.updated', ({ component }) => {
-                if (component.__instance?.name === 'departure-employee-selector') {
-                    const date = component.get('departureDate');
-                    if (date) {
-                        document.getElementById('departure_date').value = date;
-                    }
-                }
-                
-                // Reinitialize tooltips after any Livewire update
-                initializeTooltips();
-            });
-        });
-
         // Initialize tooltips on page load
         document.addEventListener('DOMContentLoaded', () => {
             initializeTooltips();
+        });
+
+        // Reinitialize tooltips after Livewire updates
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('morph.updated', () => {
+                initializeTooltips();
+            });
         });
 
         function initializeTooltips() {

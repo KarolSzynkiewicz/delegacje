@@ -51,7 +51,7 @@ class DepartureController extends Controller
     /**
      * Show the form for creating a new departure.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $locations = Location::where('id', '!=', Location::getBase()->id)
             ->orderBy('name')
@@ -63,7 +63,19 @@ class DepartureController extends Controller
 
         $baseLocation = Location::getBase();
 
-        return view('departures.create', compact('locations', 'vehicles', 'baseLocation'));
+        // Sprawdź czy daty są w przeszłości (z linku)
+        $isDateInPast = false;
+        $departureDate = $request->query('departure_date');
+        $endDate = $request->query('end_date');
+        
+        if ($departureDate) {
+            $isDateInPast = Carbon::parse($departureDate)->startOfDay()->isPast();
+        }
+        if ($endDate && !$isDateInPast) {
+            $isDateInPast = Carbon::parse($endDate)->startOfDay()->isPast();
+        }
+
+        return view('departures.create', compact('locations', 'vehicles', 'baseLocation', 'isDateInPast'));
     }
 
     /**
@@ -142,7 +154,10 @@ class DepartureController extends Controller
         // Get current participants
         $currentEmployeeIds = $departure->participants()->pluck('employee_id')->toArray();
         
-        return view('departures.edit', compact('departure', 'vehicles', 'locations', 'currentEmployeeIds'));
+        // Sprawdź czy data wyjazdu jest w przeszłości
+        $isDateInPast = $departure->event_date->startOfDay()->isPast();
+        
+        return view('departures.edit', compact('departure', 'vehicles', 'locations', 'currentEmployeeIds', 'isDateInPast'));
     }
 
     /**
@@ -349,7 +364,7 @@ class DepartureController extends Controller
      */
     public function prepareBulkAssignment(Request $request): RedirectResponse|View
     {
-        $validated = $request->validate([
+        $rules = [
             'departure_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:departure_date',
             'to_location_id' => 'required|exists:locations,id',
@@ -357,13 +372,22 @@ class DepartureController extends Controller
             'employee_ids' => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
             'notes' => 'nullable|string',
-        ], [
+        ];
+
+        // If departure_date is in the past, require confirmation
+        $departureDate = $request->input('departure_date');
+        if ($departureDate && Carbon::parse($departureDate)->startOfDay()->isPast()) {
+            $rules['confirm_past_date'] = 'accepted';
+        }
+
+        $validated = $request->validate($rules, [
             'departure_date.required' => 'Proszę podać datę wyjazdu.',
             'end_date.required' => 'Proszę podać datę przybycia.',
             'end_date.after_or_equal' => 'Data przybycia musi być taka sama lub późniejsza niż data wyjazdu.',
             'to_location_id.required' => 'Proszę wybrać lokalizację docelową.',
             'employee_ids.required' => 'Proszę wybrać co najmniej jednego uczestnika.',
             'employee_ids.min' => 'Proszę wybrać co najmniej jednego uczestnika.',
+            'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
         ]);
 
         // Get base location ID

@@ -108,4 +108,15 @@
             </div>
         </div>
     @endif
+
+    @if($this->isDateInPast)
+        <div class="mb-3">
+            <div class="form-check form-check-inline">
+                <input type="checkbox" class="form-check-input" id="confirm-past-date" name="confirm_past_date">
+                <label class="form-check-label small text-muted" for="confirm-past-date">
+                    Data w przeszłości
+                </label>
+            </div>
+        </div>
+    @endif
 </div>

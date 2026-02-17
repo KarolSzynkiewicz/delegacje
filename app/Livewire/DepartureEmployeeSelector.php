@@ -16,6 +16,24 @@ class DepartureEmployeeSelector extends Component
     public $editMode = false;
 
     protected $listeners = ['dateChanged' => 'updateEmployees'];
+    
+    public function getIsDateInPastProperty()
+    {
+        if (!$this->departureDate) {
+            return false;
+        }
+        
+        $today = Carbon::today();
+        $departure = Carbon::parse($this->departureDate)->startOfDay();
+        
+        // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
+        return $departure->lt($today);
+    }
+    
+    protected function isDateInPast()
+    {
+        return $this->isDateInPast;
+    }
 
     public function mount($departureDate = null, $selectedEmployeeIds = [], $endDate = null)
     {

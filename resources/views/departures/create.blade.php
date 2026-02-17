@@ -67,7 +67,10 @@
                         </select>
                     </div>
 
-                    @livewire('departure-employee-selector', ['departureDate' => old('departure_date', date('Y-m-d'))], key('departure-selector'))
+                    @livewire('departure-employee-selector', [
+                        'departureDate' => old('departure_date', date('Y-m-d')),
+                        'endDate' => old('end_date')
+                    ], key('departure-selector'))
 
                     <div class="mb-4">
                         <label class="form-label fw-semibold d-flex align-items-center gap-1">
@@ -102,16 +105,16 @@
 
     @push('scripts')
     <script>
-        // Reinitialize tooltips after Livewire updates
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.hook('morph.updated', () => {
-                initializeTooltips();
-            });
-        });
-
         // Initialize tooltips on page load
         document.addEventListener('DOMContentLoaded', () => {
             initializeTooltips();
+        });
+
+        // Reinitialize tooltips after Livewire updates
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('morph.updated', () => {
+                initializeTooltips();
+            });
         });
 
         function initializeTooltips() {

@@ -177,24 +177,6 @@
                                 <i class="bi bi-save me-1"></i> Zapisz
                             </x-ui.button>
                             <x-ui.button variant="ghost" href="{{ $project ? route('projects.show', $project) : route('project-assignments.index') }}">Anuluj</x-ui.button>
-                            
-                            @if(isset($isDateInPast) && $isDateInPast)
-                                <div class="form-check form-check-inline">
-                                    <input type="checkbox" class="form-check-input" id="confirm-past-date" name="confirm_past_date">
-                                    <label class="form-check-label small text-muted" for="confirm-past-date">
-                                        Data w przeszłości
-                                    </label>
-                                </div>
-                            @endif
-                            
-                            <div id="past-date-checkbox-container" class="d-none">
-                                <div class="form-check form-check-inline">
-                                    <input type="checkbox" class="form-check-input" id="confirm-past-date-dynamic" name="confirm_past_date">
-                                    <label class="form-check-label small text-muted" for="confirm-past-date-dynamic">
-                                        Data w przeszłości
-                                    </label>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -239,45 +221,19 @@
             const startInput = document.getElementById('start-date-input');
             const endInput = document.getElementById('end-date-input');
             const employeeSelect = document.getElementById('employee-select');
-            let pastDateWarning = null;
 
-            function checkDates() {
-                const today = new Date().toISOString().split('T')[0];
-                const startDate = startInput.value;
-                const endDate = endInput.value;
-                const isPast = (startDate && startDate < today) || (endDate && endDate < today);
-
-                const checkboxContainer = document.getElementById('past-date-checkbox-container');
-                const existingCheckbox = document.getElementById('confirm-past-date');
-                
-                // Jeśli już jest checkbox z PHP, nie dodawaj kolejnego
-                if (existingCheckbox) {
-                    return;
-                }
-
-                if (isPast) {
-                    if (checkboxContainer) {
-                        checkboxContainer.classList.remove('d-none');
-                    }
-                } else {
-                    if (checkboxContainer) {
-                        checkboxContainer.classList.add('d-none');
-                    }
-                    const dynamicCheckbox = document.getElementById('confirm-past-date-dynamic');
-                    if (dynamicCheckbox) {
-                        dynamicCheckbox.checked = false;
-                    }
-                }
-            }
-
+            // Listen for date changes
             [startInput, endInput].forEach(input => {
-                input.addEventListener('change', () => { 
-                    checkDates(); 
-                    updateLivewireComponent();
-                    // Po aktualizacji Livewire, poczekaj chwilę i posortuj (dostępność może się zmienić)
-                    setTimeout(sortEmployeeOptions, 300);
-                });
-                input.addEventListener('input', () => { checkDates(); updateLivewireComponent(); });
+                if (input) {
+                    input.addEventListener('change', () => { 
+                        updateLivewireComponent();
+                        // Po aktualizacji Livewire, poczekaj chwilę i posortuj (dostępność może się zmienić)
+                        setTimeout(sortEmployeeOptions, 300);
+                    });
+                    input.addEventListener('input', () => { 
+                        updateLivewireComponent();
+                    });
+                }
             });
 
             if (employeeSelect) employeeSelect.addEventListener('change', updateLivewireComponent);
@@ -343,21 +299,7 @@
                 }
             }
 
-            form.addEventListener('submit', function(e) {
-                const checkbox = document.getElementById('confirm-past-date') || document.getElementById('confirm-past-date-dynamic');
-                const startDate = startInput.value;
-                const endDate = endInput.value;
-                const today = new Date().toISOString().split('T')[0];
-                const isPast = (startDate && startDate < today) || (endDate && endDate < today);
-
-                if (isPast && !(checkbox && checkbox.checked)) {
-                    e.preventDefault();
-                    alert('Musisz potwierdzić, że chcesz dodać przypisanie dla dat w przeszłości.');
-                }
-            });
-
             if (startInput.value) setTimeout(updateLivewireComponent, 200);
-            checkDates();
         });
     </script>
 </x-app-layout>
