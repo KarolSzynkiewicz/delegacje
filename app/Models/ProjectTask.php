@@ -7,6 +7,7 @@ use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 
 class ProjectTask extends Model
@@ -127,5 +128,27 @@ class ProjectTask extends Model
         $this->update([
             'assigned_to' => $user?->id,
         ]);
+    }
+
+    /**
+     * Get the subtasks for this task.
+     */
+    public function subtasks(): HasMany
+    {
+        return $this->hasMany(TaskSubtask::class, 'task_id');
+    }
+
+    /**
+     * Get the progress percentage of completed subtasks.
+     */
+    public function getSubtasksProgressAttribute(): float
+    {
+        $total = $this->subtasks()->count();
+        if ($total === 0) {
+            return 0;
+        }
+        
+        $completed = $this->subtasks()->where('is_completed', true)->count();
+        return round(($completed / $total) * 100, 2);
     }
 }

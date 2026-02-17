@@ -154,6 +154,10 @@
                 </x-ui.detail-list>
             </x-ui.card>
 
+            <div class="mt-4">
+                <livewire:task-subtasks :task="$task" />
+            </div>
+
             <x-ui.card label="Akcje" class="mt-4">
                 <x-tasks-actions :task="$task" :project="$task->project" size="sm" gap="2" class="flex-wrap" />
             </x-ui.card>

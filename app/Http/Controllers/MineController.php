@@ -198,23 +198,19 @@ class MineController extends Controller
     }
 
     /**
-     * Display tasks assigned to the current user from projects managed by the user.
+     * Display tasks assigned to the current user.
      */
     public function tasks(): View|RedirectResponse
     {
         $user = auth()->user();
         
-        // Admin widzi wszystko
+        // Admin widzi wszystko - przekieruj do głównej listy zadań
         if ($user->isAdmin()) {
-            return redirect()->route('projects.index');
+            return redirect()->route('tasks.index');
         }
         
-        // Pobierz ID projektów którymi zarządza użytkownik
-        $projectIds = $user->getManagedProjectIds();
-        
-        return view('mine.tasks', [
-            'projectIds' => $projectIds,
-        ]);
+        // Pokazuj wszystkie zadania przypisane do użytkownika (niezależnie od projektu)
+        return view('mine.tasks');
     }
 
     /**

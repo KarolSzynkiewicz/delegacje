@@ -30,7 +30,7 @@ class ProjectTaskController extends Controller
             abort(404);
         }
 
-        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user']);
+        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks']);
         $users = \App\Models\User::orderBy('name')->get();
         
         return view('projects.tasks.show', compact('project', 'task', 'users'));
@@ -281,7 +281,7 @@ class ProjectTaskController extends Controller
      */
     public function showGlobal(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user']);
+        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks']);
         $users = \App\Models\User::orderBy('name')->get();
         
         return view('tasks.show', compact('task', 'users'));
