@@ -128,8 +128,11 @@ class User extends Authenticatable
      * Check if user has a specific permission (using Spatie).
      * Wrapper method for backward compatibility.
      * 
-     * Dla kierowników: jeśli zarządza projektem związanym z akcją, przyznaje dostęp
-     * nawet bez przypisanego permission w tabeli.
+     * Logika:
+     * 1. Rola - daje dostęp do zasobów bez scope (wszystkie projekty)
+     * 2. Kierownik - daje dostęp do zasobów ze scope (tylko zarządzane projekty)
+     * 3. Łączymy zbiory: jeśli user ma rolę (wszystkie) + jest kierownikiem (swoje),
+     *    to widzi wszystkie (wszystkie + swoje = wszystkie)
      */
     public function hasPermission(string $permissionName): bool
     {
@@ -138,15 +141,21 @@ class User extends Authenticatable
             return true;
         }
 
-        // Sprawdź czy to jest akcja dla kierownika i czy user zarządza projektem
-        $managerPermission = $this->checkManagerPermission($permissionName);
-        if ($managerPermission !== null) {
-            return $managerPermission;
+        // 1. Sprawdź uprawnienia z roli (bez scope - wszystkie zasoby)
+        // Sprawdza wszystkie role użytkownika i ich uprawnienia
+        $rolePermission = $this->checkPermissionTo($permissionName);
+        if ($rolePermission) {
+            return true; // Rola daje dostęp do wszystkich zasobów
         }
 
-        // Użyj checkPermissionTo() zamiast hasPermissionTo()
-        // - zwraca false zamiast rzucać wyjątek gdy uprawnienie nie istnieje
-        return $this->checkPermissionTo($permissionName);
+        // 2. Sprawdź uprawnienia z funkcji kierownika (ze scope - tylko zarządzane projekty)
+        $managerPermission = $this->checkManagerPermission($permissionName);
+        if ($managerPermission === true) {
+            return true; // Kierownik ma dostęp do zasobów w swoim scope
+        }
+
+        // Jeśli żadne źródło nie daje dostępu, zwróć false
+        return false;
     }
 
     /**
