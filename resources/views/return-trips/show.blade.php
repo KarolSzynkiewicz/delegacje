@@ -55,19 +55,6 @@
                             <p class="fw-semibold">{{ $returnTrip->event_date->format('Y-m-d H:i') }}</p>
                         </div>
                         <div class="col-md-6">
-                            <h6 class="text-muted small mb-1">Status</h6>
-                            @php
-                                $badgeVariant = match($returnTrip->status->value) {
-                                    'planned' => 'primary',
-                                    'in_progress' => 'info',
-                                    'completed' => 'success',
-                                    'cancelled' => 'danger',
-                                    default => 'accent'
-                                };
-                            @endphp
-                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $returnTrip->status->label() }}</x-ui.badge>
-                        </div>
-                        <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Pojazd</h6>
                             <p class="fw-semibold">
                                 {{ $returnTrip->vehicle ? $returnTrip->vehicle->registration_number . ' - ' . $returnTrip->vehicle->brand . ' ' . $returnTrip->vehicle->model : '-' }}

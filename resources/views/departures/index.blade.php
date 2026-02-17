@@ -52,23 +52,18 @@
                             <td>{{ $departure->participants->count() }} osób</td>
                             <td>
                                 @php
-                                    $badgeVariant = match($departure->status->value) {
-                                        'planned' => 'primary',
-                                        'in_progress' => 'info',
-                                        'completed' => 'success',
-                                        'cancelled' => 'danger',
+                                    $visualStatus = $departure->getVisualStatus();
+                                    $badgeVariant = match($visualStatus) {
+                                        'oczekuje' => 'primary',
+                                        'w trakcie' => 'warning',
+                                        'zakończone' => 'success',
+                                        'anulowany' => 'danger',
                                         default => 'accent'
                                     };
                                 @endphp
-                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $departure->status->label() }}</x-ui.badge>
+                                <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($visualStatus) }}</x-ui.badge>
                             </td>
                             <td class="text-end">
-                                @if($departure->status === \App\Enums\LogisticsEventStatus::PLANNED || $departure->status === \App\Enums\LogisticsEventStatus::COMPLETED)
-                                    <x-ui.button variant="ghost" href="{{ route('departures.edit', $departure) }}" class="btn-sm">
-                                        <i class="bi bi-pencil"></i>
-                                        <span class="d-none d-sm-inline ms-1">Edytuj</span>
-                                    </x-ui.button>
-                                @endif
                                 <x-ui.button variant="ghost" href="{{ route('departures.show', $departure) }}" class="btn-sm">
                                     <i class="bi bi-eye"></i>
                                     <span class="d-none d-sm-inline ms-1">Zobacz</span>

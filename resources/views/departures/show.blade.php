@@ -13,13 +13,6 @@
             <x-slot name="right">
                 @if($departure->status === \App\Enums\LogisticsEventStatus::PLANNED || $departure->status === \App\Enums\LogisticsEventStatus::COMPLETED)
                     <x-ui.button 
-                        variant="primary" 
-                        href="{{ route('departures.edit', $departure) }}"
-                    >
-                        <i class="bi bi-pencil me-1"></i>
-                        Edytuj
-                    </x-ui.button>
-                    <x-ui.button 
                         variant="danger" 
                         href="{{ route('departures.prepare-cancellation', $departure) }}"
                         action="cancel"
@@ -69,24 +62,6 @@
             </div>
             <div class="col-md-6">
                 <h6 class="text-muted small mb-1 d-flex align-items-center gap-1">
-                    Status przypisań
-                    <x-tooltip title="Status przypisań pokazuje, czy wszyscy uczestnicy wyjazdu zostali już przypisani do projektów. 'Oczekuje na przypisanie' = wymaga akcji w panelu tygodnia. 'Przypisany' = wszyscy przypisani, wyjazd skompletowany.">
-                        <i class="bi bi-people-fill text-primary fs-6"></i>
-                    </x-tooltip>
-                </h6>
-                @php
-                    $badgeVariant = match($departure->status->value) {
-                        'planned' => 'warning',
-                        'in_progress' => 'info',
-                        'completed' => 'success',
-                        'cancelled' => 'danger',
-                        default => 'accent'
-                    };
-                @endphp
-                <x-ui.badge variant="{{ $badgeVariant }}">{{ $departure->status->label() }}</x-ui.badge>
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-muted small mb-1 d-flex align-items-center gap-1">
                     Status wyjazdu
                     <x-tooltip title="Status wyjazdu obliczany jest automatycznie na podstawie dat. 'Oczekuje' = wyjazd w przyszłości. 'W trakcie' = trwa teraz (między datą wyjazdu a datą przybycia). 'Zakończone' = wyjazd się już odbył.">
                         <i class="bi bi-calendar-event text-info fs-6"></i>
@@ -98,7 +73,6 @@
                         'oczekuje' => 'primary',
                         'w trakcie' => 'warning',
                         'zakończone' => 'success',
-                        'przypisany' => 'success',
                         'anulowany' => 'danger',
                         default => 'accent'
                     };
@@ -149,8 +123,8 @@
 
         <div class="border-top pt-4">
             <h5 class="fw-bold text-dark mb-4 d-flex align-items-center gap-2">
-                Uczestnicy - Postęp: {{ $departure->getAssignedParticipantsCount() }}/{{ $departure->getTotalParticipantsCount() }}
-                <x-tooltip title="Lista pracowników uczestniczących w tym wyjeździe i ich status przypisań do projektów, pojazdów i zakwaterowania.">
+                Uczestnicy
+                <x-tooltip title="Lista pracowników uczestniczących w tym wyjeździe i ich przypisania do projektów, pojazdów i zakwaterowania.">
                     <i class="bi bi-people text-primary fs-5"></i>
                 </x-tooltip>
             </h5>
@@ -198,10 +172,15 @@
                                     </td>
                                     <td>
                                         @if($projectAssignment)
-                                            <span class="badge bg-success me-1">✓</span>
-                                            <a href="{{ route('project-assignments.show', $projectAssignment) }}" class="text-decoration-none">
-                                                {{ $projectAssignment->project->name }}
-                                            </a>
+                                            <div>
+                                                <span class="badge bg-success me-1">✓</span>
+                                                <a href="{{ route('project-assignments.show', $projectAssignment) }}" class="text-decoration-none">
+                                                    {{ $projectAssignment->project->name }}
+                                                </a>
+                                            </div>
+                                            <small class="text-muted d-block mt-1">
+                                                {{ $projectAssignment->start_date->format('d.m.Y') }} - {{ $projectAssignment->end_date ? $projectAssignment->end_date->format('d.m.Y') : 'brak daty' }}
+                                            </small>
                                         @else
                                             <span class="text-muted">
                                                 <i class="bi bi-dash-circle"></i> Nie przypisany
@@ -210,20 +189,30 @@
                                     </td>
                                     <td>
                                         @if($vehicleAssignment)
-                                            <span class="badge bg-success me-1">✓</span>
-                                            <a href="{{ route('vehicle-assignments.show', $vehicleAssignment) }}" class="text-decoration-none">
-                                                {{ $vehicleAssignment->vehicle->registration_number }}
-                                            </a>
+                                            <div>
+                                                <span class="badge bg-success me-1">✓</span>
+                                                <a href="{{ route('vehicle-assignments.show', $vehicleAssignment) }}" class="text-decoration-none">
+                                                    {{ $vehicleAssignment->vehicle->registration_number }}
+                                                </a>
+                                            </div>
+                                            <small class="text-muted d-block mt-1">
+                                                {{ $vehicleAssignment->start_date->format('d.m.Y') }} - {{ $vehicleAssignment->end_date ? $vehicleAssignment->end_date->format('d.m.Y') : 'brak daty' }}
+                                            </small>
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
                                     </td>
                                     <td>
                                         @if($accommodationAssignment)
-                                            <span class="badge bg-success me-1">✓</span>
-                                            <a href="{{ route('accommodation-assignments.show', $accommodationAssignment) }}" class="text-decoration-none">
-                                                {{ $accommodationAssignment->accommodation->name }}
-                                            </a>
+                                            <div>
+                                                <span class="badge bg-success me-1">✓</span>
+                                                <a href="{{ route('accommodation-assignments.show', $accommodationAssignment) }}" class="text-decoration-none">
+                                                    {{ $accommodationAssignment->accommodation->name }}
+                                                </a>
+                                            </div>
+                                            <small class="text-muted d-block mt-1">
+                                                {{ $accommodationAssignment->start_date->format('d.m.Y') }} - {{ $accommodationAssignment->end_date ? $accommodationAssignment->end_date->format('d.m.Y') : 'brak daty' }}
+                                            </small>
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
