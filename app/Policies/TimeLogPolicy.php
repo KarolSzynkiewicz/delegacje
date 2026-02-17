@@ -37,6 +37,11 @@ class TimeLogPolicy
             return true;
         }
 
+        // Sprawdź uprawnienia z roli - jeśli ma uprawnienie w roli, widzi wszystkie
+        if ($user->hasPermission('time-logs.viewAny') || $user->hasPermission('time-logs.view')) {
+            return true;
+        }
+
         $assignment = $timeLog->projectAssignment;
         if (!$assignment) {
             return false;
@@ -52,6 +57,11 @@ class TimeLogPolicy
     public function create(User $user, ?int $assignmentId = null): bool
     {
         if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Sprawdź uprawnienia z roli - jeśli ma uprawnienie w roli, może tworzyć wszystkie
+        if ($user->hasPermission('time-logs.create')) {
             return true;
         }
 
@@ -78,6 +88,11 @@ class TimeLogPolicy
     public function update(User $user, TimeLog $timeLog): bool
     {
         if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Sprawdź uprawnienia z roli - jeśli ma uprawnienie w roli, może aktualizować wszystkie
+        if ($user->hasPermission('time-logs.update')) {
             return true;
         }
 
@@ -108,6 +123,11 @@ class TimeLogPolicy
     public function bulkUpdate(User $user, $model, array $entries = []): bool
     {
         if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Sprawdź uprawnienia z roli - jeśli ma uprawnienie w roli, może aktualizować wszystkie
+        if ($user->hasPermission('time-logs.update')) {
             return true;
         }
 
