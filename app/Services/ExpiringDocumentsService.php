@@ -102,7 +102,6 @@ class ExpiringDocumentsService
         return Accommodation::where('type', 'wynajmowany')
             ->whereNotNull('lease_end_date')
             ->whereBetween('lease_end_date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
-            ->with('location')
             ->orderBy('lease_end_date')
             ->get();
     }

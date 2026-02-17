@@ -55,9 +55,19 @@
                 </div>
 
                 <div class="row mb-3">
-                    <div class="col-md-12">
+                    <div class="col-md-6">
                         <h5>Kod Pocztowy</h5>
                         <p>{{ $accommodation->postal_code ?? '-' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Kraj</h5>
+                        <p>
+                            @if($accommodation->country)
+                                {{ $accommodation->country->labelWithFlag() }}
+                            @else
+                                -
+                            @endif
+                        </p>
                     </div>
                 </div>
 

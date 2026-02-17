@@ -174,9 +174,17 @@
                                             </td>
                                             <td>
                                                 {{ $assignment->accommodation->name }}
-                                                @if($assignment->accommodation->location)
+                                                @if($assignment->accommodation->city || $assignment->accommodation->country)
                                                     <small class="text-muted d-block">
-                                                        {{ $assignment->accommodation->location->name }}
+                                                        @if($assignment->accommodation->city)
+                                                            {{ $assignment->accommodation->city }}
+                                                        @endif
+                                                        @if($assignment->accommodation->city && $assignment->accommodation->country)
+                                                            , 
+                                                        @endif
+                                                        @if($assignment->accommodation->country)
+                                                            {{ $assignment->accommodation->country->label() }}
+                                                        @endif
                                                     </small>
                                                 @endif
                                             </td>
