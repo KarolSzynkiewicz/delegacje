@@ -79,23 +79,20 @@ class TimeLogsTable extends Component
     {
         $query = TimeLog::with('projectAssignment.employee', 'projectAssignment.project');
         
-        // Filtruj dla kierownika - tylko time-logi z jego projektów
-        if (!auth()->user()->isAdmin()) {
-            $userProjectIds = auth()->user()->getManagedProjectIds();
-            $query->whereHas('projectAssignment', function($q) use ($userProjectIds) {
-                $q->whereIn('project_id', $userProjectIds);
-            });
-        }
+        // Sprawdź czy to widok /mine/* (ma filterAssignmentIds) czy globalny /time-logs
+        $isMineView = $this->filterAssignmentIds && is_array($this->filterAssignmentIds) && !empty($this->filterAssignmentIds);
         
         // Filtrowanie po przypisaniach (dla /mine/*)
-        if ($this->filterAssignmentIds && is_array($this->filterAssignmentIds) && !empty($this->filterAssignmentIds)) {
+        if ($isMineView) {
             $query->whereIn('project_assignment_id', $this->filterAssignmentIds);
-            // W widoku /mine/* nie filtrujemy po projekcie - użytkownik widzi tylko swoje projekty
             $this->isMineView = true;
             // Wyczyść projectFilter jeśli był ustawiony w query string
             if ($this->projectFilter) {
                 $this->projectFilter = '';
             }
+        } else {
+            // Widok globalny /time-logs - middleware już sprawdził uprawnienia, pokazuj wszystko
+            $this->isMineView = false;
         }
 
         // Filtrowanie po pracowniku
@@ -168,13 +165,18 @@ class TimeLogsTable extends Component
         
         $employees = $employeesQuery->orderBy('last_name')->orderBy('first_name')->get();
         
-        // Filtruj projekty dla kierownika
-        $projectsQuery = Project::query();
-        if (!auth()->user()->isAdmin()) {
+        // Projekty w dropdownie
+        if ($isMineView) {
+            // W widoku /mine/* - pokaż tylko projekty z przypisań kierownika
             $userProjectIds = auth()->user()->getManagedProjectIds();
-            $projectsQuery->whereIn('id', $userProjectIds);
+            $projects = Project::query()
+                ->whereIn('id', $userProjectIds)
+                ->orderBy('name')
+                ->get();
+        } else {
+            // Widok globalny /time-logs - pokaż wszystkie projekty (middleware już sprawdził uprawnienia)
+            $projects = Project::query()->orderBy('name')->get();
         }
-        $projects = $projectsQuery->orderBy('name')->get();
 
         return view('livewire.time-logs-table', compact('timeLogs', 'employees', 'projects'));
     }

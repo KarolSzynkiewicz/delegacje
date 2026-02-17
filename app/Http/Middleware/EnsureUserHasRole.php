@@ -24,7 +24,12 @@ class EnsureUserHasRole
         
         // Sprawdź czy użytkownik ma jakąkolwiek rolę
         if ($user && $user->roles()->count() === 0) {
-            // Użytkownik bez roli - przekieruj do widoku z komunikatem
+            // Kierownik (zarządza projektami) ma dostęp nawet bez roli
+            if ($user->isManager()) {
+                return $next($request);
+            }
+            
+            // Użytkownik bez roli i bez zarządzanych projektów - przekieruj do widoku z komunikatem
             // Pozwól na dostęp do: no-role, profile, logout
             if (!$request->routeIs('no-role') && !$request->routeIs('profile.*') && !$request->routeIs('logout')) {
                 return redirect()->route('no-role');

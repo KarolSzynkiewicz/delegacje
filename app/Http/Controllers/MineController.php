@@ -7,6 +7,7 @@ use App\Models\TimeLog;
 use App\Models\Employee;
 use App\Models\ProjectAssignment;
 use App\Services\TimeLogService;
+use App\Policies\MineTimeLogPolicy;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -72,25 +73,22 @@ class MineController extends Controller
     public function timeLogs(): View|RedirectResponse
     {
         $user = auth()->user();
+        $policy = new MineTimeLogPolicy();
         
-        // Admin widzi wszystko
+        // Admin widzi wszystko - przekieruj do globalnego widoku
         if ($user->isAdmin()) {
             return redirect()->route('time-logs.index');
         }
         
-        // Pobierz ID projektów którymi zarządza użytkownik
-        $projectIds = $user->getManagedProjectIds();
-        
-        if (empty($projectIds)) {
+        // Sprawdź czy user ma dostęp do mine view
+        if (!$policy->viewAny($user)) {
             return view('mine.time-logs', [
-                'projectIds' => [],
+                'assignmentIds' => [],
             ]);
         }
         
-        // Pobierz ID przypisań do tych projektów
-        $assignmentIds = ProjectAssignment::whereIn('project_id', $projectIds)
-            ->pluck('id')
-            ->toArray();
+        // Pobierz scope (assignment IDs) z Policy
+        $assignmentIds = $policy->getScopeAssignmentIds($user);
         
         return view('mine.time-logs', [
             'assignmentIds' => $assignmentIds,
@@ -219,13 +217,15 @@ class MineController extends Controller
     public function monthlyGrid(Request $request): View|RedirectResponse
     {
         $user = auth()->user();
+        $policy = new MineTimeLogPolicy();
         
-        // Admin widzi wszystko
+        // Admin widzi wszystko - przekieruj do globalnego widoku
         if ($user->isAdmin()) {
             return redirect()->route('time-logs.monthly-grid', $request->query());
         }
         
-        // Pobierz ID projektów którym zarządza użytkownik
+        // Pobierz ID projektów z Policy scope
+        $assignmentIds = $policy->getScopeAssignmentIds($user);
         $projectIds = $user->getManagedProjectIds();
         
         $month = $request->query('month', Carbon::now()->format('Y-m'));

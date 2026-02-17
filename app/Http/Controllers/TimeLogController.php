@@ -21,7 +21,6 @@ class TimeLogController extends Controller
     public function __construct(TimeLogService $timeLogService)
     {
         $this->timeLogService = $timeLogService;
-        $this->authorizeResource(TimeLog::class, 'timeLog');
     }
 
     /**
@@ -38,17 +37,11 @@ class TimeLogController extends Controller
     public function create(): View
     {
         // Get active assignments (based on dates) that are not cancelled
-        $assignmentsQuery = ProjectAssignment::with('employee', 'project', 'role')
+        $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->active()
-            ->where('is_cancelled', false);
-        
-        // Filtruj dla kierownika - tylko jego projekty
-        if (!auth()->user()->isAdmin()) {
-            $projectIds = auth()->user()->getManagedProjectIds();
-            $assignmentsQuery->whereIn('project_id', $projectIds);
-        }
-        
-        $assignments = $assignmentsQuery->orderBy('start_date', 'desc')->get();
+            ->where('is_cancelled', false)
+            ->orderBy('start_date', 'desc')
+            ->get();
         
         return view('time-logs.create', compact('assignments'));
     }
@@ -98,17 +91,11 @@ class TimeLogController extends Controller
     public function edit(TimeLog $timeLog): View
     {
         // Get active assignments (based on dates) that are not cancelled
-        $assignmentsQuery = ProjectAssignment::with('employee', 'project', 'role')
+        $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->active()
-            ->where('is_cancelled', false);
-        
-        // Filtruj dla kierownika - tylko jego projekty
-        if (!auth()->user()->isAdmin()) {
-            $projectIds = auth()->user()->getManagedProjectIds();
-            $assignmentsQuery->whereIn('project_id', $projectIds);
-        }
-        
-        $assignments = $assignmentsQuery->orderBy('start_date', 'desc')->get();
+            ->where('is_cancelled', false)
+            ->orderBy('start_date', 'desc')
+            ->get();
         
         return view('time-logs.edit', compact('timeLog', 'assignments'));
     }
@@ -158,14 +145,6 @@ class TimeLogController extends Controller
      */
     public function byAssignment(ProjectAssignment $assignment): View
     {
-        // Autoryzuj dostęp - kierownik może widzieć tylko swoje projekty
-        $this->authorize('viewAny', TimeLog::class);
-        
-        // Sprawdź czy użytkownik ma dostęp do tego projektu
-        if (!auth()->user()->isAdmin() && !auth()->user()->managesProject($assignment->project_id)) {
-            abort(403, 'Nie masz uprawnień do tego projektu.');
-        }
-        
         $timeLogs = $assignment->timeLogs()
             ->orderBy('start_time', 'desc')
             ->get();
@@ -178,18 +157,10 @@ class TimeLogController extends Controller
      */
     public function monthlyGrid(Request $request): View
     {
-        // Autoryzuj dostęp - kierownik może widzieć tylko swoje projekty
-        $this->authorize('viewAny', TimeLog::class);
-        
         $month = $request->query('month', Carbon::now()->format('Y-m'));
         
-        // Filtruj projekty dla kierownika
-        $projectIds = null;
-        if (!auth()->user()->isAdmin()) {
-            $projectIds = auth()->user()->getManagedProjectIds();
-        }
-        
-        $data = $this->timeLogService->getMonthlyGridData($month, $projectIds);
+        // Pokaż wszystkie projekty - middleware już sprawdził uprawnienia
+        $data = $this->timeLogService->getMonthlyGridData($month, null);
 
         return view('time-logs.monthly-grid', $data);
     }
@@ -236,9 +207,7 @@ class TimeLogController extends Controller
                 ->withInput();
         }
 
-        // Autoryzacja przez Policy
-        $this->authorize('bulkUpdate', [\App\Models\TimeLog::class, $entries]);
-        
+        // Middleware już sprawdził uprawnienia - można aktualizować wszystkie
         $results = $this->timeLogService->bulkUpdateTimeLogs($entries);
 
         $message = 'Zaktualizowano: ' . $results['created'] . ' utworzono, ' . $results['updated'] . ' zaktualizowano, ' . $results['deleted'] . ' usunięto.';
