@@ -33,8 +33,10 @@ class UpdateDepartureRequest extends FormRequest
         ];
 
         // If departure_date is in the past, require confirmation
+        // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
         $departureDate = $this->input('departure_date');
-        if ($departureDate && \Carbon\Carbon::parse($departureDate)->startOfDay()->isPast()) {
+        $today = \Carbon\Carbon::today();
+        if ($departureDate && \Carbon\Carbon::parse($departureDate)->startOfDay()->lt($today)) {
             $rules['confirm_past_date'] = ['accepted'];
         }
 

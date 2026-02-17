@@ -364,73 +364,93 @@ class DepartureController extends Controller
      */
     public function prepareBulkAssignment(Request $request): RedirectResponse|View
     {
-        $rules = [
-            'departure_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:departure_date',
-            'to_location_id' => 'required|exists:locations,id',
-            'vehicle_id' => 'nullable|exists:vehicles,id',
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'notes' => 'nullable|string',
-        ];
+        try {
+            $rules = [
+                'departure_date' => 'required|date',
+                'end_date' => 'required|date|after_or_equal:departure_date',
+                'to_location_id' => 'required|exists:locations,id',
+                'vehicle_id' => 'nullable|exists:vehicles,id',
+                'employee_ids' => 'required|array|min:1',
+                'employee_ids.*' => 'exists:employees,id',
+                'notes' => 'nullable|string',
+            ];
 
-        // If departure_date is in the past, require confirmation
-        $departureDate = $request->input('departure_date');
-        if ($departureDate && Carbon::parse($departureDate)->startOfDay()->isPast()) {
-            $rules['confirm_past_date'] = 'accepted';
+            // If departure_date is in the past, require confirmation
+            // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
+            $departureDate = $request->input('departure_date');
+            $today = Carbon::today();
+            if ($departureDate && Carbon::parse($departureDate)->startOfDay()->lt($today)) {
+                $rules['confirm_past_date'] = 'accepted';
+            }
+
+            $validated = $request->validate($rules, [
+                'departure_date.required' => 'Proszę podać datę wyjazdu.',
+                'end_date.required' => 'Proszę podać datę przybycia.',
+                'end_date.after_or_equal' => 'Data przybycia musi być taka sama lub późniejsza niż data wyjazdu.',
+                'to_location_id.required' => 'Proszę wybrać lokalizację docelową.',
+                'employee_ids.required' => 'Proszę wybrać co najmniej jednego uczestnika.',
+                'employee_ids.min' => 'Proszę wybrać co najmniej jednego uczestnika.',
+                'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
+            ]);
+            // Get base location ID
+            $fromLocationId = Location::getBase()->id;
+            
+            // Prepare departure data
+            $departureData = [
+                'event_date' => $validated['departure_date'],
+                'end_date' => $validated['end_date'],
+                'from_location_id' => $fromLocationId,
+                'to_location_id' => $validated['to_location_id'],
+                'vehicle_id' => $validated['vehicle_id'] ?? null,
+                'participants' => $validated['employee_ids'],
+                'notes' => $validated['notes'] ?? null,
+            ];
+            
+            // Save departure data in session (don't store in DB yet)
+            session(['pending_departure' => $departureData]);
+
+            // Load employees with their roles
+            $employees = Employee::with('roles')->findMany($validated['employee_ids']);
+
+            // Load resources for assignments
+            $projects = Project::active()->orderBy('name')->get();
+            $roles = Role::orderBy('name')->get();
+            $vehicles = Vehicle::orderBy('registration_number')->get();
+            $accommodations = Accommodation::orderBy('name')->get();
+
+            $toLocation = Location::findOrFail($validated['to_location_id']);
+            $arrivalDate = Carbon::parse($validated['end_date']);
+            $weekEnd = $arrivalDate->copy()->endOfWeek();
+
+            return view('departures.bulk-assignment', compact(
+                'employees',
+                'projects',
+                'roles',
+                'vehicles',
+                'accommodations',
+                'toLocation',
+                'arrivalDate',
+                'weekEnd',
+                'departureData'
+            ));
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors($e->errors())
+                ->with('error', 'Proszę poprawić błędy w formularzu.');
+        } catch (\Exception $e) {
+            Log::error('Error preparing bulk assignment', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Wystąpił błąd podczas przygotowania formularza: ' . $e->getMessage());
         }
-
-        $validated = $request->validate($rules, [
-            'departure_date.required' => 'Proszę podać datę wyjazdu.',
-            'end_date.required' => 'Proszę podać datę przybycia.',
-            'end_date.after_or_equal' => 'Data przybycia musi być taka sama lub późniejsza niż data wyjazdu.',
-            'to_location_id.required' => 'Proszę wybrać lokalizację docelową.',
-            'employee_ids.required' => 'Proszę wybrać co najmniej jednego uczestnika.',
-            'employee_ids.min' => 'Proszę wybrać co najmniej jednego uczestnika.',
-            'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
-        ]);
-
-        // Get base location ID
-        $fromLocationId = Location::getBase()->id;
-        
-        // Prepare departure data
-        $departureData = [
-            'event_date' => $validated['departure_date'],
-            'end_date' => $validated['end_date'],
-            'from_location_id' => $fromLocationId,
-            'to_location_id' => $validated['to_location_id'],
-            'vehicle_id' => $validated['vehicle_id'] ?? null,
-            'participants' => $validated['employee_ids'],
-            'notes' => $validated['notes'] ?? null,
-        ];
-        
-        // Save departure data in session (don't store in DB yet)
-        session(['pending_departure' => $departureData]);
-
-        // Load employees with their roles
-        $employees = Employee::with('roles')->findMany($validated['employee_ids']);
-
-        // Load resources for assignments
-        $projects = Project::active()->orderBy('name')->get();
-        $roles = Role::orderBy('name')->get();
-        $vehicles = Vehicle::orderBy('registration_number')->get();
-        $accommodations = Accommodation::orderBy('name')->get();
-
-        $toLocation = Location::findOrFail($validated['to_location_id']);
-        $arrivalDate = Carbon::parse($validated['end_date']);
-        $weekEnd = $arrivalDate->copy()->endOfWeek();
-
-        return view('departures.bulk-assignment', compact(
-            'employees',
-            'projects',
-            'roles',
-            'vehicles',
-            'accommodations',
-            'toLocation',
-            'arrivalDate',
-            'weekEnd',
-            'departureData'
-        ));
     }
 
     /**
@@ -539,10 +559,15 @@ class DepartureController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollback();
             
+            $errorMessage = 'Błąd walidacji danych. Proszę sprawdzić wprowadzone informacje.';
+            if ($e->getMessage()) {
+                $errorMessage .= ' ' . $e->getMessage();
+            }
+            
             return back()
                 ->withInput()
                 ->withErrors($e->errors())
-                ->with('error', 'Błąd walidacji: ' . $e->getMessage());
+                ->with('error', $errorMessage);
                 
         } catch (\Exception $e) {
             DB::rollback();
@@ -554,7 +579,7 @@ class DepartureController extends Controller
 
             return back()
                 ->withInput()
-                ->with('error', 'Wystąpił błąd podczas zapisywania: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas zapisywania wyjazdu. Spróbuj ponownie lub skontaktuj się z administratorem.');
         }
     }
 }
