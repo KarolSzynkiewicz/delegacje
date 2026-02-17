@@ -21,7 +21,7 @@ class StoreDepartureRequest extends FormRequest
      */
     public function rules(): array
     {
-        $rules = [
+        return [
             'employee_ids' => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['exists:employees,id'],
             'departure_date' => ['required', 'date'],
@@ -30,16 +30,6 @@ class StoreDepartureRequest extends FormRequest
             'vehicle_id' => ['nullable', 'exists:vehicles,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
-
-        // If departure_date is in the past, require confirmation
-        // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
-        $departureDate = $this->input('departure_date');
-        $today = \Carbon\Carbon::today();
-        if ($departureDate && \Carbon\Carbon::parse($departureDate)->startOfDay()->lt($today)) {
-            $rules['confirm_past_date'] = ['accepted'];
-        }
-
-        return $rules;
     }
 
     /**
@@ -56,7 +46,6 @@ class StoreDepartureRequest extends FormRequest
             'employee_ids.*.exists' => 'Wybrany pracownik nie istnieje.',
             'departure_date.required' => 'Data wyjazdu jest wymagana.',
             'departure_date.date' => 'Data wyjazdu musi być poprawną datą.',
-            'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
             'end_date.required' => 'Data przybycia jest wymagana.',
             'end_date.date' => 'Data przybycia musi być poprawną datą.',
             'end_date.after' => 'Data przybycia musi być późniejsza niż data wyjazdu.',
