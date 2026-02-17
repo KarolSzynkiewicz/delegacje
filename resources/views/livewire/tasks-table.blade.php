@@ -179,6 +179,31 @@
                                 </div>
                             </div>
                             
+                            <!-- Podzadania -->
+                            @php
+                                $subtasksCount = $task->subtasks->count();
+                                $completedSubtasksCount = $task->subtasks->where('is_completed', true)->count();
+                            @endphp
+                            @if($subtasksCount > 0)
+                                <div class="mt-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <small class="text-muted">
+                                            <i class="bi bi-list-check me-1"></i>Podzadania: {{ $subtasksCount }}
+                                        </small>
+                                        <div style="flex: 1; max-width: 200px;">
+                                            <x-ui.progress 
+                                                value="{{ $completedSubtasksCount }}" 
+                                                max="{{ $subtasksCount }}" 
+                                                variant="{{ $completedSubtasksCount == $subtasksCount ? 'success' : ($completedSubtasksCount > 0 ? 'warning' : 'default') }}"
+                                            />
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ $completedSubtasksCount }}/{{ $subtasksCount }} ukończone
+                                        </small>
+                                    </div>
+                                </div>
+                            @endif
+                            
                             <!-- GŁÓWNY WIERSZ 2: Detale w Bootstrap row -->
                             <hr>
                             <div class="row g-3">
