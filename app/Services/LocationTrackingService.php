@@ -26,7 +26,7 @@ use Carbon\Carbon;
  * NEW MODEL (2026-02-15):
  * Employee location is determined by:
  * 1. in_transit (LogisticsEvent between event_date and end_date)
- * 2. accommodation_location (AccommodationAssignment active on date)
+ * 2. accommodation (AccommodationAssignment active on date)
  * 3. project_location (ProjectAssignment active on date)
  * 4. outside_base flag (Employee.outside_base)
  * 
@@ -38,7 +38,7 @@ class LocationTrackingService
      * Get complete location status for employee on specific date.
      * 
      * Returns array with:
-     * - accommodation_location: Location|null (where employee lives during project)
+     * - accommodation: Accommodation|null (where employee lives during project)
      * - project_location: Location|null (where employee works)
      * - in_transit: bool (is traveling between locations)
      * - outside_base: bool (is outside base location)
@@ -55,14 +55,14 @@ class LocationTrackingService
         // 2. Check if in transit
         $inTransit = LogisticsEvent::isEmployeeInTransit($employee, $date);
         
-        // 3. Get accommodation location
-        $accommodationLocation = $this->getAccommodationLocationOnDate($employee, $date);
+        // 3. Get accommodation
+        $accommodation = $this->getAccommodationOnDate($employee, $date);
         
         // 4. Get project location
         $projectLocation = $this->getProjectLocationOnDate($employee, $date);
         
         return [
-            'accommodation_location' => $accommodationLocation,
+            'accommodation' => $accommodation,
             'project_location' => $projectLocation,
             'in_transit' => $inTransit,
             'outside_base' => (bool) $employee->outside_base,
@@ -153,13 +153,13 @@ class LocationTrackingService
     }
 
     /**
-     * Get accommodation location on specific date.
+     * Get accommodation on specific date.
      * 
      * @param Employee $employee
      * @param Carbon $date
-     * @return Location|null
+     * @return \App\Models\Accommodation|null
      */
-    protected function getAccommodationLocationOnDate(Employee $employee, Carbon $date): ?Location
+    protected function getAccommodationOnDate(Employee $employee, Carbon $date): ?\App\Models\Accommodation
     {
         $accommodationAssignment = $employee->accommodationAssignments()
             ->where('start_date', '<=', $date)
@@ -167,10 +167,10 @@ class LocationTrackingService
                 $q->whereNull('end_date')
                   ->orWhere('end_date', '>=', $date);
             })
-            ->with('accommodation.location')
+            ->with('accommodation')
             ->first();
         
-        return $accommodationAssignment?->accommodation?->location;
+        return $accommodationAssignment?->accommodation;
     }
 
     /**
@@ -202,9 +202,10 @@ class LocationTrackingService
      * 
      * Priority:
      * 1. In transit → null (can't determine single location)
-     * 2. Accommodation → accommodation.location
-     * 3. Project → project.location
-     * 4. Base
+     * 2. Project → project.location
+     * 3. Base
+     * 
+     * Note: Accommodation no longer has location, so it's skipped
      * 
      * @param Employee $employee
      * @return Location|null
@@ -214,10 +215,7 @@ class LocationTrackingService
         $status = $this->getLocationStatus($employee, now());
         
         // Priority: accommodation > project > base
-        if ($status['accommodation_location']) {
-            return $status['accommodation_location'];
-        }
-        
+        // Note: accommodation no longer has location, so skip it
         if ($status['project_location']) {
             return $status['project_location'];
         }
@@ -254,8 +252,9 @@ class LocationTrackingService
         }
         
         // Priority: accommodation > project > base
-        if ($status['accommodation_location']) {
-            return $status['accommodation_location'];
+        // Note: accommodation no longer has location, so skip it
+        if ($status['project_location']) {
+            return $status['project_location'];
         }
         
         if ($status['project_location']) {

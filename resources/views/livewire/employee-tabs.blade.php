@@ -68,9 +68,9 @@
                                     <x-tooltip title="Pracownik jest w bazie">
                                         <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
                                     </x-tooltip>
-                                @elseif($locationStatus['accommodation_location'] && $locationStatus['project_location'])
+                                @elseif($locationStatus['accommodation'] && $locationStatus['project_location'])
                                     @php
-                                        $accomName = $locationStatus['accommodation_location']->name;
+                                        $accomName = $locationStatus['accommodation']->name;
                                         $projName = $locationStatus['project_location']->name;
                                     @endphp
                                     <x-tooltip title="Mieszka: {{ $accomName }}, Pracuje: {{ $projName }}{{ $projectsList ? ' (' . $projectsList . ')' : '' }}">
@@ -86,9 +86,9 @@
                                             Projekt: {{ $projectsList }}
                                         </div>
                                     @endif
-                                @elseif($locationStatus['accommodation_location'])
-                                    <x-tooltip title="Mieszka w: {{ $locationStatus['accommodation_location']->name }}">
-                                        <x-ui.badge variant="info">🏡 {{ $locationStatus['accommodation_location']->name }}</x-ui.badge>
+                                @elseif($locationStatus['accommodation'])
+                                    <x-tooltip title="Mieszka w: {{ $locationStatus['accommodation']->name }}">
+                                        <x-ui.badge variant="info">🏡 {{ $locationStatus['accommodation']->name }}</x-ui.badge>
                                     </x-tooltip>
                                 @elseif($locationStatus['project_location'])
                                     <x-tooltip title="{{ $projectsList ? 'Projekt: ' . $projectsList . ' w ' . $locationStatus['project_location']->name : 'Pracuje w: ' . $locationStatus['project_location']->name }}">

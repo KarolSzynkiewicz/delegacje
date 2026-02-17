@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Accommodation;
-use App\Models\Location;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreAccommodationRequest;
 use App\Http\Requests\UpdateAccommodationRequest;
@@ -27,8 +26,7 @@ class AccommodationController extends Controller
      */
     public function create(): View
     {
-        $locations = Location::orderBy('name')->get();
-        return view('accommodations.create', compact('locations'));
+        return view('accommodations.create');
     }
 
     /**
@@ -68,8 +66,7 @@ class AccommodationController extends Controller
      */
     public function edit(Accommodation $accommodation): View
     {
-        $locations = Location::orderBy('name')->get();
-        return view('accommodations.edit', compact('accommodation', 'locations'));
+        return view('accommodations.edit', compact('accommodation'));
     }
 
     /**

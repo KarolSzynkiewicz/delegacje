@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Traits\HasComments;
@@ -23,10 +22,10 @@ class Accommodation extends Model
         'address',
         'city',
         'postal_code',
+        'country',
         'capacity',
         'description',
         'image_path',
-        'location_id',
         'type',
         'lease_start_date',
         'lease_end_date',
@@ -52,15 +51,9 @@ class Accommodation extends Model
     protected $casts = [
         'lease_start_date' => 'date',
         'lease_end_date' => 'date',
+        'country' => \App\Enums\EuropeanCountry::class,
     ];
 
-    /**
-     * Get the location for this accommodation.
-     */
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(Location::class);
-    }
 
     /**
      * Get all assignments for this accommodation.

@@ -165,9 +165,9 @@
                             <td class="text-center">
                                 @if(!$locationStatus['outside_base'] || $locationStatus['in_transit'])
                                     <span class="text-muted">─</span>
-                                @elseif($locationStatus['accommodation_location'])
+                                @elseif($locationStatus['accommodation'])
                                     <x-ui.badge variant="info">
-                                        🏡 {{ $locationStatus['accommodation_location']->name }}
+                                        🏡 {{ $locationStatus['accommodation']->name }}
                                     </x-ui.badge>
                                 @else
                                     <x-ui.badge variant="danger">

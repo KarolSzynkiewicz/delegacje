@@ -34,22 +34,6 @@
 
                     <div class="mb-3">
                         <x-ui.input 
-                            type="select" 
-                            name="location_id" 
-                            label="Lokalizacja"
-                            required="true"
-                        >
-                            <option value="">Wybierz lokalizację</option>
-                            @foreach($locations as $location)
-                                <option value="{{ $location->id }}" {{ old('location_id') == $location->id ? 'selected' : '' }}>
-                                    {{ $location->name }} ({{ $location->address }})
-                                </option>
-                            @endforeach
-                        </x-ui.input>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
                             type="text" 
                             name="address" 
                             label="Adres"
@@ -59,7 +43,7 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <x-ui.input 
                                     type="text" 
@@ -69,7 +53,7 @@
                                 />
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <x-ui.input 
                                     type="text" 
@@ -77,6 +61,20 @@
                                     label="Kod Pocztowy"
                                     value="{{ old('postal_code') }}"
                                 />
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <x-input-label for="country" value="Kraj" />
+                                <select id="country" name="country" class="form-select mt-1">
+                                    <option value="">-- Wybierz kraj --</option>
+                                    @foreach(\App\Enums\EuropeanCountry::sorted() as $country)
+                                        <option value="{{ $country->value }}" {{ old('country') === $country->value ? 'selected' : '' }}>
+                                            {{ $country->labelWithFlag() }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('country')" class="mt-2" />
                             </div>
                         </div>
                     </div>
