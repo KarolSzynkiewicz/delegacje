@@ -233,13 +233,13 @@
                                 <p class="text-muted small mb-0 mt-1">
                                     <i class="bi bi-calendar3"></i>
                                     @if($project->start_date)
-                                        {{ $project->start_date->format('Y-m-d') !!}
+                                        {{ $project->start_date->format('Y-m-d') }}
                                     @endif
                                     @if($project->start_date && $project->end_date)
                                         -
                                     @endif
                                     @if($project->end_date)
-                                        {{ $project->end_date->format('Y-m-d') !!}
+                                        {{ $project->end_date->format('Y-m-d') }}
                                     @elseif($project->start_date)
                                         (brak daty końca)
                                     @endif
@@ -247,7 +247,7 @@
                             @endif
                         </div>
                         @if($project->type)
-                            <x-ui.badge variant="info">{{ $project->type->label() !!}</x-ui.badge>
+                            <x-ui.badge variant="info">{{ $project->type->label() }}</x-ui.badge>
                         @endif
                     </div>
 
@@ -387,14 +387,14 @@
                                     </x-tooltip>
                                 </span>
                             </x-slot>
-                            <x-ui.badge variant="{{ $projectData['plan_execution'] >= 100 ? 'success' : ($projectData['plan_execution'] >= 80 ? 'warning' : 'danger') !!}">
+                            <x-ui.badge variant="{{ $projectData['plan_execution'] >= 100 ? 'success' : ($projectData['plan_execution'] >= 80 ? 'warning' : 'danger') }}">
                                 {{ formatNumber($projectData['plan_execution']) }}%
                             </x-ui.badge>
                         </x-ui.detail-item>
                     </x-ui.detail-list>
 
                     <div class="mt-3 pt-3 border-top">
-                        <x-ui.button variant="ghost" href="{{ route('projects.show', $project) !!}" class="btn-sm">
+                        <x-ui.button variant="ghost" href="{{ route('projects.show', $project) }}" class="btn-sm">
                             <i class="bi bi-eye me-1"></i> Szczegóły
                         </x-ui.button>
                     </div>
@@ -445,7 +445,7 @@
                                 @foreach($topEmployees as $employeeData)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $employeeData['employee']) !!}" class="text-decoration-none">
+                                            <a href="{{ route('employees.show', $employeeData['employee']) }}" class="text-decoration-none">
                                                 {{ $employeeData['employee']->full_name }}
                                             </a>
                                         </td>
@@ -505,7 +505,7 @@
                                 @foreach($longestRotations as $rotationData)
                                     <tr>
                                         <td>
-                                            <a href="{{ route('employees.show', $rotationData['employee']) !!}" class="text-decoration-none">
+                                            <a href="{{ route('employees.show', $rotationData['employee']) }}" class="text-decoration-none">
                                                 {{ $rotationData['employee']->full_name }}
                                             </a>
                                         </td>

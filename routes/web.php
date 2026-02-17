@@ -236,6 +236,28 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('payrolls/{payroll}/recalculate', [\App\Http\Controllers\PayrollController::class, 'recalculate'])
             ->name('payrolls.recalculate')
             ->defaults('resource', 'payrolls');
+        
+        // Project Tasks Actions - MUST BE BEFORE resource routes to avoid route conflict
+        Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])
+            ->name('projects.tasks.mark-in-progress')
+            ->defaults('resource', 'project-tasks');
+        Route::post('projects/{project}/tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompleted'])
+            ->name('projects.tasks.mark-completed')
+            ->defaults('resource', 'project-tasks');
+        Route::post('projects/{project}/tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancel'])
+            ->name('projects.tasks.cancel')
+            ->defaults('resource', 'project-tasks');
+        
+        // Global task actions (for tasks without project)
+        Route::post('tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgressGlobal'])
+            ->name('tasks.mark-in-progress')
+            ->defaults('resource', 'project-tasks');
+        Route::post('tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompletedGlobal'])
+            ->name('tasks.mark-completed')
+            ->defaults('resource', 'project-tasks');
+        Route::post('tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancelGlobal'])
+            ->name('tasks.cancel')
+            ->defaults('resource', 'project-tasks');
     });
     
     // ===== RESOURCE ROUTES =====
@@ -286,33 +308,6 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::delete('projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'destroy'])
         ->name('projects.tasks.destroy')
         ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    
-    Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])
-        ->name('projects.tasks.mark-in-progress')
-        ->defaults('permission_type', 'action')
-        ->defaults('resource', 'project-tasks');
-    Route::post('projects/{project}/tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompleted'])
-        ->name('projects.tasks.mark-completed')
-        ->defaults('permission_type', 'action')
-        ->defaults('resource', 'project-tasks');
-    Route::post('projects/{project}/tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancel'])
-        ->name('projects.tasks.cancel')
-        ->defaults('permission_type', 'action')
-        ->defaults('resource', 'project-tasks');
-    
-    // Global task actions (for tasks without project)
-    Route::post('tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgressGlobal'])
-        ->name('tasks.mark-in-progress')
-        ->defaults('permission_type', 'action')
-        ->defaults('resource', 'project-tasks');
-    Route::post('tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompletedGlobal'])
-        ->name('tasks.mark-completed')
-        ->defaults('permission_type', 'action')
-        ->defaults('resource', 'project-tasks');
-    Route::post('tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancelGlobal'])
-        ->name('tasks.cancel')
-        ->defaults('permission_type', 'action')
         ->defaults('resource', 'project-tasks');
     
     // Global task views (for tasks without project)

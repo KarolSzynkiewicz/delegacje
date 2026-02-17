@@ -92,23 +92,8 @@
                         $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
                         $rolePermissions = $userRole->permissions->pluck('name')->toArray();
                         
-                        // Mapowanie nazw zasobów na polskie
-                        $resourceNames = [
-                            'projects' => 'Projekty',
-                            'employees' => 'Pracownicy',
-                            'vehicles' => 'Pojazdy',
-                            'accommodations' => 'Mieszkania',
-                            'locations' => 'Lokalizacje',
-                            'roles' => 'Role',
-                            'assignments' => 'Przypisania projektów',
-                            'vehicle-assignments' => 'Przypisania pojazdów',
-                            'accommodation-assignments' => 'Przypisania mieszkań',
-                            'demands' => 'Zapotrzebowania',
-                            'reports' => 'Raporty',
-                            'weekly-overview' => 'Planer tygodniowy',
-                            'user-roles' => 'Role użytkowników',
-                            'users' => 'Użytkownicy',
-                        ];
+                        // Use RoutePermissionService to get resource labels (single source of truth)
+                        $routePermissionService = app(\App\Services\RoutePermissionService::class);
                         
                         $groupedPermissions = [];
                         foreach ($allPermissions as $permission) {
@@ -117,6 +102,9 @@
                             if (count($parts) === 2) {
                                 $resource = $parts[0];
                                 $action = $parts[1];
+                                
+                                // Get resource label from menu_items.php via RoutePermissionService
+                                $resourceName = $routePermissionService->getResourceLabel($resource);
                                 
                                 // Mapuj akcje na CRUD
                                 $crudMap = [
@@ -130,7 +118,6 @@
                                 $crud = $crudMap[$action] ?? null;
                                 if ($crud) {
                                     if (!isset($groupedPermissions[$resource])) {
-                                        $resourceName = $resourceNames[$resource] ?? ucfirst(str_replace('-', ' ', $resource));
                                         $groupedPermissions[$resource] = [
                                             'name' => $resourceName,
                                             'permissions' => ['C' => null, 'R' => null, 'U' => null, 'D' => null]

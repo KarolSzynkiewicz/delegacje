@@ -178,7 +178,7 @@ return [
     'user_roles' => [
         'route' => 'user-roles.index',
         'icon' => 'bi bi-shield-check',
-        'label' => 'Role użytkowników',
+        'label' => 'Role i uprawnienia',
     ],
     
     'system_actions' => [

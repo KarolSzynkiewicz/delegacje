@@ -367,51 +367,47 @@ class RoutePermissionService
     }
     
     /**
-     * Get Polish name for resource (single source of truth for resource labels).
+     * Get Polish name for resource.
+     * Uses menu_items.php as single source of truth for labels.
+     * Maps resource name (with dashes) to menu_items key (with underscores).
      */
     public function getResourceLabel(string $resource): string
     {
-        $labels = [
-            'projects' => 'Projekty',
-            'employees' => 'Pracownicy',
-            'vehicles' => 'Pojazdy',
-            'accommodations' => 'Mieszkania',
-            'locations' => 'Lokalizacje',
-            'roles' => 'Role',
-            'assignments' => 'Przypisania projektów',
-            'vehicle-assignments' => 'Przypisania pojazdów',
-            'accommodation-assignments' => 'Przypisania mieszkań',
-            'demands' => 'Zapotrzebowania',
-            'project-demands' => 'Zapotrzebowania projektów',
-            'reports' => 'Raporty',
-            'dashboard' => 'Dashboard',
-            'weekly-overview' => 'Planer tygodniowy',
-            'profitability' => 'Dashboard rentowności',
-            'user-roles' => 'Role użytkowników',
-            'users' => 'Użytkownicy',
-            'logistics-events' => 'Zdarzenia logistyczne',
-            'equipment' => 'Sprzęt',
-            'equipment-issues' => 'Wydania sprzętu',
-            'transport-costs' => 'Koszty transportu',
-            'time-logs' => 'Ewidencje godzin',
-            'adjustments' => 'Kary i nagrody',
-            'advances' => 'Zaliczki',
-            'documents' => 'Dokumenty',
-            'employee-documents' => 'Dokumenty pracowników',
-            'employee-rates' => 'Stawki pracowników',
-            'fixed-costs' => 'Koszty stałe',
-            'payrolls' => 'Payroll',
-            'project-variable-costs' => 'Koszty zmienne projektów',
-            'rotations' => 'Rotacje',
-            'return-trips' => 'Zjazdy',
-            'comments' => 'Komentarze',
-            'project-files' => 'Pliki projektów',
-            'project-tasks' => 'Zadania',
-            'files' => 'Pliki',
-            'tasks' => 'Zadania', // Mapowane na project-tasks w extractResourceFromRoute
+        // Get menu items config
+        $menuItems = config('menu_items', []);
+        
+        // Special mappings for resources that don't match menu_items keys directly
+        $specialMappings = [
+            'project-tasks' => 'tasks', // project-tasks -> tasks
+            'project-assignments' => 'assignments', // project-assignments -> assignments
+            'project-demands' => 'demands', // project-demands -> demands
+            'profitability' => 'dashboard', // profitability -> dashboard
         ];
         
-        return $labels[$resource] ?? ucfirst(str_replace('-', ' ', $resource));
+        // Check special mappings first
+        if (isset($specialMappings[$resource])) {
+            $menuKey = $specialMappings[$resource];
+            if (isset($menuItems[$menuKey]['label'])) {
+                return $menuItems[$menuKey]['label'];
+            }
+        }
+        
+        // Map resource name (with dashes) to menu_items key (with underscores)
+        // e.g., 'user-roles' -> 'user_roles', 'vehicle-assignments' -> 'vehicle_assignments'
+        $menuKey = str_replace('-', '_', $resource);
+        
+        // Try to get label from menu_items
+        if (isset($menuItems[$menuKey]['label'])) {
+            return $menuItems[$menuKey]['label'];
+        }
+        
+        // Fallback: try direct match (for resources that use same format)
+        if (isset($menuItems[$resource]['label'])) {
+            return $menuItems[$resource]['label'];
+        }
+        
+        // Final fallback: generate label from resource name
+        return ucfirst(str_replace('-', ' ', $resource));
     }
 
     /**
