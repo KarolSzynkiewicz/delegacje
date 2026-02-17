@@ -17,8 +17,14 @@ class TimeLogPolicy
             return true;
         }
 
+        // Sprawdź uprawnienia z roli - jeśli ma uprawnienie w roli, widzi wszystkie
+        if ($user->hasPermission('time-logs.viewAny') || $user->hasPermission('time-logs.view')) {
+            return true;
+        }
+
         // Kierownik widzi time-logi ze swoich projektów
-        return $user->getManagedProjectIds()->isNotEmpty();
+        $managedProjectIds = $user->getManagedProjectIds();
+        return !empty($managedProjectIds);
     }
 
     /**
