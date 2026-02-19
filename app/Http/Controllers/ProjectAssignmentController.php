@@ -152,7 +152,7 @@ class ProjectAssignmentController extends Controller
      */
     public function show(ProjectAssignment $assignment): View
     {
-        $assignment->load("employee", "project", "role");
+        $assignment->load("employee", "project", "role", "logisticsEvent.toLocation", "logisticsEvent.fromLocation");
         
         return view("assignments.show", compact("assignment"));
     }

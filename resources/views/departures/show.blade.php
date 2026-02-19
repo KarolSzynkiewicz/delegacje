@@ -182,9 +182,15 @@
                                                 {{ $projectAssignment->start_date->format('d.m.Y') }} - {{ $projectAssignment->end_date ? $projectAssignment->end_date->format('d.m.Y') : 'brak daty' }}
                                             </small>
                                         @else
-                                            <span class="text-muted">
-                                                <i class="bi bi-dash-circle"></i> Nie przypisany
-                                            </span>
+                                            @if($departure->status === \App\Enums\LogisticsEventStatus::CANCELLED)
+                                                <span class="text-muted small">
+                                                    <i class="bi bi-info-circle"></i> Powiązanie usunięto w momencie anulowania wyjazdu
+                                                </span>
+                                            @else
+                                                <span class="text-muted">
+                                                    <i class="bi bi-dash-circle"></i> Nie przypisany
+                                                </span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td>
@@ -199,7 +205,13 @@
                                                 {{ $vehicleAssignment->start_date->format('d.m.Y') }} - {{ $vehicleAssignment->end_date ? $vehicleAssignment->end_date->format('d.m.Y') : 'brak daty' }}
                                             </small>
                                         @else
-                                            <span class="text-muted">—</span>
+                                            @if($departure->status === \App\Enums\LogisticsEventStatus::CANCELLED)
+                                                <span class="text-muted small">
+                                                    <i class="bi bi-info-circle"></i> Powiązanie usunięto w momencie anulowania wyjazdu
+                                                </span>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td>
@@ -214,7 +226,13 @@
                                                 {{ $accommodationAssignment->start_date->format('d.m.Y') }} - {{ $accommodationAssignment->end_date ? $accommodationAssignment->end_date->format('d.m.Y') : 'brak daty' }}
                                             </small>
                                         @else
-                                            <span class="text-muted">—</span>
+                                            @if($departure->status === \App\Enums\LogisticsEventStatus::CANCELLED)
+                                                <span class="text-muted small">
+                                                    <i class="bi bi-info-circle"></i> Powiązanie usunięto w momencie anulowania wyjazdu
+                                                </span>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
                                         @endif
                                     </td>
                                 </tr>

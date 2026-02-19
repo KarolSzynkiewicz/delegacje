@@ -40,7 +40,22 @@
                                 <i class="bi bi-truck text-warning fs-6"></i>
                             </x-tooltip>
                         </label>
-                        <select name="vehicle_id" class="form-select">
+                        <select 
+                            name="vehicle_id" 
+                            id="vehicle_select"
+                            class="form-select"
+                            x-data="{ 
+                                vehicleId: '{{ old('vehicle_id') ?? '' }}',
+                                departureDate: '{{ old('departure_date', date('Y-m-d')) }}',
+                                endDate: '{{ old('end_date') ?? '' }}'
+                            }"
+                            x-on:change="vehicleId = $event.target.value; 
+                                        departureDate = document.querySelector('[name=departure_date]')?.value || '{{ date('Y-m-d') }}';
+                                        endDate = document.querySelector('[name=end_date]')?.value || '';
+                                        $wire.set('vehicleId', vehicleId);
+                                        $wire.set('departureDate', departureDate);
+                                        $wire.set('endDate', endDate);"
+                        >
                             <option value="">Brak pojazdu</option>
                             @foreach($vehicles as $vehicle)
                                 <option value="{{ $vehicle->id }}" {{ old('vehicle_id') == $vehicle->id ? 'selected' : '' }}>
@@ -48,6 +63,12 @@
                                 </option>
                             @endforeach
                         </select>
+                        
+                        @livewire('vehicle-availability-checker', [
+                            'vehicleId' => old('vehicle_id') ?? '',
+                            'departureDate' => old('departure_date', date('Y-m-d')),
+                            'endDate' => old('end_date') ?? ''
+                        ], key('vehicle-checker'))
                     </div>
 
                     <div class="mb-3">
@@ -108,6 +129,7 @@
         // Initialize tooltips on page load
         document.addEventListener('DOMContentLoaded', () => {
             initializeTooltips();
+            setupVehicleValidation();
         });
 
         // Reinitialize tooltips after Livewire updates
@@ -141,6 +163,60 @@
                     if (e.key === 'Escape') {
                         newElement.classList.remove('active');
                     }
+                });
+            });
+        }
+        
+        function setupVehicleValidation() {
+            const vehicleSelect = document.getElementById('vehicle_select');
+            
+            // Wait for Livewire to be ready
+            document.addEventListener('livewire:init', () => {
+                const checker = Livewire.find('vehicle-checker');
+                if (!checker) return;
+                
+                // Listen for vehicle selection changes
+                if (vehicleSelect) {
+                    vehicleSelect.addEventListener('change', function() {
+                        const vehicleId = this.value;
+                        const departureDate = document.querySelector('[name="departure_date"]')?.value || '';
+                        const endDate = document.querySelector('[name="end_date"]')?.value || '';
+                        
+                        checker.set('vehicleId', vehicleId);
+                        if (departureDate) checker.set('departureDate', departureDate);
+                        if (endDate) checker.set('endDate', endDate);
+                    });
+                }
+                
+                // Listen for date changes from Livewire departure-employee-selector
+                Livewire.on('dateChanged', (data) => {
+                    const vehicleId = vehicleSelect?.value || '';
+                    if (vehicleId && data.departureDate) {
+                        checker.set('departureDate', data.departureDate);
+                    }
+                    if (vehicleId && data.endDate) {
+                        checker.set('endDate', data.endDate);
+                    }
+                });
+                
+                // Also listen to DOM changes (fallback)
+                const observer = new MutationObserver(() => {
+                    const vehicleId = vehicleSelect?.value || '';
+                    const departureDate = document.querySelector('[name="departure_date"]')?.value || '';
+                    const endDate = document.querySelector('[name="end_date"]')?.value || '';
+                    
+                    if (vehicleId && departureDate && endDate) {
+                        checker.set('vehicleId', vehicleId);
+                        checker.set('departureDate', departureDate);
+                        checker.set('endDate', endDate);
+                    }
+                });
+                
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['value']
                 });
             });
         }

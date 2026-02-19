@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 class VehicleAssignmentService
 {
     public function __construct(
-        protected LogisticsEventService $logisticsEventService
+        protected VehicleValidationService $vehicleValidationService
     ) {}
     /**
      * Create a vehicle assignment with availability validation.
@@ -33,13 +33,14 @@ class VehicleAssignmentService
     ): VehicleAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
-        // Validate driver availability (only one driver per vehicle per period)
-        if ($position === VehiclePosition::DRIVER) {
-            $this->validateDriverAvailability($vehicle, $startDate, $endDate);
-        }
-
-        // Validate employee doesn't have overlapping assignment to the same vehicle
-        $this->validateNoOverlappingAssignment($employee, $vehicle, $startDate, $endDate);
+        // Use centralized validation service
+        $this->vehicleValidationService->validateForProjectAssignmentOrFail(
+            $vehicle,
+            $employee,
+            $position,
+            $startDate,
+            $endDate
+        );
 
         return VehicleAssignment::create([
             'employee_id' => $employee->id,
@@ -68,14 +69,15 @@ class VehicleAssignmentService
     ): VehicleAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
-        // Validate driver availability (only one driver per vehicle per period)
-        // Exclude current assignment if it's being updated
-        if ($position === VehiclePosition::DRIVER) {
-            $this->validateDriverAvailability($vehicle, $startDate, $endDate, $assignment->id);
-        }
-
-        // Validate employee doesn't have overlapping assignment to the same vehicle (excluding current)
-        $this->validateNoOverlappingAssignment($assignment->employee, $vehicle, $startDate, $endDate, $assignment->id);
+        // Use centralized validation service (exclude current assignment)
+        $this->vehicleValidationService->validateForProjectAssignmentOrFail(
+            $vehicle,
+            $assignment->employee,
+            $position,
+            $startDate,
+            $endDate,
+            $assignment->id
+        );
 
         $assignment->update([
             'vehicle_id' => $vehicle->id,
@@ -89,59 +91,4 @@ class VehicleAssignmentService
         return $assignment;
     }
 
-    /**
-     * Validate that employee doesn't have overlapping assignment to the same vehicle.
-     *
-     * @throws ValidationException
-     */
-    protected function validateNoOverlappingAssignment(
-        Employee $employee,
-        Vehicle $vehicle,
-        Carbon $startDate,
-        Carbon $endDate,
-        ?int $excludeAssignmentId = null
-    ): void {
-        $query = $employee->vehicleAssignments()
-            ->where('vehicle_id', $vehicle->id)
-            ->where('is_return_trip', false); // Exclude return trip assignments
-
-        DateRangeService::validateNoOverlappingAssignments(
-            $query,
-            $startDate,
-            $endDate,
-            $excludeAssignmentId,
-            'vehicle_id',
-            'Pracownik ma już przypisanie do tego pojazdu w tym okresie. Nie można tworzyć nakładających się przypisań.'
-        );
-    }
-
-    /**
-     * Validate that there's only one driver per vehicle in date range.
-     * Also checks if vehicle is not used by logistics events (departures/returns).
-     *
-     * @throws ValidationException
-     */
-    protected function validateDriverAvailability(Vehicle $vehicle, Carbon $startDate, Carbon $endDate, ?int $excludeAssignmentId = null): void
-    {
-        // Check if vehicle already has a driver assigned
-        $query = $vehicle->assignments()
-            ->where('position', VehiclePosition::DRIVER->value)
-            ->where('is_return_trip', false) // Exclude return trip assignments
-            ->overlappingWith($startDate, $endDate);
-
-        if ($excludeAssignmentId) {
-            $query->where('id', '!=', $excludeAssignmentId);
-        }
-
-        $hasDriver = $query->exists();
-
-        if ($hasDriver) {
-            throw ValidationException::withMessages([
-                'position' => 'Pojazd ma już przypisanego kierowcę w tym okresie.'
-            ]);
-        }
-
-        // Check if vehicle is used by logistics event (departure/return)
-        $this->logisticsEventService->validateVehicleAvailability($vehicle, $startDate, $endDate);
-    }
 }

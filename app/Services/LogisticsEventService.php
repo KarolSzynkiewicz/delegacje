@@ -18,6 +18,9 @@ use Illuminate\Validation\ValidationException;
  */
 class LogisticsEventService
 {
+    public function __construct(
+        protected VehicleValidationService $vehicleValidationService
+    ) {}
     /**
      * Validate vehicle availability for logistics event.
      * 
@@ -37,45 +40,13 @@ class LogisticsEventService
             return; // No vehicle = no validation needed
         }
         
-        // 1. Check other logistics events using this vehicle
-        $hasConflictingEvent = LogisticsEvent::where('vehicle_id', $vehicle->id)
-            ->whereNotIn('status', [LogisticsEventStatus::CANCELLED])
-            ->when($excludeEventId, fn($q) => $q->where('id', '!=', $excludeEventId))
-            ->where(function($q) use ($startDate, $endDate) {
-                // Check if dates overlap
-                $q->where(function($query) use ($startDate, $endDate) {
-                    $query->where('event_date', '<=', $endDate)
-                          ->where(function($q2) use ($startDate) {
-                              // If end_date is null, use event_date as end
-                              $q2->whereRaw('COALESCE(end_date, event_date) >= ?', [$startDate]);
-                          });
-                });
-            })
-            ->exists();
-            
-        if ($hasConflictingEvent) {
-            throw ValidationException::withMessages([
-                'vehicle_id' => 'Pojazd jest już zajęty przez inny wyjazd/zjazd w tym okresie.'
-            ]);
-        }
-        
-        // 2. Check vehicle assignments (project assignments)
-        $hasProjectAssignment = VehicleAssignment::where('vehicle_id', $vehicle->id)
-            ->where('is_cancelled', false)
-            ->where(function($q) use ($startDate, $endDate) {
-                $q->where('start_date', '<=', $endDate)
-                  ->where(function($q2) use ($startDate) {
-                      $q2->whereNull('end_date')
-                         ->orWhere('end_date', '>=', $startDate);
-                  });
-            })
-            ->exists();
-            
-        if ($hasProjectAssignment) {
-            throw ValidationException::withMessages([
-                'vehicle_id' => 'Pojazd jest przypisany do projektu w tym okresie.'
-            ]);
-        }
+        // Use centralized validation service
+        $this->vehicleValidationService->validateForLogisticsEventOrFail(
+            $vehicle,
+            $startDate,
+            $endDate,
+            $excludeEventId
+        );
     }
 
     /**
@@ -109,7 +80,7 @@ class LogisticsEventService
 
         // Check logistics events
         $events = LogisticsEvent::where('vehicle_id', $vehicle->id)
-            ->whereNotIn('status', [LogisticsEventStatus::CANCELLED])
+            ->where('status', '!=', LogisticsEventStatus::CANCELLED->value)
             ->when($excludeEventId, fn($q) => $q->where('id', '!=', $excludeEventId))
             ->where(function($q) use ($startDate, $endDate) {
                 $q->where(function($query) use ($startDate, $endDate) {

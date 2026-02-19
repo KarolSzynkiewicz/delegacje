@@ -12,6 +12,7 @@ use App\Models\LogisticsEvent;
 use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\AccommodationAssignmentService;
+use App\Services\VehicleValidationService;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\VehiclePosition;
@@ -193,7 +194,7 @@ class BulkDepartureAssignments extends Component
                         }
                         
                         // Check overlapping assignments
-                        $overlaps = $employee->assignments()
+                        $overlappingAssignments = $employee->assignments()
                             ->where('is_cancelled', false)
                             ->where(function($q) use ($startDate, $endDate) {
                                 $q->whereBetween('start_date', [$startDate, $endDate])
@@ -206,10 +207,16 @@ class BulkDepartureAssignments extends Component
                                          });
                                   });
                             })
-                            ->exists();
+                            ->get();
                         
-                        if ($overlaps) {
-                            $errors[] = "PROJEKT: Nakładające się przypisanie";
+                        if ($overlappingAssignments->isNotEmpty()) {
+                            $assignmentIds = $overlappingAssignments->pluck('id')->toArray();
+                            $dates = $overlappingAssignments->map(fn($a) => $a->start_date->format('d.m.Y') . ' - ' . ($a->end_date ? $a->end_date->format('d.m.Y') : '...'))->join(', ');
+                            $errorMsg = "PROJEKT: Nakładające się przypisanie ({$dates})";
+                            $errors[] = [
+                                'message' => $errorMsg,
+                                'overlapping_assignments' => array_map(fn($id) => ['id' => $id, 'type' => 'project_assignment'], $assignmentIds)
+                            ];
                         }
                         
                         // Check project dates (start/end)
@@ -251,15 +258,39 @@ class BulkDepartureAssignments extends Component
                     $errors[] = "AUTO: Start przed przyjazdem ({$arrivalDate->format('d.m.Y')})";
                 }
                 
-                // Check if multiple drivers in same vehicle
+                // Check if multiple drivers in same vehicle (within form)
                 if ($assignment['position'] === 'driver' && count($vehicleDrivers[$vehicleId]) > 1) {
                     $otherDrivers = array_filter($vehicleDrivers[$vehicleId], fn($name) => $name !== $employee->full_name);
-                    $errors[] = "AUTO: Konflikt kierowców - " . implode(', ', $otherDrivers);
+                    $errors[] = "AUTO: Konflikt kierowców w formularzu - " . implode(', ', $otherDrivers);
                 }
                 
-                // Check vehicle capacity
-                if ($vehicle && $vehicleUsage[$vehicleId] > $vehicle->capacity) {
-                    $errors[] = "AUTO: Przekroczona pojemność ({$vehicleUsage[$vehicleId]}/{$vehicle->capacity})";
+                // Use centralized validation service
+                if ($vehicle) {
+                    $position = \App\Enums\VehiclePosition::from($assignment['position']);
+                    $currentCapacity = $vehicleUsage[$vehicleId] ?? null;
+                    
+                    $validationService = app(VehicleValidationService::class);
+                    // pending_departure data will be checked inside validation service
+                    // to exclude conflicts if assignment starts from departure's end_date
+                    $validationResult = $validationService->validateForProjectAssignment(
+                        $vehicle,
+                        $employee,
+                        $position,
+                        $startDate,
+                        $endDate,
+                        null, // excludeAssignmentId
+                        $currentCapacity,
+                        null // excludeEventId - nie ma jeszcze ID, ale pending_departure będzie sprawdzone w checkVehicleLogisticsEvents
+                    );
+                    
+                    if (!$validationResult['valid']) {
+                        foreach ($validationResult['errors'] as $errorMsg) {
+                            $errors[] = [
+                                'message' => "AUTO: {$errorMsg}",
+                                'overlapping_assignments' => $validationResult['conflicts']
+                            ];
+                        }
+                    }
                 }
             }
             
@@ -405,7 +436,8 @@ class BulkDepartureAssignments extends Component
         
         if (!$departureData) {
             session()->flash('error', 'Brak danych wyjazdu. Rozpocznij proces od początku.');
-            return redirect()->route('departures.create');
+            $this->redirectRoute('departures.create');
+            return;
         }
         
         try {
@@ -419,7 +451,7 @@ class BulkDepartureAssignments extends Component
                 'from_location_id' => $departureData['from_location_id'],
                 'to_location_id' => $departureData['to_location_id'],
                 'vehicle_id' => $departureData['vehicle_id'] ?? null,
-                'status' => LogisticsEventStatus::PLANNED,
+                'status' => LogisticsEventStatus::COMPLETED, // Wyjazd wymusza przypisanie, więc zawsze COMPLETED
                 'notes' => $departureData['notes'] ?? null,
                 'has_transport' => !empty($departureData['vehicle_id']),
                 'created_by' => auth()->id(),
@@ -451,7 +483,7 @@ class BulkDepartureAssignments extends Component
                     Carbon::parse($assignmentData['project_start_date']),
                     Carbon::parse($assignmentData['project_end_date']),
                     null, // notes
-                    $departure->id // Link to departure!
+                    $departure->id // Link to departure - also used for validation!
                 );
 
                 // Vehicle assignment
@@ -485,10 +517,39 @@ class BulkDepartureAssignments extends Component
 
             session()->flash('success', "Wyjazd oraz wszystkie przypisania zostały utworzone! ({$departure->participants->count()} pracowników)");
             
-            return redirect()->route('weekly-overview.index', [
+            $this->redirectRoute('weekly-overview.index', [
                 'start_date' => Carbon::parse($departureData['end_date'])->startOfWeek()->format('Y-m-d')
             ]);
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollback();
+            
+            // Add validation errors to component errors
+            $errorMessages = [];
+            foreach ($e->errors() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $errorMessages[] = $message;
+                }
+            }
+            
+            // Add to validation errors for display
+            foreach ($this->assignments as $employeeId => $assignmentData) {
+                $employee = Employee::find($employeeId);
+                if ($employee) {
+                    if (!isset($this->validationErrors[$employeeId])) {
+                        $this->validationErrors[$employeeId] = [
+                            'name' => $employee->full_name,
+                            'errors' => []
+                        ];
+                    }
+                    foreach ($errorMessages as $errorMsg) {
+                        $this->validationErrors[$employeeId]['errors'][] = "PROJEKT: " . $errorMsg;
+                    }
+                }
+            }
+            
+            session()->flash('error', 'Wystąpiły błędy walidacji. Sprawdź szczegóły poniżej.');
+            
         } catch (\Exception $e) {
             DB::rollback();
             

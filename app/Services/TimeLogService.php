@@ -73,6 +73,10 @@ class TimeLogService
         float $hoursWorked,
         ?string $notes = null
     ): bool {
+        // OPTIMIZATION: Eager load assignment to avoid lazy loading
+        if (!$timeLog->relationLoaded('projectAssignment')) {
+            $timeLog->load('projectAssignment');
+        }
         $assignment = $timeLog->projectAssignment;
         return $this->updateTimeLogWithAssignment($timeLog, $assignment, $workDate, $hoursWorked, $notes);
     }
@@ -272,15 +276,16 @@ class TimeLogService
         
         $projects = $projectsQuery->orderBy('name')->get();
         
-        // Get all time logs for this month (even if assignment was deleted)
+        // OPTIMIZATION: Get all time logs for this month in one query (even if assignment was deleted)
+        // Use join instead of whereHas for better performance
         $timeLogsQuery = TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()])
-            ->with(['projectAssignment.project', 'projectAssignment.employee']);
+            ->join('project_assignments', 'time_logs.project_assignment_id', '=', 'project_assignments.id')
+            ->with(['projectAssignment.project', 'projectAssignment.employee'])
+            ->select('time_logs.*');
         
         // Filter by project IDs if provided (for /mine/* routes)
         if ($projectIds !== null && !empty($projectIds)) {
-            $timeLogsQuery->whereHas('projectAssignment', function($query) use ($projectIds) {
-                $query->whereIn('project_id', $projectIds);
-            });
+            $timeLogsQuery->whereIn('project_assignments.project_id', $projectIds);
         }
         
         $allTimeLogs = $timeLogsQuery->get();
@@ -416,26 +421,88 @@ class TimeLogService
             'errors' => [],
         ];
 
+        if (empty($entries)) {
+            return $results;
+        }
+
+        // OPTIMIZATION: Load all assignments at once instead of N queries
+        $assignmentIds = array_unique(array_filter(array_column($entries, 'assignment_id')));
+        $assignments = ProjectAssignment::whereIn('id', $assignmentIds)
+            ->get()
+            ->keyBy('id');
+
+        // OPTIMIZATION: Load all existing time logs at once
+        // Build date ranges for all entries
+        $dateRanges = [];
+        foreach ($entries as $entry) {
+            if (!isset($entry['assignment_id']) || !isset($entry['date'])) {
+                continue;
+            }
+            $assignmentId = (int)$entry['assignment_id'];
+            $date = Carbon::parse($entry['date'])->startOfDay();
+            $dayStart = $date->copy()->startOfDay();
+            $dayEnd = $date->copy()->endOfDay();
+            
+            if (!isset($dateRanges[$assignmentId])) {
+                $dateRanges[$assignmentId] = [];
+            }
+            $dateRanges[$assignmentId][] = [$dayStart, $dayEnd];
+        }
+
+        // Load all time logs for all assignments and dates in one query
+        $existingTimeLogs = collect();
+        if (!empty($dateRanges)) {
+            $timeLogsQuery = TimeLog::whereIn('project_assignment_id', array_keys($dateRanges));
+            
+            // Build OR conditions for all date ranges
+            $timeLogsQuery->where(function($query) use ($dateRanges) {
+                foreach ($dateRanges as $assignmentId => $ranges) {
+                    foreach ($ranges as $range) {
+                        $query->orWhere(function($q) use ($assignmentId, $range) {
+                            $q->where('project_assignment_id', $assignmentId)
+                              ->whereBetween('start_time', $range);
+                        });
+                    }
+                }
+            });
+            
+            $existingTimeLogs = $timeLogsQuery->get()->keyBy(function($timeLog) {
+                return $timeLog->project_assignment_id . '_' . $timeLog->start_time->format('Y-m-d');
+            });
+        }
+
+        // Process entries
         foreach ($entries as $index => $entry) {
             try {
+                if (!isset($entry['assignment_id']) || !isset($entry['date'])) {
+                    continue;
+                }
+
                 $assignmentId = (int)$entry['assignment_id'];
-                $assignment = ProjectAssignment::findOrFail($assignmentId);
-                // Parsuj datę i ustaw na startOfDay() od razu - zapewnia stabilność
+                
+                // Get assignment from pre-loaded collection
+                if (!isset($assignments[$assignmentId])) {
+                    $results['errors'][] = [
+                        'assignment_id' => $assignmentId,
+                        'date' => $entry['date'] ?? null,
+                        'message' => 'Przypisanie nie zostało znalezione.',
+                    ];
+                    continue;
+                }
+                
+                $assignment = $assignments[$assignmentId];
+                
+                // Parse date
                 $date = Carbon::parse($entry['date'])->startOfDay();
                 $hours = isset($entry['hours']) && $entry['hours'] !== '' && $entry['hours'] !== null ? (float)$entry['hours'] : 0;
 
-                // Find existing time log
-                // Używamy whereBetween z startOfDay/endOfDay zamiast whereDate (problemy z timezone)
-                $dayStart = $date->copy()->startOfDay();
-                $dayEnd = $date->copy()->endOfDay();
-                $timeLog = TimeLog::where('project_assignment_id', $assignment->id)
-                    ->whereBetween('start_time', [$dayStart, $dayEnd])
-                    ->first();
+                // Find existing time log from pre-loaded collection
+                $timeLogKey = $assignmentId . '_' . $date->format('Y-m-d');
+                $timeLog = $existingTimeLogs->get($timeLogKey);
 
                 if ($hours > 0) {
                     if ($timeLog) {
-                        // Update existing - use the assignment from bulkUpdate, not from timeLog
-                        // This ensures we validate against the correct assignment
+                        // Update existing
                         $this->updateTimeLogWithAssignment($timeLog, $assignment, $date, $hours);
                         $results['updated']++;
                     } else {

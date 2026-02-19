@@ -24,6 +24,19 @@
         });
     </script>
 
+    <!-- Komunikaty z sesji -->
+    @if(session('success'))
+        <x-ui.alert variant="success" title="Sukces" dismissible class="mb-4">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
+
+    @if(session('error'))
+        <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-4">
+            {{ session('error') }}
+        </x-ui.alert>
+    @endif
+
     <!-- Walidator na górze -->
     @if(count($validationErrors) > 0)
         <div class="alert alert-danger mb-4">
@@ -33,7 +46,49 @@
                     <strong>{{ $data['name'] }}:</strong>
                     <ul class="mb-0">
                         @foreach($data['errors'] as $error)
-                            <li>{{ $error }}</li>
+                            <li>
+                                @if(is_array($error) && isset($error['message']))
+                                    {{ $error['message'] }}
+                                    @if(isset($error['overlapping_assignments']) && count($error['overlapping_assignments']) > 0)
+                                        <div class="mt-1 ms-3">
+                                            <small class="text-muted">Kolidujące przypisania:</small>
+                                            @foreach($error['overlapping_assignments'] as $overlap)
+                                                @if($overlap['type'] === 'vehicle_assignment')
+                                                    <a href="{{ route('vehicle-assignments.show', $overlap['id']) }}" 
+                                                       target="_blank" 
+                                                       class="badge bg-warning text-dark text-decoration-none ms-1"
+                                                       title="Otwórz przypisanie pojazdu">
+                                                        <i class="bi bi-link-45deg"></i> Auto #{{ $overlap['id'] }}
+                                                    </a>
+                                                @elseif($overlap['type'] === 'project_assignment')
+                                                    <a href="{{ route('project-assignments.show', $overlap['id']) }}" 
+                                                       target="_blank" 
+                                                       class="badge bg-info text-white text-decoration-none ms-1"
+                                                       title="Otwórz przypisanie projektu">
+                                                        <i class="bi bi-link-45deg"></i> Projekt #{{ $overlap['id'] }}
+                                                    </a>
+                                                @elseif($overlap['type'] === 'accommodation_assignment')
+                                                    <a href="{{ route('accommodation-assignments.show', $overlap['id']) }}" 
+                                                       target="_blank" 
+                                                       class="badge bg-success text-white text-decoration-none ms-1"
+                                                       title="Otwórz przypisanie zakwaterowania">
+                                                        <i class="bi bi-link-45deg"></i> Dom #{{ $overlap['id'] }}
+                                                    </a>
+                                                @elseif($overlap['type'] === 'logistics_event')
+                                                    <a href="{{ route($overlap['route'] ?? 'departures.show', $overlap['route_params'] ?? $overlap['id']) }}" 
+                                                       target="_blank" 
+                                                       class="badge bg-danger text-white text-decoration-none ms-1"
+                                                       title="{{ $overlap['description'] ?? 'Otwórz wyjazd/zjazd' }}">
+                                                        <i class="bi bi-link-45deg"></i> Wyjazd #{{ $overlap['id'] }}
+                                                    </a>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                @else
+                                    {{ $error }}
+                                @endif
+                            </li>
                         @endforeach
                     </ul>
                 </div>
@@ -196,7 +251,7 @@
                                 <option value="">-- Wybierz --</option>
                                 @foreach($vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">
-                                        {{ $vehicle->registration_number }}
+                                        {{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}
                                     </option>
                                 @endforeach
                             </select>

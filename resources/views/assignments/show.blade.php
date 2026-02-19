@@ -89,6 +89,29 @@
                         <dt class="fw-semibold mb-1">Data Zakończenia:</dt>
                         <dd>{{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : 'Bieżące' }}</dd>
                     </div>
+                    @if($assignment->logisticsEvent)
+                    <div class="col-12 mb-3">
+                        <dt class="fw-semibold mb-1">Powiązany wyjazd:</dt>
+                        <dd>
+                            <a href="{{ route('departures.show', $assignment->logisticsEvent) }}" 
+                               class="text-primary text-decoration-none d-inline-flex align-items-center gap-1"
+                               target="_blank">
+                                <i class="bi bi-link-45deg"></i>
+                                Wyjazd #{{ $assignment->logisticsEvent->id }}
+                                @if($assignment->logisticsEvent->toLocation)
+                                    - {{ $assignment->logisticsEvent->toLocation->name }}
+                                @endif
+                                @if($assignment->logisticsEvent->event_date)
+                                    ({{ $assignment->logisticsEvent->event_date->format('d.m.Y') }}
+                                    @if($assignment->logisticsEvent->end_date)
+                                        - {{ $assignment->logisticsEvent->end_date->format('d.m.Y') }}
+                                    @endif
+                                    )
+                                @endif
+                            </a>
+                        </dd>
+                    </div>
+                    @endif
                     @if($assignment->notes)
                     <div class="col-12 mb-3">
                         <dt class="fw-semibold mb-1">Uwagi:</dt>

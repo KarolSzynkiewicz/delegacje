@@ -28,7 +28,7 @@ class ProjectTabs extends Component
         $allTabs = [
             'info' => ['label' => 'Informacje', 'permission' => null, 'icon' => 'bi bi-info-circle'],
             'files' => ['label' => 'Pliki', 'permission' => 'project-files.view', 'icon' => 'bi bi-file-earmark'],
-            'tasks' => ['label' => 'Zadania', 'permission' => 'project-tasks.view', 'icon' => 'bi bi-list-check'],
+            'tasks' => ['label' => 'Zadania', 'permission' => 'tasks.view', 'icon' => 'bi bi-list-check'],
             'assignments' => ['label' => 'Przypisani pracownicy', 'permission' => 'assignments.view', 'icon' => 'bi bi-person-check'],
             'comments' => ['label' => 'Komentarze', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
         ];
@@ -43,7 +43,7 @@ class ProjectTabs extends Component
             // permission === null (np. info) zawsze dostępny
             // lub user ma wymagane permission
             // W widoku /mine/* zadania są zawsze dostępne (kierownik widzi swoje zadania)
-            if ($this->isMineView && $tab['permission'] === 'project-tasks.view') {
+            if ($this->isMineView && $tab['permission'] === 'tasks.view') {
                 return true;
             }
             return $tab['permission'] === null || auth()->user()->hasPermission($tab['permission']);

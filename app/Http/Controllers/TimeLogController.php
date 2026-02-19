@@ -141,18 +141,6 @@ class TimeLogController extends Controller
     }
 
     /**
-     * Display time logs for a specific project assignment.
-     */
-    public function byAssignment(ProjectAssignment $assignment): View
-    {
-        $timeLogs = $assignment->timeLogs()
-            ->orderBy('start_time', 'desc')
-            ->get();
-        
-        return view('time-logs.by-assignment', compact('assignment', 'timeLogs'));
-    }
-
-    /**
      * Display monthly grid for time logs editing.
      */
     public function monthlyGrid(Request $request): View

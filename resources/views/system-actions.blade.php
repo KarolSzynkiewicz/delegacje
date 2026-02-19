@@ -74,32 +74,6 @@
                         </div>
                     </div>
 
-                    <!-- Napraw daty wyjazdów -->
-                    <div class="border rounded p-3 mb-3 bg-info bg-opacity-10">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h5 class="mb-2">
-                                    <i class="bi bi-calendar-event text-info"></i>
-                                    Napraw stare daty wyjazdów
-                                </h5>
-                                <p class="text-muted mb-0 small">
-                                    <strong>🛠️ Naprawia:</strong> Dodaje <code>end_date</code> (+1 dzień) do starych wyjazdów utworzonych przed migracją. 
-                                    <strong>Jednorazowe użycie po deploy!</strong>
-                                </p>
-                            </div>
-                            <form method="POST" action="{{ route('system-actions.fix-departure-dates') }}" class="ms-3">
-                                @csrf
-                                <x-ui.button 
-                                    variant="info" 
-                                    type="submit"
-                                    onclick="return confirm('Czy na pewno chcesz naprawić daty wyjazdów?')"
-                                >
-                                    <i class="bi bi-wrench"></i> Napraw
-                                </x-ui.button>
-                            </form>
-                        </div>
-                    </div>
-
                     <!-- Debug Mode Toggle -->
                     <div class="border rounded p-3 mb-3 bg-danger bg-opacity-10">
                         <div class="d-flex justify-content-between align-items-start">

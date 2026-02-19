@@ -20,6 +20,7 @@ use App\Http\Controllers\WeeklyOverviewController;
 use App\Http\Controllers\RotationController;
 use App\Http\Controllers\EmployeeRateController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SystemActionsController;
 use Illuminate\Support\Facades\Route;
 
 //review
@@ -29,159 +30,52 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// TEST ENDPOINT - Debug Railway deployment (remove after testing)
-Route::get('/test', function () {
-    return response()->json([
-        'status' => 'ok',
-        'app_key' => config('app.key') ? 'set' : 'missing',
-        'app_key_length' => config('app.key') ? strlen(config('app.key')) : 0,
-        'env' => config('app.env'),
-        'debug' => config('app.debug'),
-        'app_name' => config('app.name'),
-        'timestamp' => now()->toIso8601String(),
-    ], 200);
-});
-
-// Healthcheck moved to routes/api.php to avoid web middleware requiring APP_KEY
 
 // Homepage - normal Laravel route (can have auth, middleware, etc.)
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+// ui build helper
 Route::get('/2', function () {
     return view('welcome2');
 })->name('home2');
 
+
 Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->group(function () {
     
+   
+   
     // ===== ACTION ROUTES =====
     // IMPORTANT: Action routes MUST be defined BEFORE resource routes to avoid route conflicts
     // Laravel matches routes in order, so specific routes (like /prepare) must come before parameterized routes (like /{id})
+    
+    
     Route::group(['defaults' => ['permission_type' => 'action']], function () {
-        // System actions - light cache clear (permissions + routes only)
-        Route::post('/system-actions/clear-permissions', function () {
-            try {
-                \Illuminate\Support\Facades\Artisan::call('permission:cache-reset');
-                \Illuminate\Support\Facades\Artisan::call('route:clear');
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', 'Cache uprawnień i route zostały odświeżone!');
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd: ' . $e->getMessage());
-            }
-        })->name('system-actions.clear-permissions')
-          ->defaults('resource', 'system-actions');
+        // System actions
+        Route::post('/system-actions/clear-permissions', [SystemActionsController::class, 'clearPermissions'])
+            ->name('system-actions.clear-permissions')
+            ->defaults('resource', 'system-actions');
         
-        // System actions - sync permissions from routes to database
-        Route::post('/system-actions/sync-permissions', function () {
-            try {
-                $service = app(\App\Services\RoutePermissionService::class);
-                $routePerms = $service->getAllPermissionsFromRoutes();
-                
-                $created = 0;
-                $existing = 0;
-                
-                foreach ($routePerms as $perm) {
-                    $p = \Spatie\Permission\Models\Permission::firstOrCreate([
-                        'name' => $perm['name'],
-                        'guard_name' => 'web',
-                    ]);
-                    
-                    if ($p->wasRecentlyCreated) {
-                        $created++;
-                    } else {
-                        $existing++;
-                    }
-                }
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', "Synchronizacja zakończona! Utworzono: {$created}, Istniało już: {$existing}");
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd synchronizacji: ' . $e->getMessage());
-            }
-        })->name('system-actions.sync-permissions')
-          ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/sync-permissions', [SystemActionsController::class, 'syncPermissions'])
+            ->name('system-actions.sync-permissions')
+            ->defaults('resource', 'system-actions');
         
-        // System actions - run migrations
-        Route::post('/system-actions/run-migrations', function () {
-            try {
-                // Uruchom migracje z --force (wymaga na produkcji)
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--force' => true,
-                    '--no-interaction' => true,
-                ]);
-                
-                $output = \Illuminate\Support\Facades\Artisan::output();
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', 'Migracje uruchomione pomyślnie! ' . ($output ?: 'Brak nowych migracji do uruchomienia.'));
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd podczas uruchamiania migracji: ' . $e->getMessage());
-            }
-        })->name('system-actions.run-migrations')
-          ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/run-migrations', [SystemActionsController::class, 'runMigrations'])
+            ->name('system-actions.run-migrations')
+            ->defaults('resource', 'system-actions');
         
-        // System actions - fix old departures without end_date
-        Route::post('/system-actions/fix-departure-dates', function () {
-            try {
-                \Illuminate\Support\Facades\Artisan::call('fix:departure-end-dates');
-                $output = \Illuminate\Support\Facades\Artisan::output();
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', 'Naprawiono daty wyjazdów! ' . $output);
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd naprawy dat: ' . $e->getMessage());
-            }
-        })->name('system-actions.fix-departure-dates')
-          ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/debug-on', [SystemActionsController::class, 'debugOn'])
+            ->name('system-actions.debug-on')
+            ->defaults('resource', 'system-actions');
         
-        // System actions - toggle debug mode (temporary via cache)
-        Route::post('/system-actions/debug-on', function () {
-            try {
-                \Illuminate\Support\Facades\Cache::put('force_debug_mode', true, now()->addHour());
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', '🐛 Debug mode WŁĄCZONY na 1 godzinę! Odśwież stronę aby zobaczyć szczegółowe błędy.');
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd: ' . $e->getMessage());
-            }
-        })->name('system-actions.debug-on')
-          ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/debug-off', [SystemActionsController::class, 'debugOff'])
+            ->name('system-actions.debug-off')
+            ->defaults('resource', 'system-actions');
         
-        Route::post('/system-actions/debug-off', function () {
-            try {
-                \Illuminate\Support\Facades\Cache::forget('force_debug_mode');
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', '✅ Debug mode WYŁĄCZONY! Błędy znów ukryte.');
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd: ' . $e->getMessage());
-            }
-        })->name('system-actions.debug-off')
-          ->defaults('resource', 'system-actions');
-        
-        // System actions - full cache clear
-        Route::post('/system-actions/clear-cache', function () {
-            try {
-                \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-                \Illuminate\Support\Facades\Artisan::call('permission:cache-reset');
-                \Illuminate\Support\Facades\Cache::flush();
-                
-                return redirect()->route('system-actions.index')
-                    ->with('success', 'Wszystkie cache zostały wyczyszczone pomyślnie!');
-            } catch (\Exception $e) {
-                return redirect()->route('system-actions.index')
-                    ->with('error', 'Błąd: ' . $e->getMessage());
-            }
-        })->name('system-actions.clear-cache')
-          ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/clear-cache', [SystemActionsController::class, 'clearCache'])
+            ->name('system-actions.clear-cache')
+            ->defaults('resource', 'system-actions');
         // Return Trips Actions - MUST BE BEFORE resource routes to avoid route conflict
         Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
             ->name('return-trips.prepare-form')
@@ -237,27 +131,16 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('payrolls.recalculate')
             ->defaults('resource', 'payrolls');
         
-        // Project Tasks Actions - MUST BE BEFORE resource routes to avoid route conflict
-        Route::post('projects/{project}/tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgress'])
-            ->name('projects.tasks.mark-in-progress')
-            ->defaults('resource', 'project-tasks');
-        Route::post('projects/{project}/tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompleted'])
-            ->name('projects.tasks.mark-completed')
-            ->defaults('resource', 'project-tasks');
-        Route::post('projects/{project}/tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancel'])
-            ->name('projects.tasks.cancel')
-            ->defaults('resource', 'project-tasks');
-        
-        // Global task actions (for tasks without project)
-        Route::post('tasks/{task}/mark-in-progress', [\App\Http\Controllers\ProjectTaskController::class, 'markInProgressGlobal'])
+        // Task actions
+        Route::post('tasks/{task}/mark-in-progress', [\App\Http\Controllers\TaskController::class, 'markInProgress'])
             ->name('tasks.mark-in-progress')
-            ->defaults('resource', 'project-tasks');
-        Route::post('tasks/{task}/mark-completed', [\App\Http\Controllers\ProjectTaskController::class, 'markCompletedGlobal'])
+            ->defaults('resource', 'tasks');
+        Route::post('tasks/{task}/mark-completed', [\App\Http\Controllers\TaskController::class, 'markCompleted'])
             ->name('tasks.mark-completed')
-            ->defaults('resource', 'project-tasks');
-        Route::post('tasks/{task}/cancel', [\App\Http\Controllers\ProjectTaskController::class, 'cancelGlobal'])
+            ->defaults('resource', 'tasks');
+        Route::post('tasks/{task}/cancel', [\App\Http\Controllers\TaskController::class, 'cancel'])
             ->name('tasks.cancel')
-            ->defaults('resource', 'project-tasks');
+            ->defaults('resource', 'tasks');
     });
     
     // ===== RESOURCE ROUTES =====
@@ -275,54 +158,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     Route::get('projects/{project}/files/{file}/download', [\App\Http\Controllers\ProjectFileController::class, 'download'])
         ->name('projects.files.download');
     
-    // Project tasks
-    // Global tasks view
-    Route::get('tasks', [\App\Http\Controllers\ProjectTaskController::class, 'index'])
-        ->name('tasks.index')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    
-    // Global tasks store (without project requirement)
-    Route::post('tasks', [\App\Http\Controllers\ProjectTaskController::class, 'storeGlobal'])
-        ->name('tasks.store')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    
-    // Projects.tasks routes (explicit routes with defaults instead of resource)
-    Route::post('projects/{project}/tasks', [\App\Http\Controllers\ProjectTaskController::class, 'store'])
-        ->name('projects.tasks.store')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    Route::get('projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'show'])
-        ->name('projects.tasks.show')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    Route::get('projects/{project}/tasks/{task}/edit', [\App\Http\Controllers\ProjectTaskController::class, 'edit'])
-        ->name('projects.tasks.edit')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    Route::match(['put', 'patch'], 'projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'update'])
-        ->name('projects.tasks.update')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    Route::delete('projects/{project}/tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'destroy'])
-        ->name('projects.tasks.destroy')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    
-    // Global task views (for tasks without project)
-    Route::get('tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'showGlobal'])
-        ->name('tasks.show')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    Route::get('tasks/{task}/edit', [\App\Http\Controllers\ProjectTaskController::class, 'editGlobal'])
-        ->name('tasks.edit')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
-    Route::put('tasks/{task}', [\App\Http\Controllers\ProjectTaskController::class, 'updateGlobal'])
-        ->name('tasks.update')
-        ->defaults('permission_type', 'resource')
-        ->defaults('resource', 'project-tasks');
+    // Tasks
+    Route::group(['defaults' => ['resource' => 'tasks']], function () {
+        Route::resource('tasks', \App\Http\Controllers\TaskController::class)
+            ->except(['create']);
+    });
     
     // Comments (polymorphic)
     Route::post('comments', [\App\Http\Controllers\CommentController::class, 'store'])
@@ -491,8 +331,6 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     
     // Time Logs
     Route::resource('time-logs', \App\Http\Controllers\TimeLogController::class);
-        Route::get('assignments/{assignment}/time-logs', [\App\Http\Controllers\TimeLogController::class, 'byAssignment'])
-            ->name('assignments.time-logs');
     
     // Employee Rates
     Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
@@ -513,7 +351,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Action routes like /return-trips/prepare must be registered before /return-trips/{id}
     Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
     
-    Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy']);
+    Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy', 'edit', 'update']);
     });
     
     // ===== VIEW ROUTES =====

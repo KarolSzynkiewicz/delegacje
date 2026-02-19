@@ -7,6 +7,7 @@ use App\Services\AssignmentQueryService;
 use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\AccommodationAssignmentService;
+use App\Services\VehicleValidationService;
 use App\Models\Vehicle;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
@@ -16,8 +17,8 @@ use App\Models\Role;
 use App\Models\Accommodation;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
+use App\Enums\VehiclePosition;
 use App\Http\Requests\StoreDepartureRequest;
-use App\Http\Requests\UpdateDepartureRequest;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,8 @@ class DepartureController extends Controller
         protected AssignmentQueryService $assignmentQueryService,
         protected ProjectAssignmentService $projectAssignmentService,
         protected VehicleAssignmentService $vehicleAssignmentService,
-        protected AccommodationAssignmentService $accommodationAssignmentService
+        protected AccommodationAssignmentService $accommodationAssignmentService,
+        protected VehicleValidationService $vehicleValidationService
     ) {}
 
     /**
@@ -134,84 +136,6 @@ class DepartureController extends Controller
         ]);
 
         return view('departures.show', compact('departure'));
-    }
-
-    /**
-     * Show the form for editing a departure.
-     * 
-     * DEPRECATED: Redirect to show page instead.
-     */
-    public function edit(LogisticsEvent $departure): View|RedirectResponse
-    {
-        // Only PLANNED and COMPLETED departures can be edited
-        if (!in_array($departure->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])) {
-            return back()->with('error', 'Nie można edytować anulowanego wyjazdu.');
-        }
-
-        $vehicles = Vehicle::orderBy('registration_number')->get();
-        $locations = Location::where('is_base', false)->orderBy('name')->get();
-        
-        // Get current participants
-        $currentEmployeeIds = $departure->participants()->pluck('employee_id')->toArray();
-        
-        // Sprawdź czy data wyjazdu jest w przeszłości
-        $isDateInPast = $departure->event_date->startOfDay()->isPast();
-        
-        return view('departures.edit', compact('departure', 'vehicles', 'locations', 'currentEmployeeIds', 'isDateInPast'));
-    }
-
-    /**
-     * Update a departure.
-     */
-    public function update(UpdateDepartureRequest $request, LogisticsEvent $departure): RedirectResponse
-    {
-        if ($departure->type !== LogisticsEventType::DEPARTURE) {
-            abort(404);
-        }
-
-        // Only allow updating if status is not CANCELLED
-        if ($departure->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
-            return redirect()
-                ->route('departures.show', $departure)
-                ->with('error', 'Nie można edytować anulowanych wyjazdów.');
-        }
-
-        $validated = $request->validated();
-
-        try {
-            // Reverse previous departure changes
-            $this->departureService->reverseDeparture($departure);
-
-            $employeeIds = $validated['employee_ids'];
-            $departureDate = Carbon::parse($validated['departure_date']);
-            $endDate = Carbon::parse($validated['end_date']);
-            $toLocationId = $validated['to_location_id'];
-            $vehicleId = $validated['vehicle_id'] ?? null;
-            $notes = $validated['notes'] ?? null;
-            $status = isset($validated['status']) 
-                ? \App\Enums\LogisticsEventStatus::from($validated['status'])
-                : null;
-
-            $event = $this->departureService->commitDeparture(
-                $employeeIds,
-                $departureDate,
-                $endDate,
-                $toLocationId,
-                $vehicleId,
-                $notes,
-                $departure,
-                $status
-            );
-
-            return redirect()
-                ->route('departures.show', $event)
-                ->with('success', 'Wyjazd został zaktualizowany pomyślnie.');
-        } catch (\Exception $e) {
-            return redirect()
-                ->back()
-                ->with('error', 'Wystąpił błąd podczas aktualizacji wyjazdu: ' . $e->getMessage())
-                ->withInput();
-        }
     }
 
     /**
@@ -392,6 +316,31 @@ class DepartureController extends Controller
                 'employee_ids.min' => 'Proszę wybrać co najmniej jednego uczestnika.',
                 'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
             ]);
+            
+            // Validate vehicle availability if vehicle is selected
+            if (!empty($validated['vehicle_id'])) {
+                $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
+                $departureDate = Carbon::parse($validated['departure_date']);
+                $endDate = Carbon::parse($validated['end_date']);
+                
+                try {
+                    $this->vehicleValidationService->validateForLogisticsEventOrFail(
+                        $vehicle,
+                        $departureDate,
+                        $endDate
+                    );
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    // Add vehicle validation errors to request
+                    return redirect()
+                        ->route('departures.create', [
+                            'departure_date' => $validated['departure_date'],
+                            'end_date' => $validated['end_date']
+                        ])
+                        ->withInput()
+                        ->withErrors($e->errors());
+                }
+            }
+            
             // Get base location ID
             $fromLocationId = Location::getBase()->id;
             
@@ -493,7 +442,7 @@ class DepartureController extends Controller
                 'from_location_id' => $departureData['from_location_id'],
                 'to_location_id' => $departureData['to_location_id'],
                 'vehicle_id' => $departureData['vehicle_id'] ?? null,
-                'status' => LogisticsEventStatus::PLANNED,
+                'status' => LogisticsEventStatus::COMPLETED, // Wyjazd wymusza przypisanie, więc zawsze COMPLETED
                 'notes' => $departureData['notes'] ?? null,
                 'has_transport' => !empty($departureData['vehicle_id']),
             ]);
@@ -529,11 +478,13 @@ class DepartureController extends Controller
                 $vehicle = Vehicle::findOrFail($assignmentData['vehicle_id']);
                 
                 $this->vehicleAssignmentService->createAssignment(
-                    $vehicle,
                     $employee,
-                    $assignmentData['position'],
+                    $vehicle,
+                    VehiclePosition::from($assignmentData['position']),
                     Carbon::parse($assignmentData['vehicle_start_date']),
-                    Carbon::parse($assignmentData['vehicle_end_date'])
+                    Carbon::parse($assignmentData['vehicle_end_date']),
+                    null, // notes
+                    $departure->id // Link to departure
                 );
 
                 // Accommodation assignment
@@ -582,4 +533,5 @@ class DepartureController extends Controller
                 ->with('error', 'Wystąpił błąd podczas zapisywania wyjazdu. Spróbuj ponownie lub skontaktuj się z administratorem.');
         }
     }
+
 }

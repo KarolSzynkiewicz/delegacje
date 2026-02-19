@@ -30,12 +30,14 @@ class EmployeeLocationValidator
      * 4. Require departure if from base to field
      * 5. Allow migration between field locations
      *
+     * @param int|null $currentDepartureId If provided, this departure is being created and should be considered
      * @throws ValidationException
      */
     public function validateForAssignment(
         Employee $employee,
         Project $project,
-        Carbon $startDate
+        Carbon $startDate,
+        ?int $currentDepartureId = null
     ): void {
         // Skip if project has no location
         if (!$project->location_id) {
@@ -59,7 +61,7 @@ class EmployeeLocationValidator
         }
         
         // 4. Require departure if from base to field
-        $this->requireDepartureIfNeeded($employee, $employeeLocation, $projectLocation, $startDate);
+        $this->requireDepartureIfNeeded($employee, $employeeLocation, $projectLocation, $startDate, $currentDepartureId);
         
         // 5. Allow migration between field locations (implicit - no exception thrown)
     }
@@ -101,12 +103,15 @@ class EmployeeLocationValidator
 
     /**
      * Require departure if employee is at base and project is elsewhere.
+     * 
+     * @param int|null $currentDepartureId If provided, check this departure as well (for bulk creation)
      */
     protected function requireDepartureIfNeeded(
         Employee $employee,
         $employeeLocation,
         Location $projectLocation,
-        Carbon $startDate
+        Carbon $startDate,
+        ?int $currentDepartureId = null
     ): void {
         $base = Location::getBase();
         
@@ -116,6 +121,26 @@ class EmployeeLocationValidator
         }
         
         // At base, project elsewhere - need departure
+        // First check if current departure being created matches
+        if ($currentDepartureId) {
+            $currentDeparture = LogisticsEvent::find($currentDepartureId);
+            if ($currentDeparture && 
+                $currentDeparture->to_location_id === $projectLocation->id &&
+                $currentDeparture->participants()->where('employee_id', $employee->id)->exists()) {
+                // Current departure matches - validate date
+                if ($currentDeparture->end_date && 
+                    $startDate->copy()->startOfDay()->lt($currentDeparture->end_date->copy()->startOfDay())) {
+                    throw ValidationException::withMessages([
+                        'start_date' => "Data przypisania ({$startDate->format('Y-m-d')}) jest przed datą przybycia pracownika " .
+                            "({$currentDeparture->end_date->format('Y-m-d')}). Pracownik może rozpocząć pracę w dniu przybycia lub później. " .
+                            "Zmień datę przypisania na {$currentDeparture->end_date->format('Y-m-d')} lub późniejszą."
+                    ]);
+                }
+                return; // Current departure is valid
+            }
+        }
+        
+        // Check for existing planned departures
         $departure = LogisticsEvent::plannedDeparturesTo($employee, $projectLocation->id)->first();
         
         if (!$departure) {

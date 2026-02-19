@@ -41,7 +41,8 @@ class ProjectAssignmentService
         $this->validateEmployeeAvailability($employee, $startDate, $endDate);
 
         // Validate employee location and logistics (extracted to separate service)
-        $this->locationValidator->validateForAssignment($employee, $project, $startDate);
+        // Pass logistics_event_id if provided (for bulk departure creation)
+        $this->locationValidator->validateForAssignment($employee, $project, $startDate, $logisticsEventId);
 
         // Validate project demand
         $this->validateProjectDemand($project, $role->id, $startDate, $endDate);
@@ -80,7 +81,9 @@ class ProjectAssignmentService
         $this->validateEmployeeAvailability($employee, $startDate, $endDate, $assignment->id);
 
         // Validate employee location and logistics (extracted to separate service)
-        $this->locationValidator->validateForAssignment($employee, $project, $startDate);
+        // For updates, use existing logistics_event_id if assignment has one
+        $existingLogisticsEventId = $assignment->logistics_event_id;
+        $this->locationValidator->validateForAssignment($employee, $project, $startDate, $existingLogisticsEventId);
 
         // Validate project demand
         $this->validateProjectDemand($project, $role->id, $startDate, $endDate);

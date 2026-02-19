@@ -551,7 +551,7 @@ class Employee extends Model
             if ($project && $project->location_id) {
                 try {
                     $validator = app(\App\Services\EmployeeLocationValidator::class);
-                    $validator->validateForAssignment($this, $project, \Carbon\Carbon::parse($startDate));
+                    $validator->validateForAssignment($this, $project, \Carbon\Carbon::parse($startDate), null);
                 } catch (\Illuminate\Validation\ValidationException $e) {
                     // Extract user-friendly message from validation exception
                     $errors = $e->errors();

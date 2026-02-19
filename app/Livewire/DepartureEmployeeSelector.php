@@ -48,6 +48,20 @@ class DepartureEmployeeSelector extends Component
     {
         $this->updateEmployees();
         $this->selectedEmployeeIds = []; // Reset selection when date changes
+        $this->dispatch('dateChanged', [
+            'departureDate' => $this->departureDate,
+            'endDate' => $this->endDate
+        ]);
+    }
+    
+    public function updatedEndDate()
+    {
+        // Update employees when end date changes (might affect availability)
+        $this->updateEmployees();
+        $this->dispatch('dateChanged', [
+            'departureDate' => $this->departureDate,
+            'endDate' => $this->endDate
+        ]);
     }
 
     public function updateEmployees()
@@ -58,14 +72,15 @@ class DepartureEmployeeSelector extends Component
         }
 
         try {
-            $date = Carbon::parse($this->departureDate);
+            $startDate = Carbon::parse($this->departureDate);
+            $endDate = $this->endDate ? Carbon::parse($this->endDate) : $startDate;
             
-            // Get available employees (not assigned to projects)
+            // Get available employees (not assigned to projects, not in transit) for the entire period
             $availableEmployees = app(AssignmentQueryService::class)
-                ->getAvailableEmployeesForDeparture($date)
-                ->map(function ($employee) use ($date) {
+                ->getAvailableEmployeesForDeparture($startDate, $endDate)
+                ->map(function ($employee) use ($startDate) {
                     // Load rotation info
-                    $rotation = $employee->getActiveRotationForDate($date);
+                    $rotation = $employee->getActiveRotationForDate($startDate);
                     
                     return [
                         'id' => $employee->id,
@@ -81,8 +96,8 @@ class DepartureEmployeeSelector extends Component
             if ($this->editMode && !empty($this->selectedEmployeeIds)) {
                 $selectedEmployees = Employee::whereIn('id', $this->selectedEmployeeIds)
                     ->get()
-                    ->map(function ($employee) use ($date) {
-                        $rotation = $employee->getActiveRotationForDate($date);
+                    ->map(function ($employee) use ($startDate) {
+                        $rotation = $employee->getActiveRotationForDate($startDate);
                         
                         return [
                             'id' => $employee->id,

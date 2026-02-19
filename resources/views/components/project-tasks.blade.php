@@ -8,8 +8,9 @@
         <x-alert type="danger" :message="session('error')" />
     @endif
     @if(!$isMineView)
-    <form action="{{ route('projects.tasks.store', $project) }}" method="POST" class="mb-4">
+    <form action="{{ route('tasks.store') }}" method="POST" class="mb-4">
         @csrf
+        <input type="hidden" name="project_id" value="{{ $project->id }}">
         <div class="row g-3">
             <div class="col-md-6">
                 <x-ui.input 

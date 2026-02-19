@@ -109,6 +109,18 @@ return [
         'label' => 'Koszty stałe',
     ],
     
+    'fixed_cost_entries' => [
+        'route' => 'fixed-cost-entries.index',
+        'icon' => 'bi bi-file-earmark-text',
+        'label' => 'Koszty księgowe',
+    ],
+    
+    'employee_evaluations' => [
+        'route' => 'employee-evaluations.index',
+        'icon' => 'bi bi-star',
+        'label' => 'Oceny pracowników',
+    ],
+    
     'employees' => [
         'route' => 'employees.index',
         'icon' => 'bi bi-people',

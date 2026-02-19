@@ -114,12 +114,14 @@
                             <div class="row g-3 mb-3">
                                 <!-- Lewa strona: Tytuł + Opis -->
                                 <div class="col-md-6">
-                                    <x-ui.hero-card 
-                                    title="{{ $task->name }}" 
-                                    subtitle="{{ Str::limit($task->description, 200) }}"
-                                    variant="gradient">
-                                    
-                                    </x-ui.hero-card>
+                                    <a href="{{ route('tasks.show', $task) }}" class="text-decoration-none" style="display: block; cursor: pointer;">
+                                        <x-ui.hero-card 
+                                        title="{{ $task->name }}" 
+                                        subtitle="{{ Str::limit($task->description, 200) }}"
+                                        variant="gradient">
+                                        
+                                        </x-ui.hero-card>
+                                    </a>
                                 </div>
                                 
                                 <!-- Prawa strona: Badge (Status, Projekt, Due Date) -->
@@ -259,83 +261,41 @@
                                     </small>
                                     <div class="d-flex gap-1 flex-wrap">
                                         @if($task->status === \App\Enums\TaskStatus::PENDING)
-                                            @if($hasProject)
-                                                <form action="{{ route('projects.tasks.mark-in-progress', [$task->project, $task]) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-info" title="Rozpocznij">
-                                                        <i class="bi bi-play-circle"></i>
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <form action="{{ route('tasks.mark-in-progress', $task) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-info" title="Rozpocznij">
-                                                        <i class="bi bi-play-circle"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
+                                            <form action="{{ route('tasks.mark-in-progress', $task) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-info" title="Rozpocznij">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                            </form>
                                         @elseif($task->status === \App\Enums\TaskStatus::IN_PROGRESS)
-                                            @if($hasProject)
-                                                <form action="{{ route('projects.tasks.mark-completed', [$task->project, $task]) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Zakończ">
-                                                        <i class="bi bi-check-circle"></i>
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <form action="{{ route('tasks.mark-completed', $task) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Zakończ">
-                                                        <i class="bi bi-check-circle"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
+                                            <form action="{{ route('tasks.mark-completed', $task) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-success" title="Zakończ">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </button>
+                                            </form>
                                         @endif
                                         
                                         @if($task->status !== \App\Enums\TaskStatus::CANCELLED && $task->status !== \App\Enums\TaskStatus::COMPLETED)
-                                            @if($hasProject)
-                                                <form action="{{ route('projects.tasks.cancel', [$task->project, $task]) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Anuluj">
-                                                        <i class="bi bi-x-circle"></i>
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <form action="{{ route('tasks.cancel', $task) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Anuluj">
-                                                        <i class="bi bi-x-circle"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
+                                            <form action="{{ route('tasks.cancel', $task) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Anuluj">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
                                         @endif
                                         
-                                        @if($hasProject)
-                                            <a href="{{ route('projects.tasks.show', [$task->project, $task]) }}" 
-                                               class="btn btn-sm btn-outline-secondary" 
-                                               title="Podgląd">
-                                                <i class="bi bi-eye"></i>
+                                        <a href="{{ route('tasks.show', $task) }}" 
+                                           class="btn btn-sm btn-outline-secondary" 
+                                           title="Podgląd">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        @if(!$isMineView)
+                                            <a href="{{ route('tasks.edit', $task) }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Edytuj">
+                                                <i class="bi bi-pencil"></i>
                                             </a>
-                                            @if(!$isMineView)
-                                                <a href="{{ route('projects.tasks.edit', [$task->project, $task]) }}" 
-                                                   class="btn btn-sm btn-outline-primary" 
-                                                   title="Edytuj">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                            @endif
-                                        @else
-                                            <a href="{{ route('tasks.show', $task) }}" 
-                                               class="btn btn-sm btn-outline-secondary" 
-                                               title="Podgląd">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            @if(!$isMineView)
-                                                <a href="{{ route('tasks.edit', $task) }}" 
-                                                   class="btn btn-sm btn-outline-primary" 
-                                                   title="Edytuj">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                            @endif
                                         @endif
                                     </div>
                                 </div>

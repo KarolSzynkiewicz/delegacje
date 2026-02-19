@@ -6,6 +6,7 @@ use App\Models\ProjectAssignment;
 use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
+use App\Models\LogisticsEvent;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -112,46 +113,55 @@ class AssignmentQueryService
      * Get available employees for departure (not in projects, with active rotation, with all required documents).
      * 
      * Available means:
-     * - NOT assigned to any project at the given date
-     * - Has active rotation at the given date
-     * - Has all required documents active at the given date
+     * - NOT assigned to any project in the date range
+     * - Has active rotation for the entire date range
+     * - Has all required documents active for the entire date range
+     * - NOT in transit (traveling) during the date range
      * 
-     * @param Carbon $date
+     * @param Carbon $startDate Departure date
+     * @param Carbon|null $endDate Arrival date (optional, defaults to startDate)
      * @return Collection<Employee>
      */
-    public function getAvailableEmployeesForDeparture(Carbon $date): Collection
+    public function getAvailableEmployeesForDeparture(Carbon $startDate, ?Carbon $endDate = null): Collection
     {
+        $endDate = $endDate ?? $startDate;
+        
         // Get all employees
         $allEmployees = Employee::with(['rotations', 'employeeDocuments.document', 'assignments'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
 
-        // Filter employees who are available
-        return $allEmployees->filter(function (Employee $employee) use ($date) {
-            // 1. Check if employee is NOT assigned to any project at the given date
+        // Filter employees who are available for the entire period
+        return $allEmployees->filter(function (Employee $employee) use ($startDate, $endDate) {
+            // 1. Check if employee is NOT assigned to any project during the date range
             // IMPORTANT: Exclude cancelled assignments
             $hasProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
                 ->where('is_cancelled', false)
-                ->activeAtDate($date)
+                ->overlappingWith($startDate, $endDate)
                 ->exists();
             
             if ($hasProjectAssignment) {
                 return false;
             }
 
-            // 2. Check if employee has active rotation at the given date
+            // 2. Check if employee has active rotation for the entire date range
             // Use eager loaded relations if available, otherwise query
             $hasActiveRotation = false;
             if ($employee->relationLoaded('rotations')) {
-                // Use eager loaded rotations
-                $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($date) {
-                    return $rotation->isActiveAt($date);
+                // Use eager loaded rotations - check if any rotation covers the entire range
+                $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($startDate, $endDate) {
+                    return $rotation->isActiveAt($startDate) && 
+                           ($rotation->end_date === null || $rotation->end_date->gte($endDate));
                 })->isNotEmpty();
             } else {
-                // Fallback to query
+                // Fallback to query - check if rotation covers entire range
                 $hasActiveRotation = $employee->rotations()
-                    ->activeAtDate($date)
+                    ->where('start_date', '<=', $startDate)
+                    ->where(function($q) use ($endDate) {
+                        $q->whereNull('end_date')
+                          ->orWhere('end_date', '>=', $endDate);
+                    })
                     ->exists();
             }
             
@@ -159,14 +169,32 @@ class AssignmentQueryService
                 return false;
             }
 
-            // 3. Check if employee has all required documents active at the given date
-            // Use a single date for document check (departure is a single date event)
+            // 3. Check if employee has all required documents active for the entire date range
             // Ensure documents are loaded
             if (!$employee->relationLoaded('employeeDocuments')) {
                 $employee->load('employeeDocuments.document');
             }
             
-            if (!$employee->hasAllDocumentsActiveInDateRange($date, $date)) {
+            if (!$employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
+                return false;
+            }
+
+            // 4. Check if employee is NOT in transit (traveling) during the date range
+            // Employee is in transit if they have an active departure/return event
+            // that overlaps with the departure period (event_date <= endDate AND (end_date >= startDate OR end_date is null))
+            $isInTransit = LogisticsEvent::whereHas('participants', function($q) use ($employee) {
+                    $q->where('employee_id', $employee->id);
+                })
+                ->whereIn('type', [\App\Enums\LogisticsEventType::DEPARTURE, \App\Enums\LogisticsEventType::RETURN])
+                ->whereIn('status', [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED])
+                ->where('event_date', '<=', $endDate) // Event started before or on end date
+                ->where(function($q) use ($startDate) {
+                    $q->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $startDate); // Event ends after or on start date
+                })
+                ->exists();
+            
+            if ($isInTransit) {
                 return false;
             }
 

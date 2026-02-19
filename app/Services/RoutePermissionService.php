@@ -258,14 +258,12 @@ class RoutePermissionService
             // - "weekly-overview.index" -> "weekly-overview" (remove action)
             if (count($parts) === 1) {
                 // No dots - route name is the resource (e.g., "dashboard")
-                // Map "tasks" to "project-tasks" (unify tasks and project-tasks)
-                return $routeName === 'tasks' ? 'project-tasks' : $routeName;
+                return $routeName;
             }
             // Has dots - remove last part (action)
             array_pop($parts);
             $resource = implode('.', $parts);
-            // Map "tasks" to "project-tasks" (unify tasks and project-tasks)
-            return $resource === 'tasks' ? 'project-tasks' : ($resource ?: null);
+            return $resource ?: null;
         }
         
         // For resource routes: remove the last part (action) to get resource
@@ -275,11 +273,6 @@ class RoutePermissionService
         // e.g., "projects.assignments.index" -> "assignments"
         // e.g., "vehicle-assignments.show" -> "vehicle-assignments"
         $resource = implode('.', $parts);
-        
-        // Map "tasks" to "project-tasks" (unify tasks and project-tasks)
-        if ($resource === 'tasks') {
-            $resource = 'project-tasks';
-        }
         
         // For nested resources, take the last part
         // e.g., "employees.vehicles" -> "vehicles"
@@ -378,10 +371,11 @@ class RoutePermissionService
         
         // Special mappings for resources that don't match menu_items keys directly
         $specialMappings = [
-            'project-tasks' => 'tasks', // project-tasks -> tasks
             'project-assignments' => 'assignments', // project-assignments -> assignments
             'project-demands' => 'demands', // project-demands -> demands
             'profitability' => 'dashboard', // profitability -> dashboard
+            'fixed-cost-entries' => 'fixed_cost_entries', // fixed-cost-entries -> fixed_cost_entries
+            'employee-evaluations' => 'employee_evaluations', // employee-evaluations -> employee_evaluations
         ];
         
         // Check special mappings first

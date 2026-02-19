@@ -42,6 +42,9 @@
                         <label class="form-label fw-semibold mb-3">Uprawnienia</label>
                         
                         @php
+                            // Use RoutePermissionService to get resource labels (single source of truth)
+                            $routePermissionService = app(\App\Services\RoutePermissionService::class);
+                            
                             // Pobierz wybrane uprawnienia (z old() po błędzie walidacji)
                             $selectedPermissions = old('permissions', []);
                             
@@ -66,8 +69,8 @@
                                 
                                 // Inicjalizuj grupę jeśli nie istnieje
                                 if (!isset($groupedPermissions[$resource])) {
-                                    // Generuj polską nazwę z resource name
-                                    $resourceLabel = ucfirst(str_replace(['-', '_'], ' ', $resource));
+                                    // Get resource label from menu_items.php via RoutePermissionService
+                                    $resourceLabel = $routePermissionService->getResourceLabel($resource);
                                     
                                     $groupedPermissions[$resource] = [
                                         'name' => $resourceLabel,

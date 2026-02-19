@@ -18,7 +18,7 @@ class ProjectTaskPolicy
 
         // Jeśli zadanie nie ma projektu, sprawdź uprawnienia do zadań
         if (!$task->project_id) {
-            return $user->hasPermission('project-tasks.update');
+            return $user->hasPermission('tasks.update');
         }
 
         // Sprawdź czy user zarządza projektem zadania

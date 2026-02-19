@@ -44,7 +44,12 @@
                 </x-tooltip>
             </label>
             <p class="small text-muted mb-2">
-                Dostępni pracownicy z rotacją aktywną i wymaganymi dokumentami (nie w projekcie) na dzień {{ \Carbon\Carbon::parse($departureDate)->format('Y-m-d') }}
+                Dostępni pracownicy z rotacją aktywną i wymaganymi dokumentami (nie w projekcie, nie w podróży) 
+                @if($endDate && $endDate != $departureDate)
+                    w okresie {{ \Carbon\Carbon::parse($departureDate)->format('Y-m-d') }} - {{ \Carbon\Carbon::parse($endDate)->format('Y-m-d') }}
+                @else
+                    na dzień {{ \Carbon\Carbon::parse($departureDate)->format('Y-m-d') }}
+                @endif
             </p>
             
             @if(count($employees) > 0)
@@ -72,7 +77,7 @@
             @else
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> Brak dostępnych pracowników na wybraną datę. 
-                    Pracownik musi mieć aktywną rotację, wszystkie wymagane dokumenty i nie być przypisanym do projektu.
+                    Pracownik musi mieć aktywną rotację, wszystkie wymagane dokumenty, nie być przypisanym do projektu i nie być w podróży.
                 </div>
             @endif
         </div>

@@ -53,6 +53,9 @@
                             </x-ui.alert>
                         @else
                         @php
+                            // Use RoutePermissionService to get resource labels (single source of truth)
+                            $routePermissionService = app(\App\Services\RoutePermissionService::class);
+                            
                             // Pobierz wybrane uprawnienia użytkownika
                             $selectedPermissions = old('permissions', $userRole->permissions->pluck('name')->toArray());
                             
@@ -77,8 +80,8 @@
                                 
                                 // Inicjalizuj grupę jeśli nie istnieje
                                 if (!isset($groupedPermissions[$resource])) {
-                                    // Generuj polską nazwę z resource name
-                                    $resourceLabel = ucfirst(str_replace(['-', '_'], ' ', $resource));
+                                    // Get resource label from menu_items.php via RoutePermissionService
+                                    $resourceLabel = $routePermissionService->getResourceLabel($resource);
                                     
                                     $groupedPermissions[$resource] = [
                                         'name' => $resourceLabel,

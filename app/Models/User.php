@@ -170,7 +170,7 @@ class User extends Authenticatable
             'employee-evaluations.create',
             'employee-evaluations.update',
             'employee-evaluations.delete',
-            'project-tasks.update', // Dla mark-in-progress, mark-completed, cancel
+            'tasks.update', // Dla mark-in-progress, mark-completed, cancel
             'time-logs.update', // Dla bulk-update
         ];
 
@@ -217,7 +217,7 @@ class User extends Authenticatable
                 }
                 break;
 
-            case 'project-tasks.update':
+            case 'tasks.update':
                 // Sprawdź project_id z zadania w route
                 $route = request()->route();
                 if ($route) {
