@@ -31,9 +31,13 @@ class VehicleValidationService
      * Checks:
      * 1. Only one driver per vehicle per period
      * 2. Employee doesn't have overlapping assignment to same vehicle
-     * 3. Vehicle not used by other employees in projects (VehicleAssignment)
-     * 4. Vehicle not used in logistics events (departures/returns)
-     * 5. Vehicle capacity (if provided)
+     * 3. Vehicle not used in logistics events (departures/returns)
+     * 4. Vehicle capacity (if provided)
+     * 
+     * Note: Multiple employees can use the same vehicle simultaneously if:
+     * - There's only one driver (checked in point 1)
+     * - Capacity is not exceeded (checked in point 4)
+     * - Employee doesn't have overlapping assignment (checked in point 2)
      * 
      * @return array ['valid' => bool, 'errors' => array, 'conflicts' => array]
      */
@@ -66,14 +70,7 @@ class VehicleValidationService
             $conflicts = array_merge($conflicts, $employeeConflicts);
         }
 
-        // 3. Check vehicle not used by other employees in projects
-        $projectConflicts = $this->checkVehicleProjectAssignments($vehicle, $employee->id, $startDate, $endDate, $excludeAssignmentId);
-        if (!empty($projectConflicts)) {
-            $errors[] = 'Pojazd jest przypisany do projektu w tym okresie.';
-            $conflicts = array_merge($conflicts, $projectConflicts);
-        }
-
-        // 4. Check vehicle not used in logistics events
+        // 3. Check vehicle not used in logistics events
         // Note: Wyjazd zajmuje pojazd od event_date do end_date (włącznie)
         // Ale przypisania mogą zaczynać się od end_date (dzień przyjazdu), bo wtedy pojazd już jest dostępny
         $pendingDepartureData = session('pending_departure');
@@ -83,7 +80,7 @@ class VehicleValidationService
             $conflicts = array_merge($conflicts, $logisticsConflicts);
         }
 
-        // 5. Check vehicle capacity
+        // 4. Check vehicle capacity
         if ($currentCapacity !== null && $vehicle->capacity && $currentCapacity > $vehicle->capacity) {
             $errors[] = "Przekroczona pojemność pojazdu ({$currentCapacity}/{$vehicle->capacity}).";
         }
