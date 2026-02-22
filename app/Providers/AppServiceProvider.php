@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\SystemBootstrapService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -52,5 +53,17 @@ class AppServiceProvider extends ServiceProvider
             'logistics_event' => \App\Models\LogisticsEvent::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
+
+        // Auto-bootstrap system if uninitialized (only in non-production)
+        // This is a state check, not a user action - no HTTP endpoint exposed
+        // System transitions from "uninitialized" to "initialized" state automatically
+        if (config('app.env') !== 'production') {
+            try {
+                $this->app->make(SystemBootstrapService::class)->ensureInitialized();
+            } catch (\Exception $e) {
+                // Silently fail - system might not be ready yet (DB not migrated)
+                // Will retry on next request
+            }
+        }
     }
 }

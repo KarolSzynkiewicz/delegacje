@@ -84,83 +84,95 @@ class RoutePermissionService
      */
     public function getAllPermissionsFromRoutes(): Collection
     {
-        return Cache::remember(
-            'all_route_permissions',
-            now()->addHour(),
-            function () {
-                $routes = Route::getRoutes();
-                $permissions = collect();
-                
-                foreach ($routes as $route) {
-                    // Get permission type from route defaults
-                    // Route groups store defaults in action['defaults'], individual routes in defaults property
-                    $permissionType = $route->defaults['permission_type'] 
-                        ?? $route->getAction('defaults')['permission_type'] 
-                        ?? null;
-                    if (!$permissionType) {
-                        continue;
-                    }
-                    
-                    $routeName = $route->getName();
-                    if (!$routeName) {
-                        continue;
-                    }
-                    
-                    // Skip excluded routes (same as middleware)
-                    if ($this->isExcluded($routeName)) {
-                        continue;
-                    }
-                    
-                    // Get resource from route defaults first
-                    $resource = $route->defaults['resource'] 
-                        ?? $route->getAction('defaults')['resource'] 
-                        ?? null;
-                    
-                    // For action routes, if resource is not explicitly set, use full route name
-                    if ($permissionType === 'action' && !$resource) {
-                        $resource = $routeName;
-                    } elseif (!$resource) {
-                        // For other types, try to extract from route name (fallback)
-                        $resource = $this->extractResourceFromRoute($routeName, $permissionType);
-                    }
-                    
-                    if (!$resource) {
-                        continue;
-                    }
-                    
-                    $routeAction = $this->getRouteAction($routeName);
-                    $httpMethod = $route->methods()[0] ?? 'GET';
-                    
-                    // Generate permission name using same logic as middleware
-                    $permissionName = $this->generatePermissionName(
-                        $permissionType,
-                        $resource,
-                        $routeAction,
-                        $httpMethod
-                    );
-                    
-                    if (!$permissionName) {
-                        continue;
-                    }
-                    
-                    // Ensure we never return viewAny - middleware generates view for index/show
-                    // But for safety, if somehow viewAny appears, replace with view
-                    if (str_ends_with($permissionName, '.viewAny')) {
-                        $permissionName = str_replace('.viewAny', '.view', $permissionName);
-                    }
-                    
-                    $permissions->push([
-                        'name' => $permissionName,
-                        'type' => $permissionType,
-                        'resource' => $resource,
-                        'action' => $this->getPermissionAction($permissionName, $permissionType),
-                    ]);
-                }
-                
-                // Remove duplicates and return
-                return $permissions->unique('name')->values();
+        try {
+            return Cache::remember(
+                'all_route_permissions',
+                now()->addHour(),
+                fn() => $this->buildPermissionsFromRoutes()
+            );
+        } catch (\Exception $e) {
+            // Cache not available (e.g., during migrations with permission issues) - return without cache
+            return $this->buildPermissionsFromRoutes();
+        }
+    }
+
+    /**
+     * Build permissions from routes without using cache.
+     * Used internally and during migrations when cache may not be available.
+     */
+    private function buildPermissionsFromRoutes(): Collection
+    {
+        $routes = Route::getRoutes();
+        $permissions = collect();
+        
+        foreach ($routes as $route) {
+            // Get permission type from route defaults
+            // Route groups store defaults in action['defaults'], individual routes in defaults property
+            $permissionType = $route->defaults['permission_type'] 
+                ?? $route->getAction('defaults')['permission_type'] 
+                ?? null;
+            if (!$permissionType) {
+                continue;
             }
-        );
+            
+            $routeName = $route->getName();
+            if (!$routeName) {
+                continue;
+            }
+            
+            // Skip excluded routes (same as middleware)
+            if ($this->isExcluded($routeName)) {
+                continue;
+            }
+            
+            // Get resource from route defaults first
+            $resource = $route->defaults['resource'] 
+                ?? $route->getAction('defaults')['resource'] 
+                ?? null;
+            
+            // For action routes, if resource is not explicitly set, use full route name
+            if ($permissionType === 'action' && !$resource) {
+                $resource = $routeName;
+            } elseif (!$resource) {
+                // For other types, try to extract from route name (fallback)
+                $resource = $this->extractResourceFromRoute($routeName, $permissionType);
+            }
+            
+            if (!$resource) {
+                continue;
+            }
+            
+            $routeAction = $this->getRouteAction($routeName);
+            $httpMethod = $route->methods()[0] ?? 'GET';
+            
+            // Generate permission name using same logic as middleware
+            $permissionName = $this->generatePermissionName(
+                $permissionType,
+                $resource,
+                $routeAction,
+                $httpMethod
+            );
+            
+            if (!$permissionName) {
+                continue;
+            }
+            
+            // Ensure we never return viewAny - middleware generates view for index/show
+            // But for safety, if somehow viewAny appears, replace with view
+            if (str_ends_with($permissionName, '.viewAny')) {
+                $permissionName = str_replace('.viewAny', '.view', $permissionName);
+            }
+            
+            $permissions->push([
+                'name' => $permissionName,
+                'type' => $permissionType,
+                'resource' => $resource,
+                'action' => $this->getPermissionAction($permissionName, $permissionType),
+            ]);
+        }
+        
+        // Remove duplicates and return
+        return $permissions->unique('name')->values();
     }
     
     /**

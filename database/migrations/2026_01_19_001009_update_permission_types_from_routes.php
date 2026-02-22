@@ -15,6 +15,7 @@ return new class extends Migration
     public function up(): void
     {
         // Get all permissions from routes
+        // getAllPermissionsFromRoutes() will handle cache failures gracefully
         $routePermissionService = new RoutePermissionService();
         $routePermissions = $routePermissionService->getAllPermissionsFromRoutes();
         

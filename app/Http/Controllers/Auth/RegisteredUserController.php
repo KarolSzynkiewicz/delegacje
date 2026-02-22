@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
+use App\Services\SystemBootstrapService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,14 +44,18 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        // Assign default role: if this is the first user, make them admin, otherwise NO ROLE (user sees nothing)
-        if (User::count() === 1) {
-            $adminRole = Role::where('name', 'administrator')->first();
-            if ($adminRole) {
-                $user->assignRole($adminRole);
-            }
+        // If this is the first user, ensure system is bootstrapped and assign admin role
+        // For subsequent users, system is already initialized and they get no role
+        $isFirstUser = User::count() === 1;
+        
+        if ($isFirstUser) {
+            // Ensure system is bootstrapped (creates permissions, roles, etc.)
+            // This will also assign admin role to first user
+            app(SystemBootstrapService::class)->ensureInitialized();
         }
+        
         // Nowy użytkownik NIE dostaje żadnej roli - musi być przypisany przez admina
+        // (pierwszy użytkownik dostaje rolę w SystemBootstrapService)
 
         event(new Registered($user));
 
