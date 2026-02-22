@@ -1,8 +1,13 @@
-<nav class="navbar navbar-expand-lg navbar-light">
+<nav class="navbar navbar-expand-lg navbar-light" @if(config('app.env') !== 'production') style="background: #000000 !important;" @endif>
     <div class="container-fluid">
         <!-- Logo -->
-        <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
+        <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('dashboard') }}">
             <x-application-logo class="d-block navbar-logo" />
+            @if(config('app.env') !== 'production')
+                <span class="badge bg-danger-white fw-semibold">
+                    {{ strtoupper(config('app.env')) }}
+                </span>
+            @endif
         </a>
 
         <!-- Toggle button for mobile -->
