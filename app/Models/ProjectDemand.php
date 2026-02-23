@@ -51,4 +51,31 @@ class ProjectDemand extends Model
     {
         return $this->belongsTo(Role::class);
     }
+
+    /**
+     * Check if the demand is active (not ended yet).
+     * 
+     * @return bool True if demand is active, false if completed
+     */
+    public function isActive(): bool
+    {
+        if ($this->end_date === null) {
+            return true; // Open-ended demands are always active
+        }
+
+        $today = \Carbon\Carbon::today();
+        $endDate = \App\Services\DateRangeService::normalizeDate($this->end_date);
+        
+        return $endDate->gte($today);
+    }
+
+    /**
+     * Check if the demand is completed (ended).
+     * 
+     * @return bool True if demand is completed, false if active
+     */
+    public function isCompleted(): bool
+    {
+        return !$this->isActive();
+    }
 }

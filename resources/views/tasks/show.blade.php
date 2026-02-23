@@ -162,9 +162,7 @@
                 <x-tasks-actions :task="$task" :project="$task->project" size="sm" gap="2" class="flex-wrap" />
             </x-ui.card>
 
-            <x-ui.card label="Komentarze" class="mt-4">
-                <x-comments :commentable="$task" />
-            </x-ui.card>
+            <x-comments :commentable="$task" class="mt-4" />
         </div>
     </div>
 </x-app-layout>

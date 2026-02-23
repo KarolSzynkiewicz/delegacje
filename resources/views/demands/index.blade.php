@@ -29,6 +29,7 @@
                             <th>Rola</th>
                             <th>Liczba osób</th>
                             <th>Od - Do</th>
+                            <th>Status</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -50,6 +51,13 @@
                                             - ...
                                         @endif
                                     </small>
+                                </td>
+                                <td>
+                                    @if($demand->isActive())
+                                        <x-ui.badge variant="success">Aktywne</x-ui.badge>
+                                    @else
+                                        <x-ui.badge variant="secondary">Zakończone</x-ui.badge>
+                                    @endif
                                 </td>
                                 <td>
                                     <x-action-buttons

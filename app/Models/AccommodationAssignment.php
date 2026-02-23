@@ -62,4 +62,50 @@ class AccommodationAssignment extends Model
         return $this->belongsTo(LogisticsEvent::class);
     }
 
+    /**
+     * Check if the assignment is scheduled (starts in the future).
+     * 
+     * @return bool True if assignment starts in the future
+     */
+    public function isScheduled(): bool
+    {
+        return parent::isScheduled(); // Używa metody z HasDateRange trait
+    }
+
+    /**
+     * Check if the assignment is active (currently running, not scheduled).
+     * 
+     * @return bool True if assignment is currently active, false if scheduled or completed
+     */
+    public function isActive(): bool
+    {
+        // Jeśli start_date jest w przyszłości, to nie jest aktywne (tylko zaplanowane)
+        if ($this->isScheduled()) {
+            return false;
+        }
+
+        if ($this->end_date === null) {
+            return true; // Open-ended assignments are always active (if not scheduled)
+        }
+
+        $today = Carbon::today();
+        $endDate = \App\Services\DateRangeService::normalizeDate($this->end_date);
+        
+        return $endDate->gte($today);
+    }
+
+    /**
+     * Check if the assignment is completed (ended).
+     * 
+     * @return bool True if assignment is completed, false if active or scheduled
+     */
+    public function isCompleted(): bool
+    {
+        if ($this->isScheduled()) {
+            return false; // Scheduled is not completed
+        }
+
+        return !$this->isActive();
+    }
+
 }

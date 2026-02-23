@@ -1,10 +1,28 @@
-@props(['commentable'])
+@props([
+    'commentable',
+    'label' => null,
+    'inputLabel' => null,
+    'buttonText' => null,
+])
 
 @php
     $commentableType = \App\Enums\CommentableType::fromModel($commentable);
+    
+    // Dla ProjectTask używamy innych tekstów
+    $isTask = $commentable instanceof \App\Models\ProjectTask;
+    
+    $cardLabel = $label ?? ($isTask ? 'Dziennik operacyjny' : 'Komentarze');
+    $inputLabelText = $inputLabel ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
+    $buttonTextValue = $buttonText ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
 @endphp
 
-<x-ui.card label="Komentarze">
+<x-ui.card>
+    <span class="card-label">
+        @if($isTask && !$label)
+            <i class="bi bi-briefcase me-1"></i>
+        @endif
+        {{ $cardLabel }}
+    </span>
     <form action="{{ route('comments.store') }}" method="POST" class="mb-4">
         @csrf
         <input type="hidden" name="commentable_type" value="{{ $commentableType->value }}">
@@ -13,14 +31,14 @@
         <x-ui.input 
             type="textarea" 
             name="body" 
-            label="Dodaj komentarz"
+            :label="$inputLabelText"
             rows="3"
             required
         />
         
         <div class="mt-3">
             <x-ui.button variant="primary" type="submit" action="save">
-                Dodaj komentarz
+                {{ $buttonTextValue }}
             </x-ui.button>
         </div>
     </form>
@@ -83,7 +101,7 @@
     @else
         <x-ui.empty-state 
             icon="chat-dots"
-            message="Brak komentarzy"
+            :message="$isTask ? 'Brak raportów z działania' : 'Brak komentarzy'"
         />
     @endif
 </x-ui.card>

@@ -14,14 +14,12 @@ class VehicleAssignmentsTable extends Component
 
     public $searchEmployee = '';
     public $searchVehicle = '';
-    public $dateFrom = '';
-    public $dateTo = '';
+    public $statusFilter = '';
 
     protected $queryString = [
         'searchEmployee' => ['except' => ''],
         'searchVehicle' => ['except' => ''],
-        'dateFrom' => ['except' => ''],
-        'dateTo' => ['except' => ''],
+        'statusFilter' => ['except' => ''],
     ];
 
     public function updatingSearchEmployee()
@@ -34,12 +32,7 @@ class VehicleAssignmentsTable extends Component
         $this->resetPage();
     }
 
-    public function updatingDateFrom()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingDateTo()
+    public function updatingStatusFilter()
     {
         $this->resetPage();
     }
@@ -48,8 +41,7 @@ class VehicleAssignmentsTable extends Component
     {
         $this->searchEmployee = '';
         $this->searchVehicle = '';
-        $this->dateFrom = '';
-        $this->dateTo = '';
+        $this->statusFilter = '';
         $this->resetPage();
     }
 
@@ -80,15 +72,26 @@ class VehicleAssignmentsTable extends Component
             });
         }
 
-        // Filter by date range
-        if ($this->dateFrom) {
-            $query->where('start_date', '>=', $this->dateFrom);
-        }
-        if ($this->dateTo) {
-            $query->where(function ($q) {
-                $q->where('end_date', '<=', $this->dateTo)
-                  ->orWhereNull('end_date');
-            });
+        // Filter by status
+        if ($this->statusFilter === 'active') {
+            $today = \Carbon\Carbon::today();
+            $query->where('start_date', '<=', $today)
+                  ->where(function ($q) use ($today) {
+                      $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $today);
+                  })
+                  ->where('is_cancelled', false);
+        } elseif ($this->statusFilter === 'scheduled') {
+            $today = \Carbon\Carbon::today();
+            $query->where('start_date', '>', $today)
+                  ->where('is_cancelled', false);
+        } elseif ($this->statusFilter === 'completed') {
+            $today = \Carbon\Carbon::today();
+            $query->whereNotNull('end_date')
+                  ->where('end_date', '<', $today)
+                  ->where('is_cancelled', false);
+        } elseif ($this->statusFilter === 'cancelled') {
+            $query->where('is_cancelled', true);
         }
 
         $assignments = $query->paginate(20);

@@ -14,14 +14,12 @@ class AccommodationAssignmentsTable extends Component
 
     public $searchEmployee = '';// to wpisal w input- to stan ui- zmiana ui- odswiezenie danych
     public $searchAccommodation = '';
-    public $dateFrom = '';
-    public $dateTo = '';
+    public $statusFilter = '';
 
     protected $queryString = [
         'searchEmployee' => ['except' => ''],
         'searchAccommodation' => ['except' => ''],
-        'dateFrom' => ['except' => ''],
-        'dateTo' => ['except' => ''],
+        'statusFilter' => ['except' => ''],
     ];
 
     public function updatingSearchEmployee()
@@ -34,12 +32,7 @@ class AccommodationAssignmentsTable extends Component
         $this->resetPage();
     }
 
-    public function updatingDateFrom()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingDateTo()
+    public function updatingStatusFilter()
     {
         $this->resetPage();
     }
@@ -48,8 +41,7 @@ class AccommodationAssignmentsTable extends Component
     {
         $this->searchEmployee = '';
         $this->searchAccommodation = '';
-        $this->dateFrom = '';
-        $this->dateTo = '';
+        $this->statusFilter = '';
         $this->resetPage();
     }
 
@@ -79,15 +71,21 @@ class AccommodationAssignmentsTable extends Component
             });
         }
 
-        // Filter by date range
-        if ($this->dateFrom) {
-            $query->where('start_date', '>=', $this->dateFrom);
-        }
-        if ($this->dateTo) {
-            $query->where(function ($q) {
-                $q->where('end_date', '<=', $this->dateTo)
-                  ->orWhereNull('end_date');
-            });
+        // Filter by status
+        if ($this->statusFilter === 'active') {
+            $today = \Carbon\Carbon::today();
+            $query->where('start_date', '<=', $today)
+                  ->where(function ($q) use ($today) {
+                      $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $today);
+                  });
+        } elseif ($this->statusFilter === 'scheduled') {
+            $today = \Carbon\Carbon::today();
+            $query->where('start_date', '>', $today);
+        } elseif ($this->statusFilter === 'completed') {
+            $today = \Carbon\Carbon::today();
+            $query->whereNotNull('end_date')
+                  ->where('end_date', '<', $today);
         }
 
         $assignments = $query->paginate(20);

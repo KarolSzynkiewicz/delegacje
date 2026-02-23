@@ -25,13 +25,10 @@
                     <label class="form-label small">
                         <i class="bi bi-search me-1"></i> Szukaj
                     </label>
-                    <div class="position-relative">
-                        <input type="text" name="search" value="{{ request('search') }}" 
-                            placeholder="Nazwa sprzętu..."
-                            class="form-control ps-5"
-                            onchange="this.form.submit()">
-                        <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                    </div>
+                    <input type="text" name="search" value="{{ request('search') }}" 
+                        placeholder="Nazwa sprzętu..."
+                        class="form-control"
+                        onchange="this.form.submit()">
                 </div>
 
                 <!-- Kategoria -->

@@ -32,12 +32,9 @@
                 <label class="form-label small">
                     <i class="bi bi-search me-1"></i> Szukaj
                 </label>
-                <div class="position-relative">
-                    <input type="text" wire:model.live.debounce.500ms="search" 
-                        placeholder="Nazwa projektu lub klient..."
-                        class="form-control ps-5">
-                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                </div>
+                <input type="text" wire:model.live.debounce.500ms="search" 
+                    placeholder="Nazwa projektu lub klient..."
+                    class="form-control">
             </div>
 
             <!-- Status -->

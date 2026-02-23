@@ -1,11 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Projekty</h2>
-            <x-ui.button variant="primary" href="{{ route('projects.create') }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Projekt
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Projekty">
+            <x-slot name="right">
+                <x-ui.button variant="primary" href="{{ route('projects.create') }}" action="create">
+                    Dodaj Projekt
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     @if (session('success'))

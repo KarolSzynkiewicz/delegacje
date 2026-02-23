@@ -51,23 +51,13 @@
     @if($tasks->count() > 0)
         <!-- Sortowanie -->
         <div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
-            <small class="text-muted">Sortuj:</small>
-            <button 
-                type="button" 
-                wire:click="sortBy('name')" 
-                class="btn btn-sm btn-outline-secondary"
-            >
-                <i class="bi bi-list-task me-1"></i> Zadanie
-                @if($sortField === 'name')
-                    <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
-                @endif
-            </button>
+            <small class="text-muted">Sortuj po:</small>
             <button 
                 type="button" 
                 wire:click="sortBy('created_by')" 
                 class="btn btn-sm btn-outline-secondary"
             >
-                <i class="bi bi-person-plus me-1"></i> Utworzył
+                <i class="bi bi-person-plus me-1"></i> utworzonym przez
                 @if($sortField === 'created_by')
                     <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                 @endif
@@ -77,7 +67,7 @@
                 wire:click="sortBy('updated_at')" 
                 class="btn btn-sm btn-outline-secondary"
             >
-                <i class="bi bi-pencil-square me-1"></i> Zmodyfikował
+                <i class="bi bi-pencil-square me-1"></i> zmodyfikowanym
                 @if($sortField === 'updated_at')
                     <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                 @endif
@@ -87,7 +77,7 @@
                 wire:click="sortBy('assigned_to')" 
                 class="btn btn-sm btn-outline-secondary"
             >
-                <i class="bi bi-person-check me-1"></i> Przypisany
+                <i class="bi bi-person-check me-1"></i> przypisanym użytkowniku
                 @if($sortField === 'assigned_to')
                     <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                 @endif

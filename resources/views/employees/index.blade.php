@@ -1,11 +1,17 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Pracownicy</h2>
-            <x-ui.button variant="primary" href="{{ route('employees.create') }}">
-                <i class="bi bi-plus-circle"></i> Dodaj Pracownika
-            </x-ui.button>
-        </div>
+        <x-ui.page-header title="Pracownicy">
+            <x-slot name="right">
+                <x-ui.button 
+                    variant="primary" 
+                    href="{{ route('employees.create') }}"
+                    routeName="employees.create"
+                    action="create"
+                >
+                    Dodaj Pracownika
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
     <livewire:employees-table />

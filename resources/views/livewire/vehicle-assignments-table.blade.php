@@ -25,16 +25,16 @@
                         class="form-control form-control-sm">
                 </div>
 
-                <!-- Data od -->
+                <!-- Status -->
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Data od</label>
-                    <input type="date" wire:model.live="dateFrom" class="form-control form-control-sm">
-                </div>
-
-                <!-- Data do -->
-                <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Data do</label>
-                    <input type="date" wire:model.live="dateTo" class="form-control form-control-sm">
+                    <label class="form-label small fw-semibold">Status</label>
+                    <select wire:model.live="statusFilter" class="form-select form-select-sm">
+                        <option value="">Wszystkie</option>
+                        <option value="active">Aktywne</option>
+                        <option value="scheduled">Przyszłe</option>
+                        <option value="completed">Zakończone</option>
+                        <option value="cancelled">Anulowane</option>
+                    </select>
                 </div>
             </div>
     </x-ui.card>
@@ -67,6 +67,7 @@
                             <th>Pracownik</th>
                             <th>Rola</th>
                             <th>Od - Do</th>
+                            <th>Status</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -91,6 +92,17 @@
                                         {{ $assignment->start_date->format('Y-m-d') }} - 
                                         {{ $assignment->end_date ? $assignment->end_date->format('Y-m-d') : '...' }}
                                     </small>
+                                </td>
+                                <td>
+                                    @if($assignment->is_cancelled)
+                                        <x-ui.badge variant="danger">Anulowane</x-ui.badge>
+                                    @elseif($assignment->isScheduled())
+                                        <x-ui.badge variant="info">Przyszłe</x-ui.badge>
+                                    @elseif($assignment->isActive())
+                                        <x-ui.badge variant="success">Aktywne</x-ui.badge>
+                                    @else
+                                        <x-ui.badge variant="secondary">Zakończone</x-ui.badge>
+                                    @endif
                                 </td>
                                 <td>
                                     <x-action-buttons
