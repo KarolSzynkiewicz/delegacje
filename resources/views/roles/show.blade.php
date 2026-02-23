@@ -86,9 +86,15 @@
                                         </td>
                                         <td>{{ $demand->required_count }}</td>
                                         <td>
-                                            {{ $demand->date_from->format('Y-m-d') }}
-                                            @if($demand->date_to)
-                                                - {{ $demand->date_to->format('Y-m-d') }}
+                                            @if($demand->start_date)
+                                                {{ $demand->start_date->format('Y-m-d') }}
+                                            @else
+                                                -
+                                            @endif
+                                            @if($demand->end_date)
+                                                - {{ $demand->end_date->format('Y-m-d') }}
+                                            @elseif($demand->start_date)
+                                                - ...
                                             @endif
                                         </td>
                                     </tr>
