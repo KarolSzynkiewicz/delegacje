@@ -389,7 +389,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
     });
     
-    // Mine routes - projects managed by current user
+    // Mine routes - projects managed by current user for manages of projects)
     Route::prefix('mine')->name('mine.')->group(function () {
         Route::get('projects', [\App\Http\Controllers\MineController::class, 'projects'])->name('projects.index');
         Route::get('projects/{project}', [\App\Http\Controllers\MineController::class, 'show'])->name('projects.show');
@@ -408,5 +408,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return view('no-role');
     })->name('no-role');
 });
+
+//routes definied only for non-production enviroments.
+if (!app()->environment('production')) {
+    Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->group(function () {
+        Route::post('/system-actions/seed-database', [SystemActionsController::class, 'seedDatabase'])
+            ->name('system-actions.seed-database')
+            ->defaults('resource', 'system-actions')
+            ->defaults('permission_type', 'action');
+    });
+}
+
 
 require __DIR__.'/auth.php';

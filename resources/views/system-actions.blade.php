@@ -144,7 +144,7 @@
                     </div>
 
                     <!-- Pełne czyszczenie - wszystko -->
-                    <div class="border rounded p-3">
+                    <div class="border rounded p-3 mb-3">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
                                 <h5 class="mb-2">
@@ -167,6 +167,34 @@
                             </form>
                         </div>
                     </div>
+
+                    @if(!app()->environment('production'))
+                        <!-- Seedowanie bazy danych - tylko nie-prod -->
+                        <div class="border rounded p-3 bg-info bg-opacity-10">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-2">
+                                        <i class="bi bi-database-add text-info"></i>
+                                        Seeduj bazę danych
+                                    </h5>
+                                    <p class="text-muted mb-0 small">
+                                        <strong>🌱 Tylko nie-prod:</strong> Uruchamia seedery bazy danych. 
+                                        <strong class="text-danger">UWAGA: Może nadpisać istniejące dane!</strong>
+                                    </p>
+                                </div>
+                                <form method="POST" action="{{ route('system-actions.seed-database') }}" class="ms-3">
+                                    @csrf
+                                    <x-ui.button 
+                                        variant="info" 
+                                        type="submit"
+                                        onclick="return confirm('⚠️ UWAGA: To nadpisze dane w bazie! Czy na pewno chcesz uruchomić seedery?')"
+                                    >
+                                        <i class="bi bi-database-add"></i> Seeduj
+                                    </x-ui.button>
+                                </form>
+                            </div>
+                        </div>
+                    @endif
                 </x-ui.card>
             </div>
 

@@ -166,4 +166,31 @@ class SystemActionsController extends Controller
                 ->with('error', 'Błąd: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Seed the database.
+     * Only available in non-production environments.
+     */
+    public function seedDatabase(): RedirectResponse
+    {
+        // Double check environment (should be protected by route, but extra safety)
+        if (app()->environment('production')) {
+            abort(403, 'Seeding is not allowed in production environment.');
+        }
+
+        try {
+            Artisan::call('db:seed', [
+                '--force' => true,
+                '--no-interaction' => true,
+            ]);
+            
+            $output = Artisan::output();
+            
+            return redirect()->route('system-actions.index')
+                ->with('success', 'Baza danych została zaseedowana pomyślnie! ' . ($output ?: ''));
+        } catch (\Exception $e) {
+            return redirect()->route('system-actions.index')
+                ->with('error', 'Błąd podczas seedowania bazy danych: ' . $e->getMessage());
+        }
+    }
 }
