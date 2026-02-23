@@ -101,7 +101,13 @@ class VehicleAssignment extends Model
             return false;
         }
         
-        return parent::isScheduled(); // Używa metody z HasDateRange trait
+        // Użyj metody z HasDateRange trait bezpośrednio
+        $start = $this->getStartDate();
+        if ($start === null) {
+            return false;
+        }
+        
+        return $start->gt(Carbon::today());
     }
 
     /**
