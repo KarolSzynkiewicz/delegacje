@@ -75,6 +75,9 @@
                             Nazwa
                         </x-livewire.sortable-header>
                         <th class="text-start d-none d-md-table-cell">Klient</th>
+                        <x-livewire.sortable-header field="type" :sortField="$sortField" :sortDirection="$sortDirection">
+                            Typ
+                        </x-livewire.sortable-header>
                         <x-livewire.sortable-header field="status" :sortField="$sortField" :sortDirection="$sortDirection">
                             Status
                         </x-livewire.sortable-header>
@@ -94,6 +97,26 @@
                             </td>
                             <td class="d-none d-md-table-cell">
                                 <div>{{ $project->client_name ?? '-' }}</div>
+                            </td>
+                            <td>
+                                @php
+                                    $type = $project->type ?? \App\Enums\ProjectType::CONTRACT;
+                                    $typeValue = $type instanceof \App\Enums\ProjectType ? $type->value : $type;
+                                    
+                                    if ($typeValue === 'hourly') {
+                                        $typeLabel = 'Stawka za godzinę';
+                                        $typeInfo = $project->hourly_rate ? number_format($project->hourly_rate, 2, ',', ' ') . ' ' . ($project->currency ?? 'EUR') : '';
+                                    } else {
+                                        $typeLabel = 'Zakontraktowany';
+                                        $typeInfo = $project->contract_amount ? number_format($project->contract_amount, 2, ',', ' ') . ' ' . ($project->currency ?? 'PLN') : '';
+                                    }
+                                @endphp
+                                <div>
+                                    <span class="fw-medium">{{ $typeLabel }}</span>
+                                    @if($typeInfo)
+                                        <div class="small text-muted mt-1">{{ $typeInfo }}</div>
+                                    @endif
+                                </div>
                             </td>
                             <td>
                                 @php
@@ -138,7 +161,7 @@
                             :has-filters="$search || $statusFilter || $locationFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="4"
+                            colspan="5"
                         />
                     @endforelse
                 </tbody>

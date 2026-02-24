@@ -14,8 +14,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             // PermissionSeeder removed - permissions are now generated dynamically from routes
-            UserRoleSeeder::class,
-            UserSeeder::class,
             RoleSeeder::class,
             LocationSeeder::class,
             DocumentSeeder::class, // Wymagania formalne (dokumenty)
@@ -24,7 +22,6 @@ class DatabaseSeeder extends Seeder
             AccommodationSeeder::class,
             VehicleSeeder::class,
             ProjectSeeder::class,
-            ProjectDemandSeeder::class, // Zapotrzebowania na projekty
             // Przypisania (project_assignments, vehicle_assignments, accommodation_assignments) 
             // są tworzone ręcznie przez użytkownika w UI z pełną walidacją biznesową
         ]);

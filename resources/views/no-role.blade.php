@@ -50,4 +50,8 @@
             </div>
         </x-ui.card>
 
+        <div class="mt-4 text-center text-sm text-gray-500">
+            env: {{ config('app.env') }}
+        </div>
+
 </x-app-layout>
