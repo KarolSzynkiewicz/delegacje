@@ -770,6 +770,54 @@ textarea.form-control {
     border-color: rgba(245, 158, 11, 0.2) !important;
 }
 
+/* Today's date styles */
+.table thead th.today-header {
+    background: rgba(59, 130, 246, 0.25) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+    position: relative;
+}
+
+.table thead th.today-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--primary);
+}
+
+.table tbody td.today-cell {
+    background: rgba(59, 130, 246, 0.15) !important;
+    position: relative;
+}
+
+.table tbody td.today-cell::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--primary);
+}
+
+.table tbody td.today-cell input.time-input {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+.table tbody td.today-cell input.time-input:focus {
+    background: rgba(59, 130, 246, 0.3) !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+}
+
+.table tbody td.today-cell input.disabled-input {
+    background: rgba(59, 130, 246, 0.1) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
 .disabled-cell {
     background: rgba(255, 255, 255, 0.02) !important;
 }
@@ -810,17 +858,20 @@ textarea.form-control {
 
 /* --- CLICKABLE CARDS --- */
 .vehicle-card-clickable,
-.accommodation-card-clickable {
+.accommodation-card-clickable,
+.document-card-clickable {
     cursor: pointer;
     transition: all 0.2s ease;
 }
 .vehicle-card-clickable:hover,
-.accommodation-card-clickable:hover {
+.accommodation-card-clickable:hover,
+.document-card-clickable:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
 }
 .vehicle-card-clickable:hover .card-title,
-.accommodation-card-clickable:hover .card-title {
+.accommodation-card-clickable:hover .card-title,
+.document-card-clickable:hover .card-title {
     color: var(--primary);
 }
 

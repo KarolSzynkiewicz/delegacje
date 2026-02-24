@@ -92,7 +92,10 @@
                                     Projekt / Osoba
                                 </th>
                                 @foreach($days as $day)
-                                    <th class="text-center fw-bold {{ $day['isWeekend'] ? 'weekend-header' : '' }}" style="min-width: 60px; background: var(--bg-card);">
+                                    @php
+                                        $isToday = $day['date']->isToday();
+                                    @endphp
+                                    <th class="text-center fw-bold {{ $day['isWeekend'] ? 'weekend-header' : '' }} {{ $isToday ? 'today-header' : '' }}" style="min-width: 60px; background: var(--bg-card);">
                                         <div>{{ $day['number'] }}</div>
                                         <div class="small fw-normal text-muted">{{ $day['date']->format('D') }}</div>
                                     </th>
@@ -120,7 +123,10 @@
                                         @endif
                                     </td>
                                     @foreach($days as $day)
-                                        <td class="text-center {{ $day['isWeekend'] ? 'weekend-cell' : '' }}"></td>
+                                        @php
+                                            $isToday = $day['date']->isToday();
+                                        @endphp
+                                        <td class="text-center {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }}"></td>
                                     @endforeach
                                 </tr>
 
@@ -142,6 +148,7 @@
                                             @php
                                                 $dayNumber = $day['number'];
                                                 $date = $day['date'];
+                                                $isToday = $date->isToday();
                                                 $isInAssignment = isset($daysInAssignment[$dayNumber]);
                                                 $timeLog = $timeLogs[$dayNumber] ?? null;
                                                 $hours = $timeLog['hours'] ?? '';
@@ -187,7 +194,7 @@
                                                     $assignmentId = $assignmentData['assignments'][0]->id;
                                                 }
                                             @endphp
-                                            <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ !$isInAssignment ? 'disabled-cell' : '' }}">
+                                            <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }} {{ !$isInAssignment ? 'disabled-cell' : '' }}">
                                                 @if($isInAssignment && $assignmentId)
                                                     {{-- Aktywne przypisanie - pole edytowalne --}}
                                                     <input 

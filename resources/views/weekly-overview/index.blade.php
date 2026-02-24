@@ -778,9 +778,14 @@
                 @if(isset($weekData['assigned_employees']) && $weekData['assigned_employees']->isNotEmpty())
                     <div class="mt-4">
                         <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
-                            <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
-                                Przypisz osoby
-                            </x-ui.button>
+                            <div class="d-flex gap-2">
+                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                                    Przypisz osoby
+                                </x-ui.button>
+                                <x-ui.button variant="success" href="{{ route('departures.create', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                                    Utwórz wyjazd
+                                </x-ui.button>
+                            </div>
                         </x-ui.table-header>
                         <div class="table-responsive">
                             <table class="table align-middle">
@@ -898,9 +903,14 @@
                 @else
                     <div class="mt-4">
                         <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
-                            <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
-                                Przypisz osoby
-                            </x-ui.button>
+                            <div class="d-flex gap-2">
+                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                                    Przypisz osoby
+                                </x-ui.button>
+                                <x-ui.button variant="success" href="{{ route('departures.create', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                                    Utwórz wyjazd
+                                </x-ui.button>
+                            </div>
                         </x-ui.table-header>
                         <x-ui.empty-state 
                             icon="people"
@@ -1001,21 +1011,23 @@
                             <div class="row g-3">
                                 @foreach($expiringItems['documents']->take(6) as $document)
                                     <div class="col-md-4">
-                                        <x-ui.card>
-                                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                                <div class="flex-grow-1">
-                                                    <h5 class="fw-bold mb-1">{{ $document->employee->full_name }}</h5>
-                                                    <p class="mb-1 text-muted small">{{ $document->document->name ?? 'Dokument' }}</p>
-                                                    @if($document->type)
-                                                        <x-ui.badge variant="info" class="mb-2">{{ $document->type }}</x-ui.badge>
-                                                    @endif
+                                        <a href="{{ route('employee-documents.edit', $document) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 document-card-clickable">
+                                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="fw-bold mb-1">{{ $document->employee->full_name }}</h5>
+                                                        <p class="mb-1 text-muted small">{{ $document->document->name ?? 'Dokument' }}</p>
+                                                        @if($document->type)
+                                                            <x-ui.badge variant="info" class="mb-2">{{ $document->type }}</x-ui.badge>
+                                                        @endif
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div class="d-flex align-items-center gap-2">
-                                                <i class="bi bi-calendar-event text-warning"></i>
-                                                <span class="small">Ważny do: <strong>{{ $document->valid_to->format('d.m.Y') }}</strong></span>
-                                            </div>
-                                        </x-ui.card>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-event text-warning"></i>
+                                                    <span class="small">Ważny do: <strong>{{ $document->valid_to->format('d.m.Y') }}</strong></span>
+                                                </div>
+                                            </x-ui.card>
+                                        </a>
                                     </div>
                                 @endforeach
                             </div>
@@ -1044,30 +1056,32 @@
                                         $date = $item['date'];
                                     @endphp
                                     <div class="col-md-4">
-                                        <x-ui.card>
-                                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                                <div class="flex-grow-1">
-                                                    <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
-                                                    <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
-                                                    @if($type === 'inspection')
-                                                        <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
-                                                    @else
-                                                        <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
-                                                    @endif
+                                        <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 vehicle-card-clickable">
+                                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
+                                                        <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
+                                                        @if($type === 'inspection')
+                                                            <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
+                                                        @else
+                                                            <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
+                                                        @endif
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div class="d-flex align-items-center gap-2">
-                                                <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
-                                                <span class="small">
-                                                    @if($type === 'inspection')
-                                                        Przegląd ważny do:
-                                                    @else
-                                                        OC ważne do:
-                                                    @endif
-                                                    <strong>{{ $date->format('d.m.Y') }}</strong>
-                                                </span>
-                                            </div>
-                                        </x-ui.card>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
+                                                    <span class="small">
+                                                        @if($type === 'inspection')
+                                                            Przegląd ważny do:
+                                                        @else
+                                                            OC ważne do:
+                                                        @endif
+                                                        <strong>{{ $date->format('d.m.Y') }}</strong>
+                                                    </span>
+                                                </div>
+                                            </x-ui.card>
+                                        </a>
                                     </div>
                                 @endforeach
                                 
@@ -1080,30 +1094,32 @@
                                                 $date = $item['date'];
                                             @endphp
                                             <div class="col-md-4">
-                                                <x-ui.card>
-                                                    <div class="d-flex align-items-start justify-content-between mb-2">
-                                                        <div class="flex-grow-1">
-                                                            <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
-                                                            <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
-                                                            @if($type === 'inspection')
-                                                                <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
-                                                            @else
-                                                                <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
-                                                            @endif
+                                                <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none" style="display: block;">
+                                                    <x-ui.card class="h-100 vehicle-card-clickable">
+                                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                                            <div class="flex-grow-1">
+                                                                <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
+                                                                <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
+                                                                @if($type === 'inspection')
+                                                                    <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
+                                                                @else
+                                                                    <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
+                                                                @endif
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="d-flex align-items-center gap-2">
-                                                        <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
-                                                        <span class="small">
-                                                            @if($type === 'inspection')
-                                                                Przegląd ważny do:
-                                                            @else
-                                                                OC ważne do:
-                                                            @endif
-                                                            <strong>{{ $date->format('d.m.Y') }}</strong>
-                                                        </span>
-                                                    </div>
-                                                </x-ui.card>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
+                                                            <span class="small">
+                                                                @if($type === 'inspection')
+                                                                    Przegląd ważny do:
+                                                                @else
+                                                                    OC ważne do:
+                                                                @endif
+                                                                <strong>{{ $date->format('d.m.Y') }}</strong>
+                                                            </span>
+                                                        </div>
+                                                    </x-ui.card>
+                                                </a>
                                             </div>
                                         @endforeach
                                     </template>
@@ -1130,19 +1146,21 @@
                             <div class="row g-3">
                                 @foreach($expiringItems['accommodations']->take(5) as $accommodation)
                                     <div class="col-md-4">
-                                        <x-ui.card>
-                                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                                <div class="flex-grow-1">
-                                                    <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
-                                                    <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
-                                                    <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                        <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 accommodation-card-clickable">
+                                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
+                                                        <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
+                                                        <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div class="d-flex align-items-center gap-2">
-                                                <i class="bi bi-calendar-event text-warning"></i>
-                                                <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
-                                            </div>
-                                        </x-ui.card>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-event text-warning"></i>
+                                                    <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                </div>
+                                            </x-ui.card>
+                                        </a>
                                     </div>
                                 @endforeach
                                 
@@ -1150,19 +1168,21 @@
                                     <template x-if="showAllAccommodations">
                                         @foreach($expiringItems['accommodations']->skip(5) as $accommodation)
                                             <div class="col-md-4">
-                                                <x-ui.card>
-                                                    <div class="d-flex align-items-start justify-content-between mb-2">
-                                                        <div class="flex-grow-1">
-                                                            <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
-                                                            <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
-                                                            <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none" style="display: block;">
+                                                    <x-ui.card class="h-100 accommodation-card-clickable">
+                                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                                            <div class="flex-grow-1">
+                                                                <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
+                                                                <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
+                                                                <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="d-flex align-items-center gap-2">
-                                                        <i class="bi bi-calendar-event text-warning"></i>
-                                                        <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
-                                                    </div>
-                                                </x-ui.card>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <i class="bi bi-calendar-event text-warning"></i>
+                                                            <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                        </div>
+                                                    </x-ui.card>
+                                                </a>
                                             </div>
                                         @endforeach
                                     </template>
