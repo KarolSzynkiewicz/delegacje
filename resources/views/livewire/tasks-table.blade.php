@@ -97,7 +97,7 @@
                     };
                     $updatedAt = \Carbon\Carbon::parse($task->updated_at);
                 @endphp
-                <div class="col-12" wire:key="task-{{ $task->id }}">
+                <div class="col-12" wire:key="task-{{ $task->id }}" id="task-{{ $task->id }}">
                     <div class="card">
                         <div class="card-body">
                             <!-- GŁÓWNY WIERSZ 1: Tytuł + Opis (lewa) + Badge (Status, Projekt, Due Date) (prawa) -->

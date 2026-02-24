@@ -206,9 +206,9 @@ return [
     ],
     
     'mine_time_logs' => [
-        'route' => 'mine.time-logs.index',
+        'route' => 'mine.time-logs.monthly-grid',
         'icon' => 'bi bi-clock',
-        'label' => 'Ewidencje godzin zespołu',
+        'label' => 'Ewidencja godzin',
     ],
     
     'mine_employees' => [

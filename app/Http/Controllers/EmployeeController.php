@@ -28,7 +28,8 @@ class EmployeeController extends Controller
     public function create(): View
     {
         $roles = Role::all();
-        return view('employees.create', compact('roles'));
+        $hasRoles = $roles->count() > 0;
+        return view('employees.create', compact('roles', 'hasRoles'));
     }
 
     /**

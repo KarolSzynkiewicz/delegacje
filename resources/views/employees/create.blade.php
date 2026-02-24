@@ -8,6 +8,22 @@
             <x-ui.card label="Dodaj Nowego Pracownika">
                 <x-ui.errors />
 
+                @if(!$hasRoles)
+                    <x-ui.alert variant="warning" dismissible class="mb-4">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                            <div>
+                                <strong>Brak ról w systemie!</strong>
+                                <p class="mb-0 mt-1">
+                                    Aby dodać pracownika, musisz najpierw utworzyć przynajmniej jedną rolę pracownika (np. "Kierowca", "Mechanik").
+                                    <br>
+                                    <a href="{{ route('roles.create') }}" class="fw-semibold">Kliknij tutaj, aby utworzyć rolę</a>
+                                </p>
+                            </div>
+                        </div>
+                    </x-ui.alert>
+                @endif
+
                 <form action="{{ route('employees.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
 

@@ -196,10 +196,12 @@
                         </table>
                     </div>
                 @else
-                    <x-ui.empty-state 
-                        icon="file-earmark"
-                        message="Brak dokumentów"
-                    />
+                    <div class="text-center py-5">
+                        <p class="text-muted mb-3">Brak dokumentów</p>
+                        <x-ui.button variant="primary" href="{{ route('employee-documents.create', ['employee_id' => $employee->id]) }}" class="btn-sm">
+                            Dodaj dokument
+                        </x-ui.button>
+                    </div>
                 @endif
             </x-ui.card>
         </div>

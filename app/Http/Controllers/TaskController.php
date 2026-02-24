@@ -166,7 +166,7 @@ class TaskController extends Controller
 
         $task->markInProgress();
 
-        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako w trakcie.');
+        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako w trakcie.')->withFragment('task-' . $task->id);
     }
 
     /**
@@ -179,7 +179,7 @@ class TaskController extends Controller
 
         $task->markCompleted();
 
-        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako zakończone.');
+        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako zakończone.')->withFragment('task-' . $task->id);
     }
 
     /**
@@ -192,6 +192,6 @@ class TaskController extends Controller
 
         $task->cancel();
 
-        return redirect()->back()->with('success', 'Zadanie zostało anulowane.');
+        return redirect()->back()->with('success', 'Zadanie zostało anulowane.')->withFragment('task-' . $task->id);
     }
 }
