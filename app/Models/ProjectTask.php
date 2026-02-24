@@ -19,6 +19,8 @@ class ProjectTask extends Model
         'name',
         'description',
         'status',
+        'priority',
+        'category',
         'assigned_to',
         'due_date',
         'completed_at',

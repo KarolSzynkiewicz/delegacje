@@ -41,6 +41,8 @@ class TaskController extends Controller
                 'name' => $request->input('name'),
                 'description' => $request->input('description'),
                 'status' => $status,
+                'priority' => $request->input('priority') ?: null,
+                'category' => $request->input('category') ?: null,
                 'assigned_to' => $request->input('assigned_to') ?: null,
                 'due_date' => $request->input('due_date') ?: null,
                 'created_by' => auth()->id(),
@@ -116,7 +118,7 @@ class TaskController extends Controller
             : $task->status;
 
         // Aktualizuj podstawowe pola
-        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'project_id']));
+        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'project_id', 'priority', 'category']));
 
         // Jeśli status się zmienił, użyj metod domenowych lub zaktualizuj bezpośrednio
         if ($newStatus !== $oldStatus) {

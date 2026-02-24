@@ -74,7 +74,7 @@
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col-md-6 mb-3 mb-md-0">
+                        <div class="col-md-4 mb-3 mb-md-0">
                             <x-ui.input 
                                 type="date" 
                                 name="due_date" 
@@ -82,7 +82,21 @@
                                 value="{{ old('due_date', $task->due_date ? $task->due_date->format('Y-m-d') : '') }}"
                             />
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="select" 
+                                name="priority" 
+                                label="Priorytet"
+                            >
+                                <option value="">Brak priorytetu</option>
+                                <option value="1" {{ old('priority', $task->priority) == '1' ? 'selected' : '' }}>1 - Najniższy</option>
+                                <option value="2" {{ old('priority', $task->priority) == '2' ? 'selected' : '' }}>2 - Niski</option>
+                                <option value="3" {{ old('priority', $task->priority) == '3' ? 'selected' : '' }}>3 - Średni</option>
+                                <option value="4" {{ old('priority', $task->priority) == '4' ? 'selected' : '' }}>4 - Wysoki</option>
+                                <option value="5" {{ old('priority', $task->priority) == '5' ? 'selected' : '' }}>5 - Najwyższy</option>
+                            </x-ui.input>
+                        </div>
+                        <div class="col-md-4">
                             <x-ui.input 
                                 type="select" 
                                 name="status" 
@@ -94,6 +108,16 @@
                                 <option value="cancelled" {{ old('status', $task->status->value) === 'cancelled' ? 'selected' : '' }}>Anulowane</option>
                             </x-ui.input>
                         </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="text" 
+                            name="category" 
+                            label="Kategoria (opcjonalnie)"
+                            value="{{ old('category', $task->category) }}"
+                            placeholder="np. Bug, Feature, Dokumentacja..."
+                        />
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">

@@ -79,10 +79,52 @@
                                 </div>
                             @endif
                             
+                            <!-- Priorytet -->
+                            @if($task->priority)
+                                @php
+                                    $priorityVariant = match((int)$task->priority) {
+                                        1, 2 => 'secondary',
+                                        3 => 'info',
+                                        4 => 'warning',
+                                        5 => 'danger',
+                                        default => 'secondary',
+                                    };
+                                    $priorityLabel = match((int)$task->priority) {
+                                        1 => 'Najniższy',
+                                        2 => 'Niski',
+                                        3 => 'Średni',
+                                        4 => 'Wysoki',
+                                        5 => 'Najwyższy',
+                                        default => '',
+                                    };
+                                @endphp
+                                <div>
+                                    <small class="text-muted d-block mb-1">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>Priorytet
+                                    </small>
+                                    <span class="badge bg-{{ $priorityVariant }}">
+                                        <i class="bi bi-{{ $task->priority >= 4 ? 'exclamation-triangle-fill' : 'exclamation-triangle' }} me-1"></i>
+                                        {{ $task->priority }} - {{ $priorityLabel }}
+                                    </span>
+                                </div>
+                            @endif
+                            
+                            <!-- Kategoria -->
+                            @if($task->category)
+                                <div>
+                                    <small class="text-muted d-block mb-1">
+                                        <i class="bi bi-tag me-1"></i>Kategoria
+                                    </small>
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-tag me-1"></i>{{ $task->category }}
+                                    </span>
+                                </div>
+                            @endif
+                            
                             <!-- Due Date Badge -->
                             @if($task->due_date)
                                 @php
-                                    $dueDate = \Carbon\Carbon::parse($task->due_date);
+                                    $dueDate = $task->due_date; // Already a Carbon instance due to model cast
                                     $now = \Carbon\Carbon::now();
                                     $isPast = $dueDate->isPast();
                                     $isToday = $dueDate->isToday();
@@ -117,6 +159,63 @@
                             {{ $task->assignedTo->name }}
                         @else
                             <span class="text-muted">Nie przypisane</span>
+                        @endif
+                    </x-ui.detail-item>
+                    <x-ui.detail-item label="Priorytet">
+                        @if($task->priority)
+                            @php
+                                $priorityVariant = match((int)$task->priority) {
+                                    1, 2 => 'secondary',
+                                    3 => 'info',
+                                    4 => 'warning',
+                                    5 => 'danger',
+                                    default => 'secondary',
+                                };
+                                $priorityLabel = match((int)$task->priority) {
+                                    1 => 'Najniższy',
+                                    2 => 'Niski',
+                                    3 => 'Średni',
+                                    4 => 'Wysoki',
+                                    5 => 'Najwyższy',
+                                    default => '',
+                                };
+                            @endphp
+                            <span class="badge bg-{{ $priorityVariant }}">
+                                <i class="bi bi-{{ $task->priority >= 4 ? 'exclamation-triangle-fill' : 'exclamation-triangle' }} me-1"></i>
+                                {{ $task->priority }} - {{ $priorityLabel }}
+                            </span>
+                        @else
+                            <span class="text-muted">Nie ustawiono</span>
+                        @endif
+                    </x-ui.detail-item>
+                    <x-ui.detail-item label="Kategoria">
+                        @if($task->category)
+                            <span class="badge bg-primary">
+                                <i class="bi bi-tag me-1"></i>{{ $task->category }}
+                            </span>
+                        @else
+                            <span class="text-muted">Nie ustawiono</span>
+                        @endif
+                    </x-ui.detail-item>
+                    <x-ui.detail-item label="Termin wykonania">
+                        @if($task->due_date)
+                            @php
+                                $dueDate = $task->due_date; // Already a Carbon instance due to model cast
+                                $now = \Carbon\Carbon::now();
+                                $isPast = $dueDate->isPast();
+                                $isToday = $dueDate->isToday();
+                            @endphp
+                            <div>
+                                <span class="fw-semibold">{{ $dueDate->format('d.m.Y') }}</span>
+                                <span class="text-muted ms-2">({{ $dueDate->diffForHumans() }})</span>
+                                @if($isPast && !$isToday)
+                                    <span class="badge bg-danger ms-2">Przeterminowane</span>
+                                @elseif($isToday)
+                                    <span class="badge bg-warning ms-2">Dzisiaj</span>
+                                @endif
+                            </div>
+                        @else
+                            <span class="text-muted">Nie ustawiono</span>
                         @endif
                     </x-ui.detail-item>
                     @if($task->completed_at)

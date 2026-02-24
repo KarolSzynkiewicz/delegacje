@@ -141,32 +141,86 @@
                                             @endif
                                         </div>
                                         
+                                        <!-- Priorytet -->
+                                        <div>
+                                            <small class="text-muted d-block mb-1">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>Priorytet
+                                            </small>
+                                            @if($task->priority)
+                                                @php
+                                                    $priorityVariant = match((int)$task->priority) {
+                                                        1, 2 => 'secondary',
+                                                        3 => 'info',
+                                                        4 => 'warning',
+                                                        5 => 'danger',
+                                                        default => 'secondary',
+                                                    };
+                                                    $priorityLabel = match((int)$task->priority) {
+                                                        1 => 'Najniższy',
+                                                        2 => 'Niski',
+                                                        3 => 'Średni',
+                                                        4 => 'Wysoki',
+                                                        5 => 'Najwyższy',
+                                                        default => '',
+                                                    };
+                                                @endphp
+                                                <span class="badge bg-{{ $priorityVariant }}">
+                                                    <i class="bi bi-{{ $task->priority >= 4 ? 'exclamation-triangle-fill' : 'exclamation-triangle' }} me-1"></i>
+                                                    {{ $task->priority }}
+                                                </span>
+                                            @else
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="bi bi-x-circle me-1"></i>Brak
+                                                </span>
+                                            @endif
+                                        </div>
+                                        
+                                        <!-- Kategoria -->
+                                        <div>
+                                            <small class="text-muted d-block mb-1">
+                                                <i class="bi bi-tag me-1"></i>Kategoria
+                                            </small>
+                                            @if($task->category)
+                                                <span class="badge bg-primary">
+                                                    <i class="bi bi-tag me-1"></i>{{ Str::limit($task->category, 15) }}
+                                                </span>
+                                            @else
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="bi bi-x-circle me-1"></i>Brak
+                                                </span>
+                                            @endif
+                                        </div>
+                                        
                                         <!-- Due Date Badge -->
-                                        @if($task->due_date)
-                                            @php
-                                                $dueDate = \Carbon\Carbon::parse($task->due_date);
-                                                $now = \Carbon\Carbon::now();
-                                                $isPast = $dueDate->isPast();
-                                                $isToday = $dueDate->isToday();
-                                                $daysDiff = $now->diffInDays($dueDate, false); // false = signed difference
-                                                
-                                                // Określ kolor badge
-                                                $dueDateBadgeVariant = 'info'; // Niebieski - domyślnie
-                                                if ($isPast || $isToday) {
-                                                    $dueDateBadgeVariant = 'danger'; // Czerwony - dzisiaj lub w przeszłości
-                                                } elseif ($daysDiff <= 3) {
-                                                    $dueDateBadgeVariant = 'warning'; // Żółty - w ciągu najbliższych 3 dni
-                                                }
-                                            @endphp
-                                            <div>
-                                                <small class="text-muted d-block mb-1">
-                                                    <i class="bi bi-calendar-event me-1"></i>Termin wykonania
-                                                </small>
+                                        <div>
+                                            <small class="text-muted d-block mb-1">
+                                                <i class="bi bi-calendar-event me-1"></i>Termin wykonania
+                                            </small>
+                                            @if($task->due_date)
+                                                @php
+                                                    $dueDate = $task->due_date; // Already a Carbon instance due to model cast
+                                                    $now = \Carbon\Carbon::now();
+                                                    $isPast = $dueDate->isPast();
+                                                    $isToday = $dueDate->isToday();
+                                                    $daysDiff = $now->diffInDays($dueDate, false); // false = signed difference
+                                                    
+                                                    // Określ kolor badge
+                                                    $dueDateBadgeVariant = 'info'; // Niebieski - domyślnie
+                                                    if ($isPast || $isToday) {
+                                                        $dueDateBadgeVariant = 'danger'; // Czerwony - dzisiaj lub w przeszłości
+                                                    } elseif ($daysDiff <= 3) {
+                                                        $dueDateBadgeVariant = 'warning'; // Żółty - w ciągu najbliższych 3 dni
+                                                    }
+                                                @endphp
                                                 <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
                                                     <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }} ({{ $dueDate->diffForHumans() }})
                                                 </x-ui.badge>
-                                            </div>
-                                        @endif
+                                            @else
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="bi bi-x-circle me-1"></i>Nie ustawiono
+                                                </span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </div>

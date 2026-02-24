@@ -28,6 +28,8 @@ class StoreProjectTaskRequest extends FormRequest
             'assigned_to' => ['nullable', 'exists:users,id'],
             'due_date' => ['nullable', 'date', 'after_or_equal:today'],
             'status' => ['nullable', 'in:pending,in_progress,completed,cancelled'],
+            'priority' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'category' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -38,6 +40,9 @@ class StoreProjectTaskRequest extends FormRequest
             'assigned_to.exists' => 'Wybrany użytkownik nie istnieje.',
             'due_date.date' => 'Nieprawidłowa data.',
             'due_date.after_or_equal' => 'Data zakończenia nie może być w przeszłości.',
+            'priority.integer' => 'Priorytet musi być liczbą.',
+            'priority.min' => 'Priorytet musi być między 1 a 5.',
+            'priority.max' => 'Priorytet musi być między 1 a 5.',
         ];
     }
 }

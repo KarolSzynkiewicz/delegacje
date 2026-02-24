@@ -27,6 +27,8 @@ class UpdateProjectTaskRequest extends FormRequest
             'assigned_to' => ['nullable', 'exists:users,id'],
             'due_date' => ['nullable', 'date'],
             'status' => ['nullable', 'in:pending,in_progress,completed,cancelled'],
+            'priority' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'category' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -36,6 +38,9 @@ class UpdateProjectTaskRequest extends FormRequest
             'name.required' => 'Nazwa zadania jest wymagana.',
             'assigned_to.exists' => 'Wybrany użytkownik nie istnieje.',
             'due_date.date' => 'Nieprawidłowa data.',
+            'priority.integer' => 'Priorytet musi być liczbą.',
+            'priority.min' => 'Priorytet musi być między 1 a 5.',
+            'priority.max' => 'Priorytet musi być między 1 a 5.',
         ];
     }
 }

@@ -42,7 +42,7 @@
                 </div>
                 
                 <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <x-ui.input 
                             type="select" 
                             name="project_id" 
@@ -57,7 +57,7 @@
                         </x-ui.input>
                     </div>
                     
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <x-ui.input 
                             type="select" 
                             name="assigned_to" 
@@ -72,12 +72,39 @@
                         </x-ui.input>
                     </div>
                     
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <x-ui.input 
                             type="date" 
                             name="due_date" 
                             label="Termin"
                             value="{{ old('due_date') }}"
+                        />
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="priority" 
+                            label="Priorytet"
+                        >
+                            <option value="">Brak priorytetu</option>
+                            <option value="1" {{ old('priority') == '1' ? 'selected' : '' }}>1 - Najniższy</option>
+                            <option value="2" {{ old('priority') == '2' ? 'selected' : '' }}>2 - Niski</option>
+                            <option value="3" {{ old('priority') == '3' ? 'selected' : '' }}>3 - Średni</option>
+                            <option value="4" {{ old('priority') == '4' ? 'selected' : '' }}>4 - Wysoki</option>
+                            <option value="5" {{ old('priority') == '5' ? 'selected' : '' }}>5 - Najwyższy</option>
+                        </x-ui.input>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <x-ui.input 
+                            type="text" 
+                            name="category" 
+                            label="Kategoria (opcjonalnie)"
+                            value="{{ old('category') }}"
+                            placeholder="np. Bug, Feature, Dokumentacja..."
                         />
                     </div>
                 </div>
