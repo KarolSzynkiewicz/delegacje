@@ -31,12 +31,15 @@
                     </thead>
                     <tbody>
                         @foreach ($returnTrips as $trip)
+                            @php
+                                $uniqueParticipantsCount = $trip->participants->pluck('employee_id')->unique()->count();
+                            @endphp
                             <tr>
-                                <td>{{ $trip->event_date->format('Y-m-d H:i') }}</td>
+                                <td>{{ $trip->event_date->format('Y-m-d') }}</td>
                                 <td>{{ $trip->vehicle ? $trip->vehicle->registration_number : '-' }}</td>
                                 <td>{{ $trip->fromLocation->name }}</td>
                                 <td>{{ $trip->toLocation->name }}</td>
-                                <td>{{ $trip->participants->count() }} osób</td>
+                                <td>{{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }}</td>
                                 <td>
                                     @php
                                         $badgeVariant = match($trip->status->value) {

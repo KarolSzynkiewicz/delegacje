@@ -102,10 +102,10 @@
                                     <small class="text-muted d-block mb-1">
                                         <i class="bi bi-exclamation-triangle me-1"></i>Priorytet
                                     </small>
-                                    <span class="badge bg-{{ $priorityVariant }}">
+                                    <x-ui.badge variant="{{ $priorityVariant }}">
                                         <i class="bi bi-{{ $task->priority >= 4 ? 'exclamation-triangle-fill' : 'exclamation-triangle' }} me-1"></i>
                                         {{ $task->priority }} - {{ $priorityLabel }}
-                                    </span>
+                                    </x-ui.badge>
                                 </div>
                             @endif
                             
@@ -115,9 +115,9 @@
                                     <small class="text-muted d-block mb-1">
                                         <i class="bi bi-tag me-1"></i>Kategoria
                                     </small>
-                                    <span class="badge bg-primary">
+                                    <x-ui.badge variant="info">
                                         <i class="bi bi-tag me-1"></i>{{ $task->category }}
-                                    </span>
+                                    </x-ui.badge>
                                 </div>
                             @endif
                             
@@ -142,9 +142,9 @@
                                     <small class="text-muted d-block mb-1">
                                         <i class="bi bi-calendar-event me-1"></i>Termin wykonania
                                     </small>
-                                    <span class="badge bg-{{ $dueDateBadgeVariant }}">
+                                    <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
                                         <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
-                                    </span>
+                                    </x-ui.badge>
                                 </div>
                             @endif
                         </div>
@@ -180,19 +180,19 @@
                                     default => '',
                                 };
                             @endphp
-                            <span class="badge bg-{{ $priorityVariant }}">
+                            <x-ui.badge variant="{{ $priorityVariant }}">
                                 <i class="bi bi-{{ $task->priority >= 4 ? 'exclamation-triangle-fill' : 'exclamation-triangle' }} me-1"></i>
                                 {{ $task->priority }} - {{ $priorityLabel }}
-                            </span>
+                            </x-ui.badge>
                         @else
                             <span class="text-muted">Nie ustawiono</span>
                         @endif
                     </x-ui.detail-item>
                     <x-ui.detail-item label="Kategoria">
                         @if($task->category)
-                            <span class="badge bg-primary">
+                            <x-ui.badge variant="info">
                                 <i class="bi bi-tag me-1"></i>{{ $task->category }}
-                            </span>
+                            </x-ui.badge>
                         @else
                             <span class="text-muted">Nie ustawiono</span>
                         @endif
@@ -209,9 +209,9 @@
                                 <span class="fw-semibold">{{ $dueDate->format('d.m.Y') }}</span>
                                 <span class="text-muted ms-2">({{ $dueDate->diffForHumans() }})</span>
                                 @if($isPast && !$isToday)
-                                    <span class="badge bg-danger ms-2">Przeterminowane</span>
+                                    <x-ui.badge variant="danger" class="ms-2">Przeterminowane</x-ui.badge>
                                 @elseif($isToday)
-                                    <span class="badge bg-warning ms-2">Dzisiaj</span>
+                                    <x-ui.badge variant="warning" class="ms-2">Dzisiaj</x-ui.badge>
                                 @endif
                             </div>
                         @else

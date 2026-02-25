@@ -2,24 +2,44 @@
     <x-ui.card class="mb-4">     
         <!-- Search bar -->
         <div class="row">
-            <div class="col-md-4">
-                <input 
-                    type="text" 
-                    wire:model.live.debounce.300ms="searchTask" 
-                    placeholder="Szukaj zadania..."
-                    class="form-control form-control-sm">
-            </div>
-          
-            <div class="col-md-4">
-                <input 
-                    type="text" 
-                    wire:model.live.debounce.300ms="searchProject" 
-                    placeholder="Szukaj projektu..."
-                    class="form-control form-control-sm">
+            <div class="col-md-8">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <input 
+                            type="text" 
+                            wire:model.live.debounce.300ms="searchTask" 
+                            placeholder="Szukaj zadania..."
+                            class="form-control form-control-sm">
+                    </div>
+                  
+                    <div class="col-md-3">
+                        <input 
+                            type="text" 
+                            wire:model.live.debounce.300ms="searchProject" 
+                            placeholder="Szukaj projektu..."
+                            class="form-control form-control-sm">
+                    </div>
+
+                    <div class="col-md-3">
+                        <input 
+                            type="text" 
+                            wire:model.live.debounce.300ms="searchCategory" 
+                            placeholder="Szukaj kategorii..."
+                            class="form-control form-control-sm">
+                    </div>
+
+                    <div class="col-md-3">
+                        <input 
+                            type="text" 
+                            wire:model.live.debounce.300ms="searchAssignedTo" 
+                            placeholder="Szukaj przypisanej osoby..."
+                            class="form-control form-control-sm">
+                    </div>
+                </div>
             </div>
 
             <div class="col-md-4">
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex gap-2 flex-wrap h-100 align-items-center">
                     <div class="btn-group" role="group">
                         <button 
                             type="button"
@@ -54,11 +74,31 @@
             <small class="text-muted">Sortuj po:</small>
             <button 
                 type="button" 
-                wire:click="sortBy('created_by')" 
+                wire:click="sortBy('priority')" 
                 class="btn btn-sm btn-outline-secondary"
             >
-                <i class="bi bi-person-plus me-1"></i> utworzonym przez
-                @if($sortField === 'created_by')
+                <i class="bi bi-exclamation-triangle me-1"></i> priorytecie
+                @if($sortField === 'priority')
+                    <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                @endif
+            </button>
+            <button 
+                type="button" 
+                wire:click="sortBy('due_date')" 
+                class="btn btn-sm btn-outline-secondary"
+            >
+                <i class="bi bi-calendar-event me-1"></i> dacie wykonania
+                @if($sortField === 'due_date')
+                    <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
+                @endif
+            </button>
+            <button 
+                type="button" 
+                wire:click="sortBy('created_at')" 
+                class="btn btn-sm btn-outline-secondary"
+            >
+                <i class="bi bi-calendar-plus me-1"></i> dacie utworzenia
+                @if($sortField === 'created_at')
                     <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                 @endif
             </button>
@@ -67,18 +107,8 @@
                 wire:click="sortBy('updated_at')" 
                 class="btn btn-sm btn-outline-secondary"
             >
-                <i class="bi bi-pencil-square me-1"></i> zmodyfikowanym
+                <i class="bi bi-pencil-square me-1"></i> dacie edycji
                 @if($sortField === 'updated_at')
-                    <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
-                @endif
-            </button>
-            <button 
-                type="button" 
-                wire:click="sortBy('assigned_to')" 
-                class="btn btn-sm btn-outline-secondary"
-            >
-                <i class="bi bi-person-check me-1"></i> przypisanym użytkowniku
-                @if($sortField === 'assigned_to')
                     <i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>
                 @endif
             </button>
@@ -95,6 +125,7 @@
                         \App\Enums\TaskStatus::COMPLETED => 'success',
                         \App\Enums\TaskStatus::CANCELLED => 'danger',
                     };
+                    $createdAt = \Carbon\Carbon::parse($task->created_at);
                     $updatedAt = \Carbon\Carbon::parse($task->updated_at);
                 @endphp
                 <div class="col-12" wire:key="task-{{ $task->id }}" id="task-{{ $task->id }}">
@@ -114,113 +145,116 @@
                                     </a>
                                 </div>
                                 
-                                <!-- Prawa strona: Badge (Status, Projekt, Due Date) -->
+                                <!-- Prawa strona: Badge (Status, Projekt, Kategoria, Termin, Komentarze) -->
                                 <div class="col-md-6">
-                                    <div class="d-flex gap-3 flex-wrap align-items-end">
-                                        <!-- Status -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">
-                                                <i class="bi bi-flag me-1"></i>Status
-                                            </small>
-                                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
+                                    <div class="d-flex flex-column gap-2">
+                                        <!-- Linia 1: Status / Projekt / Kategoria -->
+                                        <div class="d-flex gap-3 flex-wrap align-items-end">
+                                            <!-- Status -->
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-flag me-1"></i>Status
+                                                </small>
+                                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
+                                            </div>
+                                            
+                                            <!-- Projekt -->
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-folder me-1"></i>Projekt
+                                                </small>
+                                                @if($task->project)
+                                                    <span class="badge bg-secondary">
+                                                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-light text-dark">
+                                                        <i class="bi bi-x-circle me-1"></i>Brak projektu
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            
+                                            <!-- Kategoria -->
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-tag me-1"></i>Kategoria
+                                                </small>
+                                                @if($task->category)
+                                                    <x-ui.badge variant="info">
+                                                        <i class="bi bi-tag me-1"></i>{{ Str::limit($task->category, 15) }}
+                                                    </x-ui.badge>
+                                                @else
+                                                    <span class="badge bg-light text-dark">
+                                                        <i class="bi bi-x-circle me-1"></i>Brak
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </div>
                                         
-                                        <!-- Projekt -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">
-                                                <i class="bi bi-folder me-1"></i>Projekt
-                                            </small>
-                                            @if($task->project)
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
-                                                </span>
-                                            @else
-                                                <span class="badge bg-light text-dark">
-                                                    <i class="bi bi-x-circle me-1"></i>Brak projektu
-                                                </span>
-                                            @endif
+                                        <!-- Linia 2: Termin wykonania -->
+                                        <div class="d-flex gap-3 flex-wrap align-items-end">
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-calendar-event me-1"></i>Termin wykonania
+                                                </small>
+                                                @if($task->due_date)
+                                                    @php
+                                                        $dueDate = $task->due_date; // Already a Carbon instance due to model cast
+                                                        $now = \Carbon\Carbon::now();
+                                                        $isPast = $dueDate->isPast();
+                                                        $isToday = $dueDate->isToday();
+                                                        $daysDiff = $now->diffInDays($dueDate, false); // false = signed difference
+                                                        
+                                                        // Określ kolor badge
+                                                        $dueDateBadgeVariant = 'info'; // Niebieski - domyślnie
+                                                        if ($isPast || $isToday) {
+                                                            $dueDateBadgeVariant = 'danger'; // Czerwony - dzisiaj lub w przeszłości
+                                                        } elseif ($daysDiff <= 3) {
+                                                            $dueDateBadgeVariant = 'warning'; // Żółty - w ciągu najbliższych 3 dni
+                                                        }
+                                                    @endphp
+                                                    <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
+                                                        <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
+                                                    </x-ui.badge>
+                                                @else
+                                                    <span class="badge bg-light text-dark">
+                                                        <i class="bi bi-x-circle me-1"></i>Nie ustawiono
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </div>
                                         
-                                        <!-- Priorytet -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">
-                                                <i class="bi bi-exclamation-triangle me-1"></i>Priorytet
-                                            </small>
-                                            @if($task->priority)
-                                                @php
-                                                    $priorityVariant = match((int)$task->priority) {
-                                                        1, 2 => 'secondary',
-                                                        3 => 'info',
-                                                        4 => 'warning',
-                                                        5 => 'danger',
-                                                        default => 'secondary',
-                                                    };
-                                                    $priorityLabel = match((int)$task->priority) {
-                                                        1 => 'Najniższy',
-                                                        2 => 'Niski',
-                                                        3 => 'Średni',
-                                                        4 => 'Wysoki',
-                                                        5 => 'Najwyższy',
-                                                        default => '',
-                                                    };
-                                                @endphp
-                                                <span class="badge bg-{{ $priorityVariant }}">
-                                                    <i class="bi bi-{{ $task->priority >= 4 ? 'exclamation-triangle-fill' : 'exclamation-triangle' }} me-1"></i>
-                                                    {{ $task->priority }}
-                                                </span>
-                                            @else
-                                                <span class="badge bg-light text-dark">
-                                                    <i class="bi bi-x-circle me-1"></i>Brak
-                                                </span>
-                                            @endif
+                                        <!-- Linia 3: Ilość komentarzy -->
+                                        @php
+                                            $commentsCount = $task->comments->count();
+                                        @endphp
+                                        <div class="d-flex gap-3 flex-wrap align-items-end">
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-chat-dots me-1"></i>Komentarze
+                                                </small>
+                                                <span class="fw-semibold">{{ $commentsCount }}</span>
+                                            </div>
                                         </div>
                                         
-                                        <!-- Kategoria -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">
-                                                <i class="bi bi-tag me-1"></i>Kategoria
-                                            </small>
-                                            @if($task->category)
-                                                <span class="badge bg-primary">
-                                                    <i class="bi bi-tag me-1"></i>{{ Str::limit($task->category, 15) }}
-                                                </span>
-                                            @else
-                                                <span class="badge bg-light text-dark">
-                                                    <i class="bi bi-x-circle me-1"></i>Brak
-                                                </span>
-                                            @endif
-                                        </div>
-                                        
-                                        <!-- Due Date Badge -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">
-                                                <i class="bi bi-calendar-event me-1"></i>Termin wykonania
-                                            </small>
-                                            @if($task->due_date)
-                                                @php
-                                                    $dueDate = $task->due_date; // Already a Carbon instance due to model cast
-                                                    $now = \Carbon\Carbon::now();
-                                                    $isPast = $dueDate->isPast();
-                                                    $isToday = $dueDate->isToday();
-                                                    $daysDiff = $now->diffInDays($dueDate, false); // false = signed difference
-                                                    
-                                                    // Określ kolor badge
-                                                    $dueDateBadgeVariant = 'info'; // Niebieski - domyślnie
-                                                    if ($isPast || $isToday) {
-                                                        $dueDateBadgeVariant = 'danger'; // Czerwony - dzisiaj lub w przeszłości
-                                                    } elseif ($daysDiff <= 3) {
-                                                        $dueDateBadgeVariant = 'warning'; // Żółty - w ciągu najbliższych 3 dni
-                                                    }
-                                                @endphp
-                                                <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
-                                                    <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }} ({{ $dueDate->diffForHumans() }})
-                                                </x-ui.badge>
-                                            @else
-                                                <span class="badge bg-light text-dark">
-                                                    <i class="bi bi-x-circle me-1"></i>Nie ustawiono
-                                                </span>
-                                            @endif
-                                        </div>
+                                        <!-- Linia 4: Ostatni komentarz -->
+                                        @php
+                                            $lastComment = $task->comments->sortByDesc('created_at')->first();
+                                        @endphp
+                                        @if($lastComment)
+                                            <div>
+                                                <small class="text-muted d-block mb-1">
+                                                    <i class="bi bi-chat-quote me-1"></i>Ostatni komentarz
+                                                </small>
+                                                <div>
+                                                    <small class="text-break">{{ Str::limit($lastComment->body, 100) }}</small>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        {{ $lastComment->user->name }} - {{ $lastComment->created_at->format('d.m.Y H:i') }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -253,34 +287,27 @@
                             <!-- GŁÓWNY WIERSZ 2: Detale w Bootstrap row -->
                             <hr>
                             <div class="row g-3">
-                                <!-- Utworzył -->
+                                <!-- Data utworzenia -->
                                 <div class="col-md-3">
                                     <small class="text-muted d-block mb-1">
-                                        <i class="bi bi-person-plus me-1"></i>Utworzył
+                                        <i class="bi bi-calendar-plus me-1"></i>Utworzono
                                     </small>
                                     <div>
-                                        @if($task->createdBy)
-                                            <x-ui.person :user="$task->createdBy" avatar-size="32px" :show-email="false" />
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        <small class="fw-semibold">{{ $createdAt->format('d.m.Y H:i') }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ $createdAt->diffForHumans() }}</small>
                                     </div>
                                 </div>
                                 
-                                <!-- Zmodyfikował -->
+                                <!-- Data edycji -->
                                 <div class="col-md-3">
                                     <small class="text-muted d-block mb-1">
-                                        <i class="bi bi-pencil-square me-1"></i>Zmodyfikował
+                                        <i class="bi bi-pencil-square me-1"></i>Zmodyfikowano
                                     </small>
                                     <div>
-                                        @if($task->createdBy)
-                                            <x-ui.person :user="$task->createdBy" avatar-size="32px" :show-email="false" />
-                                            <small class="text-muted d-block mt-1">{{ $updatedAt->diffForHumans() }}</small>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                            <br>
-                                            <small class="text-muted">{{ $updatedAt->diffForHumans() }}</small>
-                                        @endif
+                                        <small class="fw-semibold">{{ $updatedAt->format('d.m.Y H:i') }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ $updatedAt->diffForHumans() }}</small>
                                     </div>
                                 </div>
                                 

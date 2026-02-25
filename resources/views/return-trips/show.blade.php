@@ -52,7 +52,7 @@
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Data zjazdu</h6>
-                            <p class="fw-semibold">{{ $returnTrip->event_date->format('Y-m-d H:i') }}</p>
+                            <p class="fw-semibold">{{ $returnTrip->event_date->format('Y-m-d') }}</p>
                         </div>
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Pojazd</h6>

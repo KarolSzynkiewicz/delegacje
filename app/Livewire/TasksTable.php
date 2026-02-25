@@ -13,6 +13,8 @@ class TasksTable extends Component
 
     public $searchProject = '';
     public $searchTask = '';
+    public $searchCategory = '';
+    public $searchAssignedTo = '';
     public $status = ''; // 'active', 'closed', or specific status
     public $myTasksOnly = false; // Toggle for filtering only my tasks
     public $sortField = 'due_date';
@@ -26,12 +28,14 @@ class TasksTable extends Component
     protected $queryString = [
         'searchProject' => ['except' => ''],
         'searchTask' => ['except' => ''],
+        'searchCategory' => ['except' => ''],
+        'searchAssignedTo' => ['except' => ''],
         'status' => ['except' => ''],
         'myTasksOnly' => ['except' => false],
         'sortField' => ['except' => 'due_date'],
         'sortDirection' => ['except' => 'asc'],
     ];
-    protected $updatesQueryString = ['searchProject', 'searchTask', 'status', 'myTasksOnly', 'sortField', 'sortDirection'];
+    protected $updatesQueryString = ['searchProject', 'searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly', 'sortField', 'sortDirection'];
 
     public function updating($name, $value)
     {
@@ -53,6 +57,8 @@ class TasksTable extends Component
     {
         $this->searchProject = '';
         $this->searchTask = '';
+        $this->searchCategory = '';
+        $this->searchAssignedTo = '';
         $this->status = '';
         $this->myTasksOnly = false;
         $this->sortField = 'due_date';
@@ -124,6 +130,18 @@ class TasksTable extends Component
                 });
             }
 
+            // Filter by category
+            if ($this->searchCategory) {
+                $query->where('category', 'like', '%' . $this->searchCategory . '%');
+            }
+
+            // Filter by assigned user
+            if ($this->searchAssignedTo) {
+                $query->whereHas('assignedTo', function ($q) {
+                    $q->where('name', 'like', '%' . $this->searchAssignedTo . '%');
+                });
+            }
+
             // Filter by status
             // 'active' = pending + in_progress (domyślnie)
             // 'closed' = completed + cancelled
@@ -141,18 +159,24 @@ class TasksTable extends Component
             
             // Apply sorting
             // Handle special cases for related fields
-            if ($this->sortField === 'assigned_to') {
-                $query->leftJoin('users as assigned_user', 'project_tasks.assigned_to', '=', 'assigned_user.id')
-                      ->orderBy('assigned_user.name', $this->sortDirection)
-                      ->select('project_tasks.*');
-            } elseif ($this->sortField === 'created_by') {
-                $query->leftJoin('users as creator_user', 'project_tasks.created_by', '=', 'creator_user.id')
-                      ->orderBy('creator_user.name', $this->sortDirection)
-                      ->select('project_tasks.*');
-            } elseif ($this->sortField === 'project') {
+            if ($this->sortField === 'project') {
                 $query->leftJoin('projects', 'project_tasks.project_id', '=', 'projects.id')
                       ->orderBy('projects.name', $this->sortDirection)
                       ->select('project_tasks.*');
+            } elseif ($this->sortField === 'priority') {
+                // Sort by priority: null values last
+                if ($this->sortDirection === 'asc') {
+                    $query->orderByRaw('ISNULL(priority), priority ASC');
+                } else {
+                    $query->orderByRaw('ISNULL(priority), priority DESC');
+                }
+            } elseif ($this->sortField === 'due_date') {
+                // Sort by due_date: null values last
+                if ($this->sortDirection === 'asc') {
+                    $query->orderByRaw('ISNULL(due_date), due_date ASC');
+                } else {
+                    $query->orderByRaw('ISNULL(due_date), due_date DESC');
+                }
             } else {
                 $query->orderBy($this->sortField, $this->sortDirection);
             }
