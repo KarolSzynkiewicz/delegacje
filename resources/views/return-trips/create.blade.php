@@ -38,6 +38,17 @@
 
                     @livewire('return-trip-employee-selector', ['returnDate' => old('return_date', date('Y-m-d'))], key('return-trip-selector'))
 
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="date" 
+                            name="end_date" 
+                            label="Data końcowa"
+                            value="{{ old('end_date') }}"
+                            required
+                        />
+                        <small class="form-text text-muted">Data zakończenia zjazdu (musi być równa lub późniejsza niż data zjazdu)</small>
+                    </div>
+
                     <div class="mb-4">
                         <x-ui.input 
                             type="textarea" 

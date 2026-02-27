@@ -103,7 +103,7 @@ class Vehicle extends Model
      */
     public function getCurrentLocation(): ?Location
     {
-        return app(\App\Services\LocationTrackingService::class)->forVehicle($this);
+        return app(\App\Services\LocationTrackingService::class)->getVehicleLocation($this);
     }
 
     /**

@@ -71,7 +71,44 @@ class BulkDepartureAssignments extends Component
     
     public function updated($propertyName)
     {
+        // Log for debugging
+        \Log::debug('BulkDepartureAssignments updated', ['property' => $propertyName]);
+        
         $this->validateAllAssignments();
+        
+        // If any assignment property changed, update destination location display
+        // Property name format: "assignments.{employeeId}.project_id" or "assignments.{employeeId}.role_id" etc.
+        if (str_starts_with($propertyName, 'assignments.')) {
+            // Check if it's a project_id change (which affects destination location)
+            if (str_ends_with($propertyName, '.project_id')) {
+                \Log::debug('Project ID changed, updating destination location');
+                $this->updateDestinationLocationDisplay();
+            }
+        }
+    }
+    
+    /**
+     * Specific hook for when assignments array changes.
+     * This is called when any nested property in assignments changes.
+     */
+    public function updatedAssignments($value, $key)
+    {
+        \Log::debug('BulkDepartureAssignments updatedAssignments', ['key' => $key, 'value' => $value]);
+        
+        // If project_id was changed, update destination location
+        if (str_ends_with($key, '.project_id')) {
+            $this->updateDestinationLocationDisplay();
+        }
+    }
+    
+    /**
+     * Update destination location display via Livewire event.
+     */
+    protected function updateDestinationLocationDisplay()
+    {
+        $locationName = $this->destinationLocationName;
+        // Dispatch event with location name - use simpler format for Livewire 3
+        $this->dispatch('destination-location-updated', locationName: $locationName);
     }
     
     public function validateAllAssignments()
@@ -440,6 +477,14 @@ class BulkDepartureAssignments extends Component
             return;
         }
         
+        // Automatically determine destination location from assigned projects
+        $destinationLocationId = $this->determineDestinationLocation();
+        
+        if (!$destinationLocationId) {
+            session()->flash('error', 'Nie można określić lokalizacji docelowej. Upewnij się, że wszystkie projekty mają przypisaną lokalizację.');
+            return;
+        }
+        
         try {
             DB::beginTransaction();
             
@@ -449,7 +494,7 @@ class BulkDepartureAssignments extends Component
                 'event_date' => Carbon::parse($departureData['event_date']),
                 'end_date' => Carbon::parse($departureData['end_date']),
                 'from_location_id' => $departureData['from_location_id'],
-                'to_location_id' => $departureData['to_location_id'],
+                'to_location_id' => $destinationLocationId,
                 'vehicle_id' => $departureData['vehicle_id'] ?? null,
                 'status' => LogisticsEventStatus::COMPLETED, // Wyjazd wymusza przypisanie, więc zawsze COMPLETED
                 'notes' => $departureData['notes'] ?? null,
@@ -562,6 +607,59 @@ class BulkDepartureAssignments extends Component
         }
     }
     
+    /**
+     * Determine destination location from assigned projects.
+     * Returns the unique location ID if all projects have the same location, null otherwise.
+     */
+    protected function determineDestinationLocation(): ?int
+    {
+        $locationIds = [];
+        
+        foreach ($this->assignments as $employeeId => $assignmentData) {
+            if (empty($assignmentData['project_id'])) {
+                continue;
+            }
+            
+            $project = Project::with('location')->find($assignmentData['project_id']);
+            if (!$project || !$project->location_id) {
+                return null; // Project has no location
+            }
+            
+            $locationIds[] = $project->location_id;
+        }
+        
+        if (empty($locationIds)) {
+            return null; // No projects assigned
+        }
+        
+        // Get unique location IDs
+        $uniqueLocationIds = array_unique($locationIds);
+        
+        // If all projects are in the same location, return that location
+        if (count($uniqueLocationIds) === 1) {
+            return reset($uniqueLocationIds);
+        }
+        
+        // Multiple locations - this is an error case
+        // For now, return the first one, but this should be handled better
+        // (maybe show a warning or require user to select)
+        return reset($uniqueLocationIds);
+    }
+    
+    /**
+     * Get destination location name for display (called from view via computed property).
+     */
+    public function getDestinationLocationNameProperty(): ?string
+    {
+        $locationId = $this->determineDestinationLocation();
+        if (!$locationId) {
+            return null;
+        }
+        
+        $location = \App\Models\Location::find($locationId);
+        return $location ? $location->name : null;
+    }
+    
     public function render()
     {
         // Load collections fresh for each render (not stored in state)
@@ -571,12 +669,16 @@ class BulkDepartureAssignments extends Component
         $vehicles = Vehicle::findMany($this->vehicleIds);
         $accommodations = Accommodation::findMany($this->accommodationIds);
         
+        // Get destination location name for display
+        $destinationLocationName = $this->destinationLocationName;
+        
         return view('livewire.bulk-departure-assignments', [
             'employees' => $employees,
             'projects' => $projects,
             'roles' => $roles,
             'vehicles' => $vehicles,
             'accommodations' => $accommodations,
+            'destinationLocationName' => $destinationLocationName,
         ]);
     }
 }

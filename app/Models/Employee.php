@@ -184,7 +184,7 @@ class Employee extends Model
      */
     public function getCurrentLocation(): ?Location
     {
-        return app(\App\Services\LocationTrackingService::class)->forEmployee($this);
+        return app(\App\Services\LocationTrackingService::class)->getEmployeeLocation($this);
     }
 
     /**

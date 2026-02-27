@@ -1,4 +1,24 @@
 <div>
+    <!-- Dispatch location update on mount and when assignments change -->
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            const component = @this;
+            
+            // Update location on initial load
+            updateDestinationLocation();
+            
+            // Listen for assignment changes
+            Livewire.hook('morph.updated', () => {
+                updateDestinationLocation();
+            });
+            
+            function updateDestinationLocation() {
+                const locationName = component.get('destinationLocationName');
+                Livewire.dispatch('destination-location-updated', { locationName: locationName });
+            }
+        });
+    </script>
+    
     <!-- Toast notification -->
     <div id="copy-toast" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
         <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">

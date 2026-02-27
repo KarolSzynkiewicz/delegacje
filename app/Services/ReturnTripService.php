@@ -87,6 +87,7 @@ class ReturnTripService
      * @param string|null $notes Additional notes
      * @param LogisticsEvent|null $existingEvent If provided, updates existing event instead of creating new one
      * @param LogisticsEventStatus|null $status If provided, sets this status (only for updates)
+     * @param Carbon|null $endDate End date for the return trip
      * @return LogisticsEvent
      * @throws ValidationException
      */
@@ -94,7 +95,8 @@ class ReturnTripService
         ReturnTripPreparation $preparation,
         ?string $notes = null,
         ?LogisticsEvent $existingEvent = null,
-        ?LogisticsEventStatus $status = null
+        ?LogisticsEventStatus $status = null,
+        ?Carbon $endDate = null
     ): LogisticsEvent
     {
         // Validate preparation is valid (no blocking conflicts)
@@ -109,7 +111,7 @@ class ReturnTripService
 
         $baseLocation = Location::getBase();
 
-        return DB::transaction(function () use ($preparation, $baseLocation, $notes, $existingEvent, $status) {
+        return DB::transaction(function () use ($preparation, $baseLocation, $notes, $existingEvent, $status, $endDate) {
             // Shorten all assignments and save original end_date
             foreach ($preparation->assignmentsToShorten as $assignmentToShorten) {
                 $assignment = $assignmentToShorten->assignment;
@@ -172,6 +174,7 @@ class ReturnTripService
                 $event = $existingEvent;
                 $updateData = [
                     'event_date' => $preparation->returnDate,
+                    'end_date' => $endDate ?? $preparation->returnDate,
                     'vehicle_id' => $preparation->returnVehicle?->id,
                     'from_location_id' => $this->getCurrentLocationForEmployees($preparation->employeeIds)?->id ?? $baseLocation->id,
                     'to_location_id' => $baseLocation->id,
@@ -192,6 +195,7 @@ class ReturnTripService
                 $event = LogisticsEvent::create([
                     'type' => LogisticsEventType::RETURN,
                     'event_date' => $preparation->returnDate,
+                    'end_date' => $endDate ?? $preparation->returnDate,
                     'has_transport' => false,
                     'vehicle_id' => $preparation->returnVehicle?->id,
                     'transport_id' => null,
@@ -284,7 +288,7 @@ class ReturnTripService
             return null;
         }
 
-        return app(LocationTrackingService::class)->forEmployee($employee);
+        return app(LocationTrackingService::class)->getEmployeeLocation($employee);
     }
 
     /**
@@ -352,6 +356,6 @@ class ReturnTripService
     ): LogisticsEvent {
         // For backward compatibility, delegate to new prepare/commit flow
         $preparation = $this->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
-        return $this->commitZjazd($preparation, $notes);
+        return $this->commitZjazd($preparation, $notes, null, null, null);
     }
 }

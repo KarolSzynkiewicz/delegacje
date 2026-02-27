@@ -23,6 +23,7 @@ class StoreReturnTripRequest extends FormRequest
     {
         return [
             'notes' => ['nullable', 'string', 'max:1000'],
+            'end_date' => ['required', 'date'],
             'status' => ['nullable', 'in:' . implode(',', \App\Enums\LogisticsEventStatus::values())],
             'accept_consequences' => ['required', 'accepted'],
             'return_trip_id' => ['nullable', 'exists:logistics_events,id'],
@@ -39,6 +40,8 @@ class StoreReturnTripRequest extends FormRequest
         return [
             'accept_consequences.required' => 'Musisz zaakceptować konsekwencje zjazdu.',
             'accept_consequences.accepted' => 'Musisz zaakceptować konsekwencje zjazdu.',
+            'end_date.required' => 'Data końcowa jest wymagana.',
+            'end_date.date' => 'Data końcowa musi być poprawną datą.',
             'notes.max' => 'Notatki nie mogą przekraczać 1000 znaków.',
             'status.in' => 'Nieprawidłowy status.',
             'return_trip_id.exists' => 'Wybrany zjazd nie istnieje.',

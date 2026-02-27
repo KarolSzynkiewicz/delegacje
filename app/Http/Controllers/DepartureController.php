@@ -55,10 +55,6 @@ class DepartureController extends Controller
      */
     public function create(Request $request): View
     {
-        $locations = Location::where('id', '!=', Location::getBase()->id)
-            ->orderBy('name')
-            ->get();
-
         $vehicles = Vehicle::where('type', 'company_vehicle')
             ->orderBy('registration_number')
             ->get();
@@ -77,7 +73,7 @@ class DepartureController extends Controller
             $isDateInPast = Carbon::parse($endDate)->startOfDay()->isPast();
         }
 
-        return view('departures.create', compact('locations', 'vehicles', 'baseLocation', 'isDateInPast'));
+        return view('departures.create', compact('vehicles', 'baseLocation', 'isDateInPast'));
     }
 
     /**
@@ -228,7 +224,7 @@ class DepartureController extends Controller
                 // Update outside_base flag for all participants
                 $locationTracker = app(\App\Services\LocationTrackingService::class);
                 foreach ($participants as $participant) {
-                    $locationTracker->syncOutsideBaseFlag($participant->employee, now());
+                    $locationTracker->getLocationStatus($participant->employee, now());
                 }
                 
                 // Log the cancellation
@@ -292,7 +288,6 @@ class DepartureController extends Controller
             $rules = [
                 'departure_date' => 'required|date',
                 'end_date' => 'required|date|after_or_equal:departure_date',
-                'to_location_id' => 'required|exists:locations,id',
                 'vehicle_id' => 'nullable|exists:vehicles,id',
                 'employee_ids' => 'required|array|min:1',
                 'employee_ids.*' => 'exists:employees,id',
@@ -311,7 +306,6 @@ class DepartureController extends Controller
                 'departure_date.required' => 'Proszę podać datę wyjazdu.',
                 'end_date.required' => 'Proszę podać datę przybycia.',
                 'end_date.after_or_equal' => 'Data przybycia musi być taka sama lub późniejsza niż data wyjazdu.',
-                'to_location_id.required' => 'Proszę wybrać lokalizację docelową.',
                 'employee_ids.required' => 'Proszę wybrać co najmniej jednego uczestnika.',
                 'employee_ids.min' => 'Proszę wybrać co najmniej jednego uczestnika.',
                 'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
@@ -344,12 +338,12 @@ class DepartureController extends Controller
             // Get base location ID
             $fromLocationId = Location::getBase()->id;
             
-            // Prepare departure data
+            // Prepare departure data (to_location_id will be set in step 2 based on assigned projects)
             $departureData = [
                 'event_date' => $validated['departure_date'],
                 'end_date' => $validated['end_date'],
                 'from_location_id' => $fromLocationId,
-                'to_location_id' => $validated['to_location_id'],
+                'to_location_id' => null, // Will be determined in step 2 from assigned projects
                 'vehicle_id' => $validated['vehicle_id'] ?? null,
                 'participants' => $validated['employee_ids'],
                 'notes' => $validated['notes'] ?? null,
@@ -367,7 +361,6 @@ class DepartureController extends Controller
             $vehicles = Vehicle::orderBy('registration_number')->get();
             $accommodations = Accommodation::orderBy('name')->get();
 
-            $toLocation = Location::findOrFail($validated['to_location_id']);
             $arrivalDate = Carbon::parse($validated['end_date']);
             $weekEnd = $arrivalDate->copy()->endOfWeek();
 
@@ -377,7 +370,6 @@ class DepartureController extends Controller
                 'roles',
                 'vehicles',
                 'accommodations',
-                'toLocation',
                 'arrivalDate',
                 'weekEnd',
                 'departureData'
@@ -432,6 +424,16 @@ class DepartureController extends Controller
             'assignments.*.accommodation_end_date' => 'required|date|after_or_equal:assignments.*.accommodation_start_date',
         ]);
 
+        // Automatically determine destination location from assigned projects
+        $destinationLocationId = $this->determineDestinationLocationFromAssignments($validated['assignments']);
+        
+        if (!$destinationLocationId) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Nie można określić lokalizacji docelowej. Upewnij się, że wszystkie projekty mają przypisaną lokalizację i wszystkie są w tej samej lokalizacji.');
+        }
+
         DB::beginTransaction();
         try {
             // 1. Create departure (logistics event)
@@ -440,7 +442,7 @@ class DepartureController extends Controller
                 'event_date' => Carbon::parse($departureData['event_date']),
                 'end_date' => Carbon::parse($departureData['end_date']),
                 'from_location_id' => $departureData['from_location_id'],
-                'to_location_id' => $departureData['to_location_id'],
+                'to_location_id' => $destinationLocationId,
                 'vehicle_id' => $departureData['vehicle_id'] ?? null,
                 'status' => LogisticsEventStatus::COMPLETED, // Wyjazd wymusza przypisanie, więc zawsze COMPLETED
                 'notes' => $departureData['notes'] ?? null,
@@ -532,6 +534,43 @@ class DepartureController extends Controller
                 ->withInput()
                 ->with('error', 'Wystąpił błąd podczas zapisywania wyjazdu. Spróbuj ponownie lub skontaktuj się z administratorem.');
         }
+    }
+
+    /**
+     * Determine destination location from assigned projects.
+     * Returns the unique location ID if all projects have the same location, null otherwise.
+     */
+    protected function determineDestinationLocationFromAssignments(array $assignments): ?int
+    {
+        $locationIds = [];
+        
+        foreach ($assignments as $employeeId => $assignmentData) {
+            if (empty($assignmentData['project_id'])) {
+                continue;
+            }
+            
+            $project = Project::with('location')->find($assignmentData['project_id']);
+            if (!$project || !$project->location_id) {
+                return null; // Project has no location
+            }
+            
+            $locationIds[] = $project->location_id;
+        }
+        
+        if (empty($locationIds)) {
+            return null; // No projects assigned
+        }
+        
+        // Get unique location IDs
+        $uniqueLocationIds = array_unique($locationIds);
+        
+        // If all projects are in the same location, return that location
+        if (count($uniqueLocationIds) === 1) {
+            return reset($uniqueLocationIds);
+        }
+        
+        // Multiple locations - this is an error case
+        return null;
     }
 
 }

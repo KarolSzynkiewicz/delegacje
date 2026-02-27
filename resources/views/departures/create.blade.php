@@ -71,23 +71,6 @@
                         ], key('vehicle-checker'))
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold d-flex align-items-center gap-1">
-                            Lokalizacja docelowa <span class="text-danger">*</span>
-                            <x-tooltip title="Miejsce, do którego pracownicy dojeżdżają. Tu będą wykonywać pracę na projekcie.">
-                                <i class="bi bi-geo-alt-fill text-success fs-6"></i>
-                            </x-tooltip>
-                        </label>
-                        <select name="to_location_id" class="form-select" required>
-                            <option value="">Wybierz lokalizację</option>
-                            @foreach($locations as $location)
-                                <option value="{{ $location->id }}" {{ old('to_location_id') == $location->id ? 'selected' : '' }}>
-                                    {{ $location->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
                     @livewire('departure-employee-selector', [
                         'departureDate' => old('departure_date', date('Y-m-d')),
                         'endDate' => old('end_date')

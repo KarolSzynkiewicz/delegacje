@@ -26,6 +26,7 @@ class UpdateReturnTripRequest extends FormRequest
             'employee_ids' => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['exists:employees,id'],
             'return_date' => ['required', 'date', 'after_or_equal:today'],
+            'end_date' => ['required', 'date', 'after_or_equal:return_date'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'accept_consequences' => ['required', 'accepted'],
         ];
@@ -46,6 +47,9 @@ class UpdateReturnTripRequest extends FormRequest
             'return_date.required' => 'Data zjazdu jest wymagana.',
             'return_date.date' => 'Data zjazdu musi być poprawną datą.',
             'return_date.after_or_equal' => 'Data zjazdu nie może być wcześniejsza niż dzisiaj.',
+            'end_date.required' => 'Data końcowa jest wymagana.',
+            'end_date.date' => 'Data końcowa musi być poprawną datą.',
+            'end_date.after_or_equal' => 'Data końcowa nie może być wcześniejsza niż data zjazdu.',
             'vehicle_id.exists' => 'Wybrany pojazd nie istnieje.',
             'notes.max' => 'Notatki nie mogą przekraczać 1000 znaków.',
             'accept_consequences.required' => 'Musisz zaakceptować konsekwencje zjazdu.',

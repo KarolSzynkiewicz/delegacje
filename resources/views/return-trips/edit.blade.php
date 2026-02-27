@@ -42,6 +42,18 @@
                     ], key('return-trip-selector-edit'))
 
                         <div class="mb-3">
+                            <label class="form-label fw-semibold">Data końcowa <span class="text-danger">*</span></label>
+                            <input 
+                                type="date" 
+                                name="end_date" 
+                                class="form-control"
+                                value="{{ old('end_date', $returnTrip->end_date ? $returnTrip->end_date->format('Y-m-d') : $returnTrip->event_date->format('Y-m-d')) }}"
+                                required
+                            />
+                            <small class="form-text text-muted">Data zakończenia zjazdu (musi być równa lub późniejsza niż data zjazdu)</small>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label fw-semibold">Status</label>
                             <select name="status" class="form-select">
                                 @foreach(\App\Enums\LogisticsEventStatus::cases() as $status)

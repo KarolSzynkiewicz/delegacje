@@ -42,15 +42,22 @@
                                 <td>{{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount == 1 ? 'osoba' : 'osób' }}</td>
                                 <td>
                                     @php
-                                        $badgeVariant = match($trip->status->value) {
-                                            'scheduled' => 'accent',
-                                            'in_progress' => 'info',
-                                            'completed' => 'success',
-                                            'cancelled' => 'danger',
-                                            default => 'info'
-                                        };
+                                        if ($trip->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
+                                            $statusLabel = 'Anulowany';
+                                            $badgeVariant = 'danger';
+                                        } else {
+                                            // Sprawdź czy data zjazdu jest w przeszłości czy przyszłości
+                                            $endDate = $trip->end_date ?? $trip->event_date;
+                                            if ($endDate->isPast()) {
+                                                $statusLabel = 'Przeszły';
+                                                $badgeVariant = 'secondary';
+                                            } else {
+                                                $statusLabel = 'Zaplanowany';
+                                                $badgeVariant = 'info';
+                                            }
+                                        }
                                     @endphp
-                                    <x-ui.badge variant="{{ $badgeVariant }}">{{ $trip->status->label() }}</x-ui.badge>
+                                    <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
                                 </td>
                                 <td>
                                     @if($trip->status === \App\Enums\LogisticsEventStatus::PLANNED)

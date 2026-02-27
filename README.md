@@ -67,16 +67,6 @@ Aplikacja oferuje następujące moduły:
 
 ---
 
-## 👤 Instrukcje dla Użytkownika
-
-### Logowanie
-
-1. Otwórz aplikację w przeglądarce (domyślnie: `http://localhost`)
-2. Kliknij **"Logowanie"** w prawym górnym rogu
-3. Wprowadź dane logowania:
-   - **Email:** `test@example.com`
-   - **Hasło:** `password123`
-4. Kliknij **"Zaloguj się"**
 
 ### Dashboard
 

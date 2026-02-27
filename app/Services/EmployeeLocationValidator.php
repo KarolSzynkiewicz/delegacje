@@ -44,7 +44,7 @@ class EmployeeLocationValidator
             return;
         }
 
-        $employeeLocation = $this->locationTracker->forEmployeeOnDate($employee, $startDate);
+        $employeeLocation = $this->locationTracker->getEmployeeLocationOnDate($employee, $startDate);
         $projectLocation = $project->location;
         
         // 1. Block if in transit

@@ -44,7 +44,7 @@
                 </div>
                 <div class="col-md-3">
                     <strong>📍 Lokalizacja docelowa:</strong><br>
-                    {{ $toLocation->name }}
+                    <span id="destination-location-display" class="text-muted">Zostanie wykryta automatycznie z przypisanych projektów</span>
                 </div>
                 <div class="col-md-3">
                     <strong>👥 Liczba uczestników:</strong><br>
@@ -63,4 +63,41 @@
             'accommodationIds' => $accommodations->pluck('id')->toArray()
         ])
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            // Listen for destination location updates
+            Livewire.on('destination-location-updated', (event) => {
+                console.log('Destination location updated event received:', event);
+                const displayElement = document.getElementById('destination-location-display');
+                if (displayElement) {
+                    // Handle different event formats (Livewire 2 vs 3)
+                    let locationName = null;
+                    if (typeof event === 'string') {
+                        // Simple string
+                        locationName = event;
+                    } else if (event?.locationName) {
+                        // Object with locationName property
+                        locationName = event.locationName;
+                    } else if (Array.isArray(event) && event[0]?.locationName) {
+                        // Array format
+                        locationName = event[0].locationName;
+                    } else if (event?.detail?.[0]?.locationName) {
+                        // Detail format
+                        locationName = event.detail[0].locationName;
+                    }
+                    
+                    if (locationName) {
+                        displayElement.textContent = locationName;
+                        displayElement.className = 'text-success fw-semibold';
+                    } else {
+                        displayElement.textContent = 'Zostanie wykryta automatycznie z przypisanych projektów';
+                        displayElement.className = 'text-muted';
+                    }
+                }
+            });
+        });
+    </script>
+    @endpush
 </x-app-layout>

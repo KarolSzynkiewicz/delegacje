@@ -14,6 +14,9 @@
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <p><strong>Data zjazdu:</strong> {{ $preparation->returnDate->format('d.m.Y') }}</p>
+                            @if(isset($validated['end_date']))
+                                <p><strong>Data końcowa:</strong> {{ \Carbon\Carbon::parse($validated['end_date'])->format('d.m.Y') }}</p>
+                            @endif
                             <p><strong>Pracownicy:</strong></p>
                             <ul>
                                 @foreach($preparation->employeeIds as $employeeId)
@@ -192,6 +195,9 @@
                         <form method="POST" action="{{ route('return-trips.store') }}">
                             @csrf
                             <input type="hidden" name="notes" value="{{ $validated['notes'] ?? '' }}">
+                            @if(isset($validated['end_date']))
+                                <input type="hidden" name="end_date" value="{{ $validated['end_date'] }}">
+                            @endif
                             @if(isset($validated['status']))
                                 <input type="hidden" name="status" value="{{ $validated['status'] }}">
                             @endif

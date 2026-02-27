@@ -206,7 +206,10 @@ class ReturnTripController extends Controller
             $status = isset($validated['status']) 
                 ? \App\Enums\LogisticsEventStatus::from($validated['status'])
                 : null;
-            $event = $this->returnTripService->commitZjazd($preparation, $notes, $existingEvent, $status);
+            $endDate = isset($validated['end_date']) 
+                ? \Carbon\Carbon::parse($validated['end_date'])
+                : null;
+            $event = $this->returnTripService->commitZjazd($preparation, $notes, $existingEvent, $status, $endDate);
 
             // Clear preparation from session
             session()->forget('return_trip_preparation');
@@ -312,7 +315,10 @@ class ReturnTripController extends Controller
 
             // Commit new return trip (updates existing event)
             $notes = $validated['notes'] ?? null;
-            $event = $this->returnTripService->commitZjazd($preparation, $notes, $returnTrip);
+            $endDate = isset($validated['end_date']) 
+                ? \Carbon\Carbon::parse($validated['end_date'])
+                : null;
+            $event = $this->returnTripService->commitZjazd($preparation, $notes, $returnTrip, null, $endDate);
 
             return redirect()
                 ->route('return-trips.show', $event)

@@ -89,7 +89,13 @@ class EmployeesTable extends Component
 
     public function render()
     {
-        $query = Employee::with(['roles', 'assignments.project', 'rotations']);
+        // OPTIMIZATION: Eager load all relations needed for location status calculation
+        $query = Employee::with([
+            'roles', 
+            'assignments.project.location',  // Added location for project
+            'accommodationAssignments.accommodation',  // Added for accommodation status
+            'rotations'
+        ]);
         
         // Filtrowanie po pracownikach (dla /mine/*)
         if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && !empty($this->filterEmployeeIds)) {
@@ -130,17 +136,16 @@ class EmployeesTable extends Component
             $locationTracker = app(\App\Services\LocationTrackingService::class);
             
             $filteredEmployees = $allEmployees->filter(function ($employee) use ($locationTracker, $checkDate) {
-                // Location filter using new model
                 if ($this->locationFilter) {
                     $status = $locationTracker->getLocationStatus($employee, $checkDate);
                     
                     $locationMatch = false;
                     if ($this->locationFilter === 'base') {
-                        $locationMatch = !$status['outside_base'];
+                        $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::IN_BASE;
                     } elseif ($this->locationFilter === 'transit') {
-                        $locationMatch = $status['in_transit'];
+                        $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT;
                     } elseif ($this->locationFilter === 'field') {
-                        $locationMatch = $status['outside_base'] && !$status['in_transit'];
+                        $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::OUTSIDE_BASE;
                     }
                     
                     if (!$locationMatch) {

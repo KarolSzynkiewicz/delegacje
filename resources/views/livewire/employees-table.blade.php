@@ -109,11 +109,9 @@
                 <tbody>
                     @forelse ($employees as $employee)
                         @php
-                            // Get location status for this employee on checkDate
                             $locationTracker = app(\App\Services\LocationTrackingService::class);
                             $locationStatus = $locationTracker->getLocationStatus($employee, $checkDate);
                             
-                            // Check rotation status on checkDate
                             $hasActiveRotation = $employee->rotations->filter(function($rotation) use ($checkDate) {
                                 $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
                                 $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
@@ -135,39 +133,22 @@
                             
                             <!-- Status (Baza/W podróży/Poza bazą) -->
                             <td class="text-center">
-                                @php
-                                    // Build detailed tooltip explaining the logic
-                                    $statusExplanation = '';
-                                    if($locationStatus['in_transit']) {
-                                        $statusExplanation = "🚗 W PODRÓŻY\n\nPracownik jest między datą wyjazdu a datą przyjazdu.\n\nLogika:\n1. Sprawdzamy aktywne wyjazdy (DEPARTURE) gdzie dzisiaj jest między event_date a end_date\n2. Status: W PODRÓŻY = tak";
-                                    } elseif(!$locationStatus['outside_base']) {
-                                        $statusExplanation = "🏠 W BAZIE\n\nPracownik jest w bazie firmy.\n\nLogika:\n1. Ostatni wyjazd (PLANNED/COMPLETED) został zakończony powrotem (RETURN)\n   LUB nie było żadnych aktywnych wyjazdów\n2. Brak aktywnych przypisań do projektów\n3. Brak aktywnych przypisań do domów\n\n❗ Anulowane wyjazdy (CANCELLED) są ignorowane";
-                                    } else {
-                                        $statusExplanation = "📍 POZA BAZĄ\n\nPracownik jest poza bazą na projekcie/w domu.\n\nLogika:\n1. Ostatni wyjazd (PLANNED/COMPLETED) nie został jeszcze zakończony powrotem\n   LUB\n2. Ma aktywne przypisanie do projektu\n   LUB\n3. Ma aktywne przypisanie do domu\n\n❗ Anulowane wyjazdy (CANCELLED) są ignorowane\n❗ Jeśli anulowano wyjazd i usunięto przypisania → status zmienia się na 'W bazie'";
-                                    }
-                                @endphp
-                                @if($locationStatus['in_transit'])
-                                    <x-tooltip :title="$statusExplanation">
-                                        <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
-                                    </x-tooltip>
-                                @elseif(!$locationStatus['outside_base'])
-                                    <x-tooltip :title="$statusExplanation">
-                                        <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
-                                    </x-tooltip>
+                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
+                                    <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
+                                @elseif($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE)
+                                    <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
                                 @else
-                                    <x-tooltip :title="$statusExplanation">
-                                        <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
-                                    </x-tooltip>
+                                    <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
                                 @endif
                             </td>
                             
                             <!-- Dom (Accommodation) -->
                             <td class="text-center">
-                                @if(!$locationStatus['outside_base'] || $locationStatus['in_transit'])
+                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE || $locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
                                     <span class="text-muted">─</span>
-                                @elseif($locationStatus['accommodation'])
+                                @elseif($locationStatus['accommodation_name'])
                                     <x-ui.badge variant="info">
-                                        🏡 {{ $locationStatus['accommodation']->name }}
+                                        🏡 {{ $locationStatus['accommodation_name'] }}
                                     </x-ui.badge>
                                 @else
                                     <x-ui.badge variant="danger">
@@ -178,11 +159,11 @@
                             
                             <!-- Projekt -->
                             <td class="text-center">
-                                @if(!$locationStatus['outside_base'] || $locationStatus['in_transit'])
+                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE || $locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
                                     <span class="text-muted">─</span>
-                                @elseif($locationStatus['project_location'])
+                                @elseif($locationStatus['project_name'])
                                     <x-ui.badge variant="info">
-                                        🏢 {{ $locationStatus['project_location']->name }}
+                                        🏢 {{ $locationStatus['project_name'] }}
                                     </x-ui.badge>
                                 @else
                                     <x-ui.badge variant="danger">

@@ -6672,6 +6672,8 @@ namespace App\Models {
 	 * @property \Illuminate\Support\Carbon|null $completed_at
 	 * @property \Illuminate\Support\Carbon|null $due_date
 	 * @property int|null $assigned_to
+	 * @property mixed $category
+	 * @property bool|null $priority
 	 * @property \App\Enums\TaskStatus $status
 	 * @property mixed $description
 	 * @property mixed $name
@@ -6690,6 +6692,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereName($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereDescription($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereStatus($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask wherePriority($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereCategory($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereAssignedTo($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereDueDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectTask>|ProjectTask whereCompletedAt($value)
