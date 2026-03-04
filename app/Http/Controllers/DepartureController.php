@@ -447,6 +447,7 @@ class DepartureController extends Controller
                 'status' => LogisticsEventStatus::COMPLETED, // Wyjazd wymusza przypisanie, więc zawsze COMPLETED
                 'notes' => $departureData['notes'] ?? null,
                 'has_transport' => !empty($departureData['vehicle_id']),
+                'created_by' => auth()->id() ?? 1,
             ]);
 
             // 2. Add participants to departure
@@ -571,6 +572,363 @@ class DepartureController extends Controller
         
         // Multiple locations - this is an error case
         return null;
+    }
+
+    /**
+     * Show the V2 form for creating a new departure with drag-and-drop.
+     */
+    public function createV2(Request $request): View
+    {
+        $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->orderBy('registration_number')
+            ->get();
+
+        $baseLocation = Location::getBase();
+
+        return view('departures.create-v2', compact('vehicles', 'baseLocation'));
+    }
+
+    /**
+     * Show step 2: Accommodation assignment for assigned employees.
+     */
+    public function createV2Step2(Request $request): View
+    {
+        $departureData = session('departure_v2');
+        
+        if (!$departureData || !isset($departureData['step1'])) {
+            return redirect()
+                ->route('departures.create-v2')
+                ->with('error', 'Brak danych z kroku 1. Rozpocznij od początku.');
+        }
+
+        $accommodations = Accommodation::orderBy('name')->get();
+        $baseLocation = Location::getBase();
+
+        return view('departures.create-v2-step2', compact('accommodations', 'baseLocation'));
+    }
+
+    /**
+     * Show step 3: Vehicle assignment for assigned employees.
+     */
+    public function createV2Step3(Request $request): View
+    {
+        $departureData = session('departure_v2');
+        
+        if (!$departureData || !isset($departureData['step1']) || !isset($departureData['step2'])) {
+            return redirect()
+                ->route('departures.create-v2-step2')
+                ->with('error', 'Brak danych z kroku 2. Rozpocznij od początku.');
+        }
+
+        $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->orderBy('registration_number')
+            ->get();
+        $baseLocation = Location::getBase();
+
+        return view('departures.create-v2-step3', compact('vehicles', 'baseLocation'));
+    }
+
+    /**
+     * Save draft version of departure (stored in session).
+     */
+    public function saveDraftV2(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'departure_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:departure_date',
+            'vehicle_id' => 'nullable|exists:vehicles,id',
+            'assignments' => 'nullable|array',
+            'vehicle_seats' => 'nullable|array',
+        ]);
+
+        // Store in session
+        session(['departure_draft_v2' => $validated]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Wersja robocza zapisana',
+        ]);
+    }
+
+    /**
+     * Clear draft version of departure from session.
+     */
+    public function clearDraftV2(): RedirectResponse
+    {
+        session()->forget('departure_draft_v2');
+        
+        return redirect()
+            ->route('departures.create-v2')
+            ->with('success', 'Wersja robocza została wyczyszczona');
+    }
+
+    /**
+     * Store the final V2 departure with all assignments.
+     */
+    public function storeV2(Request $request): RedirectResponse
+    {
+        // Get data from session (multi-step form)
+        $departureData = session('departure_v2');
+        
+        if (!$departureData || !isset($departureData['step1'])) {
+            return redirect()
+                ->route('departures.create-v2')
+                ->with('error', 'Brak danych z formularza. Rozpocznij od początku.');
+        }
+        
+        $step1 = $departureData['step1'];
+        $step2 = $departureData['step2'] ?? [];
+        $step3 = $departureData['step3'] ?? [];
+        
+        // Transform assignments from nested structure to flat array
+        $assignmentsData = $step1['assignments'] ?? [];
+        
+        // Handle case where assignments might be a JSON string
+        if (is_string($assignmentsData)) {
+            $assignmentsData = json_decode($assignmentsData, true) ?? [];
+        }
+        
+        // Ensure it's an array
+        if (!is_array($assignmentsData)) {
+            $assignmentsData = [];
+        }
+        
+        $flatAssignments = [];
+        
+        foreach ($assignmentsData as $dayKey => $projects) {
+            // Extract day number from "day_1", "day_2", etc.
+            $dayNumber = (int) str_replace('day_', '', $dayKey);
+            
+            if (!is_array($projects)) {
+                continue;
+            }
+            
+            foreach ($projects as $projectId => $roles) {
+                if (!is_array($roles)) {
+                    continue;
+                }
+                
+                foreach ($roles as $roleId => $employeeIds) {
+                    if (!is_array($employeeIds)) {
+                        continue;
+                    }
+                    
+                    foreach ($employeeIds as $employeeId) {
+                        $flatAssignments[] = [
+                            'employee_id' => $employeeId,
+                            'project_id' => $projectId,
+                            'role_id' => $roleId,
+                            'day' => $dayNumber,
+                        ];
+                    }
+                }
+            }
+        }
+        
+        // Get assignment ranges from step1 (for days beyond 7)
+        $assignmentRanges = $step1['assignment_ranges'] ?? [];
+        
+        // Validate data
+        $validated = [
+            'departure_date' => $step1['departure_date'],
+            'end_date' => $step1['end_date'],
+            'vehicle_id' => $step1['vehicle_id'] ?? null,
+            'assignments' => $flatAssignments,
+            'assignment_ranges' => $assignmentRanges,
+        ];
+        
+        // Basic validation
+        if (empty($validated['departure_date']) || empty($validated['end_date'])) {
+            return redirect()
+                ->route('departures.create-v2')
+                ->with('error', 'Brak wymaganych dat wyjazdu.');
+        }
+        
+        // Validate assignment ranges separately
+        if (!empty($assignmentRanges)) {
+            foreach ($assignmentRanges as $key => $range) {
+                if (empty($range['employee_id']) || empty($range['project_id']) || empty($range['role_id']) || empty($range['start_date']) || empty($range['end_date'])) {
+                    continue; // Skip invalid ranges
+                }
+                
+                $startDate = Carbon::parse($range['start_date']);
+                $endDate = Carbon::parse($range['end_date']);
+                
+                if ($endDate->lt($startDate)) {
+                    return redirect()
+                        ->back()
+                        ->withInput()
+                        ->with('error', "Nieprawidłowy zakres dat dla przypisania: {$range['start_date']} - {$range['end_date']}");
+                }
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            $departureDate = Carbon::parse($validated['departure_date']);
+            $endDate = Carbon::parse($validated['end_date']);
+            $arrivalDate = $endDate;
+
+            // Determine destination location from assigned projects (both assignments and ranges)
+            $projectIds = collect($validated['assignments'])->pluck('project_id')->unique();
+            foreach ($assignmentRanges as $range) {
+                if (!empty($range['project_id'])) {
+                    $projectIds->push($range['project_id']);
+                }
+            }
+            $projectIds = $projectIds->unique();
+            
+            if ($projectIds->isEmpty()) {
+                DB::rollBack();
+                return redirect()
+                    ->back()
+                    ->with('error', 'Brak przypisań do projektów.');
+            }
+            
+            $projects = Project::whereIn('id', $projectIds)->with('location')->get();
+            
+            $locationIds = $projects->pluck('location_id')->filter()->unique();
+            if ($locationIds->count() !== 1) {
+                DB::rollBack();
+                return redirect()
+                    ->back()
+                    ->with('error', 'Wszystkie projekty muszą być w tej samej lokalizacji.');
+            }
+            
+            $destinationLocationId = $locationIds->first();
+            $baseLocation = Location::getBase();
+
+            // Create departure
+            $departure = LogisticsEvent::create([
+                'type' => LogisticsEventType::DEPARTURE,
+                'event_date' => $departureDate,
+                'end_date' => $endDate,
+                'from_location_id' => $baseLocation->id,
+                'to_location_id' => $destinationLocationId,
+                'vehicle_id' => $validated['vehicle_id'] ?? null,
+                'status' => LogisticsEventStatus::COMPLETED,
+                'notes' => null,
+                'has_transport' => !empty($validated['vehicle_id']),
+                'created_by' => auth()->id() ?? 1,
+            ]);
+
+            // Get unique employee IDs from both assignments and ranges
+            $employeeIds = collect($validated['assignments'])->pluck('employee_id')->unique();
+            foreach ($assignmentRanges as $range) {
+                if (!empty($range['employee_id'])) {
+                    $employeeIds->push($range['employee_id']);
+                }
+            }
+            $employeeIds = $employeeIds->unique();
+
+            // Add participants
+            foreach ($employeeIds as $employeeId) {
+                $departure->participants()->create([
+                    'employee_id' => $employeeId,
+                ]);
+            }
+
+            // Create project assignments from date ranges (new multi-step form uses ranges)
+            // If assignmentRanges exist, use only those (they contain date ranges)
+            // Otherwise, fall back to day-based assignments for backward compatibility
+            if (!empty($assignmentRanges)) {
+                // Use assignment ranges (new way - one assignment per range)
+                foreach ($assignmentRanges as $range) {
+                    if (empty($range['employee_id']) || empty($range['project_id']) || empty($range['role_id']) || empty($range['start_date'])) {
+                        continue;
+                    }
+                    
+                    $startDate = Carbon::parse($range['start_date']);
+                    $endDate = !empty($range['end_date']) ? Carbon::parse($range['end_date']) : $startDate;
+                    
+                    // Create assignment with date range
+                    $this->projectAssignmentService->createAssignment(
+                        Project::find($range['project_id']),
+                        Employee::find($range['employee_id']),
+                        Role::find($range['role_id']),
+                        $startDate,
+                        $endDate,
+                        null,
+                        $departure->id
+                    );
+                }
+            } else {
+                // Fallback: Create project assignments from day-based assignments (days 1-7) - old way
+            foreach ($validated['assignments'] as $assignment) {
+                $dayNumber = $assignment['day'];
+                $assignmentDate = $arrivalDate->copy()->addDays($dayNumber - 1);
+                
+                // For day-based assignments, create single-day assignment
+                $this->projectAssignmentService->createAssignment(
+                    Project::find($assignment['project_id']),
+                    Employee::find($assignment['employee_id']),
+                    Role::find($assignment['role_id']),
+                    $assignmentDate,
+                    $assignmentDate, // Single day assignment
+                    null,
+                    $departure->id
+                );
+            }
+            }
+            
+            // Create accommodation assignments from step 2
+            $accommodationAssignments = $step2['accommodation_assignments'] ?? [];
+            foreach ($accommodationAssignments as $employeeId => $assignment) {
+                $employee = Employee::find($employeeId);
+                $accommodation = Accommodation::find($assignment['accommodation_id']);
+                
+                if ($employee && $accommodation) {
+                    $this->accommodationAssignmentService->createAssignment(
+                        $employee,
+                        $accommodation,
+                        Carbon::parse($assignment['start_date']),
+                        Carbon::parse($assignment['end_date']),
+                        null,
+                        $departure->id
+                    );
+                }
+            }
+
+            // Create vehicle assignments from step 3
+            $vehicleAssignments = $step3['vehicle_assignments'] ?? [];
+            foreach ($vehicleAssignments as $employeeId => $assignment) {
+                $employee = Employee::find($employeeId);
+                $vehicle = Vehicle::find($assignment['vehicle_id']);
+                
+                if ($employee && $vehicle) {
+                        $this->vehicleAssignmentService->createAssignment(
+                        $employee,
+                        $vehicle,
+                        VehiclePosition::from($assignment['position'] ?? 'passenger'),
+                        Carbon::parse($assignment['start_date']),
+                        Carbon::parse($assignment['end_date']),
+                            null,
+                            $departure->id
+                        );
+                }
+            }
+
+            DB::commit();
+
+            // Clear session data
+            session()->forget('departure_v2');
+            session()->forget('departure_draft_v2');
+
+            return redirect()
+                ->route('departures.index')
+                ->with('success', 'Wyjazd został utworzony pomyślnie!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating V2 departure: ' . $e->getMessage(), [
+                'exception' => $e,
+                'request' => $validated,
+            ]);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Wystąpił błąd podczas tworzenia wyjazdu: ' . $e->getMessage());
+        }
     }
 
 }

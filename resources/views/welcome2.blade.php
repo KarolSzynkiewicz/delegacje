@@ -911,4 +911,61 @@
         }
         </style>
 
+        {{-- x-ui.cal --}}
+        <div class="mb-4">
+            <h4 class="fw-semibold">x-ui.cal</h4>
+            <p class="text-muted small">Komponent kalendarza miesięcznego w ciemnym stylu. Props: startDate, days, availability, selectedStartDate, selectedEndDate, onDateClick</p>
+            <div class="row">
+                <div class="col-12 mb-3">
+                    @php
+                        $startDate = \Carbon\Carbon::now();
+                        $availability = [];
+                        for ($i = 0; $i < 30; $i++) {
+                            $date = $startDate->copy()->addDays($i);
+                            $dateKey = $date->format('Y-m-d');
+                            // Przykładowe dane - dostępne w dni powszednie, niedostępne w weekendy
+                            $availability[$dateKey] = [
+                                'can_assign' => !$date->isWeekend(),
+                                'reason' => $date->isWeekend() ? 'Weekend' : null,
+                            ];
+                        }
+                    @endphp
+                    <x-ui.cal 
+                        :startDate="$startDate"
+                        :days="30"
+                        :availability="$availability"
+                    />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12 mb-3">
+                    <p class="text-muted small mb-2">Przykład z wybranym zakresem dat:</p>
+                    @php
+                        $startDate2 = \Carbon\Carbon::now();
+                        $availability2 = [];
+                        for ($i = 0; $i < 30; $i++) {
+                            $date = $startDate2->copy()->addDays($i);
+                            $dateKey = $date->format('Y-m-d');
+                            $availability2[$dateKey] = [
+                                'can_assign' => !$date->isWeekend(),
+                                'reason' => $date->isWeekend() ? 'Weekend' : null,
+                            ];
+                        }
+                        $selectedStart = $startDate2->copy()->addDays(5);
+                        $selectedEnd = $startDate2->copy()->addDays(10);
+                    @endphp
+                    <x-ui.cal 
+                        :startDate="$startDate2"
+                        :days="30"
+                        :availability="$availability2"
+                        :selectedStartDate="$selectedStart->format('Y-m-d')"
+                        :selectedEndDate="$selectedEnd->format('Y-m-d')"
+                    />
+                </div>
+            </div>
+        </div>
+        <hr>
+
+    </div>
+
 </x-app-layout>

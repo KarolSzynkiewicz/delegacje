@@ -8936,6 +8936,8 @@ namespace App\Models {
 	 * @property \Illuminate\Support\Carbon|null $created_at
 	 * @property int|null $current_location_id
 	 * @property mixed $image_path
+	 * @property int|null $last_departure_id
+	 * @property boolean $outside_base
 	 * @property mixed $notes
 	 * @property \Illuminate\Support\Carbon|null $ac_wazne_do
 	 * @property \Illuminate\Support\Carbon|null $insurance_valid_to
@@ -8954,6 +8956,7 @@ namespace App\Models {
 	 * @property-read int|null $assignments_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Employee> $employees
 	 * @property-read int|null $employees_count
+	 * @property-read \App\Models\LogisticsEvent $lastDeparture
 	 * @property-read \App\Models\Location $currentLocation
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Comment> $comments
 	 * @property-read int|null $comments_count
@@ -8968,6 +8971,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereInsuranceValidTo($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereAcWazneDo($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereNotes($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereOutsideBase($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereLastDepartureId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereImagePath($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereCurrentLocationId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Vehicle>|Vehicle whereCreatedAt($value)

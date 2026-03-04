@@ -126,75 +126,74 @@ class AssignmentQueryService
     {
         $endDate = $endDate ?? $startDate;
         
-        // Get all employees
-        $allEmployees = Employee::with(['rotations', 'employeeDocuments.document', 'assignments'])
+        // OPTIMIZATION: Pre-fetch all data to avoid N+1 queries
+        // Get all employees with eager loading
+        $allEmployees = Employee::with([
+            'rotations',
+            'employeeDocuments.document',
+            'assignments' => function($query) use ($startDate, $endDate) {
+                $query->where('is_cancelled', false)
+                    ->overlappingWith($startDate, $endDate);
+            }
+        ])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
 
+        // OPTIMIZATION: Get all employee IDs with project assignments in one query
+        $employeesWithProjectAssignments = ProjectAssignment::where('is_cancelled', false)
+            ->overlappingWith($startDate, $endDate)
+            ->pluck('employee_id')
+            ->unique()
+            ->toArray();
+
+        // OPTIMIZATION: Get all employee IDs in transit in one query
+        $employeesInTransit = LogisticsEvent::whereHas('participants', function($q) {
+                // No need to filter by employee_id here - we'll check in the main query
+            })
+            ->whereIn('type', [\App\Enums\LogisticsEventType::DEPARTURE, \App\Enums\LogisticsEventType::RETURN])
+            ->whereIn('status', [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED])
+            ->where('event_date', '<=', $endDate)
+            ->where(function($q) use ($startDate) {
+                $q->whereNull('end_date')
+                  ->orWhere('end_date', '>=', $startDate);
+            })
+            ->with('participants')
+            ->get()
+            ->flatMap(function($event) {
+                return $event->participants->pluck('employee_id');
+            })
+            ->unique()
+            ->toArray();
+
         // Filter employees who are available for the entire period
-        return $allEmployees->filter(function (Employee $employee) use ($startDate, $endDate) {
+        return $allEmployees->filter(function (Employee $employee) use ($startDate, $endDate, $employeesWithProjectAssignments, $employeesInTransit) {
             // 1. Check if employee is NOT assigned to any project during the date range
-            // IMPORTANT: Exclude cancelled assignments
-            $hasProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
-                ->where('is_cancelled', false)
-                ->overlappingWith($startDate, $endDate)
-                ->exists();
-            
-            if ($hasProjectAssignment) {
+            // Use pre-fetched list instead of querying for each employee
+            if (in_array($employee->id, $employeesWithProjectAssignments)) {
                 return false;
             }
 
             // 2. Check if employee has active rotation for the entire date range
-            // Use eager loaded relations if available, otherwise query
-            $hasActiveRotation = false;
-            if ($employee->relationLoaded('rotations')) {
-                // Use eager loaded rotations - check if any rotation covers the entire range
-                $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($startDate, $endDate) {
-                    return $rotation->isActiveAt($startDate) && 
-                           ($rotation->end_date === null || $rotation->end_date->gte($endDate));
-                })->isNotEmpty();
-            } else {
-                // Fallback to query - check if rotation covers entire range
-                $hasActiveRotation = $employee->rotations()
-                    ->where('start_date', '<=', $startDate)
-                    ->where(function($q) use ($endDate) {
-                        $q->whereNull('end_date')
-                          ->orWhere('end_date', '>=', $endDate);
-                    })
-                    ->exists();
-            }
+            // Use eager loaded rotations
+            $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($startDate, $endDate) {
+                return $rotation->isActiveAt($startDate) && 
+                       ($rotation->end_date === null || $rotation->end_date->gte($endDate));
+            })->isNotEmpty();
             
             if (!$hasActiveRotation) {
                 return false;
             }
 
             // 3. Check if employee has all required documents active for the entire date range
-            // Ensure documents are loaded
-            if (!$employee->relationLoaded('employeeDocuments')) {
-                $employee->load('employeeDocuments.document');
-            }
-            
+            // Documents are already eager loaded
             if (!$employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
                 return false;
             }
 
             // 4. Check if employee is NOT in transit (traveling) during the date range
-            // Employee is in transit if they have an active departure/return event
-            // that overlaps with the departure period (event_date <= endDate AND (end_date >= startDate OR end_date is null))
-            $isInTransit = LogisticsEvent::whereHas('participants', function($q) use ($employee) {
-                    $q->where('employee_id', $employee->id);
-                })
-                ->whereIn('type', [\App\Enums\LogisticsEventType::DEPARTURE, \App\Enums\LogisticsEventType::RETURN])
-                ->whereIn('status', [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED])
-                ->where('event_date', '<=', $endDate) // Event started before or on end date
-                ->where(function($q) use ($startDate) {
-                    $q->whereNull('end_date')
-                      ->orWhere('end_date', '>=', $startDate); // Event ends after or on start date
-                })
-                ->exists();
-            
-            if ($isInTransit) {
+            // Use pre-fetched list instead of querying for each employee
+            if (in_array($employee->id, $employeesInTransit)) {
                 return false;
             }
 

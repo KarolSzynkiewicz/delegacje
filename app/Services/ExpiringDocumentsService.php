@@ -105,4 +105,46 @@ class ExpiringDocumentsService
             ->orderBy('lease_end_date')
             ->get();
     }
+
+    /**
+     * Get expiring documents for a specific employee within the next N days.
+     * Also includes expired required documents (within last N days).
+     * 
+     * @param \App\Models\Employee $employee
+     * @param int $days Number of days to look ahead (default: 30)
+     * @return Collection<EmployeeDocument>
+     */
+    public function getExpiringDocumentsForEmployee(\App\Models\Employee $employee, int $days = 30): Collection
+    {
+        $now = Carbon::now();
+        $startDate = $now->copy()->subDays($days); // Look back N days for expired documents
+        $endDate = $now->copy()->addDays($days); // Look ahead N days for expiring documents
+
+        // Get documents expiring in the future (within next N days)
+        $expiring = EmployeeDocument::where('employee_id', $employee->id)
+            ->where('kind', 'okresowy')
+            ->whereNotNull('valid_to')
+            ->where('valid_to', '>=', $now->format('Y-m-d'))
+            ->where('valid_to', '<=', $endDate->format('Y-m-d'))
+            ->with('document')
+            ->get();
+
+        // Get expired required documents (within last N days)
+        $expiredRequired = EmployeeDocument::where('employee_id', $employee->id)
+            ->where('kind', 'okresowy')
+            ->whereNotNull('valid_to')
+            ->where('valid_to', '<', $now->format('Y-m-d'))
+            ->where('valid_to', '>=', $startDate->format('Y-m-d'))
+            ->with('document')
+            ->get()
+            ->filter(function ($doc) {
+                // Only include required documents
+                return $doc->document && $doc->document->is_required;
+            });
+
+        // Merge and sort by valid_to date
+        return $expiring->merge($expiredRequired)
+            ->sortBy('valid_to')
+            ->values();
+    }
 }

@@ -1,4 +1,8 @@
 {
+  "_index-B9ygI19o.js": {
+    "file": "assets/index-B9ygI19o.js",
+    "name": "index"
+  },
   "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff": {
     "file": "assets/bootstrap-icons-BeopsB42.woff",
     "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff"
@@ -8,14 +12,26 @@
     "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CDW9_pwM.css",
+    "file": "assets/app-XX41zUFL.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-UW9OuAtd.js",
+    "file": "assets/app-CNcEoHqi.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_index-B9ygI19o.js"
+    ]
+  },
+  "resources/js/react-app.jsx": {
+    "file": "assets/react-app-XisVPmKT.js",
+    "name": "react-app",
+    "src": "resources/js/react-app.jsx",
+    "isEntry": true,
+    "imports": [
+      "_index-B9ygI19o.js"
+    ]
   }
 }

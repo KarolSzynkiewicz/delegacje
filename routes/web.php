@@ -101,6 +101,17 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('departures.store-with-assignments')
             ->defaults('resource', 'departures');
         
+        // New V2 departure form with drag-and-drop
+        Route::post('departures/draft-v2', [\App\Http\Controllers\DepartureController::class, 'saveDraftV2'])
+            ->name('departures.draft-v2')
+            ->defaults('resource', 'departures');
+        Route::post('departures/clear-draft-v2', [\App\Http\Controllers\DepartureController::class, 'clearDraftV2'])
+            ->name('departures.clear-draft-v2')
+            ->defaults('resource', 'departures');
+        Route::match(['get', 'post'], 'departures/store-v2', [\App\Http\Controllers\DepartureController::class, 'storeV2'])
+            ->name('departures.store-v2')
+            ->defaults('resource', 'departures');
+        
         // Equipment Issues Actions
         Route::get('equipment-issues/{equipmentIssue}/return', [\App\Http\Controllers\EquipmentIssueController::class, 'returnForm'])
             ->name('equipment-issues.return')
@@ -350,6 +361,14 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Return Trips (Zjazdy) - resource routes (MUST BE AFTER action routes to avoid route conflict)
     // Action routes like /return-trips/prepare must be registered before /return-trips/{id}
     Route::resource('return-trips', \App\Http\Controllers\ReturnTripController::class)->except(['destroy']);
+    
+    // V2 departure form route (must be before resource route to avoid conflict)
+    Route::get('departures/create-v2', [\App\Http\Controllers\DepartureController::class, 'createV2'])
+        ->name('departures.create-v2');
+    Route::get('departures/create-v2-step2', [\App\Http\Controllers\DepartureController::class, 'createV2Step2'])
+        ->name('departures.create-v2-step2');
+    Route::get('departures/create-v2-step3', [\App\Http\Controllers\DepartureController::class, 'createV2Step3'])
+        ->name('departures.create-v2-step3');
     
     Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy', 'edit', 'update']);
     });

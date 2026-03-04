@@ -16,7 +16,10 @@
         "vite": "^5.0.0"
     },
     "dependencies": {
+        "@vitejs/plugin-react": "^5.1.4",
         "bootstrap": "^5.3.0",
-        "bootstrap-icons": "^1.13.1"
+        "bootstrap-icons": "^1.13.1",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4"
     }
 }

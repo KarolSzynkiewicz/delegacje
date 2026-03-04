@@ -2253,3 +2253,87 @@ html .text-muted,
         width: 100%;
     }
 }
+
+/* ============================================
+   Modal Styles - Dark Theme
+   ============================================ */
+.modal {
+    z-index: 1055;
+}
+
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1050;
+}
+
+.modal-content {
+    background: var(--bg-card) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+    color: var(--text-main) !important;
+}
+
+.modal-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    padding: 1.5rem !important;
+    color: var(--text-main) !important;
+}
+
+.modal-title {
+    color: var(--text-main) !important;
+    font-weight: 600;
+}
+
+.modal-body {
+    background: transparent !important;
+    padding: 1.5rem !important;
+    color: var(--text-main) !important;
+}
+
+.modal-footer {
+    background: transparent !important;
+    border-top: 1px solid var(--glass-border) !important;
+    padding: 1.5rem !important;
+}
+
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.7;
+}
+
+.btn-close:hover {
+    opacity: 1;
+}
+
+.btn-close-white {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.modal-dialog-centered {
+    display: flex;
+    align-items: center;
+    min-height: calc(100% - 3.5rem);
+}
+
+.modal-xl {
+    max-width: 1140px;
+}
+
+/* Employee Assignment Modal specific styles */
+.employee-assignment-modal .modal-content {
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.employee-assignment-modal .modal-body {
+    overflow-y: auto;
+    flex: 1;
+}

@@ -32,6 +32,8 @@ class Vehicle extends Model
         'notes',
         'image_path',
         'current_location_id',
+        'outside_base',
+        'last_departure_id',
     ];
 
     /**
@@ -56,6 +58,7 @@ class Vehicle extends Model
         'insurance_valid_to' => 'date',
         'ac_wazne_do' => 'date',
         'type' => VehicleType::class,
+        'outside_base' => 'boolean',
     ];
 
     /**
@@ -104,6 +107,44 @@ class Vehicle extends Model
     public function getCurrentLocation(): ?Location
     {
         return app(\App\Services\LocationTrackingService::class)->getVehicleLocation($this);
+    }
+
+    /**
+     * Get the location of this vehicle on a specific date.
+     * 
+     * Delegates to LocationTrackingService for business logic.
+     * 
+     * @param \Carbon\Carbon|string $date
+     * @return \App\Models\Location|string|null Returns Location, "W PODRÓŻY" string, or null
+     */
+    public function getLocationOnDate($date): Location|string|null
+    {
+        $carbonDate = \Carbon\Carbon::parse($date);
+        return app(\App\Services\LocationTrackingService::class)->getVehicleLocationOnDate($this, $carbonDate);
+    }
+
+    /**
+     * Get comprehensive location status for this vehicle on a specific date.
+     * 
+     * Delegates to LocationTrackingService for business logic.
+     * 
+     * @param \Carbon\Carbon|string $date
+     * @return array Returns comprehensive status with locations, occupancy, etc.
+     */
+    public function getLocationStatusOnDate($date): array
+    {
+        $carbonDate = \Carbon\Carbon::parse($date);
+        return app(\App\Services\LocationTrackingService::class)->getVehicleLocationStatus($this, $carbonDate);
+    }
+
+    /**
+     * Get the last departure event that set outside_base flag.
+     * 
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function lastDeparture()
+    {
+        return $this->belongsTo(LogisticsEvent::class, 'last_departure_id');
     }
 
     /**

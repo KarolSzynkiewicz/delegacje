@@ -82,8 +82,12 @@ class ProjectAssignmentService
 
         // Validate employee location and logistics (extracted to separate service)
         // For updates, use existing logistics_event_id if assignment has one
+        // This allows editing assignment that already has a departure
         $existingLogisticsEventId = $assignment->logistics_event_id;
-        $this->locationValidator->validateForAssignment($employee, $project, $startDate, $existingLogisticsEventId);
+        
+        // If editing and assignment already has logistics_event_id, pass it to validator
+        // Also pass assignment ID to exclude it from checks
+        $this->locationValidator->validateForAssignment($employee, $project, $startDate, $existingLogisticsEventId, $assignment->id);
 
         // Validate project demand
         $this->validateProjectDemand($project, $role->id, $startDate, $endDate);

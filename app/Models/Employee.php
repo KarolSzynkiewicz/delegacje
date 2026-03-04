@@ -359,9 +359,13 @@ class Employee extends Model
                         if ($doc->kind === 'bezokresowy') {
                             return $doc->valid_from && $doc->valid_from->lte($endDate);
                         } else {
-                            // Dokument okresowy - musi być aktywny w całym zakresie
-                            return $doc->valid_from && $doc->valid_from->lte($startDate) &&
-                                   (!$doc->valid_to || $doc->valid_to->gte($endDate));
+                            // Dokument okresowy - sprawdź czy jest aktywny w zakresie dat
+                            // Dokument jest aktywny jeśli:
+                            // - valid_from <= endDate (dokument już się zaczął)
+                            // - valid_to >= startDate (dokument jeszcze nie wygasł)
+                            $validFromOk = $doc->valid_from && $doc->valid_from->lte($endDate);
+                            $validToOk = !$doc->valid_to || $doc->valid_to->gte($startDate);
+                            return $validFromOk && $validToOk;
                         }
                     })
                     ->isNotEmpty();
@@ -375,12 +379,15 @@ class Employee extends Model
                             $q2->where('kind', 'bezokresowy')
                                ->where('valid_from', '<=', $endDate);
                         })->orWhere(function ($q2) use ($startDate, $endDate) {
-                            // Dokument okresowy - musi być aktywny w całym zakresie
+                            // Dokument okresowy - sprawdź czy jest aktywny w zakresie dat
+                            // Dokument jest aktywny jeśli:
+                            // - valid_from <= endDate (dokument już się zaczął)
+                            // - valid_to >= startDate (dokument jeszcze nie wygasł)
                             $q2->where('kind', 'okresowy')
-                               ->where('valid_from', '<=', $startDate)
-                               ->where(function ($q3) use ($endDate) {
+                               ->where('valid_from', '<=', $endDate)
+                               ->where(function ($q3) use ($startDate) {
                                    $q3->whereNull('valid_to')
-                                      ->orWhere('valid_to', '>=', $endDate);
+                                      ->orWhere('valid_to', '>=', $startDate);
                                });
                         });
                     })
@@ -551,7 +558,17 @@ class Employee extends Model
             if ($project && $project->location_id) {
                 try {
                     $validator = app(\App\Services\EmployeeLocationValidator::class);
-                    $validator->validateForAssignment($this, $project, \Carbon\Carbon::parse($startDate), null);
+                    
+                    // If editing assignment, check if it has logistics_event_id (departure)
+                    $currentDepartureId = null;
+                    if ($excludeAssignmentId) {
+                        $existingAssignment = \App\Models\ProjectAssignment::find($excludeAssignmentId);
+                        if ($existingAssignment && $existingAssignment->logistics_event_id) {
+                            $currentDepartureId = $existingAssignment->logistics_event_id;
+                        }
+                    }
+                    
+                    $validator->validateForAssignment($this, $project, \Carbon\Carbon::parse($startDate), $currentDepartureId, $excludeAssignmentId);
                 } catch (\Illuminate\Validation\ValidationException $e) {
                     // Extract user-friendly message from validation exception
                     $errors = $e->errors();

@@ -13,6 +13,8 @@ class VehiclesTable extends Component
     public $search = '';
     public $conditionFilter = '';
     public $statusFilter = '';
+    public $locationFilter = '';
+    public $statusDate = ''; // Filtr daty
     public $sortField = 'registration_number';
     public $sortDirection = 'asc';
 
@@ -20,6 +22,8 @@ class VehiclesTable extends Component
         'search' => ['except' => ''],
         'conditionFilter' => ['except' => ''],
         'statusFilter' => ['except' => ''],
+        'locationFilter' => ['except' => ''],
+        'statusDate' => ['except' => ''],
         'sortField' => ['except' => 'registration_number'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -39,11 +43,23 @@ class VehiclesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingLocationFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStatusDate()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->search = '';
         $this->conditionFilter = '';
         $this->statusFilter = '';
+        $this->locationFilter = '';
+        $this->statusDate = '';
         $this->sortField = 'registration_number';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -84,15 +100,28 @@ class VehiclesTable extends Component
             $query->where('technical_condition', $this->conditionFilter);
         }
 
-        // Filtrowanie po statusie (zajęty/wolny)
+        // Determine date for status check
+        $checkDate = $this->statusDate ? \Carbon\Carbon::parse($this->statusDate) : now();
+
+        // Filtrowanie po statusie (zajęty/wolny) - używa checkDate
         if ($this->statusFilter) {
             if ($this->statusFilter === 'occupied') {
-                $query->whereHas('assignments', function ($q) {
-                    $q->active(); // Use scope from HasDateRange trait
+                $query->whereHas('assignments', function ($q) use ($checkDate) {
+                    $q->where('is_cancelled', false)
+                      ->where('start_date', '<=', $checkDate)
+                      ->where(function ($q2) use ($checkDate) {
+                          $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $checkDate);
+                      });
                 });
             } else {
-                $query->whereDoesntHave('assignments', function ($q) {
-                    $q->active(); // Use scope from HasDateRange trait
+                $query->whereDoesntHave('assignments', function ($q) use ($checkDate) {
+                    $q->where('is_cancelled', false)
+                      ->where('start_date', '<=', $checkDate)
+                      ->where(function ($q2) use ($checkDate) {
+                          $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $checkDate);
+                      });
                 });
             }
         }
@@ -100,23 +129,57 @@ class VehiclesTable extends Component
         // Sortowanie
         $query->orderBy($this->sortField, $this->sortDirection);
 
+        // Filtrowanie po lokalizacji (wymaga sprawdzenia statusu dla każdego pojazdu)
+        if ($this->locationFilter) {
+            $allVehicles = $query->get();
+            $locationTracker = app(\App\Services\LocationTrackingService::class);
+            
+            $filteredVehicles = $allVehicles->filter(function ($vehicle) use ($locationTracker, $checkDate) {
+                $status = $locationTracker->getVehicleLocationStatus($vehicle, $checkDate);
+                
+                $locationMatch = false;
+                if ($this->locationFilter === 'base') {
+                    $locationMatch = !$status['outside_base'] && !$status['in_transit'];
+                } elseif ($this->locationFilter === 'transit') {
+                    $locationMatch = $status['in_transit'];
+                } elseif ($this->locationFilter === 'field') {
+                    $locationMatch = $status['outside_base'] && !$status['in_transit'];
+                }
+                
+                return $locationMatch;
+            });
+            
+            // Paginate manually
+            $currentPage = $this->getPage();
+            $perPage = 10;
+            $currentPageItems = $filteredVehicles->slice(($currentPage - 1) * $perPage, $perPage)->values();
+            
+            $vehicles = new \Illuminate\Pagination\LengthAwarePaginator(
+                $currentPageItems,
+                $filteredVehicles->count(),
+                $perPage,
+                $currentPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
+        } else {
         // Załaduj liczbę unikalnych pracowników (dla wyświetlenia X/Y)
         // Liczymy unikalnych pracowników, nie przypisania (jeden pracownik może mieć wiele przypisań)
-        $today = \Carbon\Carbon::today();
         $query->addSelect([
             'unique_employees_count' => \App\Models\VehicleAssignment::select(\Illuminate\Support\Facades\DB::raw('count(distinct employee_id)'))
                 ->whereColumn('vehicle_id', 'vehicles.id')
-                ->where('start_date', '<=', $today)
-                ->where(function ($q) use ($today) {
+                    ->where('start_date', '<=', $checkDate)
+                    ->where(function ($q) use ($checkDate) {
                     $q->whereNull('end_date')
-                      ->orWhere('end_date', '>=', $today);
+                          ->orWhere('end_date', '>=', $checkDate);
                 })
         ]);
 
         $vehicles = $query->paginate(10);
+        }
 
         return view('livewire.vehicles-table', [
             'vehicles' => $vehicles,
+            'checkDate' => $checkDate,
         ]);
     }
 }

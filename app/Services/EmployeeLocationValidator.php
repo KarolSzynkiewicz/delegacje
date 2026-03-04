@@ -37,7 +37,8 @@ class EmployeeLocationValidator
         Employee $employee,
         Project $project,
         Carbon $startDate,
-        ?int $currentDepartureId = null
+        ?int $currentDepartureId = null,
+        ?int $excludeAssignmentId = null
     ): void {
         // Skip if project has no location
         if (!$project->location_id) {
@@ -61,7 +62,7 @@ class EmployeeLocationValidator
         }
         
         // 4. Require departure if from base to field
-        $this->requireDepartureIfNeeded($employee, $employeeLocation, $projectLocation, $startDate, $currentDepartureId);
+        $this->requireDepartureIfNeeded($employee, $employeeLocation, $projectLocation, $startDate, $currentDepartureId, $excludeAssignmentId, $project);
         
         // 5. Allow migration between field locations (implicit - no exception thrown)
     }
@@ -105,13 +106,17 @@ class EmployeeLocationValidator
      * Require departure if employee is at base and project is elsewhere.
      * 
      * @param int|null $currentDepartureId If provided, check this departure as well (for bulk creation)
+     * @param int|null $excludeAssignmentId If provided, exclude this assignment from checks (for editing)
+     * @param Project|null $project If provided, check assignments to this project
      */
     protected function requireDepartureIfNeeded(
         Employee $employee,
         $employeeLocation,
         Location $projectLocation,
         Carbon $startDate,
-        ?int $currentDepartureId = null
+        ?int $currentDepartureId = null,
+        ?int $excludeAssignmentId = null,
+        ?Project $project = null
     ): void {
         $base = Location::getBase();
         
@@ -137,6 +142,22 @@ class EmployeeLocationValidator
                     ]);
                 }
                 return; // Current departure is valid
+            }
+        }
+        
+        // If editing assignment, check if it already has a departure
+        if ($excludeAssignmentId && $project) {
+            $existingAssignment = \App\Models\ProjectAssignment::find($excludeAssignmentId);
+            if ($existingAssignment && 
+                $existingAssignment->logistics_event_id &&
+                $existingAssignment->project_id === $project->id) {
+                $departure = LogisticsEvent::find($existingAssignment->logistics_event_id);
+                if ($departure && 
+                    $departure->to_location_id === $projectLocation->id &&
+                    $departure->participants()->where('employee_id', $employee->id)->exists()) {
+                    // Assignment being edited already has a departure - allow it
+                    return;
+                }
             }
         }
         
