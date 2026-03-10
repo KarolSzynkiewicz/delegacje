@@ -27,7 +27,6 @@ class ProjectAssignment extends Model
         'start_date',
         'end_date',
         'notes',
-        'is_cancelled',
         'logistics_event_id',
     ];
 
@@ -39,7 +38,6 @@ class ProjectAssignment extends Model
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
-        'is_cancelled' => 'boolean',
     ];
 
     /**
@@ -85,11 +83,10 @@ class ProjectAssignment extends Model
     /**
      * Get the computed status based on dates.
      * 
-     * Status calculation priority:
-     * 1. If is_cancelled is true, return CANCELLED
-     * 2. If assignment is currently active (start_date <= today <= end_date or end_date is null) -> ACTIVE
-     * 3. If assignment is in the past (end_date < today) -> COMPLETED
-     * 4. If assignment is scheduled (start_date > today) -> ACTIVE
+     * Status calculation:
+     * 1. If assignment is currently active (start_date <= today <= end_date or end_date is null) -> ACTIVE
+     * 2. If assignment is in the past (end_date < today) -> COMPLETED
+     * 3. If assignment is scheduled (start_date > today) -> ACTIVE
      * 
      * This ensures that "active" status is only shown for assignments that are actually active now,
      * not for past assignments.
@@ -98,11 +95,6 @@ class ProjectAssignment extends Model
      */
     public function getStatusAttribute($value): AssignmentStatus
     {
-        // If assignment is explicitly cancelled, return CANCELLED
-        if ($this->is_cancelled) {
-            return AssignmentStatus::CANCELLED;
-        }
-
         // Calculate status based on dates
         if ($this->isCurrentlyActive()) {
             // Currently active: start_date <= today <= end_date (or end_date is null)

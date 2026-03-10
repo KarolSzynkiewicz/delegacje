@@ -28,7 +28,7 @@
                     class="form-select"
                 >
                     <option value="">Brak pojazdu</option>
-                    @foreach(\App\Models\Vehicle::where('type', 'company_vehicle')->orderBy('registration_number')->get() as $v)
+                    @foreach($this->availableVehicles as $v)
                         <option value="{{ $v->id }}">
                             {{ $v->registration_number }} - {{ $v->brand }} {{ $v->model }}
                             @if($v->capacity) ({{ $v->capacity }} miejsc) @endif
@@ -40,31 +40,24 @@
     </x-ui.card>
 
     <!-- Step Navigation -->
-    <div class="mb-4">
-        <ul class="nav nav-tabs">
-            <li class="nav-item">
-                <a class="nav-link {{ $currentStep === 1 ? 'active' : '' }}" 
-                   wire:click="goToStep(1)"
-                   style="cursor: pointer;">
-                    Krok 1: Przypisania do projektów
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ $currentStep === 2 ? 'active' : '' }}" 
-                   wire:click="goToStep(2)"
-                   style="cursor: pointer;">
-                    Krok 2: Przypisania do mieszkań
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ $currentStep === 3 ? 'active' : '' }}" 
-                   wire:click="goToStep(3)"
-                   style="cursor: pointer;">
-                    Krok 3: Przypisania do pojazdów
-                </a>
-            </li>
-        </ul>
-    </div>
+    <x-ui.tabs 
+        :tabs="[
+            1 => [
+                'label' => 'Krok 1: Przypisania do projektów',
+                'wireClick' => 'goToStep(1)',
+            ],
+            2 => [
+                'label' => 'Krok 2: Przypisania do mieszkań',
+                'wireClick' => 'goToStep(2)',
+            ],
+            3 => [
+                'label' => 'Krok 3: Przypisania do pojazdów',
+                'wireClick' => 'goToStep(3)',
+            ],
+        ]"
+        :activeTab="$currentStep"
+        id="departureStepsTabs"
+    />
 
     <!-- Step Content -->
     @if($currentStep === 1)

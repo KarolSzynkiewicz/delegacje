@@ -129,7 +129,6 @@ class TimeLogsTable extends Component
         // Filtruj pracowników na podstawie wybranego projektu i zakresu dat
         if ($this->projectFilter || $this->dateFrom || $this->dateTo) {
             $employeesQuery->join('project_assignments', 'employees.id', '=', 'project_assignments.employee_id')
-                ->where('project_assignments.is_cancelled', false)
                 ->distinct();
             
             // Filtruj po projekcie

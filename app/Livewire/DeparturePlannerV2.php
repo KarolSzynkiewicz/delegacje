@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use Carbon\Carbon;
+use App\Models\Vehicle;
+use App\Services\LocationTrackingService;
 
 class DeparturePlannerV2 extends Component
 {
@@ -131,12 +133,21 @@ class DeparturePlannerV2 extends Component
         }
     }
     
-    public function handleAssignmentRemoved($data)
+    public function handleAssignmentRemoved($data = [])
     {
-        $day = $data['day'];
-        $projectId = $data['project_id'];
-        $roleId = $data['role_id'];
-        $employeeId = $data['employee_id'];
+        // Jeśli $data jest puste lub nie jest tablicą, nie rób nic
+        if (empty($data) || !is_array($data)) {
+            return;
+        }
+        
+        $day = $data['day'] ?? null;
+        $projectId = $data['project_id'] ?? null;
+        $roleId = $data['role_id'] ?? null;
+        $employeeId = $data['employee_id'] ?? null;
+        
+        if (!$day || !$projectId || !$roleId || !$employeeId) {
+            return;
+        }
         
         if (isset($this->assignments[$day][$projectId][$roleId])) {
             $this->assignments[$day][$projectId][$roleId] = array_values(
@@ -214,10 +225,41 @@ class DeparturePlannerV2 extends Component
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
     }
     
-    public function handleAssignmentRangeRemoved($data)
+    public function handleAssignmentRangeRemoved($data = [])
     {
-        $key = $data['employee_id'] . '_' . $data['project_id'] . '_' . $data['role_id'];
+        // Jeśli $data jest puste lub nie jest tablicą, nie rób nic
+        if (empty($data) || !is_array($data)) {
+            return;
+        }
+        
+        $employeeId = $data['employee_id'] ?? null;
+        $projectId = $data['project_id'] ?? null;
+        $roleId = $data['role_id'] ?? null;
+        
+        if (!$employeeId || !$projectId || !$roleId) {
+            return;
+        }
+        
+        $key = $employeeId . '_' . $projectId . '_' . $roleId;
         unset($this->assignmentRanges[$key]);
+        
+        // Usuń również pracownika z vehicleSeats jeśli tam jest
+        if ($this->vehicleId && !empty($this->vehicleSeats)) {
+            foreach ($this->vehicleSeats as $index => $seat) {
+                if (!empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
+                    $this->vehicleSeats[$index] = [
+                        'employee_id' => null,
+                        'position' => 'passenger',
+                    ];
+                    break;
+                }
+            }
+            // Dispatch event z aktualnymi vehicleSeats do komponentu Step1
+            $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
+        }
+        
+        // Dispatch event to refresh child component
+        $this->dispatch('refresh-assignments');
     }
     
     public function handleVehicleSeatUpdated($data)
@@ -280,6 +322,8 @@ class DeparturePlannerV2 extends Component
     
     public function goToStep($step)
     {
+        $step = (int)$step;
+        
         // Walidacja przed przejściem do następnego kroku
         if ($step === 2) {
             $hasAssignments = !empty($this->assignments) || !empty($this->assignmentRanges);
@@ -311,6 +355,33 @@ class DeparturePlannerV2 extends Component
             'accommodation_assignments' => $this->accommodationAssignments,
             'vehicle_assignments' => $this->vehicleAssignments,
         ]);
+    }
+
+    /**
+     * Get vehicles that are in base on departure date
+     */
+    public function getAvailableVehiclesProperty()
+    {
+        if (!$this->departureDate) {
+            return collect();
+        }
+        
+        $departureDate = Carbon::parse($this->departureDate);
+        $locationTrackingService = app(LocationTrackingService::class);
+        
+        // Pobierz wszystkie pojazdy firmowe
+        $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->orderBy('registration_number')
+            ->get();
+        
+        // Filtruj tylko te, które są w bazie na dzień wyjazdu
+        $availableVehicles = $vehicles->filter(function ($vehicle) use ($departureDate, $locationTrackingService) {
+            $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $departureDate);
+            // Pojazd jest dostępny jeśli nie jest w podróży i nie jest poza bazą
+            return !$status['in_transit'] && !$status['outside_base'];
+        });
+        
+        return $availableVehicles;
     }
 
     public function render()

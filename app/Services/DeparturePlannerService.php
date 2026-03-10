@@ -132,8 +132,7 @@ class DeparturePlannerService
                         ->with('role');
                 },
                 'assignments' => function ($query) use ($weekStart, $weekEnd) {
-                    $query->where('is_cancelled', false)
-                        ->overlappingWith($weekStart, $weekEnd);
+                    $query->overlappingWith($weekStart, $weekEnd);
                 }
             ])
             ->get();
@@ -251,7 +250,6 @@ class DeparturePlannerService
 
         // 4. Check if employee is already assigned to another project on this date
         $existingAssignment = ProjectAssignment::where('employee_id', $employee->id)
-            ->where('is_cancelled', false)
             ->where(function ($query) use ($date) {
                 $query->where('start_date', '<=', $date)
                     ->where(function ($q) use ($date) {
@@ -269,7 +267,6 @@ class DeparturePlannerService
         // 5. Check if employee is already assigned to this project on this date (same or different role)
         $sameProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
             ->where('project_id', $project->id)
-            ->where('is_cancelled', false)
             ->where(function ($query) use ($date) {
                 $query->where('start_date', '<=', $date)
                     ->where(function ($q) use ($date) {
@@ -326,8 +323,7 @@ class DeparturePlannerService
                         ->with('role');
                 },
                 'assignments' => function ($query) use ($weekStart, $weekEnd) {
-                    $query->where('is_cancelled', false)
-                        ->overlappingWith($weekStart, $weekEnd);
+                    $query->overlappingWith($weekStart, $weekEnd);
                 }
             ])
             ->get();
@@ -562,7 +558,6 @@ class DeparturePlannerService
 
             // 6. Check if employee is already assigned to another project on this date (in database)
             $existingAssignment = ProjectAssignment::where('employee_id', $employee->id)
-                ->where('is_cancelled', false)
                 ->where('project_id', '!=', $project->id)
                 ->where(function ($query) use ($date) {
                     $query->where('start_date', '<=', $date)
@@ -583,7 +578,6 @@ class DeparturePlannerService
             // 7. Check if employee is already assigned to this project on this date (in database)
             $sameProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
                 ->where('project_id', $project->id)
-                ->where('is_cancelled', false)
                 ->where(function ($query) use ($date) {
                     $query->where('start_date', '<=', $date)
                         ->where(function ($q) use ($date) {
@@ -596,6 +590,7 @@ class DeparturePlannerService
             if ($sameProjectAssignment) {
                 $dayAvailability['reason'] = 'already_assigned_same_project';
                 $dayAvailability['reason_text'] = 'Już przypisany do tego projektu';
+                $dayAvailability['can_assign'] = false;
                 $availability[$dateKey] = $dayAvailability;
                 continue;
             }
@@ -738,7 +733,6 @@ class DeparturePlannerService
 
             // 6. Check if employee is already assigned to another project on this date (in database)
             $existingAssignment = ProjectAssignment::where('employee_id', $employee->id)
-                ->where('is_cancelled', false)
                 ->where('project_id', '!=', $project->id)
                 ->where(function ($query) use ($currentDate) {
                     $query->where('start_date', '<=', $currentDate)
@@ -752,6 +746,27 @@ class DeparturePlannerService
             if ($existingAssignment) {
                 $dayAvailability['reason'] = 'already_assigned';
                 $dayAvailability['reason_text'] = 'Już przypisany do innego projektu';
+                $availability[$dateKey] = $dayAvailability;
+                $currentDate->addDay();
+                continue;
+            }
+
+            // 7. Check if employee is already assigned to this project on this date (in database)
+            $sameProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
+                ->where('project_id', $project->id)
+                ->where(function ($query) use ($currentDate) {
+                    $query->where('start_date', '<=', $currentDate)
+                        ->where(function ($q) use ($currentDate) {
+                            $q->whereNull('end_date')
+                              ->orWhere('end_date', '>=', $currentDate);
+                        });
+                })
+                ->exists();
+
+            if ($sameProjectAssignment) {
+                $dayAvailability['reason'] = 'already_assigned_same_project';
+                $dayAvailability['reason_text'] = 'Już przypisany do tego projektu';
+                $dayAvailability['can_assign'] = false;
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
                 continue;

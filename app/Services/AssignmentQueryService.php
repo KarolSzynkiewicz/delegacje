@@ -132,8 +132,7 @@ class AssignmentQueryService
             'rotations',
             'employeeDocuments.document',
             'assignments' => function($query) use ($startDate, $endDate) {
-                $query->where('is_cancelled', false)
-                    ->overlappingWith($startDate, $endDate);
+                $query->overlappingWith($startDate, $endDate);
             }
         ])
             ->orderBy('last_name')
@@ -141,8 +140,7 @@ class AssignmentQueryService
             ->get();
 
         // OPTIMIZATION: Get all employee IDs with project assignments in one query
-        $employeesWithProjectAssignments = ProjectAssignment::where('is_cancelled', false)
-            ->overlappingWith($startDate, $endDate)
+        $employeesWithProjectAssignments = ProjectAssignment::overlappingWith($startDate, $endDate)
             ->pluck('employee_id')
             ->unique()
             ->toArray();

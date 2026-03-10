@@ -345,7 +345,6 @@ class Step3VehicleAssignments extends Component
         
         // 2. Get projects from existing database assignments (active at arrival date)
         $existingAssignments = VehicleAssignment::where('vehicle_id', $vehicleId)
-            ->where('is_cancelled', false)
             ->where('start_date', '<=', $this->arrivalDate)
             ->where(function($query) {
                 $query->whereNull('end_date')
@@ -357,7 +356,6 @@ class Step3VehicleAssignments extends Component
                           $q->whereNull('end_date')
                             ->orWhere('end_date', '>=', $this->arrivalDate);
                       })
-                      ->where('is_cancelled', false)
                       ->with('project');
             }])
             ->get();
@@ -404,7 +402,6 @@ class Step3VehicleAssignments extends Component
         
         // Count from existing database assignments
         $dbAssignments = VehicleAssignment::where('vehicle_id', $vehicleId)
-            ->where('is_cancelled', false)
             ->where('start_date', '<=', $this->arrivalDate)
             ->where(function($query) {
                 $query->whereNull('end_date')
@@ -602,7 +599,6 @@ class Step3VehicleAssignments extends Component
                     $q->whereNull('end_date')
                       ->orWhere('end_date', '>=', $date);
                 })
-                ->where('is_cancelled', false)
                 ->get();
             
             // Count form assignments for this vehicle on this date (excluding current employee if editing)

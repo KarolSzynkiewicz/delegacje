@@ -33,7 +33,6 @@
                         <option value="active">Aktywne</option>
                         <option value="scheduled">Przyszłe</option>
                         <option value="completed">Zakończone</option>
-                        <option value="cancelled">Anulowane</option>
                     </select>
                 </div>
             </div>
@@ -94,9 +93,7 @@
                                     </small>
                                 </td>
                                 <td>
-                                    @if($assignment->is_cancelled)
-                                        <x-ui.badge variant="danger">Anulowane</x-ui.badge>
-                                    @elseif($assignment->isScheduled())
+                                    @if($assignment->isScheduled())
                                         <x-ui.badge variant="info">Przyszłe</x-ui.badge>
                                     @elseif($assignment->isActive())
                                         <x-ui.badge variant="success">Aktywne</x-ui.badge>

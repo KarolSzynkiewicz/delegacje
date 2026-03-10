@@ -167,7 +167,6 @@ class LocationTrackingService
 
         // 4. Znajdź wszystkie aktywne przypisania pojazdu na daną datę
         $activeAssignments = VehicleAssignment::where('vehicle_id', $vehicle->id)
-            ->where('is_cancelled', false)
             ->where('start_date', '<=', $date)
             ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
             ->with(['employee'])
@@ -318,7 +317,6 @@ class LocationTrackingService
         // Jeśli brak eventu, sprawdź aktywne przypisania
         if (!$lastEvent) {
             $hasActiveAssignments = VehicleAssignment::where('vehicle_id', $vehicle->id)
-                ->where('is_cancelled', false)
                 ->where('start_date', '<=', $date)
                 ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
                 ->exists();
@@ -375,8 +373,7 @@ class LocationTrackingService
     {
         if ($employee->relationLoaded('assignments')) {
             $assignment = $employee->assignments
-                ->filter(fn($a) => !$a->is_cancelled
-                    && $a->start_date <= $date
+                ->filter(fn($a) => $a->start_date <= $date
                     && ($a->end_date === null || $a->end_date >= $date))
                 ->sortByDesc('start_date')
                 ->sortByDesc('id')
@@ -390,7 +387,6 @@ class LocationTrackingService
         }
         
         return $employee->assignments()
-            ->where('is_cancelled', false)
             ->where('start_date', '<=', $date)
             ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
             ->orderBy('start_date', 'desc')

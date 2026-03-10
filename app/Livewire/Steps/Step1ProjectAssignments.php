@@ -193,7 +193,7 @@ class Step1ProjectAssignments extends Component
         
         // Get all employees (not just available ones) so we can show them in vehicle seats
         // We'll filter out assigned ones in getFilteredEmployees()
-        $allEmployees = Employee::with('roles')
+        $allEmployees = Employee::with(['roles', 'employeeDocuments.document'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get()
@@ -203,6 +203,87 @@ class Step1ProjectAssignments extends Component
                 
                 // Get expiring documents (within a month)
                 $expiringDocuments = $this->expiringDocumentsService->getExpiringDocumentsForEmployee($employee, 30);
+                
+                // POPRAWKA: Sprawdź również wszystkie wygasłe wymagane dokumenty (niezależnie od daty wygaśnięcia)
+                // aby wyświetlić je w liście pracowników, nawet jeśli wygasły dawno
+                $now = Carbon::now();
+                $allExpiredRequired = \App\Models\EmployeeDocument::where('employee_id', $employee->id)
+                    ->where('kind', 'okresowy')
+                    ->whereNotNull('valid_to')
+                    ->where('valid_to', '<', $now->format('Y-m-d'))
+                    ->with('document')
+                    ->get()
+                    ->filter(function ($doc) {
+                        // Tylko wymagane dokumenty
+                        return $doc->document && $doc->document->is_required;
+                    })
+                    ->map(function ($doc) use ($now) {
+                        $validTo = Carbon::parse($doc->valid_to);
+                        $daysDiff = $validTo->diffInDays($now);
+                        
+                        return [
+                            'id' => $doc->id,
+                            'document_name' => $doc->document->name ?? 'Nieznany dokument',
+                            'valid_to' => $doc->valid_to->format('Y-m-d'),
+                            'days_until_expiry' => -$daysDiff, // Negative for expired
+                            'is_expired' => true,
+                            'is_required' => true,
+                        ];
+                    });
+                
+                // Przekonwertuj expiring documents na tablice
+                $expiringDocumentsArray = $expiringDocuments->map(function ($doc) use ($now) {
+                    $validTo = Carbon::parse($doc->valid_to);
+                    $isExpired = $validTo->lt($now);
+                    $daysDiff = $validTo->diffInDays($now);
+                    
+                    return [
+                        'id' => $doc->id,
+                        'document_name' => $doc->document->name ?? 'Nieznany dokument',
+                        'valid_to' => $doc->valid_to->format('Y-m-d'),
+                        'days_until_expiry' => $isExpired ? -$daysDiff : $daysDiff, // Negative for expired
+                        'is_expired' => $isExpired,
+                        'is_required' => $doc->document->is_required ?? false,
+                    ];
+                });
+                
+                // POPRAWKA: Sprawdź brakujące wymagane dokumenty (których pracownik w ogóle nie ma)
+                // Użyj getAvailabilityStatus() aby sprawdzić wszystkie wymagane dokumenty
+                $endDate = $this->endDate ? Carbon::parse($this->endDate) : $departureDate->copy()->addDays(30);
+                $availabilityStatus = $employee->getAvailabilityStatus($departureDate, $endDate);
+                $missingRequiredDocuments = [];
+                
+                if (isset($availabilityStatus['missing_documents'])) {
+                    foreach ($availabilityStatus['missing_documents'] as $missingDoc) {
+                        // Dodaj tylko wymagane dokumenty, które są całkowicie brakujące (nie mają valid_to)
+                        if (($missingDoc['is_required'] ?? false) && ($missingDoc['problem'] ?? '') === 'Brak dokumentu') {
+                            $missingRequiredDocuments[] = [
+                                'id' => null, // Nie ma dokumentu, więc nie ma ID
+                                'document_name' => $missingDoc['document_name'] ?? 'Nieznany dokument',
+                                'valid_to' => null,
+                                'days_until_expiry' => null,
+                                'is_expired' => true, // Traktuj brak dokumentu jako "wygasły"
+                                'is_required' => true,
+                                'is_missing' => true, // Flaga że dokument w ogóle nie istnieje
+                            ];
+                        }
+                    }
+                }
+                
+                // Połącz expiring documents z wygasłymi wymaganymi dokumentami
+                // Usuń duplikaty (jeśli dokument jest już w expiringDocuments, nie dodawaj go ponownie)
+                $expiringDocumentIds = $expiringDocumentsArray->pluck('id')->toArray();
+                $allExpiredRequired = $allExpiredRequired->filter(function ($doc) use ($expiringDocumentIds) {
+                    return !in_array($doc['id'], $expiringDocumentIds);
+                });
+                
+                // Połącz wszystkie dokumenty: expiring, expired, i missing
+                // merge() i concat() próbują użyć getKey() na elementach, co nie działa dla tablic
+                $allDocuments = collect(array_merge(
+                    $expiringDocumentsArray->toArray(), 
+                    $allExpiredRequired->toArray(),
+                    $missingRequiredDocuments
+                ));
                 
                 return [
                     'id' => $employee->id,
@@ -219,21 +300,7 @@ class Step1ProjectAssignments extends Component
                         'start_date' => $rotation->start_date->format('Y-m-d'),
                         'end_date' => $rotation->end_date ? $rotation->end_date->format('Y-m-d') : null,
                     ] : null,
-                    'expiring_documents' => $expiringDocuments->map(function ($doc) {
-                        $now = Carbon::now();
-                        $validTo = Carbon::parse($doc->valid_to);
-                        $isExpired = $validTo->lt($now);
-                        $daysDiff = $validTo->diffInDays($now);
-                        
-                        return [
-                            'id' => $doc->id,
-                            'document_name' => $doc->document->name ?? 'Nieznany dokument',
-                            'valid_to' => $doc->valid_to->format('Y-m-d'),
-                            'days_until_expiry' => $isExpired ? -$daysDiff : $daysDiff, // Negative for expired
-                            'is_expired' => $isExpired,
-                            'is_required' => $doc->document->is_required ?? false,
-                        ];
-                    })->toArray(),
+                    'expiring_documents' => $allDocuments->values()->toArray(),
                 ];
             })
             ->toArray();
@@ -472,10 +539,39 @@ class Step1ProjectAssignments extends Component
     {
         $assignedIds = $this->getAllAssignedEmployeeIds();
         
+        // Get date range for checking database assignments
+        $startDate = $this->departureDate ? Carbon::parse($this->departureDate) : null;
+        $endDate = $this->endDate ? Carbon::parse($this->endDate) : null;
+        
+        // Get all employee IDs that have assignments in database for this date range
+        $employeesWithDbAssignments = [];
+        if ($startDate && $endDate) {
+            // Get all employees who have assignments in database overlapping with the departure date range
+            $employeesWithDbAssignments = \App\Models\ProjectAssignment::where(function ($query) use ($startDate, $endDate) {
+                $query->where(function ($q) use ($startDate, $endDate) {
+                    // Assignment starts before or during the range
+                    $q->where('start_date', '<=', $endDate)
+                      ->where(function ($q2) use ($startDate) {
+                          $q2->whereNull('end_date')
+                             ->orWhere('end_date', '>=', $startDate);
+                      });
+                });
+            })
+            ->pluck('employee_id')
+            ->unique()
+            ->toArray();
+        }
+        
         // Filter from all available employees (not just current page)
-        $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds) {
-            // Filter out already assigned employees
+        $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments) {
+            // Filter out already assigned employees (in form)
             if (in_array($employee['id'], $assignedIds)) {
+                return false;
+            }
+            
+            // Filter out employees who have assignments in database for this date range
+            // (unless they're already assigned in form, which is checked above)
+            if (in_array($employee['id'], $employeesWithDbAssignments)) {
                 return false;
             }
             
@@ -490,11 +586,37 @@ class Step1ProjectAssignments extends Component
             }
             
             return true;
-        })->values()->toArray();
+        });
+        
+        // Sort employees: no issues first, expired required documents last
+        $sorted = $filtered->sortBy(function ($employee) {
+            $expiringDocs = $employee['expiring_documents'] ?? [];
+            
+            // Check if employee has expired required documents
+            $hasExpiredRequired = false;
+            foreach ($expiringDocs as $doc) {
+                if (($doc['is_expired'] ?? false) && ($doc['is_required'] ?? false)) {
+                    $hasExpiredRequired = true;
+                    break;
+                }
+            }
+            
+            // Check if employee has any documents issues
+            $hasAnyIssues = !empty($expiringDocs);
+            
+            // Priority: 0 = no issues (top), 1 = has issues but not expired required (middle), 2 = has expired required (bottom)
+            if (!$hasAnyIssues) {
+                return 0; // No issues - top
+            } elseif ($hasExpiredRequired) {
+                return 2; // Expired required - bottom
+            } else {
+                return 1; // Has issues but not expired required - middle
+            }
+        })->values();
         
         // Apply pagination
         $offset = ($this->employeesPage - 1) * $this->employeesPerPage;
-        $paginated = array_slice($filtered, $offset, $this->employeesPerPage);
+        $paginated = array_slice($sorted->toArray(), $offset, $this->employeesPerPage);
         
         return $paginated;
     }
@@ -531,6 +653,45 @@ class Step1ProjectAssignments extends Component
         }
         
         return $employeeIds;
+    }
+    
+    /**
+     * Get all employees assigned to projects (for display when no vehicle is selected)
+     */
+    public function getAssignedEmployeesForNoVehicle()
+    {
+        $employeeIds = [];
+        
+        // From range-based assignments (primary source)
+        foreach ($this->assignmentRanges as $range) {
+            if (!empty($range['employee_id']) && !in_array($range['employee_id'], $employeeIds)) {
+                $employeeIds[] = $range['employee_id'];
+            }
+        }
+        
+        // From day-based assignments (fallback)
+        foreach ($this->assignments as $dayAssignments) {
+            foreach ($dayAssignments as $projectAssignments) {
+                foreach ($projectAssignments as $roleAssignments) {
+                    foreach ($roleAssignments as $employeeId) {
+                        if (!in_array($employeeId, $employeeIds)) {
+                            $employeeIds[] = $employeeId;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Get employee data from allAvailableEmployees
+        $assignedEmployees = [];
+        foreach ($employeeIds as $employeeId) {
+            $employee = collect($this->allAvailableEmployees)->firstWhere('id', $employeeId);
+            if ($employee) {
+                $assignedEmployees[] = $employee;
+            }
+        }
+        
+        return $assignedEmployees;
     }
     
     public function openEmployeeModal($employeeId, $projectId, $roleId)
@@ -695,7 +856,7 @@ class Step1ProjectAssignments extends Component
     public function goToNextStep()
     {
         // Wysyła event do rodzica
-        $this->dispatch('go-to-step', 2);
+        $this->dispatch('go-to-step', step: 2);
     }
     
     public function render()

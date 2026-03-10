@@ -100,7 +100,6 @@
         $preloadedProjectAssignments = collect();
         if ($allEmployeeIds->isNotEmpty()) {
             $preloadedProjectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $allEmployeeIds)
-                ->where('is_cancelled', false)
                 ->where(function($query) use ($weekStart, $weekEnd) {
                     $query->where(function($q) use ($weekStart, $weekEnd) {
                         $q->where('start_date', '<=', $weekEnd)

@@ -1,6 +1,6 @@
 <div>
-    <!-- Vehicle Seats Placeholders -->
-    @if($vehicle && $vehicle->capacity)
+    <!-- Vehicle Seats Placeholders or No Vehicle List -->
+    @if($vehicleId && $vehicle && $vehicle->capacity)
         <x-ui.card class="mb-4">
             <h6 class="mb-3">Miejsca w pojeździe ({{ $vehicle->registration_number }})</h6>
             <div class="d-flex flex-wrap gap-2">
@@ -58,6 +58,48 @@
                 @endforeach
             </div>
         </x-ui.card>
+    @elseif(!$vehicleId && (!empty($assignmentRanges) || !empty($assignments)))
+        @php
+            $assignedEmployees = $this->getAssignedEmployeesForNoVehicle();
+        @endphp
+        @if(!empty($assignedEmployees))
+            <x-ui.card class="mb-4">
+                <h6 class="mb-3">wyjazd transportem publicznym lub własnym</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach($assignedEmployees as $employee)
+                    <div 
+                        class="border rounded p-3"
+                        style="min-width: 200px; background: rgba(255,255,255,0.05);"
+                        wire:key="no-vehicle-employee-{{ $employee['id'] }}"
+                    >
+                        <div class="d-flex align-items-center gap-2">
+                            @if($employee['image_url'])
+                                <img src="{{ $employee['image_url'] }}" alt="{{ $employee['full_name'] }}" 
+                                     class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                            @else
+                                <div class="bg-primary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" 
+                                     style="width: 40px; height: 40px;">
+                                    <span class="text-primary fw-semibold small">
+                                        {{ substr($employee['first_name'], 0, 1) }}{{ substr($employee['last_name'], 0, 1) }}
+                                    </span>
+                                </div>
+                            @endif
+                            <div class="flex-grow-1 text-start">
+                                <div class="small fw-semibold">{{ $employee['full_name'] }}</div>
+                                @if(!empty($employee['roles']))
+                                    <div class="small mt-1">
+                                        @foreach($employee['roles'] as $role)
+                                            <x-ui.badge variant="accent" class="me-1 small">{{ $role['name'] }}</x-ui.badge>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </x-ui.card>
+        @endif
     @endif
 
     <!-- Main Layout: 4/12 + 8/12 -->
@@ -151,9 +193,21 @@
                                                 @php
                                                     $isExpired = $doc['is_expired'] ?? false;
                                                     $isRequired = $doc['is_required'] ?? false;
-                                                    $daysText = $isExpired 
-                                                        ? 'wygasł ' . abs($doc['days_until_expiry']) . ' dni temu' 
-                                                        : 'wygasa za ' . $doc['days_until_expiry'] . ' dni';
+                                                    $isMissing = $doc['is_missing'] ?? false;
+                                                    
+                                                    // Określ tekst dla dokumentu
+                                                    if ($isMissing) {
+                                                        $daysText = 'brak dokumentu';
+                                                    } elseif ($isExpired && isset($doc['days_until_expiry'])) {
+                                                        $daysText = 'wygasł ' . abs($doc['days_until_expiry']) . ' dni temu';
+                                                    } elseif ($isExpired) {
+                                                        $daysText = 'wygasł';
+                                                    } elseif (isset($doc['days_until_expiry'])) {
+                                                        $daysText = 'wygasa za ' . $doc['days_until_expiry'] . ' dni';
+                                                    } else {
+                                                        $daysText = 'wygasł';
+                                                    }
+                                                    
                                                     $color = $isRequired ? '#ef4444' : '#f59e0b';
                                                 @endphp
                                                 <span style="color: {{ $color }}; font-weight: {{ $isRequired ? 'bold' : 'normal' }};">
@@ -316,7 +370,7 @@
                                                                             type="button"
                                                                             class="btn-close btn-close-white"
                                                                             style="font-size: 0.6rem; opacity: 0.7;"
-                                                                            onclick="Livewire.dispatch('assignment-removed', { day: 'day_1', project_id: {{ $projectId }}, role_id: {{ $roleId }}, employee_id: {{ $assignedEmployeeId }} })"
+                                                                            onclick="$dispatch('assignment-range-removed', { employee_id: {{ $assignedEmployeeId }}, project_id: {{ $projectId }}, role_id: {{ $roleId }} })"
                                                                             title="Usuń przypisanie"
                                                                         ></button>
                                                                     </div>
@@ -442,6 +496,47 @@
 @script
 <script>
     let draggedEmployeeId = null;
+    let autoScrollInterval = null;
+    let isDragging = false;
+
+    // Auto-scroll during drag
+    function startAutoScroll(e) {
+        if (!isDragging) return;
+        
+        const viewportHeight = window.innerHeight;
+        const scrollThreshold = 100; // Distance from top/bottom in pixels to trigger scroll
+        const scrollSpeed = 10; // Pixels per scroll step
+        const mouseY = e.clientY;
+        
+        // Check if mouse is near top or bottom of viewport
+        if (mouseY < scrollThreshold) {
+            // Scroll up
+            if (autoScrollInterval) clearInterval(autoScrollInterval);
+            autoScrollInterval = setInterval(() => {
+                if (!isDragging) {
+                    clearInterval(autoScrollInterval);
+                    return;
+                }
+                window.scrollBy(0, -scrollSpeed);
+            }, 10);
+        } else if (mouseY > viewportHeight - scrollThreshold) {
+            // Scroll down
+            if (autoScrollInterval) clearInterval(autoScrollInterval);
+            autoScrollInterval = setInterval(() => {
+                if (!isDragging) {
+                    clearInterval(autoScrollInterval);
+                    return;
+                }
+                window.scrollBy(0, scrollSpeed);
+            }, 10);
+        } else {
+            // Stop scrolling if mouse is in middle area
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+        }
+    }
 
     // Employee cards - drag start
     document.addEventListener('dragstart', function(e) {
@@ -450,6 +545,7 @@
             const employeeId = card.getAttribute('data-employee-id');
             if (employeeId) {
                 draggedEmployeeId = employeeId;
+                isDragging = true;
                 e.dataTransfer.setData('text/plain', employeeId);
                 e.dataTransfer.effectAllowed = 'move';
                 card.style.opacity = '0.5';
@@ -464,6 +560,18 @@
             card.style.opacity = '1';
         }
         draggedEmployeeId = null;
+        isDragging = false;
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    }, true);
+    
+    // Auto-scroll during drag over
+    document.addEventListener('dragover', function(e) {
+        if (isDragging) {
+            startAutoScroll(e);
+        }
     }, true);
 
     // Drag over - drop zones (project/role only)

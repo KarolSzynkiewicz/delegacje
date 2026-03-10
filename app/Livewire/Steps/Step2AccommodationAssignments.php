@@ -206,6 +206,9 @@ class Step2AccommodationAssignments extends Component
         
         // From day-based assignments
         foreach ($this->assignments as $dayKey => $dayAssignments) {
+            $dayNum = (int) str_replace('day_', '', $dayKey);
+            $dayDate = $this->arrivalDate->copy()->addDays($dayNum - 1);
+            
             foreach ($dayAssignments as $projectId => $roles) {
                 foreach ($roles as $roleId => $employeeIds) {
                     if (in_array($employeeId, $employeeIds)) {
@@ -213,21 +216,19 @@ class Step2AccommodationAssignments extends Component
                         $role = $this->getRole($roleId);
                         
                         if ($project && $role) {
-                            $dayNumber = (int) str_replace('day_', '', $dayKey);
-                            $date = $this->arrivalDate->copy()->addDays($dayNumber - 1);
-                            
-                            $key = $projectId . '_' . $roleId;
+                            $key = "{$projectId}_{$roleId}";
                             if (!isset($assignments[$key])) {
                                 $assignments[$key] = [
                                     'project_id' => $projectId,
                                     'project_name' => $project->name,
                                     'role_id' => $roleId,
                                     'role_name' => $role->name,
+                                    'dates' => [],
                                     'date_ranges' => [],
                                 ];
                             }
-                            
-                            $assignments[$key]['date_ranges'][] = $date->format('d.m.Y');
+                            $assignments[$key]['dates'][] = $dayDate->format('Y-m-d');
+                            $assignments[$key]['date_ranges'][] = $dayDate->format('d.m.Y');
                         }
                     }
                 }
@@ -241,24 +242,31 @@ class Step2AccommodationAssignments extends Component
                 $role = $this->getRole($range['role_id']);
                 
                 if ($project && $role) {
-                    $startDate = Carbon::parse($range['start_date']);
-                    $endDate = Carbon::parse($range['end_date']);
-                    
-                    $key = $range['project_id'] . '_' . $range['role_id'];
+                    $key = "{$range['project_id']}_{$range['role_id']}";
                     if (!isset($assignments[$key])) {
                         $assignments[$key] = [
                             'project_id' => $range['project_id'],
                             'project_name' => $project->name,
                             'role_id' => $range['role_id'],
                             'role_name' => $role->name,
+                            'dates' => [],
                             'date_ranges' => [],
                         ];
                     }
+                    // Add all dates in range
+                    $start = Carbon::parse($range['start_date']);
+                    $end = Carbon::parse($range['end_date']);
+                    $current = $start->copy();
+                    while ($current->lte($end)) {
+                        $assignments[$key]['dates'][] = $current->format('Y-m-d');
+                        $current->addDay();
+                    }
                     
-                    if ($startDate->eq($endDate)) {
-                        $assignments[$key]['date_ranges'][] = $startDate->format('d.m.Y');
+                    // Add date range for display
+                    if ($start->eq($end)) {
+                        $assignments[$key]['date_ranges'][] = $start->format('d.m.Y');
                     } else {
-                        $assignments[$key]['date_ranges'][] = $startDate->format('d.m.Y') . ' - ' . $endDate->format('d.m.Y');
+                        $assignments[$key]['date_ranges'][] = $start->format('d.m.Y') . ' - ' . $end->format('d.m.Y');
                     }
                 }
             }
@@ -312,6 +320,48 @@ class Step2AccommodationAssignments extends Component
             $totalOccupied = $dbOccupied;
         }
         
+        $available = $capacity - $totalOccupied;
+        
+        return [
+            'occupied' => $totalOccupied,
+            'capacity' => $capacity,
+            'available' => max(0, $available),
+        ];
+    }
+    
+    /**
+     * Get accommodation occupancy for a specific date
+     */
+    protected function getAccommodationOccupancyForDate($accommodationId, Carbon $date): array
+    {
+        $accommodationId = (int) $accommodationId;
+        $accommodation = $this->getAccommodation($accommodationId);
+        $capacity = $accommodation?->capacity ?? 0;
+        
+        // Count from form assignments for this specific date
+        $formOccupied = 0;
+        foreach ($this->accommodationAssignments as $employeeId => $assignment) {
+            $assignmentAccommodationId = isset($assignment['accommodation_id']) ? (int) $assignment['accommodation_id'] : null;
+            if ($assignmentAccommodationId === $accommodationId) {
+                $assignmentStart = Carbon::parse($assignment['start_date']);
+                $assignmentEnd = Carbon::parse($assignment['end_date']);
+                if ($date->gte($assignmentStart) && $date->lte($assignmentEnd)) {
+                    $formOccupied++;
+                }
+            }
+        }
+        
+        // Count from existing database assignments for this specific date
+        $dbOccupied = AccommodationAssignment::where('accommodation_id', $accommodationId)
+            ->where('start_date', '<=', $date)
+            ->where(function($query) use ($date) {
+                $query->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $date);
+            })
+            ->count();
+        
+        // Total occupied (form + database)
+        $totalOccupied = $formOccupied + $dbOccupied;
         $available = $capacity - $totalOccupied;
         
         return [
@@ -512,12 +562,28 @@ class Step2AccommodationAssignments extends Component
         $availability = [];
         $currentDate = $startDate->copy();
         
+        // Get employee's project assignment dates
+        $employeeAssignments = $this->getEmployeeProjectAssignments($employeeId);
+        $projectDates = [];
+        foreach ($employeeAssignments as $assignment) {
+            foreach ($assignment['dates'] as $date) {
+                $projectDates[] = $date;
+            }
+        }
+        $projectDates = array_unique($projectDates);
+        
+        $hasNoProjects = empty($projectDates);
+        
         while ($currentDate->lte($maxDate)) {
             $dateKey = $currentDate->format('Y-m-d');
             
-            // Check capacity
-            $occupancy = $this->getAccommodationOccupancy($accommodation->id);
+            // Check if employee has project assignment for this date
+            $hasProjectOnDate = in_array($dateKey, $projectDates);
+            
+            // Check capacity for this specific date
+            $occupancy = $this->getAccommodationOccupancyForDate($accommodation->id, $currentDate);
             $isOverbooked = $occupancy['occupied'] >= $occupancy['capacity'];
+            $availableSpots = $occupancy['available'];
             
             // Check lease end date
             $leaseEnded = false;
@@ -528,13 +594,41 @@ class Step2AccommodationAssignments extends Component
             
             $canAssign = !$isOverbooked && !$leaseEnded;
             
+            // Set warning if no projects or date is outside project range
+            $warning = false;
+            $warningText = '';
+            if ($hasNoProjects) {
+                $warning = true;
+                $warningText = 'Brak przypisania do projektu';
+            } elseif (!$hasProjectOnDate) {
+                $warning = true;
+                $warningText = 'Data poza zakresem przypisania do projektu';
+            }
+            
+            // Build reason text for tooltip
+            $reasonText = '';
+            if ($isOverbooked) {
+                $reasonText = 'Brak miejsc (' . $occupancy['capacity'] . ' miejsc zajętych)';
+            } elseif ($leaseEnded) {
+                $reasonText = 'Koniec wynajmu';
+            } else {
+                $reasonText = 'Wolne miejsca: ' . $availableSpots . ' / ' . $occupancy['capacity'];
+            }
+            
+            // Add warning info to reason text if applicable
+            if ($warning && $canAssign) {
+                $reasonText = ($reasonText ? $reasonText . '. ' : '') . $warningText;
+            }
+            
             $availability[$dateKey] = [
                 'date' => $dateKey,
                 'available' => $canAssign,
                 'can_assign' => $canAssign,
                 'reason' => $isOverbooked ? 'overbooked' : ($leaseEnded ? 'lease_ended' : null),
-                'reason_text' => $isOverbooked ? 'Brak miejsc' : ($leaseEnded ? 'Koniec wynajmu' : null),
-                'warning' => false,
+                'reason_text' => $reasonText,
+                'warning' => $warning,
+                'has_projects' => !$hasNoProjects,
+                'available_capacity' => $availableSpots,
             ];
             
             $currentDate->addDay();
@@ -572,13 +666,13 @@ class Step2AccommodationAssignments extends Component
         }
         
         // Wysyła event do rodzica
-        $this->dispatch('go-to-step', 3);
+        $this->dispatch('go-to-step', step: 3);
     }
     
     public function confirmGoToNextStep()
     {
         // User confirmed, proceed to step 3
-        $this->dispatch('go-to-step', 3);
+        $this->dispatch('go-to-step', step: 3);
     }
     
     public function render()

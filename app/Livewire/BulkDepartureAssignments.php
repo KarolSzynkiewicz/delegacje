@@ -232,7 +232,6 @@ class BulkDepartureAssignments extends Component
                         
                         // Check overlapping assignments
                         $overlappingAssignments = $employee->assignments()
-                            ->where('is_cancelled', false)
                             ->where(function($q) use ($startDate, $endDate) {
                                 $q->whereBetween('start_date', [$startDate, $endDate])
                                   ->orWhereBetween('end_date', [$startDate, $endDate])

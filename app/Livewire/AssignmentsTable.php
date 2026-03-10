@@ -91,17 +91,15 @@ class AssignmentsTable extends Component
         if ($this->status) {
             if ($this->status === 'active') {
                 // For 'active', use scope active() which filters by dates
-                $query->active()->where('is_cancelled', false);
+                $query->active();
             } elseif ($this->status === 'completed') {
                 // For 'completed', filter by past assignments
                 $query->where(function($q) {
                     $q->whereNotNull('end_date')
                       ->where('end_date', '<', now());
-                })->where('is_cancelled', false);
-            } elseif ($this->status === 'cancelled') {
-                // For 'cancelled', filter by is_cancelled flag
-                $query->where('is_cancelled', true);
+                });
             }
+            // Note: 'cancelled' filter removed - assignments are physically deleted when cancelled
         }
 
         // Filter by date range

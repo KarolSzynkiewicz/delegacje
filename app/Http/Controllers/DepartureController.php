@@ -153,15 +153,12 @@ class DepartureController extends Controller
         // Find all affected assignments - SIMPLE! Use relationships
         $affectedProjectAssignments = $departure->projectAssignments()
             ->with(['employee', 'project', 'role'])
-            ->where('is_cancelled', false)
             ->get();
         
         $affectedVehicleAssignments = $departure->vehicleAssignments()
             ->with(['employee', 'vehicle'])
-            ->where('is_cancelled', false)
             ->get();
         
-        // accommodation_assignments doesn't have is_cancelled column
         $affectedAccommodationAssignments = $departure->accommodationAssignments()
             ->with(['employee', 'accommodation'])
             ->get();
@@ -206,9 +203,8 @@ class DepartureController extends Controller
                 $participants = $departure->participants()->with('employee')->get();
                 
                 // SIMPLE! Use direct relationships - we know exactly which assignments belong to this departure
-                $projectAssignments = $departure->projectAssignments()->where('is_cancelled', false)->get();
-                $vehicleAssignments = $departure->vehicleAssignments()->where('is_cancelled', false)->get();
-                // accommodation_assignments doesn't have is_cancelled column
+                $projectAssignments = $departure->projectAssignments()->get();
+                $vehicleAssignments = $departure->vehicleAssignments()->get();
                 $accommodationAssignments = $departure->accommodationAssignments()->get();
                 
                 // Cancel the departure
@@ -575,113 +571,36 @@ class DepartureController extends Controller
     }
 
     /**
-     * Show the V2 form for creating a new departure with drag-and-drop.
+     * Show the V2 form for creating a new departure.
+     * Uses Livewire component for all form logic.
      */
     public function createV2(Request $request): View
     {
-        $vehicles = Vehicle::where('type', 'company_vehicle')
-            ->orderBy('registration_number')
-            ->get();
-
         $baseLocation = Location::getBase();
 
-        return view('departures.create-v2', compact('vehicles', 'baseLocation'));
+        return view('departures.create-v2', compact('baseLocation'));
     }
 
     /**
-     * Show step 2: Accommodation assignment for assigned employees.
+     * Store the final V2 departure with all assignments.
+     * Receives data from Livewire component via request parameters.
      */
-    public function createV2Step2(Request $request): View
+    public function storeV2(Request $request): RedirectResponse
     {
-        $departureData = session('departure_v2');
-        
-        if (!$departureData || !isset($departureData['step1'])) {
-            return redirect()
-                ->route('departures.create-v2')
-                ->with('error', 'Brak danych z kroku 1. Rozpocznij od początku.');
-        }
-
-        $accommodations = Accommodation::orderBy('name')->get();
-        $baseLocation = Location::getBase();
-
-        return view('departures.create-v2-step2', compact('accommodations', 'baseLocation'));
-    }
-
-    /**
-     * Show step 3: Vehicle assignment for assigned employees.
-     */
-    public function createV2Step3(Request $request): View
-    {
-        $departureData = session('departure_v2');
-        
-        if (!$departureData || !isset($departureData['step1']) || !isset($departureData['step2'])) {
-            return redirect()
-                ->route('departures.create-v2-step2')
-                ->with('error', 'Brak danych z kroku 2. Rozpocznij od początku.');
-        }
-
-        $vehicles = Vehicle::where('type', 'company_vehicle')
-            ->orderBy('registration_number')
-            ->get();
-        $baseLocation = Location::getBase();
-
-        return view('departures.create-v2-step3', compact('vehicles', 'baseLocation'));
-    }
-
-    /**
-     * Save draft version of departure (stored in session).
-     */
-    public function saveDraftV2(Request $request): \Illuminate\Http\JsonResponse
-    {
+        // Validate and get data from request (from Livewire component)
         $validated = $request->validate([
             'departure_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:departure_date',
             'vehicle_id' => 'nullable|exists:vehicles,id',
             'assignments' => 'nullable|array',
+            'assignment_ranges' => 'nullable|array',
             'vehicle_seats' => 'nullable|array',
+            'accommodation_assignments' => 'nullable|array',
+            'vehicle_assignments' => 'nullable|array',
         ]);
-
-        // Store in session
-        session(['departure_draft_v2' => $validated]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Wersja robocza zapisana',
-        ]);
-    }
-
-    /**
-     * Clear draft version of departure from session.
-     */
-    public function clearDraftV2(): RedirectResponse
-    {
-        session()->forget('departure_draft_v2');
         
-        return redirect()
-            ->route('departures.create-v2')
-            ->with('success', 'Wersja robocza została wyczyszczona');
-    }
-
-    /**
-     * Store the final V2 departure with all assignments.
-     */
-    public function storeV2(Request $request): RedirectResponse
-    {
-        // Get data from session (multi-step form)
-        $departureData = session('departure_v2');
-        
-        if (!$departureData || !isset($departureData['step1'])) {
-            return redirect()
-                ->route('departures.create-v2')
-                ->with('error', 'Brak danych z formularza. Rozpocznij od początku.');
-        }
-        
-        $step1 = $departureData['step1'];
-        $step2 = $departureData['step2'] ?? [];
-        $step3 = $departureData['step3'] ?? [];
-        
-        // Transform assignments from nested structure to flat array
-        $assignmentsData = $step1['assignments'] ?? [];
+        // Transform assignments from nested structure to flat array (if needed)
+        $assignmentsData = $validated['assignments'] ?? [];
         
         // Handle case where assignments might be a JSON string
         if (is_string($assignmentsData)) {
@@ -725,17 +644,11 @@ class DepartureController extends Controller
             }
         }
         
-        // Get assignment ranges from step1 (for days beyond 7)
-        $assignmentRanges = $step1['assignment_ranges'] ?? [];
+        // Get assignment ranges (primary way - from Livewire)
+        $assignmentRanges = $validated['assignment_ranges'] ?? [];
         
-        // Validate data
-        $validated = [
-            'departure_date' => $step1['departure_date'],
-            'end_date' => $step1['end_date'],
-            'vehicle_id' => $step1['vehicle_id'] ?? null,
-            'assignments' => $flatAssignments,
-            'assignment_ranges' => $assignmentRanges,
-        ];
+        // Update validated data
+        $validated['assignments'] = $flatAssignments;
         
         // Basic validation
         if (empty($validated['departure_date']) || empty($validated['end_date'])) {
@@ -871,9 +784,13 @@ class DepartureController extends Controller
             }
             }
             
-            // Create accommodation assignments from step 2
-            $accommodationAssignments = $step2['accommodation_assignments'] ?? [];
+            // Create accommodation assignments
+            $accommodationAssignments = $validated['accommodation_assignments'] ?? [];
             foreach ($accommodationAssignments as $employeeId => $assignment) {
+                if (!is_array($assignment) || empty($assignment['accommodation_id'])) {
+                    continue;
+                }
+                
                 $employee = Employee::find($employeeId);
                 $accommodation = Accommodation::find($assignment['accommodation_id']);
                 
@@ -889,30 +806,30 @@ class DepartureController extends Controller
                 }
             }
 
-            // Create vehicle assignments from step 3
-            $vehicleAssignments = $step3['vehicle_assignments'] ?? [];
+            // Create vehicle assignments
+            $vehicleAssignments = $validated['vehicle_assignments'] ?? [];
             foreach ($vehicleAssignments as $employeeId => $assignment) {
+                if (!is_array($assignment) || empty($assignment['vehicle_id'])) {
+                    continue;
+                }
+                
                 $employee = Employee::find($employeeId);
                 $vehicle = Vehicle::find($assignment['vehicle_id']);
                 
                 if ($employee && $vehicle) {
-                        $this->vehicleAssignmentService->createAssignment(
+                    $this->vehicleAssignmentService->createAssignment(
                         $employee,
                         $vehicle,
                         VehiclePosition::from($assignment['position'] ?? 'passenger'),
                         Carbon::parse($assignment['start_date']),
                         Carbon::parse($assignment['end_date']),
-                            null,
-                            $departure->id
-                        );
+                        null,
+                        $departure->id
+                    );
                 }
             }
 
             DB::commit();
-
-            // Clear session data
-            session()->forget('departure_v2');
-            session()->forget('departure_draft_v2');
 
             return redirect()
                 ->route('departures.index')

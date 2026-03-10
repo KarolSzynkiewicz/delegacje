@@ -364,7 +364,6 @@ class DepartureAccommodationPlanner extends Component
                           $q->whereNull('end_date')
                             ->orWhere('end_date', '>=', $arrivalDate);
                       })
-                      ->where('is_cancelled', false)
                       ->with('project');
             }])
             ->get();

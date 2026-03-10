@@ -204,8 +204,7 @@ class ProjectAssignmentService
         }
 
         // Check if employee is available (no conflicting assignments in ANY project)
-        $query = $employee->assignments()
-            ->where('is_cancelled', false);
+        $query = $employee->assignments();
 
         DateRangeService::validateNoOverlappingAssignments(
             $query,

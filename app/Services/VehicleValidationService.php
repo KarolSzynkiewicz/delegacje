@@ -144,7 +144,6 @@ class VehicleValidationService
         $query = $vehicle->assignments()
             ->where('position', VehiclePosition::DRIVER->value)
             ->where('is_return_trip', false)
-            ->where('is_cancelled', false)
             ->where(function($q) {
                 // Exclude assignments linked to cancelled logistics events
                 $q->whereNull('logistics_event_id')
@@ -184,7 +183,6 @@ class VehicleValidationService
         $query = $employee->vehicleAssignments()
             ->where('vehicle_id', $vehicle->id)
             ->where('is_return_trip', false)
-            ->where('is_cancelled', false)
             ->where(function($q) {
                 // Exclude assignments linked to cancelled logistics events
                 $q->whereNull('logistics_event_id')
@@ -222,7 +220,6 @@ class VehicleValidationService
         ?int $excludeAssignmentId = null
     ): array {
         $query = VehicleAssignment::where('vehicle_id', $vehicle->id)
-            ->where('is_cancelled', false)
             ->where(function($q) {
                 // Exclude assignments linked to cancelled logistics events
                 $q->whereNull('logistics_event_id')

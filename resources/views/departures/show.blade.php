@@ -153,17 +153,14 @@
                                 @php
                                     $projectAssignment = $departure->projectAssignments
                                         ->where('employee_id', $participant->employee_id)
-                                        ->where('is_cancelled', false)
                                         ->first();
                                     
                                     $vehicleAssignment = $departure->vehicleAssignments
                                         ->where('employee_id', $participant->employee_id)
-                                        ->where('is_cancelled', false)
                                         ->first();
                                     
                                     $accommodationAssignment = $departure->accommodationAssignments
                                         ->where('employee_id', $participant->employee_id)
-                                        ->where('is_cancelled', false)
                                         ->first();
                                 @endphp
                                 <tr>

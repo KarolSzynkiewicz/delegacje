@@ -244,10 +244,10 @@
             <div class="d-flex justify-content-end gap-2">
                 <x-ui.button 
                     variant="ghost" 
-                    wire:click="$dispatch('go-to-step', 1)"
+                    wire:click="$dispatch('go-to-step', { step: 1 })"
                     action="cancel"
                 >
-                    ← Wróć do kroku 1
+                    ← Wróć do poprzedniej karty
                 </x-ui.button>
                 <x-ui.button 
                     variant="primary" 

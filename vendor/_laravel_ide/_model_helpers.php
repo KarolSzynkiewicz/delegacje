@@ -5805,7 +5805,7 @@ namespace App\Models {
 	 * @property mixed $notes
 	 * @property string|null $actual_end_date
 	 * @property string|null $actual_start_date
-	 * @property boolean $is_cancelled
+	 * @property bool $is_cancelled
 	 * @property \Illuminate\Support\Carbon|null $end_date
 	 * @property \Illuminate\Support\Carbon $start_date
 	 * @property int|null $logistics_event_id
@@ -9239,7 +9239,7 @@ namespace App\Models {
 	 *
 	 * @property \Illuminate\Support\Carbon|null $updated_at
 	 * @property \Illuminate\Support\Carbon|null $created_at
-	 * @property boolean $is_cancelled
+	 * @property bool $is_cancelled
 	 * @property boolean $is_return_trip
 	 * @property mixed $notes
 	 * @property string|null $actual_end_date

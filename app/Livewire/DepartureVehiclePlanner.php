@@ -277,7 +277,6 @@ class DepartureVehiclePlanner extends Component
         
         // Get all employees assigned to this vehicle in database (active at arrival date)
         $existingAssignments = VehicleAssignment::where('vehicle_id', $vehicleId)
-            ->where('is_cancelled', false)
             ->where('start_date', '<=', $arrivalDate)
             ->where(function($query) use ($arrivalDate) {
                 $query->whereNull('end_date')
@@ -289,7 +288,6 @@ class DepartureVehiclePlanner extends Component
                           $q->whereNull('end_date')
                             ->orWhere('end_date', '>=', $arrivalDate);
                       })
-                      ->where('is_cancelled', false)
                       ->with('project');
             }])
             ->get();
@@ -341,7 +339,6 @@ class DepartureVehiclePlanner extends Component
         
         // Count from existing database assignments
         $dbAssignments = VehicleAssignment::where('vehicle_id', $vehicleId)
-            ->where('is_cancelled', false)
             ->where('start_date', '<=', $arrivalDate)
             ->where(function($query) use ($arrivalDate) {
                 $query->whereNull('end_date')
@@ -635,7 +632,6 @@ class DepartureVehiclePlanner extends Component
                     $q->whereNull('end_date')
                       ->orWhere('end_date', '>=', $date);
                 })
-                ->where('is_cancelled', false)
                 ->get();
             
             // Count form assignments for this vehicle on this date (excluding current employee if editing)

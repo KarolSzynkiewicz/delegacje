@@ -211,8 +211,7 @@ class LogisticsEvent extends Model
     {
         return $this->participants()
             ->whereHas('employee.projectAssignments', function ($query) {
-                $query->where('logistics_event_id', $this->id)
-                    ->where('is_cancelled', false);
+                $query->where('logistics_event_id', $this->id);
             })
             ->count();
     }

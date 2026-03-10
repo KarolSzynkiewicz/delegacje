@@ -126,8 +126,7 @@ class WeeklyStabilityService
                 return $assignment->employee_id === $employee->id
                     && $assignment->project_id === $project->id
                     && $assignment->start_date->lte($day)
-                    && ($assignment->end_date === null || $assignment->end_date->gte($day))
-                    && $assignment->is_cancelled === false;
+                    && ($assignment->end_date === null || $assignment->end_date->gte($day));
             });
         } else {
             // Fallback to query if pre-loaded data not available

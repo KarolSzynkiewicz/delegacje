@@ -29,7 +29,6 @@ class VehicleAssignment extends Model
         'end_date',
         'notes',
         'is_return_trip',
-        'is_cancelled',
         'logistics_event_id',
     ];
 
@@ -43,7 +42,6 @@ class VehicleAssignment extends Model
         'end_date' => 'datetime',
         'position' => VehiclePosition::class,
         'is_return_trip' => 'boolean',
-        'is_cancelled' => 'boolean',
     ];
 
     /**
@@ -72,11 +70,6 @@ class VehicleAssignment extends Model
 
     public function getStatusAttribute($value): AssignmentStatus
     {
-        // If assignment is explicitly cancelled, return CANCELLED
-        if ($this->is_cancelled) {
-            return AssignmentStatus::CANCELLED;
-        }
-
         // Calculate status based on dates
         if ($this->isCurrentlyActive()) {
             return AssignmentStatus::ACTIVE;
@@ -97,10 +90,6 @@ class VehicleAssignment extends Model
      */
     public function isScheduled(): bool
     {
-        if ($this->is_cancelled) {
-            return false;
-        }
-        
         // Użyj metody z HasDateRange trait bezpośrednio
         $start = $this->getStartDate();
         if ($start === null) {
@@ -117,10 +106,6 @@ class VehicleAssignment extends Model
      */
     public function isActive(): bool
     {
-        if ($this->is_cancelled) {
-            return false;
-        }
-
         // Jeśli start_date jest w przyszłości, to nie jest aktywne (tylko zaplanowane)
         if ($this->isScheduled()) {
             return false;
@@ -143,10 +128,6 @@ class VehicleAssignment extends Model
      */
     public function isCompleted(): bool
     {
-        if ($this->is_cancelled) {
-            return false; // Cancelled is not completed
-        }
-
         if ($this->isScheduled()) {
             return false; // Scheduled is not completed
         }

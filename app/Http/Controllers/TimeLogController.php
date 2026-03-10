@@ -36,10 +36,9 @@ class TimeLogController extends Controller
      */
     public function create(): View
     {
-        // Get active assignments (based on dates) that are not cancelled
+        // Get active assignments (based on dates)
         $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->active()
-            ->where('is_cancelled', false)
             ->orderBy('start_date', 'desc')
             ->get();
         
@@ -90,10 +89,9 @@ class TimeLogController extends Controller
      */
     public function edit(TimeLog $timeLog): View
     {
-        // Get active assignments (based on dates) that are not cancelled
+        // Get active assignments (based on dates)
         $assignments = ProjectAssignment::with('employee', 'project', 'role')
             ->active()
-            ->where('is_cancelled', false)
             ->orderBy('start_date', 'desc')
             ->get();
         

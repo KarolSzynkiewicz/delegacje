@@ -265,8 +265,7 @@ class TimeLogService
                       $q2->whereNull('end_date')
                          ->orWhere('end_date', '>=', $monthStart);
                   });
-            })
-            ->where('is_cancelled', false);
+            });
         });
         
         // Filter by project IDs if provided (for /mine/* routes)
@@ -319,11 +318,6 @@ class TimeLogService
             // Group assignments by employee
             $employeesMap = [];
             foreach ($project->assignments as $assignment) {
-                // Exclude cancelled assignments
-                if ($assignment->is_cancelled) {
-                    continue;
-                }
-                
                 $employeeId = $assignment->employee_id;
                 if (!isset($employeesMap[$employeeId])) {
                     $employeesMap[$employeeId] = [

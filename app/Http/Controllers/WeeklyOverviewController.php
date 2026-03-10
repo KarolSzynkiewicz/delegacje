@@ -61,8 +61,7 @@ class WeeklyOverviewController extends Controller
             ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
             ->with([
                 'participants.employee.projectAssignments' => function($query) {
-                    $query->where('is_cancelled', false)
-                          ->select('id', 'employee_id', 'logistics_event_id', 'is_cancelled');
+                    $query->select('id', 'employee_id', 'logistics_event_id');
                 },
                 'vehicle', 
                 'toLocation'

@@ -64,7 +64,6 @@ return new class extends Migration
             // Check active assignments (can override to outside_base = true)
             if (!$shouldBeOutside) {
                 $hasActiveProject = $employee->assignments()
-                    ->where('is_cancelled', false)
                     ->where('start_date', '<=', $today)
                     ->where(function ($q) use ($today) {
                         $q->whereNull('end_date')

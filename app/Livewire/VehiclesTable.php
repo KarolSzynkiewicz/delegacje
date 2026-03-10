@@ -107,8 +107,7 @@ class VehiclesTable extends Component
         if ($this->statusFilter) {
             if ($this->statusFilter === 'occupied') {
                 $query->whereHas('assignments', function ($q) use ($checkDate) {
-                    $q->where('is_cancelled', false)
-                      ->where('start_date', '<=', $checkDate)
+                    $q->where('start_date', '<=', $checkDate)
                       ->where(function ($q2) use ($checkDate) {
                           $q2->whereNull('end_date')
                             ->orWhere('end_date', '>=', $checkDate);
@@ -116,8 +115,7 @@ class VehiclesTable extends Component
                 });
             } else {
                 $query->whereDoesntHave('assignments', function ($q) use ($checkDate) {
-                    $q->where('is_cancelled', false)
-                      ->where('start_date', '<=', $checkDate)
+                    $q->where('start_date', '<=', $checkDate)
                       ->where(function ($q2) use ($checkDate) {
                           $q2->whereNull('end_date')
                             ->orWhere('end_date', '>=', $checkDate);

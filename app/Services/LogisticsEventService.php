@@ -101,7 +101,6 @@ class LogisticsEventService
 
         // Check vehicle assignments
         $assignments = VehicleAssignment::where('vehicle_id', $vehicle->id)
-            ->where('is_cancelled', false)
             ->where(function($q) use ($startDate, $endDate) {
                 $q->where('start_date', '<=', $endDate)
                   ->where(function($q2) use ($startDate) {

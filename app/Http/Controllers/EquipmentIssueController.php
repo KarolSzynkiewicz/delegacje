@@ -59,7 +59,6 @@ class EquipmentIssueController extends Controller
         $equipment = Equipment::orderBy('name')->get();
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
         $assignments = \App\Models\ProjectAssignment::active()
-            ->where('is_cancelled', false)
             ->with('employee', 'project')
             ->get();
 

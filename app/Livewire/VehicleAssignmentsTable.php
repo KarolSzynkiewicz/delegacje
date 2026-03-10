@@ -79,20 +79,16 @@ class VehicleAssignmentsTable extends Component
                   ->where(function ($q) use ($today) {
                       $q->whereNull('end_date')
                         ->orWhere('end_date', '>=', $today);
-                  })
-                  ->where('is_cancelled', false);
+                  });
         } elseif ($this->statusFilter === 'scheduled') {
             $today = \Carbon\Carbon::today();
-            $query->where('start_date', '>', $today)
-                  ->where('is_cancelled', false);
+            $query->where('start_date', '>', $today);
         } elseif ($this->statusFilter === 'completed') {
             $today = \Carbon\Carbon::today();
             $query->whereNotNull('end_date')
-                  ->where('end_date', '<', $today)
-                  ->where('is_cancelled', false);
-        } elseif ($this->statusFilter === 'cancelled') {
-            $query->where('is_cancelled', true);
+                  ->where('end_date', '<', $today);
         }
+        // Note: 'cancelled' filter removed - assignments are physically deleted when cancelled
 
         $assignments = $query->paginate(20);
 

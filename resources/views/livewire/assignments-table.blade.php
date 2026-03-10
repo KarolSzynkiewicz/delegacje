@@ -26,7 +26,6 @@
                         <option value="">Wszystkie</option>
                         <option value="active">Aktywne</option>
                         <option value="completed">Zakończone</option>
-                        <option value="cancelled">Anulowane</option>
                     </select>
                 </div>
             </div>

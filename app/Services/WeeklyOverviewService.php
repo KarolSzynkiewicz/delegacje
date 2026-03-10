@@ -141,7 +141,6 @@ class WeeklyOverviewService
     protected function getAssignmentsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
     {
         return ProjectAssignment::where('project_id', $project->id)
-            ->where('is_cancelled', false) // Only exclude cancelled assignments
             ->overlappingWith($weekStart, $weekEnd)
             ->with(['employee', 'role', 'project'])
             ->get();
@@ -952,8 +951,7 @@ class WeeklyOverviewService
         }
         
         // Get all employees with project assignments in this week
-        $employeesWithProjects = ProjectAssignment::where('is_cancelled', false)
-            ->overlappingWith($weekStart, $weekEnd)
+        $employeesWithProjects = ProjectAssignment::overlappingWith($weekStart, $weekEnd)
             ->pluck('employee_id')
             ->unique();
         
