@@ -35,6 +35,7 @@
                             <th>Nazwa</th>
                             <th>Email</th>
                             <th>Role</th>
+                            <th>Kierownik</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -52,6 +53,17 @@
                                         </div>
                                     @else
                                         <span class="text-muted small">Brak ról</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($user->managedProjects->count() > 0)
+                                        <div class="d-flex flex-column gap-1">
+                                            @foreach($user->managedProjects as $project)
+                                                <x-ui.badge variant="info">{{ $project->name }}</x-ui.badge>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-muted small">Brak</span>
                                     @endif
                                 </td>
                                 <td>

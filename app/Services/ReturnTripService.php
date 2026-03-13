@@ -14,6 +14,7 @@ use App\Models\Employee;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use App\Services\AssignmentQueryService;
+use App\Services\VehicleValidationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -28,7 +29,8 @@ use Illuminate\Support\Collection;
 class ReturnTripService
 {
     public function __construct(
-        protected AssignmentQueryService $assignmentQueryService
+        protected AssignmentQueryService $assignmentQueryService,
+        protected VehicleValidationService $vehicleValidationService
     ) {}
 
     /**
@@ -49,11 +51,52 @@ class ReturnTripService
     public function prepareZjazd(
         array $employeeIds,
         Carbon $returnDate,
-        ?Vehicle $returnVehicle = null
+        ?Vehicle $returnVehicle = null,
+        ?Carbon $endDate = null,
+        ?int $excludeEventId = null
     ): ReturnTripPreparation {
         // Validate employees exist
+        $employees = [];
         foreach ($employeeIds as $employeeId) {
-            Employee::findOrFail($employeeId);
+            $employees[] = Employee::findOrFail($employeeId);
+        }
+
+        // Validate employees are not in transit on return date
+        // Exclude the current event if editing (it will be reversed before this check)
+        foreach ($employees as $employee) {
+            // Check if employee is in transit, but exclude the event being edited
+            $inTransitQuery = LogisticsEvent::inTransitOn($employee, $returnDate);
+            if ($excludeEventId) {
+                $inTransitQuery->where('id', '!=', $excludeEventId);
+            }
+            
+            if ($inTransitQuery->exists()) {
+                throw ValidationException::withMessages([
+                    'employee_ids' => "Pracownik {$employee->full_name} jest już w trakcie podróży w dniu {$returnDate->format('Y-m-d')}. Nie można utworzyć powrotu dla pracownika, który jest już w podróży."
+                ]);
+            }
+        }
+
+        // Validate vehicle availability if specified
+        if ($returnVehicle) {
+            // Use end_date if provided, otherwise use return_date (same day return)
+            $effectiveEndDate = $endDate ?? $returnDate;
+            
+            // Check if vehicle is available for logistics event
+            try {
+                $this->vehicleValidationService->validateForLogisticsEventOrFail(
+                    $returnVehicle,
+                    $returnDate,
+                    $effectiveEndDate,
+                    $excludeEventId
+                );
+            } catch (ValidationException $e) {
+                // Re-throw with more specific message for return trips
+                throw ValidationException::withMessages([
+                    'vehicle_id' => "Pojazd {$returnVehicle->registration_number} jest już zajęty w tym okresie ({$returnDate->format('d.m.Y')} - {$effectiveEndDate->format('d.m.Y')}). " . 
+                                   "Nie można utworzyć powrotu z tym pojazdem, ponieważ jest już używany w innym wyjeździe/zjeździe."
+                ]);
+            }
         }
 
         // Get all active assignments for returning employees
@@ -355,7 +398,7 @@ class ReturnTripService
         ?string $notes = null
     ): LogisticsEvent {
         // For backward compatibility, delegate to new prepare/commit flow
-        $preparation = $this->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
+        $preparation = $this->prepareZjazd($employeeIds, $returnDate, $returnVehicle, null, null);
         return $this->commitZjazd($preparation, $notes, null, null, null);
     }
 }

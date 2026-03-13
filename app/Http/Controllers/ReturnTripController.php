@@ -95,8 +95,15 @@ class ReturnTripController extends Controller
             $returnVehicle = isset($validated['vehicle_id']) 
                 ? Vehicle::findOrFail($validated['vehicle_id'])
                 : null;
+            $endDate = isset($validated['end_date']) 
+                ? \Carbon\Carbon::parse($validated['end_date'])
+                : null;
             
-            $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
+            $isEditMode = $validated['edit_mode'] ?? false;
+            $returnTripId = $validated['return_trip_id'] ?? null;
+            $excludeEventId = ($isEditMode && $returnTripId) ? $returnTripId : null;
+            
+            $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle, $endDate, $excludeEventId);
 
             // Store preparation in session for commit
             session(['return_trip_preparation' => serialize($preparation)]);
@@ -113,9 +120,6 @@ class ReturnTripController extends Controller
             $returnVehicle = isset($validated['vehicle_id']) 
                 ? Vehicle::find($validated['vehicle_id']) 
                 : null;
-
-            $isEditMode = $validated['edit_mode'] ?? false;
-            $returnTripId = $validated['return_trip_id'] ?? null;
 
             return view('return-trips.prepare', compact('preparation', 'employeeNames', 'returnVehicle', 'validated', 'isEditMode', 'returnTripId'));
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -194,8 +198,11 @@ class ReturnTripController extends Controller
                 $employeeIds = $originalPreparation->employeeIds;
                 $returnDate = $originalPreparation->returnDate;
                 $returnVehicle = $originalPreparation->returnVehicle;
+                $endDate = isset($validated['end_date']) 
+                    ? \Carbon\Carbon::parse($validated['end_date'])
+                    : null;
                 
-                $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
+                $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle, $endDate, $existingEvent->id);
             } else {
                 // For new return trips, use preparation from session
                 $preparation = unserialize($preparationSerialized);
@@ -310,8 +317,11 @@ class ReturnTripController extends Controller
             $returnVehicle = isset($validated['vehicle_id']) 
                 ? Vehicle::findOrFail($validated['vehicle_id'])
                 : null;
+            $endDate = isset($validated['end_date']) 
+                ? \Carbon\Carbon::parse($validated['end_date'])
+                : null;
             
-            $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle);
+            $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle, $endDate, $returnTrip->id);
 
             // Commit new return trip (updates existing event)
             $notes = $validated['notes'] ?? null;
