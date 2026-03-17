@@ -146,6 +146,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('tasks/{task}/cancel', [\App\Http\Controllers\TaskController::class, 'cancel'])
             ->name('tasks.cancel')
             ->defaults('resource', 'tasks');
+        
+        // Geocoding API
+        Route::get('api/geocoding/search', [\App\Http\Controllers\Api\GeocodingController::class, 'search'])
+            ->name('api.geocoding.search');
+        Route::post('api/geocoding/geocode', [\App\Http\Controllers\Api\GeocodingController::class, 'geocode'])
+            ->name('api.geocoding.geocode');
     });
     
     // ===== RESOURCE ROUTES =====

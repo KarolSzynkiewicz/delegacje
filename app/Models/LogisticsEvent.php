@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use App\Traits\HasComments;
+use App\Models\Accommodation;
 
 /**
  * LogisticsEvent - fakt biznesowy (co, kiedy, kto, gdzie)
@@ -32,6 +33,9 @@ class LogisticsEvent extends Model
         'status',
         'notes',
         'created_by',
+        'route_distance',
+        'route_duration',
+        'route_waypoints',
     ];
 
     protected $casts = [
@@ -40,6 +44,9 @@ class LogisticsEvent extends Model
         'has_transport' => 'boolean',
         'type' => LogisticsEventType::class,
         'status' => LogisticsEventStatus::class,
+        'route_distance' => 'decimal:2',
+        'route_duration' => 'integer',
+        'route_waypoints' => 'array',
     ];
 
     /**
@@ -240,5 +247,67 @@ class LogisticsEvent extends Model
         if ($this->allParticipantsAssigned() && $this->status === LogisticsEventStatus::PLANNED) {
             $this->update(['status' => LogisticsEventStatus::COMPLETED]);
         }
+    }
+
+    /**
+     * Check if route data is available.
+     */
+    public function hasRouteData(): bool
+    {
+        return !is_null($this->route_distance) && !is_null($this->route_duration);
+    }
+
+    /**
+     * Get route distance formatted (km).
+     */
+    public function getFormattedDistance(): ?string
+    {
+        if (!$this->hasRouteData()) {
+            return null;
+        }
+
+        return number_format($this->route_distance, 1) . ' km';
+    }
+
+    /**
+     * Get route duration formatted (hours and minutes).
+     */
+    public function getFormattedDuration(): ?string
+    {
+        if (!$this->hasRouteData()) {
+            return null;
+        }
+
+        $hours = floor($this->route_duration / 3600);
+        $minutes = floor(($this->route_duration % 3600) / 60);
+
+        if ($hours > 0) {
+            return sprintf('%d h %d min', $hours, $minutes);
+        }
+
+        return sprintf('%d min', $minutes);
+    }
+
+    /**
+     * Get waypoint accommodations (in order).
+     */
+    public function getWaypointAccommodations(): \Illuminate\Support\Collection
+    {
+        if (empty($this->route_waypoints)) {
+            return collect();
+        }
+
+        // Get accommodations in the order specified by route_waypoints
+        $accommodations = Accommodation::whereIn('id', $this->route_waypoints)->get()->keyBy('id');
+        
+        // Return in the correct order
+        $ordered = collect();
+        foreach ($this->route_waypoints as $accommodationId) {
+            if ($accommodations->has($accommodationId)) {
+                $ordered->push($accommodations->get($accommodationId));
+            }
+        }
+        
+        return $ordered;
     }
 }

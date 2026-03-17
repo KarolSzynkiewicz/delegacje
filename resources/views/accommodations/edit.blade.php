@@ -22,119 +22,7 @@
                     @csrf
                     @method('PUT')
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="text" 
-                            name="name" 
-                            label="Nazwa"
-                            value="{{ old('name', $accommodation->name) }}"
-                            required="true"
-                        />
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="text" 
-                            name="address" 
-                            label="Adres"
-                            value="{{ old('address', $accommodation->address) }}"
-                            required="true"
-                        />
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <x-ui.input 
-                                    type="text" 
-                                    name="city" 
-                                    label="Miasto"
-                                    value="{{ old('city', $accommodation->city) }}"
-                                />
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <x-ui.input 
-                                    type="text" 
-                                    name="postal_code" 
-                                    label="Kod Pocztowy"
-                                    value="{{ old('postal_code', $accommodation->postal_code) }}"
-                                />
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <x-input-label for="country" value="Kraj" />
-                                <select id="country" name="country" class="form-select mt-1">
-                                    <option value="">-- Wybierz kraj --</option>
-                                    @foreach(\App\Enums\EuropeanCountry::sorted() as $country)
-                                        <option value="{{ $country->value }}" {{ old('country', $accommodation->country?->value) === $country->value ? 'selected' : '' }}>
-                                            {{ $country->labelWithFlag() }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('country')" class="mt-2" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="number" 
-                            name="capacity" 
-                            label="Pojemność (liczba osób)"
-                            value="{{ old('capacity', $accommodation->capacity) }}"
-                            min="1"
-                            required="true"
-                        />
-                    </div>
-
-                    <div x-data="{ type: '{{ old('type', $accommodation->type ?? 'własny') }}' }">
-                        <div class="mb-3">
-                            <x-ui.input 
-                                type="select" 
-                                name="type" 
-                                label="Typ"
-                                required="true"
-                                x-model="type"
-                            >
-                                <option value="własny" {{ old('type', $accommodation->type ?? 'własny') === 'własny' ? 'selected' : '' }}>Własny</option>
-                                <option value="wynajmowany" {{ old('type', $accommodation->type ?? 'własny') === 'wynajmowany' ? 'selected' : '' }}>Wynajmowany</option>
-                            </x-ui.input>
-                        </div>
-
-                        <div class="mb-3" x-show="type === 'wynajmowany'" x-cloak>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <x-ui.input 
-                                        type="date" 
-                                        name="lease_start_date" 
-                                        label="Okres najmu - od"
-                                        value="{{ old('lease_start_date', $accommodation->lease_start_date?->format('Y-m-d')) }}"
-                                    />
-                                </div>
-                                <div class="col-md-6">
-                                    <x-ui.input 
-                                        type="date" 
-                                        name="lease_end_date" 
-                                        label="Okres najmu - do"
-                                        value="{{ old('lease_end_date', $accommodation->lease_end_date?->format('Y-m-d')) }}"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="textarea" 
-                            name="description" 
-                            label="Opis"
-                            value="{{ old('description', $accommodation->description) }}"
-                            rows="4"
-                        />
-                    </div>
+                    @livewire('accommodation-form', ['accommodation' => $accommodation])
 
                     <x-ui.image-preview 
                         :showCurrentImage="$accommodation->image_path ? true : false"
@@ -142,7 +30,7 @@
                         :currentImage="$accommodation->name"
                     />
 
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-center mt-4">
                         <x-ui.button 
                             variant="primary" 
                             type="submit"

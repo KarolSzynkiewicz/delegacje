@@ -29,6 +29,8 @@ class Accommodation extends Model
         'type',
         'lease_start_date',
         'lease_end_date',
+        'latitude',
+        'longitude',
     ];
 
     /**
@@ -52,6 +54,8 @@ class Accommodation extends Model
         'lease_start_date' => 'date',
         'lease_end_date' => 'date',
         'country' => \App\Enums\EuropeanCountry::class,
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
     ];
 
 
@@ -104,5 +108,43 @@ class Accommodation extends Model
     public function hasAvailableSpace($startDate, $endDate, ?int $excludeAssignmentId = null): bool
     {
         return $this->getAvailableCapacity($startDate, $endDate, $excludeAssignmentId) > 0;
+    }
+
+    /**
+     * Get full address string for geocoding.
+     */
+    public function getFullAddress(): string
+    {
+        $parts = array_filter([
+            $this->address,
+            $this->city,
+            $this->postal_code,
+            $this->country?->value ?? null,
+        ]);
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * Check if accommodation has coordinates.
+     */
+    public function hasCoordinates(): bool
+    {
+        return !is_null($this->latitude) && !is_null($this->longitude);
+    }
+
+    /**
+     * Get coordinates as array [lat, lng].
+     */
+    public function getCoordinates(): ?array
+    {
+        if (!$this->hasCoordinates()) {
+            return null;
+        }
+
+        return [
+            (float) $this->latitude,
+            (float) $this->longitude,
+        ];
     }
 }

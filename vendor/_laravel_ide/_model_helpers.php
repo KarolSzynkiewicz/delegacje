@@ -13,6 +13,8 @@ namespace App\Models {
 	 * @property \Illuminate\Support\Carbon|null $lease_end_date
 	 * @property \Illuminate\Support\Carbon|null $lease_start_date
 	 * @property mixed $type
+	 * @property float|null $longitude
+	 * @property float|null $latitude
 	 * @property \App\Enums\EuropeanCountry|null $country
 	 * @property mixed $postal_code
 	 * @property mixed $city
@@ -32,6 +34,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereCity($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation wherePostalCode($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereCountry($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLatitude($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLongitude($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereType($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLeaseStartDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Accommodation>|Accommodation whereLeaseEndDate($value)
@@ -4334,6 +4338,8 @@ namespace App\Models {
 	 * @property \App\Enums\EuropeanCountry|null $country
 	 * @property mixed $postal_code
 	 * @property mixed $city
+	 * @property float|null $longitude
+	 * @property float|null $latitude
 	 * @property mixed $address
 	 * @property mixed $name
 	 * @property int $id
@@ -4342,6 +4348,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereName($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereAddress($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereLatitude($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereLongitude($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereCity($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location wherePostalCode($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Location>|Location whereCountry($value)
@@ -4618,6 +4626,10 @@ namespace App\Models {
 	 * @property int $created_by
 	 * @property mixed $notes
 	 * @property \App\Enums\LogisticsEventStatus $status
+	 * @property array|null $route_waypoints
+	 * @property string|null $route_geometry
+	 * @property integer|null $route_duration
+	 * @property float|null $route_distance
 	 * @property int $to_location_id
 	 * @property int $from_location_id
 	 * @property int|null $transport_id
@@ -4651,6 +4663,10 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereTransportId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereFromLocationId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereToLocationId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteDistance($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteDuration($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteGeometry($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteWaypoints($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereStatus($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereNotes($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereCreatedBy($value)
@@ -5805,7 +5821,6 @@ namespace App\Models {
 	 * @property mixed $notes
 	 * @property string|null $actual_end_date
 	 * @property string|null $actual_start_date
-	 * @property bool $is_cancelled
 	 * @property \Illuminate\Support\Carbon|null $end_date
 	 * @property \Illuminate\Support\Carbon $start_date
 	 * @property int|null $logistics_event_id
@@ -5827,7 +5842,6 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereLogisticsEventId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereStartDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereEndDate($value)
-	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereIsCancelled($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereActualStartDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereActualEndDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProjectAssignment>|ProjectAssignment whereNotes($value)
@@ -9239,7 +9253,6 @@ namespace App\Models {
 	 *
 	 * @property \Illuminate\Support\Carbon|null $updated_at
 	 * @property \Illuminate\Support\Carbon|null $created_at
-	 * @property bool $is_cancelled
 	 * @property boolean $is_return_trip
 	 * @property mixed $notes
 	 * @property string|null $actual_end_date
@@ -9266,7 +9279,6 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereActualEndDate($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereNotes($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereIsReturnTrip($value)
-	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereIsCancelled($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereCreatedAt($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment whereUpdatedAt($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<VehicleAssignment>|VehicleAssignment newModelQuery()

@@ -38,6 +38,24 @@
                     @if($location->country)
                     <x-ui.detail-item label="Kraj">{{ $location->country->labelWithFlag() }}</x-ui.detail-item>
                     @endif
+                    @if($location->hasCoordinates())
+                    <x-ui.detail-item label="Współrzędne geograficzne">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span>
+                                <i class="bi bi-geo-alt-fill text-success"></i>
+                                {{ number_format((float)$location->latitude, 8) }}, {{ number_format((float)$location->longitude, 8) }}
+                            </span>
+                            <a 
+                                href="https://www.openstreetmap.org/?mlat={{ $location->latitude }}&mlon={{ $location->longitude }}&zoom=15" 
+                                target="_blank"
+                                class="btn btn-sm btn-outline-secondary"
+                                title="Otwórz na mapie"
+                            >
+                                <i class="bi bi-map"></i> Otwórz na mapie
+                            </a>
+                        </div>
+                    </x-ui.detail-item>
+                    @endif
                     <x-ui.detail-item label="Baza">
                         @if($location->is_base)
                             <x-ui.badge variant="success">Tak - Lokalizacja jest bazą</x-ui.badge>

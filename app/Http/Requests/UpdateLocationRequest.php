@@ -31,6 +31,8 @@ class UpdateLocationRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string'],
             'is_base' => ['nullable', 'boolean'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
         ];
     }
 

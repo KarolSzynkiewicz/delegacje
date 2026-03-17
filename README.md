@@ -756,6 +756,58 @@ System sprawdza ważność dokumentów przed przypisaniem pracownika do projektu
 
 ---
 
+## 🗺️ Zewnętrzne API – Lokalizacja i Trasy
+
+Aplikacja korzysta z dwóch zewnętrznych serwisów do geolokalizacji i planowania tras.
+
+### 1. Nominatim / OpenStreetMap — Geokodowanie adresów
+
+| Parametr | Wartość |
+| :--- | :--- |
+| **Serwis** | [Nominatim (OpenStreetMap)](https://nominatim.openstreetmap.org) |
+| **Zastosowanie** | Zamiana adresu tekstowego na współrzędne GPS (i odwrotnie); autouzupełnianie pól adresowych |
+| **Klucz API** | ❌ Nie wymagany |
+| **Limit** | 1 żądanie/sekundę (policy OpenStreetMap) |
+| **Konfiguracja `.env`** | Brak – działa bez konfiguracji |
+
+**Gdzie jest używany:**
+- Edycja lokalizacji (`/locations/{id}/edit`) — przycisk "Szukaj miejsca" → autouzupełnianie + pobieranie współrzędnych
+- Edycja akomodacji — jak wyżej
+- `Step4RoutePlanning` — automatyczne geokodowanie akomodacji bez współrzędnych podczas planowania trasy
+
+---
+
+### 2. OpenRouteService — Planowanie tras i obliczanie odległości
+
+| Parametr | Wartość |
+| :--- | :--- |
+| **Serwis** | [OpenRouteService](https://openrouteservice.org) |
+| **Zastosowanie** | Obliczanie tras, odległości (km) i czasu przejazdu między punktami; planowanie kolejności przystanków w kroku 4 formularza wyjazdu |
+| **Klucz API** | ✅ **Wymagany** (darmowy plan: 2 000 żądań/dzień) |
+| **Rejestracja** | [https://openrouteservice.org/dev/#/signup](https://openrouteservice.org/dev/#/signup) |
+
+**Jak skonfigurować:**
+
+1. Zarejestruj się na [openrouteservice.org](https://openrouteservice.org/dev/#/signup)
+2. Wejdź w panel → **Tokens** → **Create Token**
+3. Skopiuj wygenerowany klucz
+4. Dodaj do `.env`:
+
+```env
+OPENROUTESERVICE_API_KEY=twój_klucz_api_tutaj
+OPENROUTESERVICE_BASE_URL=https://api.openrouteservice.org/v2
+```
+
+> 💡 **Uwaga:** Jeśli używasz Docker Sail, dodaj te zmienne do pliku `.env` w głównym katalogu projektu. Po dodaniu możesz potrzebować zrestartować kontenery: `./vendor/bin/sail restart`.
+
+**Gdzie jest używany:**
+- `Step4RoutePlanning` — obliczanie trasy baza → mieszkania w formacie wyjazdu V2
+- `RoutePlanningService` — wyliczanie dystansów dom-projekt dla planu wyjazdu
+
+> ⚠️ **Bez skonfigurowanego `OPENROUTESERVICE_API_KEY` krok 4 formularza wyjazdu (`/departures/create-v2`) nie będzie w stanie zaplanować trasy** — system wyświetli komunikat błędu, ale zapis wyjazdu nadal zadziała (dane trasy zostaną puste).
+
+---
+
 ## 🛠️ Wymagania Techniczne
 
 ### Dla Docker (Zalecane)

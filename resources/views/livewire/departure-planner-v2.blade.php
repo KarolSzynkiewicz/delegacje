@@ -54,6 +54,10 @@
                 'label' => 'Krok 3: Przypisania do pojazdów',
                 'wireClick' => 'goToStep(3)',
             ],
+            4 => [
+                'label' => 'Krok 4: Planowanie trasy',
+                'wireClick' => 'goToStep(4)',
+            ],
         ]"
         :activeTab="$currentStep"
         id="departureStepsTabs"
@@ -89,6 +93,15 @@
             :accommodation-assignments="$accommodationAssignments"
             :vehicle-assignments="$vehicleAssignments"
             key="step3-{{ $departureDate }}-{{ md5(json_encode($assignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
+        />
+    @elseif($currentStep === 4)
+        <livewire:steps.step4-route-planning
+            :departure-date="$departureDate"
+            :end-date="$endDate"
+            :accommodation-assignments="$accommodationAssignments"
+            :assignment-ranges="$assignmentRanges"
+            :vehicle-assignments="$vehicleAssignments"
+            key="step4-{{ $departureDate }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
         />
     @endif
 </div>

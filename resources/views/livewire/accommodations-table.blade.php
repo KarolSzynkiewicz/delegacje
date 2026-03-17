@@ -43,7 +43,7 @@
 
     <x-ui.card>
         <div class="table-responsive">
-            <table class="table">
+            <table class="table align-middle">
                 <thead>
                     <tr>
                         <th class="text-start">Zdjęcie</th>
@@ -51,6 +51,9 @@
                             Nazwa
                         </x-livewire.sortable-header>
                         <th class="text-start d-none d-md-table-cell">Adres</th>
+                        <th class="text-start">Miasto</th>
+                        <th class="text-start">Kraj</th>
+                        <th class="text-start">Współrzędne</th>
                         <th class="text-start">Pojemność</th>
                         <th class="text-start">Status</th>
                         <th class="text-end">Akcje</th>
@@ -75,11 +78,44 @@
                                     />
                                 </div>
                             </td>
+                            <td class="fw-medium">{{ $accommodation->name }}</td>
+                            <td class="d-none d-md-table-cell">{{ $accommodation->address }}</td>
+                            <td>{{ $accommodation->city ?? '-' }}</td>
+                            <td>{{ $accommodation->country ? $accommodation->country->labelWithFlag() : '-' }}</td>
                             <td>
-                                <div class="fw-medium">{{ $accommodation->name }}</div>
-                            </td>
-                            <td class="d-none d-md-table-cell">
-                                <div>{{ $accommodation->address }}{{ $accommodation->city ? ', ' . $accommodation->city : '' }}</div>
+                                @if($accommodation->hasCoordinates())
+                                    <div>
+                                        <a 
+                                            href="https://www.openstreetmap.org/?mlat={{ floatval($accommodation->latitude) }}&mlon={{ floatval($accommodation->longitude) }}&zoom=15" 
+                                            target="_blank"
+                                            class="text-decoration-none d-inline-flex align-items-center gap-1"
+                                            title="Otwórz na mapie"
+                                            style="color: var(--success); cursor: pointer;"
+                                            onmouseover="this.style.opacity='0.8';"
+                                            onmouseout="this.style.opacity='1';"
+                                        >
+                                            <i class="bi bi-geo-alt-fill"></i>
+                                            <small>
+                                                {{ number_format((float)$accommodation->latitude, 6) }}, {{ number_format((float)$accommodation->longitude, 6) }}
+                                            </small>
+                                        </a>
+                                    </div>
+                                    <div class="mt-1">
+                                        <a 
+                                            href="https://www.openstreetmap.org/?mlat={{ floatval($accommodation->latitude) }}&mlon={{ floatval($accommodation->longitude) }}&zoom=15" 
+                                            target="_blank"
+                                            class="btn btn-sm btn-outline-secondary"
+                                            style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                                            title="Otwórz na mapie"
+                                        >
+                                            <i class="bi bi-map"></i> Mapa
+                                        </a>
+                                    </div>
+                                @else
+                                    <small class="text-muted">
+                                        <i class="bi bi-geo-alt"></i> Brak
+                                    </small>
+                                @endif
                             </td>
                             <td>
                                 <span class="small {{ $isOverfilled ? 'text-danger fw-bold' : ($isFull ? 'text-success fw-semibold' : 'text-muted') }}">
@@ -112,7 +148,7 @@
                             :has-filters="$search || $statusFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="6"
+                            colspan="9"
                         />
                     @endforelse
                 </tbody>

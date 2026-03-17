@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Location;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class LocationService
 {
@@ -27,19 +28,33 @@ class LocationService
         ?string $phone = null,
         ?string $email = null,
         ?string $description = null,
-        bool $isBase = false
+        bool $isBase = false,
+        ?float $latitude = null,
+        ?float $longitude = null
     ): Location {
-        return Location::create([
-            'name' => $name,
-            'address' => $address,
-            'city' => $city,
-            'postal_code' => $postalCode,
-            'contact_person' => $contactPerson,
-            'phone' => $phone,
-            'email' => $email,
-            'description' => $description,
-            'is_base' => $isBase,
-        ]);
+        return DB::transaction(function () use (
+            $name, $address, $city, $postalCode, $contactPerson, $phone, $email, 
+            $description, $isBase, $latitude, $longitude
+        ) {
+            // Jeśli tworzymy nową bazę, odznacz wszystkie istniejące bazy
+            if ($isBase) {
+                Location::where('is_base', true)->update(['is_base' => false]);
+            }
+            
+            return Location::create([
+                'name' => $name,
+                'address' => $address,
+                'city' => $city,
+                'postal_code' => $postalCode,
+                'contact_person' => $contactPerson,
+                'phone' => $phone,
+                'email' => $email,
+                'description' => $description,
+                'is_base' => $isBase,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ]);
+        });
     }
 
     /**
@@ -55,19 +70,35 @@ class LocationService
         ?string $phone = null,
         ?string $email = null,
         ?string $description = null,
-        bool $isBase = false
+        bool $isBase = false,
+        ?float $latitude = null,
+        ?float $longitude = null
     ): bool {
-        return $location->update([
-            'name' => $name,
-            'address' => $address,
-            'city' => $city,
-            'postal_code' => $postalCode,
-            'contact_person' => $contactPerson,
-            'phone' => $phone,
-            'email' => $email,
-            'description' => $description,
-            'is_base' => $isBase,
-        ]);
+        return DB::transaction(function () use (
+            $location, $name, $address, $city, $postalCode, $contactPerson, $phone, $email,
+            $description, $isBase, $latitude, $longitude
+        ) {
+            // Jeśli ustawiamy tę lokalizację jako bazę, odznacz wszystkie inne bazy
+            if ($isBase) {
+                Location::where('is_base', true)
+                    ->where('id', '!=', $location->id)
+                    ->update(['is_base' => false]);
+            }
+            
+            return $location->update([
+                'name' => $name,
+                'address' => $address,
+                'city' => $city,
+                'postal_code' => $postalCode,
+                'contact_person' => $contactPerson,
+                'phone' => $phone,
+                'email' => $email,
+                'description' => $description,
+                'is_base' => $isBase,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ]);
+        });
     }
 
     /**

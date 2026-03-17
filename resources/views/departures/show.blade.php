@@ -243,6 +243,102 @@
         </div>
     </x-ui.card>
 
+    @if($departure->hasRouteData() && $departure->route_waypoints)
+        <x-ui.card label="Plan trasy">
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted small mb-1 d-flex align-items-center gap-1">
+                        Szacowany dystans
+                        <x-tooltip title="Całkowity szacowany dystans trasy od bazy przez wszystkie przystanki do miejsca docelowego.">
+                            <i class="bi bi-speedometer2 text-info fs-6"></i>
+                        </x-tooltip>
+                    </h6>
+                    <p class="fw-semibold fs-5">{{ $departure->getFormattedDistance() }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted small mb-1 d-flex align-items-center gap-1">
+                        Szacowany czas podróży
+                        <x-tooltip title="Całkowity szacowany czas podróży od bazy przez wszystkie przystanki do miejsca docelowego.">
+                            <i class="bi bi-clock text-info fs-6"></i>
+                        </x-tooltip>
+                    </h6>
+                    <p class="fw-semibold fs-5">{{ $departure->getFormattedDuration() }}</p>
+                </div>
+            </div>
+
+            @php
+                $waypointAccommodations = $departure->getWaypointAccommodations();
+            @endphp
+
+            @if($waypointAccommodations->isNotEmpty())
+                <div class="border-top pt-4">
+                    <h5 class="fw-bold text-dark mb-4 d-flex align-items-center gap-2">
+                        <i class="bi bi-signpost-split text-primary"></i>
+                        Przystanki w kolejności
+                        <x-tooltip title="Lista przystanków (akomodacji) w kolejności, w jakiej pojazd będzie je odwiedzał podczas wyjazdu.">
+                            <i class="bi bi-info-circle text-muted fs-6"></i>
+                        </x-tooltip>
+                    </h5>
+                    @foreach($waypointAccommodations as $index => $accommodation)
+                        @php
+                            $hasCoords = $accommodation->hasCoordinates();
+                            // Get employees assigned to this accommodation for this departure
+                            $accommodationEmployees = $departure->accommodationAssignments
+                                ->where('accommodation_id', $accommodation->id)
+                                ->map(fn($assignment) => $assignment->employee)
+                                ->filter();
+                        @endphp
+                        <div class="waypoint-item mb-2 p-3 border rounded {{ !$hasCoords ? 'border-danger' : '' }}"
+                             style="background: var(--bg-card);">
+                            <div class="d-flex align-items-start gap-2">
+                                <!-- Order number -->
+                                <div class="waypoint-number bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                                     style="width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0;">
+                                    {{ $index + 1 }}
+                                </div>
+
+                                <!-- Content -->
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="fw-semibold">
+                                            <a href="{{ route('accommodations.show', $accommodation) }}" class="text-decoration-none">
+                                                {{ $accommodation->name }}
+                                            </a>
+                                        </div>
+                                        @if($hasCoords)
+                                            <i class="bi bi-geo-alt-fill text-success" title="Ma współrzędne"></i>
+                                        @else
+                                            <i class="bi bi-geo-alt text-danger" title="Brak współrzędnych"></i>
+                                        @endif
+                                    </div>
+                                    <div class="small text-muted">
+                                        {{ $accommodation->address }}
+                                        @if(!empty($accommodation->city))
+                                            , {{ $accommodation->city }}
+                                        @endif
+                                    </div>
+                                    @if(!$hasCoords)
+                                        <div class="small text-danger mt-1">
+                                            <i class="bi bi-exclamation-triangle"></i> Brak współrzędnych - edytuj akomodację i użyj wyszukiwania miejsca
+                                        </div>
+                                    @endif
+                                    @if($accommodationEmployees->isNotEmpty())
+                                        <div class="small mt-1">
+                                            <span class="text-muted">miejsce docelowe dla:</span>
+                                            <span class="fw-semibold">
+                                                {{ $accommodationEmployees->pluck('full_name')->join(', ') }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </x-ui.card>
+    @endif
+
     <!-- Komentarze -->
     <x-comments 
         :commentable="$departure" 

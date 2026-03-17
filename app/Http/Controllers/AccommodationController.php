@@ -43,6 +43,10 @@ class AccommodationController extends Controller
             $validated['lease_end_date'] = null;
         }
         
+        // Normalize coordinates - convert empty strings to null
+        $validated['latitude'] = !empty($validated['latitude']) ? (float)$validated['latitude'] : null;
+        $validated['longitude'] = !empty($validated['longitude']) ? (float)$validated['longitude'] : null;
+        
         Accommodation::create($validated);
         
         return redirect()->route('accommodations.index')->with('success', 'Akomodacja została dodana.');
@@ -82,6 +86,10 @@ class AccommodationController extends Controller
             $validated['lease_start_date'] = null;
             $validated['lease_end_date'] = null;
         }
+        
+        // Normalize coordinates - convert empty strings to null
+        $validated['latitude'] = !empty($validated['latitude']) ? (float)$validated['latitude'] : null;
+        $validated['longitude'] = !empty($validated['longitude']) ? (float)$validated['longitude'] : null;
         
         $accommodation->update($validated);
         
