@@ -25,6 +25,8 @@ class UpdateAccommodationRequest extends FormRequest
             'lease_start_date' => ['nullable', 'date', 'required_if:type,wynajmowany'],
             'lease_end_date' => ['nullable', 'date', 'required_if:type,wynajmowany', 'after_or_equal:lease_start_date'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
         ];
     }
 }

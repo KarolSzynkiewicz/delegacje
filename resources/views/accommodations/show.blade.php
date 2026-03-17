@@ -23,65 +23,65 @@
         </x-ui.page-header>
     </x-slot>
 
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <x-ui.card label="Szczegóły Mieszkania">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <x-ui.card label="Informacje podstawowe">
                 @if($accommodation->image_path)
                     <div class="mb-4 text-center">
                         <img src="{{ $accommodation->image_url }}" alt="{{ $accommodation->name }}" class="img-fluid rounded">
                     </div>
                 @endif
 
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h5>Nazwa</h5>
-                        <p>{{ $accommodation->name }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h5>Pojemność</h5>
-                        <p>{{ $accommodation->capacity }} osób</p>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h5>Adres</h5>
-                        <p>{{ $accommodation->address }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h5>Miasto</h5>
-                        <p>{{ $accommodation->city ?? '-' }}</p>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h5>Kod Pocztowy</h5>
-                        <p>{{ $accommodation->postal_code ?? '-' }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h5>Kraj</h5>
-                        <p>
-                            @if($accommodation->country)
-                                {{ $accommodation->country->labelWithFlag() }}
-                            @else
-                                -
-                            @endif
-                        </p>
-                    </div>
-                </div>
-
-                @if ($accommodation->description)
-                    <div class="mb-3">
-                        <h5>Opis</h5>
-                        <p>{{ $accommodation->description }}</p>
-                    </div>
-                @endif
-
-                <div class="d-flex gap-2 mt-4 pt-3 border-top">
-                    <x-ui.button variant="primary" href="{{ route('accommodations.edit', $accommodation) }}">Edytuj</x-ui.button>
-                    <x-ui.button variant="ghost" href="{{ route('accommodations.index') }}">Wróć do Listy</x-ui.button>
-                </div>
+                <x-ui.detail-list>
+                    <x-ui.detail-item label="Nazwa">{{ $accommodation->name }}</x-ui.detail-item>
+                    <x-ui.detail-item label="Adres">{{ $accommodation->address }}</x-ui.detail-item>
+                    @if($accommodation->city)
+                    <x-ui.detail-item label="Miasto">{{ $accommodation->city }}</x-ui.detail-item>
+                    @endif
+                    @if($accommodation->postal_code)
+                    <x-ui.detail-item label="Kod pocztowy">{{ $accommodation->postal_code }}</x-ui.detail-item>
+                    @endif
+                    @if($accommodation->country)
+                    <x-ui.detail-item label="Kraj">{{ $accommodation->country->labelWithFlag() }}</x-ui.detail-item>
+                    @endif
+                    @if($accommodation->hasCoordinates())
+                    <x-ui.detail-item label="Współrzędne geograficzne">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span>
+                                <i class="bi bi-geo-alt-fill text-success"></i>
+                                {{ number_format((float)$accommodation->latitude, 8) }}, {{ number_format((float)$accommodation->longitude, 8) }}
+                            </span>
+                            <a 
+                                href="https://www.openstreetmap.org/?mlat={{ floatval($accommodation->latitude) }}&mlon={{ floatval($accommodation->longitude) }}&zoom=15" 
+                                target="_blank"
+                                class="btn btn-sm btn-outline-secondary"
+                                title="Otwórz na mapie"
+                            >
+                                <i class="bi bi-map"></i> Otwórz na mapie
+                            </a>
+                        </div>
+                    </x-ui.detail-item>
+                    @endif
+                    <x-ui.detail-item label="Pojemność">{{ $accommodation->capacity }} osób</x-ui.detail-item>
+                    <x-ui.detail-item label="Typ">
+                        @if($accommodation->type === 'własny')
+                            <x-ui.badge variant="success">Własny</x-ui.badge>
+                        @else
+                            <x-ui.badge variant="info">Wynajmowany</x-ui.badge>
+                        @endif
+                    </x-ui.detail-item>
+                    @if($accommodation->type === 'wynajmowany')
+                        @if($accommodation->lease_start_date)
+                        <x-ui.detail-item label="Okres najmu - od">{{ $accommodation->lease_start_date->format('d.m.Y') }}</x-ui.detail-item>
+                        @endif
+                        @if($accommodation->lease_end_date)
+                        <x-ui.detail-item label="Okres najmu - do">{{ $accommodation->lease_end_date->format('d.m.Y') }}</x-ui.detail-item>
+                        @endif
+                    @endif
+                    @if($accommodation->description)
+                    <x-ui.detail-item label="Opis" fullWidth>{{ $accommodation->description }}</x-ui.detail-item>
+                    @endif
+                </x-ui.detail-list>
             </x-ui.card>
 
             <x-ui.card label="Przypisania do mieszkania" class="mt-4">

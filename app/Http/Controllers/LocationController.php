@@ -36,6 +36,16 @@ class LocationController extends Controller
         $validated = $request->validated();
         $isBase = $request->has('is_base') && $request->input('is_base') == '1';
         
+        // Sprawdź czy już istnieje baza (przed utworzeniem nowej)
+        $hadExistingBase = false;
+        if ($isBase) {
+            $hadExistingBase = Location::where('is_base', true)->exists();
+        }
+        
+        // Normalize coordinates - convert empty strings to null
+        $latitude = !empty($validated['latitude']) ? (float)$validated['latitude'] : null;
+        $longitude = !empty($validated['longitude']) ? (float)$validated['longitude'] : null;
+        
         app(\App\Services\LocationService::class)->createLocation(
             $validated['name'],
             $validated['address'],
@@ -45,10 +55,17 @@ class LocationController extends Controller
             $validated['phone'] ?? null,
             $validated['email'] ?? null,
             $validated['description'] ?? null,
-            $isBase
+            $isBase,
+            $latitude,
+            $longitude
         );
 
-        return redirect()->route('locations.index')->with('success', 'Lokalizacja została dodana.');
+        $message = 'Lokalizacja została dodana.';
+        if ($isBase && $hadExistingBase) {
+            $message .= ' Poprzednia baza została automatycznie odznaczona.';
+        }
+
+        return redirect()->route('locations.index')->with('success', $message);
     }
 
     /**
@@ -77,6 +94,31 @@ class LocationController extends Controller
         $validated = $request->validated();
         $isBase = $request->has('is_base') && $request->input('is_base') == '1';
         
+        // Sprawdź czy już istnieje inna baza (przed aktualizacją)
+        $hadOtherBase = false;
+        if ($isBase && !$location->is_base) {
+            $hadOtherBase = Location::where('is_base', true)
+                ->where('id', '!=', $location->id)
+                ->exists();
+        }
+        
+        // Normalize coordinates - convert empty strings to null
+        // Check both validated array and raw request input
+        $latitude = null;
+        $longitude = null;
+        
+        if (isset($validated['latitude']) && $validated['latitude'] !== '' && $validated['latitude'] !== null) {
+            $latitude = (float)$validated['latitude'];
+        } elseif ($request->has('latitude') && $request->input('latitude') !== '' && $request->input('latitude') !== null) {
+            $latitude = (float)$request->input('latitude');
+        }
+        
+        if (isset($validated['longitude']) && $validated['longitude'] !== '' && $validated['longitude'] !== null) {
+            $longitude = (float)$validated['longitude'];
+        } elseif ($request->has('longitude') && $request->input('longitude') !== '' && $request->input('longitude') !== null) {
+            $longitude = (float)$request->input('longitude');
+        }
+        
         app(\App\Services\LocationService::class)->updateLocation(
             $location,
             $validated['name'],
@@ -87,10 +129,17 @@ class LocationController extends Controller
             $validated['phone'] ?? null,
             $validated['email'] ?? null,
             $validated['description'] ?? null,
-            $isBase
+            $isBase,
+            $latitude,
+            $longitude
         );
 
-        return redirect()->route('locations.index')->with('success', 'Lokalizacja została zaktualizowana.');
+        $message = 'Lokalizacja została zaktualizowana.';
+        if ($isBase && $hadOtherBase) {
+            $message .= ' Poprzednia baza została automatycznie odznaczona.';
+        }
+
+        return redirect()->route('locations.index')->with('success', $message);
     }
 
     /**

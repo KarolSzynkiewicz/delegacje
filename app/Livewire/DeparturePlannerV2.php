@@ -21,6 +21,7 @@ class DeparturePlannerV2 extends Component
     public $vehicleSeats = []; // [seat_index => ['employee_id' => ..., 'position' => 'driver'|'passenger']]
     public $accommodationAssignments = []; // [employee_id => ['accommodation_id' => ..., 'start_date' => ..., 'end_date' => ...]]
     public $vehicleAssignments = []; // [employee_id => ['vehicle_id' => ..., 'position' => ..., 'start_date' => ..., 'end_date' => ...]]
+    public $routeData = null; // Route planning data
     
     // Listenery na eventy z podkomponentów
     protected $listeners = [
@@ -42,6 +43,9 @@ class DeparturePlannerV2 extends Component
         // Navigation
         'go-to-step' => 'goToStep',
         'save-departure' => 'saveDeparture',
+        
+        // Step 4 - Route Planning
+        'route-planned' => 'handleRoutePlanned',
     ];
 
     public function mount($departureDate = null, $endDate = null, $vehicleId = null)
@@ -336,6 +340,16 @@ class DeparturePlannerV2 extends Component
         $this->currentStep = $step;
     }
     
+    public function handleRoutePlanned($data)
+    {
+        // Store complete route data including waypoint order, distance, and duration
+        $this->routeData = [
+            'route_distance' => $data['route_distance'] ?? null,
+            'route_duration' => $data['route_duration'] ?? null,
+            'route_waypoints' => $data['route_waypoints'] ?? [], // Order of accommodation IDs
+        ];
+    }
+    
     public function saveDeparture()
     {
         // Walidacja przed zapisem
@@ -344,17 +358,23 @@ class DeparturePlannerV2 extends Component
             return;
         }
 
-        // Przekieruj do kontrolera, który zapisze dane
-        return redirect()->route('departures.store-v2', [
-            'departure_date' => $this->departureDate,
-            'end_date' => $this->endDate,
-            'vehicle_id' => $this->vehicleId,
-            'assignments' => $this->assignments,
-            'assignment_ranges' => $this->assignmentRanges,
-            'vehicle_seats' => $this->vehicleSeats,
-            'accommodation_assignments' => $this->accommodationAssignments,
-            'vehicle_assignments' => $this->vehicleAssignments,
+        // Zapisz dane w sesji (route_data może być duże, więc lepiej przez sesję)
+        session([
+            'departure_v2_data' => [
+                'departure_date' => $this->departureDate,
+                'end_date' => $this->endDate,
+                'vehicle_id' => $this->vehicleId,
+                'assignments' => $this->assignments,
+                'assignment_ranges' => $this->assignmentRanges,
+                'vehicle_seats' => $this->vehicleSeats,
+                'accommodation_assignments' => $this->accommodationAssignments,
+                'vehicle_assignments' => $this->vehicleAssignments,
+                'route_data' => $this->routeData, // Contains: route_distance, route_duration, route_waypoints
+            ]
         ]);
+
+        // Przekieruj do kontrolera, który zapisze dane
+        return redirect()->route('departures.store-v2');
     }
 
     /**

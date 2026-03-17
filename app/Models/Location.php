@@ -26,11 +26,15 @@ class Location extends Model
         'email',
         'description',
         'is_base',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
         'is_base' => 'boolean',
         'country' => \App\Enums\EuropeanCountry::class,
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
     ];
 
     /**
@@ -62,5 +66,43 @@ class Location extends Model
     public function scopeBase($query)
     {
         return $query->where('is_base', true);
+    }
+
+    /**
+     * Check if location has coordinates.
+     */
+    public function hasCoordinates(): bool
+    {
+        return !is_null($this->latitude) && !is_null($this->longitude);
+    }
+
+    /**
+     * Get coordinates as array [lat, lng].
+     */
+    public function getCoordinates(): ?array
+    {
+        if (!$this->hasCoordinates()) {
+            return null;
+        }
+
+        return [
+            (float) $this->latitude,
+            (float) $this->longitude,
+        ];
+    }
+
+    /**
+     * Get full address string for geocoding.
+     */
+    public function getFullAddress(): string
+    {
+        $parts = array_filter([
+            $this->address,
+            $this->city,
+            $this->postal_code,
+            $this->country?->value ?? null,
+        ]);
+
+        return implode(', ', $parts);
     }
 }

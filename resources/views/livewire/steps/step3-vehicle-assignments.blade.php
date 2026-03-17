@@ -258,16 +258,9 @@
                 </x-ui.button>
                 <x-ui.button 
                     variant="primary" 
-                    wire:click="saveDeparture"
-                    wire:loading.attr="disabled"
+                    wire:click="$dispatch('go-to-step', { step: 4 })"
                 >
-                    <span wire:loading.remove wire:target="saveDeparture">
-                        Zapisz wyjazd
-                    </span>
-                    <span wire:loading wire:target="saveDeparture">
-                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        Przetwarzanie...
-                    </span>
+                    Przejdź do następnej karty →
                 </x-ui.button>
             </div>
         </div>

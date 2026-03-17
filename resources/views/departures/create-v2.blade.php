@@ -34,6 +34,16 @@
             </x-ui.alert>
         @endif
 
+        @if($errors->any())
+            <x-ui.alert variant="danger" title="Błąd walidacji" dismissible class="mb-3">
+                <ul class="mb-0 ps-3">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+        @endif
+
         <livewire:departure-planner-v2 
             :departureDate="old('departure_date', date('Y-m-d'))"
             :endDate="old('end_date')"

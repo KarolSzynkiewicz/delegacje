@@ -587,8 +587,14 @@ class DepartureController extends Controller
      */
     public function storeV2(Request $request): RedirectResponse
     {
-        // Validate and get data from request (from Livewire component)
-        $validated = $request->validate([
+        // Get data from session (set by Livewire component) or from request (fallback)
+        $sessionData = session('departure_v2_data', []);
+        
+        // Merge session data with request data (request takes precedence)
+        $data = array_merge($sessionData, $request->all());
+        
+        // Validate data
+        $validator = validator($data, [
             'departure_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:departure_date',
             'vehicle_id' => 'nullable|exists:vehicles,id',
@@ -597,7 +603,23 @@ class DepartureController extends Controller
             'vehicle_seats' => 'nullable|array',
             'accommodation_assignments' => 'nullable|array',
             'vehicle_assignments' => 'nullable|array',
+            'route_data' => 'nullable|array',
+            'route_data.route_distance' => 'nullable|numeric|min:0',
+            'route_data.route_duration' => 'nullable|numeric|min:0', // float from OpenRouteService
+            'route_data.route_waypoints' => 'nullable|array',
         ]);
+
+        if ($validator->fails()) {
+            $errorMessages = collect($validator->errors()->all())->implode(' | ');
+            return redirect()
+                ->route('departures.create-v2')
+                ->with('error', 'Błąd walidacji danych wyjazdu: ' . $errorMessages);
+        }
+
+        $validated = $validator->validated();
+
+        // Clear session data after reading
+        session()->forget('departure_v2_data');
         
         // Transform assignments from nested structure to flat array (if needed)
         $assignmentsData = $validated['assignments'] ?? [];
@@ -660,12 +682,12 @@ class DepartureController extends Controller
         // Validate assignment ranges separately
         if (!empty($assignmentRanges)) {
             foreach ($assignmentRanges as $key => $range) {
-                if (empty($range['employee_id']) || empty($range['project_id']) || empty($range['role_id']) || empty($range['start_date']) || empty($range['end_date'])) {
+                if (empty($range['employee_id']) || empty($range['project_id']) || empty($range['role_id']) || empty($range['start_date'])) {
                     continue; // Skip invalid ranges
                 }
                 
                 $startDate = Carbon::parse($range['start_date']);
-                $endDate = Carbon::parse($range['end_date']);
+                $endDate = !empty($range['end_date']) ? Carbon::parse($range['end_date']) : $startDate;
                 
                 if ($endDate->lt($startDate)) {
                     return redirect()
@@ -674,6 +696,13 @@ class DepartureController extends Controller
                         ->with('error', "Nieprawidłowy zakres dat dla przypisania: {$range['start_date']} - {$range['end_date']}");
                 }
             }
+        }
+        
+        // Validate that we have at least some assignments (either flat or ranges)
+        if (empty($flatAssignments) && empty($assignmentRanges)) {
+            return redirect()
+                ->route('departures.create-v2')
+                ->with('error', 'Musisz przypisać przynajmniej jednego pracownika do projektu.');
         }
 
         DB::beginTransaction();
@@ -711,6 +740,29 @@ class DepartureController extends Controller
             $destinationLocationId = $locationIds->first();
             $baseLocation = Location::getBase();
 
+            if (!$baseLocation) {
+                DB::rollBack();
+                return redirect()
+                    ->route('departures.create-v2')
+                    ->with('error', 'Brak skonfigurowanej lokalizacji bazy. Przejdź do Lokalizacje i oznacz jedną jako bazę (is_base = true).');
+            }
+
+            // Prepare route data if available
+            $routeData = $validated['route_data'] ?? null;
+            $routeWaypointAccommodationIds = null;
+            
+            if ($routeData && !empty($routeData['route_waypoints'])) {
+                // Ensure route_waypoints is an array (should be already, but double-check)
+                $waypoints = $routeData['route_waypoints'];
+                if (is_string($waypoints)) {
+                    $waypoints = json_decode($waypoints, true);
+                }
+                if (is_array($waypoints)) {
+                    // Filter out any null/empty values and ensure all are integers
+                    $routeWaypointAccommodationIds = array_filter(array_map('intval', $waypoints));
+                }
+            }
+
             // Create departure
             $departure = LogisticsEvent::create([
                 'type' => LogisticsEventType::DEPARTURE,
@@ -723,6 +775,10 @@ class DepartureController extends Controller
                 'notes' => null,
                 'has_transport' => !empty($validated['vehicle_id']),
                 'created_by' => auth()->id() ?? 1,
+                // Route data
+                'route_distance' => $routeData['route_distance'] ?? null,
+                'route_duration' => isset($routeData['route_duration']) ? (int) $routeData['route_duration'] : null,
+                'route_waypoints' => !empty($routeWaypointAccommodationIds) ? $routeWaypointAccommodationIds : null,
             ]);
 
             // Get unique employee IDs from both assignments and ranges
@@ -834,17 +890,52 @@ class DepartureController extends Controller
             return redirect()
                 ->route('departures.index')
                 ->with('success', 'Wyjazd został utworzony pomyślnie!');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors($e->errors())
+                ->with('error', 'Błąd walidacji danych. Sprawdź wprowadzone dane.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            DB::rollBack();
+            Log::error('Database error creating V2 departure: ' . $e->getMessage(), [
+                'exception' => $e,
+                'request' => $validated,
+            ]);
+            
+            // Provide user-friendly error message for common database errors
+            $errorMessage = 'Wystąpił błąd podczas zapisywania danych do bazy.';
+            if (str_contains($e->getMessage(), 'Invalid JSON')) {
+                $errorMessage = 'Błąd zapisu danych trasy. Sprawdź czy wszystkie przystanki mają poprawne współrzędne.';
+            } elseif (str_contains($e->getMessage(), 'foreign key constraint')) {
+                $errorMessage = 'Błąd zapisu: Niektóre z wybranych danych nie istnieją w systemie. Odśwież stronę i spróbuj ponownie.';
+            } elseif (str_contains($e->getMessage(), 'Integrity constraint violation')) {
+                $errorMessage = 'Błąd zapisu: Niektóre dane są nieprawidłowe lub już istnieją w systemie.';
+            }
+            
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', $errorMessage);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error creating V2 departure: ' . $e->getMessage(), [
                 'exception' => $e,
                 'request' => $validated,
+                'trace' => $e->getTraceAsString(),
             ]);
 
+            // Provide user-friendly error message
+            $errorMessage = 'Wystąpił nieoczekiwany błąd podczas tworzenia wyjazdu.';
+            if (str_contains($e->getMessage(), 'OpenRouteService')) {
+                $errorMessage = 'Błąd podczas planowania trasy. Sprawdź czy wszystkie przystanki mają poprawne współrzędne i spróbuj ponownie.';
+            }
+            
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Wystąpił błąd podczas tworzenia wyjazdu: ' . $e->getMessage());
+                ->with('error', $errorMessage);
         }
     }
 

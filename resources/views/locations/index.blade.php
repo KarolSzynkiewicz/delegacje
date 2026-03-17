@@ -30,6 +30,7 @@
                             <th>Adres</th>
                             <th>Miasto</th>
                             <th>Kraj</th>
+                            <th>Współrzędne</th>
                             <th>Baza</th>
                             <th>Kontakt</th>
                             <th>Akcje</th>
@@ -42,6 +43,41 @@
                                 <td>{{ $location->address }}</td>
                                 <td>{{ $location->city ?? '-' }}</td>
                                 <td>{{ $location->country ? $location->country->labelWithFlag() : '-' }}</td>
+                                <td>
+                                    @if($location->hasCoordinates())
+                                        <div>
+                                            <a 
+                                                href="https://www.openstreetmap.org/?mlat={{ $location->latitude }}&mlon={{ $location->longitude }}&zoom=15" 
+                                                target="_blank"
+                                                class="text-decoration-none d-inline-flex align-items-center gap-1"
+                                                title="Otwórz na mapie"
+                                                style="color: var(--success); cursor: pointer;"
+                                                onmouseover="this.style.opacity='0.8';"
+                                                onmouseout="this.style.opacity='1';"
+                                            >
+                                                <i class="bi bi-geo-alt-fill"></i>
+                                                <small>
+                                                    {{ number_format((float)$location->latitude, 6) }}, {{ number_format((float)$location->longitude, 6) }}
+                                                </small>
+                                            </a>
+                                        </div>
+                                        <div class="mt-1">
+                                            <a 
+                                                href="https://www.openstreetmap.org/?mlat={{ $location->latitude }}&mlon={{ $location->longitude }}&zoom=15" 
+                                                target="_blank"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                                                title="Otwórz na mapie"
+                                            >
+                                                <i class="bi bi-map"></i> Mapa
+                                            </a>
+                                        </div>
+                                    @else
+                                        <small class="text-muted">
+                                            <i class="bi bi-geo-alt"></i> Brak
+                                        </small>
+                                    @endif
+                                </td>
                                 <td>
                                     @if($location->is_base)
                                         <x-ui.badge variant="success">Baza</x-ui.badge>
