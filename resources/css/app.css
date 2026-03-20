@@ -1,6 +1,7 @@
 /* Import Bootstrap jako bazę */
 @import 'bootstrap/dist/css/bootstrap.css';
 @import 'bootstrap-icons/font/bootstrap-icons.css';
+@import url('https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&display=swap');
 
 /* Custom styles for the application */
 /* IMPORTANT: Override Bootstrap defaults to use UI system */
@@ -1509,7 +1510,7 @@ body.min-vh-100 {
 
 /* Logo w navbarze */
 .navbar-logo {
-    height: 2rem;
+    height: 5rem; /* x2 względem poprzedniego rozmiaru */
     width: auto;
 }
 

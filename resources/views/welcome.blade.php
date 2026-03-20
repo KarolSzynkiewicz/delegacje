@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Stocznia - Inteligentny System Zarządzania Projektami i Logistyką</title>
+    <title>MK TECHNIC - Inteligentny System Zarządzania Projektami i Logistyką</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -63,6 +63,20 @@
             margin-bottom: 1.5rem;
             text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
             line-height: 1.2;
+        }
+
+        .brand-gradient-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'Albert Sans', sans-serif;
+            font-weight: 800;
+        }
+
+        .hero-title sup {
+            font-size: 0.35em;
+            top: -0.4em;
         }
 
         .hero-subtitle {
@@ -481,10 +495,11 @@
     <section class="hero-section">
         <div class="container">
             <div class="hero-content">
-                <div class="hero-logo">
-                    <x-application-logo class="d-block" style="width: 100%; height: 100%;" />
-                </div>
-                <h1 class="hero-title">Stocznia</h1>
+                <h1 class="hero-title">
+                    <span class="brand-gradient-text">
+                        MK TECHNIC<sup>®</sup>
+                    </span>
+                </h1>
                 <p class="hero-subtitle">Inteligentny System Zarządzania Projektami i Logistyką</p>
                 <p class="hero-description">
                     Eliminuj chaos w planowaniu. Automatyzuj przypisania. Kontroluj dokumentację. 
@@ -755,7 +770,7 @@
         <!-- Comparison Section -->
         <section class="comparison-section">
             <div class="container">
-                <h2 class="section-title">Stocznia vs Tradycyjne metody</h2>
+                <h2 class="section-title">MK TECHNIC<sup>®</sup> vs Tradycyjne metody</h2>
                 <p class="section-subtitle">Porównaj nasz system z kanbanami, tablicami i Excelami</p>
                 
                 <div class="row g-4 mb-5">
@@ -807,7 +822,7 @@
                             <div class="comparison-icon our-system">
                                 <i class="bi bi-rocket-takeoff-fill"></i>
                             </div>
-                            <h4 class="comparison-title">System Stocznia</h4>
+                            <h4 class="comparison-title">System MK TECHNIC<sup>®</sup></h4>
                             <ul class="comparison-list our-system">
                                 <li>
                                     <i class="bi bi-check-circle-fill"></i>

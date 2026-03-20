@@ -4,7 +4,7 @@
             <div class="row gx-lg-5 align-items-center">
                 <div class="col-lg-6 mb-5 mb-lg-0" style="z-index: 10">
                     <h1 class="my-5 display-5 fw-bold ls-tight">
-                        Stocznia <br />
+                        <span class="text-white">MK TECHNIC<sup>®</sup></span> <br />
                         <span class="text-primary">System Zarządzania</span>
                     </h1>
                     <p class="mb-4 opacity-75 text-muted">
