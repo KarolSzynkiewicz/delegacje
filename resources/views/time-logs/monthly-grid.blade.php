@@ -3,11 +3,13 @@
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
             @php
                 $monthlyGridRoute = isset($isMineRoute) && $isMineRoute ? 'mine.time-logs.monthly-grid' : 'time-logs.monthly-grid';
+                $selectedProjectParam = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
+                $selectedUserParam = isset($userPage) && $userPage ? ['user_page' => $userPage] : [];
             @endphp
             
             @if(!($isMineRoute ?? false))
                 <!-- Przycisk poprzedni miesiąc -->
-                <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, ['month' => $prevMonth]) }}" class="btn-sm">
+                <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, array_merge(['month' => $prevMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm">
                     <i class="bi bi-chevron-left"></i>
                     <span>Poprzedni miesiąc</span>
                 </x-ui.button>
@@ -19,7 +21,7 @@
 
             @if(!($isMineRoute ?? false))
                 <!-- Przycisk następny miesiąc -->
-                <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, ['month' => $nextMonth]) }}" class="btn-sm">
+                <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, array_merge(['month' => $nextMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm">
                     <span>Następny miesiąc</span>
                     <i class="bi bi-chevron-right"></i>
                 </x-ui.button>
@@ -29,6 +31,97 @@
 
     <div class="py-4">
         <div class="container-xxl">
+                <!-- Wybór projektu -->
+                @php
+                    $selectedProjectParamBody = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
+                    $selectedUserParamBody = isset($userPage) && $userPage ? ['user_page' => $userPage] : [];
+                @endphp
+
+                @if(isset($availableProjects) && $availableProjects && count($availableProjects) > 0)
+                    <div class="mb-4 d-flex justify-content-end gap-3 align-items-center flex-wrap">
+                        <div class="text-end">
+                            <div class="small text-muted mb-1">Projekt</div>
+                            <div class="fw-semibold">
+                                @if($selectedProjectId)
+                                    Wybór: {{ $availableProjects->firstWhere('id', $selectedProjectId)->name ?? '-' }}
+                                @else
+                                    Wybór: -
+                                @endif
+                            </div>
+                        </div>
+                        <select
+                            class="form-select form-select"
+                            style="min-width: 280px;"
+                            onchange="if(this.value) { window.location.href = this.value; }"
+                        >
+                            @foreach($availableProjects as $project)
+                                @php
+                                    $href = route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m'), 'project_id' => $project->id], $selectedUserParamBody));
+                                @endphp
+                                <option
+                                    value="{{ $href }}"
+                                    {{ ($selectedProjectId ?? null) === $project->id ? 'selected' : '' }}
+                                >
+                                    {{ $project->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                <!-- Paginacja: 10 userów na stronę -->
+                @php
+                    $userPerPage = isset($userPerPage) ? (int) $userPerPage : 10;
+                    $userPage = isset($userPage) ? (int) $userPage : 1;
+                    if ($userPerPage < 1) $userPerPage = 10;
+                    if ($userPage < 1) $userPage = 1;
+                    $userOffset = ($userPage - 1) * $userPerPage;
+
+                    $totalUsersForPagination = 0;
+                    if (!empty($projectsData) && isset($projectsData[0]['assignments'])) {
+                        $totalUsersForPagination = count($projectsData[0]['assignments']);
+                    }
+                    $totalUserPages = $userPerPage > 0 ? (int) ceil($totalUsersForPagination / $userPerPage) : 1;
+                    if ($totalUserPages < 1) $totalUserPages = 1;
+                @endphp
+
+                @if(!empty($projectsData) && $totalUsersForPagination > 0 && $totalUserPages > 1)
+                    <div class="mb-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                        <div class="small text-muted">
+                            Strona <span class="fw-semibold">{{ $userPage }}</span> z <span class="fw-semibold">{{ $totalUserPages }}</span> (użytkownicy {{ $userOffset + 1 }}–{{ min($userOffset + $userPerPage, $totalUsersForPagination) }})
+                        </div>
+                        <div class="d-flex gap-2">
+                            @if($userPage > 1)
+                                <x-ui.button
+                                    variant="ghost"
+                                    class="btn-sm"
+                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => max(1, $userPage - 1)])) }}"
+                                >
+                                    <i class="bi bi-chevron-left"></i> Poprzedni
+                                </x-ui.button>
+                            @else
+                                <x-ui.button variant="ghost" class="btn-sm" disabled>
+                                    <i class="bi bi-chevron-left"></i> Poprzedni
+                                </x-ui.button>
+                            @endif
+
+                            @if($userPage < $totalUserPages)
+                                <x-ui.button
+                                    variant="primary"
+                                    class="btn-sm"
+                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => min($totalUserPages, $userPage + 1)])) }}"
+                                >
+                                    Następny <i class="bi bi-chevron-right"></i>
+                                </x-ui.button>
+                            @else
+                                <x-ui.button variant="primary" class="btn-sm" disabled>
+                                    Następny <i class="bi bi-chevron-right"></i>
+                                </x-ui.button>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
             <!-- Informacje o miesiącu - pod headerem -->
             <div class="text-center mb-4">
                 <div class="fw-bold mb-1">
@@ -106,7 +199,8 @@
                             @forelse($projectsData as $projectData)
                                 @php
                                     $project = $projectData['project'];
-                                    $assignments = $projectData['assignments'];
+                                    $assignmentsAll = $projectData['assignments'];
+                                    $assignments = array_slice($assignmentsAll, $userOffset, $userPerPage);
                                 @endphp
                                 
                                 <!-- Nagłówek projektu -->
@@ -152,6 +246,21 @@
                                                 $isInAssignment = isset($daysInAssignment[$dayNumber]);
                                                 $timeLog = $timeLogs[$dayNumber] ?? null;
                                                 $hours = $timeLog['hours'] ?? '';
+
+                                                // UI: wyświetlaj godziny jako `H:MM` zamiast `5.75`.
+                                                // Wymuszamy skoki co 15 minut (zaokrąglenie do najbliższego kwadransa).
+                                                $hoursText = '';
+                                                if ($hours !== '' && $hours !== null) {
+                                                    $hoursFloat = is_numeric($hours) ? (float) $hours : (float) str_replace(',', '.', (string) $hours);
+                                                    $totalMinutes = (int) round($hoursFloat * 60);
+                                                    $roundedMinutes = (int) (round($totalMinutes / 15) * 15);
+                                                    if ($roundedMinutes < 0) {
+                                                        $roundedMinutes = 0;
+                                                    }
+                                                    $hPart = intdiv($roundedMinutes, 60);
+                                                    $mPart = $roundedMinutes % 60;
+                                                    $hoursText = $roundedMinutes === 0 ? '' : ($hPart . ':' . str_pad((string) $mPart, 2, '0', STR_PAD_LEFT));
+                                                }
                                                 
                                                 // Find assignment for this day
                                                 $assignmentId = null;
@@ -196,33 +305,22 @@
                                             @endphp
                                             <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }} {{ !$isInAssignment ? 'disabled-cell' : '' }}">
                                                 @if($isInAssignment && $assignmentId)
-                                                    {{-- Aktywne przypisanie - pole edytowalne --}}
-                                                    <input 
-                                                        type="hidden" 
-                                                        name="entries[{{ $assignmentId }}_{{ $date->format('Y-m-d') }}][assignment_id]" 
-                                                        value="{{ $assignmentId }}"
-                                                    >
-                                                    <input 
-                                                        type="hidden" 
-                                                        name="entries[{{ $assignmentId }}_{{ $date->format('Y-m-d') }}][date]" 
-                                                        value="{{ $date->format('Y-m-d') }}"
-                                                    >
-                                                    <input 
-                                                        type="number" 
-                                                        name="entries[{{ $assignmentId }}_{{ $date->format('Y-m-d') }}][hours]"
-                                                        class="form-control form-control-sm text-center time-input" 
-                                                        value="{{ $hours }}"
-                                                        min="0" 
-                                                        max="24" 
-                                                        step="0.5"
-                                                        placeholder="0"
+                                                    {{-- Aktywne przypisanie - pole edytowalne.
+                                                         Uwaga: trzymamy tylko 1 input na komórkę, żeby nie przekraczać `max_input_vars` na dużych siatkach. --}}
+                                                    <input
+                                                        type="text"
+                                                        name="entries[{{ $assignmentId }}][{{ $date->format('Y-m-d') }}]"
+                                                        class="form-control form-control-sm text-center time-input"
+                                                        value="{{ $hoursText }}"
+                                                        inputmode="numeric"
+                                                        placeholder=""
                                                     >
                                                 @elseif($hours && $timeLog && isset($timeLog['assignment_id']))
                                                     {{-- Godziny zaksiegowane, ale przypisanie usunięte - pole zablokowane z wartością --}}
                                                     <input 
-                                                        type="number" 
+                                                        type="text"
                                                         class="form-control form-control-sm text-center time-input disabled-input" 
-                                                        value="{{ $hours }}"
+                                                        value="{{ $hoursText }}"
                                                         readonly
                                                         tabindex="-1"
                                                         title="Przypisanie zostało usunięte, ale godziny są zaksiegowane"
@@ -230,7 +328,7 @@
                                                 @else
                                                     {{-- Brak przypisania i brak godzin - pole puste i zablokowane --}}
                                                     <input 
-                                                        type="number" 
+                                                        type="text"
                                                         class="form-control form-control-sm text-center time-input disabled-input" 
                                                         value=""
                                                         readonly

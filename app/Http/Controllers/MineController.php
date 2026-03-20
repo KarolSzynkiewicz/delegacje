@@ -229,6 +229,16 @@ class MineController extends Controller
         $projectIds = $user->getManagedProjectIds();
         
         $month = $request->query('month', Carbon::now()->format('Y-m'));
+        $projectId = $request->query('project_id');
+        $userPerPage = 10;
+        $userPage = (int) $request->query('user_page', 1);
+        if ($userPage < 1) {
+            $userPage = 1;
+        }
+
+        $currentDate = Carbon::parse($month . '-01');
+        $monthStart = $currentDate->copy()->startOfMonth();
+        $monthEnd = $currentDate->copy()->endOfMonth();
         
         if (empty($projectIds)) {
             // Brak projektów - pokaż pusty widok
@@ -259,12 +269,40 @@ class MineController extends Controller
                 'monthStart' => $monthStart,
                 'monthEnd' => $monthEnd,
                 'isMineRoute' => true,
+                'availableProjects' => collect(),
+                'selectedProjectId' => null,
+                'userPage' => $userPage,
+                'userPerPage' => $userPerPage,
             ]);
         }
-        
-        $month = $request->query('month', Carbon::now()->format('Y-m'));
-        $data = $this->timeLogService->getMonthlyGridData($month, $projectIds);
+
+        // Projekty kierownika, które mają aktywne przypisania w tym miesiącu.
+        $projectsForDropdown = Project::query()
+            ->whereIn('id', $projectIds)
+            ->whereHas('assignments', function ($q) use ($monthStart, $monthEnd) {
+                $q->where('start_date', '<=', $monthEnd)
+                    ->where(function ($q2) use ($monthStart) {
+                        $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $monthStart);
+                    });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $availableProjectIds = $projectsForDropdown->pluck('id')->values()->all();
+
+        // Domyśl: pierwszy projekt z listy (żeby nie generować siatki dla wszystkich).
+        if (!$projectId && !empty($availableProjectIds)) {
+            $projectId = $availableProjectIds[0];
+        }
+
+        $gridProjectIds = $projectId ? [(int) $projectId] : null;
+        $data = $this->timeLogService->getMonthlyGridData($month, $gridProjectIds);
         $data['isMineRoute'] = true; // Flag dla widoku, żeby linki prowadziły do /mine/*
+        $data['availableProjects'] = $projectsForDropdown;
+        $data['selectedProjectId'] = $projectId ? (int) $projectId : null;
+        $data['userPage'] = $userPage;
+        $data['userPerPage'] = $userPerPage;
         
         return view('time-logs.monthly-grid', $data);
     }

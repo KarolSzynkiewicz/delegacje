@@ -144,9 +144,48 @@ class TimeLogController extends Controller
     public function monthlyGrid(Request $request): View
     {
         $month = $request->query('month', Carbon::now()->format('Y-m'));
-        
-        // Pokaż wszystkie projekty - middleware już sprawdził uprawnienia
-        $data = $this->timeLogService->getMonthlyGridData($month, null);
+
+        $projectId = $request->query('project_id');
+        $userPerPage = 10;
+        $userPage = (int) $request->query('user_page', 1);
+        if ($userPage < 1) {
+            $userPage = 1;
+        }
+
+        $currentDate = Carbon::parse($month . '-01');
+        $monthStart = $currentDate->copy()->startOfMonth();
+        $monthEnd = $currentDate->copy()->endOfMonth();
+
+        // Projekty, które mają aktywne przypisania w tym miesiącu.
+        // Dzięki temu domyślnie nie ładujemy całej siatki (limit `max_input_vars`).
+        $projectsForDropdown = \App\Models\Project::query()
+            ->whereHas('assignments', function ($q) use ($monthStart, $monthEnd) {
+                $q->where('start_date', '<=', $monthEnd)
+                    ->where(function ($q2) use ($monthStart) {
+                        $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $monthStart);
+                    });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $availableProjectIds = $projectsForDropdown->pluck('id')->values()->all();
+
+        // Jeżeli użytkownik nie podał projektu w query, ustaw domyślnie pierwszy z listy.
+        if (!$projectId && !empty($availableProjectIds)) {
+            $projectId = $availableProjectIds[0];
+        }
+
+        // Jeżeli podano projekt, ale nie należy do listy z przypisaniami w tym miesiącu - pokaż pustą siatkę.
+        // (Zostawiamy UX: użytkownik nadal może wybrać dowolny projekt, nawet jeśli w danym miesiącu nie ma przypisań.)
+        $gridProjectIds = $projectId ? [(int) $projectId] : null;
+
+        $data = $this->timeLogService->getMonthlyGridData($month, $gridProjectIds);
+        $data['availableProjects'] = $projectsForDropdown;
+        $data['selectedProjectId'] = $projectId ? (int) $projectId : null;
+        $data['isMineRoute'] = false;
+        $data['userPage'] = $userPage;
+        $data['userPerPage'] = $userPerPage;
 
         return view('time-logs.monthly-grid', $data);
     }
@@ -159,13 +198,67 @@ class TimeLogController extends Controller
         // Convert form data to entries array format
         $entries = [];
         $formEntries = $request->input('entries', []);
-        
-        foreach ($formEntries as $entry) {
-            if (isset($entry['assignment_id']) && isset($entry['date'])) {
+
+        // Nowy format z `monthly-grid`:
+        // entries[assignment_id][date] = hours
+        // (cel: ograniczyć liczbę inputów w requestcie i nie przekraczać `max_input_vars`)
+        foreach ($formEntries as $assignmentId => $dates) {
+            if (!is_array($dates)) {
+                continue;
+            }
+
+            foreach ($dates as $date => $hours) {
+                // hours może przyjść jako:
+                // - numeric: 5.75
+                // - format UI: H:MM (np. 5:30)
+                $parsedHours = null;
+                $rawNotEmpty = !($hours === '' || $hours === null);
+
+                if ($rawNotEmpty) {
+                    $hoursStr = trim((string) $hours);
+                    $hoursStrNormalized = str_replace(',', '.', $hoursStr);
+
+                    // Obsłuż format `H:MM`
+                    if (str_contains($hoursStrNormalized, ':')) {
+                        [$hStr, $mStr] = array_pad(explode(':', $hoursStrNormalized, 2), 2, null);
+                        $hStr = $hStr !== null ? trim((string) $hStr) : null;
+                        $mStr = $mStr !== null ? trim((string) $mStr) : null;
+
+                        if ($hStr !== null && $mStr !== null && is_numeric($hStr) && is_numeric($mStr)) {
+                            $h = (int) $hStr;
+                            $m = (int) $mStr;
+
+                            $totalMinutes = $h * 60 + $m;
+                            if ($m < 0 || $m >= 60 || ($totalMinutes % 15) !== 0) {
+                                $parsedHours = 'invalid';
+                            } else {
+                                $parsedHours = $totalMinutes / 60;
+                            }
+                        } else {
+                            $parsedHours = 'invalid';
+                        }
+                    } else {
+                        // Obsłuż format liczbowy `5.75` (także z przecinkiem: `5,75`)
+                        if (is_numeric($hoursStrNormalized)) {
+                            $hoursFloat = (float) $hoursStrNormalized;
+                            $totalMinutes = (int) round($hoursFloat * 60);
+
+                            if (($totalMinutes % 15) !== 0) {
+                                $parsedHours = 'invalid';
+                            } else {
+                                $parsedHours = $totalMinutes / 60;
+                            }
+                        } else {
+                            $parsedHours = 'invalid';
+                        }
+                    }
+                }
+
                 $entries[] = [
-                    'assignment_id' => $entry['assignment_id'],
-                    'date' => $entry['date'],
-                    'hours' => $entry['hours'] ?? 0,
+                    'assignment_id' => (int) $assignmentId,
+                    'date' => $date,
+                    // '' => null (żeby przechodziło `nullable|numeric` w walidacji)
+                    'hours' => $parsedHours,
                 ];
             }
         }
@@ -178,6 +271,8 @@ class TimeLogController extends Controller
                 'entries.*.assignment_id' => 'required|integer|exists:project_assignments,id',
                 'entries.*.date' => 'required|date',
                 'entries.*.hours' => 'nullable|numeric|min:0|max:24',
+            ], [
+                'entries.*.hours.numeric' => 'Dozwolone są jedynie następujące części godzin: 15, 30 lub 45 minut (kroki co 15 minut).',
             ])->validate();
         } catch (\Illuminate\Validation\ValidationException $e) {
             if ($request->expectsJson()) {
