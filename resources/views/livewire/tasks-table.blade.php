@@ -127,6 +127,10 @@
                     };
                     $createdAt = \Carbon\Carbon::parse($task->created_at);
                     $updatedAt = \Carbon\Carbon::parse($task->updated_at);
+                    // Support both stored newlines and stored <br> tags (historical data)
+                    $taskDescriptionForDisplay = $task->description
+                        ? preg_replace('/<br\\s*\\/?\\s*>/i', "\n", (string) $task->description)
+                        : null;
                 @endphp
                 <div class="col-12" wire:key="task-{{ $task->id }}" id="task-{{ $task->id }}">
                     <div class="card">
@@ -138,7 +142,7 @@
                                     <a href="{{ route('tasks.show', $task) }}" class="text-decoration-none" style="display: block; cursor: pointer;">
                                         <x-ui.hero-card 
                                         title="{{ $task->name }}" 
-                                        subtitle="{{ Str::limit($task->description, 200) }}"
+                                        subtitle="{{ Str::limit($taskDescriptionForDisplay, 2000) }}"
                                         variant="gradient">
                                         
                                         </x-ui.hero-card>

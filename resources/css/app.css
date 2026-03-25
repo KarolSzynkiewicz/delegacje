@@ -2168,10 +2168,11 @@ html .text-muted,
     color: var(--text-muted);
     margin: 0;
     line-height: 1.6;
+    white-space: pre-line; /* render newlines as line breaks */
     overflow-wrap: anywhere; /* prevent long words from overflowing */
     word-break: break-word;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 5;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
