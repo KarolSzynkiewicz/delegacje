@@ -149,7 +149,7 @@ class ReturnTripPreparation
                 $this->conflicts->push(new ReturnTripConflict(
                     $assignment,
                     $this->returnVehicle,
-                    "Osoba {$assignment->employee->full_name} jest przypisana do auta powrotnego po dacie zjazdu. Przypisanie zostanie anulowane i osoba zostanie bez auta.",
+                    "Osoba {$assignment->employee->full_name} jest przypisana do auta powrotnego po dacie zjazdu. Przypisanie zostanie skrócone do daty zjazdu i od tej daty osoba będzie bez auta.",
                     false // Not blocking - can be accepted
                 ));
             }

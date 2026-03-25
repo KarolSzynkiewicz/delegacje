@@ -241,7 +241,7 @@
                                     $nonBlockingConflicts = $preparation->conflicts->where('isBlocking', false);
                                 @endphp
                                 @if($nonBlockingConflicts->isNotEmpty())
-                                    <li><strong>Przypisania do auta powrotnego dla osób NIE objętych zjazdem zostaną anulowane</strong> - te osoby zostaną bez auta</li>
+                                    <li><strong>Przypisania do auta powrotnego dla osób NIE objętych zjazdem zostaną skrócone do daty zjazdu</strong> - od tej daty te osoby zostaną bez auta</li>
                                 @else
                                     <li>Pojazd powrotny nie może mieć aktywnych przypisań po dacie zjazdu dla osób NIE objętych zjazdem</li>
                                 @endif
