@@ -105,7 +105,8 @@ class VehicleValidationService
         Vehicle $vehicle,
         Carbon $startDate,
         Carbon $endDate,
-        ?int $excludeEventId = null
+        ?int $excludeEventId = null,
+        bool $ignoreProjectAssignments = false
     ): array {
         $errors = [];
         $conflicts = [];
@@ -118,11 +119,15 @@ class VehicleValidationService
             $conflicts = array_merge($conflicts, $logisticsConflicts);
         }
 
-        // 2. Check vehicle not used in project assignments
-        $projectConflicts = $this->checkVehicleProjectAssignments($vehicle, null, $startDate, $endDate);
-        if (!empty($projectConflicts)) {
-            $errors[] = 'Pojazd jest przypisany do projektu w tym okresie.';
-            $conflicts = array_merge($conflicts, $projectConflicts);
+        // 2. Check vehicle not used in project assignments (optional)
+        // For some domain flows (e.g. Return Trip / Zjazd) a vehicle can be "in project"
+        // but still be allowed as long as it is not in another logistics trip.
+        if (!$ignoreProjectAssignments) {
+            $projectConflicts = $this->checkVehicleProjectAssignments($vehicle, null, $startDate, $endDate);
+            if (!empty($projectConflicts)) {
+                $errors[] = 'Pojazd jest przypisany do projektu w tym okresie.';
+                $conflicts = array_merge($conflicts, $projectConflicts);
+            }
         }
 
         return [
@@ -351,13 +356,15 @@ class VehicleValidationService
         Vehicle $vehicle,
         Carbon $startDate,
         Carbon $endDate,
-        ?int $excludeEventId = null
+        ?int $excludeEventId = null,
+        bool $ignoreProjectAssignments = false
     ): void {
         $result = $this->validateForLogisticsEvent(
             $vehicle,
             $startDate,
             $endDate,
-            $excludeEventId
+            $excludeEventId,
+            $ignoreProjectAssignments
         );
 
         if (!$result['valid']) {

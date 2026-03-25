@@ -88,13 +88,19 @@ class ReturnTripService
                     $returnVehicle,
                     $returnDate,
                     $effectiveEndDate,
-                    $excludeEventId
+                    $excludeEventId,
+                    true // ignore project assignments; block only if vehicle is in another logistics trip
                 );
             } catch (ValidationException $e) {
-                // Re-throw with more specific message for return trips
+                // Re-throw with more specific message for return trips (keep original cause if available)
+                $original = $e->errors()['vehicle_id'] ?? null;
+                $suffix = '';
+                if (is_array($original) && !empty($original)) {
+                    $suffix = ' (' . implode(' ', $original) . ')';
+                }
                 throw ValidationException::withMessages([
-                    'vehicle_id' => "Pojazd {$returnVehicle->registration_number} jest już zajęty w tym okresie ({$returnDate->format('d.m.Y')} - {$effectiveEndDate->format('d.m.Y')}). " . 
-                                   "Nie można utworzyć powrotu z tym pojazdem, ponieważ jest już używany w innym wyjeździe/zjeździe."
+                    'vehicle_id' => "Pojazd {$returnVehicle->registration_number} jest już zajęty w tym okresie ({$returnDate->format('d.m.Y')} - {$effectiveEndDate->format('d.m.Y')}). " .
+                        "Nie można utworzyć powrotu z tym pojazdem, ponieważ jest już używany w innym wyjeździe/zjeździe." . $suffix
                 ]);
             }
         }

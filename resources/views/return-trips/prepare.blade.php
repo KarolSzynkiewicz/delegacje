@@ -116,6 +116,65 @@
                         @endif
                     </div>
 
+                    <!-- Skrócenie przypisań do auta powrotnego dla osób NIE objętych zjazdem -->
+                    @if($returnVehicle)
+                        @php
+                            $returnVehicleWarnings = $preparation->conflicts
+                                ->where('isBlocking', false)
+                                ->filter(function ($conflict) {
+                                    return $conflict->assignment instanceof \App\Models\VehicleAssignment;
+                                });
+                        @endphp
+                        <div class="mb-4">
+                            <h4 class="fs-6 fw-bold mb-3">
+                                Auto powrotne – przypisania do skrócenia dla osób, które NIE wracają
+                                <span class="text-muted small">({{ $returnVehicleWarnings->count() }})</span>
+                            </h4>
+                            @if($returnVehicleWarnings->isEmpty())
+                                <p class="text-muted mb-0">
+                                    Brak osób spoza zjazdu, które mają przypisanie do tego auta po dacie zjazdu.
+                                </p>
+                            @else
+                                <div class="alert alert-warning">
+                                    <p class="fw-bold mb-2">
+                                        Te osoby nie wracają, ale mają auto powrotne przypisane po dacie zjazdu — przypisania zostaną skrócone, a osoby zostaną bez auta:
+                                    </p>
+                                    <div class="table-responsive mb-0">
+                                        <table class="table mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Osoba</th>
+                                                    <th>Auto</th>
+                                                    <th>Obecna data końcowa</th>
+                                                    <th>Nowa data końcowa</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($returnVehicleWarnings as $conflict)
+                                                    @php
+                                                        $assignment = $conflict->assignment;
+                                                    @endphp
+                                                    <tr>
+                                                        <td>{{ $assignment->employee->full_name }}</td>
+                                                        <td>{{ $returnVehicle->registration_number }}</td>
+                                                        <td>
+                                                            {{ $assignment->end_date
+                                                                ? \Carbon\Carbon::parse($assignment->end_date)->format('d.m.Y')
+                                                                : 'Brak (bezterminowe)' }}
+                                                        </td>
+                                                        <td class="fw-bold text-primary">
+                                                            {{ $preparation->returnDate->format('d.m.Y') }}
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
                     <!-- Konflikty -->
                     @if($preparation->conflicts->isNotEmpty())
                         @php
