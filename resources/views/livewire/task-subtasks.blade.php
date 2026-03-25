@@ -62,16 +62,51 @@
                 </h6>
                 <div>
                     @foreach($pendingSubtasks as $subtask)
-                        <div class="form-check" wire:key="pending-{{ $subtask->id }}">
-                            <input 
-                                type="checkbox" 
-                                class="form-check-input" 
-                                id="subtask-{{ $subtask->id }}"
-                                wire:click="toggleSubtask({{ $subtask->id }})"
-                            >
-                            <label class="form-check-label" for="subtask-{{ $subtask->id }}">
-                                {{ $subtask->name }}
-                            </label>
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="pending-{{ $subtask->id }}">
+                            <div class="flex-grow-1">
+                                @if($editingSubtaskId === $subtask->id)
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-sm @error('editingSubtaskName') is-invalid @enderror"
+                                        wire:model.defer="editingSubtaskName"
+                                    />
+                                    @error('editingSubtaskName')
+                                        <span class="text-danger small d-block mt-1">{{ $message }}</span>
+                                    @enderror
+                                @else
+                                    <div class="form-check mb-0">
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input"
+                                            id="subtask-{{ $subtask->id }}"
+                                            wire:click="toggleSubtask({{ $subtask->id }})"
+                                        >
+                                        <label class="form-check-label" for="subtask-{{ $subtask->id }}">
+                                            {{ $subtask->name }}
+                                        </label>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                @if($editingSubtaskId === $subtask->id)
+                                    <button type="button" class="btn btn-sm btn-primary" wire:click="saveSubtaskEdits({{ $subtask->id }})">
+                                        Zapisz
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="cancelEditSubtask">
+                                        Anuluj
+                                    </button>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-outline-primary" wire:click="startEditSubtask({{ $subtask->id }})">
+                                        Edytuj
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            wire:click="deleteSubtask({{ $subtask->id }})"
+                                            onclick="return confirm('Na pewno usunąć to podzadanie?')">
+                                        Usuń
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -86,17 +121,52 @@
                 </h6>
                 <div>
                     @foreach($completedSubtasks as $subtask)
-                        <div class="form-check" wire:key="completed-{{ $subtask->id }}" style="opacity: 0.7;">
-                            <input 
-                                type="checkbox" 
-                                class="form-check-input" 
-                                id="subtask-{{ $subtask->id }}"
-                                checked
-                                wire:click="toggleSubtask({{ $subtask->id }})"
-                            >
-                            <label class="form-check-label text-decoration-line-through text-muted" for="subtask-{{ $subtask->id }}">
-                                {{ $subtask->name }}
-                            </label>
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="completed-{{ $subtask->id }}" style="opacity: 0.7;">
+                            <div class="flex-grow-1">
+                                @if($editingSubtaskId === $subtask->id)
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-sm @error('editingSubtaskName') is-invalid @enderror"
+                                        wire:model.defer="editingSubtaskName"
+                                    />
+                                    @error('editingSubtaskName')
+                                        <span class="text-danger small d-block mt-1">{{ $message }}</span>
+                                    @enderror
+                                @else
+                                    <div class="form-check mb-0">
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input"
+                                            id="subtask-{{ $subtask->id }}"
+                                            checked
+                                            wire:click="toggleSubtask({{ $subtask->id }})"
+                                        >
+                                        <label class="form-check-label text-decoration-line-through text-muted" for="subtask-{{ $subtask->id }}">
+                                            {{ $subtask->name }}
+                                        </label>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                @if($editingSubtaskId === $subtask->id)
+                                    <button type="button" class="btn btn-sm btn-primary" wire:click="saveSubtaskEdits({{ $subtask->id }})">
+                                        Zapisz
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="cancelEditSubtask">
+                                        Anuluj
+                                    </button>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-outline-primary" wire:click="startEditSubtask({{ $subtask->id }})">
+                                        Edytuj
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            wire:click="deleteSubtask({{ $subtask->id }})"
+                                            onclick="return confirm('Na pewno usunąć to podzadanie?')">
+                                        Usuń
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>

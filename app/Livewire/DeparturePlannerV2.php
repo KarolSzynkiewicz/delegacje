@@ -3,12 +3,17 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Carbon\Carbon;
+use App\Models\Employee;
+use App\Models\Location;
 use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
 
 class DeparturePlannerV2 extends Component
 {
+    use WithFileUploads;
+
     // Podstawowe dane formularza
     public $departureDate;
     public $endDate;
@@ -22,6 +27,7 @@ class DeparturePlannerV2 extends Component
     public $accommodationAssignments = []; // [employee_id => ['accommodation_id' => ..., 'start_date' => ..., 'end_date' => ...]]
     public $vehicleAssignments = []; // [employee_id => ['vehicle_id' => ..., 'position' => ..., 'start_date' => ..., 'end_date' => ...]]
     public $routeData = null; // Route planning data
+    public $ticketCostsByEmployee = []; // [employee_id => ['amount' => ..., 'currency' => 'PLN', 'attachment' => file, 'destination_stop_location_id' => ...]]
     
     // Listenery na eventy z podkomponentów
     protected $listeners = [
@@ -60,6 +66,11 @@ class DeparturePlannerV2 extends Component
     {
         // Wyczyść miejsca w aucie gdy zmienia się pojazd
         $this->vehicleSeats = [];
+
+        if (!empty($this->vehicleId)) {
+            // Koszt biletu dotyczy tylko wyjazdu bez auta.
+            $this->ticketCostsByEmployee = [];
+        }
         
         // Inicjalizuj miejsca dla nowego pojazdu
         if ($this->vehicleId) {
@@ -358,6 +369,57 @@ class DeparturePlannerV2 extends Component
             return;
         }
 
+        if (empty($this->vehicleId)) {
+            $ticketCostsPerEmployee = [];
+            $employeeIds = $this->getSelectedEmployeeIds();
+
+            foreach ($employeeIds as $employeeId) {
+                $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
+                $amount = $employeeCost['amount'] ?? null;
+                $currency = strtoupper((string) ($employeeCost['currency'] ?? ''));
+                $destinationStopLocationId = $employeeCost['destination_stop_location_id'] ?? null;
+                $attachment = $employeeCost['attachment'] ?? null;
+
+                if ($amount === null || $amount === '' || !is_numeric($amount) || (float) $amount <= 0) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu dla tego pracownika.');
+                }
+
+                if (strlen($currency) !== 3) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
+                }
+
+                if (empty($destinationStopLocationId) || !Location::whereKey($destinationStopLocationId)->exists()) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.destination_stop_location_id", 'Wybierz lokalizację przystanku docelowego z listy.');
+                }
+
+                if ($attachment) {
+                    $this->validate([
+                        "ticketCostsByEmployee.{$employeeId}.attachment" => 'file|max:10240',
+                    ], [
+                        "ticketCostsByEmployee.{$employeeId}.attachment.file" => 'Załącznik musi być poprawnym plikiem.',
+                        "ticketCostsByEmployee.{$employeeId}.attachment.max" => 'Załącznik może mieć maksymalnie 10 MB.',
+                    ]);
+                }
+
+                $attachmentPath = null;
+                if ($attachment) {
+                    $attachmentPath = $attachment->store('transport_costs', 'public');
+                }
+
+                $ticketCostsPerEmployee[$employeeId] = [
+                    'amount' => (float) $amount,
+                    'currency' => $currency,
+                    'destination_stop_location_id' => (int) $destinationStopLocationId,
+                    'attachment_path' => $attachmentPath,
+                ];
+            }
+
+            if ($this->getErrorBag()->isNotEmpty()) {
+                $this->dispatch('error', message: 'Uzupełnij koszty biletów dla wszystkich uczestników.');
+                return;
+            }
+        }
+
         // Zapisz dane w sesji (route_data może być duże, więc lepiej przez sesję)
         session([
             'departure_v2_data' => [
@@ -370,6 +432,7 @@ class DeparturePlannerV2 extends Component
                 'accommodation_assignments' => $this->accommodationAssignments,
                 'vehicle_assignments' => $this->vehicleAssignments,
                 'route_data' => $this->routeData, // Contains: route_distance, route_duration, route_waypoints
+                'ticket_costs_per_employee' => $ticketCostsPerEmployee ?? [],
             ]
         ]);
 
@@ -402,6 +465,62 @@ class DeparturePlannerV2 extends Component
         });
         
         return $availableVehicles;
+    }
+
+    public function getSelectedEmployeesProperty()
+    {
+        $employeeIds = $this->getSelectedEmployeeIds();
+
+        if (empty($employeeIds)) {
+            return collect();
+        }
+
+        return Employee::whereIn('id', $employeeIds)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+    }
+
+    public function getAvailableLocationsProperty()
+    {
+        return Location::orderBy('name')->get();
+    }
+
+    protected function getSelectedEmployeeIds(): array
+    {
+        $employeeIds = collect();
+
+        foreach ($this->assignments as $projects) {
+            if (!is_array($projects)) {
+                continue;
+            }
+
+            foreach ($projects as $roles) {
+                if (!is_array($roles)) {
+                    continue;
+                }
+
+                foreach ($roles as $ids) {
+                    if (!is_array($ids)) {
+                        continue;
+                    }
+                    $employeeIds = $employeeIds->merge($ids);
+                }
+            }
+        }
+
+        foreach ($this->assignmentRanges as $range) {
+            if (!empty($range['employee_id'])) {
+                $employeeIds->push($range['employee_id']);
+            }
+        }
+
+        return $employeeIds
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function render()

@@ -37,6 +37,80 @@
                 </select>
             </div>
         </div>
+
+        @if(empty($vehicleId))
+            <hr class="my-4">
+            <h6 class="fw-semibold mb-3">Koszty biletów (osobno dla każdej osoby)</h6>
+            @if($this->selectedEmployees->isEmpty())
+                <div class="alert alert-info mb-0">
+                    Najpierw przypisz pracowników do wyjazdu, aby dodać koszty biletów.
+                </div>
+            @else
+                <div class="vstack gap-3">
+                    @foreach($this->selectedEmployees as $employee)
+                        <div class="border rounded p-3">
+                            <div class="fw-semibold mb-3">{{ $employee->full_name }}</div>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Koszt biletu <span class="text-danger">*</span></label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.amount"
+                                        class="form-control @error('ticketCostsByEmployee.' . $employee->id . '.amount') is-invalid @enderror"
+                                        placeholder="np. 120.50"
+                                    >
+                                    @error('ticketCostsByEmployee.' . $employee->id . '.amount')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label fw-semibold">Waluta <span class="text-danger">*</span></label>
+                                    <select
+                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.currency"
+                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.currency') is-invalid @enderror"
+                                    >
+                                        <option value="PLN">PLN</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="USD">USD</option>
+                                    </select>
+                                    @error('ticketCostsByEmployee.' . $employee->id . '.currency')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Lokalizacja przystanku docelowego <span class="text-danger">*</span></label>
+                                    <select
+                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.destination_stop_location_id"
+                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.destination_stop_location_id') is-invalid @enderror"
+                                    >
+                                        <option value="">Wybierz lokalizację</option>
+                                        @foreach($this->availableLocations as $location)
+                                            <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('ticketCostsByEmployee.' . $employee->id . '.destination_stop_location_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Załącznik do kosztu (bilet/faktura)</label>
+                                    <input
+                                        type="file"
+                                        wire:model="ticketCostsByEmployee.{{ $employee->id }}.attachment"
+                                        class="form-control @error('ticketCostsByEmployee.' . $employee->id . '.attachment') is-invalid @enderror"
+                                    >
+                                    @error('ticketCostsByEmployee.' . $employee->id . '.attachment')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        @endif
     </x-ui.card>
 
     <!-- Step Navigation -->

@@ -243,6 +243,55 @@
         </div>
     </x-ui.card>
 
+    <x-ui.card label="Bilety">
+        @php
+            $ticketCosts = $departure->transportCosts->where('cost_type', 'ticket')->values();
+        @endphp
+
+        @if($ticketCosts->isNotEmpty())
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Opis</th>
+                            <th>Kwota</th>
+                            <th>Data</th>
+                            <th>Notatka</th>
+                            <th>Załącznik</th>
+                            <th>Szczegóły</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($ticketCosts as $ticketCost)
+                            <tr>
+                                <td>{{ $ticketCost->description ?: 'Bilet' }}</td>
+                                <td>{{ number_format((float) $ticketCost->amount, 2) }} {{ $ticketCost->currency }}</td>
+                                <td>{{ $ticketCost->cost_date?->format('Y-m-d') ?? '-' }}</td>
+                                <td>{{ $ticketCost->notes ?: '—' }}</td>
+                                <td>
+                                    @if($ticketCost->file_path)
+                                        <a href="{{ asset('storage/' . $ticketCost->file_path) }}" target="_blank" class="text-decoration-none">
+                                            <i class="bi bi-paperclip"></i> Podgląd
+                                        </a>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <a href="{{ route('transport-costs.show', $ticketCost) }}" class="text-decoration-none">
+                                        Zobacz
+                                    </a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="text-muted mb-0">Brak kosztów biletów dla tego wyjazdu.</p>
+        @endif
+    </x-ui.card>
+
     @if($departure->hasRouteData() && $departure->route_waypoints)
         <x-ui.card label="Plan trasy">
             <div class="row g-4 mb-4">

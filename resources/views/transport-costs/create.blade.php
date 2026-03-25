@@ -16,6 +16,13 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Dodaj Nowy Koszt Transportu">
+                @php
+                    $prefillEventId = old('logistics_event_id', $defaults['logistics_event_id'] ?? null);
+                    $prefillCostType = old('cost_type', $defaults['cost_type'] ?? null);
+                    $prefillCostDate = old('cost_date', $defaults['cost_date'] ?? date('Y-m-d'));
+                    $prefillDescription = old('description', $defaults['description'] ?? null);
+                    $prefillVehicleId = old('vehicle_id', $defaults['vehicle_id'] ?? null);
+                @endphp
                 <form method="POST" action="{{ route('transport-costs.store') }}" enctype="multipart/form-data">
                     @csrf
 
@@ -27,7 +34,7 @@
                         >
                             <option value="">Brak</option>
                             @foreach($events as $event)
-                                <option value="{{ $event->id }}" {{ old('logistics_event_id') == $event->id ? 'selected' : '' }}>
+                                <option value="{{ $event->id }}" {{ (string) $prefillEventId === (string) $event->id ? 'selected' : '' }}>
                                     {{ $event->type->label() }} - {{ $event->event_date->format('Y-m-d H:i') }}
                                 </option>
                             @endforeach
@@ -42,27 +49,29 @@
                         >
                             <option value="">Brak</option>
                             @foreach($vehicles as $vehicle)
-                                <option value="{{ $vehicle->id }}" {{ old('vehicle_id') == $vehicle->id ? 'selected' : '' }}>
+                                <option value="{{ $vehicle->id }}" {{ (string) $prefillVehicleId === (string) $vehicle->id ? 'selected' : '' }}>
                                     {{ $vehicle->registration_number }} - {{ $vehicle->brand }} {{ $vehicle->model }}
                                 </option>
                             @endforeach
                         </x-ui.input>
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="transport_id" 
-                            label="Transport (opcjonalne)"
-                        >
-                            <option value="">Brak</option>
-                            @foreach($transports as $transport)
-                                <option value="{{ $transport->id }}" {{ old('transport_id') == $transport->id ? 'selected' : '' }}>
-                                    {{ $transport->mode->label() }} - {{ $transport->departure_datetime->format('Y-m-d H:i') }}
-                                </option>
-                            @endforeach
-                        </x-ui.input>
-                    </div>
+                    @if($prefillCostType === 'ticket')
+                        <div class="mb-3">
+                            <x-ui.input 
+                                type="select" 
+                                name="transport_id" 
+                                label="Transport (opcjonalne)"
+                            >
+                                <option value="">Brak</option>
+                                @foreach($transports as $transport)
+                                    <option value="{{ $transport->id }}" {{ old('transport_id') == $transport->id ? 'selected' : '' }}>
+                                        {{ $transport->mode->label() }} - {{ $transport->departure_datetime->format('Y-m-d H:i') }}
+                                    </option>
+                                @endforeach
+                            </x-ui.input>
+                        </div>
+                    @endif
 
                     <div class="mb-3">
                         <x-ui.input 
@@ -72,11 +81,11 @@
                             required="true"
                         >
                             <option value="">Wybierz typ</option>
-                            <option value="fuel" {{ old('cost_type') == 'fuel' ? 'selected' : '' }}>Paliwo</option>
-                            <option value="ticket" {{ old('cost_type') == 'ticket' ? 'selected' : '' }}>Bilet</option>
-                            <option value="parking" {{ old('cost_type') == 'parking' ? 'selected' : '' }}>Parking</option>
-                            <option value="toll" {{ old('cost_type') == 'toll' ? 'selected' : '' }}>Opłata drogowa</option>
-                            <option value="other" {{ old('cost_type') == 'other' ? 'selected' : '' }}>Inne</option>
+                            <option value="fuel" {{ $prefillCostType == 'fuel' ? 'selected' : '' }}>Paliwo</option>
+                            <option value="ticket" {{ $prefillCostType == 'ticket' ? 'selected' : '' }}>Bilet</option>
+                            <option value="parking" {{ $prefillCostType == 'parking' ? 'selected' : '' }}>Parking</option>
+                            <option value="toll" {{ $prefillCostType == 'toll' ? 'selected' : '' }}>Opłata drogowa</option>
+                            <option value="other" {{ $prefillCostType == 'other' ? 'selected' : '' }}>Inne</option>
                         </x-ui.input>
                     </div>
 
@@ -112,7 +121,7 @@
                             type="date" 
                             name="cost_date" 
                             label="Data kosztu"
-                            value="{{ old('cost_date', date('Y-m-d')) }}"
+                            value="{{ $prefillCostDate }}"
                             required="true"
                         />
                     </div>
@@ -122,7 +131,7 @@
                             type="text" 
                             name="description" 
                             label="Opis"
-                            value="{{ old('description') }}"
+                            value="{{ $prefillDescription }}"
                         />
                     </div>
 

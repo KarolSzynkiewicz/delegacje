@@ -15,6 +15,7 @@ use App\Models\Employee;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\Accommodation;
+use App\Models\TransportCost;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\VehiclePosition;
@@ -129,6 +130,7 @@ class DepartureController extends Controller
             'projectAssignments.project',
             'vehicleAssignments.vehicle',
             'accommodationAssignments.accommodation',
+            'transportCosts.creator',
         ]);
 
         return view('departures.show', compact('departure'));
@@ -592,6 +594,14 @@ class DepartureController extends Controller
         
         // Merge session data with request data (request takes precedence)
         $data = array_merge($sessionData, $request->all());
+
+        // Normalize empty strings to null for integer/nullable fields
+        // (session data bypasses ConvertEmptyStringsToNull middleware)
+        foreach (['vehicle_id'] as $field) {
+            if (isset($data[$field]) && $data[$field] === '') {
+                $data[$field] = null;
+            }
+        }
         
         // Validate data
         $validator = validator($data, [
@@ -607,6 +617,7 @@ class DepartureController extends Controller
             'route_data.route_distance' => 'nullable|numeric|min:0',
             'route_data.route_duration' => 'nullable|numeric|min:0', // float from OpenRouteService
             'route_data.route_waypoints' => 'nullable|array',
+            'ticket_costs_per_employee' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -617,6 +628,16 @@ class DepartureController extends Controller
         }
 
         $validated = $validator->validated();
+
+        if (empty($validated['vehicle_id'])) {
+            $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
+
+            if (empty($ticketCostsPerEmployee) || !is_array($ticketCostsPerEmployee)) {
+                return redirect()
+                    ->route('departures.create-v2')
+                    ->with('error', 'Przy wyjeździe bez auta musisz uzupełnić koszty biletów dla każdej osoby.');
+            }
+        }
 
         // Clear session data after reading
         session()->forget('departure_v2_data');
@@ -779,6 +800,7 @@ class DepartureController extends Controller
                 'route_distance' => $routeData['route_distance'] ?? null,
                 'route_duration' => isset($routeData['route_duration']) ? (int) $routeData['route_duration'] : null,
                 'route_waypoints' => !empty($routeWaypointAccommodationIds) ? $routeWaypointAccommodationIds : null,
+                'destination_stop_location' => null,
             ]);
 
             // Get unique employee IDs from both assignments and ranges
@@ -790,11 +812,60 @@ class DepartureController extends Controller
             }
             $employeeIds = $employeeIds->unique();
 
+            if (empty($validated['vehicle_id'])) {
+                $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
+                foreach ($employeeIds as $employeeId) {
+                    $costData = $ticketCostsPerEmployee[$employeeId] ?? null;
+                    if (!$costData || empty($costData['amount']) || empty($costData['currency']) || empty($costData['destination_stop_location_id'])) {
+                        DB::rollBack();
+                        return redirect()
+                            ->route('departures.create-v2')
+                            ->with('error', 'Uzupełnij koszt biletu, walutę i przystanek docelowy dla każdej osoby.');
+                    }
+                }
+            }
+
             // Add participants
             foreach ($employeeIds as $employeeId) {
                 $departure->participants()->create([
                     'employee_id' => $employeeId,
                 ]);
+            }
+
+            if (empty($validated['vehicle_id']) && $employeeIds->isNotEmpty()) {
+                $employeeNames = Employee::whereIn('id', $employeeIds)->get()->pluck('full_name', 'id');
+                $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
+                $destinationLocationIds = collect($ticketCostsPerEmployee)
+                    ->pluck('destination_stop_location_id')
+                    ->filter()
+                    ->unique()
+                    ->values();
+                $destinationLocationNames = Location::whereIn('id', $destinationLocationIds)->pluck('name', 'id');
+
+                foreach ($employeeIds as $employeeId) {
+                    $employeeName = $employeeNames[$employeeId] ?? ("ID: " . $employeeId);
+                    $costData = $ticketCostsPerEmployee[$employeeId] ?? [];
+                    $destinationStopLocationName = null;
+                    if (!empty($costData['destination_stop_location_id'])) {
+                        $destinationStopLocationName = $destinationLocationNames[(int) $costData['destination_stop_location_id']] ?? null;
+                    }
+
+                    TransportCost::create([
+                        'logistics_event_id' => $departure->id,
+                        'vehicle_id' => null,
+                        'transport_id' => null,
+                        'cost_type' => 'ticket',
+                        'amount' => (float) ($costData['amount'] ?? 0),
+                        'currency' => strtoupper((string) ($costData['currency'] ?? 'PLN')),
+                        'cost_date' => $departureDate->toDateString(),
+                        'description' => 'Bilet - ' . $employeeName,
+                        'file_path' => $costData['attachment_path'] ?? null,
+                        'notes' => !empty($destinationStopLocationName)
+                            ? 'Przystanek docelowy: ' . $destinationStopLocationName
+                            : null,
+                        'created_by' => auth()->id() ?? 1,
+                    ]);
+                }
             }
 
             // Create project assignments from date ranges (new multi-step form uses ranges)

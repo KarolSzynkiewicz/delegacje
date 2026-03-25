@@ -36,6 +36,7 @@ class LogisticsEvent extends Model
         'route_distance',
         'route_duration',
         'route_waypoints',
+        'destination_stop_location',
     ];
 
     protected $casts = [
@@ -119,6 +120,14 @@ class LogisticsEvent extends Model
     public function accommodationAssignments(): HasMany
     {
         return $this->hasMany(AccommodationAssignment::class);
+    }
+
+    /**
+     * Get transport costs related to this logistics event.
+     */
+    public function transportCosts(): HasMany
+    {
+        return $this->hasMany(TransportCost::class);
     }
 
     /**

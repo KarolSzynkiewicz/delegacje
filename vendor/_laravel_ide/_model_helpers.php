@@ -4626,8 +4626,8 @@ namespace App\Models {
 	 * @property int $created_by
 	 * @property mixed $notes
 	 * @property \App\Enums\LogisticsEventStatus $status
+	 * @property mixed $destination_stop_location
 	 * @property array|null $route_waypoints
-	 * @property string|null $route_geometry
 	 * @property integer|null $route_duration
 	 * @property float|null $route_distance
 	 * @property int $to_location_id
@@ -4652,6 +4652,8 @@ namespace App\Models {
 	 * @property-read int|null $vehicleAssignments_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AccommodationAssignment> $accommodationAssignments
 	 * @property-read int|null $accommodationAssignments_count
+	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\TransportCost> $transportCosts
+	 * @property-read int|null $transportCosts_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Comment> $comments
 	 * @property-read int|null $comments_count
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereId($value)
@@ -4665,8 +4667,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereToLocationId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteDistance($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteDuration($value)
-	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteGeometry($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereRouteWaypoints($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereDestinationStopLocation($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereStatus($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereNotes($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<LogisticsEvent>|LogisticsEvent whereCreatedBy($value)

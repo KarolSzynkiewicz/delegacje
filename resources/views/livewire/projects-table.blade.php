@@ -147,10 +147,6 @@
                                         <i class="bi bi-eye"></i>
                                         <span class="d-none d-sm-inline ms-1">Zobacz</span>
                                     </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route($showRoute, $project) }}" class="btn-sm">
-                                        <i class="bi bi-people"></i>
-                                        <span class="d-none d-sm-inline ms-1">Pracownicy</span>
-                                    </x-ui.button>
                                 </div>
                             </td>
                         </tr>

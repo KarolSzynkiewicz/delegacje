@@ -11,6 +11,9 @@ class TaskSubtasks extends Component
     public ProjectTask $task;
     public string $newSubtaskName = '';
 
+    public ?int $editingSubtaskId = null;
+    public string $editingSubtaskName = '';
+
     public function mount(ProjectTask $task): void
     {
         $this->task = $task;
@@ -49,6 +52,66 @@ class TaskSubtasks extends Component
             $subtask->markIncomplete();
         } else {
             $subtask->markCompleted();
+        }
+
+        $this->task->refresh();
+        $this->task->load('subtasks');
+    }
+
+    public function startEditSubtask(int $subtaskId): void
+    {
+        $subtask = TaskSubtask::findOrFail($subtaskId);
+
+        if ($subtask->task_id !== $this->task->id) {
+            abort(403, 'Nieprawidłowe podzadanie.');
+        }
+
+        $this->editingSubtaskId = $subtask->id;
+        $this->editingSubtaskName = $subtask->name;
+    }
+
+    public function cancelEditSubtask(): void
+    {
+        $this->editingSubtaskId = null;
+        $this->editingSubtaskName = '';
+    }
+
+    public function saveSubtaskEdits(int $subtaskId): void
+    {
+        $this->validate([
+            'editingSubtaskName' => 'required|string|max:255',
+        ], [
+            'editingSubtaskName.required' => 'Nazwa podzadania jest wymagana.',
+            'editingSubtaskName.max' => 'Nazwa podzadania nie może przekraczać 255 znaków.',
+        ]);
+
+        $subtask = TaskSubtask::findOrFail($subtaskId);
+
+        if ($subtask->task_id !== $this->task->id) {
+            abort(403, 'Nieprawidłowe podzadanie.');
+        }
+
+        $subtask->update([
+            'name' => trim($this->editingSubtaskName),
+        ]);
+
+        $this->cancelEditSubtask();
+        $this->task->refresh();
+        $this->task->load('subtasks');
+    }
+
+    public function deleteSubtask(int $subtaskId): void
+    {
+        $subtask = TaskSubtask::findOrFail($subtaskId);
+
+        if ($subtask->task_id !== $this->task->id) {
+            abort(403, 'Nieprawidłowe podzadanie.');
+        }
+
+        $subtask->delete();
+
+        if ($this->editingSubtaskId === $subtaskId) {
+            $this->cancelEditSubtask();
         }
 
         $this->task->refresh();

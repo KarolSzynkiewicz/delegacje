@@ -14,25 +14,71 @@ class TransportCostController extends Controller
     /**
      * Display a listing of transport costs.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $costs = TransportCost::with(['logisticsEvent', 'vehicle', 'transport', 'creator'])
-            ->orderBy('cost_date', 'desc')
-            ->paginate(20);
+        $withoutCost = $request->boolean('without_cost');
+        $sortBy = $request->query('sort_by', 'event_date');
+        $sortDir = $request->query('sort_dir', 'desc');
 
-        return view('transport-costs.index', compact('costs'));
+        $allowedSorts = ['event_date', 'route_distance', 'costs_count'];
+        if (!in_array($sortBy, $allowedSorts, true)) {
+            $sortBy = 'event_date';
+        }
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
+
+        $eventsQuery = LogisticsEvent::with([
+                'fromLocation',
+                'toLocation',
+                'vehicle',
+                'participants',
+                'transportCosts' => fn ($query) => $query->with('creator')->latest('cost_date')->latest('id'),
+            ])
+            ->withCount([
+                'transportCosts as costs_count',
+            ]);
+
+        if ($withoutCost) {
+            $eventsQuery->whereDoesntHave('transportCosts');
+        }
+
+        if ($sortBy === 'costs_count') {
+            $eventsQuery->orderBy('costs_count', $sortDir)->orderBy('event_date', 'desc');
+        } else {
+            $eventsQuery->orderBy($sortBy, $sortDir)->orderBy('event_date', 'desc');
+        }
+
+        $events = $eventsQuery->paginate(20)->withQueryString();
+
+        return view('transport-costs.index', compact('events', 'withoutCost', 'sortBy', 'sortDir'));
     }
 
     /**
      * Show the form for creating a new transport cost.
      */
-    public function create()
+    public function create(Request $request)
     {
         $events = LogisticsEvent::orderBy('event_date', 'desc')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
         $transports = Transport::with('logisticsEvent')->orderBy('departure_datetime', 'desc')->get();
 
-        return view('transport-costs.create', compact('events', 'vehicles', 'transports'));
+        $defaults = [
+            'logistics_event_id' => $request->query('logistics_event_id'),
+            'cost_type' => $request->query('cost_type', 'ticket'),
+            'cost_date' => $request->query('cost_date', now()->toDateString()),
+            'description' => $request->query('description'),
+        ];
+
+        // Autofill vehicle from selected logistics event (useful for fuel costs)
+        if (!empty($defaults['logistics_event_id'])) {
+            $event = LogisticsEvent::find($defaults['logistics_event_id']);
+            if ($event && $event->vehicle_id) {
+                $defaults['vehicle_id'] = $event->vehicle_id;
+            }
+        }
+
+        return view('transport-costs.create', compact('events', 'vehicles', 'transports', 'defaults'));
     }
 
     /**
