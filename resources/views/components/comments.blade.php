@@ -51,6 +51,11 @@
     @if($comments->count() > 0)
         <div class="comments-list">
             @foreach($comments as $comment)
+                @php
+                    // Support both stored newlines and stored <br> tags (historical data)
+                    $commentBodyForDisplay = preg_replace('/<br\\s*\\/?\\s*>/i', "\n", (string) $comment->body);
+                    $commentBodyForEdit = $commentBodyForDisplay;
+                @endphp
                 <div class="card mb-3">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -76,7 +81,7 @@
                             @endif
                         </div>
                         <div id="comment-body-{{ $comment->id }}">
-                            <p class="mb-0">{{ nl2br(e($comment->body)) }}</p>
+                            <p class="mb-0">{!! nl2br(e($commentBodyForDisplay)) !!}</p>
                         </div>
                         <div id="comment-edit-{{ $comment->id }}" style="display: none;">
                             <form action="{{ route('comments.update', $comment) }}" method="POST">
@@ -85,7 +90,7 @@
                                 <x-ui.input 
                                     type="textarea" 
                                     name="body" 
-                                    :value="$comment->body"
+                                    :value="$commentBodyForEdit"
                                     rows="3"
                                 />
                                 <div class="mt-2">
