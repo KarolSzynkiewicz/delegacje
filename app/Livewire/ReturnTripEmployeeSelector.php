@@ -3,6 +3,9 @@
 namespace App\Livewire;
 
 use App\Services\AssignmentQueryService;
+use App\Services\LocationTrackingService;
+use App\Models\Employee;
+use App\Enums\EmployeeLocationState;
 use Livewire\Component;
 use Carbon\Carbon;
 
@@ -45,14 +48,27 @@ class ReturnTripEmployeeSelector extends Component
             if ($this->returnTripId) {
                 $this->employees = $this->getEmployeesForEditMode($date);
             } else {
-                // Normal mode - show employees with active assignments
-                $this->employees = app(AssignmentQueryService::class)
-                    ->getEmployeesWithActiveAssignments($date)
+                // Normal mode - show employees who are outside base on selected date
+                $locationTrackingService = app(LocationTrackingService::class);
+                $this->employees = Employee::orderBy('last_name')
+                    ->orderBy('first_name')
+                    ->get()
+                    ->filter(function ($employee) use ($locationTrackingService, $date) {
+                        $status = $locationTrackingService->getLocationStatus($employee, $date);
+                        return $status['state'] === EmployeeLocationState::OUTSIDE_BASE;
+                    })
                     ->map(function ($employee) {
                         return [
                             'id' => $employee->id,
                             'full_name' => $employee->full_name,
-                            'project' => $employee->assignments->first()?->project->name ?? null,
+                            'project' => $employee->assignments()
+                                ->where('start_date', '<=', $this->returnDate)
+                                ->where(function ($q) {
+                                    $q->whereNull('end_date')
+                                        ->orWhere('end_date', '>=', $this->returnDate);
+                                })
+                                ->with('project')
+                                ->first()?->project?->name,
                         ];
                     })
                     ->toArray();

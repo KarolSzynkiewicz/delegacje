@@ -16,7 +16,7 @@
         <div class="mb-3">
             <label class="form-label fw-semibold">Pracownicy <span class="text-danger">*</span></label>
             <p class="small text-muted mb-2">
-                Pracownicy z aktywnymi przypisaniami (projekt, dom, auto) na dzień {{ \Carbon\Carbon::parse($returnDate)->format('Y-m-d') }}
+                Pracownicy, którzy są poza bazą na dzień {{ \Carbon\Carbon::parse($returnDate)->format('Y-m-d') }}
             </p>
             
             @if(count($employees) > 0)
@@ -40,7 +40,7 @@
                 <small class="form-text text-muted">Przytrzymaj Ctrl/Cmd aby wybrać wielu pracowników</small>
             @else
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Brak pracowników z aktywnymi przypisaniami na wybraną datę.
+                    <i class="bi bi-info-circle"></i> Brak pracowników poza bazą na wybraną datę.
                 </div>
             @endif
         </div>
