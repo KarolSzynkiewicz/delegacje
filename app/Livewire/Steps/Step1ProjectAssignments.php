@@ -32,7 +32,7 @@ class Step1ProjectAssignments extends Component
     public $projectGapsTwoWeeks = [];
     public $vehicle;
     public $roleFilter = null;
-    public $employeeFilter = null;
+    public $employeeSearch = '';
     
     // Cache for Projects and Roles to avoid N+1 queries
     protected $projectsCache = [];
@@ -122,7 +122,7 @@ class Step1ProjectAssignments extends Component
         $this->employeesPage = 1;
     }
 
-    public function updatedEmployeeFilter()
+    public function updatedEmployeeSearch()
     {
         // Reset pagination when filter changes
         $this->employeesPage = 1;
@@ -586,8 +586,8 @@ class Step1ProjectAssignments extends Component
             if ($this->roleFilter) {
                 foreach ($employee['roles'] ?? [] as $role) {
                     if ($role['id'] == $this->roleFilter) {
-                        // Role matches; continue to employee filter
-                        if ($this->employeeFilter && (int) $employee['id'] !== (int) $this->employeeFilter) {
+                        // Role matches; continue to name search filter
+                        if ($this->employeeSearch !== '' && stripos($employee['full_name'], $this->employeeSearch) === false) {
                             return false;
                         }
                         return true;
@@ -596,8 +596,8 @@ class Step1ProjectAssignments extends Component
                 return false;
             }
 
-            // Apply employee filter if set
-            if ($this->employeeFilter && (int) $employee['id'] !== (int) $this->employeeFilter) {
+            // Apply employee live search if set
+            if ($this->employeeSearch !== '' && stripos($employee['full_name'], $this->employeeSearch) === false) {
                 return false;
             }
             

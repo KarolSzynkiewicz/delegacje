@@ -126,15 +126,12 @@
                 <!-- Employee filter -->
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Filtruj po pracowniku</label>
-                    <select
-                        wire:model.live="employeeFilter"
-                        class="form-select"
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="employeeSearch"
+                        class="form-control"
+                        placeholder="Wpisz imię lub nazwisko..."
                     >
-                        <option value="">Wszyscy pracownicy</option>
-                        @foreach(collect($allAvailableEmployees)->sortBy('full_name') as $employeeOption)
-                            <option value="{{ $employeeOption['id'] }}">{{ $employeeOption['full_name'] }}</option>
-                        @endforeach
-                    </select>
                 </div>
                 
                 <p class="small text-muted mb-3">
@@ -239,7 +236,7 @@
                     @empty
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle"></i> 
-                            @if($roleFilter || $employeeFilter)
+                            @if($roleFilter || filled($employeeSearch))
                                 Brak dostępnych pracowników dla wybranych filtrów na wybraną datę.
                             @else
                                 Brak dostępnych pracowników na wybraną datę.
