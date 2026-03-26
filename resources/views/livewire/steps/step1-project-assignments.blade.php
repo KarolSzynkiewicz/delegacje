@@ -122,6 +122,20 @@
                         @endforeach
                     </select>
                 </div>
+
+                <!-- Employee filter -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Filtruj po pracowniku</label>
+                    <select
+                        wire:model.live="employeeFilter"
+                        class="form-select"
+                    >
+                        <option value="">Wszyscy pracownicy</option>
+                        @foreach(collect($allAvailableEmployees)->sortBy('full_name') as $employeeOption)
+                            <option value="{{ $employeeOption['id'] }}">{{ $employeeOption['full_name'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 
                 <p class="small text-muted mb-3">
                     Przeciągnij pracownika do luki w projekcie
@@ -225,8 +239,8 @@
                     @empty
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle"></i> 
-                            @if($roleFilter)
-                                Brak dostępnych pracowników z wybraną rolą na wybraną datę.
+                            @if($roleFilter || $employeeFilter)
+                                Brak dostępnych pracowników dla wybranych filtrów na wybraną datę.
                             @else
                                 Brak dostępnych pracowników na wybraną datę.
                             @endif

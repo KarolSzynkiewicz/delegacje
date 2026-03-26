@@ -32,6 +32,7 @@ class Step1ProjectAssignments extends Component
     public $projectGapsTwoWeeks = [];
     public $vehicle;
     public $roleFilter = null;
+    public $employeeFilter = null;
     
     // Cache for Projects and Roles to avoid N+1 queries
     protected $projectsCache = [];
@@ -117,8 +118,14 @@ class Step1ProjectAssignments extends Component
     
     public function updatedRoleFilter()
     {
-        // Filter is applied in getFilteredEmployees() method
-        // No need to reload data, just trigger re-render
+        // Reset pagination when filter changes
+        $this->employeesPage = 1;
+    }
+
+    public function updatedEmployeeFilter()
+    {
+        // Reset pagination when filter changes
+        $this->employeesPage = 1;
     }
     
     public function updatedAssignments()
@@ -579,9 +586,18 @@ class Step1ProjectAssignments extends Component
             if ($this->roleFilter) {
                 foreach ($employee['roles'] ?? [] as $role) {
                     if ($role['id'] == $this->roleFilter) {
+                        // Role matches; continue to employee filter
+                        if ($this->employeeFilter && (int) $employee['id'] !== (int) $this->employeeFilter) {
+                            return false;
+                        }
                         return true;
                     }
                 }
+                return false;
+            }
+
+            // Apply employee filter if set
+            if ($this->employeeFilter && (int) $employee['id'] !== (int) $this->employeeFilter) {
                 return false;
             }
             
