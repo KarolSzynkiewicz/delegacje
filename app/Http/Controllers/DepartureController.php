@@ -732,41 +732,10 @@ class DepartureController extends Controller
             $endDate = Carbon::parse($validated['end_date']);
             $arrivalDate = $endDate;
 
-            // Determine destination location from assigned projects (both assignments and ranges)
-            $projectIds = collect($validated['assignments'])->pluck('project_id')->unique();
-            foreach ($assignmentRanges as $range) {
-                if (!empty($range['project_id'])) {
-                    $projectIds->push($range['project_id']);
-                }
-            }
-            $projectIds = $projectIds->unique();
-            
-            if ($projectIds->isEmpty()) {
-                DB::rollBack();
-                return redirect()
-                    ->back()
-                    ->with('error', 'Brak przypisań do projektów.');
-            }
-            
-            $projects = Project::whereIn('id', $projectIds)->with('location')->get();
-            
-            $locationIds = $projects->pluck('location_id')->filter()->unique();
-            if ($locationIds->count() !== 1) {
-                DB::rollBack();
-                return redirect()
-                    ->back()
-                    ->with('error', 'Wszystkie projekty muszą być w tej samej lokalizacji.');
-            }
-            
-            $destinationLocationId = $locationIds->first();
-            $baseLocation = Location::getBase();
-
-            if (!$baseLocation) {
-                DB::rollBack();
-                return redirect()
-                    ->route('departures.create-v2')
-                    ->with('error', 'Brak skonfigurowanej lokalizacji bazy. Przejdź do Lokalizacje i oznacz jedną jako bazę (is_base = true).');
-            }
+            // Determine destination location.
+            // In V2, the destination (to_location_id) is the location of the LAST route waypoint (accommodation).
+            // We do NOT require projects to be in the same location.
+            $destinationLocationId = null;
 
             // Prepare route data if available
             $routeData = $validated['route_data'] ?? null;
@@ -780,8 +749,79 @@ class DepartureController extends Controller
                 }
                 if (is_array($waypoints)) {
                     // Filter out any null/empty values and ensure all are integers
-                    $routeWaypointAccommodationIds = array_filter(array_map('intval', $waypoints));
+                    $routeWaypointAccommodationIds = array_values(array_filter(array_map('intval', $waypoints)));
                 }
+            }
+
+            if (!empty($routeWaypointAccommodationIds)) {
+                $lastAccommodationId = end($routeWaypointAccommodationIds);
+                $lastAccommodationId = $lastAccommodationId ? (int) $lastAccommodationId : null;
+
+                if ($lastAccommodationId) {
+                    $lastAccommodation = Accommodation::find($lastAccommodationId);
+
+                    if (!$lastAccommodation) {
+                        DB::rollBack();
+                        return redirect()
+                            ->back()
+                            ->withInput()
+                            ->with('error', 'Nie znaleziono ostatniego przystanku trasy (akomodacji).');
+                    }
+
+                    $existingLocation = Location::query()
+                        ->where('address', $lastAccommodation->address)
+                        ->where('city', $lastAccommodation->city)
+                        ->where('postal_code', $lastAccommodation->postal_code)
+                        ->where('country', $lastAccommodation->country)
+                        ->first();
+
+                    if ($existingLocation) {
+                        $destinationLocationId = $existingLocation->id;
+                    } else {
+                        $created = Location::create([
+                            'name' => $lastAccommodation->name,
+                            'address' => $lastAccommodation->address,
+                            'city' => $lastAccommodation->city,
+                            'postal_code' => $lastAccommodation->postal_code,
+                            'country' => $lastAccommodation->country,
+                            'latitude' => $lastAccommodation->latitude,
+                            'longitude' => $lastAccommodation->longitude,
+                            'is_base' => false,
+                        ]);
+
+                        $destinationLocationId = $created->id;
+                    }
+                }
+            }
+
+            // Fallback: if there is no route (or no waypoints), try to use any project location (without enforcing uniqueness).
+            if (!$destinationLocationId) {
+                $projectIds = collect($validated['assignments'])->pluck('project_id')->unique();
+                foreach ($assignmentRanges as $range) {
+                    if (!empty($range['project_id'])) {
+                        $projectIds->push($range['project_id']);
+                    }
+                }
+                $projectIds = $projectIds->unique();
+
+                $destinationLocationId = Project::whereIn('id', $projectIds)->pluck('location_id')->filter()->first();
+            }
+
+            if (!$destinationLocationId) {
+                DB::rollBack();
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with('error', 'Nie można określić lokalizacji docelowej. Uzupełnij trasę (krok 4) albo upewnij się, że projekty mają przypisaną lokalizację.');
+            }
+
+            $baseLocation = Location::getBase();
+
+            if (!$baseLocation) {
+                DB::rollBack();
+                return redirect()
+                    ->route('departures.create-v2')
+                    ->with('error', 'Brak skonfigurowanej lokalizacji bazy. Przejdź do Lokalizacje i oznacz jedną jako bazę (is_base = true).');
             }
 
             // Create departure
