@@ -126,6 +126,69 @@
                 </div>
             </x-ui.card>
 
+            {{-- Repairs (książka serwisowa) — nad przypisaniami --}}
+            <x-ui.card class="mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Książka serwisowa</h5>
+                    <x-ui.button
+                        variant="primary"
+                        href="{{ route('vehicle-repairs.create', ['vehicle_id' => $vehicle->id]) }}"
+                        class="btn-sm"
+                    >
+                        + Nowy serwis
+                    </x-ui.button>
+                </div>
+                @php $repairs = $vehicle->repairs()->with('location')->orderBy('start_date', 'desc')->limit(10)->get(); @endphp
+                @if($repairs->count() > 0)
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Typ</th>
+                                    <th>Okres</th>
+                                    <th>Warsztat</th>
+                                    <th>Koszt</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($repairs as $repair)
+                                    <tr>
+                                        <td>
+                                            <x-ui.badge variant="{{ $repair->action_type->badgeVariant() }}">
+                                                {{ $repair->action_type->label() }}
+                                            </x-ui.badge>
+                                        </td>
+                                        <td>
+                                            <small>
+                                                {{ $repair->start_date->format('Y-m-d') }}
+                                                @if($repair->end_date) → {{ $repair->end_date->format('Y-m-d') }} @else → <em class="text-muted">trwa</em> @endif
+                                            </small>
+                                        </td>
+                                        <td><small>{{ $repair->location?->name ?? '–' }}</small></td>
+                                        <td><small>{{ $repair->price ? number_format($repair->price, 2) . ' ' . $repair->currency : '–' }}</small></td>
+                                        <td>
+                                            <x-ui.badge variant="{{ $repair->status_badge_variant }}">{{ $repair->status_label }}</x-ui.badge>
+                                        </td>
+                                        <td>
+                                            <x-ui.button variant="ghost" href="{{ route('vehicle-repairs.show', $repair) }}" class="btn-sm">Szczegóły</x-ui.button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ route('vehicle-repairs.index', ['vehicle_id' => $vehicle->id]) }}" class="btn btn-sm btn-outline-secondary">
+                            Wszystkie serwisy pojazdu →
+                        </a>
+                    </div>
+                @else
+                    <x-ui.empty-state icon="tools" message="Brak wpisów serwisowych dla tego pojazdu." />
+                @endif
+            </x-ui.card>
+
             <x-ui.card class="mt-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">Przypisania do pojazdu</h5>

@@ -56,11 +56,20 @@
                         </div>
                     </x-ui.detail-item>
                     @endif
-                    <x-ui.detail-item label="Baza">
-                        @if($location->is_base)
-                            <x-ui.badge variant="success">Tak - Lokalizacja jest bazą</x-ui.badge>
+                    <x-ui.detail-item label="Typy / cele lokalizacji">
+                        @if($location->purposes->isNotEmpty())
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach($location->purposes as $p)
+                                    @php $pt = $p->purpose; @endphp
+                                    @if($pt instanceof \App\Enums\LocationPurposeType)
+                                        <x-ui.badge variant="{{ $pt->badgeVariant() }}">{{ $pt->label() }}</x-ui.badge>
+                                    @else
+                                        <x-ui.badge variant="secondary">{{ $p->purpose }}</x-ui.badge>
+                                    @endif
+                                @endforeach
+                            </div>
                         @else
-                            <span class="text-muted">Nie</span>
+                            <span class="text-muted">Brak przypisanych typów</span>
                         @endif
                     </x-ui.detail-item>
                     @if($location->contact_person)
@@ -89,6 +98,58 @@
                                     @if($project->client_name)
                                         <div class="small text-muted mt-1">{{ $project->client_name }}</div>
                                     @endif
+                                </div>
+                                <i class="bi bi-arrow-right text-muted"></i>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </x-ui.card>
+            @endif
+
+            @php $locationAccommodations = $location->accommodations()->orderBy('lease_start_date', 'desc')->get(); @endphp
+            @if($locationAccommodations->isNotEmpty())
+            <x-ui.card label="Wynajmy w tej lokalizacji ({{ $locationAccommodations->count() }})" class="mt-4">
+                <ul class="list-group-ui">
+                    @foreach($locationAccommodations as $acc)
+                        <li class="list-group-item-ui">
+                            <a href="{{ route('accommodations.show', $acc) }}" class="list-group-item-action-ui d-flex align-items-center justify-content-between text-decoration-none">
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ $acc->name }}</div>
+                                    <div class="small text-muted mt-1">
+                                        @if($acc->lease_start_date)
+                                            {{ $acc->lease_start_date->format('d.m.Y') }}
+                                            @if($acc->lease_end_date) – {{ $acc->lease_end_date->format('d.m.Y') }} @endif
+                                        @else
+                                            Brak dat najmu
+                                        @endif
+                                        · {{ $acc->capacity }} os.
+                                    </div>
+                                </div>
+                                <i class="bi bi-arrow-right text-muted"></i>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </x-ui.card>
+            @endif
+
+            @php $locationRepairs = $location->vehicleRepairs()->with('vehicle')->orderBy('start_date', 'desc')->get(); @endphp
+            @if($locationRepairs->isNotEmpty())
+            <x-ui.card label="Naprawy / serwis w tym warsztacie ({{ $locationRepairs->count() }})" class="mt-4">
+                <ul class="list-group-ui">
+                    @foreach($locationRepairs as $repair)
+                        <li class="list-group-item-ui">
+                            <a href="{{ route('vehicle-repairs.show', $repair) }}" class="list-group-item-action-ui d-flex align-items-center justify-content-between text-decoration-none">
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">
+                                        {{ $repair->vehicle->registration_number ?? '—' }}
+                                        <span class="ms-2 text-muted small">{{ $repair->action_type?->label() }}</span>
+                                    </div>
+                                    <div class="small text-muted mt-1">
+                                        {{ $repair->start_date?->format('d.m.Y') }}
+                                        @if($repair->end_date) – {{ $repair->end_date->format('d.m.Y') }} @endif
+                                    </div>
                                 </div>
                                 <i class="bi bi-arrow-right text-muted"></i>
                             </a>

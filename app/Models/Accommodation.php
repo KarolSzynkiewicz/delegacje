@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Traits\HasComments;
@@ -18,6 +19,7 @@ class Accommodation extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'location_id',
         'name',
         'address',
         'city',
@@ -58,6 +60,14 @@ class Accommodation extends Model
         'longitude' => 'decimal:8',
     ];
 
+
+    /**
+     * The physical location associated with this accommodation lease.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
+    }
 
     /**
      * Get all assignments for this accommodation.

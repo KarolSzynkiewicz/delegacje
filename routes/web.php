@@ -83,6 +83,13 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])
             ->name('return-trips.prepare')
             ->defaults('resource', 'return-trips');
+
+        Route::post('vehicle-repairs/prepare', [\App\Http\Controllers\VehicleRepairController::class, 'prepareFromForm'])
+            ->name('vehicle-repairs.prepare-form')
+            ->defaults('resource', 'vehicle-repairs');
+        Route::get('vehicle-repairs/prepare', [\App\Http\Controllers\VehicleRepairController::class, 'prepare'])
+            ->name('vehicle-repairs.prepare')
+            ->defaults('resource', 'vehicle-repairs');
         Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])
             ->name('return-trips.cancel')
             ->defaults('resource', 'return-trips');
@@ -287,6 +294,15 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
     // Vehicles, Accommodations (CRUD)
     Route::resource('vehicles', VehicleController::class);
     Route::resource('accommodations', AccommodationController::class);
+
+    // Vehicle Repairs (książka serwisowa)
+    Route::get('vehicle-repairs/{vehicleRepair}/complete', [\App\Http\Controllers\VehicleRepairController::class, 'completeForm'])
+        ->name('vehicle-repairs.complete-form')
+        ->defaults('resource', 'vehicle-repairs');
+    Route::post('vehicle-repairs/{vehicleRepair}/complete', [\App\Http\Controllers\VehicleRepairController::class, 'complete'])
+        ->name('vehicle-repairs.complete')
+        ->defaults('resource', 'vehicle-repairs');
+    Route::resource('vehicle-repairs', \App\Http\Controllers\VehicleRepairController::class);
 
     // Locations, Roles (CRUD)
     Route::resource('locations', LocationController::class);

@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\LocationPurposeType;
 use App\Models\Location;
+use App\Models\LocationPurpose;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -36,9 +38,8 @@ class LocationService
             $name, $address, $city, $postalCode, $contactPerson, $phone, $email, 
             $description, $isBase, $latitude, $longitude
         ) {
-            // Jeśli tworzymy nową bazę, odznacz wszystkie istniejące bazy
             if ($isBase) {
-                Location::where('is_base', true)->update(['is_base' => false]);
+                $this->demoteOtherMainOffices(null);
             }
             
             return Location::create([
@@ -78,11 +79,8 @@ class LocationService
             $location, $name, $address, $city, $postalCode, $contactPerson, $phone, $email,
             $description, $isBase, $latitude, $longitude
         ) {
-            // Jeśli ustawiamy tę lokalizację jako bazę, odznacz wszystkie inne bazy
             if ($isBase) {
-                Location::where('is_base', true)
-                    ->where('id', '!=', $location->id)
-                    ->update(['is_base' => false]);
+                $this->demoteOtherMainOffices($location->id);
             }
             
             return $location->update([
@@ -99,6 +97,28 @@ class LocationService
                 'longitude' => $longitude,
             ]);
         });
+    }
+
+    /**
+     * Odznacza flagę is_base i usuwa cel „base” z pivotu u innych lokalizacji (tylko jedna siedziba główna).
+     *
+     * @param  int|null  $exceptLocationId  null = democja wszystkich (np. przed utworzeniem nowej)
+     */
+    private function demoteOtherMainOffices(?int $exceptLocationId): void
+    {
+        $query = Location::query()->where('is_base', true);
+        if ($exceptLocationId !== null) {
+            $query->where('id', '!=', $exceptLocationId);
+        }
+        $ids = $query->pluck('id');
+        if ($ids->isEmpty()) {
+            return;
+        }
+        Location::whereIn('id', $ids)->update(['is_base' => false]);
+        LocationPurpose::query()
+            ->whereIn('location_id', $ids)
+            ->where('purpose', LocationPurposeType::BASE->value)
+            ->delete();
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Enums\LocationPurposeType;
 use App\Models\Location;
 use App\Services\GeocodingService;
 use Livewire\Component;
@@ -21,7 +22,10 @@ class LocationForm extends Component
     public $is_base = false;
     public $latitude = null;
     public $longitude = null;
-    
+
+    /** @var string[] */
+    public array $purposes = [];
+
     // Search
     public $searchQuery = '';
     public $searchResults = [];
@@ -50,6 +54,13 @@ class LocationForm extends Component
             $this->is_base = $location->is_base ?? false;
             $this->latitude = $location->latitude;
             $this->longitude = $location->longitude;
+            // Cel „base” w bazie jest zsynchronizowany z is_base — w checkboxach tylko pozostałe typy
+            $this->purposes = $location->purposes
+                ->pluck('purpose')
+                ->map(fn ($p) => $p instanceof LocationPurposeType ? $p->value : $p)
+                ->filter(fn (string $v) => $v !== LocationPurposeType::BASE->value)
+                ->values()
+                ->all();
         }
     }
     
@@ -172,7 +183,6 @@ class LocationForm extends Component
             'Belgium' => 'BE',
             'Belgia' => 'BE',
             'Austria' => 'AT',
-            'Austria' => 'AT',
             'Switzerland' => 'CH',
             'Szwajcaria' => 'CH',
             'United Kingdom' => 'GB',
@@ -195,18 +205,13 @@ class LocationForm extends Component
         $this->showResults = false;
     }
     
-    public function getFormattedLatitudeProperty()
-    {
-        return $this->latitude ? number_format((float)$this->latitude, 8) : '';
-    }
-    
-    public function getFormattedLongitudeProperty()
-    {
-        return $this->longitude ? number_format((float)$this->longitude, 8) : '';
-    }
-    
     public function render()
     {
-        return view('livewire.location-form');
+        return view('livewire.location-form', [
+            'purposeTypes' => array_values(array_filter(
+                LocationPurposeType::cases(),
+                fn (LocationPurposeType $c) => $c !== LocationPurposeType::BASE
+            )),
+        ]);
     }
 }

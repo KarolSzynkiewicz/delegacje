@@ -35,7 +35,7 @@ return [
             'vehicle_assignments',
             'accommodation_assignments',
             'demands',
-
+            'vehicle_repairs',
         ],
     ],
     

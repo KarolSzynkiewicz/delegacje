@@ -66,6 +66,11 @@ class CheckResourcePermission
 
         // Check if user has permission
         $hasPermission = $user->hasPermission($permissionName);
+
+        // Książka serwisowa: ten sam krąg co przypisania pojazdów (vehicle-repairs.* → fallback)
+        if (!$hasPermission && $routeName && str_starts_with($routeName, 'vehicle-repairs.')) {
+            $hasPermission = $user->hasPermission('vehicle-assignments.view');
+        }
         
         if (!$hasPermission) {
             Log::warning('CheckResourcePermission: Permission denied', [

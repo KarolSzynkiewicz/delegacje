@@ -31,6 +31,14 @@ return [
         'label' => 'Pojazdy',
     ],
     
+    'vehicle_repairs' => [
+        'route' => 'vehicle-repairs.index',
+        'icon' => 'bi bi-wrench-adjustable',
+        'label' => 'Serwisowanie pojazdów',
+        // To samo co „Przypisania pojazdów” — bez osobnej roli dla vehicle-repairs.*
+        'permission' => 'vehicle-assignments.view',
+    ],
+    
     'accommodations' => [
         'route' => 'accommodations.index',
         'icon' => 'bi bi-house',

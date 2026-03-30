@@ -165,6 +165,16 @@ class MenuService
         if (!$route) {
             return $itemData;
         }
+
+        // Jawne uprawnienie z menu_items (np. to samo co inny zasób) — nie nadpisuj z trasy
+        if (array_key_exists('permission', $itemData) && is_string($itemData['permission']) && $itemData['permission'] !== '') {
+            $routePattern = $this->generateRoutePattern($route);
+            if ($routePattern) {
+                $itemData['routePattern'] = $routePattern;
+            }
+
+            return $itemData;
+        }
         
         // Generate permission from route using RoutePermissionService
         $permission = $this->routePermissionService->getPermissionForRoute($route);

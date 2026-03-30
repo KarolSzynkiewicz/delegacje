@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LocationPurposeType;
 use App\Models\Location;
 use App\Http\Requests\StoreLocationRequest;
 use App\Http\Requests\UpdateLocationRequest;
@@ -15,8 +16,7 @@ class LocationController extends Controller
      */
     public function index(): View
     {
-        $locations = Location::all();
-        return view('locations.index', compact('locations'));
+        return view('locations.index');
     }
 
     /**
@@ -46,7 +46,7 @@ class LocationController extends Controller
         $latitude = !empty($validated['latitude']) ? (float)$validated['latitude'] : null;
         $longitude = !empty($validated['longitude']) ? (float)$validated['longitude'] : null;
         
-        app(\App\Services\LocationService::class)->createLocation(
+        $location = app(\App\Services\LocationService::class)->createLocation(
             $validated['name'],
             $validated['address'],
             $validated['city'] ?? null,
@@ -58,6 +58,10 @@ class LocationController extends Controller
             $isBase,
             $latitude,
             $longitude
+        );
+
+        $location->syncPurposes(
+            $this->purposesSyncedWithBaseFlag($validated['purposes'] ?? [], $isBase)
         );
 
         $message = 'Lokalizacja została dodana.';
@@ -134,6 +138,11 @@ class LocationController extends Controller
             $longitude
         );
 
+        $location->refresh();
+        $location->syncPurposes(
+            $this->purposesSyncedWithBaseFlag($validated['purposes'] ?? [], $isBase)
+        );
+
         $message = 'Lokalizacja została zaktualizowana.';
         if ($isBase && $hadOtherBase) {
             $message .= ' Poprzednia baza została automatycznie odznaczona.';
@@ -151,5 +160,26 @@ class LocationController extends Controller
         $location->delete();
 
         return redirect()->route('locations.index')->with('success', 'Lokalizacja została usunięta.');
+    }
+
+    /**
+     * Jedno pole formularza (is_base) steruje zarówno kolumną locations.is_base, jak i celem „base” w pivotcie.
+     */
+    private function purposesSyncedWithBaseFlag(array $validatedPurposes, bool $isBase): array
+    {
+        $purposes = array_values(array_unique($validatedPurposes));
+
+        if ($isBase) {
+            if (!in_array(LocationPurposeType::BASE->value, $purposes, true)) {
+                $purposes[] = LocationPurposeType::BASE->value;
+            }
+        } else {
+            $purposes = array_values(array_filter(
+                $purposes,
+                fn (string $p) => $p !== LocationPurposeType::BASE->value
+            ));
+        }
+
+        return $purposes;
     }
 }

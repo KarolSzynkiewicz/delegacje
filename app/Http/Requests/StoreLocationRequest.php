@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\LocationPurposeType;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreLocationRequest extends FormRequest
 {
@@ -12,6 +14,13 @@ class StoreLocationRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'purposes' => $this->input('purposes', []),
+        ]);
     }
 
     /**
@@ -33,6 +42,8 @@ class StoreLocationRequest extends FormRequest
             'is_base' => ['nullable', 'boolean'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'purposes' => ['nullable', 'array'],
+            'purposes.*' => ['string', Rule::in(LocationPurposeType::values())],
         ];
     }
 

@@ -1,244 +1,350 @@
 <div>
-    <div class="mb-3">
-        <x-input-label for="name" value="Nazwa" />
-        <span class="text-danger">*</span>
-        <x-text-input id="name" wire:model="name" name="name" type="text" class="mt-1" required />
-        <x-input-error :messages="$errors->get('name')" class="mt-2" />
-    </div>
 
-    <div class="mb-3">
-        <x-input-label for="address_search" value="Wyszukaj miejsce" />
-        <div class="d-flex gap-2">
-            <div class="flex-grow-1 position-relative">
-                <input 
-                    type="text" 
-                    id="address_search" 
-                    wire:model="searchQuery"
-                    wire:keydown.enter.prevent="search"
-                    class="form-control @error('searchQuery') is-invalid @enderror" 
-                    placeholder="Wpisz adres lub nazwę miejsca (min. 3 znaki)..."
-                    autocomplete="off"
-                />
-                
-                <!-- Loading indicator -->
-                <div wire:loading wire:target="search" class="position-absolute top-50 end-0 translate-middle-y pe-3">
-                    <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
-                </div>
-            </div>
-            <button 
+    {{-- ===== LOKALIZACJA ===== --}}
+    <div class="mb-4">
+        <x-input-label value="Lokalizacja" />
+        <span class="text-danger">*</span>
+
+        {{-- Mode toggle --}}
+        <div class="d-flex gap-2 mt-1 mb-3">
+            <button
                 type="button"
-                wire:click="search"
-                wire:loading.attr="disabled"
-                wire:target="search"
-                class="btn btn-primary"
-                style="min-width: 100px;"
+                wire:click="setLocationMode('existing')"
+                class="btn btn-sm {{ $location_mode === 'existing' ? 'btn-primary' : 'btn-outline-secondary' }}"
             >
-                <span wire:loading.remove wire:target="search">Szukaj</span>
-                <span wire:loading wire:target="search">
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    Szukanie...
-                </span>
+                <i class="bi bi-list-ul me-1"></i> Wybierz z listy
+            </button>
+            <button
+                type="button"
+                wire:click="setLocationMode('new')"
+                class="btn btn-sm {{ $location_mode === 'new' ? 'btn-primary' : 'btn-outline-secondary' }}"
+            >
+                <i class="bi bi-geo-alt me-1"></i> Nowa / wyszukaj
             </button>
         </div>
-        
-        <!-- Error message -->
-        @if($searchError)
-            <div class="alert alert-danger mt-2 mb-0" role="alert" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: var(--text-main);">
-                <small><strong>Błąd:</strong> {{ $searchError }}</small>
+
+        @if($location_mode === 'existing')
+            {{-- ---- Existing location dropdown ---- --}}
+            <div class="mb-3">
+                <x-input-label for="location_id_select" value="Lokalizacja" />
+                <select
+                    id="location_id_select"
+                    class="form-select mt-1 @error('location_id') is-invalid @enderror"
+                    wire:change="selectExistingLocation($event.target.value)"
+                >
+                    <option value="">-- Wybierz lokalizację --</option>
+                    @foreach($locations as $loc)
+                        <option value="{{ $loc->id }}" {{ $location_id == $loc->id ? 'selected' : '' }}>
+                            {{ $loc->name }}@if($loc->city), {{ $loc->city }}@endif
+                        </option>
+                    @endforeach
+                </select>
+                <x-input-error :messages="$errors->get('location_id')" class="mt-2" />
             </div>
-        @endif
-        
-        <!-- Results list -->
-        @if($showResults && !empty($searchResults))
-            <div class="mt-2 accommodation-search-results rounded p-3" style="max-height: 400px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--glass-border);">
-                <div class="mb-3">
-                    <strong style="color: var(--text-main);">Znalezione miejsca ({{ count($searchResults) }}):</strong>
-                </div>
-                @foreach($searchResults as $index => $result)
-                    <button 
-                        type="button"
-                        wire:click="selectLocation({{ $index }})"
-                        class="btn btn-outline-secondary btn-sm w-100 text-start mb-2 accommodation-search-result-item"
-                        style="white-space: normal; color: var(--text-main); border-color: var(--glass-border); background: rgba(255, 255, 255, 0.05);"
-                        onmouseover="this.style.background='rgba(255, 255, 255, 0.15)'; this.style.borderColor='var(--glass-border)';"
-                        onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'; this.style.borderColor='var(--glass-border)';"
-                    >
-                        <strong style="color: var(--text-main);">{{ $result['label'] }}</strong>
-                        @if(!empty($result['city']) || !empty($result['country']))
-                            <br>
-                            <small class="text-muted" style="color: var(--text-muted) !important;">
-                                @if(!empty($result['city']))
-                                    {{ $result['city'] }}
-                                @endif
-                                @if(!empty($result['city']) && !empty($result['country'])), @endif
-                                @if(!empty($result['country']))
-                                    {{ $result['country'] }}
-                                @endif
-                            </small>
+
+            {{-- Hidden fields for existing mode --}}
+            <input type="hidden" name="location_id"   value="{{ $location_id }}">
+            <input type="hidden" name="location_name" value="">
+            <input type="hidden" name="address"       value="{{ $address }}">
+            <input type="hidden" name="city"          value="{{ $city }}">
+            <input type="hidden" name="postal_code"   value="{{ $postal_code }}">
+            <input type="hidden" name="country"       value="{{ $country }}">
+            <input type="hidden" name="latitude"      value="{{ $latitude }}">
+            <input type="hidden" name="longitude"     value="{{ $longitude }}">
+
+            @if($location_id)
+                <div class="p-3 rounded mb-2" style="background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border);">
+                    <small style="color: var(--text-muted);">
+                        <i class="bi bi-geo-alt-fill text-success me-1"></i>
+                        <strong>{{ $location_name }}</strong>
+                        @if($address) — {{ $address }}@endif
+                        @if($city), {{ $city }}@endif
+                        @if($latitude)
+                            <span class="ms-2 text-muted">({{ number_format((float)$latitude, 5) }}, {{ number_format((float)$longitude, 5) }})</span>
                         @endif
+                    </small>
+                </div>
+            @endif
+
+        @else
+            {{-- ---- New location via geo search ---- --}}
+            <input type="hidden" name="location_id" value="">
+
+            <div class="mb-3">
+                <x-input-label for="accommodation_location_search" value="Wyszukaj miejsce (geo)" />
+                <div class="d-flex gap-2">
+                    <div class="flex-grow-1 position-relative">
+                        <input
+                            type="text"
+                            id="accommodation_location_search"
+                            wire:model="searchQuery"
+                            wire:keydown.enter.prevent="search"
+                            class="form-control"
+                            placeholder="Wpisz nazwę lub adres (min. 3 znaki)…"
+                            autocomplete="off"
+                        />
+                        <div wire:loading wire:target="search" class="position-absolute top-50 end-0 translate-middle-y pe-3">
+                            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="search"
+                        wire:loading.attr="disabled"
+                        wire:target="search"
+                        class="btn btn-primary"
+                        style="min-width: 100px;"
+                    >
+                        <span wire:loading.remove wire:target="search">Szukaj</span>
+                        <span wire:loading wire:target="search">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                            Szukanie…
+                        </span>
                     </button>
-                @endforeach
+                </div>
+
+                @if($searchError)
+                    <div class="alert alert-danger mt-2 mb-0" style="background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--text-main);">
+                        <small>{{ $searchError }}</small>
+                    </div>
+                @endif
+
+                @if($showResults && !empty($searchResults))
+                    <div class="mt-2 rounded p-3 accommodation-search-results" style="max-height: 320px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--glass-border);">
+                        <strong class="d-block mb-2" style="color: var(--text-main);">Znalezione miejsca ({{ count($searchResults) }}):</strong>
+                        @foreach($searchResults as $index => $result)
+                            <button
+                                type="button"
+                                wire:click="selectGeoResult({{ $index }})"
+                                class="btn btn-outline-secondary btn-sm w-100 text-start mb-2"
+                                style="white-space: normal; color: var(--text-main); border-color: var(--glass-border); background: rgba(255,255,255,0.05);"
+                            >
+                                <strong>{{ $result['label'] }}</strong>
+                                @if(!empty($result['city']) || !empty($result['country']))
+                                    <br><small class="text-muted">{{ implode(', ', array_filter([$result['city'] ?? null, $result['country'] ?? null])) }}</small>
+                                @endif
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
             </div>
-        @elseif($showResults && empty($searchResults) && !$isSearching)
-            <div class="alert alert-info mt-2 mb-0" role="alert" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); color: var(--text-main);">
-                <small>Brak wyników dla zapytania: "{{ $searchQuery }}"</small>
+
+            <div class="mb-3">
+                <x-input-label for="location_name" value="Nazwa lokalizacji" />
+                <span class="text-danger">*</span>
+                <input
+                    type="text"
+                    id="location_name"
+                    wire:model="location_name"
+                    name="location_name"
+                    class="form-control mt-1 @error('location_name') is-invalid @enderror"
+                    placeholder="np. Dom Kowalskiego, Hostel Słoneczna"
+                    required
+                />
+                <x-input-error :messages="$errors->get('location_name')" class="mt-2" />
             </div>
+
+            <div class="row">
+                <div class="col-md-8 mb-3">
+                    <x-input-label for="address" value="Adres" />
+                    <input
+                        type="text"
+                        id="address"
+                        wire:model="address"
+                        name="address"
+                        class="form-control mt-1 @error('address') is-invalid @enderror"
+                        placeholder="ul. Przykładowa 1"
+                    />
+                    <x-input-error :messages="$errors->get('address')" class="mt-2" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <x-input-label for="postal_code" value="Kod pocztowy" />
+                    <input
+                        type="text"
+                        id="postal_code"
+                        wire:model="postal_code"
+                        name="postal_code"
+                        class="form-control mt-1"
+                    />
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <x-input-label for="city" value="Miasto" />
+                    <input
+                        type="text"
+                        id="city"
+                        wire:model="city"
+                        name="city"
+                        class="form-control mt-1"
+                    />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <x-input-label for="country" value="Kraj" />
+                    <select id="country" wire:model="country" name="country" class="form-select mt-1">
+                        <option value="">-- Wybierz kraj --</option>
+                        @foreach(\App\Enums\EuropeanCountry::sorted() as $c)
+                            <option value="{{ $c->value }}" {{ $country === $c->value ? 'selected' : '' }}>
+                                {{ $c->labelWithFlag() }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            {{-- Coordinates (hidden, filled by geo search) --}}
+            <input type="hidden" name="latitude"  id="acc_lat_hidden"  value="{{ $latitude }}">
+            <input type="hidden" name="longitude" id="acc_lng_hidden"  value="{{ $longitude }}">
+
+            @if($latitude)
+                <small class="text-muted d-block mb-3">
+                    <i class="bi bi-geo-alt-fill text-success"></i>
+                    Współrzędne: {{ number_format((float)$latitude, 6) }}, {{ number_format((float)$longitude, 6) }}
+                </small>
+            @endif
         @endif
-        
-        <small class="text-muted d-block mt-1">
-            Wpisz adres i kliknij "Szukaj", następnie wybierz miejsce z listy aby automatycznie wypełnić pola formularza.
-        </small>
-    </div>
 
-    <div class="mb-3">
-        <x-input-label for="address" value="Adres" />
-        <span class="text-danger">*</span>
-        <x-text-input id="address" wire:model="address" name="address" type="text" class="mt-1" required />
-        <x-input-error :messages="$errors->get('address')" class="mt-2" />
-    </div>
-
-    <div class="row">
-        <div class="col-md-4 mb-3">
-            <x-input-label for="city" value="Miasto" />
-            <x-text-input id="city" wire:model="city" name="city" type="text" class="mt-1" />
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <x-input-label for="postal_code" value="Kod pocztowy" />
-            <x-text-input id="postal_code" wire:model="postal_code" name="postal_code" type="text" class="mt-1" />
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <x-input-label for="country" value="Kraj" />
-            <select id="country" wire:model="country" name="country" class="form-select mt-1">
-                <option value="">-- Wybierz kraj --</option>
-                @foreach(\App\Enums\EuropeanCountry::sorted() as $countryEnum)
-                    <option value="{{ $countryEnum->value }}">
-                        {{ $countryEnum->labelWithFlag() }}
-                    </option>
-                @endforeach
-            </select>
-            <x-input-error :messages="$errors->get('country')" class="mt-2" />
-        </div>
-    </div>
-
-    <!-- Coordinates display -->
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <x-input-label for="latitude_display" value="Szerokość geograficzna" />
-            <input 
-                type="text" 
-                id="latitude_display" 
-                class="form-control mt-1" 
-                readonly
-                placeholder="Zostanie wypełnione automatycznie po wyborze miejsca"
-                value="{{ $this->formattedLatitude }}"
-                style="background-color: var(--bg-input); color: var(--text-main); cursor: not-allowed;"
-            />
-            <!-- Hidden field for form submission -->
-            <input type="hidden" wire:model="latitude" wire:key="latitude-{{ $latitude }}" name="latitude" id="latitude">
-        </div>
-        <div class="col-md-6">
-            <x-input-label for="longitude_display" value="Długość geograficzna" />
-            <input 
-                type="text" 
-                id="longitude_display" 
-                class="form-control mt-1" 
-                readonly
-                placeholder="Zostanie wypełnione automatycznie po wyborze miejsca"
-                value="{{ $this->formattedLongitude }}"
-                style="background-color: var(--bg-input); color: var(--text-main); cursor: not-allowed;"
-            />
-            <!-- Hidden field for form submission -->
-            <input type="hidden" wire:model="longitude" wire:key="longitude-{{ $longitude }}" name="longitude" id="longitude">
-        </div>
+        <p class="small text-muted mb-0 mt-3">
+            Przy zapisie wybrana lub nowa lokalizacja otrzyma automatycznie cel <strong>Kwatera</strong> (mieszkanie może współdzielić ten sam adres z innymi celami lokalizacji).
+        </p>
     </div>
 
     <hr class="my-4" style="border-color: var(--glass-border);">
 
+    {{-- ===== DANE WYNAJMU (accommodation) ===== --}}
+
+    <div class="mb-3">
+        <x-input-label for="acc_name" value="Nazwa wynajmu / umowy" />
+        <span class="text-danger">*</span>
+        <input
+            type="text"
+            id="acc_name"
+            wire:model="name"
+            name="name"
+            class="form-control mt-1 @error('name') is-invalid @enderror"
+            placeholder="np. Wynajem lato 2026, Hostel Noc 3"
+            required
+        />
+        <x-input-error :messages="$errors->get('name')" class="mt-2" />
+    </div>
+
     <div class="mb-3">
         <x-input-label for="capacity" value="Pojemność (liczba osób)" />
         <span class="text-danger">*</span>
-        <x-text-input id="capacity" wire:model="capacity" name="capacity" type="number" class="mt-1" min="1" required />
+        <input
+            type="number"
+            id="capacity"
+            wire:model="capacity"
+            name="capacity"
+            min="1"
+            class="form-control mt-1 @error('capacity') is-invalid @enderror"
+            required
+        />
         <x-input-error :messages="$errors->get('capacity')" class="mt-2" />
     </div>
 
-    <div class="mb-3" x-data="{ type: '{{ $type }}' }">
-        <x-input-label for="type" value="Typ" />
+    <div class="mb-3">
+        <x-input-label for="type" value="Typ wynajmu" />
         <span class="text-danger">*</span>
-        <select id="type" wire:model="type" name="type" class="form-select mt-1" required x-model="type">
-            <option value="własny">Własny</option>
+        <select
+            id="type"
+            wire:model.live="type"
+            name="type"
+            class="form-select mt-1 @error('type') is-invalid @enderror"
+            required
+        >
             <option value="wynajmowany">Wynajmowany</option>
+            <option value="własny">Własny</option>
         </select>
         <x-input-error :messages="$errors->get('type')" class="mt-2" />
+    </div>
 
-        <div class="mt-3" x-show="type === 'wynajmowany'" x-cloak>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <x-input-label for="lease_start_date" value="Okres najmu - od" />
-                    <x-text-input id="lease_start_date" wire:model="lease_start_date" name="lease_start_date" type="date" class="mt-1" />
-                    <x-input-error :messages="$errors->get('lease_start_date')" class="mt-2" />
-                </div>
-                <div class="col-md-6 mb-3">
-                    <x-input-label for="lease_end_date" value="Okres najmu - do" />
-                    <x-text-input id="lease_end_date" wire:model="lease_end_date" name="lease_end_date" type="date" class="mt-1" />
-                    <x-input-error :messages="$errors->get('lease_end_date')" class="mt-2" />
-                </div>
+    @if($type === 'wynajmowany')
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <x-input-label for="lease_start_date" value="Okres najmu — od" />
+                <span class="text-danger">*</span>
+                <input
+                    type="date"
+                    id="lease_start_date"
+                    wire:model="lease_start_date"
+                    name="lease_start_date"
+                    class="form-control mt-1 @error('lease_start_date') is-invalid @enderror"
+                />
+                <x-input-error :messages="$errors->get('lease_start_date')" class="mt-2" />
+            </div>
+            <div class="col-md-6 mb-3">
+                <x-input-label for="lease_end_date" value="Okres najmu — do" />
+                <span class="text-danger">*</span>
+                <input
+                    type="date"
+                    id="lease_end_date"
+                    wire:model="lease_end_date"
+                    name="lease_end_date"
+                    class="form-control mt-1 @error('lease_end_date') is-invalid @enderror"
+                />
+                <x-input-error :messages="$errors->get('lease_end_date')" class="mt-2" />
             </div>
         </div>
-    </div>
+    @endif
 
     <div class="mb-3">
-        <x-input-label for="description" value="Opis" />
-        <textarea id="description" wire:model="description" name="description" rows="4" class="form-control mt-1"></textarea>
+        <x-input-label for="description" value="Opis / uwagi do wynajmu" />
+        <textarea
+            id="description"
+            wire:model="description"
+            name="description"
+            rows="3"
+            class="form-control mt-1"
+        ></textarea>
     </div>
+
 </div>
 
 @script
 <script>
-    // Close results when clicking outside
-    document.addEventListener('click', function(e) {
-        const searchInput = document.getElementById('address_search');
-        const resultsDiv = document.querySelector('.accommodation-search-results');
-        
-        if (searchInput && resultsDiv && 
-            !searchInput.contains(e.target) && 
-            !resultsDiv.contains(e.target)) {
-            @this.closeResults();
+    // Keep coordinate hidden fields in sync with Livewire state
+    function syncAccCoords() {
+        const latEl = document.getElementById('acc_lat_hidden');
+        const lngEl = document.getElementById('acc_lng_hidden');
+        if (latEl) {
+            const lat = @this.get('latitude');
+            latEl.value = (lat !== null && lat !== undefined) ? lat : '';
         }
-    });
-    
-    // Force sync Livewire values to hidden fields before form submit
-    document.addEventListener('DOMContentLoaded', function() {
+        if (lngEl) {
+            const lng = @this.get('longitude');
+            lngEl.value = (lng !== null && lng !== undefined) ? lng : '';
+        }
+    }
+
+    $wire.on('$refresh', () => syncAccCoords());
+
+    document.addEventListener('DOMContentLoaded', () => {
+        syncAccCoords();
+
         const form = document.querySelector('form');
         if (form) {
-            form.addEventListener('submit', function(e) {
-                // Wait for Livewire to sync, then update hidden fields
-                setTimeout(function() {
-                    const componentId = @this.__instance.id;
-                    const component = Livewire.find(componentId);
-                    
-                    if (component) {
-                        const latitudeField = form.querySelector('[name="latitude"]');
-                        const longitudeField = form.querySelector('[name="longitude"]');
-                        
-                        if (latitudeField) {
-                            const lat = component.get('latitude');
-                            if (lat !== null && lat !== undefined && lat !== '') {
-                                latitudeField.value = lat;
-                            }
-                        }
-                        
-                        if (longitudeField) {
-                            const lng = component.get('longitude');
-                            if (lng !== null && lng !== undefined && lng !== '') {
-                                longitudeField.value = lng;
-                            }
-                        }
+            form.addEventListener('submit', () => {
+                const fields = ['location_name', 'address', 'city', 'postal_code'];
+                fields.forEach(field => {
+                    const el = form.querySelector(`[name="${field}"]`);
+                    if (el && !el.hasAttribute('wire:model')) {
+                        const val = @this.get(field);
+                        el.value = val || '';
                     }
-                }, 100);
+                });
+                syncAccCoords();
             });
         }
+
+        // Close geo search results when clicking outside
+        document.addEventListener('click', function (e) {
+            const resultsDiv = document.querySelector('.accommodation-search-results');
+            if (resultsDiv && !resultsDiv.contains(e.target)) {
+                @this.closeResults();
+            }
+        });
     });
 </script>
 @endscript

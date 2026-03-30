@@ -70,6 +70,22 @@ class Vehicle extends Model
     }
 
     /**
+     * Get all service/repair records for this vehicle.
+     */
+    public function repairs(): HasMany
+    {
+        return $this->hasMany(\App\Models\VehicleRepair::class);
+    }
+
+    /**
+     * Get the currently open (in-progress) repair for this vehicle.
+     */
+    public function openRepair(): ?\App\Models\VehicleRepair
+    {
+        return $this->repairs()->whereNull('end_date')->latest('start_date')->first();
+    }
+
+    /**
      * Get the employees assigned to this vehicle (M:N relationship).
      */
     public function employees(): BelongsToMany

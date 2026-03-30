@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\LocationPurposeType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Location extends Model
 {
@@ -30,6 +32,8 @@ class Location extends Model
         'longitude',
     ];
 
+    protected $with = ['purposes'];
+
     protected $casts = [
         'is_base' => 'boolean',
         'country' => \App\Enums\EuropeanCountry::class,
@@ -43,6 +47,81 @@ class Location extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    /**
+     * Get the purpose records for this location.
+     */
+    public function purposes(): HasMany
+    {
+        return $this->hasMany(LocationPurpose::class);
+    }
+
+    /**
+     * Get accommodations (lease records) linked to this location.
+     */
+    public function accommodations(): HasMany
+    {
+        return $this->hasMany(Accommodation::class);
+    }
+
+    /**
+     * Get vehicle repair records linked to this location.
+     */
+    public function vehicleRepairs(): HasMany
+    {
+        return $this->hasMany(VehicleRepair::class);
+    }
+
+    /**
+     * Add purposes without removing existing ones (idempotent).
+     *
+     * @param  string[]|LocationPurposeType[]  $purposes
+     */
+    public function addPurposes(array $purposes): void
+    {
+        foreach ($purposes as $purpose) {
+            $value = $purpose instanceof LocationPurposeType ? $purpose->value : $purpose;
+            $this->purposes()->firstOrCreate(['purpose' => $value]);
+        }
+    }
+
+    /**
+     * Replace all purposes with the given set.
+     *
+     * @param  string[]|LocationPurposeType[]  $purposes
+     */
+    public function syncPurposes(array $purposes): void
+    {
+        $values = array_map(
+            fn ($p) => $p instanceof LocationPurposeType ? $p->value : $p,
+            $purposes
+        );
+
+        $this->purposes()->whereNotIn('purpose', $values)->delete();
+
+        foreach ($values as $value) {
+            $this->purposes()->firstOrCreate(['purpose' => $value]);
+        }
+    }
+
+    /**
+     * Check if this location has a given purpose.
+     */
+    public function hasPurpose(LocationPurposeType|string $purpose): bool
+    {
+        $value = $purpose instanceof LocationPurposeType ? $purpose->value : $purpose;
+        return $this->purposes()->where('purpose', $value)->exists();
+    }
+
+    /**
+     * Get enum instances for all purposes of this location.
+     *
+     * @return Collection<int, LocationPurposeType>
+     */
+    public function getPurposeEnumsAttribute(): Collection
+    {
+        return $this->purposes->map(fn ($p) => $p->purpose)->filter()->values();
     }
 
     /**

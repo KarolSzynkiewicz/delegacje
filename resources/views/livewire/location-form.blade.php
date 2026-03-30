@@ -84,22 +84,7 @@
                 <small>Brak wyników dla zapytania: "{{ $searchQuery }}"</small>
             </div>
         @endif
-        
-        <!-- Debug info -->
-        @if(config('app.debug'))
-            <div class="mt-2">
-                <small class="text-muted">
-                    <strong>Debug:</strong> Query="{{ $searchQuery }}", 
-                    Searching={{ $isSearching ? 'true' : 'false' }}, 
-                    Results={{ count($searchResults) }}, 
-                    Show={{ $showResults ? 'true' : 'false' }}
-                    @if($searchError)
-                        <br><span class="text-danger">Error: {{ $searchError }}</span>
-                    @endif
-                </small>
-            </div>
-        @endif
-        
+
         <small class="text-muted d-block mt-1">
             Wpisz adres i kliknij "Szukaj", następnie wybierz miejsce z listy aby automatycznie wypełnić pola formularza.
         </small>
@@ -137,39 +122,75 @@
         </div>
     </div>
 
-    <!-- Coordinates display -->
+    <!-- Współrzędne: z wyszukiwarki albo ręcznie -->
     <div class="row mb-3">
         <div class="col-md-6">
-            <x-input-label for="latitude_display" value="Szerokość geograficzna" />
-            <input 
-                type="text" 
-                id="latitude_display" 
-                class="form-control mt-1" 
-                readonly
-                placeholder="Zostanie wypełnione automatycznie po wyborze miejsca"
-                value="{{ $this->formattedLatitude }}"
-                style="background-color: var(--bg-input); color: var(--text-main); cursor: not-allowed;"
+            <x-input-label for="latitude" value="Szerokość geograficzna" />
+            <input
+                type="number"
+                step="any"
+                id="latitude"
+                wire:model="latitude"
+                name="latitude"
+                class="form-control mt-1 @error('latitude') is-invalid @enderror"
+                placeholder="np. 52.2297"
             />
-            <!-- Hidden field for form submission -->
-            <input type="hidden" name="latitude" id="latitude" value="{{ $latitude !== null && $latitude !== '' ? (float)$latitude : '' }}">
+            <x-input-error :messages="$errors->get('latitude')" class="mt-2" />
         </div>
         <div class="col-md-6">
-            <x-input-label for="longitude_display" value="Długość geograficzna" />
-            <input 
-                type="text" 
-                id="longitude_display" 
-                class="form-control mt-1" 
-                readonly
-                placeholder="Zostanie wypełnione automatycznie po wyborze miejsca"
-                value="{{ $this->formattedLongitude }}"
-                style="background-color: var(--bg-input); color: var(--text-main); cursor: not-allowed;"
+            <x-input-label for="longitude" value="Długość geograficzna" />
+            <input
+                type="number"
+                step="any"
+                id="longitude"
+                wire:model="longitude"
+                name="longitude"
+                class="form-control mt-1 @error('longitude') is-invalid @enderror"
+                placeholder="np. 21.0122"
             />
-            <!-- Hidden field for form submission -->
-            <input type="hidden" name="longitude" id="longitude" value="{{ $longitude !== null && $longitude !== '' ? (float)$longitude : '' }}">
+            <x-input-error :messages="$errors->get('longitude')" class="mt-2" />
         </div>
     </div>
+    <p class="small text-muted mb-0">
+        Wypełniają się po wybraniu wyniku z wyszukiwarki powyżej. Możesz też wpisać wartości ręcznie (np. z mapy), jeśli wyszukiwarka nie znajdzie miejsca.
+    </p>
 
     <hr class="my-4" style="border-color: var(--glass-border);">
+
+    <div class="mb-4">
+        <x-input-label value="Typ / cel lokalizacji" />
+        <small class="text-muted d-block mb-2">Jeden fizyczny obiekt może mieć wiele celów (poza siedzibą główną).</small>
+
+        <div class="mb-3">
+            <x-ui.input
+                type="checkbox"
+                wire:model="is_base"
+                name="is_base"
+                id="is_base"
+                value="1"
+                label="Baza (siedziba główna)"
+            />
+            <small class="text-muted d-block mt-1 ms-1">Tylko jedna lokalizacja w systemie może być główną siedzibą — zaznaczenie automatycznie odznaczy poprzednią.</small>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3">
+            @foreach($purposeTypes as $pt)
+                <div class="form-check">
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="loc_purpose_{{ $pt->value }}"
+                        wire:model="purposes"
+                        name="purposes[]"
+                        value="{{ $pt->value }}"
+                    />
+                    <label class="form-check-label" for="loc_purpose_{{ $pt->value }}">{{ $pt->label() }}</label>
+                </div>
+            @endforeach
+        </div>
+        <x-input-error :messages="$errors->get('purposes')" class="mt-2" />
+        <x-input-error :messages="$errors->get('purposes.*')" class="mt-2" />
+    </div>
 
     <div class="mb-3">
         <x-input-label for="contact_person" value="Osoba kontaktowa" />
@@ -193,17 +214,6 @@
         <x-input-label for="description" value="Opis" />
         <textarea id="description" wire:model="description" name="description" rows="4" class="form-control mt-1"></textarea>
     </div>
-
-    <div class="mb-3">
-        <x-ui.input 
-            type="checkbox" 
-            wire:model="is_base"
-            name="is_base"
-            id="is_base"
-            value="1"
-            label="Lokalizacja jest bazą"
-        />
-    </div>
 </div>
 
 @script
@@ -219,80 +229,42 @@
             @this.closeResults();
         }
     });
-    
-    // Function to sync coordinates to hidden fields
-    function syncCoordinates() {
-        const latitudeField = document.querySelector('[name="latitude"]');
-        const longitudeField = document.querySelector('[name="longitude"]');
-        
-        if (latitudeField) {
-            const lat = @this.get('latitude');
-            if (lat !== null && lat !== undefined && lat !== '') {
-                const latValue = parseFloat(lat);
-                latitudeField.value = isNaN(latValue) ? '' : latValue.toString();
-            } else {
-                latitudeField.value = '';
-            }
-        }
-        
-        if (longitudeField) {
-            const lng = @this.get('longitude');
-            if (lng !== null && lng !== undefined && lng !== '') {
-                const lngValue = parseFloat(lng);
-                longitudeField.value = isNaN(lngValue) ? '' : lngValue.toString();
-            } else {
-                longitudeField.value = '';
-            }
-        }
-    }
-    
-    // Sync coordinates when Livewire updates
-    $wire.on('$refresh', () => {
-        syncCoordinates();
-    });
-    
-    // Sync Livewire values to form fields before submit
+
     document.addEventListener('DOMContentLoaded', function() {
-        // Initial sync
-        syncCoordinates();
-        
         const form = document.querySelector('form');
         if (form) {
-            form.addEventListener('submit', function(e) {
-                // Use Livewire's get() method to sync values
+            form.addEventListener('submit', function() {
                 const component = Livewire.find(@this.__instance.id);
-                if (component) {
-                    const fields = ['name', 'address', 'city', 'postal_code', 'country', 
-                                  'contact_person', 'phone', 'email', 'description'];
-                    
-                    fields.forEach(field => {
-                        const formField = form.querySelector(`[name="${field}"]`);
-                        if (formField) {
-                            const value = component.get(field);
-                            formField.value = value !== null && value !== undefined ? value : '';
+                if (!component) return;
+
+                const fields = [
+                    'name', 'address', 'city', 'postal_code', 'country',
+                    'contact_person', 'phone', 'email', 'description',
+                    'latitude', 'longitude',
+                ];
+
+                fields.forEach(field => {
+                    const formField = form.querySelector(`[name="${field}"]`);
+                    if (formField) {
+                        const value = component.get(field);
+                        if (value === null || value === undefined) {
+                            formField.value = '';
+                        } else {
+                            formField.value = value;
                         }
-                    });
-                    
-                    // Sync coordinates
-                    syncCoordinates();
-                    
-                    // Handle checkbox
-                    const isBaseCheckbox = form.querySelector('[name="is_base"]');
-                    if (isBaseCheckbox) {
-                        const isBase = component.get('is_base');
-                        isBaseCheckbox.checked = isBase === true || isBase === '1' || isBase === 1;
-                        if (isBaseCheckbox.checked) {
-                            isBaseCheckbox.value = '1';
-                        }
+                    }
+                });
+
+                const isBaseCheckbox = form.querySelector('[name="is_base"]');
+                if (isBaseCheckbox) {
+                    const isBase = component.get('is_base');
+                    isBaseCheckbox.checked = isBase === true || isBase === '1' || isBase === 1;
+                    if (isBaseCheckbox.checked) {
+                        isBaseCheckbox.value = '1';
                     }
                 }
             });
         }
-        
-        // Watch for coordinate changes
-        Livewire.on('livewire:update', () => {
-            setTimeout(syncCoordinates, 100);
-        });
     });
 </script>
 @endscript
