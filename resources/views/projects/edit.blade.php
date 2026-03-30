@@ -66,6 +66,27 @@
                     </div>
 
                     <div class="mb-3">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <x-ui.input
+                                    type="date"
+                                    name="start_date"
+                                    label="Data rozpoczęcia"
+                                    value="{{ old('start_date', $project->start_date ? $project->start_date->format('Y-m-d') : '') }}"
+                                />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.input
+                                    type="date"
+                                    name="end_date"
+                                    label="Data zakończenia (opcjonalnie)"
+                                    value="{{ old('end_date', $project->end_date ? $project->end_date->format('Y-m-d') : '') }}"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <x-ui.input 
                             type="select" 
                             name="status" 
@@ -147,24 +168,6 @@
                                         <option value="USD" {{ $currentCurrency == 'USD' ? 'selected' : '' }}>USD</option>
                                         <option value="GBP" {{ $currentCurrency == 'GBP' ? 'selected' : '' }}>GBP</option>
                                     </x-ui.input>
-                                </div>
-                            </div>
-                            <div class="row g-3 mt-0">
-                                <div class="col-md-6 mb-3 mb-md-0">
-                                    <x-ui.input 
-                                        type="date" 
-                                        name="start_date" 
-                                        label="Data od"
-                                        value="{{ old('start_date', $project->start_date ? $project->start_date->format('Y-m-d') : '') }}"
-                                    />
-                                </div>
-                                <div class="col-md-6">
-                                    <x-ui.input 
-                                        type="date" 
-                                        name="end_date" 
-                                        label="Data do (opcjonalnie)"
-                                        value="{{ old('end_date', $project->end_date ? $project->end_date->format('Y-m-d') : '') }}"
-                                    />
                                 </div>
                             </div>
                             <div class="row g-3 mt-0">

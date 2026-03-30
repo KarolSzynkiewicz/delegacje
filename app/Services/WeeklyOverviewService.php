@@ -40,6 +40,9 @@ class WeeklyOverviewService
      */
     public function getProjectsWithWeeklyData(array $weeks): array
     {
+        $weekStart = $weeks[0]['start'];
+        $weekEnd = $weeks[0]['end'];
+
         // Eager load all necessary relationships to avoid N+1 queries
         $projects = Project::with([
             'location', 
@@ -48,7 +51,18 @@ class WeeklyOverviewService
             'assignments.role',
             'tasks.assignedTo',
             'tasks.createdBy'
-        ])->get();
+        ])
+            // Show only projects that overlap the selected week by at least one day.
+            // Exclude projects that already ended before the week, or haven't started yet.
+            ->where(function ($q) use ($weekEnd) {
+                $q->whereNull('start_date')
+                    ->orWhereDate('start_date', '<=', $weekEnd->toDateString());
+            })
+            ->where(function ($q) use ($weekStart) {
+                $q->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $weekStart->toDateString());
+            })
+            ->get();
         
         return $projects->map(function ($project) use ($weeks) {
             $weeksData = [];

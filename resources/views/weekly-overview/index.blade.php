@@ -66,6 +66,347 @@
         </x-ui.button>
     </div>
 
+    <!-- Kończące się dokumenty i ubezpieczenia -->
+    <div class="mt-4">
+        <x-ui.card>
+            <h2 class="fs-3 fw-bold mb-4 text-center d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-exclamation-triangle text-danger"></i>
+                Kończące się dokumenty i ubezpieczenia
+            </h2>
+            
+            @php
+                // Tworzymy listę pojazdów z informacją o typie (przegląd/OC)
+                $vehiclesList = collect();
+                foreach($expiringItems['vehicle_inspections'] as $vehicle) {
+                    $vehiclesList->push([
+                        'vehicle' => $vehicle,
+                        'type' => 'inspection',
+                        'date' => $vehicle->inspection_valid_to
+                    ]);
+                }
+                foreach($expiringItems['vehicle_insurance'] as $vehicle) {
+                    $vehiclesList->push([
+                        'vehicle' => $vehicle,
+                        'type' => 'insurance',
+                        'date' => $vehicle->insurance_valid_to
+                    ]);
+                }
+                $vehiclesList = $vehiclesList->sortBy('date');
+                
+                $hasExpiringItems = ($expiringItems['documents']->isNotEmpty() || 
+                                    $vehiclesList->isNotEmpty() || 
+                                    $expiringItems['accommodations']->isNotEmpty());
+            @endphp
+            
+            @if($hasExpiringItems)
+                <div x-data="{ 
+                    showAllVehicles: false,
+                    showAllAccommodations: false
+                }">
+                    <!-- Sekcja: Dokumenty -->
+                    @if($expiringItems['documents']->isNotEmpty())
+                        <div class="mb-4">
+                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-file-earmark-text text-info"></i>
+                                Dokumenty ({{ $expiringItems['documents']->count() }})
+                            </h3>
+                            <div class="row g-3">
+                                @foreach($expiringItems['documents']->take(6) as $document)
+                                    <div class="col-md-4">
+                                        <a href="{{ route('employee-documents.edit', $document) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 document-card-clickable">
+                                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="fw-bold mb-1">{{ $document->employee->full_name }}</h5>
+                                                        <p class="mb-1 text-muted small">{{ $document->document->name ?? 'Dokument' }}</p>
+                                                        @if($document->type)
+                                                            <x-ui.badge variant="info" class="mb-2">{{ $document->type }}</x-ui.badge>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-event text-warning"></i>
+                                                    <span class="small">Ważny do: <strong>{{ $document->valid_to->format('d.m.Y') }}</strong></span>
+                                                </div>
+                                            </x-ui.card>
+                                        </a>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if($expiringItems['documents']->count() > 6)
+                                <div class="text-center mt-3">
+                                    <x-ui.button variant="outline-secondary" href="{{ route('employee-documents.index', ['filterStatus' => 'wygasa_wkrotce']) }}" class="btn-sm">
+                                        Pokaż więcej ({{ $expiringItems['documents']->count() - 6 }})
+                                    </x-ui.button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                    
+                    <!-- Sekcja: Auta -->
+                    @if($vehiclesList->isNotEmpty())
+                        <div class="mb-4">
+                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-car-front text-warning"></i>
+                                Auta ({{ $vehiclesList->count() }})
+                            </h3>
+                            <div class="row g-3">
+                                @foreach($vehiclesList->take(5) as $item)
+                                    @php
+                                        $vehicle = $item['vehicle'];
+                                        $type = $item['type'];
+                                        $date = $item['date'];
+                                    @endphp
+                                    <div class="col-md-4">
+                                        <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 vehicle-card-clickable">
+                                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
+                                                        <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
+                                                        @if($type === 'inspection')
+                                                            <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
+                                                        @else
+                                                            <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
+                                                    <span class="small">
+                                                        @if($type === 'inspection')
+                                                            Przegląd ważny do:
+                                                        @else
+                                                            OC ważne do:
+                                                        @endif
+                                                        <strong>{{ $date->format('d.m.Y') }}</strong>
+                                                    </span>
+                                                </div>
+                                            </x-ui.card>
+                                        </a>
+                                    </div>
+                                @endforeach
+                                
+                                @if($vehiclesList->count() > 5)
+                                    <template x-if="showAllVehicles">
+                                        @foreach($vehiclesList->skip(5) as $item)
+                                            @php
+                                                $vehicle = $item['vehicle'];
+                                                $type = $item['type'];
+                                                $date = $item['date'];
+                                            @endphp
+                                            <div class="col-md-4">
+                                                <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none" style="display: block;">
+                                                    <x-ui.card class="h-100 vehicle-card-clickable">
+                                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                                            <div class="flex-grow-1">
+                                                                <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
+                                                                <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
+                                                                @if($type === 'inspection')
+                                                                    <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
+                                                                @else
+                                                                    <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
+                                                            <span class="small">
+                                                                @if($type === 'inspection')
+                                                                    Przegląd ważny do:
+                                                                @else
+                                                                    OC ważne do:
+                                                                @endif
+                                                                <strong>{{ $date->format('d.m.Y') }}</strong>
+                                                            </span>
+                                                        </div>
+                                                    </x-ui.card>
+                                                </a>
+                                            </div>
+                                        @endforeach
+                                    </template>
+                                @endif
+                            </div>
+                            @if($vehiclesList->count() > 5)
+                                <div class="text-center mt-3">
+                                    <button @click="showAllVehicles = !showAllVehicles" class="btn btn-outline-secondary btn-sm">
+                                        <span x-show="!showAllVehicles">Pokaż więcej ({{ $vehiclesList->count() - 5 }})</span>
+                                        <span x-show="showAllVehicles">Pokaż mniej</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                    
+                    <!-- Sekcja: Mieszkania -->
+                    @if($expiringItems['accommodations']->isNotEmpty())
+                        <div class="mb-4">
+                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-house text-danger"></i>
+                                Mieszkania ({{ $expiringItems['accommodations']->count() }})
+                            </h3>
+                            <div class="row g-3">
+                                @foreach($expiringItems['accommodations']->take(5) as $accommodation)
+                                    <div class="col-md-4">
+                                        <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none" style="display: block;">
+                                            <x-ui.card class="h-100 accommodation-card-clickable">
+                                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
+                                                        <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
+                                                        <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-calendar-event text-warning"></i>
+                                                    <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                </div>
+                                            </x-ui.card>
+                                        </a>
+                                    </div>
+                                @endforeach
+                                
+                                @if($expiringItems['accommodations']->count() > 5)
+                                    <template x-if="showAllAccommodations">
+                                        @foreach($expiringItems['accommodations']->skip(5) as $accommodation)
+                                            <div class="col-md-4">
+                                                <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none" style="display: block;">
+                                                    <x-ui.card class="h-100 accommodation-card-clickable">
+                                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                                            <div class="flex-grow-1">
+                                                                <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
+                                                                <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
+                                                                <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <i class="bi bi-calendar-event text-warning"></i>
+                                                            <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                        </div>
+                                                    </x-ui.card>
+                                                </a>
+                                            </div>
+                                        @endforeach
+                                    </template>
+                                @endif
+                            </div>
+                            @if($expiringItems['accommodations']->count() > 5)
+                                <div class="text-center mt-3">
+                                    <button @click="showAllAccommodations = !showAllAccommodations" class="btn btn-outline-secondary btn-sm">
+                                        <span x-show="!showAllAccommodations">Pokaż więcej ({{ $expiringItems['accommodations']->count() - 5 }})</span>
+                                        <span x-show="showAllAccommodations">Pokaż mniej</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @else
+                <div class="col-12">
+                    <x-ui.card>
+                        <p class="fw-medium mb-0 text-center text-muted">Brak dokumentów, ubezpieczeń ani najmów kończących się w tym miesiącu</p>
+                    </x-ui.card>
+                </div>
+            @endif
+        </x-ui.card>
+    </div>
+
+    <!-- Sekcja: Pracownicy bez projektu, ale z autem lub domem -->
+    @if(isset($employeesWithoutProject) && $employeesWithoutProject->isNotEmpty())
+        <div class="mt-4">
+            <x-ui.alert variant="warning" title="Pracownicy bez projektu">
+                <p class="mb-3">Następujący pracownicy mają przypisane auto lub dom, ale nie są przypisani do żadnego projektu w tym tygodniu:</p>
+                <div class="row g-3">
+                    @foreach($employeesWithoutProject as $employeeData)
+                        @php
+                            $employee = $employeeData['employee'];
+                            $vehicleAssignments = $employeeData['vehicle_assignments'];
+                            $accommodationAssignments = $employeeData['accommodation_assignments'];
+                        @endphp
+                        <div class="col-md-6 col-lg-4">
+                            <x-ui.card>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <x-employee-cell :employee="$employee" />
+                                </div>
+                                @if($employee->roles->count() > 0)
+                                    <div class="mb-2">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach($employee->roles as $role)
+                                                <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                                <div class="small">
+                                    @if($vehicleAssignments->isNotEmpty())
+                                        <div class="mb-1">
+                                            <i class="bi bi-car-front text-primary"></i>
+                                            <span class="text-muted">Auto:</span>
+                                            @foreach($vehicleAssignments as $assignment)
+                                                @if($assignment->vehicle)
+                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                        {{ $assignment->vehicle->registration_number }}
+                                                        @if($assignment->vehicle->brand || $assignment->vehicle->model)
+                                                            ({{ $assignment->vehicle->brand }} {{ $assignment->vehicle->model }})
+                                                        @endif
+                                                    </a>@if(!$loop->last), @endif
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                    @if($accommodationAssignments->isNotEmpty())
+                                        <div>
+                                            <i class="bi bi-house text-success"></i>
+                                            <span class="text-muted">Dom:</span>
+                                            @foreach($accommodationAssignments as $assignment)
+                                                @if($assignment->accommodation)
+                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                        {{ $assignment->accommodation->name }}
+                                                    </a>@if(!$loop->last), @endif
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="mt-2">
+                                    @if(isset($allProjects) && $allProjects->isNotEmpty())
+                                        <div class="dropdown" style="position: relative; z-index: 9999;">
+                                            <x-ui.button 
+                                                variant="primary" 
+                                                size="sm"
+                                                data-bs-toggle="dropdown"
+                                                aria-expanded="false"
+                                            >
+                                                <i class="bi bi-person-check"></i> Przypisz projekt
+                                            </x-ui.button>
+                                            <ul class="dropdown-menu" style="background-color: var(--bg-card); opacity: 1; z-index: 9999; position: absolute;">
+                                                @foreach($allProjects as $project)
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
+                                                            {{ $project->name }}
+                                                        </a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @else
+                                        <x-ui.button 
+                                            variant="primary" 
+                                            size="sm"
+                                            href="{{ route('projects.index') }}"
+                                        >
+                                            <i class="bi bi-person-check"></i> Przypisz projekt
+                                        </x-ui.button>
+                                    @endif
+                                </div>
+                            </x-ui.card>
+                        </div>
+                    @endforeach
+                </div>
+            </x-ui.alert>
+        </div>
+    @endif
+
     <!-- Projekty -->
     @php
         // Pre-load all project assignments for all employees in vehicles/accommodations to avoid N+1 queries
@@ -961,348 +1302,6 @@
             />
         </x-ui.card>
     @endforelse
-
-    <!-- Sekcje dodatkowe -->
-    <div class="mt-4">
-        <!-- Kończące się dokumenty -->
-        <x-ui.card>
-            <h2 class="fs-3 fw-bold mb-4 text-center d-flex align-items-center justify-content-center gap-2">
-                <i class="bi bi-exclamation-triangle text-danger"></i>
-                Kończące się dokumenty i ubezpieczenia
-            </h2>
-            
-            @php
-                // Tworzymy listę pojazdów z informacją o typie (przegląd/OC)
-                $vehiclesList = collect();
-                foreach($expiringItems['vehicle_inspections'] as $vehicle) {
-                    $vehiclesList->push([
-                        'vehicle' => $vehicle,
-                        'type' => 'inspection',
-                        'date' => $vehicle->inspection_valid_to
-                    ]);
-                }
-                foreach($expiringItems['vehicle_insurance'] as $vehicle) {
-                    $vehiclesList->push([
-                        'vehicle' => $vehicle,
-                        'type' => 'insurance',
-                        'date' => $vehicle->insurance_valid_to
-                    ]);
-                }
-                $vehiclesList = $vehiclesList->sortBy('date');
-                
-                $hasExpiringItems = ($expiringItems['documents']->isNotEmpty() || 
-                                    $vehiclesList->isNotEmpty() || 
-                                    $expiringItems['accommodations']->isNotEmpty());
-            @endphp
-            
-            @if($hasExpiringItems)
-                <div x-data="{ 
-                    showAllVehicles: false,
-                    showAllAccommodations: false
-                }">
-                    <!-- Sekcja: Dokumenty -->
-                    @if($expiringItems['documents']->isNotEmpty())
-                        <div class="mb-4">
-                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-file-earmark-text text-info"></i>
-                                Dokumenty ({{ $expiringItems['documents']->count() }})
-                            </h3>
-                            <div class="row g-3">
-                                @foreach($expiringItems['documents']->take(6) as $document)
-                                    <div class="col-md-4">
-                                        <a href="{{ route('employee-documents.edit', $document) }}" class="text-decoration-none" style="display: block;">
-                                            <x-ui.card class="h-100 document-card-clickable">
-                                                <div class="d-flex align-items-start justify-content-between mb-2">
-                                                    <div class="flex-grow-1">
-                                                        <h5 class="fw-bold mb-1">{{ $document->employee->full_name }}</h5>
-                                                        <p class="mb-1 text-muted small">{{ $document->document->name ?? 'Dokument' }}</p>
-                                                        @if($document->type)
-                                                            <x-ui.badge variant="info" class="mb-2">{{ $document->type }}</x-ui.badge>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <i class="bi bi-calendar-event text-warning"></i>
-                                                    <span class="small">Ważny do: <strong>{{ $document->valid_to->format('d.m.Y') }}</strong></span>
-                                                </div>
-                                            </x-ui.card>
-                                        </a>
-                                    </div>
-                                @endforeach
-                            </div>
-                            @if($expiringItems['documents']->count() > 6)
-                                <div class="text-center mt-3">
-                                    <x-ui.button variant="outline-secondary" href="{{ route('employee-documents.index', ['filterStatus' => 'wygasa_wkrotce']) }}" class="btn-sm">
-                                        Pokaż więcej ({{ $expiringItems['documents']->count() - 6 }})
-                                    </x-ui.button>
-                                </div>
-                            @endif
-                        </div>
-                    @endif
-                    
-                    <!-- Sekcja: Auta -->
-                    @if($vehiclesList->isNotEmpty())
-                        <div class="mb-4">
-                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-car-front text-warning"></i>
-                                Auta ({{ $vehiclesList->count() }})
-                            </h3>
-                            <div class="row g-3">
-                                @foreach($vehiclesList->take(5) as $item)
-                                    @php
-                                        $vehicle = $item['vehicle'];
-                                        $type = $item['type'];
-                                        $date = $item['date'];
-                                    @endphp
-                                    <div class="col-md-4">
-                                        <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none" style="display: block;">
-                                            <x-ui.card class="h-100 vehicle-card-clickable">
-                                                <div class="d-flex align-items-start justify-content-between mb-2">
-                                                    <div class="flex-grow-1">
-                                                        <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
-                                                        <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
-                                                        @if($type === 'inspection')
-                                                            <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
-                                                        @else
-                                                            <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
-                                                    <span class="small">
-                                                        @if($type === 'inspection')
-                                                            Przegląd ważny do:
-                                                        @else
-                                                            OC ważne do:
-                                                        @endif
-                                                        <strong>{{ $date->format('d.m.Y') }}</strong>
-                                                    </span>
-                                                </div>
-                                            </x-ui.card>
-                                        </a>
-                                    </div>
-                                @endforeach
-                                
-                                @if($vehiclesList->count() > 5)
-                                    <template x-if="showAllVehicles">
-                                        @foreach($vehiclesList->skip(5) as $item)
-                                            @php
-                                                $vehicle = $item['vehicle'];
-                                                $type = $item['type'];
-                                                $date = $item['date'];
-                                            @endphp
-                                            <div class="col-md-4">
-                                                <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none" style="display: block;">
-                                                    <x-ui.card class="h-100 vehicle-card-clickable">
-                                                        <div class="d-flex align-items-start justify-content-between mb-2">
-                                                            <div class="flex-grow-1">
-                                                                <h5 class="fw-bold mb-1">{{ $vehicle->registration_number }}</h5>
-                                                                <p class="mb-1 text-muted small">{{ trim($vehicle->brand . ' ' . $vehicle->model) }}</p>
-                                                                @if($type === 'inspection')
-                                                                    <x-ui.badge variant="warning" class="mb-2">Przegląd</x-ui.badge>
-                                                                @else
-                                                                    <x-ui.badge variant="danger" class="mb-2">OC</x-ui.badge>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <i class="bi bi-calendar-event {{ $type === 'inspection' ? 'text-warning' : 'text-danger' }}"></i>
-                                                            <span class="small">
-                                                                @if($type === 'inspection')
-                                                                    Przegląd ważny do:
-                                                                @else
-                                                                    OC ważne do:
-                                                                @endif
-                                                                <strong>{{ $date->format('d.m.Y') }}</strong>
-                                                            </span>
-                                                        </div>
-                                                    </x-ui.card>
-                                                </a>
-                                            </div>
-                                        @endforeach
-                                    </template>
-                                @endif
-                            </div>
-                            @if($vehiclesList->count() > 5)
-                                <div class="text-center mt-3">
-                                    <button @click="showAllVehicles = !showAllVehicles" class="btn btn-outline-secondary btn-sm">
-                                        <span x-show="!showAllVehicles">Pokaż więcej ({{ $vehiclesList->count() - 5 }})</span>
-                                        <span x-show="showAllVehicles">Pokaż mniej</span>
-                                    </button>
-                                </div>
-                            @endif
-                        </div>
-                    @endif
-                    
-                    <!-- Sekcja: Mieszkania -->
-                    @if($expiringItems['accommodations']->isNotEmpty())
-                        <div class="mb-4">
-                            <h3 class="fs-4 fw-bold mb-3 d-flex align-items-center gap-2">
-                                <i class="bi bi-house text-danger"></i>
-                                Mieszkania ({{ $expiringItems['accommodations']->count() }})
-                            </h3>
-                            <div class="row g-3">
-                                @foreach($expiringItems['accommodations']->take(5) as $accommodation)
-                                    <div class="col-md-4">
-                                        <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none" style="display: block;">
-                                            <x-ui.card class="h-100 accommodation-card-clickable">
-                                                <div class="d-flex align-items-start justify-content-between mb-2">
-                                                    <div class="flex-grow-1">
-                                                        <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
-                                                        <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
-                                                        <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <i class="bi bi-calendar-event text-warning"></i>
-                                                    <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
-                                                </div>
-                                            </x-ui.card>
-                                        </a>
-                                    </div>
-                                @endforeach
-                                
-                                @if($expiringItems['accommodations']->count() > 5)
-                                    <template x-if="showAllAccommodations">
-                                        @foreach($expiringItems['accommodations']->skip(5) as $accommodation)
-                                            <div class="col-md-4">
-                                                <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none" style="display: block;">
-                                                    <x-ui.card class="h-100 accommodation-card-clickable">
-                                                        <div class="d-flex align-items-start justify-content-between mb-2">
-                                                            <div class="flex-grow-1">
-                                                                <h5 class="fw-bold mb-1">{{ $accommodation->name }}</h5>
-                                                                <p class="mb-1 text-muted small">{{ $accommodation->address }}</p>
-                                                                <x-ui.badge variant="danger" class="mb-2">Najem</x-ui.badge>
-                                                            </div>
-                                                        </div>
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <i class="bi bi-calendar-event text-warning"></i>
-                                                            <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
-                                                        </div>
-                                                    </x-ui.card>
-                                                </a>
-                                            </div>
-                                        @endforeach
-                                    </template>
-                                @endif
-                            </div>
-                            @if($expiringItems['accommodations']->count() > 5)
-                                <div class="text-center mt-3">
-                                    <button @click="showAllAccommodations = !showAllAccommodations" class="btn btn-outline-secondary btn-sm">
-                                        <span x-show="!showAllAccommodations">Pokaż więcej ({{ $expiringItems['accommodations']->count() - 5 }})</span>
-                                        <span x-show="showAllAccommodations">Pokaż mniej</span>
-                                    </button>
-                                </div>
-                            @endif
-                        </div>
-                    @endif
-                </div>
-            @else
-                <div class="col-12">
-                    <x-ui.card>
-                        <p class="fw-medium mb-0 text-center text-muted">Brak dokumentów, ubezpieczeń ani najmów kończących się w tym miesiącu</p>
-                    </x-ui.card>
-                </div>
-            @endif
-        </x-ui.card>
-    </div>
-
-    <!-- Sekcja: Pracownicy bez projektu, ale z autem lub domem -->
-    @if(isset($employeesWithoutProject) && $employeesWithoutProject->isNotEmpty())
-        <div class="mt-4">
-            <x-ui.alert variant="warning" title="Pracownicy bez projektu">
-                <p class="mb-3">Następujący pracownicy mają przypisane auto lub dom, ale nie są przypisani do żadnego projektu w tym tygodniu:</p>
-                <div class="row g-3">
-                    @foreach($employeesWithoutProject as $employeeData)
-                        @php
-                            $employee = $employeeData['employee'];
-                            $vehicleAssignments = $employeeData['vehicle_assignments'];
-                            $accommodationAssignments = $employeeData['accommodation_assignments'];
-                        @endphp
-                        <div class="col-md-6 col-lg-4">
-                            <x-ui.card>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <x-employee-cell :employee="$employee" />
-                                </div>
-                                @if($employee->roles->count() > 0)
-                                    <div class="mb-2">
-                                        <div class="d-flex flex-wrap gap-1">
-                                            @foreach($employee->roles as $role)
-                                                <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-                                <div class="small">
-                                    @if($vehicleAssignments->isNotEmpty())
-                                        <div class="mb-1">
-                                            <i class="bi bi-car-front text-primary"></i>
-                                            <span class="text-muted">Auto:</span>
-                                            @foreach($vehicleAssignments as $assignment)
-                                                @if($assignment->vehicle)
-                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
-                                                        {{ $assignment->vehicle->registration_number }}
-                                                        @if($assignment->vehicle->brand || $assignment->vehicle->model)
-                                                            ({{ $assignment->vehicle->brand }} {{ $assignment->vehicle->model }})
-                                                        @endif
-                                                    </a>@if(!$loop->last), @endif
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                    @if($accommodationAssignments->isNotEmpty())
-                                        <div>
-                                            <i class="bi bi-house text-success"></i>
-                                            <span class="text-muted">Dom:</span>
-                                            @foreach($accommodationAssignments as $assignment)
-                                                @if($assignment->accommodation)
-                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
-                                                        {{ $assignment->accommodation->name }}
-                                                    </a>@if(!$loop->last), @endif
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="mt-2">
-                                    @if(isset($allProjects) && $allProjects->isNotEmpty())
-                                        <div class="dropdown" style="position: relative; z-index: 9999;">
-                                            <x-ui.button 
-                                                variant="primary" 
-                                                size="sm"
-                                                data-bs-toggle="dropdown"
-                                                aria-expanded="false"
-                                            >
-                                                <i class="bi bi-person-check"></i> Przypisz projekt
-                                            </x-ui.button>
-                                            <ul class="dropdown-menu" style="background-color: var(--bg-card); opacity: 1; z-index: 9999; position: absolute;">
-                                                @foreach($allProjects as $project)
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
-                                                            {{ $project->name }}
-                                                        </a>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @else
-                                        <x-ui.button 
-                                            variant="primary" 
-                                            size="sm"
-                                            href="{{ route('projects.index') }}"
-                                        >
-                                            <i class="bi bi-person-check"></i> Przypisz projekt
-                                        </x-ui.button>
-                                    @endif
-                                </div>
-                            </x-ui.card>
-                        </div>
-                    @endforeach
-                </div>
-            </x-ui.alert>
-        </div>
-    @endif
 
     @push('scripts')
     <script>

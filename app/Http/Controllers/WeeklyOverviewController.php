@@ -28,6 +28,8 @@ class WeeklyOverviewController extends Controller
         $projectId = $request->query('project_id') ? (int) $request->query('project_id') : null;
         
         $weeks = $this->weeklyOverviewService->getWeeks($startDate);
+        $weekStart = $weeks[0]['start'];
+        $weekEnd = $weeks[0]['end'];
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
         $projects = $this->filterProjectsById($projects, $projectId);
         
@@ -37,15 +39,13 @@ class WeeklyOverviewController extends Controller
         $navigation = $this->buildNavigation('weekly-overview.index', $weeks[0], $projectId);
         
         // Get all projects for the search dropdown
-        $allProjects = $this->getAllProjectsForDropdown();
+        $allProjects = $this->getAllProjectsForDropdown($weekStart, $weekEnd);
         
         // Get users for tasks component
         $users = \App\Models\User::orderBy('name')->get();
         
         // Get return trips (zjazdy) for the week (exclude CANCELLED)
         // Use event_date (when return starts) - end_date may be NULL
-        $weekStart = $weeks[0]['start'];
-        $weekEnd = $weeks[0]['end'];
         $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
             ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
             ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
@@ -109,6 +109,8 @@ class WeeklyOverviewController extends Controller
         $projectId = $request->query('project_id') ? (int) $request->query('project_id') : null;
         
         $weeks = $this->weeklyOverviewService->getWeeks($startDate);
+        $weekStart = $weeks[0]['start'];
+        $weekEnd = $weeks[0]['end'];
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
         $projects = $this->filterProjectsById($projects, $projectId);
         
@@ -117,7 +119,7 @@ class WeeklyOverviewController extends Controller
         $navigation = $this->buildNavigation('weekly-overview.planner2', $weeks[0], $projectId);
         
         // Get all projects for the search dropdown
-        $allProjects = $this->getAllProjectsForDropdown();
+        $allProjects = $this->getAllProjectsForDropdown($weekStart, $weekEnd);
         
         return view('weekly-overview.planner2', compact('weeks', 'projectsWithCalendar', 'startDate', 'navigation', 'projectId', 'allProjects'));
     }
@@ -131,12 +133,12 @@ class WeeklyOverviewController extends Controller
         $projectId = $request->query('project_id');
         
         $weeks = $this->weeklyOverviewService->getWeeks($startDate);
+        $weekStart = $weeks[0]['start'];
+        $weekEnd = $weeks[0]['end'];
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
         $projects = $this->filterProjectsById($projects, $projectId);
         
         $week = $weeks[0];
-        $weekStart = $week['start'];
-        $weekEnd = $week['end'];
         $projectsWithStability = $this->enrichProjectsWithStability($projects, $weekStart, $weekEnd);
         
         $navigation = $this->buildNavigation('weekly-overview.planner3', $weeks[0], $projectId);
@@ -252,10 +254,22 @@ class WeeklyOverviewController extends Controller
      * Get all active projects for dropdowns.
      * Uses cache with shorter TTL to ensure new projects appear quickly.
      */
-    protected function getAllProjectsForDropdown()
+    protected function getAllProjectsForDropdown(Carbon $weekStart, Carbon $weekEnd)
     {
-        return cache()->remember('active_projects_dropdown', 300, function () {
-            return Project::active()->orderBy('name')->get();
+        $cacheKey = 'active_projects_dropdown_' . $weekStart->format('Y-m-d');
+
+        return cache()->remember($cacheKey, 300, function () use ($weekStart, $weekEnd) {
+            return Project::active()
+                ->where(function ($q) use ($weekEnd) {
+                    $q->whereNull('start_date')
+                        ->orWhereDate('start_date', '<=', $weekEnd->toDateString());
+                })
+                ->where(function ($q) use ($weekStart) {
+                    $q->whereNull('end_date')
+                        ->orWhereDate('end_date', '>=', $weekStart->toDateString());
+                })
+                ->orderBy('name')
+                ->get();
         });
     }
 }

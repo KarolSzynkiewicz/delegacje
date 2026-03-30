@@ -266,10 +266,24 @@
                 <p class="small text-muted mb-3">
                     Braki w rolach na najbliższe 2 tygodnie (14 dni od przybycia). Zakres pokazuje minimalną i maksymalną liczbę braków w ciągu 14 dni.
                 </p>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Filtruj po nazwie projektu</label>
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="projectSearch"
+                        class="form-control"
+                        placeholder="Wpisz nazwę projektu..."
+                    >
+                </div>
                 
                 <div class="project-gaps-list">
-                    @if(!empty($projectGapsTwoWeeks))
-                        @foreach($projectGapsTwoWeeks as $projectId => $project)
+                    @php
+                        $filteredProjectGapsTwoWeeks = $this->filteredProjectGapsTwoWeeks;
+                    @endphp
+
+                    @if(!empty($filteredProjectGapsTwoWeeks))
+                        @foreach($filteredProjectGapsTwoWeeks as $projectId => $project)
                             <div class="project-item mb-4 p-3 border rounded">
                                 <div class="d-flex align-items-start gap-2 mb-3">
                                     <div class="flex-grow-1">
@@ -399,7 +413,13 @@
                     @else
                         <div class="text-center text-muted py-4">
                             <i class="bi bi-check-circle fs-1 text-success"></i>
-                            <p class="mt-2">Brak braków w rolach na najbliższe 2 tygodnie</p>
+                            <p class="mt-2">
+                                @if(filled($projectSearch))
+                                    Brak braków dla wybranych filtrów
+                                @else
+                                    Brak braków w rolach na najbliższe 2 tygodnie
+                                @endif
+                            </p>
                         </div>
                     @endif
                 </div>

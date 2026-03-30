@@ -33,6 +33,7 @@ class Step1ProjectAssignments extends Component
     public $vehicle;
     public $roleFilter = null;
     public $employeeSearch = '';
+    public $projectSearch = '';
     
     // Cache for Projects and Roles to avoid N+1 queries
     protected $projectsCache = [];
@@ -126,6 +127,12 @@ class Step1ProjectAssignments extends Component
     {
         // Reset pagination when filter changes
         $this->employeesPage = 1;
+    }
+
+    public function updatedProjectSearch()
+    {
+        // No pagination on projects list yet, but keep it reactive and predictable
+        $this->dispatch('$refresh');
     }
     
     public function updatedAssignments()
@@ -341,6 +348,29 @@ class Step1ProjectAssignments extends Component
         $arrivalDate = Carbon::parse($this->endDate);
         $this->projectGaps = $this->departurePlannerService->getProjectGapsForWeek($arrivalDate);
         $this->projectGapsTwoWeeks = $this->departurePlannerService->getProjectGapsForTwoWeeks($arrivalDate);
+    }
+
+    public function getFilteredProjectGapsTwoWeeksProperty(): array
+    {
+        $gaps = $this->projectGapsTwoWeeks ?? [];
+        if (empty($gaps) || !is_array($gaps)) {
+            return [];
+        }
+
+        $search = trim((string) ($this->projectSearch ?? ''));
+        if ($search === '') {
+            return $gaps;
+        }
+
+        $searchLower = mb_strtolower($search);
+
+        return collect($gaps)
+            ->filter(function ($project) use ($searchLower) {
+                $name = is_array($project) ? ($project['name'] ?? '') : '';
+                $nameLower = mb_strtolower((string) $name);
+                return str_contains($nameLower, $searchLower);
+            })
+            ->all();
     }
     
     public function loadVehicle()
