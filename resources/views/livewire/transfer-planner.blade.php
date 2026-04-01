@@ -297,7 +297,7 @@
                     :disabled="count($selectedEmployeeIds) === 0"
                 >
                     <option value="">— brak / nie dotyczy —</option>
-                    @foreach($this->employees->whereIn('id', $selectedEmployeeIds) as $emp)
+                    @foreach($this->selectedEmployees as $emp)
                         <option value="{{ $emp->id }}">{{ $emp->full_name }}</option>
                     @endforeach
                 </x-ui.input>
