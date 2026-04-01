@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\LogisticsEvent;
 
 class Adjustment extends Model
 {
@@ -18,6 +19,7 @@ class Adjustment extends Model
     protected $fillable = [
         'employee_id',
         'payroll_id',
+        'logistics_event_id',
         'amount',
         'currency',
         'type',
@@ -49,6 +51,14 @@ class Adjustment extends Model
     public function payroll(): BelongsTo
     {
         return $this->belongsTo(Payroll::class);
+    }
+
+    /**
+     * Get the logistics event (transfer) this adjustment is linked to.
+     */
+    public function logisticsEvent(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsEvent::class);
     }
 
     /**

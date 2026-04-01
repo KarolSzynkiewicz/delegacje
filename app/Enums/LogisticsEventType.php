@@ -6,12 +6,14 @@ enum LogisticsEventType: string
 {
     case DEPARTURE = 'departure';
     case RETURN = 'return';
+    case TRANSFER = 'transfer';
 
     public function label(): string
     {
         return match($this) {
             self::DEPARTURE => 'Wyjazd',
             self::RETURN => 'Zjazd',
+            self::TRANSFER => 'Transfer',
         };
     }
 

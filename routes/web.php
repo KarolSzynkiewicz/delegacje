@@ -21,6 +21,7 @@ use App\Http\Controllers\RotationController;
 use App\Http\Controllers\EmployeeRateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SystemActionsController;
+use App\Http\Controllers\TransferController;
 use Illuminate\Support\Facades\Route;
 
 //review
@@ -383,6 +384,20 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->name('departures.create-v2');
     
     Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy', 'edit', 'update']);
+
+    // Transfers
+    Route::group(['defaults' => ['resource' => 'transfers']], function () {
+        Route::post('transfers/{transfer}/cancel', [\App\Http\Controllers\TransferController::class, 'cancel'])
+            ->name('transfers.cancel')
+            ->defaults('permission_type', 'action');
+
+        Route::get('transfers', [\App\Http\Controllers\TransferController::class, 'index'])
+            ->name('transfers.index');
+        Route::get('transfers/create', [\App\Http\Controllers\TransferController::class, 'create'])
+            ->name('transfers.create');
+        Route::get('transfers/{transfer}', [\App\Http\Controllers\TransferController::class, 'show'])
+            ->name('transfers.show');
+    });
     });
     
     // ===== VIEW ROUTES =====

@@ -10,6 +10,7 @@ use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use App\Traits\HasComments;
 use App\Models\Accommodation;
+use App\Models\Adjustment;
 
 /**
  * LogisticsEvent - fakt biznesowy (co, kiedy, kto, gdzie)
@@ -128,6 +129,14 @@ class LogisticsEvent extends Model
     public function transportCosts(): HasMany
     {
         return $this->hasMany(TransportCost::class);
+    }
+
+    /**
+     * Get driver payment adjustments linked to this transfer.
+     */
+    public function driverAdjustments(): HasMany
+    {
+        return $this->hasMany(Adjustment::class);
     }
 
     /**

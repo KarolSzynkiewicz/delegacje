@@ -49,6 +49,7 @@ return [
             'rotations',
             'return_trips',
             'departures',
+            'transfers',
         ],
     ],
     

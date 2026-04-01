@@ -86,6 +86,12 @@ return [
         'icon' => 'bi bi-arrow-right',
         'label' => 'Wyjazdy',
     ],
+
+    'transfers' => [
+        'route' => 'transfers.index',
+        'icon' => 'bi bi-shuffle',
+        'label' => 'Transfery',
+    ],
     
     'equipment' => [
         'route' => 'equipment.index',
