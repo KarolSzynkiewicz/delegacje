@@ -213,7 +213,7 @@
                                 <x-ui.input
                                     type="checkbox"
                                     name="emp_{{ $employee->id }}"
-                                    :label="'<span class=&quot;fw-semibold&quot;>' . e($employee->full_name) . '</span>' . ($employee->phone ? '<div class=&quot;text-muted&quot; style=&quot;font-size:0.75rem;&quot;>' . e($employee->phone) . '</div>' : '')"
+                                    :label="'<span class=\"fw-semibold\">' . e($employee->full_name) . '</span>' . ($employee->phone ? '<div class=\"text-muted\" style=\"font-size:0.75rem;\">' . e($employee->phone) . '</div>' : '')"
                                     :value="$selected"
                                     class="mb-0"
                                     disabled
