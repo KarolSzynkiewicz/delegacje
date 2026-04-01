@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\LogisticsEvent;
+use App\Models\Location;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
 use Illuminate\Http\Request;
@@ -48,7 +49,28 @@ class TransferController extends Controller
             'driverAdjustments.payroll',
         ]);
 
-        return view('transfers.show', compact('transfer'));
+        $waypointIds = array_values(array_filter(array_map('intval', (array) ($transfer->route_waypoints ?? []))));
+        $waypointsById = empty($waypointIds)
+            ? collect()
+            : Location::whereIn('id', $waypointIds)->get()->keyBy('id');
+
+        $orderedWaypoints = collect();
+        foreach ($waypointIds as $id) {
+            if ($waypointsById->has($id)) {
+                $orderedWaypoints->push($waypointsById->get($id));
+            }
+        }
+
+        $routeStops = collect()
+            ->when($transfer->fromLocation, fn ($c) => $c->push($transfer->fromLocation))
+            ->concat($orderedWaypoints)
+            ->when($transfer->toLocation, fn ($c) => $c->push($transfer->toLocation));
+
+        return view('transfers.show', [
+            'transfer' => $transfer,
+            'routeStops' => $routeStops,
+            'waypoints' => $orderedWaypoints,
+        ]);
     }
 
     public function cancel(LogisticsEvent $transfer): RedirectResponse

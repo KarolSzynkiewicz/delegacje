@@ -87,6 +87,57 @@
         </div>
     </x-ui.card>
 
+    <!-- Trasa -->
+    <x-ui.card label="Trasa" class="mb-4">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <h6 class="text-muted small mb-1">Dystans</h6>
+                <p class="fw-semibold mb-0">{{ $transfer->getFormattedDistance() ?? '—' }}</p>
+            </div>
+            <div class="col-md-4">
+                <h6 class="text-muted small mb-1">Czas</h6>
+                <p class="fw-semibold mb-0">{{ $transfer->getFormattedDuration() ?? '—' }}</p>
+            </div>
+            <div class="col-md-4">
+                <h6 class="text-muted small mb-1">Liczba przystanków</h6>
+                <p class="fw-semibold mb-0">{{ max(0, ($routeStops->count() ?? 0) - 2) }}</p>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            @if(isset($routeStops) && $routeStops->count() > 0)
+                <div class="row g-2">
+                    @foreach($routeStops as $i => $loc)
+                        @php
+                            $isStart = $i === 0;
+                            $isEnd = $i === ($routeStops->count() - 1);
+                            $badge = $isStart ? 'Start' : ($isEnd ? 'Cel' : 'Przystanek');
+                            $badgeVariant = $isStart ? 'primary' : ($isEnd ? 'success' : 'accent');
+                        @endphp
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-2 border rounded-3 d-flex align-items-start gap-2">
+                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $badge }}</x-ui.badge>
+                                <div class="min-w-0">
+                                    <div class="fw-semibold small text-truncate">{{ $loc->name }}</div>
+                                    @if($loc->city)
+                                        <div class="text-muted" style="font-size: 0.75rem;">{{ $loc->city }}</div>
+                                    @endif
+                                    @if(!$loc->hasCoordinates())
+                                        <div class="text-warning" style="font-size: 0.75rem;">
+                                            <i class="bi bi-exclamation-triangle"></i> brak współrzędnych
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <x-ui.empty-state icon="map" message="Brak zapisanej trasy (brak przystanków)" />
+            @endif
+        </div>
+    </x-ui.card>
+
     <!-- Uczestnicy -->
     <x-ui.card label="Uczestnicy" class="mb-4">
         @if($transfer->participants->count() > 0)
