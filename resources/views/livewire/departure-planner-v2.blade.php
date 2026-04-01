@@ -1,4 +1,15 @@
 <div>
+    @if($currentStep === 4 && $errors->any())
+        <x-ui.alert variant="danger" title="Nie można zapisać wyjazdu" dismissible class="mb-4">
+            <div class="fw-semibold mb-2">Popraw poniższe błędy i spróbuj ponownie:</div>
+            <ul class="mb-0 ps-3">
+                @foreach($errors->all() as $error)
+                    <li class="text-white">{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
+
     <!-- Form Header: Dates and Vehicle -->
     <x-ui.card class="mb-4">
         <div class="row g-3">
@@ -79,18 +90,33 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Lokalizacja przystanku docelowego <span class="text-danger">*</span></label>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Lotnisko startowe <span class="text-danger">*</span></label>
                                     <select
-                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.destination_stop_location_id"
-                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.destination_stop_location_id') is-invalid @enderror"
+                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.start_airport_location_id"
+                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.start_airport_location_id') is-invalid @enderror"
                                     >
-                                        <option value="">Wybierz lokalizację</option>
-                                        @foreach($this->availableLocations as $location)
-                                            <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                        <option value="">Wybierz lotnisko</option>
+                                        @foreach($this->availableAirports as $airport)
+                                            <option value="{{ $airport->id }}">{{ $airport->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('ticketCostsByEmployee.' . $employee->id . '.destination_stop_location_id')
+                                    @error('ticketCostsByEmployee.' . $employee->id . '.start_airport_location_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Lotnisko docelowe <span class="text-danger">*</span></label>
+                                    <select
+                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.end_airport_location_id"
+                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.end_airport_location_id') is-invalid @enderror"
+                                    >
+                                        <option value="">Wybierz lotnisko</option>
+                                        @foreach($this->availableAirports as $airport)
+                                            <option value="{{ $airport->id }}">{{ $airport->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('ticketCostsByEmployee.' . $employee->id . '.end_airport_location_id')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
@@ -172,9 +198,11 @@
         <livewire:steps.step4-route-planning
             :departure-date="$departureDate"
             :end-date="$endDate"
+            :vehicle-id="$vehicleId"
             :accommodation-assignments="$accommodationAssignments"
             :assignment-ranges="$assignmentRanges"
             :vehicle-assignments="$vehicleAssignments"
+            :ticket-costs-by-employee="$ticketCostsByEmployee"
             key="step4-{{ $departureDate }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
         />
     @endif

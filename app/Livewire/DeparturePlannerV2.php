@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
+use App\Enums\LocationPurposeType;
 
 class DeparturePlannerV2 extends Component
 {
@@ -27,7 +28,7 @@ class DeparturePlannerV2 extends Component
     public $accommodationAssignments = []; // [employee_id => ['accommodation_id' => ..., 'start_date' => ..., 'end_date' => ...]]
     public $vehicleAssignments = []; // [employee_id => ['vehicle_id' => ..., 'position' => ..., 'start_date' => ..., 'end_date' => ...]]
     public $routeData = null; // Route planning data
-    public $ticketCostsByEmployee = []; // [employee_id => ['amount' => ..., 'currency' => 'PLN', 'attachment' => file, 'destination_stop_location_id' => ...]]
+    public $ticketCostsByEmployee = []; // [employee_id => ['amount' => ..., 'currency' => 'PLN', 'attachment' => file]]
     
     // Listenery na eventy z podkomponentów
     protected $listeners = [
@@ -363,21 +364,27 @@ class DeparturePlannerV2 extends Component
     
     public function saveDeparture()
     {
+        // Wyczyść błędy z poprzedniej próby zapisu
+        $this->resetErrorBag();
+
         // Walidacja przed zapisem
         if (empty($this->assignments) && empty($this->assignmentRanges)) {
             $this->dispatch('error', message: 'Musisz przypisać przynajmniej jednego pracownika do projektu.');
             return;
         }
 
+        $ticketCostsPerEmployee = [];
+
         if (empty($this->vehicleId)) {
-            $ticketCostsPerEmployee = [];
             $employeeIds = $this->getSelectedEmployeeIds();
 
+            // Krok 1: waliduj wszystkie pola (bez uploadu pliku)
             foreach ($employeeIds as $employeeId) {
                 $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
                 $amount = $employeeCost['amount'] ?? null;
-                $currency = strtoupper((string) ($employeeCost['currency'] ?? ''));
-                $destinationStopLocationId = $employeeCost['destination_stop_location_id'] ?? null;
+                $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                $startAirportLocationId = $employeeCost['start_airport_location_id'] ?? null;
+                $endAirportLocationId = $employeeCost['end_airport_location_id'] ?? null;
                 $attachment = $employeeCost['attachment'] ?? null;
 
                 if ($amount === null || $amount === '' || !is_numeric($amount) || (float) $amount <= 0) {
@@ -388,18 +395,44 @@ class DeparturePlannerV2 extends Component
                     $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
                 }
 
-                if (empty($destinationStopLocationId) || !Location::whereKey($destinationStopLocationId)->exists()) {
-                    $this->addError("ticketCostsByEmployee.{$employeeId}.destination_stop_location_id", 'Wybierz lokalizację przystanku docelowego z listy.');
+                if (empty($startAirportLocationId) || !Location::whereKey($startAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.start_airport_location_id", 'Wybierz lotnisko startowe z listy.');
+                }
+
+                if (empty($endAirportLocationId) || !Location::whereKey($endAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.end_airport_location_id", 'Wybierz lotnisko docelowe z listy.');
                 }
 
                 if ($attachment) {
-                    $this->validate([
-                        "ticketCostsByEmployee.{$employeeId}.attachment" => 'file|max:10240',
-                    ], [
-                        "ticketCostsByEmployee.{$employeeId}.attachment.file" => 'Załącznik musi być poprawnym plikiem.',
-                        "ticketCostsByEmployee.{$employeeId}.attachment.max" => 'Załącznik może mieć maksymalnie 10 MB.',
-                    ]);
+                    $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
+                        ["attachment" => $attachment],
+                        ["attachment" => 'file|max:10240'],
+                        [
+                            "attachment.file" => 'Załącznik musi być poprawnym plikiem.',
+                            "attachment.max"  => 'Załącznik może mieć maksymalnie 10 MB.',
+                        ]
+                    );
+                    if ($attachmentValidator->fails()) {
+                        foreach ($attachmentValidator->errors()->all() as $message) {
+                            $this->addError("ticketCostsByEmployee.{$employeeId}.attachment", $message);
+                        }
+                    }
                 }
+            }
+
+            // Jeśli walidacja nie przeszła — zatrzymaj, pokaż błędy w UI
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            // Krok 2: walidacja OK — uploaduj pliki i buduj tablicę kosztów
+            foreach ($employeeIds as $employeeId) {
+                $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
+                $amount = $employeeCost['amount'] ?? null;
+                $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                $startAirportLocationId = $employeeCost['start_airport_location_id'] ?? null;
+                $endAirportLocationId = $employeeCost['end_airport_location_id'] ?? null;
+                $attachment = $employeeCost['attachment'] ?? null;
 
                 $attachmentPath = null;
                 if ($attachment) {
@@ -409,14 +442,10 @@ class DeparturePlannerV2 extends Component
                 $ticketCostsPerEmployee[$employeeId] = [
                     'amount' => (float) $amount,
                     'currency' => $currency,
-                    'destination_stop_location_id' => (int) $destinationStopLocationId,
                     'attachment_path' => $attachmentPath,
+                    'start_airport_location_id' => (int) $startAirportLocationId,
+                    'end_airport_location_id' => (int) $endAirportLocationId,
                 ];
-            }
-
-            if ($this->getErrorBag()->isNotEmpty()) {
-                $this->dispatch('error', message: 'Uzupełnij koszty biletów dla wszystkich uczestników.');
-                return;
             }
         }
 
@@ -484,6 +513,14 @@ class DeparturePlannerV2 extends Component
     public function getAvailableLocationsProperty()
     {
         return Location::orderBy('name')->get();
+    }
+
+    public function getAvailableAirportsProperty()
+    {
+        return Location::query()
+            ->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))
+            ->orderBy('name')
+            ->get();
     }
 
     protected function getSelectedEmployeeIds(): array

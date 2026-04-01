@@ -103,9 +103,19 @@
         <div class="col-md-8">
             <x-ui.card>
                 <h6 class="mb-3">W jakich domach będą mieszkali po przyjeździe?</h6>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Szukaj po mieszkaniu</label>
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="accommodationSearch"
+                        class="form-control"
+                        placeholder="Wpisz nazwę/adres/miasto..."
+                    >
+                </div>
                 
                 <div class="row g-3">
-                    @foreach($accommodations as $accommodation)
+                    @foreach($this->filteredAccommodations as $accommodation)
                         <div class="col-md-4">
                             <div class="accommodation-item p-3 border rounded h-100" style="background: rgba(255,255,255,0.03);">
                                 <div class="d-flex align-items-center justify-content-between mb-2">

@@ -17,9 +17,11 @@ class Step4RoutePlanning extends Component
     // Dane otrzymane z rodzica (read-only)
     public $departureDate;
     public $endDate;
+    public $vehicleId;
     public $accommodationAssignments = []; // Read-only z rodzica
     public $assignmentRanges = []; // Read-only z rodzica
     public $vehicleAssignments = []; // Read-only z rodzica
+    public $ticketCostsByEmployee = []; // Read-only z rodzica (for public transport tickets)
 
     // Dane trasy
     public $routeWaypoints = []; // Array of accommodation IDs in order
@@ -43,13 +45,15 @@ class Step4RoutePlanning extends Component
         $this->routePlanningService = $routePlanningService;
     }
 
-    public function mount($departureDate, $endDate, $accommodationAssignments = [], $assignmentRanges = [], $vehicleAssignments = [])
+    public function mount($departureDate, $endDate, $vehicleId = null, $accommodationAssignments = [], $assignmentRanges = [], $vehicleAssignments = [], $ticketCostsByEmployee = [])
     {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
+        $this->vehicleId = $vehicleId;
         $this->accommodationAssignments = $accommodationAssignments;
         $this->assignmentRanges = $assignmentRanges;
         $this->vehicleAssignments = $vehicleAssignments;
+        $this->ticketCostsByEmployee = $ticketCostsByEmployee;
 
         $this->loadLocations();
         $this->initializeWaypoints();
@@ -322,6 +326,7 @@ class Step4RoutePlanning extends Component
     public function getTripPlanProperty(): array
     {
         $plan = [];
+        $isPublicTransport = empty($this->vehicleId);
         
         // Collect all IDs for eager loading
         $employeeIds = array_keys($this->accommodationAssignments);
@@ -334,6 +339,22 @@ class Step4RoutePlanning extends Component
         $accommodations = Accommodation::whereIn('id', $accommodationIds)->get()->keyBy('id');
         $projects = \App\Models\Project::with('location')->whereIn('id', $projectIds)->get()->keyBy('id');
         $vehicles = Vehicle::whereIn('id', $vehicleIds)->get()->keyBy('id');
+
+        $airportNames = collect();
+        if ($isPublicTransport) {
+            $airportIds = collect($this->ticketCostsByEmployee)
+                ->flatMap(function ($row) {
+                    $start = $row['start_airport_location_id'] ?? null;
+                    $end = $row['end_airport_location_id'] ?? null;
+                    return array_filter([(int) $start, (int) $end]);
+                })
+                ->unique()
+                ->values();
+
+            if ($airportIds->isNotEmpty()) {
+                $airportNames = Location::whereIn('id', $airportIds)->pluck('name', 'id');
+            }
+        }
         
         // Build assignment maps for quick lookup
         $employeeToProject = [];
@@ -365,8 +386,32 @@ class Step4RoutePlanning extends Component
             
             // Calculate distance from accommodation to project
             $distance = null;
-            if ($project && $project->location && $accommodation->hasCoordinates() && $project->location->hasCoordinates()) {
+            if (!$isPublicTransport && $project && $project->location && $accommodation->hasCoordinates() && $project->location->hasCoordinates()) {
                 $distance = $this->getCachedDistance($accommodation, $project->location);
+            }
+
+            $ticket = null;
+            if ($isPublicTransport) {
+                $ticketData = $this->ticketCostsByEmployee[$employeeId] ?? [];
+                $amount = $ticketData['amount'] ?? null;
+                $currency = $ticketData['currency'] ?? null;
+                $attachmentPath = $ticketData['attachment_path'] ?? null;
+                $startAirportLocationId = $ticketData['start_airport_location_id'] ?? null;
+                $endAirportLocationId = $ticketData['end_airport_location_id'] ?? null;
+                $startAirportName = $startAirportLocationId ? ($airportNames[(int) $startAirportLocationId] ?? null) : null;
+                $endAirportName = $endAirportLocationId ? ($airportNames[(int) $endAirportLocationId] ?? null) : null;
+
+                if ($amount !== null || $currency !== null || $attachmentPath !== null) {
+                    $ticket = [
+                        'amount' => $amount,
+                        'currency' => $currency,
+                        'attachment_path' => $attachmentPath,
+                        'start_airport_location_id' => $startAirportLocationId,
+                        'end_airport_location_id' => $endAirportLocationId,
+                        'start_airport_name' => $startAirportName,
+                        'end_airport_name' => $endAirportName,
+                    ];
+                }
             }
             
             if (!isset($plan[$accommodationId])) {
@@ -388,6 +433,7 @@ class Step4RoutePlanning extends Component
                 'distance' => $distance,
                 'vehicle_id' => $vehicleId,
                 'vehicle_name' => $vehicleName,
+                'ticket' => $ticket,
             ];
         }
         

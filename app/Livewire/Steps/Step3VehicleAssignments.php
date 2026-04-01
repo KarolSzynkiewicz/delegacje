@@ -27,6 +27,7 @@ class Step3VehicleAssignments extends Component
     // Własne dane (ciężkie obliczenia)
     public $assignedEmployees = [];
     public $vehicles = [];
+    public $vehicleSearch = '';
     
     // Cache for Projects, Roles, and Vehicles to avoid N+1 queries
     protected $projectsCache = [];
@@ -67,6 +68,39 @@ class Step3VehicleAssignments extends Component
         $this->loadAssignedEmployees();
         $this->loadVehicles();
         $this->loadCaches();
+    }
+
+    public function updatedVehicleSearch()
+    {
+        // Keep it reactive and predictable
+        $this->dispatch('$refresh');
+    }
+
+    public function getFilteredVehiclesProperty(): array
+    {
+        $items = $this->vehicles ?? [];
+        if (empty($items) || !is_array($items)) {
+            return [];
+        }
+
+        $search = trim((string) ($this->vehicleSearch ?? ''));
+        if ($search === '') {
+            return $items;
+        }
+
+        $needle = mb_strtolower($search);
+
+        return collect($items)
+            ->filter(function ($v) use ($needle) {
+                $reg = (string) ($v['registration_number'] ?? '');
+                $brand = (string) ($v['brand'] ?? '');
+                $model = (string) ($v['model'] ?? '');
+
+                $haystack = mb_strtolower(trim($reg . ' ' . $brand . ' ' . $model));
+                return $haystack !== '' && str_contains($haystack, $needle);
+            })
+            ->values()
+            ->all();
     }
     
     protected function loadCaches()

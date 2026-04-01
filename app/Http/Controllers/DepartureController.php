@@ -856,11 +856,17 @@ class DepartureController extends Controller
                 $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
                 foreach ($employeeIds as $employeeId) {
                     $costData = $ticketCostsPerEmployee[$employeeId] ?? null;
-                    if (!$costData || empty($costData['amount']) || empty($costData['currency']) || empty($costData['destination_stop_location_id'])) {
+                    if (
+                        !$costData
+                        || empty($costData['amount'])
+                        || empty($costData['currency'])
+                        || empty($costData['start_airport_location_id'])
+                        || empty($costData['end_airport_location_id'])
+                    ) {
                         DB::rollBack();
                         return redirect()
                             ->route('departures.create-v2')
-                            ->with('error', 'Uzupełnij koszt biletu, walutę i przystanek docelowy dla każdej osoby.');
+                            ->with('error', 'Uzupełnij koszt biletu, walutę oraz lotnisko startowe i docelowe dla każdej osoby.');
                     }
                 }
             }
@@ -875,19 +881,31 @@ class DepartureController extends Controller
             if (empty($validated['vehicle_id']) && $employeeIds->isNotEmpty()) {
                 $employeeNames = Employee::whereIn('id', $employeeIds)->get()->pluck('full_name', 'id');
                 $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
-                $destinationLocationIds = collect($ticketCostsPerEmployee)
-                    ->pluck('destination_stop_location_id')
-                    ->filter()
+                $destinationStopLocationName = Location::whereKey($destinationLocationId)->value('name');
+                $airportLocationIds = collect($ticketCostsPerEmployee)
+                    ->flatMap(function ($row) {
+                        $start = $row['start_airport_location_id'] ?? null;
+                        $end = $row['end_airport_location_id'] ?? null;
+                        return array_filter([(int) $start, (int) $end]);
+                    })
                     ->unique()
                     ->values();
-                $destinationLocationNames = Location::whereIn('id', $destinationLocationIds)->pluck('name', 'id');
+                $airportNames = Location::whereIn('id', $airportLocationIds)->pluck('name', 'id');
 
                 foreach ($employeeIds as $employeeId) {
                     $employeeName = $employeeNames[$employeeId] ?? ("ID: " . $employeeId);
                     $costData = $ticketCostsPerEmployee[$employeeId] ?? [];
-                    $destinationStopLocationName = null;
-                    if (!empty($costData['destination_stop_location_id'])) {
-                        $destinationStopLocationName = $destinationLocationNames[(int) $costData['destination_stop_location_id']] ?? null;
+                    $startAirportName = null;
+                    $endAirportName = null;
+                    if (!empty($costData['start_airport_location_id'])) {
+                        $startAirportName = $airportNames[(int) $costData['start_airport_location_id']] ?? null;
+                    }
+                    if (!empty($costData['end_airport_location_id'])) {
+                        $endAirportName = $airportNames[(int) $costData['end_airport_location_id']] ?? null;
+                    }
+                    $airportText = null;
+                    if ($startAirportName && $endAirportName) {
+                        $airportText = 'Lotnisko: ' . $startAirportName . ' → ' . $endAirportName;
                     }
 
                     TransportCost::create([
@@ -900,9 +918,10 @@ class DepartureController extends Controller
                         'cost_date' => $departureDate->toDateString(),
                         'description' => 'Bilet - ' . $employeeName,
                         'file_path' => $costData['attachment_path'] ?? null,
-                        'notes' => !empty($destinationStopLocationName)
-                            ? 'Przystanek docelowy: ' . $destinationStopLocationName
-                            : null,
+                        'notes' => collect([
+                            !empty($destinationStopLocationName) ? ('Przystanek docelowy: ' . $destinationStopLocationName) : null,
+                            $airportText,
+                        ])->filter()->implode(' | ') ?: null,
                         'created_by' => auth()->id() ?? 1,
                     ]);
                 }

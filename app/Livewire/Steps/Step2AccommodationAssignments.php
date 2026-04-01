@@ -24,6 +24,7 @@ class Step2AccommodationAssignments extends Component
     // Własne dane (ciężkie obliczenia)
     public $assignedEmployees = [];
     public $accommodations = [];
+    public $accommodationSearch = '';
     
     // Cache for Projects, Roles, and Accommodations to avoid N+1 queries
     protected $projectsCache = [];
@@ -61,6 +62,40 @@ class Step2AccommodationAssignments extends Component
         $this->loadAssignedEmployees();
         $this->loadAccommodations();
         $this->loadCaches();
+    }
+
+    public function updatedAccommodationSearch()
+    {
+        // Keep it reactive and predictable
+        $this->dispatch('$refresh');
+    }
+
+    public function getFilteredAccommodationsProperty(): array
+    {
+        $items = $this->accommodations ?? [];
+        if (empty($items) || !is_array($items)) {
+            return [];
+        }
+
+        $search = trim((string) ($this->accommodationSearch ?? ''));
+        if ($search === '') {
+            return $items;
+        }
+
+        $needle = mb_strtolower($search);
+
+        return collect($items)
+            ->filter(function ($acc) use ($needle) {
+                $name = (string) ($acc['name'] ?? '');
+                $address = (string) ($acc['address'] ?? '');
+                $city = (string) ($acc['city'] ?? '');
+                $country = (string) ($acc['country'] ?? '');
+
+                $haystack = mb_strtolower(trim($name . ' ' . $address . ' ' . $city . ' ' . $country));
+                return $haystack !== '' && str_contains($haystack, $needle);
+            })
+            ->values()
+            ->all();
     }
     
     protected function loadCaches()

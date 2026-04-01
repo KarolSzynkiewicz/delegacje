@@ -105,9 +105,19 @@
         <div class="col-md-8">
             <x-ui.card>
                 <h6 class="mb-3">Czym będą dojeżdżać do pracy?</h6>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Szukaj po pojeździe</label>
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="vehicleSearch"
+                        class="form-control"
+                        placeholder="Wpisz rejestrację/markę/model..."
+                    >
+                </div>
                 
                 <div class="row g-3">
-                    @foreach($vehicles as $vehicle)
+                    @foreach($this->filteredVehicles as $vehicle)
                         @php
                             $isSelectedVehicle = isset($vehicleId) && (int)$vehicleId === (int)$vehicle['id'];
                             $occupancy = $this->getVehicleOccupancy($vehicle['id']);

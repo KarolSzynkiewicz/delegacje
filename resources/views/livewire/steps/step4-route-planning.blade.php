@@ -227,30 +227,60 @@
                                                     </div>
                                                 @endif
 
-                                                @if($employee['distance'] !== null)
-                                                    <div class="small mb-1">
-                                                        <i class="bi bi-arrow-right-circle"></i>
-                                                        <span class="text-muted">Dystans dom-projekt:</span>
-                                                        <span class="fw-semibold">{{ number_format($employee['distance'], 1) }} km</span>
-                                                    </div>
-                                                @elseif($employee['project_name'])
-                                                    <div class="small mb-1 text-warning">
-                                                        <i class="bi bi-exclamation-triangle"></i>
-                                                        Nie można obliczyć dystansu (brak współrzędnych)
-                                                    </div>
+                                                @if(!empty($vehicleId))
+                                                    @if($employee['distance'] !== null)
+                                                        <div class="small mb-1">
+                                                            <i class="bi bi-arrow-right-circle"></i>
+                                                            <span class="text-muted">Dystans dom-projekt:</span>
+                                                            <span class="fw-semibold">{{ number_format($employee['distance'], 1) }} km</span>
+                                                        </div>
+                                                    @elseif($employee['project_name'])
+                                                        <div class="small mb-1 text-warning">
+                                                            <i class="bi bi-exclamation-triangle"></i>
+                                                            Nie można obliczyć dystansu (brak współrzędnych)
+                                                        </div>
+                                                    @endif
                                                 @endif
 
-                                                @if($employee['vehicle_name'])
-                                                    <div class="small">
-                                                        <i class="bi bi-car-front"></i>
-                                                        <span class="text-muted">Pojazd:</span>
-                                                        <span class="fw-semibold">{{ $employee['vehicle_name'] }}</span>
-                                                    </div>
+                                                @if(!empty($vehicleId))
+                                                    @if($employee['vehicle_name'])
+                                                        <div class="small">
+                                                            <i class="bi bi-car-front"></i>
+                                                            <span class="text-muted">Pojazd:</span>
+                                                            <span class="fw-semibold">{{ $employee['vehicle_name'] }}</span>
+                                                        </div>
+                                                    @else
+                                                        <div class="small text-muted">
+                                                            <i class="bi bi-car-front"></i>
+                                                            Brak przypisanego pojazdu
+                                                        </div>
+                                                    @endif
                                                 @else
-                                                    <div class="small text-muted">
-                                                        <i class="bi bi-car-front"></i>
-                                                        Brak przypisanego pojazdu
+                                                    <div class="small">
+                                                        <i class="bi bi-train-front"></i>
+                                                        <span class="text-muted">Podróż:</span>
+                                                        <span class="fw-semibold">transportem publicznym</span>
                                                     </div>
+                                                    @if(!empty($employee['ticket']))
+                                                        @if(!empty($employee['ticket']['start_airport_name']) && !empty($employee['ticket']['end_airport_name']))
+                                                            <div class="small mt-1">
+                                                                <i class="bi bi-airplane"></i>
+                                                                <span class="text-muted">Lotnisko:</span>
+                                                                <span class="fw-semibold">{{ $employee['ticket']['start_airport_name'] }} → {{ $employee['ticket']['end_airport_name'] }}</span>
+                                                            </div>
+                                                        @endif
+                                                        <div class="small mt-1">
+                                                            <i class="bi bi-ticket-perforated"></i>
+                                                            <span class="text-muted">Bilet:</span>
+                                                            <span class="fw-semibold">
+                                                                {{ $employee['ticket']['amount'] ?? '—' }}
+                                                                {{ $employee['ticket']['currency'] ?? '' }}
+                                                            </span>
+                                                            @if(!empty($employee['ticket']['attachment_path']))
+                                                                <span class="text-muted"> (załącznik dodany)</span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
                                                 @endif
                                             </div>
                                         @endforeach
