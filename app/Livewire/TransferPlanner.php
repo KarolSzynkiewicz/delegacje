@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Livewire\WithPagination;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Log;
 
 class TransferPlanner extends Component
 {
+    use WithPagination;
+
     // Basic
     public string $transferDate = '';
     public ?int $vehicleId = null;
@@ -67,21 +70,48 @@ class TransferPlanner extends Component
 
     // ─── Computed properties ────────────────────────────────────────────────────
 
-    public function getEmployeesProperty()
+    public function updatingEmployeeSearch(): void
     {
-        return Employee::orderBy('last_name')->orderBy('first_name')->get();
+        $this->resetPage();
     }
 
-    public function getFilteredEmployeesProperty()
+    public function paginationView()
     {
-        return $this->employees->filter(function (Employee $e) {
-            if (!$this->employeeSearch) {
-                return true;
-            }
-            $q = mb_strtolower($this->employeeSearch);
-            return str_contains(mb_strtolower($e->full_name), $q)
-                || str_contains(mb_strtolower($e->phone ?? ''), $q);
-        });
+        return 'vendor.livewire.simple-pagination';
+    }
+
+    public function getEmployeesQueryProperty()
+    {
+        $q = Employee::query()->orderBy('last_name')->orderBy('first_name');
+
+        if ($this->employeeSearch !== '') {
+            $search = mb_strtolower(trim($this->employeeSearch));
+            $q->where(function ($inner) use ($search) {
+                $inner->whereRaw('LOWER(CONCAT(first_name, \" \", last_name)) LIKE ?', ['%' . $search . '%'])
+                    ->orWhereRaw('LOWER(CONCAT(last_name, \" \", first_name)) LIKE ?', ['%' . $search . '%'])
+                    ->orWhereRaw('LOWER(first_name) LIKE ?', ['%' . $search . '%'])
+                    ->orWhereRaw('LOWER(last_name) LIKE ?', ['%' . $search . '%'])
+                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $search . '%']);
+            });
+        }
+
+        return $q;
+    }
+
+    public function getEmployeesPageProperty()
+    {
+        return $this->employeesQuery->paginate(12);
+    }
+
+    public function getSelectedEmployeesProperty()
+    {
+        if (empty($this->selectedEmployeeIds)) {
+            return collect();
+        }
+        return Employee::whereIn('id', $this->selectedEmployeeIds)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
     }
 
     public function getLocationsProperty()
