@@ -213,11 +213,16 @@
                                 <x-ui.input
                                     type="checkbox"
                                     name="emp_{{ $employee->id }}"
-                                    :label="'<span class=\"fw-semibold\">' . e($employee->full_name) . '</span>' . ($employee->phone ? '<div class=\"text-muted\" style=\"font-size:0.75rem;\">' . e($employee->phone) . '</div>' : '')"
+                                    :label="$employee->full_name"
                                     :value="$selected"
                                     class="mb-0"
                                     disabled
                                 />
+                                @if($employee->phone)
+                                    <div class="text-muted ms-4" style="font-size: 0.75rem;">
+                                        {{ $employee->phone }}
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
