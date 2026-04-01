@@ -245,7 +245,7 @@
                     name="driverEmployeeId"
                     label="Kierowca"
                     wire:model.live="driverEmployeeId"
-                    @if(count($selectedEmployeeIds) === 0) disabled @endif
+                    :disabled="count($selectedEmployeeIds) === 0"
                 >
                     <option value="">— brak / nie dotyczy —</option>
                     @foreach($this->employees->whereIn('id', $selectedEmployeeIds) as $emp)
