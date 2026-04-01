@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Enums\Currency;
 
 class StoreAdjustmentRequest extends FormRequest
 {
@@ -23,9 +24,26 @@ class StoreAdjustmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'payroll_id' => ['required', 'exists:payrolls,id'],
+            'employee_id' => ['required', 'exists:employees,id'],
+            'payroll_id' => [
+                'nullable',
+                'exists:payrolls,id',
+                function ($attribute, $value, $fail) {
+                    if (!$value) {
+                        return;
+                    }
+                    $employeeId = $this->input('employee_id');
+                    if (!$employeeId) {
+                        return;
+                    }
+                    $payroll = \App\Models\Payroll::find($value);
+                    if ($payroll && (int) $payroll->employee_id !== (int) $employeeId) {
+                        $fail('Wybrany payroll nie należy do tego pracownika.');
+                    }
+                },
+            ],
             'amount' => ['required', 'numeric'],
-            'currency' => ['required', 'string', 'size:3'],
+            'currency' => ['required', 'string', Rule::in(Currency::values())],
             'type' => ['required', 'string', Rule::in(['penalty', 'bonus'])],
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
@@ -40,8 +58,9 @@ class StoreAdjustmentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'payroll_id.required' => 'Payroll jest wymagany.',
             'payroll_id.exists' => 'Wybrany payroll nie istnieje.',
+            'employee_id.required' => 'Pracownik jest wymagany.',
+            'employee_id.exists' => 'Wybrany pracownik nie istnieje.',
             'amount.required' => 'Kwota jest wymagana.',
             'amount.numeric' => 'Kwota musi być liczbą.',
             'type.required' => 'Typ jest wymagany.',

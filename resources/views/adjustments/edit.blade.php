@@ -23,19 +23,40 @@
                     <div class="mb-3">
                         <x-ui.input 
                             type="select" 
-                            name="payroll_id" 
-                            id="payroll_id"
-                            label="Payroll"
+                            name="employee_id" 
+                            id="employee_id"
+                            label="Pracownik"
                             required="true"
                         >
-                            <option value="">Wybierz payroll</option>
+                            <option value="">Wybierz pracownika</option>
+                            @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}" {{ old('employee_id', $adjustment->employee_id) == $employee->id ? 'selected' : '' }}>
+                                    {{ $employee->full_name }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                        <small class="form-text text-muted">Pracownik, którego dotyczy kara/nagroda</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="payroll_id" 
+                            id="payroll_id"
+                            label="Payroll (opcjonalnie)"
+                        >
+                            <option value="">— przypisz później —</option>
                             @foreach($payrolls as $payroll)
-                                <option value="{{ $payroll->id }}" {{ old('payroll_id', $adjustment->payroll_id) == $payroll->id ? 'selected' : '' }}>
+                                <option 
+                                    value="{{ $payroll->id }}"
+                                    data-employee-id="{{ $payroll->employee_id }}"
+                                    {{ old('payroll_id', $adjustment->payroll_id) == $payroll->id ? 'selected' : '' }}
+                                >
                                     {{ $payroll->display_name }}
                                 </option>
                             @endforeach
                         </x-ui.input>
-                        <small class="form-text text-muted">Wybierz payroll, do którego przypisać karę/nagrodę</small>
+                        <small class="form-text text-muted">Payroll można przypisać później</small>
                     </div>
 
                     <div class="row mb-3">
@@ -84,9 +105,11 @@
                                 label="Waluta"
                                 required="true"
                             >
-                                <option value="PLN" {{ old('currency', $adjustment->currency) == 'PLN' ? 'selected' : '' }}>PLN</option>
-                                <option value="EUR" {{ old('currency', $adjustment->currency) == 'EUR' ? 'selected' : '' }}>EUR</option>
-                                <option value="USD" {{ old('currency', $adjustment->currency) == 'USD' ? 'selected' : '' }}>USD</option>
+                                @foreach(\App\Enums\Currency::cases() as $c)
+                                    <option value="{{ $c->value }}" {{ old('currency', $adjustment->currency) == $c->value ? 'selected' : '' }}>
+                                        {{ $c->label() }}
+                                    </option>
+                                @endforeach
                             </x-ui.input>
                         </div>
                     </div>
@@ -123,3 +146,33 @@
         </div>
     </div>
 </x-app-layout>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const employeeSelect = document.getElementById('employee_id');
+    const payrollSelect = document.getElementById('payroll_id');
+
+    if (!employeeSelect || !payrollSelect) return;
+
+    function syncPayrollOptions() {
+        const employeeId = employeeSelect.value;
+        const options = Array.from(payrollSelect.options);
+
+        options.forEach((opt) => {
+            const optEmployeeId = opt.getAttribute('data-employee-id');
+            if (!optEmployeeId) return; // placeholder
+            const match = employeeId && optEmployeeId === employeeId;
+            opt.hidden = !match;
+            opt.disabled = !match;
+        });
+
+        const selected = payrollSelect.selectedOptions[0];
+        if (selected && selected.getAttribute('data-employee-id') && selected.disabled) {
+            payrollSelect.value = '';
+        }
+    }
+
+    employeeSelect.addEventListener('change', syncPayrollOptions);
+    syncPayrollOptions();
+});
+</script>
