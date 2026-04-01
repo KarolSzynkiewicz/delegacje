@@ -11,17 +11,27 @@ use App\Models\LogisticsEventParticipant;
 use App\Models\Adjustment;
 use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
+use App\Enums\Currency;
+use App\Services\RoutePlanningService;
+use App\Services\GeocodingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class TransferPlanner extends Component
 {
     // Basic
     public string $transferDate = '';
-    public ?int $fromLocationId = null;
-    public ?int $toLocationId = null;
     public ?int $vehicleId = null;
     public string $notes = '';
+
+    // Route: ordered list of location IDs [from, ...waypoints, to]
+    public array $waypointLocationIds = [];
+
+    // Route result
+    public ?array $routeData = null;
+    public bool $isPlanningRoute = false;
+    public ?string $routeError = null;
 
     // Participants
     public array $selectedEmployeeIds = [];
@@ -35,11 +45,27 @@ class TransferPlanner extends Component
     // Search helpers
     public string $employeeSearch = '';
     public string $vehicleSearch = '';
+    public string $locationSearch = '';
+
+    // UI: which location slot to add next
+    public ?int $addLocationId = null;
+
+    protected RoutePlanningService $routePlanningService;
+    protected GeocodingService $geocodingService;
+
+    public function boot(RoutePlanningService $routePlanningService, GeocodingService $geocodingService): void
+    {
+        $this->routePlanningService = $routePlanningService;
+        $this->geocodingService = $geocodingService;
+    }
 
     public function mount(): void
     {
         $this->transferDate = now()->format('Y-m-d\TH:i');
+        $this->driverPaymentCurrency = Currency::PLN->value;
     }
+
+    // ─── Computed properties ────────────────────────────────────────────────────
 
     public function getEmployeesProperty()
     {
@@ -61,6 +87,33 @@ class TransferPlanner extends Component
     public function getLocationsProperty()
     {
         return Location::orderBy('name')->get();
+    }
+
+    public function getFilteredLocationsForPickerProperty()
+    {
+        return $this->locations->filter(function (Location $loc) {
+            if (!$this->locationSearch) {
+                return true;
+            }
+            $q = mb_strtolower($this->locationSearch);
+            return str_contains(mb_strtolower($loc->name), $q)
+                || str_contains(mb_strtolower($loc->city ?? ''), $q);
+        })->whereNotIn('id', $this->waypointLocationIds);
+    }
+
+    public function getWaypointLocationsProperty(): array
+    {
+        if (empty($this->waypointLocationIds)) {
+            return [];
+        }
+        $locations = Location::whereIn('id', $this->waypointLocationIds)->get()->keyBy('id');
+        $result = [];
+        foreach ($this->waypointLocationIds as $id) {
+            if ($loc = $locations->get($id)) {
+                $result[] = $loc;
+            }
+        }
+        return $result;
     }
 
     public function getVehiclesProperty()
@@ -90,11 +143,134 @@ class TransferPlanner extends Component
             ->get();
     }
 
-    public function updatedDriverEmployeeId(): void
+    public function getCurrenciesProperty(): array
     {
-        // Reset payroll selection when driver changes
-        $this->driverPayrollId = null;
+        return Currency::cases();
     }
+
+    // ─── Waypoint management ────────────────────────────────────────────────────
+
+    public function addWaypoint(): void
+    {
+        if (!$this->addLocationId) {
+            return;
+        }
+        $id = (int) $this->addLocationId;
+        if (!in_array($id, $this->waypointLocationIds)) {
+            $this->waypointLocationIds[] = $id;
+        }
+        $this->addLocationId = null;
+        $this->locationSearch = '';
+        $this->planRoute();
+    }
+
+    public function removeWaypoint(int $index): void
+    {
+        array_splice($this->waypointLocationIds, $index, 1);
+        $this->waypointLocationIds = array_values($this->waypointLocationIds);
+        $this->planRoute();
+    }
+
+    public function moveWaypointUp(int $index): void
+    {
+        if ($index <= 0) {
+            return;
+        }
+        [$this->waypointLocationIds[$index - 1], $this->waypointLocationIds[$index]] =
+            [$this->waypointLocationIds[$index], $this->waypointLocationIds[$index - 1]];
+        $this->planRoute();
+    }
+
+    public function moveWaypointDown(int $index): void
+    {
+        if ($index >= count($this->waypointLocationIds) - 1) {
+            return;
+        }
+        [$this->waypointLocationIds[$index], $this->waypointLocationIds[$index + 1]] =
+            [$this->waypointLocationIds[$index + 1], $this->waypointLocationIds[$index]];
+        $this->planRoute();
+    }
+
+    // ─── Route planning ─────────────────────────────────────────────────────────
+
+    public function planRoute(): void
+    {
+        if (count($this->waypointLocationIds) < 2) {
+            $this->routeData = null;
+            $this->routeError = null;
+            return;
+        }
+
+        $locations = Location::whereIn('id', $this->waypointLocationIds)->get()->keyBy('id');
+
+        // Geocode any locations missing coordinates
+        foreach ($this->waypointLocationIds as $locId) {
+            $loc = $locations->get($locId);
+            if (!$loc) {
+                continue;
+            }
+            if (!$loc->hasCoordinates()) {
+                $address = $loc->getFullAddress();
+                if ($address) {
+                    try {
+                        $coords = $this->geocodingService->geocode($address);
+                        if ($coords && isset($coords['latitude'], $coords['longitude'])) {
+                            $loc->update(['latitude' => $coords['latitude'], 'longitude' => $coords['longitude']]);
+                            $loc->refresh();
+                            $locations->put($loc->id, $loc);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Geocoding failed for location', ['id' => $loc->id]);
+                    }
+                }
+            }
+        }
+
+        $missingCoords = [];
+        foreach ($this->waypointLocationIds as $locId) {
+            $loc = $locations->get($locId);
+            if (!$loc || !$loc->hasCoordinates()) {
+                $missingCoords[] = $loc ? $loc->name : "ID:{$locId}";
+            }
+        }
+
+        if (!empty($missingCoords)) {
+            $this->routeError = 'Brak współrzędnych dla: ' . implode(', ', $missingCoords) . '. Edytuj lokalizację i uzupełnij adres.';
+            $this->routeData = null;
+            return;
+        }
+
+        $this->isPlanningRoute = true;
+        $this->routeError = null;
+
+        try {
+            $ordered = array_map(fn($id) => $locations->get($id), $this->waypointLocationIds);
+            $start = array_shift($ordered);
+            $end = array_pop($ordered);
+            $intermediates = $ordered;
+
+            $route = $this->routePlanningService->planRouteWithWaypoints($start, $end, $intermediates);
+
+            if ($route) {
+                $this->routeData = [
+                    'distance' => $route['distance'],
+                    'duration' => $route['duration'],
+                ];
+                $this->routeError = null;
+            } else {
+                $this->routeError = 'Nie udało się zaplanować trasy. Sprawdź współrzędne lokalizacji.';
+                $this->routeData = null;
+            }
+        } catch (\Exception $e) {
+            Log::error('Transfer route planning failed', ['message' => $e->getMessage()]);
+            $this->routeError = 'Błąd podczas planowania trasy: ' . $e->getMessage();
+            $this->routeData = null;
+        } finally {
+            $this->isPlanningRoute = false;
+        }
+    }
+
+    // ─── Participants ────────────────────────────────────────────────────────────
 
     public function toggleEmployee(int $employeeId): void
     {
@@ -102,7 +278,6 @@ class TransferPlanner extends Component
             $this->selectedEmployeeIds = array_values(
                 array_filter($this->selectedEmployeeIds, fn($id) => $id !== $employeeId)
             );
-            // If removed employee was the driver, clear driver
             if ($this->driverEmployeeId === $employeeId) {
                 $this->driverEmployeeId = null;
                 $this->driverPayrollId = null;
@@ -112,18 +287,24 @@ class TransferPlanner extends Component
         }
     }
 
+    public function updatedDriverEmployeeId(): void
+    {
+        $this->driverPayrollId = null;
+    }
+
+    // ─── Save ────────────────────────────────────────────────────────────────────
+
     public function save(): void
     {
         $this->validate([
             'transferDate'           => ['required', 'date'],
-            'fromLocationId'         => ['required', 'exists:locations,id'],
-            'toLocationId'           => ['required', 'exists:locations,id', 'different:fromLocationId'],
+            'waypointLocationIds'    => ['required', 'array', 'min:2'],
             'vehicleId'              => ['nullable', 'exists:vehicles,id'],
             'selectedEmployeeIds'    => ['required', 'array', 'min:1'],
             'selectedEmployeeIds.*'  => ['exists:employees,id'],
             'driverEmployeeId'       => ['nullable', 'in:' . implode(',', $this->selectedEmployeeIds ?: [0])],
             'driverPaymentAmount'    => ['nullable', 'numeric', 'min:0'],
-            'driverPaymentCurrency'  => ['required_with:driverPaymentAmount', 'size:3'],
+            'driverPaymentCurrency'  => ['required_with:driverPaymentAmount', 'in:' . implode(',', Currency::values())],
             'driverPayrollId'        => [
                 'nullable',
                 'exists:payrolls,id',
@@ -138,26 +319,33 @@ class TransferPlanner extends Component
             ],
         ], [
             'transferDate.required'        => 'Data transferu jest wymagana.',
-            'fromLocationId.required'      => 'Wybierz lokalizację startową.',
-            'toLocationId.required'        => 'Wybierz lokalizację docelową.',
-            'toLocationId.different'       => 'Lokalizacja docelowa musi być inna niż startowa.',
+            'waypointLocationIds.required' => 'Dodaj co najmniej 2 lokalizacje (start i cel).',
+            'waypointLocationIds.min'      => 'Transfer musi mieć co najmniej lokalizację startową i docelową.',
             'selectedEmployeeIds.required' => 'Dodaj co najmniej jednego uczestnika.',
             'selectedEmployeeIds.min'      => 'Dodaj co najmniej jednego uczestnika.',
-            'driverPaymentCurrency.size'   => 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).',
+            'driverPaymentCurrency.in'     => 'Wybierz walutę z listy.',
         ]);
 
-        DB::transaction(function () {
+        $fromLocationId = $this->waypointLocationIds[0];
+        $toLocationId = $this->waypointLocationIds[count($this->waypointLocationIds) - 1];
+
+        DB::transaction(function () use ($fromLocationId, $toLocationId) {
             $event = LogisticsEvent::create([
-                'type'             => LogisticsEventType::TRANSFER,
-                'event_date'       => $this->transferDate,
-                'end_date'         => $this->transferDate,
-                'from_location_id' => $this->fromLocationId,
-                'to_location_id'   => $this->toLocationId,
-                'vehicle_id'       => $this->vehicleId ?: null,
-                'has_transport'    => empty($this->vehicleId),
-                'status'           => LogisticsEventStatus::PLANNED,
-                'notes'            => $this->notes ?: null,
-                'created_by'       => Auth::id(),
+                'type'              => LogisticsEventType::TRANSFER,
+                'event_date'        => $this->transferDate,
+                'end_date'          => $this->transferDate,
+                'from_location_id'  => $fromLocationId,
+                'to_location_id'    => $toLocationId,
+                'vehicle_id'        => $this->vehicleId ?: null,
+                'has_transport'     => empty($this->vehicleId),
+                'status'            => LogisticsEventStatus::PLANNED,
+                'notes'             => $this->notes ?: null,
+                'route_distance'    => $this->routeData['distance'] ?? null,
+                'route_duration'    => $this->routeData ? (int) $this->routeData['duration'] : null,
+                'route_waypoints'   => count($this->waypointLocationIds) > 2
+                    ? array_slice($this->waypointLocationIds, 1, -1)
+                    : null,
+                'created_by'        => Auth::id(),
             ]);
 
             foreach ($this->selectedEmployeeIds as $employeeId) {
@@ -168,13 +356,13 @@ class TransferPlanner extends Component
                 ]);
             }
 
-            if ($this->driverEmployeeId && $this->driverPaymentAmount !== '' && $this->driverPaymentAmount > 0) {
+            if ($this->driverEmployeeId && $this->driverPaymentAmount !== '' && (float) $this->driverPaymentAmount > 0) {
                 Adjustment::create([
                     'employee_id'        => $this->driverEmployeeId,
                     'logistics_event_id' => $event->id,
                     'payroll_id'         => $this->driverPayrollId ?: null,
                     'amount'             => $this->driverPaymentAmount,
-                    'currency'           => strtoupper(trim($this->driverPaymentCurrency)),
+                    'currency'           => $this->driverPaymentCurrency,
                     'type'               => 'bonus',
                     'date'               => \Carbon\Carbon::parse($this->transferDate)->toDateString(),
                     'notes'              => 'Wynagrodzenie za transfer',
