@@ -216,7 +216,7 @@
                                     :label="$employee->full_name"
                                     :value="$selected"
                                     class="mb-0"
-                                    disabled
+                                    wire:click.stop="toggleEmployee({{ $employee->id }})"
                                 />
                                 @if($employee->phone)
                                     <div class="text-muted ms-4" style="font-size: 0.75rem;">
