@@ -292,21 +292,12 @@ class DepartureController extends Controller
                 'notes' => 'nullable|string',
             ];
 
-            // If departure_date is in the past, require confirmation
-            // Dziś nie jest w przeszłości - sprawdzamy czy data jest wcześniejsza niż dzisiaj
-            $departureDate = $request->input('departure_date');
-            $today = Carbon::today();
-            if ($departureDate && Carbon::parse($departureDate)->startOfDay()->lt($today)) {
-                $rules['confirm_past_date'] = 'accepted';
-            }
-
             $validated = $request->validate($rules, [
                 'departure_date.required' => 'Proszę podać datę wyjazdu.',
                 'end_date.required' => 'Proszę podać datę przybycia.',
                 'end_date.after_or_equal' => 'Data przybycia musi być taka sama lub późniejsza niż data wyjazdu.',
                 'employee_ids.required' => 'Proszę wybrać co najmniej jednego uczestnika.',
                 'employee_ids.min' => 'Proszę wybrać co najmniej jednego uczestnika.',
-                'confirm_past_date.accepted' => 'Musisz potwierdzić, że chcesz dodać wyjazd z datą w przeszłości.',
             ]);
             
             // Validate vehicle availability if vehicle is selected
