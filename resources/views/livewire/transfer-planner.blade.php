@@ -13,28 +13,31 @@
     <x-ui.card label="Dane transferu" class="mb-4">
         <div class="row g-3">
             <div class="col-md-4">
-                <label class="form-label fw-semibold">Data i godzina <span class="text-danger">*</span></label>
-                <input
+                <x-ui.input
                     type="datetime-local"
+                    name="transferDate"
+                    label="Data i godzina"
+                    :required="true"
                     wire:model.live="transferDate"
-                    class="form-control @error('transferDate') is-invalid @enderror"
-                >
-                @error('transferDate') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                />
             </div>
 
             <div class="col-md-4">
-                <label class="form-label fw-semibold">Pojazd</label>
                 <div class="mb-2">
-                    <input
+                    <x-ui.input
                         type="text"
-                        wire:model.live.debounce.300ms="vehicleSearch"
-                        class="form-control form-control-sm"
+                        name="vehicleSearch"
+                        label="Szukaj pojazdu"
                         placeholder="Szukaj pojazdu..."
-                    >
+                        wire:model.live.debounce.300ms="vehicleSearch"
+                    />
                 </div>
-                <select
+
+                <x-ui.input
+                    type="select"
+                    name="vehicleId"
+                    label="Pojazd"
                     wire:model.live="vehicleId"
-                    class="form-select @error('vehicleId') is-invalid @enderror"
                 >
                     <option value="">Brak pojazdu / transport własny</option>
                     @foreach($this->vehicles as $v)
@@ -43,18 +46,18 @@
                             @if($v->brand || $v->model) — {{ trim($v->brand . ' ' . $v->model) }} @endif
                         </option>
                     @endforeach
-                </select>
-                @error('vehicleId') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </x-ui.input>
             </div>
 
             <div class="col-md-4">
-                <label class="form-label fw-semibold">Notatki</label>
-                <textarea
-                    wire:model.live.debounce.500ms="notes"
-                    class="form-control"
+                <x-ui.input
+                    type="textarea"
+                    name="notes"
+                    label="Notatki"
                     rows="3"
                     placeholder="Opcjonalne uwagi..."
-                ></textarea>
+                    wire:model.live.debounce.500ms="notes"
+                />
             </div>
         </div>
     </x-ui.card>
@@ -116,14 +119,22 @@
         <!-- Dodaj lokalizację -->
         <div class="d-flex gap-2 align-items-end">
             <div class="flex-grow-1">
-                <label class="form-label fw-semibold small mb-1">Dodaj lokalizację</label>
-                <input
-                    type="text"
-                    wire:model.live.debounce.300ms="locationSearch"
-                    class="form-control form-control-sm mb-1"
-                    placeholder="Szukaj lokalizacji..."
+                <div class="mb-2">
+                    <x-ui.input
+                        type="text"
+                        name="locationSearch"
+                        label="Szukaj lokalizacji"
+                        placeholder="Szukaj lokalizacji..."
+                        wire:model.live.debounce.300ms="locationSearch"
+                    />
+                </div>
+
+                <x-ui.input
+                    type="select"
+                    name="addLocationId"
+                    label="Dodaj lokalizację"
+                    wire:model.live="addLocationId"
                 >
-                <select wire:model.live="addLocationId" class="form-select form-select-sm">
                     <option value="">— wybierz —</option>
                     @foreach($this->filteredLocationsForPicker as $loc)
                         <option value="{{ $loc->id }}">
@@ -131,7 +142,7 @@
                             @if(!$loc->hasCoordinates()) ⚠ @endif
                         </option>
                     @endforeach
-                </select>
+                </x-ui.input>
             </div>
             <button type="button" wire:click="addWaypoint"
                 class="btn btn-outline-primary btn-sm"
@@ -179,12 +190,13 @@
         @error('selectedEmployeeIds') <div class="alert alert-danger py-2 mb-2">{{ $message }}</div> @enderror
 
         <div class="mb-3">
-            <input
+            <x-ui.input
                 type="text"
-                wire:model.live.debounce.300ms="employeeSearch"
-                class="form-control form-control-sm"
+                name="employeeSearch"
+                label="Szukaj pracownika"
                 placeholder="Szukaj pracownika..."
-            >
+                wire:model.live.debounce.300ms="employeeSearch"
+            />
         </div>
 
         <div class="row g-2">
@@ -197,12 +209,15 @@
                         style="cursor: pointer;"
                     >
                         <div class="d-flex align-items-center gap-2">
-                            <input type="checkbox" class="form-check-input" @checked($selected) readonly>
-                            <div class="small">
-                                <div class="fw-semibold">{{ $employee->full_name }}</div>
-                                @if($employee->phone)
-                                    <div class="text-muted" style="font-size: 0.75rem;">{{ $employee->phone }}</div>
-                                @endif
+                            <div class="flex-grow-1">
+                                <x-ui.input
+                                    type="checkbox"
+                                    name="emp_{{ $employee->id }}"
+                                    :label="'<span class=&quot;fw-semibold&quot;>' . e($employee->full_name) . '</span>' . ($employee->phone ? '<div class=&quot;text-muted&quot; style=&quot;font-size:0.75rem;&quot;>' . e($employee->phone) . '</div>' : '')"
+                                    :value="$selected"
+                                    class="mb-0"
+                                    disabled
+                                />
                             </div>
                         </div>
                     </div>
@@ -225,18 +240,18 @@
 
         <div class="row g-3">
             <div class="col-md-4">
-                <label class="form-label fw-semibold">Kierowca</label>
-                <select
+                <x-ui.input
+                    type="select"
+                    name="driverEmployeeId"
+                    label="Kierowca"
                     wire:model.live="driverEmployeeId"
-                    class="form-select @error('driverEmployeeId') is-invalid @enderror"
                     @if(count($selectedEmployeeIds) === 0) disabled @endif
                 >
                     <option value="">— brak / nie dotyczy —</option>
                     @foreach($this->employees->whereIn('id', $selectedEmployeeIds) as $emp)
                         <option value="{{ $emp->id }}">{{ $emp->full_name }}</option>
                     @endforeach
-                </select>
-                @error('driverEmployeeId') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </x-ui.input>
                 @if(count($selectedEmployeeIds) === 0)
                     <div class="form-text text-muted">Najpierw wybierz uczestników.</div>
                 @endif
@@ -244,48 +259,45 @@
 
             @if($driverEmployeeId)
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold">Kwota wynagrodzenia</label>
-                    <input
+                    <x-ui.input
                         type="number"
-                        wire:model.live.debounce.300ms="driverPaymentAmount"
-                        class="form-control @error('driverPaymentAmount') is-invalid @enderror"
+                        name="driverPaymentAmount"
+                        label="Kwota wynagrodzenia"
+                        placeholder="0.00"
                         min="0"
                         step="0.01"
-                        placeholder="0.00"
-                    >
-                    @error('driverPaymentAmount') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        wire:model.live.debounce.300ms="driverPaymentAmount"
+                    />
                 </div>
 
                 <div class="col-md-2">
-                    <label class="form-label fw-semibold">Waluta</label>
-                    <select
+                    <x-ui.input
+                        type="select"
+                        name="driverPaymentCurrency"
+                        label="Waluta"
                         wire:model.live="driverPaymentCurrency"
-                        class="form-select @error('driverPaymentCurrency') is-invalid @enderror"
                     >
                         @foreach($this->currencies as $currency)
                             <option value="{{ $currency->value }}">{{ $currency->label() }}</option>
                         @endforeach
-                    </select>
-                    @error('driverPaymentCurrency') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </x-ui.input>
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label fw-semibold d-flex align-items-center gap-1">
-                        Payroll
-                        <x-tooltip title="Opcjonalnie. Jeśli payroll jeszcze nie istnieje, zostaw puste. Bonus pojawi się w liście nagród bez payrollu i można go przypisać później.">
-                            <i class="bi bi-info-circle text-muted"></i>
-                        </x-tooltip>
-                    </label>
-                    <select
+                    <x-ui.input
+                        type="select"
+                        name="driverPayrollId"
+                        label="Payroll"
                         wire:model.live="driverPayrollId"
-                        class="form-select @error('driverPayrollId') is-invalid @enderror"
                     >
                         <option value="">— przypisz później —</option>
                         @foreach($this->driverPayrolls as $payroll)
                             <option value="{{ $payroll->id }}">{{ $payroll->display_name }}</option>
                         @endforeach
-                    </select>
-                    @error('driverPayrollId') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </x-ui.input>
+                    <div class="form-text text-muted">
+                        Opcjonalnie. Jeśli payroll nie istnieje, zostaw puste.
+                    </div>
                 </div>
             @endif
         </div>
