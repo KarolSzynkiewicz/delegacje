@@ -2,19 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\ReturnTripService;
-use App\Services\AssignmentQueryService;
-use App\Models\Vehicle;
-use App\Models\Location;
-use App\Models\LogisticsEvent;
 use App\Enums\LogisticsEventType;
 use App\Http\Requests\PrepareReturnTripRequest;
 use App\Http\Requests\StoreReturnTripRequest;
 use App\Http\Requests\UpdateReturnTripRequest;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
+use App\Models\Vehicle;
+use App\Services\AssignmentQueryService;
+use App\Services\ReturnTripService;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Carbon\Carbon; 
 
 class ReturnTripController extends Controller
 {
@@ -26,14 +26,39 @@ class ReturnTripController extends Controller
     /**
      * Display a listing of return trips.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $returnTrips = LogisticsEvent::where('type', LogisticsEventType::RETURN)
-            ->with(['vehicle', 'fromLocation', 'toLocation', 'creator', 'participants.employee'])
-            ->orderBy('event_date', 'desc')
-            ->paginate(20);
+        $sort = (string) $request->query('sort', 'id');
+        $dir = strtolower((string) $request->query('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['id', 'event_date', 'created_at'];
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'id';
+        }
 
-        return view('return-trips.index', compact('returnTrips'));
+        $query = LogisticsEvent::where('type', LogisticsEventType::RETURN)
+            ->with([
+                'vehicle',
+                'fromLocation',
+                'toLocation',
+                'creator',
+                'participants.employee',
+                'participants.assignment' => function ($morphTo) {
+                    $morphTo->morphWith([
+                        \App\Models\VehicleAssignment::class => ['vehicle'],
+                        \App\Models\ProjectAssignment::class => ['project'],
+                        \App\Models\AccommodationAssignment::class => ['accommodation.location'],
+                    ]);
+                },
+            ])
+            ->orderBy($sort, $dir);
+
+        if ($sort !== 'id') {
+            $query->orderBy('id', 'desc');
+        }
+
+        $returnTrips = $query->paginate(20)->withQueryString();
+
+        return view('return-trips.index', compact('returnTrips', 'sort', 'dir'));
     }
 
     /**
@@ -62,7 +87,7 @@ class ReturnTripController extends Controller
         // Ręczne zbudowanie query string, tablice są poprawnie zakodowane
         $query = http_build_query($validated);
 
-        return redirect(route('return-trips.prepare') . '?' . $query);
+        return redirect(route('return-trips.prepare').'?'.$query);
     }
 
     /**
@@ -72,16 +97,16 @@ class ReturnTripController extends Controller
     public function prepare(PrepareReturnTripRequest $request): View|RedirectResponse
     {
         // If no data provided, redirect to appropriate form
-        if (!$request->has('employee_ids') && !$request->old('employee_ids')) {
+        if (! $request->has('employee_ids') && ! $request->old('employee_ids')) {
             $isEditMode = $request->input('edit_mode', false);
             $returnTripId = $request->input('return_trip_id');
-            
+
             if ($isEditMode && $returnTripId) {
                 return redirect()
                     ->route('return-trips.edit', $returnTripId)
                     ->with('info', 'Proszę wypełnić formularz przygotowania zjazdu.');
             }
-            
+
             return redirect()->route('return-trips.create')
                 ->with('info', 'Proszę wypełnić formularz przygotowania zjazdu.');
         }
@@ -92,17 +117,17 @@ class ReturnTripController extends Controller
         try {
             $employeeIds = $validated['employee_ids'];
             $returnDate = \Carbon\Carbon::parse($validated['return_date']);
-            $returnVehicle = isset($validated['vehicle_id']) 
+            $returnVehicle = isset($validated['vehicle_id'])
                 ? Vehicle::findOrFail($validated['vehicle_id'])
                 : null;
-            $endDate = isset($validated['end_date']) 
+            $endDate = isset($validated['end_date'])
                 ? \Carbon\Carbon::parse($validated['end_date'])
                 : null;
-            
+
             $isEditMode = $validated['edit_mode'] ?? false;
             $returnTripId = $validated['return_trip_id'] ?? null;
             $excludeEventId = ($isEditMode && $returnTripId) ? $returnTripId : null;
-            
+
             $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle, $endDate, $excludeEventId);
 
             // Store preparation in session for commit
@@ -117,22 +142,22 @@ class ReturnTripController extends Controller
                 }
             }
 
-            $returnVehicle = isset($validated['vehicle_id']) 
-                ? Vehicle::find($validated['vehicle_id']) 
+            $returnVehicle = isset($validated['vehicle_id'])
+                ? Vehicle::find($validated['vehicle_id'])
                 : null;
 
             return view('return-trips.prepare', compact('preparation', 'employeeNames', 'returnVehicle', 'validated', 'isEditMode', 'returnTripId'));
         } catch (\Illuminate\Validation\ValidationException $e) {
             $isEditMode = $request->input('edit_mode', false);
             $returnTripId = $request->input('return_trip_id');
-            
+
             if ($isEditMode && $returnTripId) {
                 return redirect()
                     ->route('return-trips.edit', $returnTripId)
                     ->withErrors($e->errors())
                     ->withInput();
             }
-            
+
             return redirect()
                 ->route('return-trips.create')
                 ->withErrors($e->errors())
@@ -140,17 +165,17 @@ class ReturnTripController extends Controller
         } catch (\Exception $e) {
             $isEditMode = $request->input('edit_mode', false);
             $returnTripId = $request->input('return_trip_id');
-            
+
             if ($isEditMode && $returnTripId) {
                 return redirect()
                     ->route('return-trips.edit', $returnTripId)
-                    ->with('error', 'Wystąpił błąd podczas przygotowania zjazdu: ' . $e->getMessage())
+                    ->with('error', 'Wystąpił błąd podczas przygotowania zjazdu: '.$e->getMessage())
                     ->withInput();
             }
-            
+
             return redirect()
                 ->route('return-trips.create')
-                ->with('error', 'Wystąpił błąd podczas przygotowania zjazdu: ' . $e->getMessage())
+                ->with('error', 'Wystąpił błąd podczas przygotowania zjazdu: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -164,7 +189,7 @@ class ReturnTripController extends Controller
 
         // Get preparation from session
         $preparationSerialized = session('return_trip_preparation');
-        if (!$preparationSerialized) {
+        if (! $preparationSerialized) {
             return redirect()
                 ->route('return-trips.create')
                 ->with('error', 'Sesja przygotowania zjazdu wygasła. Proszę przygotować zjazd ponownie.');
@@ -174,34 +199,34 @@ class ReturnTripController extends Controller
             // Get existing event if editing
             $existingEvent = null;
             $preparation = null;
-            
+
             if (isset($validated['return_trip_id'])) {
                 $existingEvent = LogisticsEvent::findOrFail($validated['return_trip_id']);
-                
+
                 // Only allow updating if status is not CANCELLED
                 if ($existingEvent->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
                     return redirect()
                         ->route('return-trips.show', $existingEvent)
                         ->with('error', 'Nie można edytować anulowanych zjazdów.');
                 }
-                
+
                 // Get preparation data from session before reversing
                 // We need employee_ids, return_date, and vehicle_id from the original preparation
                 $originalPreparation = unserialize($preparationSerialized);
-                
+
                 // Reverse previous return trip changes (restore original end dates)
                 // This must be done BEFORE preparing new zjazd to restore the state
                 $this->returnTripService->reverseZjazd($existingEvent);
-                
+
                 // Re-prepare the return trip with restored assignments
                 // This is necessary because the original preparation was done on already-shortened assignments
                 $employeeIds = $originalPreparation->employeeIds;
                 $returnDate = $originalPreparation->returnDate;
                 $returnVehicle = $originalPreparation->returnVehicle;
-                $endDate = isset($validated['end_date']) 
+                $endDate = isset($validated['end_date'])
                     ? \Carbon\Carbon::parse($validated['end_date'])
                     : null;
-                
+
                 $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle, $endDate, $existingEvent->id);
             } else {
                 // For new return trips, use preparation from session
@@ -210,10 +235,10 @@ class ReturnTripController extends Controller
 
             // Commit the return trip (create or update)
             $notes = $validated['notes'] ?? null;
-            $status = isset($validated['status']) 
+            $status = isset($validated['status'])
                 ? \App\Enums\LogisticsEventStatus::from($validated['status'])
                 : null;
-            $endDate = isset($validated['end_date']) 
+            $endDate = isset($validated['end_date'])
                 ? \Carbon\Carbon::parse($validated['end_date'])
                 : null;
             $event = $this->returnTripService->commitZjazd($preparation, $notes, $existingEvent, $status, $endDate);
@@ -232,7 +257,7 @@ class ReturnTripController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->back()
-                ->with('error', 'Wystąpił błąd podczas tworzenia zjazdu: ' . $e->getMessage())
+                ->with('error', 'Wystąpił błąd podczas tworzenia zjazdu: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -266,13 +291,17 @@ class ReturnTripController extends Controller
      */
     public function edit(LogisticsEvent $returnTrip): View|RedirectResponse
     {
+        return redirect()
+            ->route('return-trips.show', $returnTrip)
+            ->with('error', 'Edycja zjazdów jest wyłączona. Możesz tylko anulować zjazd.');
+
         // Only allow editing if status is not CANCELLED and not COMPLETED
         if ($returnTrip->status === \App\Enums\LogisticsEventStatus::CANCELLED) {
             return redirect()
                 ->route('return-trips.show', $returnTrip)
                 ->with('error', 'Nie można edytować anulowanych zjazdów.');
         }
-        
+
         if ($returnTrip->status === \App\Enums\LogisticsEventStatus::COMPLETED) {
             return redirect()
                 ->route('return-trips.show', $returnTrip)
@@ -314,18 +343,18 @@ class ReturnTripController extends Controller
             // Prepare new return trip
             $employeeIds = $validated['employee_ids'];
             $returnDate = \Carbon\Carbon::parse($validated['return_date']);
-            $returnVehicle = isset($validated['vehicle_id']) 
+            $returnVehicle = isset($validated['vehicle_id'])
                 ? Vehicle::findOrFail($validated['vehicle_id'])
                 : null;
-            $endDate = isset($validated['end_date']) 
+            $endDate = isset($validated['end_date'])
                 ? \Carbon\Carbon::parse($validated['end_date'])
                 : null;
-            
+
             $preparation = $this->returnTripService->prepareZjazd($employeeIds, $returnDate, $returnVehicle, $endDate, $returnTrip->id);
 
             // Commit new return trip (updates existing event)
             $notes = $validated['notes'] ?? null;
-            $endDate = isset($validated['end_date']) 
+            $endDate = isset($validated['end_date'])
                 ? \Carbon\Carbon::parse($validated['end_date'])
                 : null;
             $event = $this->returnTripService->commitZjazd($preparation, $notes, $returnTrip, null, $endDate);
@@ -341,7 +370,7 @@ class ReturnTripController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->back()
-                ->with('error', 'Wystąpił błąd podczas aktualizacji zjazdu: ' . $e->getMessage())
+                ->with('error', 'Wystąpił błąd podczas aktualizacji zjazdu: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -362,7 +391,7 @@ class ReturnTripController extends Controller
         try {
             // Reverse all assignments (restore original end dates, delete return trip assignments)
             $this->returnTripService->reverseZjazd($returnTrip);
-            
+
             // Set status to CANCELLED
             $returnTrip->update([
                 'status' => \App\Enums\LogisticsEventStatus::CANCELLED,
@@ -374,7 +403,7 @@ class ReturnTripController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->route('return-trips.show', $returnTrip)
-                ->with('error', 'Wystąpił błąd podczas anulowania zjazdu: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas anulowania zjazdu: '.$e->getMessage());
         }
     }
 }

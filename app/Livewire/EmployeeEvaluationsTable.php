@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\EmployeeEvaluation;
 use App\Models\Employee;
+use App\Models\EmployeeEvaluation;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -12,10 +12,13 @@ class EmployeeEvaluationsTable extends Component
     use WithPagination;
 
     public $search = '';
+
     public $employeeFilter = '';
+
     public $sortField = 'created_at';
+
     public $sortDirection = 'desc';
-    
+
     // Optional filter for /mine/* routes
     public $filterEmployeeIds = null;
 
@@ -53,7 +56,7 @@ class EmployeeEvaluationsTable extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        
+
         $this->resetPage();
     }
 
@@ -65,24 +68,20 @@ class EmployeeEvaluationsTable extends Component
     public function render()
     {
         $query = EmployeeEvaluation::with(['employee', 'createdBy']);
-        
+
         // Filtrowanie po pracownikach (dla /mine/*)
-        if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && !empty($this->filterEmployeeIds)) {
+        if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && ! empty($this->filterEmployeeIds)) {
             $query->whereIn('employee_id', $this->filterEmployeeIds);
         }
 
-        // Filtrowanie po pracowniku
-        if ($this->employeeFilter) {
-            $query->whereHas('employee', function ($q) {
-                $q->where('first_name', 'like', '%' . $this->employeeFilter . '%')
-                  ->orWhere('last_name', 'like', '%' . $this->employeeFilter . '%')
-                  ->orWhere('email', 'like', '%' . $this->employeeFilter . '%');
-            });
+        // Filtrowanie po pracowniku (select przekazuje ID)
+        if ($this->employeeFilter !== '' && $this->employeeFilter !== null) {
+            $query->where('employee_id', (int) $this->employeeFilter);
         }
 
         // Wyszukiwanie (po uwagach)
         if ($this->search) {
-            $query->where('notes', 'like', '%' . $this->search . '%');
+            $query->where('notes', 'like', '%'.$this->search.'%');
         }
 
         // Sortowanie

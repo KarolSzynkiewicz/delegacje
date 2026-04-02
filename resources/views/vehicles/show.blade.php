@@ -135,7 +135,7 @@
                         href="{{ route('vehicle-repairs.create', ['vehicle_id' => $vehicle->id]) }}"
                         class="btn-sm"
                     >
-                        + Nowy serwis
+                        + Nowa akcja serwisowa
                     </x-ui.button>
                 </div>
                 @php $repairs = $vehicle->repairs()->with('location')->orderBy('start_date', 'desc')->limit(10)->get(); @endphp

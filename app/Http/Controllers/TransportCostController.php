@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TransportCost;
 use App\Models\LogisticsEvent;
-use App\Models\Vehicle;
 use App\Models\Transport;
+use App\Models\TransportCost;
+use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -21,20 +21,21 @@ class TransportCostController extends Controller
         $sortDir = $request->query('sort_dir', 'desc');
 
         $allowedSorts = ['event_date', 'route_distance', 'costs_count'];
-        if (!in_array($sortBy, $allowedSorts, true)) {
+        if (! in_array($sortBy, $allowedSorts, true)) {
             $sortBy = 'event_date';
         }
-        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+        if (! in_array($sortDir, ['asc', 'desc'], true)) {
             $sortDir = 'desc';
         }
 
         $eventsQuery = LogisticsEvent::with([
-                'fromLocation',
-                'toLocation',
-                'vehicle',
-                'participants',
-                'transportCosts' => fn ($query) => $query->with('creator')->latest('cost_date')->latest('id'),
-            ])
+            'fromLocation',
+            'toLocation',
+            'vehicle',
+            'participants',
+            'transportCosts' => fn ($query) => $query->with('creator')->latest('cost_date')->latest('id'),
+            'driverAdjustments' => fn ($query) => $query->with('employee')->where('type', 'bonus'),
+        ])
             ->withCount([
                 'transportCosts as costs_count',
             ]);
@@ -71,7 +72,7 @@ class TransportCostController extends Controller
         ];
 
         // Autofill vehicle from selected logistics event (useful for fuel costs)
-        if (!empty($defaults['logistics_event_id'])) {
+        if (! empty($defaults['logistics_event_id'])) {
             $event = LogisticsEvent::find($defaults['logistics_event_id']);
             if ($event && $event->vehicle_id) {
                 $defaults['vehicle_id'] = $event->vehicle_id;
@@ -171,7 +172,7 @@ class TransportCostController extends Controller
             if ($transportCost->file_path) {
                 Storage::disk('public')->delete($transportCost->file_path);
             }
-            
+
             $file = $request->file('file');
             $directory = 'transport_costs';
             $filePath = $file->store($directory, 'public');

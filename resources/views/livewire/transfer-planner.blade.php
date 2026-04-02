@@ -122,16 +122,6 @@
                 <!-- Dodaj lokalizację -->
                 <div class="d-flex gap-2 align-items-end">
                     <div class="flex-grow-1">
-                        <div class="mb-2">
-                            <x-ui.input
-                                type="text"
-                                name="locationSearch"
-                                label="Szukaj lokalizacji"
-                                placeholder="Szukaj lokalizacji..."
-                                wire:model.live.debounce.300ms="locationSearch"
-                            />
-                        </div>
-
                         <x-ui.input
                             type="select"
                             name="addLocationId"

@@ -19,11 +19,33 @@
     @endif
 
     <x-ui.card>
+        @php
+            $sortHref = function (string $column) use ($sort, $dir) {
+                $nextDir = ($sort === $column) ? ($dir === 'asc' ? 'desc' : 'asc') : 'desc';
+
+                return route('transfers.index', array_merge(request()->except('page'), ['sort' => $column, 'dir' => $nextDir]));
+            };
+        @endphp
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th class="text-start">Data</th>
+                        <th class="text-start text-nowrap">
+                            <a href="{{ $sortHref('id') }}" class="text-decoration-none text-reset">
+                                ID
+                                @if($sort === 'id')
+                                    <i class="bi bi-sort-{{ $dir === 'asc' ? 'up' : 'down' }}"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th class="text-start text-nowrap">
+                            <a href="{{ $sortHref('event_date') }}" class="text-decoration-none text-reset">
+                                Data
+                                @if($sort === 'event_date')
+                                    <i class="bi bi-sort-{{ $dir === 'asc' ? 'up' : 'down' }}"></i>
+                                @endif
+                            </a>
+                        </th>
                         <th class="text-start">Trasa</th>
                         <th class="text-start">Pojazd</th>
                         <th class="text-start">Uczestnicy</th>
@@ -35,6 +57,7 @@
                 <tbody>
                     @forelse($transfers as $transfer)
                         <tr>
+                            <td class="text-muted small">{{ $transfer->id }}</td>
                             <td>
                                 <div class="fw-semibold">{{ $transfer->event_date->format('d.m.Y') }}</div>
                                 <small class="text-muted">{{ $transfer->event_date->format('H:i') }}</small>
@@ -66,7 +89,15 @@
                                     <div class="d-flex flex-column gap-1">
                                         @foreach($transfer->participants->take(3) as $participant)
                                             @if($participant->employee)
-                                                <small>{{ $participant->employee->full_name }}</small>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-person text-primary"></i>
+                                                    <x-employee-cell
+                                                        :employee="$participant->employee"
+                                                        :avatar-size="'24px'"
+                                                        :show-phone="false"
+                                                        :name-class="'small'"
+                                                    />
+                                                </div>
                                             @endif
                                         @endforeach
                                         @if($transfer->participants->count() > 3)
@@ -85,9 +116,6 @@
                                     <div class="small">
                                         <div class="fw-semibold">{{ $driverAdj->employee?->full_name }}</div>
                                         <div class="text-success">{{ number_format($driverAdj->amount, 2) }} {{ $driverAdj->currency }}</div>
-                                        @if(!$driverAdj->payroll_id)
-                                            <span class="badge bg-warning text-dark">bez payrollu</span>
-                                        @endif
                                     </div>
                                 @else
                                     <span class="text-muted">—</span>

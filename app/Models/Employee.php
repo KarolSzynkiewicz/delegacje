@@ -80,6 +80,22 @@ class Employee extends Model
     }
 
     /**
+     * Get all rate records for this employee.
+     */
+    public function rates(): HasMany
+    {
+        return $this->hasMany(EmployeeRate::class);
+    }
+
+    /**
+     * Get the currently active rate (today's date).
+     */
+    public function currentRate(): ?EmployeeRate
+    {
+        return $this->rates()->active()->orderByDesc('start_date')->first();
+    }
+
+    /**
      * Get all vehicle assignments for this employee.
      */
     public function vehicleAssignments(): HasMany
@@ -117,17 +133,17 @@ class Employee extends Model
 
     /**
      * Get current active projects for this employee.
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getCurrentProjectsAttribute()
     {
         $activeAssignments = $this->assignments()->active()->with('project')->get();
-        
+
         if ($activeAssignments->isEmpty()) {
             return collect();
         }
-        
+
         return $activeAssignments->pluck('project')->filter()->unique('id')->values();
     }
 
@@ -160,7 +176,7 @@ class Employee extends Model
      */
     public function getFullNameAttribute(): string
     {
-        return $this->first_name . ' ' . $this->last_name;
+        return $this->first_name.' '.$this->last_name;
     }
 
     /**
@@ -168,19 +184,17 @@ class Employee extends Model
      */
     public function getImageUrlAttribute(): ?string
     {
-        if (!$this->image_path) {
+        if (! $this->image_path) {
             return null;
         }
 
-        return asset('storage/' . $this->image_path);
+        return asset('storage/'.$this->image_path);
     }
 
     /**
      * Get the current location of this employee.
-     * 
+     *
      * Delegates to LocationTrackingService for business logic.
-     * 
-     * @return \App\Models\Location|null
      */
     public function getCurrentLocation(): ?Location
     {
@@ -267,7 +281,7 @@ class Employee extends Model
         $rotations = $this->rotations()
             ->where(function ($q) {
                 $q->whereNull('status')
-                  ->orWhere('status', '!=', 'cancelled');
+                    ->orWhere('status', '!=', 'cancelled');
             })
             ->overlappingWith($startDate, $endDate)
             ->orderBy('start_date')
@@ -285,11 +299,11 @@ class Employee extends Model
         foreach ($rotations as $rotation) {
             $rotationStart = $rotation->getStartDate();
             $rotationEnd = $rotation->getEndDate();
-            
+
             if ($rotationStart === null || $rotationEnd === null) {
                 continue; // Skip rotations without dates
             }
-            
+
             $rotationStart = \App\Services\DateRangeService::normalizeDate($rotationStart);
             $rotationEnd = \App\Services\DateRangeService::normalizeDate($rotationEnd);
 
@@ -331,15 +345,15 @@ class Employee extends Model
     {
         // Sprawdź czy kolumna is_required istnieje w tabeli documents
         $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
-        
+
         // Jeśli kolumna nie istnieje, nie ma wymaganych dokumentów - wszystko OK
-        if (!$hasIsRequiredColumn) {
+        if (! $hasIsRequiredColumn) {
             return true;
         }
-        
+
         // Pobierz tylko wymagane dokumenty (is_required = true)
         $requiredDocuments = \App\Models\Document::where('is_required', true)->pluck('id');
-        
+
         // Jeśli nie ma żadnych wymaganych dokumentów, uznajemy że dokumenty są OK
         if ($requiredDocuments->isEmpty()) {
             return true;
@@ -348,7 +362,7 @@ class Employee extends Model
         // Dla każdego wymaganego dokumentu sprawdź czy pracownik ma aktywny dokument w okresie
         foreach ($requiredDocuments as $documentTypeId) {
             $hasActiveDocument = false;
-            
+
             // Use eager loaded relations if available, otherwise query
             if ($this->relationLoaded('employeeDocuments')) {
                 // Use eager loaded employeeDocuments
@@ -364,7 +378,8 @@ class Employee extends Model
                             // - valid_from <= endDate (dokument już się zaczął)
                             // - valid_to >= startDate (dokument jeszcze nie wygasł)
                             $validFromOk = $doc->valid_from && $doc->valid_from->lte($endDate);
-                            $validToOk = !$doc->valid_to || $doc->valid_to->gte($startDate);
+                            $validToOk = ! $doc->valid_to || $doc->valid_to->gte($startDate);
+
                             return $validFromOk && $validToOk;
                         }
                     })
@@ -374,27 +389,27 @@ class Employee extends Model
                 $hasActiveDocument = $this->employeeDocuments()
                     ->where('document_id', $documentTypeId)
                     ->where(function ($q) use ($startDate, $endDate) {
-                        $q->where(function ($q2) use ($startDate, $endDate) {
+                        $q->where(function ($q2) use ($endDate) {
                             // Dokument bezokresowy - zawsze aktywny jeśli valid_from <= endDate
                             $q2->where('kind', 'bezokresowy')
-                               ->where('valid_from', '<=', $endDate);
+                                ->where('valid_from', '<=', $endDate);
                         })->orWhere(function ($q2) use ($startDate, $endDate) {
                             // Dokument okresowy - sprawdź czy jest aktywny w zakresie dat
                             // Dokument jest aktywny jeśli:
                             // - valid_from <= endDate (dokument już się zaczął)
                             // - valid_to >= startDate (dokument jeszcze nie wygasł)
                             $q2->where('kind', 'okresowy')
-                               ->where('valid_from', '<=', $endDate)
-                               ->where(function ($q3) use ($startDate) {
-                                   $q3->whereNull('valid_to')
-                                      ->orWhere('valid_to', '>=', $startDate);
-                               });
+                                ->where('valid_from', '<=', $endDate)
+                                ->where(function ($q3) use ($startDate) {
+                                    $q3->whereNull('valid_to')
+                                        ->orWhere('valid_to', '>=', $startDate);
+                                });
                         });
                     })
                     ->exists();
             }
 
-            if (!$hasActiveDocument) {
+            if (! $hasActiveDocument) {
                 return false;
             }
         }
@@ -414,7 +429,7 @@ class Employee extends Model
 
         // 0. Sprawdź czy pracownik ma wybraną rolę (jeśli rola jest podana)
         if ($roleId !== null) {
-            if (!$this->roles->contains('id', $roleId)) {
+            if (! $this->roles->contains('id', $roleId)) {
                 $available = false;
                 $reasons[] = 'Pracownik nie ma wymaganej roli';
             }
@@ -422,30 +437,30 @@ class Employee extends Model
 
         // 1. Sprawdź dokumenty - szczegółowo
         // Upewnij się, że relacja jest załadowana
-        if (!$this->relationLoaded('employeeDocuments')) {
+        if (! $this->relationLoaded('employeeDocuments')) {
             $this->load('employeeDocuments.document');
         }
-        
+
         // Sprawdź czy kolumna is_required istnieje
         $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
-        
+
         // Sprawdź tylko wymagane dokumenty lub wszystkie jeśli kolumna nie istnieje
         if ($hasIsRequiredColumn) {
             $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
         } else {
             $requiredDocuments = \App\Models\Document::all();
         }
-        
+
         // Jeśli nie ma żadnych wymaganych dokumentów, nie sprawdzaj nic
         if ($hasIsRequiredColumn && $requiredDocuments->isEmpty()) {
             // Nie ma wymaganych dokumentów - wszystko OK
-        } elseif (!$this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
+        } elseif (! $this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
             $available = false;
-            
+
             foreach ($requiredDocuments as $document) {
                 $employeeDoc = $this->employeeDocuments->where('document_id', $document->id)->first();
-                
-                if (!$employeeDoc) {
+
+                if (! $employeeDoc) {
                     $missingDocuments[] = [
                         'document_id' => $document->id,
                         'document_name' => $document->name,
@@ -455,21 +470,22 @@ class Employee extends Model
                         'valid_to' => null,
                         'is_required' => $hasIsRequiredColumn ? $document->is_required : true,
                     ];
+
                     continue;
                 }
-                
+
                 // Sprawdź czy dokument jest aktywny w całym zakresie
                 $isValid = false;
                 $problem = '';
-                
+
                 // Przygotuj przedział ważności dokumentu
                 $docValidFrom = $employeeDoc->valid_from ? $employeeDoc->valid_from->format('Y-m-d') : null;
                 $docValidTo = $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null;
-                
+
                 if ($employeeDoc->kind === 'bezokresowy') {
                     if ($employeeDoc->valid_from > $endDate) {
                         $isValid = false;
-                        $problem = $docValidTo 
+                        $problem = $docValidTo
                             ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
                             : "Dokument ważny od: {$docValidFrom}";
                     } else {
@@ -479,20 +495,20 @@ class Employee extends Model
                     // Dokument okresowy
                     if ($employeeDoc->valid_from > $startDate) {
                         $isValid = false;
-                        $problem = $docValidTo 
+                        $problem = $docValidTo
                             ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
                             : "Dokument ważny od: {$docValidFrom}";
                     } elseif ($employeeDoc->valid_to && $employeeDoc->valid_to < $endDate) {
                         $isValid = false;
-                        $problem = $docValidFrom 
+                        $problem = $docValidFrom
                             ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
                             : "Dokument ważny do: {$docValidTo}";
                     } else {
                         $isValid = true;
                     }
                 }
-                
-                if (!$isValid) {
+
+                if (! $isValid) {
                     $missingDocuments[] = [
                         'document_id' => $document->id,
                         'document_name' => $document->name,
@@ -505,15 +521,15 @@ class Employee extends Model
                     ];
                 }
             }
-            
+
             // Filtruj tylko wymagane dokumenty jeśli kolumna istnieje
             if ($hasIsRequiredColumn) {
-                $missingDocuments = array_filter($missingDocuments, function($doc) {
+                $missingDocuments = array_filter($missingDocuments, function ($doc) {
                     return isset($doc['is_required']) && $doc['is_required'] === true;
                 });
             }
-            
-            if (!empty($missingDocuments)) {
+
+            if (! empty($missingDocuments)) {
                 // Sprawdź czy kolumna is_required istnieje, aby dostosować komunikat
                 if ($hasIsRequiredColumn) {
                     $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
@@ -524,7 +540,7 @@ class Employee extends Model
         }
 
         // 2. Sprawdź rotację
-        if (!$this->hasActiveRotationInDateRange($startDate, $endDate)) {
+        if (! $this->hasActiveRotationInDateRange($startDate, $endDate)) {
             $available = false;
             $reasons[] = 'Brak rotacji pokrywającej cały okres';
         }
@@ -533,17 +549,17 @@ class Employee extends Model
         $query = $this->assignments()
             ->active()
             ->overlappingWith($startDate, $endDate);
-        
+
         // Jeśli podano projectId, wyklucz przypisania do tego samego projektu (pozwól na edycję)
         if ($projectId !== null) {
             $query->where('project_id', '!=', $projectId);
         }
-        
+
         // Wyklucz aktualnie edytowane przypisanie
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);
         }
-        
+
         $hasConflictingAssignments = $query->exists();
 
         if ($hasConflictingAssignments) {
@@ -554,11 +570,11 @@ class Employee extends Model
         // 4. Sprawdź lokalizację i wymagania logistyczne (wyjazdy)
         if ($projectId !== null && $available) {
             $project = \App\Models\Project::find($projectId);
-            
+
             if ($project && $project->location_id) {
                 try {
                     $validator = app(\App\Services\EmployeeLocationValidator::class);
-                    
+
                     // If editing assignment, check if it has logistics_event_id (departure)
                     $currentDepartureId = null;
                     if ($excludeAssignmentId) {
@@ -567,19 +583,19 @@ class Employee extends Model
                             $currentDepartureId = $existingAssignment->logistics_event_id;
                         }
                     }
-                    
+
                     $validator->validateForAssignment($this, $project, \Carbon\Carbon::parse($startDate), $currentDepartureId, $excludeAssignmentId);
                 } catch (\Illuminate\Validation\ValidationException $e) {
                     // Extract user-friendly message from validation exception
                     $errors = $e->errors();
-                    
+
                     if (isset($errors['employee_id'])) {
                         $available = false;
                         $message = $errors['employee_id'][0];
-                        
+
                         // Make message more concise for availability status
                         if (str_contains($message, 'w bazie') && str_contains($message, 'Najpierw utwórz wyjazd')) {
-                            $reasons[] = 'Wymaga wyjazdu do lokalizacji: ' . $project->location->name;
+                            $reasons[] = 'Wymaga wyjazdu do lokalizacji: '.$project->location->name;
                         } elseif (str_contains($message, 'w trakcie podróży')) {
                             $reasons[] = 'W podróży w dniu rozpoczęcia przypisania';
                         } else {
@@ -604,12 +620,12 @@ class Employee extends Model
     public function isAvailableInDateRange($startDate, $endDate, ?int $excludeAssignmentId = null): bool
     {
         // 1. Sprawdź czy pracownik ma wszystkie wymagane dokumenty aktywne
-        if (!$this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
+        if (! $this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
             return false;
         }
 
         // 2. Sprawdź czy pracownik ma aktywną rotację w tym okresie
-        if (!$this->hasActiveRotationInDateRange($startDate, $endDate)) {
+        if (! $this->hasActiveRotationInDateRange($startDate, $endDate)) {
             return false; // Brak rotacji = pracownik nie może pracować
         }
 
@@ -617,14 +633,14 @@ class Employee extends Model
         $query = $this->assignments()
             ->active()
             ->overlappingWith($startDate, $endDate);
-        
+
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);
         }
-        
+
         $hasConflictingAssignments = $query->exists();
 
-        return !$hasConflictingAssignments;
+        return ! $hasConflictingAssignments;
     }
 
     /**

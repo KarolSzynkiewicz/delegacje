@@ -2,10 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\ProjectAssignment;
-use App\Models\Employee;
 use App\Models\Project;
-use App\Models\Role;
+use App\Models\ProjectAssignment;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -14,12 +12,20 @@ class AssignmentsTable extends Component
     use WithPagination;
 
     public $searchEmployee = '';
+
     public $searchProject = '';
+
     public $searchRole = '';
+
+    /** Filtr po konkretnym projekcie (ID z listy) */
+    public $projectFilter = '';
+
     public $status = '';
+
     public $dateFrom = '';
+
     public $dateTo = '';
-    
+
     // Optional filter for /mine/* routes
     public $filterProjectIds = null;
 
@@ -27,11 +33,13 @@ class AssignmentsTable extends Component
         'searchEmployee' => ['except' => ''],
         'searchProject' => ['except' => ''],
         'searchRole' => ['except' => ''],
+        'projectFilter' => ['except' => ''],
         'status' => ['except' => ''],
         'dateFrom' => ['except' => ''],
         'dateTo' => ['except' => ''],
     ];
-    protected $updatesQueryString = ['searchEmployee', 'searchProject', 'searchRole', 'status', 'dateFrom', 'dateTo'];
+
+    protected $updatesQueryString = ['searchEmployee', 'searchProject', 'searchRole', 'projectFilter', 'status', 'dateFrom', 'dateTo'];
 
     public function updating($name, $value)
     {
@@ -43,6 +51,7 @@ class AssignmentsTable extends Component
         $this->searchEmployee = '';
         $this->searchProject = '';
         $this->searchRole = '';
+        $this->projectFilter = '';
         $this->status = '';
         $this->dateFrom = '';
         $this->dateTo = '';
@@ -57,33 +66,38 @@ class AssignmentsTable extends Component
     public function render()
     {
         $query = ProjectAssignment::with(['employee', 'project', 'role']);
-        
+
         // Filtrowanie po projektach (dla /mine/*)
-        if ($this->filterProjectIds && is_array($this->filterProjectIds) && !empty($this->filterProjectIds)) {
+        if ($this->filterProjectIds && is_array($this->filterProjectIds) && ! empty($this->filterProjectIds)) {
             $query->whereIn('project_id', $this->filterProjectIds);
         }
-        
+
         $query->orderBy('start_date', 'asc');
 
         // Filter by employee
         if ($this->searchEmployee) {
             $query->whereHas('employee', function ($q) {
-                $q->where('first_name', 'like', '%' . $this->searchEmployee . '%')
-                  ->orWhere('last_name', 'like', '%' . $this->searchEmployee . '%');
+                $q->where('first_name', 'like', '%'.$this->searchEmployee.'%')
+                    ->orWhere('last_name', 'like', '%'.$this->searchEmployee.'%');
             });
         }
 
-        // Filter by project
+        // Filtr: konkretny projekt (select)
+        if ($this->projectFilter !== '' && $this->projectFilter !== null) {
+            $query->where('project_id', (int) $this->projectFilter);
+        }
+
+        // Filter by project name (tekst)
         if ($this->searchProject) {
             $query->whereHas('project', function ($q) {
-                $q->where('name', 'like', '%' . $this->searchProject . '%');
+                $q->where('name', 'like', '%'.$this->searchProject.'%');
             });
         }
 
         // Filter by role
         if ($this->searchRole) {
             $query->whereHas('role', function ($q) {
-                $q->where('name', 'like', '%' . $this->searchRole . '%');
+                $q->where('name', 'like', '%'.$this->searchRole.'%');
             });
         }
 
@@ -94,9 +108,9 @@ class AssignmentsTable extends Component
                 $query->active();
             } elseif ($this->status === 'completed') {
                 // For 'completed', filter by past assignments
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->whereNotNull('end_date')
-                      ->where('end_date', '<', now());
+                        ->where('end_date', '<', now());
                 });
             }
             // Note: 'cancelled' filter removed - assignments are physically deleted when cancelled
@@ -109,21 +123,17 @@ class AssignmentsTable extends Component
         if ($this->dateTo) {
             $query->where(function ($q) {
                 $q->where('end_date', '<=', $this->dateTo)
-                  ->orWhereNull('end_date');
+                    ->orWhereNull('end_date');
             });
         }
 
         $assignments = $query->paginate(20);
 
-        $employees = Employee::orderBy('last_name')->get();
         $projects = Project::orderBy('name')->get();
-        $roles = Role::orderBy('name')->get();
 
         return view('livewire.assignments-table', [
             'assignments' => $assignments,
-            'employees' => $employees,
             'projects' => $projects,
-            'roles' => $roles,
         ]);
     }
 }

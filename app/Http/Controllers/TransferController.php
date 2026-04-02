@@ -2,19 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\LogisticsEvent;
-use App\Models\Location;
-use App\Enums\LogisticsEventType;
 use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 
 class TransferController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $sort = (string) $request->query('sort', 'id');
+        $dir = strtolower((string) $request->query('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['id', 'event_date', 'created_at'];
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'id';
+        }
+
         $transfers = LogisticsEvent::where('type', LogisticsEventType::TRANSFER)
             ->with([
                 'vehicle',
@@ -24,10 +30,11 @@ class TransferController extends Controller
                 'participants.employee',
                 'driverAdjustments.employee',
             ])
-            ->orderBy('event_date', 'desc')
-            ->paginate(20);
+            ->orderBy($sort, $dir)
+            ->paginate(20)
+            ->withQueryString();
 
-        return view('transfers.index', compact('transfers'));
+        return view('transfers.index', compact('transfers', 'sort', 'dir'));
     }
 
     public function create(): View
@@ -77,7 +84,7 @@ class TransferController extends Controller
     {
         abort_if($transfer->type !== LogisticsEventType::TRANSFER, 404);
 
-        if (!in_array($transfer->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])) {
+        if (! in_array($transfer->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])) {
             return redirect()->route('transfers.show', $transfer)
                 ->with('error', 'Tego transferu nie można anulować.');
         }

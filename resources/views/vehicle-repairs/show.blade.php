@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Naprawa #{{ $vehicleRepair->id }} – {{ $vehicleRepair->vehicle->registration_number }}">
+        <x-ui.page-header title="Akcja serwisowa #{{ $vehicleRepair->id }} – {{ $vehicleRepair->vehicle->registration_number }}">
             <x-slot name="left">
                 <x-ui.button variant="ghost" href="{{ route('vehicle-repairs.index') }}" action="back">
                     Powrót
@@ -13,11 +13,11 @@
                     </x-ui.button>
                     @if(!$vehicleRepair->isCompleted())
                         <x-ui.button variant="success" href="{{ route('vehicle-repairs.complete-form', $vehicleRepair) }}">
-                            <i class="bi bi-check-circle me-1"></i> Zakończ naprawę
+                            <i class="bi bi-check-circle me-1"></i> Zakończ akcję serwisową
                         </x-ui.button>
                     @endif
                     <form method="POST" action="{{ route('vehicle-repairs.destroy', $vehicleRepair) }}" class="d-inline"
-                          onsubmit="return confirm('Usunąć tę naprawę? Powiązany koszt księgowy również zostanie usunięty.')">
+                          onsubmit="return confirm('Usunąć tę akcję serwisową? Powiązany koszt księgowy również zostanie usunięty.')">
                         @csrf
                         @method('DELETE')
                         <x-ui.button variant="danger" type="submit" action="delete">Usuń</x-ui.button>
@@ -43,11 +43,11 @@
                 @if($vehicleRepair->status === 'in_progress')
                     <span class="ms-2">Pojazd przebywa w warsztacie.</span>
                 @elseif($vehicleRepair->status === 'completed')
-                    <span class="ms-2">Naprawa zakończona {{ $vehicleRepair->end_date->format('Y-m-d') }}.</span>
+                    <span class="ms-2">Akcja serwisowa zakończona {{ $vehicleRepair->end_date->format('Y-m-d') }}.</span>
                 @endif
             </div>
 
-            <x-ui.card label="Szczegóły naprawy">
+            <x-ui.card label="Szczegóły akcji serwisowej">
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <h6>Pojazd</h6>
@@ -79,7 +79,7 @@
 
                 @if($vehicleRepair->end_date)
                     <div class="mb-3">
-                        <h6>Czas naprawy</h6>
+                        <h6>Czas trwania</h6>
                         <p>{{ $vehicleRepair->start_date->diffInDays($vehicleRepair->end_date) }} dni</p>
                     </div>
                 @endif
@@ -155,7 +155,7 @@
             @elseif(!$vehicleRepair->isCompleted())
                 <div class="alert mt-4" style="background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--text-main);">
                     <i class="bi bi-exclamation-triangle me-2"></i>
-                    Koszt serwisu zostanie automatycznie zaksięgowany po zakończeniu naprawy.
+                    Koszt serwisu zostanie automatycznie zaksięgowany po zakończeniu akcji serwisowej.
                 </div>
             @endif
 

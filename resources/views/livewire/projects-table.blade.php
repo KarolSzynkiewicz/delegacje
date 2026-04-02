@@ -45,7 +45,7 @@
                 <select wire:model.live.debounce.300ms="statusFilter" class="form-control">
                     <option value="">Wszystkie statusy</option>
                     @foreach($statuses as $status)
-                        <option value="{{ $status }}">{{ ucfirst($status) }}</option>
+                        <option value="{{ $status->value }}">{{ $status->label() }}</option>
                     @endforeach
                 </select>
             </div>
@@ -75,9 +75,14 @@
                             Nazwa
                         </x-livewire.sortable-header>
                         <th class="text-start d-none d-md-table-cell">Klient</th>
-                        <x-livewire.sortable-header field="type" :sortField="$sortField" :sortDirection="$sortDirection">
-                            Typ
+                        <th class="text-start">Lokalizacja</th>
+                        <x-livewire.sortable-header field="start_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">
+                            Data od
                         </x-livewire.sortable-header>
+                        <x-livewire.sortable-header field="end_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">
+                            Data do
+                        </x-livewire.sortable-header>
+                        <th class="text-start">Stan</th>
                         <x-livewire.sortable-header field="status" :sortField="$sortField" :sortDirection="$sortDirection">
                             Status
                         </x-livewire.sortable-header>
@@ -86,68 +91,93 @@
                 </thead>
                 <tbody>
                     @forelse ($projects as $project)
+                        @php
+                            // Status enum (ręcznie ustawiony)
+                            $status = $project->status ?? \App\Enums\ProjectStatus::ACTIVE;
+                            $statusLabel = $status instanceof \App\Enums\ProjectStatus ? $status->label() : ucfirst($status);
+                            $badgeVariant = match(\App\Services\StatusColorService::getProjectStatusColor($status)) {
+                                'success' => 'success',
+                                'danger'  => 'danger',
+                                'warning' => 'warning',
+                                default   => 'info',
+                            };
+
+                            // Stan wyliczany z dat (HasDateRange)
+                            if ($project->isScheduled()) {
+                                $stateLabel   = 'Zaplanowany';
+                                $stateVariant = 'warning';
+                                $stateIcon    = 'clock';
+                            } elseif ($project->isCurrentlyActive()) {
+                                $stateLabel   = 'Aktywny';
+                                $stateVariant = 'success';
+                                $stateIcon    = 'play-circle';
+                            } elseif ($project->isPast()) {
+                                $stateLabel   = 'Zakończony';
+                                $stateVariant = 'info';
+                                $stateIcon    = 'check-circle';
+                            } else {
+                                $stateLabel   = 'Brak dat';
+                                $stateVariant = 'accent';
+                                $stateIcon    = 'dash-circle';
+                            }
+                        @endphp
                         <tr wire:key="project-{{ $project->id }}">
                             <td>
                                 <div class="fw-medium">{{ $project->name }}</div>
-                                @if($project->location)
-                                    <div class="small text-muted mt-1">
-                                        <i class="bi bi-geo-alt"></i> {{ $project->location->name }}
-                                    </div>
-                                @endif
-                            </td>
-                            <td class="d-none d-md-table-cell">
-                                <div>{{ $project->client_name ?? '-' }}</div>
-                            </td>
-                            <td>
                                 @php
                                     $type = $project->type ?? \App\Enums\ProjectType::CONTRACT;
                                     $typeValue = $type instanceof \App\Enums\ProjectType ? $type->value : $type;
-                                    
-                                    if ($typeValue === 'hourly') {
-                                        $typeLabel = 'Stawka za godzinę';
-                                        $typeInfo = $project->hourly_rate ? number_format($project->hourly_rate, 2, ',', ' ') . ' ' . ($project->currency ?? 'EUR') : '';
-                                    } else {
-                                        $typeLabel = 'Zakontraktowany';
-                                        $typeInfo = $project->contract_amount ? number_format($project->contract_amount, 2, ',', ' ') . ' ' . ($project->currency ?? 'PLN') : '';
-                                    }
+                                    $typeInfo = $typeValue === 'hourly'
+                                        ? ($project->hourly_rate ? number_format($project->hourly_rate, 2, ',', ' ') . ' ' . ($project->currency ?? 'EUR') . '/h' : '')
+                                        : ($project->contract_amount ? number_format($project->contract_amount, 2, ',', ' ') . ' ' . ($project->currency ?? 'PLN') : '');
                                 @endphp
-                                <div>
-                                    <span class="fw-medium">{{ $typeLabel }}</span>
-                                    @if($typeInfo)
-                                        <div class="small text-muted mt-1">{{ $typeInfo }}</div>
-                                    @endif
-                                </div>
+                                @if($typeInfo)
+                                    <div class="small text-muted mt-1">{{ $typeInfo }}</div>
+                                @endif
+                            </td>
+                            <td class="d-none d-md-table-cell">
+                                {{ $project->client_name ?? '-' }}
                             </td>
                             <td>
-                                @php
-                                    $status = $project->status ?? \App\Enums\ProjectStatus::ACTIVE;
-                                    $statusValue = $status instanceof \App\Enums\ProjectStatus ? $status->value : $status;
-                                    $statusLabel = $status instanceof \App\Enums\ProjectStatus ? $status->label() : ucfirst($status);
-                                    
-                                    $badgeVariant = match(\App\Services\StatusColorService::getProjectStatusColor($status)) {
-                                        'success' => 'success',
-                                        'danger' => 'danger',
-                                        'warning' => 'warning',
-                                        'info' => 'info',
-                                        'primary' => 'info',
-                                        'secondary' => 'info',
-                                        default => 'info'
-                                    };
-                                @endphp
+                                @if($project->location)
+                                    <div><i class="bi bi-geo-alt text-muted me-1"></i>{{ $project->location->name }}</div>
+                                    @if($project->location->city)
+                                        <div class="small text-muted">{{ $project->location->city }}</div>
+                                    @endif
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td class="text-nowrap">
+                                @if($project->start_date)
+                                    {{ $project->start_date->format('d.m.Y') }}
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td class="text-nowrap">
+                                @if($project->end_date)
+                                    {{ $project->end_date->format('d.m.Y') }}
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td class="text-nowrap">
+                                <x-ui.badge variant="{{ $stateVariant }}">
+                                    <i class="bi bi-{{ $stateIcon }} me-1"></i>{{ $stateLabel }}
+                                </x-ui.badge>
+                            </td>
+                            <td>
                                 <x-ui.badge variant="{{ $badgeVariant }}">
                                     {{ $statusLabel }}
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">
-                                <div class="d-flex gap-2 justify-content-end">
-                                    @php
-                                        $showRoute = $isMineView ? 'mine.projects.show' : 'projects.show';
-                                    @endphp
-                                    <x-ui.button variant="ghost" href="{{ route($showRoute, $project) }}" class="btn-sm">
-                                        <i class="bi bi-eye"></i>
-                                        <span class="d-none d-sm-inline ms-1">Zobacz</span>
-                                    </x-ui.button>
-                                </div>
+                                @php $showRoute = $isMineView ? 'mine.projects.show' : 'projects.show'; @endphp
+                                <x-ui.button variant="ghost" href="{{ route($showRoute, $project) }}" class="btn-sm">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="d-none d-sm-inline ms-1">Zobacz</span>
+                                </x-ui.button>
                             </td>
                         </tr>
                     @empty
@@ -157,7 +187,7 @@
                             :has-filters="$search || $statusFilter || $locationFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="5"
+                            colspan="8"
                         />
                     @endforelse
                 </tbody>

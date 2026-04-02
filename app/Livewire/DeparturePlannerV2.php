@@ -2,14 +2,14 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use Livewire\WithFileUploads;
-use Carbon\Carbon;
+use App\Enums\LocationPurposeType;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
-use App\Enums\LocationPurposeType;
+use Carbon\Carbon;
+use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class DeparturePlannerV2 extends Component
 {
@@ -17,19 +17,36 @@ class DeparturePlannerV2 extends Component
 
     // Podstawowe dane formularza
     public $departureDate;
+
     public $endDate;
+
     public $vehicleId;
+
     public $currentStep = 1;
-    
+
     // Dane z wyborów użytkownika (przechowywane w głównym komponencie)
     public $assignments = []; // [day_1 => [project_id => [role_id => [employee_id => ...]]]]
+
     public $assignmentRanges = []; // [employee_id_projectId_roleId => ['start_date' => ..., 'end_date' => ..., 'employee_id' => ..., 'project_id' => ..., 'role_id' => ...]]
+
     public $vehicleSeats = []; // [seat_index => ['employee_id' => ..., 'position' => 'driver'|'passenger']]
+
     public $accommodationAssignments = []; // [employee_id => ['accommodation_id' => ..., 'start_date' => ..., 'end_date' => ...]]
+
     public $vehicleAssignments = []; // [employee_id => ['vehicle_id' => ..., 'position' => ..., 'start_date' => ..., 'end_date' => ...]]
+
     public $routeData = null; // Route planning data
+
     public $ticketCostsByEmployee = []; // [employee_id => ['amount' => ..., 'currency' => 'PLN', 'attachment' => file]]
-    
+
+    // Shared airport selection (for public transport - same for all employees)
+    public $sharedStartAirportLocationId = null;
+
+    public $sharedEndAirportLocationId = null;
+
+    // Transfer config (created alongside departure for public transport)
+    public $transferConfig = []; // [vehicle_id, driver_employee_id, bonus_amount, bonus_currency, pickup_location_id, route_distance, route_duration, route_waypoints]
+
     // Listenery na eventy z podkomponentów
     protected $listeners = [
         // Step 1 - Project Assignments
@@ -38,21 +55,22 @@ class DeparturePlannerV2 extends Component
         'assignment-range-added' => 'handleAssignmentRangeAdded',
         'assignment-range-removed' => 'handleAssignmentRangeRemoved',
         'vehicle-seat-updated' => 'handleVehicleSeatUpdated',
-        
+
         // Step 2 - Accommodation Assignments
         'accommodation-assigned' => 'handleAccommodationAssigned',
         'accommodation-removed' => 'handleAccommodationRemoved',
-        
+
         // Step 3 - Vehicle Assignments
         'vehicle-assigned' => 'handleVehicleAssigned',
         'vehicle-assignment-removed' => 'handleVehicleAssignmentRemoved',
-        
+
         // Navigation
         'go-to-step' => 'goToStep',
         'save-departure' => 'saveDeparture',
-        
+
         // Step 4 - Route Planning
         'route-planned' => 'handleRoutePlanned',
+        'transfer-config-updated' => 'handleTransferConfigUpdated',
     ];
 
     public function mount($departureDate = null, $endDate = null, $vehicleId = null)
@@ -61,18 +79,27 @@ class DeparturePlannerV2 extends Component
         $this->endDate = $endDate ?? date('Y-m-d');
         $this->vehicleId = $vehicleId;
     }
-    
+
     // Automatyczne odświeżanie po zmianie pojazdu
     public function updatedVehicleId()
     {
         // Wyczyść miejsca w aucie gdy zmienia się pojazd
         $this->vehicleSeats = [];
 
-        if (!empty($this->vehicleId)) {
-            // Koszt biletu dotyczy tylko wyjazdu bez auta.
+        if (! empty($this->vehicleId)) {
+            // Transport publiczny dotyczy tylko wyjazdu bez auta.
             $this->ticketCostsByEmployee = [];
+            $this->sharedStartAirportLocationId = null;
+            $this->sharedEndAirportLocationId = null;
+            $this->transferConfig = [];
+            $this->routeData = null;
+        } else {
+            // Wyjazd bez auta — nie przechowuj danych o aucie WYJAZDOWYM.
+            // Uwaga: $vehicleAssignments (krok 3) to pojazdy na miejscu (dom → praca) i muszą zostać.
+            $this->vehicleSeats = [];
+            $this->routeData = null;
         }
-        
+
         // Inicjalizuj miejsca dla nowego pojazdu
         if ($this->vehicleId) {
             $vehicle = \App\Models\Vehicle::find($this->vehicleId);
@@ -84,23 +111,23 @@ class DeparturePlannerV2 extends Component
                         'position' => 'passenger',
                     ];
                 }
-                
+
                 // Wczytaj wszystkie istniejące przypisania z assignmentRanges
                 $seatIndex = 0;
                 foreach ($this->assignmentRanges as $assignmentRange) {
                     $employeeId = $assignmentRange['employee_id'];
-                    
+
                     // Sprawdź czy pracownik już nie jest w aucie (duplikaty)
                     $alreadyInVehicle = false;
                     foreach ($this->vehicleSeats as $seat) {
-                        if (!empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
+                        if (! empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
                             $alreadyInVehicle = true;
                             break;
                         }
                     }
-                    
+
                     // Jeśli nie ma go w aucie i jest miejsce, przypisz
-                    if (!$alreadyInVehicle && $seatIndex < $vehicle->capacity) {
+                    if (! $alreadyInVehicle && $seatIndex < $vehicle->capacity) {
                         $this->vehicleSeats[$seatIndex] = [
                             'employee_id' => $employeeId,
                             'position' => 'passenger', // Domyślnie pasażer
@@ -110,22 +137,22 @@ class DeparturePlannerV2 extends Component
                 }
             }
         }
-        
+
         // Dispatch event z aktualnymi vehicleSeats do komponentu Step1
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
     }
-    
+
     // Automatyczne odświeżanie po zmianie miejsc w aucie
     public function updatedVehicleSeats()
     {
         // Dispatch event z aktualnymi vehicleSeats do komponentu Step1
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
     }
-    
+
     // ============================================
     // Step 1 - Project Assignment Handlers
     // ============================================
-    
+
     public function handleAssignmentAdded($data)
     {
         // $data: ['day' => 'day_1', 'project_id' => 1, 'role_id' => 2, 'employee_id' => 3]
@@ -133,43 +160,43 @@ class DeparturePlannerV2 extends Component
         $projectId = $data['project_id'];
         $roleId = $data['role_id'];
         $employeeId = $data['employee_id'];
-        
-        if (!isset($this->assignments[$day])) {
+
+        if (! isset($this->assignments[$day])) {
             $this->assignments[$day] = [];
         }
-        if (!isset($this->assignments[$day][$projectId])) {
+        if (! isset($this->assignments[$day][$projectId])) {
             $this->assignments[$day][$projectId] = [];
         }
-        if (!isset($this->assignments[$day][$projectId][$roleId])) {
+        if (! isset($this->assignments[$day][$projectId][$roleId])) {
             $this->assignments[$day][$projectId][$roleId] = [];
         }
-        
-        if (!in_array($employeeId, $this->assignments[$day][$projectId][$roleId])) {
+
+        if (! in_array($employeeId, $this->assignments[$day][$projectId][$roleId])) {
             $this->assignments[$day][$projectId][$roleId][] = $employeeId;
         }
     }
-    
+
     public function handleAssignmentRemoved($data = [])
     {
         // Jeśli $data jest puste lub nie jest tablicą, nie rób nic
-        if (empty($data) || !is_array($data)) {
+        if (empty($data) || ! is_array($data)) {
             return;
         }
-        
+
         $day = $data['day'] ?? null;
         $projectId = $data['project_id'] ?? null;
         $roleId = $data['role_id'] ?? null;
         $employeeId = $data['employee_id'] ?? null;
-        
-        if (!$day || !$projectId || !$roleId || !$employeeId) {
+
+        if (! $day || ! $projectId || ! $roleId || ! $employeeId) {
             return;
         }
-        
+
         if (isset($this->assignments[$day][$projectId][$roleId])) {
             $this->assignments[$day][$projectId][$roleId] = array_values(
-                array_filter($this->assignments[$day][$projectId][$roleId], fn($id) => $id != $employeeId)
+                array_filter($this->assignments[$day][$projectId][$roleId], fn ($id) => $id != $employeeId)
             );
-            
+
             // Clean up empty arrays
             if (empty($this->assignments[$day][$projectId][$roleId])) {
                 unset($this->assignments[$day][$projectId][$roleId]);
@@ -182,11 +209,11 @@ class DeparturePlannerV2 extends Component
             }
         }
     }
-    
+
     public function handleAssignmentRangeAdded($data)
     {
         // $data: ['employee_id' => 1, 'project_id' => 2, 'role_id' => 3, 'start_date' => '2024-01-01', 'end_date' => '2024-01-10']
-        $key = $data['employee_id'] . '_' . $data['project_id'] . '_' . $data['role_id'];
+        $key = $data['employee_id'].'_'.$data['project_id'].'_'.$data['role_id'];
         $this->assignmentRanges[$key] = [
             'employee_id' => $data['employee_id'],
             'project_id' => $data['project_id'],
@@ -194,12 +221,12 @@ class DeparturePlannerV2 extends Component
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
         ];
-        
+
         // Automatycznie przypisz pracownika do pierwszego wolnego miejsca w aucie
         if ($this->vehicleId) {
             $employeeId = $data['employee_id'];
             $alreadyInVehicle = false;
-            
+
             // Inicjalizuj vehicleSeats jeśli są puste
             if (empty($this->vehicleSeats)) {
                 // Pobierz pojazd i zainicjalizuj miejsca
@@ -213,17 +240,17 @@ class DeparturePlannerV2 extends Component
                     }
                 }
             }
-            
+
             // Sprawdź czy pracownik już jest w aucie
             foreach ($this->vehicleSeats as $seat) {
-                if (!empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
+                if (! empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
                     $alreadyInVehicle = true;
                     break;
                 }
             }
-            
+
             // Jeśli nie ma go w aucie, przypisz do pierwszego wolnego miejsca
-            if (!$alreadyInVehicle) {
+            if (! $alreadyInVehicle) {
                 foreach ($this->vehicleSeats as $index => $seat) {
                     if (empty($seat['employee_id'])) {
                         $this->vehicleSeats[$index] = [
@@ -235,34 +262,34 @@ class DeparturePlannerV2 extends Component
                 }
             }
         }
-        
+
         // Dispatch event to refresh child component
         $this->dispatch('refresh-assignments');
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
     }
-    
+
     public function handleAssignmentRangeRemoved($data = [])
     {
         // Jeśli $data jest puste lub nie jest tablicą, nie rób nic
-        if (empty($data) || !is_array($data)) {
+        if (empty($data) || ! is_array($data)) {
             return;
         }
-        
+
         $employeeId = $data['employee_id'] ?? null;
         $projectId = $data['project_id'] ?? null;
         $roleId = $data['role_id'] ?? null;
-        
-        if (!$employeeId || !$projectId || !$roleId) {
+
+        if (! $employeeId || ! $projectId || ! $roleId) {
             return;
         }
-        
-        $key = $employeeId . '_' . $projectId . '_' . $roleId;
+
+        $key = $employeeId.'_'.$projectId.'_'.$roleId;
         unset($this->assignmentRanges[$key]);
-        
+
         // Usuń również pracownika z vehicleSeats jeśli tam jest
-        if ($this->vehicleId && !empty($this->vehicleSeats)) {
+        if ($this->vehicleId && ! empty($this->vehicleSeats)) {
             foreach ($this->vehicleSeats as $index => $seat) {
-                if (!empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
+                if (! empty($seat['employee_id']) && $seat['employee_id'] == $employeeId) {
                     $this->vehicleSeats[$index] = [
                         'employee_id' => null,
                         'position' => 'passenger',
@@ -273,11 +300,11 @@ class DeparturePlannerV2 extends Component
             // Dispatch event z aktualnymi vehicleSeats do komponentu Step1
             $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
         }
-        
+
         // Dispatch event to refresh child component
         $this->dispatch('refresh-assignments');
     }
-    
+
     public function handleVehicleSeatUpdated($data)
     {
         // $data: ['seat_index' => 0, 'employee_id' => 1, 'position' => 'driver']
@@ -286,15 +313,15 @@ class DeparturePlannerV2 extends Component
             'employee_id' => $data['employee_id'] ?? null,
             'position' => $data['position'] ?? 'passenger',
         ];
-        
+
         // Dispatch event z aktualnymi vehicleSeats do komponentu Step1
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
     }
-    
+
     // ============================================
     // Step 2 - Accommodation Assignment Handlers
     // ============================================
-    
+
     public function handleAccommodationAssigned($data)
     {
         // $data: ['employee_id' => 1, 'accommodation_id' => 2, 'start_date' => '2024-01-01', 'end_date' => '2024-01-10']
@@ -304,17 +331,17 @@ class DeparturePlannerV2 extends Component
             'end_date' => $data['end_date'],
         ];
     }
-    
+
     public function handleAccommodationRemoved($data)
     {
         // $data: ['employee_id' => 1]
         unset($this->accommodationAssignments[$data['employee_id']]);
     }
-    
+
     // ============================================
     // Step 3 - Vehicle Assignment Handlers
     // ============================================
-    
+
     public function handleVehicleAssigned($data)
     {
         // $data: ['employee_id' => 1, 'vehicle_id' => 2, 'position' => 'driver', 'start_date' => '2024-01-01', 'end_date' => '2024-01-10']
@@ -325,33 +352,34 @@ class DeparturePlannerV2 extends Component
             'end_date' => $data['end_date'],
         ];
     }
-    
+
     public function handleVehicleAssignmentRemoved($data)
     {
         // $data: ['employee_id' => 1]
         unset($this->vehicleAssignments[$data['employee_id']]);
     }
-    
+
     // ============================================
     // Navigation
     // ============================================
-    
+
     public function goToStep($step)
     {
-        $step = (int)$step;
-        
+        $step = (int) $step;
+
         // Walidacja przed przejściem do następnego kroku
         if ($step === 2) {
-            $hasAssignments = !empty($this->assignments) || !empty($this->assignmentRanges);
-            if (!$hasAssignments) {
+            $hasAssignments = ! empty($this->assignments) || ! empty($this->assignmentRanges);
+            if (! $hasAssignments) {
                 $this->dispatch('error', message: 'Musisz przypisać przynajmniej jednego pracownika do projektu przed przejściem dalej.');
+
                 return;
             }
         }
-        
+
         $this->currentStep = $step;
     }
-    
+
     public function handleRoutePlanned($data)
     {
         // Store complete route data including waypoint order, distance, and duration
@@ -361,7 +389,12 @@ class DeparturePlannerV2 extends Component
             'route_waypoints' => $data['route_waypoints'] ?? [], // Order of accommodation IDs
         ];
     }
-    
+
+    public function handleTransferConfigUpdated($data)
+    {
+        $this->transferConfig = $data;
+    }
+
     public function saveDeparture()
     {
         // Wyczyść błędy z poprzedniej próby zapisu
@@ -370,6 +403,7 @@ class DeparturePlannerV2 extends Component
         // Walidacja przed zapisem
         if (empty($this->assignments) && empty($this->assignmentRanges)) {
             $this->dispatch('error', message: 'Musisz przypisać przynajmniej jednego pracownika do projektu.');
+
             return;
         }
 
@@ -378,16 +412,31 @@ class DeparturePlannerV2 extends Component
         if (empty($this->vehicleId)) {
             $employeeIds = $this->getSelectedEmployeeIds();
 
-            // Krok 1: waliduj wszystkie pola (bez uploadu pliku)
+            // Validate shared airports (once for all employees)
+            $startAirportLocationId = $this->sharedStartAirportLocationId;
+            $endAirportLocationId = $this->sharedEndAirportLocationId;
+
+            if (empty($startAirportLocationId) || ! Location::whereKey($startAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
+                $this->addError('sharedStartAirportLocationId', 'Wybierz lotnisko startowe dla całej grupy.');
+            }
+
+            if (empty($endAirportLocationId) || ! Location::whereKey($endAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
+                $this->addError('sharedEndAirportLocationId', 'Wybierz lotnisko docelowe dla całej grupy.');
+            }
+
+            if (! empty($startAirportLocationId) && ! empty($endAirportLocationId) && (int) $startAirportLocationId === (int) $endAirportLocationId) {
+                $this->addError('sharedStartAirportLocationId', 'Lotnisko startowe i docelowe nie mogą być takie same.');
+                $this->addError('sharedEndAirportLocationId', 'Lotnisko startowe i docelowe nie mogą być takie same.');
+            }
+
+            // Krok 1: waliduj pola per-pracownik (bez uploadu pliku)
             foreach ($employeeIds as $employeeId) {
                 $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
                 $amount = $employeeCost['amount'] ?? null;
                 $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
-                $startAirportLocationId = $employeeCost['start_airport_location_id'] ?? null;
-                $endAirportLocationId = $employeeCost['end_airport_location_id'] ?? null;
                 $attachment = $employeeCost['attachment'] ?? null;
 
-                if ($amount === null || $amount === '' || !is_numeric($amount) || (float) $amount <= 0) {
+                if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                     $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu dla tego pracownika.');
                 }
 
@@ -395,21 +444,13 @@ class DeparturePlannerV2 extends Component
                     $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
                 }
 
-                if (empty($startAirportLocationId) || !Location::whereKey($startAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
-                    $this->addError("ticketCostsByEmployee.{$employeeId}.start_airport_location_id", 'Wybierz lotnisko startowe z listy.');
-                }
-
-                if (empty($endAirportLocationId) || !Location::whereKey($endAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
-                    $this->addError("ticketCostsByEmployee.{$employeeId}.end_airport_location_id", 'Wybierz lotnisko docelowe z listy.');
-                }
-
                 if ($attachment) {
                     $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
-                        ["attachment" => $attachment],
-                        ["attachment" => 'file|max:10240'],
+                        ['attachment' => $attachment],
+                        ['attachment' => 'file|max:10240'],
                         [
-                            "attachment.file" => 'Załącznik musi być poprawnym plikiem.',
-                            "attachment.max"  => 'Załącznik może mieć maksymalnie 10 MB.',
+                            'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
+                            'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
                         ]
                     );
                     if ($attachmentValidator->fails()) {
@@ -426,12 +467,11 @@ class DeparturePlannerV2 extends Component
             }
 
             // Krok 2: walidacja OK — uploaduj pliki i buduj tablicę kosztów
+            // Shared airports are copied to every employee
             foreach ($employeeIds as $employeeId) {
                 $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
                 $amount = $employeeCost['amount'] ?? null;
                 $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
-                $startAirportLocationId = $employeeCost['start_airport_location_id'] ?? null;
-                $endAirportLocationId = $employeeCost['end_airport_location_id'] ?? null;
                 $attachment = $employeeCost['attachment'] ?? null;
 
                 $attachmentPath = null;
@@ -457,12 +497,14 @@ class DeparturePlannerV2 extends Component
                 'vehicle_id' => $this->vehicleId,
                 'assignments' => $this->assignments,
                 'assignment_ranges' => $this->assignmentRanges,
-                'vehicle_seats' => $this->vehicleSeats,
+                'vehicle_seats' => ! empty($this->vehicleId) ? $this->vehicleSeats : [],
                 'accommodation_assignments' => $this->accommodationAssignments,
+                // vehicle_assignments (krok 3) są niezależne od sposobu wyjazdu (auto vs transport publiczny)
                 'vehicle_assignments' => $this->vehicleAssignments,
                 'route_data' => $this->routeData, // Contains: route_distance, route_duration, route_waypoints
                 'ticket_costs_per_employee' => $ticketCostsPerEmployee ?? [],
-            ]
+                'transfer_config' => ! empty($this->vehicleId) ? [] : $this->transferConfig,
+            ],
         ]);
 
         // Przekieruj do kontrolera, który zapisze dane
@@ -474,25 +516,26 @@ class DeparturePlannerV2 extends Component
      */
     public function getAvailableVehiclesProperty()
     {
-        if (!$this->departureDate) {
+        if (! $this->departureDate) {
             return collect();
         }
-        
+
         $departureDate = Carbon::parse($this->departureDate);
         $locationTrackingService = app(LocationTrackingService::class);
-        
+
         // Pobierz wszystkie pojazdy firmowe
         $vehicles = Vehicle::where('type', 'company_vehicle')
             ->orderBy('registration_number')
             ->get();
-        
+
         // Filtruj tylko te, które są w bazie na dzień wyjazdu
         $availableVehicles = $vehicles->filter(function ($vehicle) use ($departureDate, $locationTrackingService) {
             $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $departureDate);
+
             // Pojazd jest dostępny jeśli nie jest w podróży i nie jest poza bazą
-            return !$status['in_transit'] && !$status['outside_base'];
+            return ! $status['in_transit'] && ! $status['outside_base'];
         });
-        
+
         return $availableVehicles;
     }
 
@@ -528,17 +571,17 @@ class DeparturePlannerV2 extends Component
         $employeeIds = collect();
 
         foreach ($this->assignments as $projects) {
-            if (!is_array($projects)) {
+            if (! is_array($projects)) {
                 continue;
             }
 
             foreach ($projects as $roles) {
-                if (!is_array($roles)) {
+                if (! is_array($roles)) {
                     continue;
                 }
 
                 foreach ($roles as $ids) {
-                    if (!is_array($ids)) {
+                    if (! is_array($ids)) {
                         continue;
                     }
                     $employeeIds = $employeeIds->merge($ids);
@@ -547,7 +590,7 @@ class DeparturePlannerV2 extends Component
         }
 
         foreach ($this->assignmentRanges as $range) {
-            if (!empty($range['employee_id'])) {
+            if (! empty($range['employee_id'])) {
                 $employeeIds->push($range['employee_id']);
             }
         }

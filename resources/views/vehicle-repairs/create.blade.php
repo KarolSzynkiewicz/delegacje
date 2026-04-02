@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Nowa naprawa / serwis">
+        <x-ui.page-header title="Nowa akcja serwisowa">
             <x-slot name="left">
                 <x-ui.button variant="ghost" href="{{ route('vehicle-repairs.index') }}" action="back">
                     Powrót

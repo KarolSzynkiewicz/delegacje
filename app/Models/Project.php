@@ -2,19 +2,20 @@
 
 namespace App\Models;
 
-use App\Enums\ProjectType;
 use App\Enums\ProjectStatus;
+use App\Enums\ProjectType;
 use App\Traits\HasComments;
+use App\Traits\HasDateRange;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
 
 class Project extends Model
 {
-    use HasFactory, HasComments;
+    use HasComments, HasDateRange, HasFactory;
 
     /**
      * The attributes that are mass assignable.

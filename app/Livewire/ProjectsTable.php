@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\Project;
 use App\Models\Location;
+use App\Models\Project;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -12,13 +12,18 @@ class ProjectsTable extends Component
     use WithPagination;
 
     public $search = '';
+
     public $statusFilter = '';
+
     public $locationFilter = '';
+
     public $sortField = 'name';
+
     public $sortDirection = 'asc';
-    
+
     // Optional filter for /mine/* routes
     public $filterProjectIds = null;
+
     public $isMineView = false; // Flag to use /mine/* routes
 
     protected $queryString = [
@@ -67,16 +72,16 @@ class ProjectsTable extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        
+
         $this->resetPage();
     }
 
     public function render()
     {
         $query = Project::with('location');
-        
+
         // Filtrowanie po zarządzanych projektach (dla /mine/*)
-        if ($this->filterProjectIds && is_array($this->filterProjectIds) && !empty($this->filterProjectIds)) {
+        if ($this->filterProjectIds && is_array($this->filterProjectIds) && ! empty($this->filterProjectIds)) {
             $query->whereIn('id', $this->filterProjectIds);
             $this->isMineView = true; // Ustaw flagę jeśli filtrujemy
         }
@@ -86,8 +91,8 @@ class ProjectsTable extends Component
             $searchTerm = trim($this->search);
             if (strlen($searchTerm) >= 2) { // Minimum 2 znaki dla wyszukiwania
                 $query->where(function ($q) use ($searchTerm) {
-                    $q->where('name', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('client_name', 'like', '%' . $searchTerm . '%');
+                    $q->where('name', 'like', '%'.$searchTerm.'%')
+                        ->orWhere('client_name', 'like', '%'.$searchTerm.'%');
                 });
             }
         }
@@ -103,16 +108,18 @@ class ProjectsTable extends Component
         }
 
         // Sortowanie
-        $query->orderBy($this->sortField, $this->sortDirection);
+        $allowedSortFields = ['name', 'status', 'type', 'start_date', 'end_date'];
+        $sortField = in_array($this->sortField, $allowedSortFields, true) ? $this->sortField : 'name';
+        $query->orderBy($sortField, $this->sortDirection);
 
         $projects = $query->paginate(15);
-        
+
         // Cache locations - zmieniają się rzadko
         $locations = cache()->remember('locations_list', 3600, function () {
             return Location::orderBy('name')->get();
         });
-        
-        $statuses = ['active', 'completed', 'cancelled', 'pending'];
+
+        $statuses = \App\Enums\ProjectStatus::cases();
 
         return view('livewire.projects-table', [
             'projects' => $projects,

@@ -30,10 +30,9 @@
                         type="text"
                         wire:model.live.debounce.300ms="search"
                         placeholder="Nazwa, adres, miasto, kod…"
-                        class="form-control ps-5"
+                        class="form-control"
                         autocomplete="off"
                     >
-                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
                 </div>
             </div>
             <div class="col-md-4">

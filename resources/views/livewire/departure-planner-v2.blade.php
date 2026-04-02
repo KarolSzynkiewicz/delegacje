@@ -38,7 +38,7 @@
                     wire:model.live="vehicleId" 
                     class="form-select"
                 >
-                    <option value="">Brak pojazdu</option>
+                    <option value="">Transport publiczny</option>
                     @foreach($this->availableVehicles as $v)
                         <option value="{{ $v->id }}">
                             {{ $v->registration_number }} - {{ $v->brand }} {{ $v->model }}
@@ -51,6 +51,50 @@
 
         @if(empty($vehicleId))
             <hr class="my-4">
+            <h6 class="fw-semibold mb-3">Loty (wspólne dla całej grupy)</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Lotnisko startowe <span class="text-danger">*</span></label>
+                    <select
+                        wire:model.live="sharedStartAirportLocationId"
+                        class="form-select @error('sharedStartAirportLocationId') is-invalid @enderror"
+                    >
+                        <option value="">Wybierz lotnisko</option>
+                        @foreach($this->availableAirports as $airport)
+                            <option
+                                value="{{ $airport->id }}"
+                                @disabled(!empty($sharedEndAirportLocationId) && (int) $sharedEndAirportLocationId === (int) $airport->id)
+                            >
+                                {{ $airport->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('sharedStartAirportLocationId')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Lotnisko docelowe <span class="text-danger">*</span></label>
+                    <select
+                        wire:model.live="sharedEndAirportLocationId"
+                        class="form-select @error('sharedEndAirportLocationId') is-invalid @enderror"
+                    >
+                        <option value="">Wybierz lotnisko</option>
+                        @foreach($this->availableAirports as $airport)
+                            <option
+                                value="{{ $airport->id }}"
+                                @disabled(!empty($sharedStartAirportLocationId) && (int) $sharedStartAirportLocationId === (int) $airport->id)
+                            >
+                                {{ $airport->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('sharedEndAirportLocationId')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+
             <h6 class="fw-semibold mb-3">Koszty biletów (osobno dla każdej osoby)</h6>
             @if($this->selectedEmployees->isEmpty())
                 <div class="alert alert-info mb-0">
@@ -62,7 +106,7 @@
                         <div class="border rounded p-3">
                             <div class="fw-semibold mb-3">{{ $employee->full_name }}</div>
                             <div class="row g-3">
-                                <div class="col-md-4">
+                                <div class="col-md-5">
                                     <label class="form-label fw-semibold">Koszt biletu <span class="text-danger">*</span></label>
                                     <input
                                         type="number"
@@ -76,7 +120,7 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-3">
                                     <label class="form-label fw-semibold">Waluta <span class="text-danger">*</span></label>
                                     <select
                                         wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.currency"
@@ -90,38 +134,8 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label fw-semibold">Lotnisko startowe <span class="text-danger">*</span></label>
-                                    <select
-                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.start_airport_location_id"
-                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.start_airport_location_id') is-invalid @enderror"
-                                    >
-                                        <option value="">Wybierz lotnisko</option>
-                                        @foreach($this->availableAirports as $airport)
-                                            <option value="{{ $airport->id }}">{{ $airport->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('ticketCostsByEmployee.' . $employee->id . '.start_airport_location_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label fw-semibold">Lotnisko docelowe <span class="text-danger">*</span></label>
-                                    <select
-                                        wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.end_airport_location_id"
-                                        class="form-select @error('ticketCostsByEmployee.' . $employee->id . '.end_airport_location_id') is-invalid @enderror"
-                                    >
-                                        <option value="">Wybierz lotnisko</option>
-                                        @foreach($this->availableAirports as $airport)
-                                            <option value="{{ $airport->id }}">{{ $airport->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('ticketCostsByEmployee.' . $employee->id . '.end_airport_location_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-semibold">Załącznik do kosztu (bilet/faktura)</label>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Załącznik (bilet/faktura)</label>
                                     <input
                                         type="file"
                                         wire:model="ticketCostsByEmployee.{{ $employee->id }}.attachment"
@@ -203,7 +217,9 @@
             :assignment-ranges="$assignmentRanges"
             :vehicle-assignments="$vehicleAssignments"
             :ticket-costs-by-employee="$ticketCostsByEmployee"
-            key="step4-{{ $departureDate }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
+            :shared-start-airport-location-id="$sharedStartAirportLocationId"
+            :shared-end-airport-location-id="$sharedEndAirportLocationId"
+            key="step4-{{ $departureDate }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}-{{ $sharedStartAirportLocationId }}-{{ $sharedEndAirportLocationId }}"
         />
     @endif
 </div>

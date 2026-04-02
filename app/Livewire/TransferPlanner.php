@@ -2,22 +2,22 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use Livewire\WithPagination;
+use App\Enums\Currency;
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
+use App\Models\Adjustment;
 use App\Models\Employee;
 use App\Models\Location;
-use App\Models\Vehicle;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
-use App\Models\Adjustment;
-use App\Enums\LogisticsEventType;
-use App\Enums\LogisticsEventStatus;
-use App\Enums\Currency;
-use App\Services\RoutePlanningService;
+use App\Models\Vehicle;
 use App\Services\GeocodingService;
-use Illuminate\Support\Facades\DB;
+use App\Services\RoutePlanningService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class TransferPlanner extends Component
 {
@@ -25,7 +25,9 @@ class TransferPlanner extends Component
 
     // Basic
     public string $transferDate = '';
+
     public ?int $vehicleId = null;
+
     public string $notes = '';
 
     // Route: ordered list of location IDs [from, ...waypoints, to]
@@ -33,7 +35,9 @@ class TransferPlanner extends Component
 
     // Route result
     public ?array $routeData = null;
+
     public bool $isPlanningRoute = false;
+
     public ?string $routeError = null;
 
     // Participants
@@ -41,19 +45,25 @@ class TransferPlanner extends Component
 
     // Driver payment
     public ?int $driverEmployeeId = null;
+
     public string $driverPaymentAmount = '';
+
     public string $driverPaymentCurrency = 'PLN';
+
     public ?int $driverPayrollId = null;
 
     // Search helpers
     public string $employeeSearch = '';
+
     public string $vehicleSearch = '';
+
     public string $locationSearch = '';
 
     // UI: which location slot to add next
     public ?int $addLocationId = null;
 
     protected RoutePlanningService $routePlanningService;
+
     protected GeocodingService $geocodingService;
 
     public function boot(RoutePlanningService $routePlanningService, GeocodingService $geocodingService): void
@@ -87,11 +97,11 @@ class TransferPlanner extends Component
         if ($this->employeeSearch !== '') {
             $search = mb_strtolower(trim($this->employeeSearch));
             $q->where(function ($inner) use ($search) {
-                $inner->whereRaw('LOWER(CONCAT(first_name, \" \", last_name)) LIKE ?', ['%' . $search . '%'])
-                    ->orWhereRaw('LOWER(CONCAT(last_name, \" \", first_name)) LIKE ?', ['%' . $search . '%'])
-                    ->orWhereRaw('LOWER(first_name) LIKE ?', ['%' . $search . '%'])
-                    ->orWhereRaw('LOWER(last_name) LIKE ?', ['%' . $search . '%'])
-                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $search . '%']);
+                $inner->whereRaw('LOWER(CONCAT(first_name, \" \", last_name)) LIKE ?', ['%'.$search.'%'])
+                    ->orWhereRaw('LOWER(CONCAT(last_name, \" \", first_name)) LIKE ?', ['%'.$search.'%'])
+                    ->orWhereRaw('LOWER(first_name) LIKE ?', ['%'.$search.'%'])
+                    ->orWhereRaw('LOWER(last_name) LIKE ?', ['%'.$search.'%'])
+                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$search.'%']);
             });
         }
 
@@ -108,6 +118,7 @@ class TransferPlanner extends Component
         if (empty($this->selectedEmployeeIds)) {
             return collect();
         }
+
         return Employee::whereIn('id', $this->selectedEmployeeIds)
             ->orderBy('last_name')
             ->orderBy('first_name')
@@ -122,10 +133,11 @@ class TransferPlanner extends Component
     public function getFilteredLocationsForPickerProperty()
     {
         return $this->locations->filter(function (Location $loc) {
-            if (!$this->locationSearch) {
+            if (! $this->locationSearch) {
                 return true;
             }
             $q = mb_strtolower($this->locationSearch);
+
             return str_contains(mb_strtolower($loc->name), $q)
                 || str_contains(mb_strtolower($loc->city ?? ''), $q);
         })->whereNotIn('id', $this->waypointLocationIds);
@@ -143,6 +155,7 @@ class TransferPlanner extends Component
                 $result[] = $loc;
             }
         }
+
         return $result;
     }
 
@@ -152,10 +165,11 @@ class TransferPlanner extends Component
             ->orderBy('registration_number')
             ->get()
             ->filter(function (Vehicle $v) {
-                if (!$this->vehicleSearch) {
+                if (! $this->vehicleSearch) {
                     return true;
                 }
                 $q = mb_strtolower($this->vehicleSearch);
+
                 return str_contains(mb_strtolower($v->registration_number), $q)
                     || str_contains(mb_strtolower($v->brand ?? ''), $q)
                     || str_contains(mb_strtolower($v->model ?? ''), $q);
@@ -164,9 +178,10 @@ class TransferPlanner extends Component
 
     public function getDriverPayrollsProperty()
     {
-        if (!$this->driverEmployeeId) {
+        if (! $this->driverEmployeeId) {
             return collect();
         }
+
         return \App\Models\Payroll::with('employee')
             ->where('employee_id', $this->driverEmployeeId)
             ->orderBy('period_start', 'desc')
@@ -182,15 +197,26 @@ class TransferPlanner extends Component
 
     public function addWaypoint(): void
     {
-        if (!$this->addLocationId) {
+        if (! $this->addLocationId) {
             return;
         }
         $id = (int) $this->addLocationId;
-        if (!in_array($id, $this->waypointLocationIds)) {
+        if (! in_array($id, $this->waypointLocationIds)) {
             $this->waypointLocationIds[] = $id;
         }
         $this->addLocationId = null;
         $this->locationSearch = '';
+
+        $baseEndpointMsg = $this->baseAsRouteEndpointMessage();
+        if ($baseEndpointMsg !== null) {
+            array_pop($this->waypointLocationIds);
+            $this->waypointLocationIds = array_values($this->waypointLocationIds);
+            $this->routeError = $baseEndpointMsg;
+            $this->routeData = null;
+
+            return;
+        }
+
         $this->planRoute();
     }
 
@@ -208,6 +234,16 @@ class TransferPlanner extends Component
         }
         [$this->waypointLocationIds[$index - 1], $this->waypointLocationIds[$index]] =
             [$this->waypointLocationIds[$index], $this->waypointLocationIds[$index - 1]];
+
+        $baseEndpointMsg = $this->baseAsRouteEndpointMessage();
+        if ($baseEndpointMsg !== null) {
+            [$this->waypointLocationIds[$index - 1], $this->waypointLocationIds[$index]] =
+                [$this->waypointLocationIds[$index], $this->waypointLocationIds[$index - 1]];
+            $this->routeError = $baseEndpointMsg;
+
+            return;
+        }
+
         $this->planRoute();
     }
 
@@ -218,7 +254,44 @@ class TransferPlanner extends Component
         }
         [$this->waypointLocationIds[$index], $this->waypointLocationIds[$index + 1]] =
             [$this->waypointLocationIds[$index + 1], $this->waypointLocationIds[$index]];
+
+        $baseEndpointMsg = $this->baseAsRouteEndpointMessage();
+        if ($baseEndpointMsg !== null) {
+            [$this->waypointLocationIds[$index], $this->waypointLocationIds[$index + 1]] =
+                [$this->waypointLocationIds[$index + 1], $this->waypointLocationIds[$index]];
+            $this->routeError = $baseEndpointMsg;
+
+            return;
+        }
+
         $this->planRoute();
+    }
+
+    /**
+     * Baza nie może być pierwszym ani ostatnim punktem trasy transferu (do tego służą zjazd/wyjazd).
+     */
+    private function baseAsRouteEndpointMessage(): ?string
+    {
+        if (count($this->waypointLocationIds) < 2) {
+            return null;
+        }
+
+        $firstId = $this->waypointLocationIds[0];
+        $lastId = $this->waypointLocationIds[array_key_last($this->waypointLocationIds)];
+        $locs = Location::whereIn('id', [$firstId, $lastId])->get()->keyBy('id');
+        $first = $locs->get($firstId);
+        $last = $locs->get($lastId);
+
+        $msg = 'Lokalizacja oznaczona jako baza nie może być pierwszym ani ostatnim punktem trasy. W tym celu ustaw zjazd lub wyjazd przy planowaniu delegacji.';
+
+        if ($first && $first->is_base) {
+            return $msg;
+        }
+        if ($last && $last->is_base) {
+            return $msg;
+        }
+
+        return null;
     }
 
     // ─── Route planning ─────────────────────────────────────────────────────────
@@ -228,6 +301,15 @@ class TransferPlanner extends Component
         if (count($this->waypointLocationIds) < 2) {
             $this->routeData = null;
             $this->routeError = null;
+
+            return;
+        }
+
+        $baseMsg = $this->baseAsRouteEndpointMessage();
+        if ($baseMsg !== null) {
+            $this->routeError = $baseMsg;
+            $this->routeData = null;
+
             return;
         }
 
@@ -236,10 +318,10 @@ class TransferPlanner extends Component
         // Geocode any locations missing coordinates
         foreach ($this->waypointLocationIds as $locId) {
             $loc = $locations->get($locId);
-            if (!$loc) {
+            if (! $loc) {
                 continue;
             }
-            if (!$loc->hasCoordinates()) {
+            if (! $loc->hasCoordinates()) {
                 $address = $loc->getFullAddress();
                 if ($address) {
                     try {
@@ -259,14 +341,15 @@ class TransferPlanner extends Component
         $missingCoords = [];
         foreach ($this->waypointLocationIds as $locId) {
             $loc = $locations->get($locId);
-            if (!$loc || !$loc->hasCoordinates()) {
+            if (! $loc || ! $loc->hasCoordinates()) {
                 $missingCoords[] = $loc ? $loc->name : "ID:{$locId}";
             }
         }
 
-        if (!empty($missingCoords)) {
-            $this->routeError = 'Brak współrzędnych dla: ' . implode(', ', $missingCoords) . '. Edytuj lokalizację i uzupełnij adres.';
+        if (! empty($missingCoords)) {
+            $this->routeError = 'Brak współrzędnych dla: '.implode(', ', $missingCoords).'. Edytuj lokalizację i uzupełnij adres.';
             $this->routeData = null;
+
             return;
         }
 
@@ -274,7 +357,7 @@ class TransferPlanner extends Component
         $this->routeError = null;
 
         try {
-            $ordered = array_map(fn($id) => $locations->get($id), $this->waypointLocationIds);
+            $ordered = array_map(fn ($id) => $locations->get($id), $this->waypointLocationIds);
             $start = array_shift($ordered);
             $end = array_pop($ordered);
             $intermediates = $ordered;
@@ -293,7 +376,7 @@ class TransferPlanner extends Component
             }
         } catch (\Exception $e) {
             Log::error('Transfer route planning failed', ['message' => $e->getMessage()]);
-            $this->routeError = 'Błąd podczas planowania trasy: ' . $e->getMessage();
+            $this->routeError = 'Błąd podczas planowania trasy: '.$e->getMessage();
             $this->routeData = null;
         } finally {
             $this->isPlanningRoute = false;
@@ -306,7 +389,7 @@ class TransferPlanner extends Component
     {
         if (in_array($employeeId, $this->selectedEmployeeIds)) {
             $this->selectedEmployeeIds = array_values(
-                array_filter($this->selectedEmployeeIds, fn($id) => $id !== $employeeId)
+                array_filter($this->selectedEmployeeIds, fn ($id) => $id !== $employeeId)
             );
             if ($this->driverEmployeeId === $employeeId) {
                 $this->driverEmployeeId = null;
@@ -327,15 +410,15 @@ class TransferPlanner extends Component
     public function save(): void
     {
         $this->validate([
-            'transferDate'           => ['required', 'date'],
-            'waypointLocationIds'    => ['required', 'array', 'min:2'],
-            'vehicleId'              => ['nullable', 'exists:vehicles,id'],
-            'selectedEmployeeIds'    => ['required', 'array', 'min:1'],
-            'selectedEmployeeIds.*'  => ['exists:employees,id'],
-            'driverEmployeeId'       => ['nullable', 'in:' . implode(',', $this->selectedEmployeeIds ?: [0])],
-            'driverPaymentAmount'    => ['nullable', 'numeric', 'min:0'],
-            'driverPaymentCurrency'  => ['required_with:driverPaymentAmount', 'in:' . implode(',', Currency::values())],
-            'driverPayrollId'        => [
+            'transferDate' => ['required', 'date'],
+            'waypointLocationIds' => ['required', 'array', 'min:2'],
+            'vehicleId' => ['nullable', 'exists:vehicles,id'],
+            'selectedEmployeeIds' => ['required', 'array', 'min:1'],
+            'selectedEmployeeIds.*' => ['exists:employees,id'],
+            'driverEmployeeId' => ['nullable', 'in:'.implode(',', $this->selectedEmployeeIds ?: [0])],
+            'driverPaymentAmount' => ['nullable', 'numeric', 'min:0'],
+            'driverPaymentCurrency' => ['required_with:driverPaymentAmount', 'in:'.implode(',', Currency::values())],
+            'driverPayrollId' => [
                 'nullable',
                 'exists:payrolls,id',
                 function ($attribute, $value, $fail) {
@@ -348,54 +431,61 @@ class TransferPlanner extends Component
                 },
             ],
         ], [
-            'transferDate.required'        => 'Data transferu jest wymagana.',
+            'transferDate.required' => 'Data transferu jest wymagana.',
             'waypointLocationIds.required' => 'Dodaj co najmniej 2 lokalizacje (start i cel).',
-            'waypointLocationIds.min'      => 'Transfer musi mieć co najmniej lokalizację startową i docelową.',
+            'waypointLocationIds.min' => 'Transfer musi mieć co najmniej lokalizację startową i docelową.',
             'selectedEmployeeIds.required' => 'Dodaj co najmniej jednego uczestnika.',
-            'selectedEmployeeIds.min'      => 'Dodaj co najmniej jednego uczestnika.',
-            'driverPaymentCurrency.in'     => 'Wybierz walutę z listy.',
+            'selectedEmployeeIds.min' => 'Dodaj co najmniej jednego uczestnika.',
+            'driverPaymentCurrency.in' => 'Wybierz walutę z listy.',
         ]);
+
+        $baseEndpointMsg = $this->baseAsRouteEndpointMessage();
+        if ($baseEndpointMsg !== null) {
+            $this->addError('waypointLocationIds', $baseEndpointMsg);
+
+            return;
+        }
 
         $fromLocationId = $this->waypointLocationIds[0];
         $toLocationId = $this->waypointLocationIds[count($this->waypointLocationIds) - 1];
 
         DB::transaction(function () use ($fromLocationId, $toLocationId) {
             $event = LogisticsEvent::create([
-                'type'              => LogisticsEventType::TRANSFER,
-                'event_date'        => $this->transferDate,
-                'end_date'          => $this->transferDate,
-                'from_location_id'  => $fromLocationId,
-                'to_location_id'    => $toLocationId,
-                'vehicle_id'        => $this->vehicleId ?: null,
-                'has_transport'     => empty($this->vehicleId),
-                'status'            => LogisticsEventStatus::PLANNED,
-                'notes'             => $this->notes ?: null,
-                'route_distance'    => $this->routeData['distance'] ?? null,
-                'route_duration'    => $this->routeData ? (int) $this->routeData['duration'] : null,
-                'route_waypoints'   => count($this->waypointLocationIds) > 2
+                'type' => LogisticsEventType::TRANSFER,
+                'event_date' => $this->transferDate,
+                'end_date' => $this->transferDate,
+                'from_location_id' => $fromLocationId,
+                'to_location_id' => $toLocationId,
+                'vehicle_id' => $this->vehicleId ?: null,
+                'has_transport' => empty($this->vehicleId),
+                'status' => LogisticsEventStatus::PLANNED,
+                'notes' => $this->notes ?: null,
+                'route_distance' => $this->routeData['distance'] ?? null,
+                'route_duration' => $this->routeData ? (int) $this->routeData['duration'] : null,
+                'route_waypoints' => count($this->waypointLocationIds) > 2
                     ? array_slice($this->waypointLocationIds, 1, -1)
                     : null,
-                'created_by'        => Auth::id(),
+                'created_by' => Auth::id(),
             ]);
 
             foreach ($this->selectedEmployeeIds as $employeeId) {
                 LogisticsEventParticipant::create([
                     'logistics_event_id' => $event->id,
-                    'employee_id'        => $employeeId,
-                    'status'             => 'pending',
+                    'employee_id' => $employeeId,
+                    'status' => 'pending',
                 ]);
             }
 
             if ($this->driverEmployeeId && $this->driverPaymentAmount !== '' && (float) $this->driverPaymentAmount > 0) {
                 Adjustment::create([
-                    'employee_id'        => $this->driverEmployeeId,
+                    'employee_id' => $this->driverEmployeeId,
                     'logistics_event_id' => $event->id,
-                    'payroll_id'         => $this->driverPayrollId ?: null,
-                    'amount'             => $this->driverPaymentAmount,
-                    'currency'           => $this->driverPaymentCurrency,
-                    'type'               => 'bonus',
-                    'date'               => \Carbon\Carbon::parse($this->transferDate)->toDateString(),
-                    'notes'              => 'Wynagrodzenie za transfer',
+                    'payroll_id' => $this->driverPayrollId ?: null,
+                    'amount' => $this->driverPaymentAmount,
+                    'currency' => $this->driverPaymentCurrency,
+                    'type' => 'bonus',
+                    'date' => \Carbon\Carbon::parse($this->transferDate)->toDateString(),
+                    'notes' => 'Wynagrodzenie za transfer',
                 ]);
             }
         });

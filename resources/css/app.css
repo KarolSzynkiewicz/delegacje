@@ -55,6 +55,16 @@ body {
     object-fit: cover;
 }
 
+/* Weekly overview: assigned employees list collapse toggle */
+.weekly-overview-assigned-toggle .collapse-chevron {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.weekly-overview-assigned-toggle.collapsed .collapse-chevron {
+    transform: rotate(-90deg);
+}
+
 /* Dashboard styles */
 .dashboard-card {
     padding: 1.5rem !important;
@@ -2337,6 +2347,20 @@ html .text-muted,
 
 .modal-xl {
     max-width: 1140px;
+}
+
+/* Portal modali kalendarza (create-v2). Zostaje w drzewie Livewire — nie appendChild na body,
+   bo inaczej wire:click przestaje działać. fixed jest względem przodka z backdrop-filter (.app-content-wrapper). */
+.modal-portal-to-body {
+    position: fixed;
+    inset: 0;
+    z-index: 1055;
+    pointer-events: none;
+}
+
+.modal-portal-to-body > .modal-backdrop,
+.modal-portal-to-body > .modal {
+    pointer-events: auto;
 }
 
 /* Employee Assignment Modal specific styles */

@@ -11,16 +11,6 @@
                 </x-ui.button>
             </x-slot>
             <x-slot name="right">
-                @if($returnTrip->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
-                    <x-ui.button 
-                        variant="ghost" 
-                        href="{{ route('return-trips.edit', $returnTrip) }}"
-                        routeName="return-trips.edit"
-                        action="edit"
-                    >
-                        Edytuj
-                    </x-ui.button>
-                @endif
                 @if($returnTrip->status === \App\Enums\LogisticsEventStatus::PLANNED)
                     <form method="POST" action="{{ route('return-trips.cancel', $returnTrip) }}" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz anulować ten zjazd?');">
                         @csrf

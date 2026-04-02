@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 class RoutePlanningService
 {
     protected string $apiKey;
+
     protected string $baseUrl;
 
     public function __construct()
@@ -20,18 +21,17 @@ class RoutePlanningService
     /**
      * Plan a route between two locations.
      *
-     * @param Location $from
-     * @param Location $to
-     * @param array $options Additional options (profile: 'driving-car', 'driving-hgv', etc.)
+     * @param  array  $options  Additional options (profile: 'driving-car', 'driving-hgv', etc.)
      * @return array|null Route data or null on failure
      */
     public function planRoute(Location $from, Location $to, array $options = []): ?array
     {
-        if (!$from->hasCoordinates() || !$to->hasCoordinates()) {
+        if (! $from->hasCoordinates() || ! $to->hasCoordinates()) {
             Log::warning('Cannot plan route: locations missing coordinates', [
                 'from_id' => $from->id,
                 'to_id' => $to->id,
             ]);
+
             return null;
         }
 
@@ -61,23 +61,25 @@ class RoutePlanningService
                 ],
             ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Route planning failed', [
                     'status' => $response->status(),
                     'response' => $response->body(),
                     'from' => $from->id,
                     'to' => $to->id,
                 ]);
+
                 return null;
             }
 
             $data = $response->json();
-            
+
             if (empty($data['routes'])) {
                 Log::warning('No route found', [
                     'from' => $from->id,
                     'to' => $to->id,
                 ]);
+
                 return null;
             }
 
@@ -97,6 +99,7 @@ class RoutePlanningService
                 'from' => $from->id,
                 'to' => $to->id,
             ]);
+
             return null;
         }
     }
@@ -104,10 +107,10 @@ class RoutePlanningService
     /**
      * Plan a route with multiple waypoints (optimized order).
      *
-     * @param mixed $start Start location (Location or Accommodation with hasCoordinates/getCoordinates methods)
-     * @param mixed $end End location (Location or Accommodation with hasCoordinates/getCoordinates methods)
-     * @param array $waypoints Intermediate locations (Location or Accommodation objects)
-     * @param array $options Additional options
+     * @param  mixed  $start  Start location (Location or Accommodation with hasCoordinates/getCoordinates methods)
+     * @param  mixed  $end  End location (Location or Accommodation with hasCoordinates/getCoordinates methods)
+     * @param  array  $waypoints  Intermediate locations (Location or Accommodation objects)
+     * @param  array  $options  Additional options
      * @return array|null Route data or null on failure
      */
     public function planRouteWithWaypoints($start, $end, array $waypoints = [], array $options = []): ?array
@@ -115,11 +118,12 @@ class RoutePlanningService
         // Check all locations have coordinates
         $allLocations = array_merge([$start, $end], $waypoints);
         foreach ($allLocations as $location) {
-            if (!method_exists($location, 'hasCoordinates') || !$location->hasCoordinates()) {
+            if (! method_exists($location, 'hasCoordinates') || ! $location->hasCoordinates()) {
                 Log::warning('Cannot plan route: location missing coordinates', [
                     'location_id' => $location->id ?? 'unknown',
                     'location_type' => get_class($location),
                 ]);
+
                 return null;
             }
         }
@@ -131,12 +135,12 @@ class RoutePlanningService
         $coordinates = [];
         $startCoords = $start->getCoordinates();
         $coordinates[] = [$startCoords[1], $startCoords[0]]; // [lng, lat]
-        
+
         foreach ($waypoints as $waypoint) {
             $coords = $waypoint->getCoordinates();
             $coordinates[] = [$coords[1], $coords[0]];
         }
-        
+
         $endCoords = $end->getCoordinates();
         $coordinates[] = [$endCoords[1], $endCoords[0]];
 
@@ -159,27 +163,27 @@ class RoutePlanningService
                 ],
             ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $errorBody = $response->body();
                 $errorData = $response->json();
-                
+
                 Log::error('Route planning with waypoints failed', [
                     'status' => $response->status(),
                     'response' => $errorBody,
                     'coordinates_count' => count($coordinates),
                 ]);
-                
+
                 // Try to extract error message from response
                 $errorMessage = 'Błąd API';
                 if (isset($errorData['error'])) {
                     $errorMessage = is_string($errorData['error']) ? $errorData['error'] : ($errorData['error']['message'] ?? 'Błąd API');
                 }
-                
+
                 throw new \Exception("OpenRouteService API error ({$response->status()}): {$errorMessage}");
             }
 
             $data = $response->json();
-            
+
             if (empty($data['routes'])) {
                 Log::warning('Route planning returned no routes', [
                     'coordinates_count' => count($coordinates),
@@ -203,23 +207,20 @@ class RoutePlanningService
             Log::error('Route planning with waypoints exception', [
                 'message' => $e->getMessage(),
             ]);
-            return null;
+            throw $e;
         }
     }
 
     /**
      * Calculate distance and duration between two locations.
      *
-     * @param Location $from
-     * @param Location $to
-     * @param array $options
      * @return array|null ['distance' => float (km), 'duration' => int (seconds)]
      */
     public function calculateDistance(Location $from, Location $to, array $options = []): ?array
     {
         $route = $this->planRoute($from, $to, $options);
-        
-        if (!$route) {
+
+        if (! $route) {
             return null;
         }
 

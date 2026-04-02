@@ -12,15 +12,22 @@ class EmployeesTable extends Component
     use WithPagination;
 
     public $search = '';
+
     public $roleFilter = '';
+
     public $locationFilter = '';
+
     public $rotationFilter = '';
+
     public $statusDate = ''; // Nowy filtr daty
+
     public $sortField = 'last_name';
+
     public $sortDirection = 'asc';
-    
+
     // Optional filter for /mine/* routes
     public $filterEmployeeIds = null;
+
     public $filterProjectIds = null;
 
     protected $queryString = [
@@ -83,7 +90,7 @@ class EmployeesTable extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        
+
         $this->resetPage();
     }
 
@@ -91,23 +98,24 @@ class EmployeesTable extends Component
     {
         // OPTIMIZATION: Eager load all relations needed for location status calculation
         $query = Employee::with([
-            'roles', 
-            'assignments.project.location',  // Added location for project
-            'accommodationAssignments.accommodation',  // Added for accommodation status
-            'rotations'
+            'roles',
+            'assignments.project.location',
+            'accommodationAssignments.accommodation',
+            'rotations',
+            'rates' => fn ($q) => $q->active()->orderByDesc('start_date'),
         ]);
-        
+
         // Filtrowanie po pracownikach (dla /mine/*)
-        if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && !empty($this->filterEmployeeIds)) {
+        if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && ! empty($this->filterEmployeeIds)) {
             $query->whereIn('id', $this->filterEmployeeIds);
         }
 
         // Filtrowanie po imieniu/nazwisku/emailu
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('first_name', 'like', '%' . $this->search . '%')
-                  ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                  ->orWhere('email', 'like', '%' . $this->search . '%');
+                $q->where('first_name', 'like', '%'.$this->search.'%')
+                    ->orWhere('last_name', 'like', '%'.$this->search.'%')
+                    ->orWhere('email', 'like', '%'.$this->search.'%');
             });
         }
 
@@ -121,7 +129,7 @@ class EmployeesTable extends Component
         // Sortowanie
         if ($this->sortField === 'name') {
             $query->orderBy('last_name', $this->sortDirection)
-                  ->orderBy('first_name', $this->sortDirection);
+                ->orderBy('first_name', $this->sortDirection);
         } else {
             $query->orderBy($this->sortField, $this->sortDirection);
         }
@@ -134,11 +142,11 @@ class EmployeesTable extends Component
             // For these filters, we need to get all employees first, then filter
             $allEmployees = $query->get();
             $locationTracker = app(\App\Services\LocationTrackingService::class);
-            
+
             $filteredEmployees = $allEmployees->filter(function ($employee) use ($locationTracker, $checkDate) {
                 if ($this->locationFilter) {
                     $status = $locationTracker->getLocationStatus($employee, $checkDate);
-                    
+
                     $locationMatch = false;
                     if ($this->locationFilter === 'base') {
                         $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::IN_BASE;
@@ -147,47 +155,47 @@ class EmployeesTable extends Component
                     } elseif ($this->locationFilter === 'field') {
                         $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::OUTSIDE_BASE;
                     }
-                    
-                    if (!$locationMatch) {
+
+                    if (! $locationMatch) {
                         return false;
                     }
                 }
-                
+
                 // Rotation filter
                 if ($this->rotationFilter) {
                     // Check loaded rotations collection for active rotation
-                    $hasActiveRotation = $employee->rotations->filter(function($rotation) use ($checkDate) {
+                    $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($checkDate) {
                         $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
                         $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
-                        
-                        if (!$startDate) {
+
+                        if (! $startDate) {
                             return false;
                         }
-                        
-                        return $startDate->lte($checkDate) 
+
+                        return $startDate->lte($checkDate)
                             && ($endDate === null || $endDate->gte($checkDate));
                     })->isNotEmpty();
-                    
+
                     $rotationMatch = false;
                     if ($this->rotationFilter === 'active' && $hasActiveRotation) {
                         $rotationMatch = true;
-                    } elseif ($this->rotationFilter === 'inactive' && !$hasActiveRotation) {
+                    } elseif ($this->rotationFilter === 'inactive' && ! $hasActiveRotation) {
                         $rotationMatch = true;
                     }
-                    
-                    if (!$rotationMatch) {
+
+                    if (! $rotationMatch) {
                         return false;
                     }
                 }
-                
+
                 return true;
             });
-            
+
             // Paginate manually
             $currentPage = $this->getPage();
             $perPage = 10;
             $currentPageItems = $filteredEmployees->slice(($currentPage - 1) * $perPage, $perPage)->values();
-            
+
             $employees = new \Illuminate\Pagination\LengthAwarePaginator(
                 $currentPageItems,
                 $filteredEmployees->count(),

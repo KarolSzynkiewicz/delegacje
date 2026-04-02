@@ -243,7 +243,142 @@
         </div>
     </x-ui.card>
 
-    <x-ui.card label="Bilety">
+    @php
+        $ticketCosts = $departure->transportCosts->where('cost_type', 'ticket')->values();
+        $isPublicTransportDeparture = !$departure->vehicle_id;
+    @endphp
+
+    @if($isPublicTransportDeparture)
+        <x-ui.card label="Loty / bilety" class="mb-4">
+            @if($ticketCosts->isNotEmpty())
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Opis</th>
+                                <th>Kwota</th>
+                                <th>Data</th>
+                                <th>Notatka</th>
+                                <th>Załącznik</th>
+                                <th>Szczegóły</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($ticketCosts as $ticketCost)
+                                <tr>
+                                    <td>{{ $ticketCost->description ?: 'Bilet' }}</td>
+                                    <td>{{ number_format((float) $ticketCost->amount, 2) }} {{ $ticketCost->currency }}</td>
+                                    <td>{{ $ticketCost->cost_date?->format('Y-m-d') ?? '-' }}</td>
+                                    <td>{{ $ticketCost->notes ?: '—' }}</td>
+                                    <td>
+                                        @if($ticketCost->file_path)
+                                            <a href="{{ asset('storage/' . $ticketCost->file_path) }}" target="_blank" class="text-decoration-none">
+                                                <i class="bi bi-paperclip"></i> Podgląd
+                                            </a>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('transport-costs.show', $ticketCost) }}" class="text-decoration-none">
+                                            Zobacz
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="text-muted mb-0">Brak kosztów biletów dla tego wyjazdu.</p>
+            @endif
+        </x-ui.card>
+    @endif
+
+    @if($isPublicTransportDeparture)
+        <x-ui.card label="Transfer (lotnisko → domy)" class="mb-4">
+            @if(!empty($transfer))
+                <div class="row g-4 mb-3">
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Transfer</h6>
+                        <p class="fw-semibold mb-0">
+                            <a href="{{ route('transfers.show', $transfer) }}" class="text-decoration-none">
+                                #{{ $transfer->id }}
+                            </a>
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Dystans</h6>
+                        <p class="fw-semibold mb-0">{{ $transfer->getFormattedDistance() ?? '—' }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Czas</h6>
+                        <p class="fw-semibold mb-0">{{ $transfer->getFormattedDuration() ?? '—' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted small mb-1">Pojazd transferu</h6>
+                        <p class="fw-semibold mb-0">
+                            {{ $transfer->vehicle ? ($transfer->vehicle->registration_number . ' - ' . $transfer->vehicle->brand . ' ' . $transfer->vehicle->model) : '—' }}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted small mb-1">Kierowca / nagroda</h6>
+                        @if($transfer->driverAdjustments->isNotEmpty())
+                            @php $adj = $transfer->driverAdjustments->first(); @endphp
+                            <p class="fw-semibold mb-0">
+                                {{ $adj->employee?->full_name ?? '—' }}
+                                — {{ number_format((float) $adj->amount, 2) }} {{ $adj->currency }}
+                            </p>
+                            @if(!$adj->payroll_id)
+                                <div class="small text-muted">Bez payrollu</div>
+                            @endif
+                        @else
+                            <p class="text-muted mb-0">—</p>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="border-top pt-3">
+                    <h6 class="fw-semibold mb-3"><i class="bi bi-map me-1"></i>Trasa transferu</h6>
+                    @if(!empty($transferRouteStops) && $transferRouteStops->count() > 0)
+                        <div class="row g-2">
+                            @foreach($transferRouteStops as $i => $loc)
+                                @php
+                                    $isStart = $i === 0;
+                                    $isEnd = $i === ($transferRouteStops->count() - 1);
+                                    $badge = $isStart ? 'Start' : ($isEnd ? 'Cel' : 'Przystanek');
+                                    $badgeVariant = $isStart ? 'primary' : ($isEnd ? 'success' : 'accent');
+                                @endphp
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-2 border rounded-3 d-flex align-items-start gap-2">
+                                        <x-ui.badge variant="{{ $badgeVariant }}">{{ $badge }}</x-ui.badge>
+                                        <div class="min-w-0">
+                                            <div class="fw-semibold small text-truncate">{{ $loc->name }}</div>
+                                            @if($loc->city)
+                                                <div class="text-muted" style="font-size: 0.75rem;">{{ $loc->city }}</div>
+                                            @endif
+                                            @if(method_exists($loc, 'hasCoordinates') && !$loc->hasCoordinates())
+                                                <div class="text-warning" style="font-size: 0.75rem;">
+                                                    <i class="bi bi-exclamation-triangle"></i> brak współrzędnych
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <x-ui.empty-state icon="map" message="Brak zapisanej trasy transferu (brak przystanków)" />
+                    @endif
+                </div>
+            @else
+                <p class="text-muted mb-0">Brak powiązanego transferu (dla wyjazdów transportem publicznym transfer tworzy się automatycznie w kroku 4).</p>
+            @endif
+        </x-ui.card>
+    @endif
+
+    @if(!$isPublicTransportDeparture)
+        <x-ui.card label="Bilety">
         @php
             $ticketCosts = $departure->transportCosts->where('cost_type', 'ticket')->values();
         @endphp
@@ -291,6 +426,7 @@
             <p class="text-muted mb-0">Brak kosztów biletów dla tego wyjazdu.</p>
         @endif
     </x-ui.card>
+    @endif
 
     @if($departure->hasRouteData() && $departure->route_waypoints)
         <x-ui.card label="Plan trasy">

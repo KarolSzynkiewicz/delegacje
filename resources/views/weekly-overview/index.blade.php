@@ -842,6 +842,24 @@
                                             $accommodation = $accommodationData['accommodation'];
                                             $usagePercentage = $accommodationData['usage_percentage'] ?? 0;
                                             $progressVariant = $usagePercentage == 100 ? 'success' : ($usagePercentage >= 70 ? 'warning' : 'danger');
+                                            $accType = $accommodation->type ?? '';
+                                            if ($accType === 'własny') {
+                                                $accommodationLeaseCaption = 'Mieszkanie własne';
+                                            } elseif ($accType === 'wynajmowany' && $accommodation->lease_end_date) {
+                                                $daysToLeaseEnd = (int) now()->startOfDay()->diffInDays($accommodation->lease_end_date->copy()->startOfDay(), false);
+                                                if ($daysToLeaseEnd < 0) {
+                                                    $accommodationLeaseCaption = 'Najem zakończony';
+                                                } elseif ($daysToLeaseEnd === 0) {
+                                                    $accommodationLeaseCaption = 'Dni do końca najmu: ostatni dzień';
+                                                } else {
+                                                    $dayWord = $daysToLeaseEnd === 1 ? 'dzień' : 'dni';
+                                                    $accommodationLeaseCaption = 'Dni do końca najmu: '.$daysToLeaseEnd.' '.$dayWord;
+                                                }
+                                            } elseif ($accType === 'wynajmowany') {
+                                                $accommodationLeaseCaption = 'Wynajem — brak daty końca';
+                                            } else {
+                                                $accommodationLeaseCaption = null;
+                                            }
                                         @endphp
                                         <x-ui.card>
                                             <!-- Wiersz 1: Nazwa domu i progress bar -->
@@ -878,6 +896,9 @@
                                                             @endif
                                                         </div>
                                                     </a>
+                                                    @if($accommodationLeaseCaption)
+                                                        <div class="small text-muted mt-1">{{ $accommodationLeaseCaption }}</div>
+                                                    @endif
                                                 </div>
                                                 
                                                 <!-- Prawa połowa - lista osób -->
@@ -1115,18 +1136,44 @@
                 @endif
 
                 <!-- Tabelka z ludźmi -->
-                @if(isset($weekData['assigned_employees']) && $weekData['assigned_employees']->isNotEmpty())
-                    <div class="mt-4">
-                        <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
-                            <div class="d-flex gap-2">
-                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
-                                    Przypisz osoby
-                                </x-ui.button>
-                                <x-ui.button variant="success" href="{{ route('departures.create', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
-                                    Utwórz wyjazd
-                                </x-ui.button>
-                            </div>
-                        </x-ui.table-header>
+                @php
+                    $assignedList = isset($weekData['assigned_employees']) ? $weekData['assigned_employees'] : collect();
+                    $assignedCollapseId = 'weekly-assigned-p'.$project->id.'-w'.$weeks[0]['start']->format('Ymd');
+                @endphp
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h5 class="mb-0 text-dark">Przypisani pracownicy</h5>
+                            @if($assignedList->isNotEmpty())
+                                <span class="badge rounded-pill text-bg-secondary">{{ $assignedList->count() }}</span>
+                            @endif
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                                Przypisz osoby
+                            </x-ui.button>
+                            <x-ui.button variant="success" href="{{ route('departures.create', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                                Utwórz wyjazd
+                            </x-ui.button>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <button
+                            type="button"
+                            class="weekly-overview-assigned-toggle btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#{{ $assignedCollapseId }}"
+                            aria-expanded="true"
+                            aria-controls="{{ $assignedCollapseId }}"
+                            title="Pokaż lub ukryj listę pracowników"
+                        >
+                            <i class="bi bi-chevron-down collapse-chevron"></i>
+                            <span class="small">Lista</span>
+                        </button>
+                    </div>
+
+                    <div class="collapse show" id="{{ $assignedCollapseId }}">
+                        @if($assignedList->isNotEmpty())
                         <div class="table-responsive">
                             <table class="table align-middle">
                                 <thead>
@@ -1140,7 +1187,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($weekData['assigned_employees'] as $employeeData)
+                                    @foreach($assignedList as $employeeData)
                                         @php
                                             $dateRange = $employeeData['date_range'] ?? 'cały tydzień';
                                             $isFullWeek = ($dateRange === 'cały tydzień' || $dateRange === 'pon-nie');
@@ -1239,25 +1286,14 @@
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                @else
-                    <div class="mt-4">
-                        <x-ui.table-header title="Przypisani pracownicy" titleClass="text-dark">
-                            <div class="d-flex gap-2">
-                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
-                                    Przypisz osoby
-                                </x-ui.button>
-                                <x-ui.button variant="success" href="{{ route('departures.create', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
-                                    Utwórz wyjazd
-                                </x-ui.button>
-                            </div>
-                        </x-ui.table-header>
+                        @else
                         <x-ui.empty-state 
                             icon="people"
                             message="Brak przypisanych pracowników w tym tygodniu."
                         />
+                        @endif
                     </div>
-                @endif
+                </div>
 
                 <!-- Zadania projektu -->
                 @php

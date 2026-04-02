@@ -24,14 +24,36 @@
     </x-slot>
 
     <x-ui.card>
+        @php
+            $sortHref = function (string $column) use ($sort, $dir) {
+                $nextDir = ($sort === $column) ? ($dir === 'asc' ? 'desc' : 'asc') : 'desc';
+
+                return route('departures.index', array_merge(request()->except('page'), ['sort' => $column, 'dir' => $nextDir]));
+            };
+        @endphp
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th class="text-start">Daty</th>
+                        <th class="text-start text-nowrap">
+                            <a href="{{ $sortHref('id') }}" class="text-decoration-none text-reset">
+                                ID
+                                @if($sort === 'id')
+                                    <i class="bi bi-sort-{{ $dir === 'asc' ? 'up' : 'down' }}"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th class="text-start text-nowrap">
+                            <a href="{{ $sortHref('event_date') }}" class="text-decoration-none text-reset">
+                                Daty
+                                @if($sort === 'event_date')
+                                    <i class="bi bi-sort-{{ $dir === 'asc' ? 'up' : 'down' }}"></i>
+                                @endif
+                            </a>
+                        </th>
                         <th class="text-start">Trasa</th>
                         <th class="text-start">Pojazd</th>
-                        <th class="text-start">Uczestnicy i Lokalizacje</th>
+                        <th class="text-start">Uczestnicy</th>
                         <th class="text-start">Status</th>
                         <th class="text-end">Akcje</th>
                     </tr>
@@ -39,6 +61,7 @@
                 <tbody>
                     @forelse ($departures as $departure)
                         <tr>
+                            <td class="text-muted small">{{ $departure->id }}</td>
                             <td>
                                 <div class="d-flex flex-column gap-1">
                                     <div>
@@ -92,7 +115,7 @@
                                         </div>
                                     </div>
                                 @else
-                                    <span class="text-muted">-</span>
+                                    <span class="text-muted">Transport publiczny</span>
                                 @endif
                             </td>
                             <td>
@@ -148,7 +171,7 @@
                             icon="airplane"
                             message="Brak wyjazdów"
                             :in-table="true"
-                            colspan="6"
+                            colspan="7"
                         />
                     @endforelse
                 </tbody>

@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasDateRange;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
-use App\Traits\HasDateRange;
 
 class Rotation extends Model
 {
-    use HasFactory, HasDateRange;
+    use HasDateRange, HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -43,13 +43,26 @@ class Rotation extends Model
     }
 
     /**
+     * Liczba dni rotacji (włącznie z dniem rozpoczęcia i zakończenia).
+     */
+    public function getDurationDaysAttribute(): ?int
+    {
+        if ($this->start_date === null || $this->end_date === null) {
+            return null;
+        }
+
+        return (int) $this->start_date->copy()->startOfDay()
+            ->diffInDays($this->end_date->copy()->startOfDay()) + 1;
+    }
+
+    /**
      * Get the computed status based on dates.
      * Status: 'scheduled' (zaplanowana), 'active' (aktywna), 'completed' (zakończona)
      */
     public function getStatusAttribute($value): string
     {
         // Jeśli brak dat, zwróć 'scheduled'
-        if (!$this->start_date || !$this->end_date) {
+        if (! $this->start_date || ! $this->end_date) {
             return 'scheduled';
         }
 

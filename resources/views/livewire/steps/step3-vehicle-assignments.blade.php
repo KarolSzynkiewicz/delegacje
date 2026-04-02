@@ -278,8 +278,10 @@
 
     <!-- Modal: Vehicle Assignment Calendar -->
     @if($showVehicleModal && $selectedEmployee && $selectedVehicle)
-        <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog">
-            <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-portal-to-body">
+            <div class="modal-backdrop fade show"></div>
+            <div class="modal fade show employee-assignment-modal" style="display: block;" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">
@@ -354,7 +356,7 @@
                 </div>
             </div>
         </div>
-        <div class="modal-backdrop fade show"></div>
+        </div>
     @endif
 </div>
 

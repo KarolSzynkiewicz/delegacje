@@ -96,13 +96,11 @@
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
                             Pracownik
                         </x-livewire.sortable-header>
-                        <x-livewire.sortable-header field="email" :sortField="$sortField" :sortDirection="$sortDirection" class="d-none d-lg-table-cell">
-                            Email
-                        </x-livewire.sortable-header>
                         <th class="text-center" style="min-width: 120px;">Status</th>
                         <th class="text-center" style="min-width: 140px;">Dom</th>
                         <th class="text-center" style="min-width: 140px;">Projekt</th>
                         <th class="text-center" style="min-width: 100px;">Rotacja</th>
+                        <th class="text-end" style="min-width: 110px;">Stawka</th>
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
@@ -127,10 +125,8 @@
                         <tr>
                             <td>
                                 <x-employee-cell :employee="$employee"  />
-                                <div class="d-lg-none small text-muted mt-1">{{ $employee->email }}</div>
                             </td>
-                            <td class="d-none d-lg-table-cell">{{ $employee->email }}</td>
-                            
+
                             <!-- Status (Baza/W podróży/Poza bazą) -->
                             <td class="text-center">
                                 @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
@@ -180,7 +176,18 @@
                                     <x-ui.badge variant="danger">✗ Nie</x-ui.badge>
                                 @endif
                             </td>
-                            
+
+                            <!-- Stawka (aktywna dziś) -->
+                            <td class="text-end text-nowrap">
+                                @php $rate = $employee->rates->first(); @endphp
+                                @if($rate)
+                                    <span class="fw-semibold">{{ number_format((float) $rate->amount, 2, ',', ' ') }}</span>
+                                    <span class="text-muted small">{{ $rate->currency }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+
                             <td class="text-end">
                                 <x-ui.action-buttons>
                                     <x-ui.button variant="ghost" href="{{ route('employees.show', $employee) }}" class="btn-sm">

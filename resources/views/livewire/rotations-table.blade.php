@@ -69,6 +69,7 @@
                                 <x-livewire.sortable-header field="end_date" :sortField="$sortField" :sortDirection="$sortDirection">
                                     Data zakończenia
                                 </x-livewire.sortable-header>
+                                <th class="text-end text-nowrap">Długość</th>
                                 <th class="text-start">Status</th>
                                 <th class="text-start">Notatki</th>
                                 <th class="text-start">Akcje</th>
@@ -85,6 +86,15 @@
                                     </td>
                                     <td>
                                         <small class="text-muted">{{ $rotation->end_date->format('Y-m-d') }}</small>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        @php $days = $rotation->duration_days; @endphp
+                                        @if($days !== null)
+                                            <span class="fw-semibold">{{ $days }}</span>
+                                            <span class="text-muted small">{{ $days === 1 ? 'dzień' : 'dni' }}</span>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
                                     </td>
                                     <td>
                                         @php

@@ -106,7 +106,7 @@
 
         <div class="mt-3">
             @if(isset($routeStops) && $routeStops->count() > 0)
-                <div class="row g-2">
+                <div class="d-flex flex-column gap-2">
                     @foreach($routeStops as $i => $loc)
                         @php
                             $isStart = $i === 0;
@@ -114,20 +114,18 @@
                             $badge = $isStart ? 'Start' : ($isEnd ? 'Cel' : 'Przystanek');
                             $badgeVariant = $isStart ? 'primary' : ($isEnd ? 'success' : 'accent');
                         @endphp
-                        <div class="col-md-6 col-lg-4">
-                            <div class="p-2 border rounded-3 d-flex align-items-start gap-2">
-                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $badge }}</x-ui.badge>
-                                <div class="min-w-0">
-                                    <div class="fw-semibold small text-truncate">{{ $loc->name }}</div>
-                                    @if($loc->city)
-                                        <div class="text-muted" style="font-size: 0.75rem;">{{ $loc->city }}</div>
-                                    @endif
-                                    @if(!$loc->hasCoordinates())
-                                        <div class="text-warning" style="font-size: 0.75rem;">
-                                            <i class="bi bi-exclamation-triangle"></i> brak współrzędnych
-                                        </div>
-                                    @endif
-                                </div>
+                        <div class="p-3 border rounded-3 d-flex align-items-start gap-2 w-100">
+                            <x-ui.badge variant="{{ $badgeVariant }}">{{ $badge }}</x-ui.badge>
+                            <div class="min-w-0 flex-grow-1">
+                                <div class="fw-semibold">{{ $loc->name }}</div>
+                                @if($loc->city)
+                                    <div class="text-muted small">{{ $loc->city }}</div>
+                                @endif
+                                @if(!$loc->hasCoordinates())
+                                    <div class="text-warning small mt-1">
+                                        <i class="bi bi-exclamation-triangle"></i> brak współrzędnych
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endforeach

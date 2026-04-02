@@ -2,9 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\VehicleAssignment;
-use App\Models\Employee;
 use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -13,26 +12,22 @@ class VehicleAssignmentsTable extends Component
     use WithPagination;
 
     public $searchEmployee = '';
+
     public $searchVehicle = '';
+
+    /** Konkretny pojazd z listy (jak projectFilter przy przypisaniach do projektów) */
+    public $vehicleFilter = '';
+
     public $statusFilter = '';
 
     protected $queryString = [
         'searchEmployee' => ['except' => ''],
         'searchVehicle' => ['except' => ''],
+        'vehicleFilter' => ['except' => ''],
         'statusFilter' => ['except' => ''],
     ];
 
-    public function updatingSearchEmployee()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingSearchVehicle()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingStatusFilter()
+    public function updating($name, $value)
     {
         $this->resetPage();
     }
@@ -41,6 +36,7 @@ class VehicleAssignmentsTable extends Component
     {
         $this->searchEmployee = '';
         $this->searchVehicle = '';
+        $this->vehicleFilter = '';
         $this->statusFilter = '';
         $this->resetPage();
     }
@@ -58,17 +54,21 @@ class VehicleAssignmentsTable extends Component
         // Filter by employee
         if ($this->searchEmployee) {
             $query->whereHas('employee', function ($q) {
-                $q->where('first_name', 'like', '%' . $this->searchEmployee . '%')
-                  ->orWhere('last_name', 'like', '%' . $this->searchEmployee . '%');
+                $q->where('first_name', 'like', '%'.$this->searchEmployee.'%')
+                    ->orWhere('last_name', 'like', '%'.$this->searchEmployee.'%');
             });
         }
 
-        // Filter by vehicle
+        if ($this->vehicleFilter !== '' && $this->vehicleFilter !== null) {
+            $query->where('vehicle_id', (int) $this->vehicleFilter);
+        }
+
+        // Filter by vehicle (tekst: nr rej., marka, model)
         if ($this->searchVehicle) {
             $query->whereHas('vehicle', function ($q) {
-                $q->where('registration_number', 'like', '%' . $this->searchVehicle . '%')
-                  ->orWhere('brand', 'like', '%' . $this->searchVehicle . '%')
-                  ->orWhere('model', 'like', '%' . $this->searchVehicle . '%');
+                $q->where('registration_number', 'like', '%'.$this->searchVehicle.'%')
+                    ->orWhere('brand', 'like', '%'.$this->searchVehicle.'%')
+                    ->orWhere('model', 'like', '%'.$this->searchVehicle.'%');
             });
         }
 
@@ -76,24 +76,27 @@ class VehicleAssignmentsTable extends Component
         if ($this->statusFilter === 'active') {
             $today = \Carbon\Carbon::today();
             $query->where('start_date', '<=', $today)
-                  ->where(function ($q) use ($today) {
-                      $q->whereNull('end_date')
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('end_date')
                         ->orWhere('end_date', '>=', $today);
-                  });
+                });
         } elseif ($this->statusFilter === 'scheduled') {
             $today = \Carbon\Carbon::today();
             $query->where('start_date', '>', $today);
         } elseif ($this->statusFilter === 'completed') {
             $today = \Carbon\Carbon::today();
             $query->whereNotNull('end_date')
-                  ->where('end_date', '<', $today);
+                ->where('end_date', '<', $today);
         }
         // Note: 'cancelled' filter removed - assignments are physically deleted when cancelled
 
         $assignments = $query->paginate(20);
 
+        $vehicles = Vehicle::orderBy('registration_number')->get();
+
         return view('livewire.vehicle-assignments-table', [
             'assignments' => $assignments,
+            'vehicles' => $vehicles,
         ]);
     }
 }

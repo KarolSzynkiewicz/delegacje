@@ -8,7 +8,7 @@
                     routeName="vehicle-repairs.create"
                     action="create"
                 >
-                    Nowa naprawa
+                    Nowa akcja serwisowa
                 </x-ui.button>
             </x-slot>
         </x-ui.page-header>
