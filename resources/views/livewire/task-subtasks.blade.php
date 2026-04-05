@@ -33,21 +33,52 @@
             </div>
         @endif
 
-        <!-- Formularz dodawania podzadania -->
+        <!-- Formularz dodawania podzadania (@wzmianka jak w komentarzach) -->
         <div class="mb-4">
-            <form wire:submit.prevent="addSubtask" class="d-flex gap-2">
-                <div class="flex-grow-1">
-                    <input 
-                        type="text" 
-                        wire:model="newSubtaskName"
-                        placeholder="Dodaj nowe podzadanie..."
+            <form wire:submit.prevent="addSubtask" class="d-flex gap-2 align-items-start">
+                <div
+                    class="flex-grow-1 position-relative"
+                    x-data="subtaskMention(@js($mentionUsersForAutocomplete), 'newSubtaskName')"
+                >
+                    <input
+                        type="text"
+                        wire:model.defer="newSubtaskName"
+                        x-ref="inp"
+                        placeholder="Dodaj podzadanie… @NazwaUżytkownika"
                         class="form-control @error('newSubtaskName') is-invalid @enderror mb-0"
+                        @input="onInput($event)"
+                        @keydown.escape="close()"
                     />
+                    <ul
+                        x-show="show && results.length > 0"
+                        x-cloak
+                        class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
+                        style="z-index:1090;min-width:16rem;max-height:14rem;overflow-y:auto;top:100%;left:0;right:auto;"
+                    >
+                        <template x-for="(user, idx) in results" :key="user.name">
+                            <li>
+                                <button
+                                    type="button"
+                                    class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
+                                    :class="idx === activeIdx ? 'active' : ''"
+                                    @click="selectUser(user)"
+                                    @mouseenter="activeIdx = idx"
+                                >
+                                    <span
+                                        class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
+                                        style="width:1.75rem;height:1.75rem;font-size:.65rem;"
+                                        x-text="user.initials"
+                                    ></span>
+                                    <span class="small fw-medium" x-text="user.name"></span>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
                     @error('newSubtaskName')
                         <span class="text-danger small d-block mt-1">{{ $message }}</span>
                     @enderror
                 </div>
-                <x-ui.button variant="primary" type="submit" wire:loading.attr="disabled">
+                <x-ui.button variant="primary" type="submit" wire:loading.attr="disabled" class="flex-shrink-0">
                     <span wire:loading.remove>Dodaj</span>
                     <span wire:loading>Dodawanie...</span>
                 </x-ui.button>
@@ -65,11 +96,44 @@
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="pending-{{ $subtask->id }}">
                             <div class="flex-grow-1">
                                 @if($editingSubtaskId === $subtask->id)
-                                    <input
-                                        type="text"
-                                        class="form-control form-control-sm @error('editingSubtaskName') is-invalid @enderror"
-                                        wire:model.defer="editingSubtaskName"
-                                    />
+                                    <div
+                                        class="w-100 position-relative"
+                                        x-data="subtaskMention(@js($mentionUsersForAutocomplete), 'editingSubtaskName')"
+                                    >
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm @error('editingSubtaskName') is-invalid @enderror"
+                                            wire:model.defer="editingSubtaskName"
+                                            x-ref="inp"
+                                            @input="onInput($event)"
+                                            @keydown.escape="close()"
+                                        />
+                                        <ul
+                                            x-show="show && results.length > 0"
+                                            x-cloak
+                                            class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
+                                            style="z-index:1090;min-width:16rem;max-height:14rem;overflow-y:auto;top:100%;left:0;right:auto;"
+                                        >
+                                            <template x-for="(user, idx) in results" :key="user.name">
+                                                <li>
+                                                    <button
+                                                        type="button"
+                                                        class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
+                                                        :class="idx === activeIdx ? 'active' : ''"
+                                                        @click="selectUser(user)"
+                                                        @mouseenter="activeIdx = idx"
+                                                    >
+                                                        <span
+                                                            class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
+                                                            style="width:1.75rem;height:1.75rem;font-size:.65rem;"
+                                                            x-text="user.initials"
+                                                        ></span>
+                                                        <span class="small fw-medium" x-text="user.name"></span>
+                                                    </button>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
                                     @error('editingSubtaskName')
                                         <span class="text-danger small d-block mt-1">{{ $message }}</span>
                                     @enderror
@@ -82,7 +146,7 @@
                                             wire:click="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label" for="subtask-{{ $subtask->id }}">
-                                            {{ $subtask->name }}
+                                            {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
                                         </label>
                                     </div>
                                 @endif
@@ -124,11 +188,44 @@
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="completed-{{ $subtask->id }}" style="opacity: 0.7;">
                             <div class="flex-grow-1">
                                 @if($editingSubtaskId === $subtask->id)
-                                    <input
-                                        type="text"
-                                        class="form-control form-control-sm @error('editingSubtaskName') is-invalid @enderror"
-                                        wire:model.defer="editingSubtaskName"
-                                    />
+                                    <div
+                                        class="w-100 position-relative"
+                                        x-data="subtaskMention(@js($mentionUsersForAutocomplete), 'editingSubtaskName')"
+                                    >
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm @error('editingSubtaskName') is-invalid @enderror"
+                                            wire:model.defer="editingSubtaskName"
+                                            x-ref="inp"
+                                            @input="onInput($event)"
+                                            @keydown.escape="close()"
+                                        />
+                                        <ul
+                                            x-show="show && results.length > 0"
+                                            x-cloak
+                                            class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
+                                            style="z-index:1090;min-width:16rem;max-height:14rem;overflow-y:auto;top:100%;left:0;right:auto;"
+                                        >
+                                            <template x-for="(user, idx) in results" :key="user.name">
+                                                <li>
+                                                    <button
+                                                        type="button"
+                                                        class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
+                                                        :class="idx === activeIdx ? 'active' : ''"
+                                                        @click="selectUser(user)"
+                                                        @mouseenter="activeIdx = idx"
+                                                    >
+                                                        <span
+                                                            class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
+                                                            style="width:1.75rem;height:1.75rem;font-size:.65rem;"
+                                                            x-text="user.initials"
+                                                        ></span>
+                                                        <span class="small fw-medium" x-text="user.name"></span>
+                                                    </button>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
                                     @error('editingSubtaskName')
                                         <span class="text-danger small d-block mt-1">{{ $message }}</span>
                                     @enderror
@@ -142,7 +239,7 @@
                                             wire:click="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label text-decoration-line-through text-muted" for="subtask-{{ $subtask->id }}">
-                                            {{ $subtask->name }}
+                                            {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
                                         </label>
                                     </div>
                                 @endif

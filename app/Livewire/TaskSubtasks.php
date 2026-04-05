@@ -4,14 +4,18 @@ namespace App\Livewire;
 
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
+use App\Models\User;
+use App\Services\UserMentionService;
 use Livewire\Component;
 
 class TaskSubtasks extends Component
 {
     public ProjectTask $task;
+
     public string $newSubtaskName = '';
 
     public ?int $editingSubtaskId = null;
+
     public string $editingSubtaskName = '';
 
     public function mount(ProjectTask $task): void
@@ -29,11 +33,20 @@ class TaskSubtasks extends Component
             'newSubtaskName.max' => 'Nazwa podzadania nie może przekraczać 255 znaków.',
         ]);
 
-        TaskSubtask::create([
+        $name = trim($this->newSubtaskName);
+
+        $subtask = TaskSubtask::create([
             'task_id' => $this->task->id,
-            'name' => trim($this->newSubtaskName),
+            'name' => $name,
             'is_completed' => false,
         ]);
+
+        app(UserMentionService::class)->notifySubtaskMentions(
+            $this->task,
+            $subtask,
+            $name,
+            auth()->user()
+        );
 
         $this->newSubtaskName = '';
         $this->task->refresh();
@@ -43,7 +56,7 @@ class TaskSubtasks extends Component
     public function toggleSubtask($subtaskId): void
     {
         $subtask = TaskSubtask::findOrFail($subtaskId);
-        
+
         if ($subtask->task_id !== $this->task->id) {
             abort(403, 'Nieprawidłowe podzadanie.');
         }
@@ -91,9 +104,18 @@ class TaskSubtasks extends Component
             abort(403, 'Nieprawidłowe podzadanie.');
         }
 
+        $name = trim($this->editingSubtaskName);
+
         $subtask->update([
-            'name' => trim($this->editingSubtaskName),
+            'name' => $name,
         ]);
+
+        app(UserMentionService::class)->notifySubtaskMentions(
+            $this->task,
+            $subtask->fresh(),
+            $name,
+            auth()->user()
+        );
 
         $this->cancelEditSubtask();
         $this->task->refresh();
@@ -120,31 +142,43 @@ class TaskSubtasks extends Component
 
     public function getCompletedSubtasksProperty()
     {
-        if (!$this->task->relationLoaded('subtasks')) {
+        if (! $this->task->relationLoaded('subtasks')) {
             $this->task->load('subtasks');
         }
+
         return $this->task->subtasks->where('is_completed', true)->sortByDesc('completed_at')->values();
     }
 
     public function getPendingSubtasksProperty()
     {
-        if (!$this->task->relationLoaded('subtasks')) {
+        if (! $this->task->relationLoaded('subtasks')) {
             $this->task->load('subtasks');
         }
+
         return $this->task->subtasks->where('is_completed', false)->sortBy('created_at')->values();
     }
 
     public function getProgressPercentageProperty(): float
     {
-        if (!$this->task->relationLoaded('subtasks')) {
+        if (! $this->task->relationLoaded('subtasks')) {
             $this->task->load('subtasks');
         }
         $progress = $this->task->subtasks_progress;
-        return is_numeric($progress) ? (float)$progress : 0.0;
+
+        return is_numeric($progress) ? (float) $progress : 0.0;
     }
 
     public function render()
     {
-        return view('livewire.task-subtasks');
+        return view('livewire.task-subtasks', [
+            'mentionUsersForAutocomplete' => User::orderBy('name')
+                ->get()
+                ->map(fn (User $u) => [
+                    'name' => $u->name,
+                    'initials' => $u->initials,
+                ])
+                ->values()
+                ->all(),
+        ]);
     }
 }

@@ -50,14 +50,16 @@
                                     'bi flex-shrink-0 mt-1',
                                     'bi-person-check-fill text-primary' => ($data['type'] ?? '') === 'task_assigned',
                                     'bi-chat-quote-fill text-info'       => ($data['type'] ?? '') === 'comment_mentioned',
-                                    'bi-bell-fill text-secondary'        => !in_array($data['type'] ?? '', ['task_assigned', 'comment_mentioned']),
+                                    'bi-chat-left-text-fill text-success' => ($data['type'] ?? '') === 'task_comment_added',
+                                    'bi-list-check text-info'            => ($data['type'] ?? '') === 'subtask_mentioned',
+                                    'bi-bell-fill text-secondary'        => !in_array($data['type'] ?? '', ['task_assigned', 'comment_mentioned', 'task_comment_added', 'subtask_mentioned']),
                                 ])></i>
                                 <div class="min-w-0 flex-grow-1">
                                     <p class="mb-0 small lh-sm">
                                         {{ $data['message'] ?? 'Powiadomienie' }}
                                         @if($url)
                                             — <a href="{{ $url }}" class="fw-semibold text-decoration-none">
-                                                {{ $data['task_name'] ?? $data['context_name'] ?? 'otwórz' }}
+                                                {{ $data['task_name'] ?? $data['context_name'] ?? $data['subtask_name'] ?? 'otwórz' }}
                                             </a>
                                         @endif
                                     </p>

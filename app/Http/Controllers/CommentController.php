@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Enums\CommentableType;
 use App\Http\Requests\StoreCommentRequest;
 use App\Models\Comment;
+use App\Models\ProjectTask;
 use App\Models\User;
-use App\Notifications\CommentMentioned;
+use App\Notifications\TaskCommentAdded;
+use App\Services\UserMentionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -21,16 +23,16 @@ class CommentController extends Controller
         // Resolve type safely - don't trust the request
         $type = CommentableType::from($request->input('commentable_type'));
         $modelClass = $type->modelClass();
-        
+
         // Find the commentable model
         $commentable = $modelClass::findOrFail($request->input('commentable_id'));
-        
+
         // Add comment using domain method
         $comment = $commentable->addComment($request->input('body'), auth()->user());
 
-        // Wyslij powiadomienia do wspomnianych użytkowników (@username)
         if ($comment instanceof Comment) {
-            $this->notifyMentions($comment);
+            $mentionNotifiedIds = app(UserMentionService::class)->notifyCommentMentions($comment, auth()->user());
+            $this->notifyTaskAssigneeOfNewComment($comment, $mentionNotifiedIds);
         }
 
         return redirect()->back()->with('success', 'Komentarz został dodany.');
@@ -58,31 +60,29 @@ class CommentController extends Controller
     }
 
     /**
-     * Parsuje @wzmianki w treści komentarza i wysyła powiadomienia.
-     * Format: @NazwaUzytkownika (bez spacji — spacja kończy wzmiankę).
+     * Powiadamia przypisanego do zadania o nowym komentarzu (bez potrzeby @wzmianki).
+     * Pomija autora komentarza oraz osoby już powiadomione przez @wzmiankę.
+     *
+     * @param  list<int>  $mentionNotifiedIds
      */
-    private function notifyMentions(Comment $comment): void
+    private function notifyTaskAssigneeOfNewComment(Comment $comment, array $mentionNotifiedIds): void
     {
-        // Przechwytuje @wzmiankę do pierwszej spacji lub końca tekstu.
-        // Obsługuje też nazwy będące emailami (zawierające @ wewnątrz).
-        preg_match_all('/@([\w\-\.@]+)/u', $comment->body, $matches);
-
-        if (empty($matches[1])) {
+        $commentable = $comment->commentable;
+        if (! $commentable instanceof ProjectTask) {
             return;
         }
 
-        $mentionedNames = array_unique($matches[1]);
-        $author = auth()->user();
-
-        foreach ($mentionedNames as $name) {
-            $user = User::where('name', $name)->first();
-
-            if (! $user || $user->id === $author->id) {
-                continue;
-            }
-
-            $user->notify(new CommentMentioned($comment->load('commentable'), $author));
+        $assigneeId = $commentable->assigned_to;
+        if (! $assigneeId || $assigneeId === auth()->id()) {
+            return;
         }
+
+        if (in_array($assigneeId, $mentionNotifiedIds, true)) {
+            return;
+        }
+
+        $assignee = User::find($assigneeId);
+        $assignee?->notify(new TaskCommentAdded($commentable, $comment, auth()->user()));
     }
 
     /**
@@ -91,7 +91,7 @@ class CommentController extends Controller
     public function destroy(\App\Models\Comment $comment): RedirectResponse
     {
         // Allow deletion of own comments or by admin
-        if ($comment->user_id !== auth()->id() && !auth()->user()->isAdmin()) {
+        if ($comment->user_id !== auth()->id() && ! auth()->user()->isAdmin()) {
             abort(403);
         }
 
