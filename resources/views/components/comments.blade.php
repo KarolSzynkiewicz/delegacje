@@ -79,6 +79,9 @@
     @php
         // Ensure comments are loaded with user relationship
         $comments = $commentable->comments()->with('user')->orderBy('created_at', 'desc')->get();
+        $knownUsersForHighlight = \App\Models\User::orderBy('name')->get()
+            ->map(fn($u) => ['name' => $u->name, 'initials' => $u->initials])
+            ->all();
     @endphp
     
     @if($comments->count() > 0)
@@ -114,10 +117,9 @@
                             @endif
                         </div>
                         <div id="comment-body-{{ $comment->id }}">
-                            <p class="mb-0">{!! preg_replace(
-                                '/@([\w\-\.]+)/u',
-                                '<strong class="text-primary">@$1</strong>',
-                                nl2br(e($commentBodyForDisplay))
+                            <p class="mb-0">{!! \App\Services\UserMentionService::highlightMentions(
+                                nl2br(e($commentBodyForDisplay)),
+                                $knownUsersForHighlight
                             ) !!}</p>
                         </div>
                         <div id="comment-edit-{{ $comment->id }}" style="display: none;">
