@@ -43,6 +43,32 @@ class EmployeeDocument extends Model
     }
 
     /**
+     * Etykieta statusu do UI (lista dokumentów, podgląd) — spójna z logiką Livewire.
+     *
+     * @return string jeden z: przyszły, ważny, wygasa_wkrotce, wygasł
+     */
+    public function getUiValidityStatus(): string
+    {
+        if ($this->valid_from && $this->valid_from->isFuture()) {
+            return 'przyszły';
+        }
+
+        if ($this->kind === 'bezokresowy') {
+            return 'ważny';
+        }
+
+        if ($this->isExpired()) {
+            return 'wygasł';
+        }
+
+        if ($this->isExpiringSoon()) {
+            return 'wygasa_wkrotce';
+        }
+
+        return 'ważny';
+    }
+
+    /**
      * Check if document is expired.
      */
     public function isExpired(): bool
@@ -51,7 +77,7 @@ class EmployeeDocument extends Model
             return false;
         }
 
-        if (!$this->valid_to) {
+        if (! $this->valid_to) {
             return false;
         }
 
@@ -67,7 +93,7 @@ class EmployeeDocument extends Model
             return false;
         }
 
-        if (!$this->valid_to) {
+        if (! $this->valid_to) {
             return false;
         }
 
@@ -87,6 +113,6 @@ class EmployeeDocument extends Model
      */
     public function hasFile(): bool
     {
-        return !empty($this->file_path);
+        return ! empty($this->file_path);
     }
 }

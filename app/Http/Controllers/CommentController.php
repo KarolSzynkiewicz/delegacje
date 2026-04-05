@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Enums\CommentableType;
 use App\Http\Requests\StoreCommentRequest;
+use App\Models\Comment;
+use App\Models\User;
+use App\Notifications\CommentMentioned;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -23,8 +26,13 @@ class CommentController extends Controller
         $commentable = $modelClass::findOrFail($request->input('commentable_id'));
         
         // Add comment using domain method
-        $commentable->addComment($request->input('body'), auth()->user());
-        
+        $comment = $commentable->addComment($request->input('body'), auth()->user());
+
+        // Wyslij powiadomienia do wspomnianych użytkowników (@username)
+        if ($comment instanceof Comment) {
+            $this->notifyMentions($comment);
+        }
+
         return redirect()->back()->with('success', 'Komentarz został dodany.');
     }
 
@@ -47,6 +55,34 @@ class CommentController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Komentarz został zaktualizowany.');
+    }
+
+    /**
+     * Parsuje @wzmianki w treści komentarza i wysyła powiadomienia.
+     * Format: @NazwaUzytkownika (bez spacji — spacja kończy wzmiankę).
+     */
+    private function notifyMentions(Comment $comment): void
+    {
+        // Przechwytuje @wzmiankę do pierwszej spacji lub końca tekstu.
+        // Obsługuje też nazwy będące emailami (zawierające @ wewnątrz).
+        preg_match_all('/@([\w\-\.@]+)/u', $comment->body, $matches);
+
+        if (empty($matches[1])) {
+            return;
+        }
+
+        $mentionedNames = array_unique($matches[1]);
+        $author = auth()->user();
+
+        foreach ($mentionedNames as $name) {
+            $user = User::where('name', $name)->first();
+
+            if (! $user || $user->id === $author->id) {
+                continue;
+            }
+
+            $user->notify(new CommentMentioned($comment->load('commentable'), $author));
+        }
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ProjectTask;
 use App\Enums\TaskStatus;
 use App\Http\Requests\StoreProjectTaskRequest;
 use App\Http\Requests\UpdateProjectTaskRequest;
+use App\Models\ProjectTask;
+use App\Models\User;
+use App\Notifications\TaskAssigned;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -51,8 +53,14 @@ class TaskController extends Controller
             \Log::info('Creating task', ['data' => $taskData]);
             
             $task = ProjectTask::create($taskData);
-            
+
             \Log::info('Task created', ['task_id' => $task->id, 'project_id' => $task->project_id]);
+
+            // Powiadomienie dla przypisanego użytkownika (jeśli inny niż tworzący)
+            if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
+                $assignee = User::find($task->assigned_to);
+                $assignee?->notify(new TaskAssigned($task, auth()->user()));
+            }
 
             // Jeśli status to COMPLETED, ustaw completed_at
             if ($status === TaskStatus::COMPLETED && !$task->completed_at) {
@@ -117,8 +125,17 @@ class TaskController extends Controller
             ? TaskStatus::from($request->input('status')) 
             : $task->status;
 
+        $previousAssignee = $task->assigned_to;
+
         // Aktualizuj podstawowe pola
         $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'project_id', 'priority', 'category']));
+
+        // Powiadomienie jeśli przypisano do nowego użytkownika
+        $newAssignee = (int) $request->input('assigned_to');
+        if ($newAssignee && $newAssignee !== $previousAssignee && $newAssignee !== auth()->id()) {
+            $assignee = User::find($newAssignee);
+            $assignee?->notify(new TaskAssigned($task->fresh(), auth()->user()));
+        }
 
         // Jeśli status się zmienił, użyj metod domenowych lub zaktualizuj bezpośrednio
         if ($newStatus !== $oldStatus) {

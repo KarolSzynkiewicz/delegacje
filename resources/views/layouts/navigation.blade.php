@@ -24,8 +24,13 @@
             </ul>
 
             <!-- Right side: User menu -->
-            <ul class="navbar-nav">
+            <ul class="navbar-nav align-items-center gap-1">
                 @auth
+                    <!-- Notification Bell -->
+                    <li class="nav-item">
+                        @livewire('notification-bell')
+                    </li>
+
                     <!-- User Dropdown -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

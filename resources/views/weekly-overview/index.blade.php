@@ -1147,6 +1147,18 @@
                             @if($assignedList->isNotEmpty())
                                 <span class="badge rounded-pill text-bg-secondary">{{ $assignedList->count() }}</span>
                             @endif
+                            <button
+                                type="button"
+                                class="weekly-overview-assigned-toggle btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 collapsed"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#{{ $assignedCollapseId }}"
+                                aria-expanded="false"
+                                aria-controls="{{ $assignedCollapseId }}"
+                                title="Pokaż lub ukryj listę pracowników"
+                            >
+                                <i class="bi bi-chevron-down collapse-chevron"></i>
+                                <span class="small">Lista</span>
+                            </button>
                         </div>
                         <div class="d-flex gap-2 flex-wrap">
                             <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
@@ -1157,22 +1169,8 @@
                             </x-ui.button>
                         </div>
                     </div>
-                    <div class="mb-2">
-                        <button
-                            type="button"
-                            class="weekly-overview-assigned-toggle btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#{{ $assignedCollapseId }}"
-                            aria-expanded="true"
-                            aria-controls="{{ $assignedCollapseId }}"
-                            title="Pokaż lub ukryj listę pracowników"
-                        >
-                            <i class="bi bi-chevron-down collapse-chevron"></i>
-                            <span class="small">Lista</span>
-                        </button>
-                    </div>
 
-                    <div class="collapse show" id="{{ $assignedCollapseId }}">
+                    <div class="collapse" id="{{ $assignedCollapseId }}">
                         @if($assignedList->isNotEmpty())
                         <div class="table-responsive">
                             <table class="table align-middle">

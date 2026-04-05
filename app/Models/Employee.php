@@ -339,6 +339,49 @@ class Employee extends Model
     }
 
     /**
+     * Czy pracownik ma co najmniej jeden wpis danego typu dokumentu, którego okres ważności
+     * nachodzi na podany zakres dat (przecięcie przedziałów; nie musi pokrywać całego zakresu).
+     */
+    public function hasDocumentTypeActiveInDateRange(int $documentTypeId, $startDate, $endDate): bool
+    {
+        $startDate = \App\Services\DateRangeService::normalizeDate($startDate);
+        $endDate = \App\Services\DateRangeService::normalizeDate($endDate);
+
+        if ($this->relationLoaded('employeeDocuments')) {
+            return $this->employeeDocuments
+                ->where('document_id', $documentTypeId)
+                ->filter(function ($doc) use ($startDate, $endDate) {
+                    if ($doc->kind === 'bezokresowy') {
+                        return $doc->valid_from && $doc->valid_from->lte($endDate);
+                    }
+
+                    $validFromOk = $doc->valid_from && $doc->valid_from->lte($endDate);
+                    $validToOk = ! $doc->valid_to || $doc->valid_to->gte($startDate);
+
+                    return $validFromOk && $validToOk;
+                })
+                ->isNotEmpty();
+        }
+
+        return $this->employeeDocuments()
+            ->where('document_id', $documentTypeId)
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->where(function ($q2) use ($endDate) {
+                    $q2->where('kind', 'bezokresowy')
+                        ->where('valid_from', '<=', $endDate);
+                })->orWhere(function ($q2) use ($startDate, $endDate) {
+                    $q2->where('kind', 'okresowy')
+                        ->where('valid_from', '<=', $endDate)
+                        ->where(function ($q3) use ($startDate) {
+                            $q3->whereNull('valid_to')
+                                ->orWhere('valid_to', '>=', $startDate);
+                        });
+                });
+            })
+            ->exists();
+    }
+
+    /**
      * Check if employee has all required documents active in date range.
      */
     public function hasAllDocumentsActiveInDateRange($startDate, $endDate): bool
@@ -359,57 +402,8 @@ class Employee extends Model
             return true;
         }
 
-        // Dla każdego wymaganego dokumentu sprawdź czy pracownik ma aktywny dokument w okresie
         foreach ($requiredDocuments as $documentTypeId) {
-            $hasActiveDocument = false;
-
-            // Use eager loaded relations if available, otherwise query
-            if ($this->relationLoaded('employeeDocuments')) {
-                // Use eager loaded employeeDocuments
-                $hasActiveDocument = $this->employeeDocuments
-                    ->where('document_id', $documentTypeId)
-                    ->filter(function ($doc) use ($startDate, $endDate) {
-                        // Sprawdź czy dokument jest aktywny w zakresie
-                        if ($doc->kind === 'bezokresowy') {
-                            return $doc->valid_from && $doc->valid_from->lte($endDate);
-                        } else {
-                            // Dokument okresowy - sprawdź czy jest aktywny w zakresie dat
-                            // Dokument jest aktywny jeśli:
-                            // - valid_from <= endDate (dokument już się zaczął)
-                            // - valid_to >= startDate (dokument jeszcze nie wygasł)
-                            $validFromOk = $doc->valid_from && $doc->valid_from->lte($endDate);
-                            $validToOk = ! $doc->valid_to || $doc->valid_to->gte($startDate);
-
-                            return $validFromOk && $validToOk;
-                        }
-                    })
-                    ->isNotEmpty();
-            } else {
-                // Fallback to query
-                $hasActiveDocument = $this->employeeDocuments()
-                    ->where('document_id', $documentTypeId)
-                    ->where(function ($q) use ($startDate, $endDate) {
-                        $q->where(function ($q2) use ($endDate) {
-                            // Dokument bezokresowy - zawsze aktywny jeśli valid_from <= endDate
-                            $q2->where('kind', 'bezokresowy')
-                                ->where('valid_from', '<=', $endDate);
-                        })->orWhere(function ($q2) use ($startDate, $endDate) {
-                            // Dokument okresowy - sprawdź czy jest aktywny w zakresie dat
-                            // Dokument jest aktywny jeśli:
-                            // - valid_from <= endDate (dokument już się zaczął)
-                            // - valid_to >= startDate (dokument jeszcze nie wygasł)
-                            $q2->where('kind', 'okresowy')
-                                ->where('valid_from', '<=', $endDate)
-                                ->where(function ($q3) use ($startDate) {
-                                    $q3->whereNull('valid_to')
-                                        ->orWhere('valid_to', '>=', $startDate);
-                                });
-                        });
-                    })
-                    ->exists();
-            }
-
-            if (! $hasActiveDocument) {
+            if (! $this->hasDocumentTypeActiveInDateRange($documentTypeId, $startDate, $endDate)) {
                 return false;
             }
         }

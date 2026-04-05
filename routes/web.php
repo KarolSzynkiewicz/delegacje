@@ -237,6 +237,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         ->name('employee-documents.edit')
         ->defaults('permission_type', 'resource')
         ->defaults('resource', 'employee-documents');
+    Route::get('employee-documents/{employeeDocument}', [EmployeeDocumentController::class, 'show'])
+        ->name('employee-documents.show')
+        ->defaults('permission_type', 'view')
+        ->defaults('resource', 'employee-documents');
     Route::put('employee-documents/{employeeDocument}', [EmployeeDocumentController::class, 'update'])
         ->name('employee-documents.update')
         ->defaults('permission_type', 'resource')

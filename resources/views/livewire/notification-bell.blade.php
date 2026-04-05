@@ -1,0 +1,84 @@
+<div class="position-relative" x-data @click.outside="$wire.open && $wire.set('open', false)">
+    {{-- Przycisk dzwonka --}}
+    <button
+        type="button"
+        wire:click="toggle"
+        class="btn btn-link nav-link position-relative p-1 d-flex align-items-center"
+        title="Powiadomienia"
+        aria-label="Powiadomienia"
+    >
+        <i class="bi bi-bell{{ $unreadCount > 0 ? '-fill text-warning' : '' }} fs-5"></i>
+
+        @if($unreadCount > 0)
+            <span
+                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                style="font-size:.65rem;min-width:1.2rem;"
+            >
+                {{ $unreadCount > 99 ? '99+' : $unreadCount }}
+            </span>
+        @endif
+    </button>
+
+    {{-- Dropdown z listą --}}
+    @if($open)
+        <div
+            class="dropdown-menu show position-absolute end-0 mt-1 p-0"
+            style="width:22rem;z-index:1080;top:100%;"
+            wire:click.stop
+        >
+            <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+                <span class="fw-semibold small">Powiadomienia</span>
+                <a href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="small text-decoration-none">Moje zadania</a>
+            </div>
+
+            @if($notifications->isEmpty())
+                <div class="px-3 py-4 text-center text-muted small">
+                    <i class="bi bi-bell-slash d-block fs-3 mb-1"></i>
+                    Brak powiadomień
+                </div>
+            @else
+                <ul class="list-unstyled mb-0" style="max-height:22rem;overflow-y:auto;">
+                    @foreach($notifications as $n)
+                        @php
+                            $data = $n->data;
+                            $url  = $data['task_url'] ?? $data['url'] ?? null;
+                            $read = $n->read_at !== null;
+                        @endphp
+                        <li @class(['px-3 py-2 border-bottom', 'opacity-50' => $read])>
+                            <div class="d-flex align-items-start gap-2">
+                                <i @class([
+                                    'bi flex-shrink-0 mt-1',
+                                    'bi-person-check-fill text-primary' => ($data['type'] ?? '') === 'task_assigned',
+                                    'bi-chat-quote-fill text-info'       => ($data['type'] ?? '') === 'comment_mentioned',
+                                    'bi-bell-fill text-secondary'        => !in_array($data['type'] ?? '', ['task_assigned', 'comment_mentioned']),
+                                ])></i>
+                                <div class="min-w-0 flex-grow-1">
+                                    <p class="mb-0 small lh-sm">
+                                        {{ $data['message'] ?? 'Powiadomienie' }}
+                                        @if($url)
+                                            — <a href="{{ $url }}" class="fw-semibold text-decoration-none">
+                                                {{ $data['task_name'] ?? $data['context_name'] ?? 'otwórz' }}
+                                            </a>
+                                        @endif
+                                    </p>
+                                    <p class="mb-0 text-muted" style="font-size:.7rem;">
+                                        {{ $n->created_at->diffForHumans() }}
+                                        @if(! $read)
+                                            · <span class="text-warning fw-semibold">nowe</span>
+                                        @endif
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+
+            <div class="px-3 py-2 border-top text-center">
+                <a href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="small text-decoration-none dropdown-item text-center">
+                    <i class="bi bi-list-check me-1"></i>Moje zadania
+                </a>
+            </div>
+        </div>
+    @endif
+</div>
