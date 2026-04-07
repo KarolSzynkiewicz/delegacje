@@ -104,7 +104,13 @@
         <!-- Right Column: Vehicles (8/12) -->
         <div class="col-md-8">
             <x-ui.card>
-                <h6 class="mb-3">Czym będą dojeżdżać do pracy?</h6>
+                <h6 class="mb-3">
+                    @if($forTransfer)
+                        Jakim pojazdem ma jeździć po przeniesieniu?
+                    @else
+                        Czym będą dojeżdżać do pracy?
+                    @endif
+                </h6>
 
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Szukaj po pojeździe</label>
@@ -128,7 +134,12 @@
                                  style="background: {{ $isSelectedVehicle ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.03)' }};">
                                 @if($isSelectedVehicle)
                                     <div class="small text-primary mb-2">
-                                        <i class="bi bi-check-circle-fill"></i> Pojazd, którym przyjadą
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        @if($forTransfer)
+                                            Pojazd transferu (ten sam co w danych transferu)
+                                        @else
+                                            Pojazd, którym przyjadą
+                                        @endif
                                     </div>
                                 @endif
                                 <div class="d-flex align-items-center justify-content-between mb-2">

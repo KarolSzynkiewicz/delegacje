@@ -30,6 +30,10 @@ class ReturnTripController extends Controller
     {
         $sort = (string) $request->query('sort', 'id');
         $dir = strtolower((string) $request->query('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $employeeSearch = trim((string) $request->query('employee_search', ''));
+        $vehicleFilter = $request->query('vehicle_id'); // int|string|null; supports "none"
+        $transport = $request->query('transport'); // "vehicle"|"no_vehicle"|null
+
         $allowedSorts = ['id', 'event_date', 'created_at'];
         if (! in_array($sort, $allowedSorts, true)) {
             $sort = 'id';
@@ -50,6 +54,20 @@ class ReturnTripController extends Controller
                     ]);
                 },
             ])
+            ->when($employeeSearch !== '', function ($q) use ($employeeSearch) {
+                $s = mb_strtolower($employeeSearch);
+                $q->whereHas('participants.employee', function ($e) use ($s) {
+                    $e->whereRaw('LOWER(CONCAT(first_name, " ", last_name)) LIKE ?', ['%'.$s.'%'])
+                        ->orWhereRaw('LOWER(CONCAT(last_name, " ", first_name)) LIKE ?', ['%'.$s.'%'])
+                        ->orWhereRaw('LOWER(first_name) LIKE ?', ['%'.$s.'%'])
+                        ->orWhereRaw('LOWER(last_name) LIKE ?', ['%'.$s.'%'])
+                        ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$s.'%']);
+                });
+            })
+            ->when($transport === 'vehicle', fn ($q) => $q->whereNotNull('vehicle_id'))
+            ->when($transport === 'no_vehicle', fn ($q) => $q->whereNull('vehicle_id'))
+            ->when($vehicleFilter === 'none', fn ($q) => $q->whereNull('vehicle_id'))
+            ->when(is_numeric($vehicleFilter), fn ($q) => $q->where('vehicle_id', (int) $vehicleFilter))
             ->orderBy($sort, $dir);
 
         if ($sort !== 'id') {
@@ -58,7 +76,9 @@ class ReturnTripController extends Controller
 
         $returnTrips = $query->paginate(20)->withQueryString();
 
-        return view('return-trips.index', compact('returnTrips', 'sort', 'dir'));
+        $vehicles = Vehicle::where('type', 'company_vehicle')->orderBy('registration_number')->get();
+
+        return view('return-trips.index', compact('returnTrips', 'sort', 'dir', 'vehicles', 'employeeSearch', 'vehicleFilter', 'transport'));
     }
 
     /**

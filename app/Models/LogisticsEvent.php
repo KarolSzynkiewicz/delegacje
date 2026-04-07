@@ -2,25 +2,23 @@
 
 namespace App\Models;
 
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
+use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Enums\LogisticsEventType;
-use App\Enums\LogisticsEventStatus;
-use App\Traits\HasComments;
-use App\Models\Accommodation;
-use App\Models\Adjustment;
 
 /**
  * LogisticsEvent - fakt biznesowy (co, kiedy, kto, gdzie)
- * 
+ *
  * IMPORTANT: Model = tylko fakty, zero logiki biznesowej.
  * Wszystka logika w serwisach (ReturnTripService, DepartureService).
  */
 class LogisticsEvent extends Model
 {
-    use HasFactory, HasComments;
+    use HasComments, HasFactory;
 
     protected $fillable = [
         'type',
@@ -38,12 +36,14 @@ class LogisticsEvent extends Model
         'route_duration',
         'route_waypoints',
         'destination_stop_location',
+        'has_reassignment',
     ];
 
     protected $casts = [
         'event_date' => 'datetime',
         'end_date' => 'datetime',
         'has_transport' => 'boolean',
+        'has_reassignment' => 'boolean',
         'type' => LogisticsEventType::class,
         'status' => LogisticsEventStatus::class,
         'route_distance' => 'decimal:2',
@@ -88,7 +88,9 @@ class LogisticsEvent extends Model
      */
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')->withDefault([
+            'name' => '—',
+        ]);
     }
 
     /**
@@ -144,15 +146,16 @@ class LogisticsEvent extends Model
      */
     public function getDurationInDays(): int
     {
-        if (!$this->end_date) {
+        if (! $this->end_date) {
             return 0;
         }
+
         return $this->event_date->diffInDays($this->end_date);
     }
 
     /**
      * Get visual status based on dates (for display purposes).
-     * 
+     *
      * Returns: 'oczekuje', 'w trakcie', 'zakończone', 'anulowany'
      */
     public function getVisualStatus(): string
@@ -188,25 +191,34 @@ class LogisticsEvent extends Model
     }
 
     /**
+     * Transfery bez zmiany przypisań nie wpływają na śledzenie lokalizacji (stan pracownika / pojazdu).
+     */
+    public function scopeForLocationTracking($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('type', '!=', LogisticsEventType::TRANSFER)
+                ->orWhere('has_reassignment', true);
+        });
+    }
+
+    /**
      * Scope: Get events where employee is in transit on given date.
-     * 
+     *
      * In transit = between event_date (inclusive) and end_date (exclusive)
      * On arrival date (end_date), employee is already at destination.
      */
     public function scopeInTransitOn($query, Employee $employee, \Carbon\Carbon $date)
     {
         $dateNormalized = $date->copy()->startOfDay();
-        
-        return $query->where(function($q) {
-                $q->where('type', LogisticsEventType::DEPARTURE)
-                  ->orWhere('type', LogisticsEventType::RETURN);
-            })
-            ->whereHas('participants', fn($q) => $q->where('employee_id', $employee->id))
+
+        return $query->forLocationTracking()
+            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
+            ->whereHas('participants', fn ($q) => $q->where('employee_id', $employee->id))
             ->where('event_date', '<=', $dateNormalized)
             ->where('end_date', '>', $dateNormalized)
             ->whereIn('status', [
                 LogisticsEventStatus::PLANNED,
-                LogisticsEventStatus::COMPLETED
+                LogisticsEventStatus::COMPLETED,
             ]);
     }
 
@@ -215,7 +227,7 @@ class LogisticsEvent extends Model
      */
     public static function isEmployeeInTransit(Employee $employee, \Carbon\Carbon $date): bool
     {
-        return static::inTransitOn($employee, $date)->exists();
+        return static::query()->inTransitOn($employee, $date)->exists();
     }
 
     /**
@@ -226,7 +238,7 @@ class LogisticsEvent extends Model
         return $query->where('type', LogisticsEventType::DEPARTURE)
             ->where('to_location_id', $locationId)
             ->where('status', LogisticsEventStatus::PLANNED)
-            ->whereHas('participants', fn($q) => $q->where('employee_id', $employee->id));
+            ->whereHas('participants', fn ($q) => $q->where('employee_id', $employee->id));
     }
 
     /**
@@ -272,7 +284,7 @@ class LogisticsEvent extends Model
      */
     public function hasRouteData(): bool
     {
-        return !is_null($this->route_distance) && !is_null($this->route_duration);
+        return ! is_null($this->route_distance) && ! is_null($this->route_duration);
     }
 
     /**
@@ -280,11 +292,11 @@ class LogisticsEvent extends Model
      */
     public function getFormattedDistance(): ?string
     {
-        if (!$this->hasRouteData()) {
+        if (! $this->hasRouteData()) {
             return null;
         }
 
-        return number_format($this->route_distance, 1) . ' km';
+        return number_format($this->route_distance, 1).' km';
     }
 
     /**
@@ -292,7 +304,7 @@ class LogisticsEvent extends Model
      */
     public function getFormattedDuration(): ?string
     {
-        if (!$this->hasRouteData()) {
+        if (! $this->hasRouteData()) {
             return null;
         }
 
@@ -317,7 +329,7 @@ class LogisticsEvent extends Model
 
         // Get accommodations in the order specified by route_waypoints
         $accommodations = Accommodation::whereIn('id', $this->route_waypoints)->get()->keyBy('id');
-        
+
         // Return in the correct order
         $ordered = collect();
         foreach ($this->route_waypoints as $accommodationId) {
@@ -325,7 +337,7 @@ class LogisticsEvent extends Model
                 $ordered->push($accommodations->get($accommodationId));
             }
         }
-        
+
         return $ordered;
     }
 }

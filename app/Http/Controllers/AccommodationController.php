@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LocationPurposeType;
-use App\Models\Accommodation;
-use App\Models\Location;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreAccommodationRequest;
 use App\Http\Requests\UpdateAccommodationRequest;
-use Illuminate\View\View;
+use App\Models\Accommodation;
+use App\Models\Location;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class AccommodationController extends Controller
 {
@@ -30,16 +31,16 @@ class AccommodationController extends Controller
         $validated = $request->validated();
         $validated = $this->processImageUpload($validated, $request, 'accommodations');
 
-        if (($validated['type'] ?? '') === 'własny') {
-            $validated['lease_start_date'] = null;
-            $validated['lease_end_date']   = null;
-        }
-
         $location = $this->resolveLocation($validated);
+        $accommodation = Accommodation::create($this->buildAccommodationData($validated, $location));
 
-        $accommodationData = $this->buildAccommodationData($validated, $location);
-
-        $accommodation = Accommodation::create($accommodationData);
+        if (($validated['type'] ?? '') === 'wynajmowany') {
+            $accommodation->leases()->create([
+                'type' => 'wynajmowany',
+                'start_date' => $validated['lease_start_date'] ?? null,
+                'end_date' => $validated['lease_end_date'] ?? null,
+            ]);
+        }
 
         if ($location) {
             $this->ensureQuarterPurposeForAccommodation($location);
@@ -51,6 +52,8 @@ class AccommodationController extends Controller
 
     public function show(Accommodation $accommodation): View
     {
+        $accommodation->load(['activeLease', 'leases', 'location']);
+
         $assignments = $accommodation->assignments()
             ->with(['employee'])
             ->orderBy('start_date', 'desc')
@@ -61,6 +64,8 @@ class AccommodationController extends Controller
 
     public function edit(Accommodation $accommodation): View
     {
+        $accommodation->load('activeLease');
+
         return view('accommodations.edit', compact('accommodation'));
     }
 
@@ -69,16 +74,27 @@ class AccommodationController extends Controller
         $validated = $request->validated();
         $validated = $this->processImageUpload($validated, $request, 'accommodations', $accommodation->image_path);
 
-        if (($validated['type'] ?? '') === 'własny') {
-            $validated['lease_start_date'] = null;
-            $validated['lease_end_date']   = null;
-        }
-
         $location = $this->resolveLocation($validated);
+        $accommodation->update($this->buildAccommodationData($validated, $location));
 
-        $accommodationData = $this->buildAccommodationData($validated, $location);
+        $activeLease = $accommodation->activeLease()->first();
 
-        $accommodation->update($accommodationData);
+        if (($validated['type'] ?? '') === 'wynajmowany') {
+            $leaseData = [
+                'type' => 'wynajmowany',
+                'start_date' => $validated['lease_start_date'] ?? null,
+                'end_date' => $validated['lease_end_date'] ?? null,
+            ];
+
+            if ($activeLease) {
+                $activeLease->update($leaseData);
+            } else {
+                $accommodation->leases()->create($leaseData);
+            }
+        } elseif ($activeLease) {
+            // Zmiana na "własny" – zamknij aktywny najem
+            $activeLease->update(['end_date' => now()->toDateString()]);
+        }
 
         if ($location) {
             $this->ensureQuarterPurposeForAccommodation($location);
@@ -97,75 +113,96 @@ class AccommodationController extends Controller
     }
 
     /**
-     * Find an existing Location or create a new one based on the request data.
+     * Dodaj nowy okres najmu do istniejącej akomodacji.
      */
+    public function storeLease(Request $request, Accommodation $accommodation): RedirectResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // Zamknij aktualnie aktywny najem jeśli się nakłada
+        $activeLease = $accommodation->activeLease()->first();
+        if ($activeLease && (is_null($activeLease->end_date) || $activeLease->end_date->gt(now()))) {
+            $activeLease->update(['end_date' => now()->toDateString()]);
+        }
+
+        $accommodation->leases()->create([
+            'type' => 'wynajmowany',
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->route('accommodations.show', $accommodation)
+            ->with('success', 'Nowy okres najmu został dodany.');
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
     private function resolveLocation(array $data): ?Location
     {
-        if (!empty($data['location_id'])) {
+        if (! empty($data['location_id'])) {
             return Location::find((int) $data['location_id']);
         }
 
-        if (!empty($data['location_name'])) {
-            $location = Location::firstOrCreate(
+        // Jeśli brak nazwy lokalizacji — użyj nazwy mieszkania jako domyślnej
+        if (empty($data['location_name'])) {
+            $data['location_name'] = $data['name'] ?? null;
+        }
+
+        if (! empty($data['location_name'])) {
+            return Location::firstOrCreate(
                 [
-                    'name'    => $data['location_name'],
+                    'name' => $data['location_name'],
                     'address' => $data['address'] ?? null,
-                    'city'    => $data['city']    ?? null,
+                    'city' => $data['city'] ?? null,
                 ],
                 [
                     'postal_code' => $data['postal_code'] ?? null,
-                    'country'     => $data['country']     ?? null,
-                    'latitude'    => !empty($data['latitude'])  ? (float) $data['latitude']  : null,
-                    'longitude'   => !empty($data['longitude']) ? (float) $data['longitude'] : null,
-                    'is_base'     => false,
+                    'country' => $data['country'] ?? null,
+                    'latitude' => ! empty($data['latitude']) ? (float) $data['latitude'] : null,
+                    'longitude' => ! empty($data['longitude']) ? (float) $data['longitude'] : null,
+                    'is_base' => false,
                 ]
             );
-
-            return $location;
         }
 
         return null;
     }
 
-    /**
-     * Build the fillable array for Accommodation from request data + resolved location.
-     */
     private function buildAccommodationData(array $data, ?Location $location): array
     {
         $result = [
-            'location_id'      => $location?->id,
-            'name'             => $data['name'],
-            'capacity'         => $data['capacity'],
-            'type'             => $data['type'],
-            'description'      => $data['description'] ?? null,
-            'image_path'       => $data['image_path']  ?? null,
-            'lease_start_date' => $data['lease_start_date'] ?? null,
-            'lease_end_date'   => $data['lease_end_date']   ?? null,
+            'location_id' => $location?->id,
+            'name' => $data['name'],
+            'capacity' => $data['capacity'],
+            'description' => $data['description'] ?? null,
+            'image_path' => $data['image_path'] ?? null,
         ];
 
-        // Denormalise address fields from location (keeps backward compat for existing views)
+        // Denormalise address fields from location (backward compat for views)
         if ($location) {
-            $result['address']     = $location->address;
-            $result['city']        = $location->city;
+            $result['address'] = $location->address;
+            $result['city'] = $location->city;
             $result['postal_code'] = $location->postal_code;
-            $result['country']     = $location->country;
-            $result['latitude']    = $location->latitude  ? (float) $location->latitude  : null;
-            $result['longitude']   = $location->longitude ? (float) $location->longitude : null;
+            $result['country'] = $location->country;
+            $result['latitude'] = $location->latitude ? (float) $location->latitude : null;
+            $result['longitude'] = $location->longitude ? (float) $location->longitude : null;
         } else {
-            $result['address']     = $data['address']     ?? null;
-            $result['city']        = $data['city']        ?? null;
+            $result['address'] = $data['address'] ?? null;
+            $result['city'] = $data['city'] ?? null;
             $result['postal_code'] = $data['postal_code'] ?? null;
-            $result['country']     = $data['country']     ?? null;
-            $result['latitude']    = !empty($data['latitude'])  ? (float) $data['latitude']  : null;
-            $result['longitude']   = !empty($data['longitude']) ? (float) $data['longitude'] : null;
+            $result['country'] = $data['country'] ?? null;
+            $result['latitude'] = ! empty($data['latitude']) ? (float) $data['latitude'] : null;
+            $result['longitude'] = ! empty($data['longitude']) ? (float) $data['longitude'] : null;
         }
 
         return $result;
     }
 
-    /**
-     * Akomodacja = zawsze kwatera: dopisz cel „Kwatera” do lokalizacji (idempotentnie).
-     */
     private function ensureQuarterPurposeForAccommodation(Location $location): void
     {
         $location->addPurposes([LocationPurposeType::QUARTER]);

@@ -11,8 +11,11 @@ class AccommodationsTable extends Component
     use WithPagination;
 
     public $search = '';
+
     public $statusFilter = '';
+
     public $sortField = 'name';
+
     public $sortDirection = 'asc';
 
     protected $queryString = [
@@ -54,20 +57,26 @@ class AccommodationsTable extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        
+
         $this->resetPage();
     }
 
     public function render()
     {
-        $query = Accommodation::query();
+        $query = Accommodation::with(['location', 'activeLease']);
 
-        // Filtrowanie po nazwie/adresie
+        // Filtrowanie po nazwie/adresie (własny adres lub przez lokalizację)
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('address', 'like', '%' . $this->search . '%')
-                  ->orWhere('city', 'like', '%' . $this->search . '%');
+            $search = $this->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('address', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%")
+                    ->orWhereHas('location', fn ($lq) => $lq
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%")
+                    );
             });
         }
 

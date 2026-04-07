@@ -9,7 +9,136 @@
         </x-ui.alert>
     @endif
 
-    <!-- Podstawowe dane -->
+    <!-- Uczestnicy (na górze) -->
+    <x-ui.card label="Uczestnicy" class="mb-4">
+        <p class="text-muted small mb-3">
+            Lista zawiera wyłącznie osoby <strong>poza bazą</strong> w dniu transferu (w bazie są wyjazd i zjazd, nie transfer).
+        </p>
+        @error('selectedEmployeeIds') <div class="alert alert-danger py-2 mb-2">{{ $message }}</div> @enderror
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                <x-ui.input
+                    type="text"
+                    name="employeeSearch"
+                    label="Szukaj pracownika"
+                    placeholder="Imię, nazwisko, telefon..."
+                    wire:model.live.debounce.300ms="employeeSearch"
+                />
+            </div>
+
+            <div class="col-md-4">
+                <x-ui.input
+                    type="select"
+                    name="filterProjectId"
+                    label="Szukaj w projekcie (na dzień transferu)"
+                    wire:model.live="filterProjectId"
+                >
+                    <option value="">— dowolny —</option>
+                    @foreach($this->filteredProjectsForParticipantFilter as $p)
+                        <option value="{{ $p->id }}">
+                            {{ $p->name }}@if($p->location) ({{ $p->location->name }})@endif
+                        </option>
+                    @endforeach
+                </x-ui.input>
+            </div>
+
+            <div class="col-md-4">
+                <x-ui.input
+                    type="select"
+                    name="filterAccommodationId"
+                    label="Szukaj w domu (na dzień transferu)"
+                    wire:model.live="filterAccommodationId"
+                >
+                    <option value="">— dowolny —</option>
+                    @foreach($this->filteredAccommodationsForParticipantFilter as $a)
+                        <option value="{{ $a->id }}">
+                            {{ $a->name }}@if($a->location) ({{ $a->location->name }})@endif
+                        </option>
+                    @endforeach
+                </x-ui.input>
+            </div>
+        </div>
+
+        <div class="row g-2">
+            @foreach($this->employeesPage as $employee)
+                @php $selected = in_array($employee->id, $selectedEmployeeIds); @endphp
+                <div class="col-md-4 col-lg-3">
+                    <div
+                        class="p-2 border rounded-3 user-select-none {{ $selected ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary-subtle' }}"
+                        wire:click="toggleEmployee({{ $employee->id }})"
+                        style="cursor: pointer;"
+                    >
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="flex-grow-1">
+                                <x-ui.input
+                                    type="checkbox"
+                                    name="emp_{{ $employee->id }}"
+                                    :label="$employee->full_name"
+                                    :value="$selected"
+                                    class="mb-0"
+                                    wire:click.stop="toggleEmployee({{ $employee->id }})"
+                                />
+                                @if($employee->phone)
+                                    <div class="text-muted ms-4" style="font-size: 0.75rem;">
+                                        {{ $employee->phone }}
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        <div class="mt-3">
+            {{ $this->employeesPage->links('vendor.livewire.simple-pagination') }}
+        </div>
+
+        @if(count($selectedEmployeeIds) > 0)
+            <div class="mt-2">
+                <small class="text-muted">Wybrani: {{ count($selectedEmployeeIds) }} pracownik(ów)</small>
+            </div>
+        @endif
+
+        @if($this->selectedEmployees->isNotEmpty())
+            <hr class="my-3">
+            <div class="row g-2">
+                @foreach($this->selectedEmployees as $emp)
+                    @php
+                        $home = $participantHomeLocations[$emp->id] ?? null;
+                    @endphp
+                    <div class="col-md-6 col-lg-4">
+                        <div class="p-2 border rounded-3 d-flex align-items-center justify-content-between gap-2">
+                            <div class="min-w-0">
+                                <div class="fw-semibold small text-truncate">{{ $emp->full_name }}</div>
+                                <div class="text-muted small">
+                                    <i class="bi bi-house me-1"></i>
+                                    @if($home)
+                                        {{ $home['accommodation_name'] ?? 'Dom' }}
+                                        @if(!empty($home['location_name']))
+                                            · {{ $home['location_name'] }}
+                                        @endif
+                                        @if(!empty($home['city'])) ({{ $home['city'] }}) @endif
+                                        @if(empty($home['location_id']))
+                                            <span class="text-warning">(brak lokalizacji)</span>
+                                        @endif
+                                    @else
+                                        Brak przypisanego domu (na dzień transferu)
+                                    @endif
+                                </div>
+                            </div>
+                            @if($home && !empty($home['is_base']))
+                                <x-ui.badge variant="warning">Baza</x-ui.badge>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </x-ui.card>
+
+    <!-- Podstawowe dane (niżej) -->
     <x-ui.card label="Dane transferu" class="mb-4">
         <div class="row g-3">
             <div class="col-md-4">
@@ -23,16 +152,6 @@
             </div>
 
             <div class="col-md-4">
-                <div class="mb-2">
-                    <x-ui.input
-                        type="text"
-                        name="vehicleSearch"
-                        label="Szukaj pojazdu"
-                        placeholder="Szukaj pojazdu..."
-                        wire:model.live.debounce.300ms="vehicleSearch"
-                    />
-                </div>
-
                 <x-ui.input
                     type="select"
                     name="vehicleId"
@@ -60,16 +179,122 @@
                 />
             </div>
         </div>
+
+        <hr class="my-3">
+
+        <div class="form-check form-switch">
+            <input
+                class="form-check-input"
+                type="checkbox"
+                id="hasReassignment"
+                wire:model.live="hasReassignment"
+            >
+            <label class="form-check-label fw-semibold" for="hasReassignment">
+                Transfer obejmuje zmianę przypisań (przeniesienie)
+            </label>
+        </div>
+        <div class="form-text text-muted">
+            Gdy włączone: zamykamy stare przypisania (projekt, dom, auto) i możesz wskazać nowe dla każdej osoby.
+        </div>
     </x-ui.card>
 
-    <!-- Trasa -->
+    <!-- Przeniesienie (zmiana przypisań) -->
+    <x-ui.card label="Zmiana przypisań (przeniesienie)" class="mb-4">
+        @if(! $hasReassignment)
+            <p class="text-muted small mb-0">
+                Transfer logistyczny — bez zmian w przypisaniach do projektów i mieszkań.
+                Używaj tego dla transferów typu lotnisko→dom, dom→warsztat itp.
+            </p>
+        @endif
+
+        @if($hasReassignment && count($selectedEmployeeIds) > 0)
+            @php
+                $wizardDate = \Carbon\Carbon::parse($transferDate)->format('Y-m-d');
+                $wizardKey = md5(json_encode($selectedEmployeeIds));
+            @endphp
+
+            <p class="text-muted small mb-3">
+                Ten sam układ co przy wyjeździe (kroki 1–3): projekt i rola, mieszkanie, pojazd służbowy.
+                Na liście po lewej w kroku 1 są uczestnicy transferu. Daty w modalach ustawiają zakres nowych przypisań.
+            </p>
+
+            @error('reassignWizard')
+                <x-ui.alert variant="danger" class="mb-3" dismissible>
+                    {{ $message }}
+                </x-ui.alert>
+            @enderror
+
+            <x-ui.tabs
+                :tabs="[
+                    1 => [
+                        'label' => 'Krok 1: Przypisania do projektów',
+                        'wireClick' => 'goToReassignStep(1)',
+                    ],
+                    2 => [
+                        'label' => 'Krok 2: Przypisania do mieszkań',
+                        'wireClick' => 'goToReassignStep(2)',
+                    ],
+                    3 => [
+                        'label' => 'Krok 3: Przypisania do pojazdów',
+                        'wireClick' => 'goToReassignStep(3)',
+                    ],
+                ]"
+                :activeTab="$reassignStep"
+                id="transferReassignStepsTabs"
+            />
+
+            @if($reassignStep === 1)
+                <livewire:steps.step1-project-assignments
+                    :departure-date="$wizardDate"
+                    :end-date="$wizardDate"
+                    :vehicle-id="$vehicleId"
+                    :assignments="$assignments"
+                    :assignment-ranges="$assignmentRanges"
+                    :vehicle-seats="$vehicleSeats"
+                    :for-transfer="true"
+                    :allowed-employee-ids="$selectedEmployeeIds"
+                    :key="'tr-s1-'.$wizardKey.'-'.md5(json_encode($assignmentRanges)).'-'.md5(json_encode($vehicleSeats))"
+                />
+            @elseif($reassignStep === 2)
+                <livewire:steps.step2-accommodation-assignments
+                    :departure-date="$wizardDate"
+                    :end-date="$wizardDate"
+                    :assignments="$assignments"
+                    :assignment-ranges="$assignmentRanges"
+                    :accommodation-assignments="$accommodationAssignments"
+                    :for-transfer="true"
+                    :allowed-employee-ids="$selectedEmployeeIds"
+                    :key="'tr-s2-'.$wizardKey.'-'.md5(json_encode($accommodationAssignments)).'-'.md5(json_encode($assignmentRanges))"
+                />
+            @elseif($reassignStep === 3)
+                <livewire:steps.step3-vehicle-assignments
+                    :departure-date="$wizardDate"
+                    :end-date="$wizardDate"
+                    :vehicle-id="$vehicleId"
+                    :assignments="$assignments"
+                    :assignment-ranges="$assignmentRanges"
+                    :accommodation-assignments="$accommodationAssignments"
+                    :vehicle-assignments="$vehicleAssignments"
+                    :for-transfer="true"
+                    :allowed-employee-ids="$selectedEmployeeIds"
+                    :key="'tr-s3-'.$wizardKey.'-'.md5(json_encode($vehicleAssignments)).'-'.md5(json_encode($assignmentRanges))"
+                />
+            @endif
+        @elseif($hasReassignment && count($selectedEmployeeIds) === 0)
+            <x-ui.alert variant="info" class="mt-3">
+                Najpierw wybierz uczestników transferu.
+            </x-ui.alert>
+        @endif
+    </x-ui.card>
+
+    <!-- Trasa (pod przeniesieniem — punkty z domów starych i nowych przypisań) -->
     <x-ui.card label="Trasa" class="mb-4">
         <div class="row g-4">
             <!-- Left: route builder -->
             <div class="col-md-6">
                 <p class="text-muted small mb-3">
-                    Dodaj co najmniej 2 lokalizacje: startową i docelową. Możesz dodać punkty pośrednie.
-                    Po dodaniu minimum 2 punktów trasa zostanie automatycznie obliczona.
+                    Lista punktów uzupełnia się automatycznie o lokalizacje <strong>domów</strong>: najpierw obecne (na dzień transferu), potem — przy przeniesieniu — domy z nowych przypisań w kreatorze.
+                    Potrzebujesz co najmniej 2 punkty, żeby trasa się policzyła. Możesz dodać lub usunąć punkty ręcznie.
                 </p>
 
                 @error('waypointLocationIds') <div class="alert alert-danger py-2 mb-3">{{ $message }}</div> @enderror
@@ -213,62 +438,6 @@
                 @endif
             </div>
         </div>
-    </x-ui.card>
-
-    <!-- Uczestnicy -->
-    <x-ui.card label="Uczestnicy" class="mb-4">
-        @error('selectedEmployeeIds') <div class="alert alert-danger py-2 mb-2">{{ $message }}</div> @enderror
-
-        <div class="mb-3">
-            <x-ui.input
-                type="text"
-                name="employeeSearch"
-                label="Szukaj pracownika"
-                placeholder="Szukaj pracownika..."
-                wire:model.live.debounce.300ms="employeeSearch"
-            />
-        </div>
-
-        <div class="row g-2">
-            @foreach($this->employeesPage as $employee)
-                @php $selected = in_array($employee->id, $selectedEmployeeIds); @endphp
-                <div class="col-md-4 col-lg-3">
-                    <div
-                        class="p-2 border rounded-3 user-select-none {{ $selected ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary-subtle' }}"
-                        wire:click="toggleEmployee({{ $employee->id }})"
-                        style="cursor: pointer;"
-                    >
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="flex-grow-1">
-                                <x-ui.input
-                                    type="checkbox"
-                                    name="emp_{{ $employee->id }}"
-                                    :label="$employee->full_name"
-                                    :value="$selected"
-                                    class="mb-0"
-                                    wire:click.stop="toggleEmployee({{ $employee->id }})"
-                                />
-                                @if($employee->phone)
-                                    <div class="text-muted ms-4" style="font-size: 0.75rem;">
-                                        {{ $employee->phone }}
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endforeach
-        </div>
-
-        <div class="mt-3">
-            {{ $this->employeesPage->links('vendor.livewire.simple-pagination') }}
-        </div>
-
-        @if(count($selectedEmployeeIds) > 0)
-            <div class="mt-2">
-                <small class="text-muted">Wybrani: {{ count($selectedEmployeeIds) }} pracownik(ów)</small>
-            </div>
-        @endif
     </x-ui.card>
 
     <!-- Kierowca i wynagrodzenie -->

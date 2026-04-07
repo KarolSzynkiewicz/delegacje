@@ -24,6 +24,52 @@
     </x-slot>
 
     <x-ui.card>
+        <form method="GET" action="{{ route('departures.index') }}" class="mb-3 js-auto-submit">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small text-muted">Uczestnik</label>
+                    <input
+                        type="text"
+                        name="employee_search"
+                        value="{{ $employeeSearch ?? '' }}"
+                        class="form-control js-debounced"
+                        placeholder="Wpisz imię/nazwisko/telefon..."
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Typ transportu</label>
+                    <select name="transport" class="form-select">
+                        <option value="">— dowolny —</option>
+                        <option value="vehicle" @selected(($transport ?? '') === 'vehicle')>Pojazd firmowy</option>
+                        <option value="no_vehicle" @selected(($transport ?? '') === 'no_vehicle')>Bez pojazdu</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Pojazd</label>
+                    <select name="vehicle_id" class="form-select">
+                        <option value="">— dowolny —</option>
+                        <option value="none" @selected(($vehicleFilter ?? '') === 'none')>Bez pojazdu</option>
+                        @foreach($vehicles as $v)
+                            <option value="{{ $v->id }}" @selected((string)$v->id === (string)($vehicleFilter ?? ''))>
+                                {{ $v->registration_number }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                    <input type="hidden" name="dir" value="{{ $dir }}">
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        Filtruj
+                    </button>
+                    <a href="{{ route('departures.index') }}" class="btn btn-sm btn-outline-secondary w-100">
+                        Wyczyść
+                    </a>
+                </div>
+            </div>
+        </form>
+
         @php
             $sortHref = function (string $column) use ($sort, $dir) {
                 $nextDir = ($sort === $column) ? ($dir === 'asc' ? 'desc' : 'asc') : 'desc';
@@ -184,4 +230,20 @@
             </div>
         @endif
     </x-ui.card>
+
+    @push('scripts')
+    <script>
+        (function () {
+            const form = document.querySelector('form.js-auto-submit');
+            if (!form) return;
+            let t = null;
+            form.querySelectorAll('.js-debounced').forEach((el) => {
+                el.addEventListener('input', () => {
+                    if (t) clearTimeout(t);
+                    t = setTimeout(() => form.submit(), 300);
+                });
+            });
+        })();
+    </script>
+    @endpush
 </x-app-layout>

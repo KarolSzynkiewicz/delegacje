@@ -107,7 +107,7 @@
         <!-- Left Column: Available Employees (4/12) -->
         <div class="col-md-4">
             <x-ui.card>
-                <h5 class="mb-3">Dostępni pracownicy</h5>
+                <h5 class="mb-3">{{ $forTransfer ? 'Uczestnicy transferu' : 'Dostępni pracownicy' }}</h5>
                 
                 <!-- Role filter -->
                 <div class="mb-3">
@@ -135,7 +135,11 @@
                 </div>
                 
                 <p class="small text-muted mb-3">
-                    Przeciągnij pracownika do luki w projekcie
+                    @if($forTransfer)
+                        Przeciągnij pracownika na wybrany projekt i rolę (slot po prawej).
+                    @else
+                        Przeciągnij pracownika do luki w projekcie
+                    @endif
                 </p>
                 
                 <div class="employee-list">
@@ -236,7 +240,9 @@
                     @empty
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle"></i> 
-                            @if($roleFilter || filled($employeeSearch))
+                            @if($forTransfer)
+                                Brak uczestników do wyświetlenia — zaznacz pracowników przy transferze lub zmień filtry.
+                            @elseif($roleFilter || filled($employeeSearch))
                                 Brak dostępnych pracowników dla wybranych filtrów na wybraną datę.
                             @else
                                 Brak dostępnych pracowników na wybraną datę.
@@ -262,10 +268,17 @@
         <!-- Right Column: Project Gaps List (8/12) -->
         <div class="col-md-8">
             <x-ui.card>
-                <h5 class="mb-3">Jakich ludzi brakuje po przyjeździe?</h5>
-                <p class="small text-muted mb-3">
-                    Braki w rolach na najbliższe 2 tygodnie (14 dni od przybycia). Zakres pokazuje minimalną i maksymalną liczbę braków w ciągu 14 dni.
-                </p>
+                @if($forTransfer)
+                    <h5 class="mb-3">Do jakiego projektu chcesz przenieść pracownika?</h5>
+                    <p class="small text-muted mb-3">
+                        Wybierz projekt i rolę — przypisanie obowiązuje od daty w kalendarzu (jak przy wyjeździe). Poniżej widać też bieżące braki w rolach (2 tygodnie od daty odniesienia), żeby łatwiej celować w potrzeby.
+                    </p>
+                @else
+                    <h5 class="mb-3">Jakich ludzi brakuje po przyjeździe?</h5>
+                    <p class="small text-muted mb-3">
+                        Braki w rolach na najbliższe 2 tygodnie (14 dni od przybycia). Zakres pokazuje minimalną i maksymalną liczbę braków w ciągu 14 dni.
+                    </p>
+                @endif
 
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Filtruj po nazwie projektu</label>

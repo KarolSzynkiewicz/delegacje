@@ -14,7 +14,7 @@
                 @if(in_array($transfer->status, [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED]))
                     <form method="POST" action="{{ route('transfers.cancel', $transfer) }}" class="d-inline">
                         @csrf
-                        <x-ui.button variant="danger" type="submit" onclick="return confirm('Anulować ten transfer?')">
+                        <x-ui.button variant="danger" type="submit" onclick="return confirm('{{ $transfer->has_reassignment ? 'Anulować ten transfer? Przypisania zostaną przywrócone do stanu sprzed transferu.' : 'Anulować ten transfer?' }}')">
                             <i class="bi bi-x-circle me-1"></i> Anuluj transfer
                         </x-ui.button>
                     </form>
@@ -139,27 +139,133 @@
     <!-- Uczestnicy -->
     <x-ui.card label="Uczestnicy" class="mb-4">
         @if($transfer->participants->count() > 0)
+            @php
+                $uniqueEmployees = $transfer->participants
+                    ->filter(fn($p) => $p->employee)
+                    ->unique('employee_id');
+            @endphp
             <div class="row g-2">
-                @foreach($transfer->participants as $participant)
-                    @if($participant->employee)
-                        <div class="col-md-4 col-lg-3">
-                            <div class="d-flex align-items-center gap-2 p-2 border rounded-3">
-                                <i class="bi bi-person text-primary"></i>
-                                <div>
-                                    <div class="fw-semibold small">{{ $participant->employee->full_name }}</div>
-                                    @if($participant->employee->phone)
-                                        <div class="text-muted" style="font-size: 0.75rem;">{{ $participant->employee->phone }}</div>
-                                    @endif
-                                </div>
+                @foreach($uniqueEmployees as $participant)
+                    <div class="col-md-4 col-lg-3">
+                        <div class="d-flex align-items-center gap-2 p-2 border rounded-3">
+                            <i class="bi bi-person text-primary"></i>
+                            <div>
+                                <div class="fw-semibold small">{{ $participant->employee->full_name }}</div>
+                                @if($participant->employee->phone)
+                                    <div class="text-muted" style="font-size: 0.75rem;">{{ $participant->employee->phone }}</div>
+                                @endif
                             </div>
                         </div>
-                    @endif
+                    </div>
                 @endforeach
             </div>
         @else
             <p class="text-muted mb-0">Brak uczestników.</p>
         @endif
     </x-ui.card>
+
+    @if($transfer->has_reassignment)
+    <!-- Zmiany przypisań -->
+    <x-ui.card label="Zmiany przypisań (przeniesienie)" class="mb-4">
+        <x-ui.badge variant="info" class="mb-2">
+            <i class="bi bi-arrow-left-right me-1"></i> Transfer z przeniesieniem
+        </x-ui.badge>
+        <p class="text-muted small mb-4">
+            Dla każdej kategorii: <strong>stare przypisanie</strong> → <strong>nowe przypisanie</strong>.
+        </p>
+
+        @php
+            $reassignmentTypeLabels = [
+                'project_assignment' => 'Projekt',
+                'accommodation_assignment' => 'Mieszkanie',
+                'vehicle_assignment' => 'Pojazd',
+            ];
+            $participantsByEmployee = $transfer->participants->groupBy('employee_id');
+        @endphp
+
+        @foreach($participantsByEmployee as $employeeId => $parts)
+            @php
+                $employee = $parts->first()->employee;
+                $hasAssignmentRows = $parts->contains(fn ($p) => filled($p->assignment_type));
+            @endphp
+
+            @if($employee)
+            <div class="border rounded-3 p-3 mb-3">
+                <h6 class="fw-semibold mb-3">
+                    <i class="bi bi-person-fill text-primary me-1"></i>
+                    {{ $employee->full_name }}
+                </h6>
+
+                @if(! $hasAssignmentRows)
+                    <p class="text-muted small mb-0">Bez zmiany przypisań (zachowano poprzednie).</p>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-sm table-borderless mb-0 align-middle" style="--bs-table-bg: transparent;">
+                            <thead>
+                                <tr class="text-muted small">
+                                    <th scope="col" class="pb-2">Kategoria</th>
+                                    <th scope="col" class="pb-2">Stare przypisanie</th>
+                                    <th scope="col" class="pb-2 text-center" style="width: 2rem;"></th>
+                                    <th scope="col" class="pb-2">Nowe przypisanie</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($reassignmentTypeLabels as $typeKey => $typeLabel)
+                                    @php
+                                        $oldP = $parts->first(fn ($p) => $p->assignment_type === $typeKey && $p->original_end_date !== null);
+                                        $newP = $parts->first(fn ($p) => $p->assignment_type === $typeKey && $p->original_end_date === null);
+                                        $oldA = $oldP?->assignment;
+                                        $newA = $newP?->assignment;
+                                        $oldText = '—';
+                                        $newText = '—';
+                                        if ($oldP && $oldA) {
+                                            if ($typeKey === 'project_assignment') {
+                                                $oldText = $oldA->project?->name ?? ('#'.$oldP->assignment_id);
+                                                $oldText .= $oldP->original_end_date ? ' (do '.$oldP->original_end_date->format('d.m.Y').')' : '';
+                                            } elseif ($typeKey === 'accommodation_assignment') {
+                                                $oldText = $oldA->accommodation?->name ?? ('#'.$oldP->assignment_id);
+                                                $oldText .= $oldP->original_end_date ? ' (do '.$oldP->original_end_date->format('d.m.Y').')' : '';
+                                            } elseif ($typeKey === 'vehicle_assignment') {
+                                                $oldText = $oldA->vehicle?->registration_number ?? ('#'.$oldP->assignment_id);
+                                                $pos = $oldA->position ?? null;
+                                                $oldText .= $pos ? ' ('.$pos->label().')' : '';
+                                                $oldText .= $oldP->original_end_date ? ' (do '.$oldP->original_end_date->format('d.m.Y').')' : '';
+                                            }
+                                        }
+                                        if ($newP && $newA) {
+                                            if ($typeKey === 'project_assignment') {
+                                                $newText = $newA->project?->name ?? ('#'.$newP->assignment_id);
+                                            } elseif ($typeKey === 'accommodation_assignment') {
+                                                $newText = $newA->accommodation?->name ?? ('#'.$newP->assignment_id);
+                                            } elseif ($typeKey === 'vehicle_assignment') {
+                                                $newText = $newA->vehicle?->registration_number ?? ('#'.$newP->assignment_id);
+                                                $pos = $newA->position ?? null;
+                                                $newText .= $pos ? ' ('.$pos->label().')' : '';
+                                            }
+                                            if ($newA->start_date) {
+                                                $newText .= ' ('.$newA->start_date->format('d.m.Y').' – '.($newA->end_date?->format('d.m.Y') ?? '∞').')';
+                                            }
+                                        }
+                                        $showRow = $oldP || $newP;
+                                    @endphp
+                                    @if($showRow)
+                                        <tr>
+                                            <td class="text-muted small fw-semibold text-nowrap pe-2">{{ $typeLabel }}</td>
+                                            <td class="small">{{ $oldText }}</td>
+                                            <td class="text-center text-muted small px-1">→</td>
+                                            <td class="small">{{ $newText }}</td>
+                                        </tr>
+                                    @endif
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+            @endif
+        @endforeach
+    </x-ui.card>
+    @endif
 
     <!-- Wynagrodzenie kierowcy -->
     @if($transfer->driverAdjustments->count() > 0)
@@ -211,4 +317,9 @@
             </div>
         </div>
     </x-ui.card>
+
+    <x-comments
+        :commentable="$transfer"
+        commentable-type="logistics_event"
+    />
 </x-app-layout>

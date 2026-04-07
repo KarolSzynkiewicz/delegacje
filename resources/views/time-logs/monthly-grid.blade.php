@@ -1,4 +1,99 @@
-<x-app-layout>
+<x-app-layout :edge-to-edge="true">
+    {{-- Tylko ten widok: pełna szerokość ekranu (wyjście poza ewentualny wąski main). Bez zmian globalnego app.css. --}}
+    <style>
+        .time-logs-monthly-grid-root {
+            width: 100vw;
+            max-width: 100vw;
+            margin-left: calc(50% - 50vw);
+            margin-right: calc(50% - 50vw);
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            box-sizing: border-box;
+        }
+        @media (min-width: 768px) {
+            .time-logs-monthly-grid-root {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+        }
+        .time-logs-monthly-grid-root .monthly-grid-table-card {
+            width: 100%;
+            max-width: none;
+        }
+        .time-logs-monthly-grid-root .monthly-grid-table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        /*
+          table-layout: fixed + stała pierwsza kolumna: bez tego pierwsza kolumna pochłaniała całą szerokość,
+          a wąskie kolumny dni były ścinane do paska po prawej.
+        */
+        .time-logs-monthly-grid-root #timeLogsGrid {
+            table-layout: fixed;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid colgroup col:first-child {
+            width: 260px;
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid th:first-child,
+        .time-logs-monthly-grid-root #timeLogsGrid td:first-child {
+            width: 260px;
+            min-width: 260px;
+            max-width: 260px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid thead th:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 12;
+            background: var(--bg-card) !important;
+            box-shadow: 6px 0 12px -6px rgba(0, 0, 0, 0.45);
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 6;
+            background: var(--bg-card) !important;
+            box-shadow: 6px 0 12px -6px rgba(0, 0, 0, 0.35);
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid .project-header-row td:first-child {
+            background: rgba(59, 130, 246, 0.1) !important;
+            z-index: 7;
+            word-break: break-word;
+        }
+        /* Kolumny dni: równy podział reszty szerokości */
+        .time-logs-monthly-grid-root #timeLogsGrid thead th:not(:first-child),
+        .time-logs-monthly-grid-root #timeLogsGrid tbody td:not(:first-child) {
+            min-width: 0;
+            width: auto;
+            max-width: none;
+            padding: 3px 4px !important;
+            vertical-align: middle;
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid thead th:not(:first-child) {
+            font-size: 0.7rem;
+            line-height: 1.2;
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid .monthly-grid-day-dow {
+            font-size: 0.6rem;
+            opacity: 0.85;
+        }
+        .time-logs-monthly-grid-root #timeLogsGrid input.time-input,
+        .time-logs-monthly-grid-root #timeLogsGrid input.disabled-input {
+            padding: 3px 4px !important;
+            font-size: 0.75rem;
+            min-width: 0 !important;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+    </style>
+
     <x-slot name="header">
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
             @php
@@ -29,8 +124,8 @@
         </div>
     </x-slot>
 
-    <div class="py-4">
-        <div class="container-xxl">
+    <div class="time-logs-monthly-grid-root">
+    <div class="py-2">
                 <!-- Wybór projektu -->
                 @php
                     $selectedProjectParamBody = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
@@ -176,21 +271,31 @@
                 @csrf
 
                 <!-- Tabela miesięczna -->
-                <x-ui.card class="mb-4">
-                    <div class="table-responsive" style="max-height: 80vh; overflow-y: auto;">
+                <div class="card mb-4 monthly-grid-table-card">
+                    <div class="table-responsive monthly-grid-table-scroll">
                         <table class="table mb-0" id="timeLogsGrid">
+                        <colgroup>
+                            <col>
+                            @foreach($days as $_day)
+                                <col>
+                            @endforeach
+                        </colgroup>
                         <thead class="sticky-top">
                             <tr>
-                                <th class="text-center fw-bold" style="min-width: 200px; position: sticky; left: 0; z-index: 10; background: var(--bg-card);">
+                                <th class="text-center fw-bold">
                                     Projekt / Osoba
                                 </th>
                                 @foreach($days as $day)
                                     @php
                                         $isToday = $day['date']->isToday();
+                                        $dayTitle = $day['date']->locale('pl')->translatedFormat('l, j F Y');
                                     @endphp
-                                    <th class="text-center fw-bold {{ $day['isWeekend'] ? 'weekend-header' : '' }} {{ $isToday ? 'today-header' : '' }}" style="min-width: 60px; background: var(--bg-card);">
-                                        <div>{{ $day['number'] }}</div>
-                                        <div class="small fw-normal text-muted">{{ $day['date']->format('D') }}</div>
+                                    <th
+                                        class="text-center fw-bold {{ $day['isWeekend'] ? 'weekend-header' : '' }} {{ $isToday ? 'today-header' : '' }}"
+                                        title="{{ $dayTitle }}"
+                                    >
+                                        <div class="monthly-grid-day-num">{{ $day['number'] }}</div>
+                                        <div class="monthly-grid-day-dow text-muted">{{ $day['date']->format('D') }}</div>
                                     </th>
                                 @endforeach
                             </tr>
@@ -205,7 +310,7 @@
                                 
                                 <!-- Nagłówek projektu -->
                                 <tr class="project-header-row">
-                                    <td class="fw-bold border-end-2" style="position: sticky; left: 0; z-index: 5; background-color: inherit;">
+                                    <td class="fw-bold border-end-2">
                                         <div class="d-flex align-items-center">
                                             <span class="project-dot me-2"></span>
                                             <span>{{ $project->name }}</span>
@@ -232,10 +337,10 @@
                                         $daysInAssignment = $assignmentData['daysInAssignment'];
                                     @endphp
                                     <tr>
-                                        <td class="ps-4 border-end-2" style="position: sticky; left: 0; z-index: 5; background: var(--bg-card);">
+                                        <td class="ps-4 border-end-2">
                                             <div class="d-flex align-items-center">
                                                 <i class="bi bi-person me-2"></i>
-                                                <span>{{ $employee->first_name }} {{ $employee->last_name }}</span>
+                                                <span>{{ $employee->last_name }}, {{ $employee->first_name }}</span>
                                             </div>
                                         </td>
                                         @foreach($days as $day)
@@ -349,7 +454,7 @@
                         </tbody>
                     </table>
                     </div>
-                </x-ui.card>
+                </div>
                 
                 <!-- Przycisk zapisu - pod kartą tabelki, z prawej -->
                 <div class="d-flex justify-content-end mb-4">
@@ -373,7 +478,7 @@
                     </div>
                 </div>
             </x-ui.card>
-        </div>
+    </div>
     </div>
 
 </x-app-layout>

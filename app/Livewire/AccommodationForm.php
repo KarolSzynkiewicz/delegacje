@@ -13,30 +13,45 @@ class AccommodationForm extends Component
     public string $location_mode = 'new';
 
     // Existing location selection
-    public ?int   $location_id   = null;
+    public ?int $location_id = null;
 
     // New location geo-search fields
-    public string  $searchQuery      = '';
-    public array   $searchResults    = [];
-    public bool    $isSearching      = false;
-    public bool    $showResults      = false;
-    public ?string $searchError      = null;
+    public string $searchQuery = '';
 
-    public string  $location_name   = '';
-    public string  $address         = '';
-    public string  $city            = '';
-    public string  $postal_code     = '';
-    public string  $country         = '';
-    public ?float  $latitude        = null;
-    public ?float  $longitude       = null;
+    public array $searchResults = [];
+
+    public bool $isSearching = false;
+
+    public bool $showResults = false;
+
+    public ?string $searchError = null;
+
+    public string $location_name = '';
+
+    public string $address = '';
+
+    public string $city = '';
+
+    public string $postal_code = '';
+
+    public string $country = '';
+
+    public ?float $latitude = null;
+
+    public ?float $longitude = null;
 
     // Accommodation-specific fields
-    public string  $name             = '';
-    public int     $capacity         = 1;
-    public string  $type             = 'wynajmowany';
+    public string $name = '';
+
+    public int $capacity = 1;
+
+    public string $type = 'wynajmowany';
+
     public ?string $lease_start_date = null;
-    public ?string $lease_end_date   = null;
-    public string  $description      = '';
+
+    public ?string $lease_end_date = null;
+
+    public string $description = '';
 
     protected GeocodingService $geocodingService;
 
@@ -48,35 +63,40 @@ class AccommodationForm extends Component
     public function mount(?Accommodation $accommodation = null): void
     {
         if ($accommodation && $accommodation->exists) {
-            $this->name             = $accommodation->name;
-            $this->capacity         = $accommodation->capacity ?? 1;
-            $this->type             = $accommodation->type ?? 'wynajmowany';
-            $this->lease_start_date = $accommodation->lease_start_date?->format('Y-m-d');
-            $this->lease_end_date   = $accommodation->lease_end_date?->format('Y-m-d');
-            $this->description      = $accommodation->description ?? '';
+            $this->name = $accommodation->name;
+            $this->capacity = $accommodation->capacity ?? 1;
+            $this->description = $accommodation->description ?? '';
+
+            $lease = $accommodation->relationLoaded('activeLease')
+                ? $accommodation->activeLease
+                : $accommodation->activeLease()->first();
+
+            $this->type = $lease?->type ?? 'własny';
+            $this->lease_start_date = $lease?->start_date?->format('Y-m-d');
+            $this->lease_end_date = $lease?->end_date?->format('Y-m-d');
 
             if ($accommodation->location_id) {
                 $this->location_mode = 'existing';
-                $this->location_id   = $accommodation->location_id;
+                $this->location_id = $accommodation->location_id;
 
                 $loc = $accommodation->location;
                 if ($loc) {
-                    $this->address      = $loc->address     ?? '';
-                    $this->city         = $loc->city         ?? '';
-                    $this->postal_code  = $loc->postal_code  ?? '';
-                    $this->country      = $loc->country ?? '';
-                    $this->latitude     = $loc->latitude  ? (float) $loc->latitude  : null;
-                    $this->longitude    = $loc->longitude ? (float) $loc->longitude : null;
+                    $this->address = $loc->address ?? '';
+                    $this->city = $loc->city ?? '';
+                    $this->postal_code = $loc->postal_code ?? '';
+                    $this->country = $loc->country instanceof \App\Enums\EuropeanCountry ? $loc->country->value : ($loc->country ?? '');
+                    $this->latitude = $loc->latitude ? (float) $loc->latitude : null;
+                    $this->longitude = $loc->longitude ? (float) $loc->longitude : null;
                     $this->location_name = $loc->name ?? '';
                 }
             } else {
                 $this->location_mode = 'new';
-                $this->address      = $accommodation->address     ?? '';
-                $this->city         = $accommodation->city         ?? '';
-                $this->postal_code  = $accommodation->postal_code  ?? '';
-                $this->country      = $accommodation->country?->value ?? '';
-                $this->latitude     = $accommodation->latitude  ? (float) $accommodation->latitude  : null;
-                $this->longitude    = $accommodation->longitude ? (float) $accommodation->longitude : null;
+                $this->address = $accommodation->address ?? '';
+                $this->city = $accommodation->city ?? '';
+                $this->postal_code = $accommodation->postal_code ?? '';
+                $this->country = $accommodation->country?->value ?? '';
+                $this->latitude = $accommodation->latitude ? (float) $accommodation->latitude : null;
+                $this->longitude = $accommodation->longitude ? (float) $accommodation->longitude : null;
             }
         }
     }
@@ -93,12 +113,12 @@ class AccommodationForm extends Component
 
         if ($loc) {
             $this->location_name = $loc->name;
-            $this->address       = $loc->address      ?? '';
-            $this->city          = $loc->city          ?? '';
-            $this->postal_code   = $loc->postal_code   ?? '';
-            $this->country       = $loc->country ?? '';
-            $this->latitude      = $loc->latitude  ? (float) $loc->latitude  : null;
-            $this->longitude     = $loc->longitude ? (float) $loc->longitude : null;
+            $this->address = $loc->address ?? '';
+            $this->city = $loc->city ?? '';
+            $this->postal_code = $loc->postal_code ?? '';
+            $this->country = $loc->country instanceof \App\Enums\EuropeanCountry ? $loc->country->value : ($loc->country ?? '');
+            $this->latitude = $loc->latitude ? (float) $loc->latitude : null;
+            $this->longitude = $loc->longitude ? (float) $loc->longitude : null;
         }
     }
 
@@ -107,26 +127,27 @@ class AccommodationForm extends Component
         $query = trim($this->searchQuery);
 
         if (strlen($query) < 3) {
-            $this->searchError   = 'Wpisz co najmniej 3 znaki';
-            $this->showResults   = false;
+            $this->searchError = 'Wpisz co najmniej 3 znaki';
+            $this->showResults = false;
             $this->searchResults = [];
+
             return;
         }
 
-        $this->searchError   = null;
-        $this->isSearching   = true;
-        $this->showResults   = false;
+        $this->searchError = null;
+        $this->isSearching = true;
+        $this->showResults = false;
         $this->searchResults = [];
 
         try {
             $this->searchResults = $this->geocodingService->search($query, 10);
-            $this->showResults   = true;
+            $this->showResults = true;
 
             if (empty($this->searchResults)) {
-                $this->searchError = 'Brak wyników dla: "' . $query . '"';
+                $this->searchError = 'Brak wyników dla: "'.$query.'"';
             }
         } catch (\Exception $e) {
-            $this->searchError = 'Błąd wyszukiwania: ' . $e->getMessage();
+            $this->searchError = 'Błąd wyszukiwania: '.$e->getMessage();
         } finally {
             $this->isSearching = false;
         }
@@ -134,28 +155,24 @@ class AccommodationForm extends Component
 
     public function selectGeoResult(int $index): void
     {
-        if (!isset($this->searchResults[$index])) {
+        if (! isset($this->searchResults[$index])) {
             return;
         }
 
         $result = $this->searchResults[$index];
 
-        $this->address      = $result['address']     ?? '';
-        $this->city         = $result['city']         ?? '';
-        $this->postal_code  = $result['postal_code']  ?? '';
-        $this->latitude     = isset($result['latitude'])  ? (float) $result['latitude']  : null;
-        $this->longitude    = isset($result['longitude']) ? (float) $result['longitude'] : null;
+        $this->address = $result['address'] ?? '';
+        $this->city = $result['city'] ?? '';
+        $this->postal_code = $result['postal_code'] ?? '';
+        $this->latitude = isset($result['latitude']) ? (float) $result['latitude'] : null;
+        $this->longitude = isset($result['longitude']) ? (float) $result['longitude'] : null;
 
-        if (!empty($result['country'])) {
+        if (! empty($result['country'])) {
             $this->country = $this->mapCountryNameToCode($result['country']);
         }
 
-        if (empty($this->location_name)) {
-            $this->location_name = $result['label'] ?? '';
-        }
-
-        $this->searchQuery   = $result['label'] ?? '';
-        $this->showResults   = false;
+        $this->searchQuery = $result['label'] ?? '';
+        $this->showResults = false;
         $this->searchResults = [];
     }
 

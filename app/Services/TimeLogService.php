@@ -2,12 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\TimeLog;
-use App\Models\ProjectAssignment;
 use App\Models\Project;
-use App\Enums\AssignmentStatus;
-use Illuminate\Validation\ValidationException;
+use App\Models\ProjectAssignment;
+use App\Models\TimeLog;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Service for managing time logs (real work hours tracking).
@@ -16,12 +15,7 @@ class TimeLogService
 {
     /**
      * Create a time log entry for a project assignment.
-     * 
-     * @param ProjectAssignment $assignment
-     * @param Carbon $workDate
-     * @param float $hoursWorked
-     * @param string|null $notes
-     * @return TimeLog
+     *
      * @throws ValidationException
      */
     public function createTimeLog(
@@ -33,7 +27,7 @@ class TimeLogService
         $workDate = $workDate->copy()->startOfDay();
 
         // Assignment jest już świeży - nie trzeba refresh()
-        
+
         // Validate work date is within assignment period
         // WYŁĄCZONE - wykomentowane na prośbę użytkownika
         // $this->validateWorkDateWithinAssignment($assignment, $workDate);
@@ -50,7 +44,7 @@ class TimeLogService
 
         if ($existingLog) {
             throw ValidationException::withMessages([
-                'work_date' => 'Dla tego przypisania już istnieje wpis czasu pracy na dzień ' . $workDate->format('Y-m-d') . '.'
+                'work_date' => 'Dla tego przypisania już istnieje wpis czasu pracy na dzień '.$workDate->format('Y-m-d').'.',
             ]);
         }
 
@@ -74,10 +68,11 @@ class TimeLogService
         ?string $notes = null
     ): bool {
         // OPTIMIZATION: Eager load assignment to avoid lazy loading
-        if (!$timeLog->relationLoaded('projectAssignment')) {
+        if (! $timeLog->relationLoaded('projectAssignment')) {
             $timeLog->load('projectAssignment');
         }
         $assignment = $timeLog->projectAssignment;
+
         return $this->updateTimeLogWithAssignment($timeLog, $assignment, $workDate, $hoursWorked, $notes);
     }
 
@@ -96,7 +91,7 @@ class TimeLogService
 
         // Assignment jest już świeży z bulkUpdateTimeLogs (findOrFail)
         // Nie trzeba refresh() - może powodować problemy z cast 'date'
-        
+
         // Validate work date is within assignment period
         // WYŁĄCZONE - wykomentowane na prośbę użytkownika
         // $this->validateWorkDateWithinAssignment($assignment, $workDate);
@@ -115,7 +110,7 @@ class TimeLogService
 
         if ($existingLog) {
             throw ValidationException::withMessages([
-                'work_date' => 'Dla tego przypisania już istnieje wpis czasu pracy na dzień ' . $workDate->format('Y-m-d') . '.'
+                'work_date' => 'Dla tego przypisania już istnieje wpis czasu pracy na dzień '.$workDate->format('Y-m-d').'.',
             ]);
         }
 
@@ -144,7 +139,7 @@ class TimeLogService
         return TimeLog::whereHas('projectAssignment', function ($query) use ($projectId) {
             $query->where('project_id', $projectId);
         })
-        ->sum('hours_worked');
+            ->sum('hours_worked');
     }
 
     /**
@@ -156,48 +151,47 @@ class TimeLogService
         return TimeLog::whereHas('projectAssignment', function ($query) use ($employeeId) {
             $query->where('employee_id', $employeeId);
         })
-        ->whereBetween('start_time', [
-            $startDate->copy()->startOfDay(),
-            $endDate->copy()->endOfDay()
-        ])
-        ->sum('hours_worked');
+            ->whereBetween('start_time', [
+                $startDate->copy()->startOfDay(),
+                $endDate->copy()->endOfDay(),
+            ])
+            ->sum('hours_worked');
     }
 
     /**
      * Validate hours worked is in valid range (0-24).
-     * 
+     *
      * @throws ValidationException
      */
     protected function validateHoursWorked(float $hoursWorked): void
     {
         if ($hoursWorked < 0 || $hoursWorked > 24) {
             throw ValidationException::withMessages([
-                'hours_worked' => 'Liczba godzin musi być między 0 a 24.'
+                'hours_worked' => 'Liczba godzin musi być między 0 a 24.',
             ]);
         }
     }
 
     /**
      * Validate work date is within assignment period.
-     * 
+     *
      * @throws ValidationException
-     * 
+     *
      * WYŁĄCZONE - wykomentowane na prośbę użytkownika
      */
     protected function validateWorkDateWithinAssignment(ProjectAssignment $assignment, Carbon $workDate): void
     {
         // WALIDACJA WYŁĄCZONA - metoda nie wykonuje żadnych sprawdzeń
-        return;
-        
+
         /*
         // start_date i end_date są już obiektami Carbon (cast 'date')
         // Upewniamy się, że wszystkie daty są w tym samym formacie (bez czasu)
-        $startDate = $assignment->start_date instanceof Carbon 
-            ? $assignment->start_date->copy()->startOfDay() 
+        $startDate = $assignment->start_date instanceof Carbon
+            ? $assignment->start_date->copy()->startOfDay()
             : Carbon::parse($assignment->start_date)->startOfDay();
-        $endDate = $assignment->end_date 
-            ? ($assignment->end_date instanceof Carbon 
-                ? $assignment->end_date->copy()->startOfDay() 
+        $endDate = $assignment->end_date
+            ? ($assignment->end_date instanceof Carbon
+                ? $assignment->end_date->copy()->startOfDay()
                 : Carbon::parse($assignment->end_date)->startOfDay())
             : null;
         $workDateDay = $workDate->copy()->startOfDay();
@@ -208,8 +202,8 @@ class TimeLogService
         $workDateOnly = $workDateDay->format('Y-m-d');
 
         if ($workDateOnly < $startDateOnly) {
-            $startDateStr = $assignment->start_date instanceof Carbon 
-                ? $assignment->start_date->format('Y-m-d') 
+            $startDateStr = $assignment->start_date instanceof Carbon
+                ? $assignment->start_date->format('Y-m-d')
                 : Carbon::parse($assignment->start_date)->format('Y-m-d');
             throw ValidationException::withMessages([
                 'work_date' => 'Data pracy (' . $workDate->format('Y-m-d') . ') nie może być wcześniejsza niż data rozpoczęcia przypisania (' . $startDateStr . ').'
@@ -219,11 +213,11 @@ class TimeLogService
         // Data może być równa end_date (ostatni dzień przypisania jest dozwolony)
         // Porównujemy stringi dat (Y-m-d) zamiast obiektów Carbon
         if ($endDateOnly && $workDateOnly > $endDateOnly) {
-            $endDateStr = $assignment->end_date instanceof Carbon 
-                ? $assignment->end_date->format('Y-m-d') 
+            $endDateStr = $assignment->end_date instanceof Carbon
+                ? $assignment->end_date->format('Y-m-d')
                 : Carbon::parse($assignment->end_date)->format('Y-m-d');
-            $startDateStr = $assignment->start_date instanceof Carbon 
-                ? $assignment->start_date->format('Y-m-d') 
+            $startDateStr = $assignment->start_date instanceof Carbon
+                ? $assignment->start_date->format('Y-m-d')
                 : Carbon::parse($assignment->start_date)->format('Y-m-d');
             throw ValidationException::withMessages([
                 'work_date' => 'Data pracy (' . $workDate->format('Y-m-d') . ') nie może być późniejsza niż data zakończenia przypisania (' . $endDateStr . '). Przypisanie: ID ' . $assignment->id . ', okres: ' . $startDateStr . ' - ' . $endDateStr . '.'
@@ -234,14 +228,13 @@ class TimeLogService
 
     /**
      * Get monthly grid data for time logs editing.
-     * 
-     * @param string $month Format: Y-m (e.g., '2025-01')
-     * @param array|null $projectIds Optional: filter by project IDs (for /mine/* routes)
-     * @return array
+     *
+     * @param  string  $month  Format: Y-m (e.g., '2025-01')
+     * @param  array|null  $projectIds  Optional: filter by project IDs (for /mine/* routes)
      */
     public function getMonthlyGridData(string $month, ?array $projectIds = null): array
     {
-        $currentDate = Carbon::parse($month . '-01');
+        $currentDate = Carbon::parse($month.'-01');
         $monthStart = $currentDate->copy()->startOfMonth();
         $monthEnd = $currentDate->copy()->endOfMonth();
         $daysInMonth = $monthStart->daysInMonth;
@@ -254,41 +247,41 @@ class TimeLogService
         $projectsQuery = Project::with([
             'assignments.employee',
             'assignments.role',
-            'assignments.timeLogs' => function($query) use ($monthStart, $monthEnd) {
+            'assignments.timeLogs' => function ($query) use ($monthStart, $monthEnd) {
                 $query->whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()]);
-            }
+            },
         ])
-        ->whereHas('assignments', function($query) use ($monthStart, $monthEnd) {
-            $query->where(function($q) use ($monthStart, $monthEnd) {
-                $q->where('start_date', '<=', $monthEnd)
-                  ->where(function($q2) use ($monthStart) {
-                      $q2->whereNull('end_date')
-                         ->orWhere('end_date', '>=', $monthStart);
-                  });
+            ->whereHas('assignments', function ($query) use ($monthStart, $monthEnd) {
+                $query->where(function ($q) use ($monthStart, $monthEnd) {
+                    $q->where('start_date', '<=', $monthEnd)
+                        ->where(function ($q2) use ($monthStart) {
+                            $q2->whereNull('end_date')
+                                ->orWhere('end_date', '>=', $monthStart);
+                        });
+                });
             });
-        });
-        
+
         // Filter by project IDs if provided (for /mine/* routes)
-        if ($projectIds !== null && !empty($projectIds)) {
+        if ($projectIds !== null && ! empty($projectIds)) {
             $projectsQuery->whereIn('id', $projectIds);
         }
-        
+
         $projects = $projectsQuery->orderBy('name')->get();
-        
+
         // OPTIMIZATION: Get all time logs for this month in one query (even if assignment was deleted)
         // Use join instead of whereHas for better performance
         $timeLogsQuery = TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()])
             ->join('project_assignments', 'time_logs.project_assignment_id', '=', 'project_assignments.id')
             ->with(['projectAssignment.project', 'projectAssignment.employee'])
             ->select('time_logs.*');
-        
+
         // Filter by project IDs if provided (for /mine/* routes)
-        if ($projectIds !== null && !empty($projectIds)) {
+        if ($projectIds !== null && ! empty($projectIds)) {
             $timeLogsQuery->whereIn('project_assignments.project_id', $projectIds);
         }
-        
+
         $allTimeLogs = $timeLogsQuery->get();
-        
+
         // Create map of time logs by project_id, employee_id and day
         $timeLogsByProjectEmployee = [];
         foreach ($allTimeLogs as $timeLog) {
@@ -297,9 +290,9 @@ class TimeLogService
                 $employeeId = $timeLog->projectAssignment->employee_id;
                 $assignmentId = $timeLog->project_assignment_id;
                 $day = Carbon::parse($timeLog->start_time)->day;
-                
-                $key = $projectId . '_' . $employeeId;
-                if (!isset($timeLogsByProjectEmployee[$key])) {
+
+                $key = $projectId.'_'.$employeeId;
+                if (! isset($timeLogsByProjectEmployee[$key])) {
                     $timeLogsByProjectEmployee[$key] = [];
                 }
                 $timeLogsByProjectEmployee[$key][$day] = [
@@ -314,12 +307,12 @@ class TimeLogService
         $projectsData = [];
         foreach ($projects as $project) {
             $assignmentsData = [];
-            
+
             // Group assignments by employee
             $employeesMap = [];
             foreach ($project->assignments as $assignment) {
                 $employeeId = $assignment->employee_id;
-                if (!isset($employeesMap[$employeeId])) {
+                if (! isset($employeesMap[$employeeId])) {
                     $employeesMap[$employeeId] = [
                         'employee' => $assignment->employee,
                         'assignments' => [],
@@ -331,9 +324,9 @@ class TimeLogService
             // Convert to array and prepare time logs data
             foreach ($employeesMap as $employeeId => $data) {
                 $timeLogsMap = [];
-                
+
                 // Get time logs for this employee in this project
-                $key = $project->id . '_' . $employeeId;
+                $key = $project->id.'_'.$employeeId;
                 if (isset($timeLogsByProjectEmployee[$key])) {
                     foreach ($timeLogsByProjectEmployee[$key] as $day => $timeLogData) {
                         $timeLogsMap[$day] = $timeLogData;
@@ -345,7 +338,7 @@ class TimeLogService
                 foreach ($data['assignments'] as $assignment) {
                     $assignmentStart = Carbon::parse($assignment->start_date);
                     $assignmentEnd = $assignment->end_date ? Carbon::parse($assignment->end_date) : $monthEnd;
-                    
+
                     for ($day = 1; $day <= $daysInMonth; $day++) {
                         $checkDate = $monthStart->copy()->addDays($day - 1);
                         if ($checkDate->between($assignmentStart, $assignmentEnd)) {
@@ -362,7 +355,20 @@ class TimeLogService
                 ];
             }
 
-            if (!empty($assignmentsData)) {
+            usort($assignmentsData, function (array $a, array $b): int {
+                $la = mb_strtolower($a['employee']?->last_name ?? '');
+                $lb = mb_strtolower($b['employee']?->last_name ?? '');
+                if ($la !== $lb) {
+                    return $la <=> $lb;
+                }
+
+                $fa = mb_strtolower($a['employee']?->first_name ?? '');
+                $fb = mb_strtolower($b['employee']?->first_name ?? '');
+
+                return $fa <=> $fb;
+            });
+
+            if (! empty($assignmentsData)) {
                 $projectsData[] = [
                     'project' => $project,
                     'assignments' => $assignmentsData,
@@ -395,15 +401,15 @@ class TimeLogService
 
     /**
      * Bulk update time logs.
-     * 
-     * @param array $entries [
-     *   [
-     *     'assignment_id' => int,
-     *     'date' => string (Y-m-d),
-     *     'hours' => float|null
-     *   ],
-     *   ...
-     * ]
+     *
+     * @param  array  $entries  [
+     *                          [
+     *                          'assignment_id' => int,
+     *                          'date' => string (Y-m-d),
+     *                          'hours' => float|null
+     *                          ],
+     *                          ...
+     *                          ]
      * @return array ['created' => int, 'updated' => int, 'deleted' => int, 'errors' => array]
      */
     public function bulkUpdateTimeLogs(array $entries): array
@@ -429,15 +435,15 @@ class TimeLogService
         // Build date ranges for all entries
         $dateRanges = [];
         foreach ($entries as $entry) {
-            if (!isset($entry['assignment_id']) || !isset($entry['date'])) {
+            if (! isset($entry['assignment_id']) || ! isset($entry['date'])) {
                 continue;
             }
-            $assignmentId = (int)$entry['assignment_id'];
+            $assignmentId = (int) $entry['assignment_id'];
             $date = Carbon::parse($entry['date'])->startOfDay();
             $dayStart = $date->copy()->startOfDay();
             $dayEnd = $date->copy()->endOfDay();
-            
-            if (!isset($dateRanges[$assignmentId])) {
+
+            if (! isset($dateRanges[$assignmentId])) {
                 $dateRanges[$assignmentId] = [];
             }
             $dateRanges[$assignmentId][] = [$dayStart, $dayEnd];
@@ -445,53 +451,54 @@ class TimeLogService
 
         // Load all time logs for all assignments and dates in one query
         $existingTimeLogs = collect();
-        if (!empty($dateRanges)) {
+        if (! empty($dateRanges)) {
             $timeLogsQuery = TimeLog::whereIn('project_assignment_id', array_keys($dateRanges));
-            
+
             // Build OR conditions for all date ranges
-            $timeLogsQuery->where(function($query) use ($dateRanges) {
+            $timeLogsQuery->where(function ($query) use ($dateRanges) {
                 foreach ($dateRanges as $assignmentId => $ranges) {
                     foreach ($ranges as $range) {
-                        $query->orWhere(function($q) use ($assignmentId, $range) {
+                        $query->orWhere(function ($q) use ($assignmentId, $range) {
                             $q->where('project_assignment_id', $assignmentId)
-                              ->whereBetween('start_time', $range);
+                                ->whereBetween('start_time', $range);
                         });
                     }
                 }
             });
-            
-            $existingTimeLogs = $timeLogsQuery->get()->keyBy(function($timeLog) {
-                return $timeLog->project_assignment_id . '_' . $timeLog->start_time->format('Y-m-d');
+
+            $existingTimeLogs = $timeLogsQuery->get()->keyBy(function ($timeLog) {
+                return $timeLog->project_assignment_id.'_'.$timeLog->start_time->format('Y-m-d');
             });
         }
 
         // Process entries
         foreach ($entries as $index => $entry) {
             try {
-                if (!isset($entry['assignment_id']) || !isset($entry['date'])) {
+                if (! isset($entry['assignment_id']) || ! isset($entry['date'])) {
                     continue;
                 }
 
-                $assignmentId = (int)$entry['assignment_id'];
-                
+                $assignmentId = (int) $entry['assignment_id'];
+
                 // Get assignment from pre-loaded collection
-                if (!isset($assignments[$assignmentId])) {
+                if (! isset($assignments[$assignmentId])) {
                     $results['errors'][] = [
                         'assignment_id' => $assignmentId,
                         'date' => $entry['date'] ?? null,
                         'message' => 'Przypisanie nie zostało znalezione.',
                     ];
+
                     continue;
                 }
-                
+
                 $assignment = $assignments[$assignmentId];
-                
+
                 // Parse date
                 $date = Carbon::parse($entry['date'])->startOfDay();
-                $hours = isset($entry['hours']) && $entry['hours'] !== '' && $entry['hours'] !== null ? (float)$entry['hours'] : 0;
+                $hours = isset($entry['hours']) && $entry['hours'] !== '' && $entry['hours'] !== null ? (float) $entry['hours'] : 0;
 
                 // Find existing time log from pre-loaded collection
-                $timeLogKey = $assignmentId . '_' . $date->format('Y-m-d');
+                $timeLogKey = $assignmentId.'_'.$date->format('Y-m-d');
                 $timeLog = $existingTimeLogs->get($timeLogKey);
 
                 if ($hours > 0) {

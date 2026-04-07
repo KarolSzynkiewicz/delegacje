@@ -259,7 +259,7 @@
                                                 </div>
                                                 <div class="d-flex align-items-center gap-2">
                                                     <i class="bi bi-calendar-event text-warning"></i>
-                                                    <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                    <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date?->format('d.m.Y') ?? '—' }}</strong></span>
                                                 </div>
                                             </x-ui.card>
                                         </a>
@@ -281,7 +281,7 @@
                                                         </div>
                                                         <div class="d-flex align-items-center gap-2">
                                                             <i class="bi bi-calendar-event text-warning"></i>
-                                                            <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date->format('d.m.Y') }}</strong></span>
+                                                            <span class="small">Ważny do: <strong>{{ $accommodation->lease_end_date?->format('d.m.Y') ?? '—' }}</strong></span>
                                                         </div>
                                                     </x-ui.card>
                                                 </a>

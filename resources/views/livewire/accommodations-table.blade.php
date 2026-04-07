@@ -50,9 +50,7 @@
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
                             Nazwa
                         </x-livewire.sortable-header>
-                        <th class="text-start d-none d-md-table-cell">Adres</th>
-                        <th class="text-start">Miasto</th>
-                        <th class="text-start">Kraj</th>
+                        <th class="text-start">Lokalizacja</th>
                         <th class="text-start">Współrzędne</th>
                         <th class="text-start">Pojemność</th>
                         <th class="text-start">Status</th>
@@ -79,9 +77,20 @@
                                 </div>
                             </td>
                             <td class="fw-medium">{{ $accommodation->name }}</td>
-                            <td class="d-none d-md-table-cell">{{ $accommodation->address }}</td>
-                            <td>{{ $accommodation->city ?? '-' }}</td>
-                            <td>{{ $accommodation->country ? $accommodation->country->labelWithFlag() : '-' }}</td>
+                            <td>
+                                @if($accommodation->location)
+                                    <a href="{{ route('locations.show', $accommodation->location) }}" class="text-decoration-none">
+                                        <span class="fw-medium">{{ $accommodation->location->name }}</span>
+                                        @if($accommodation->location->city)
+                                            <br><small class="text-muted">{{ $accommodation->location->city }}</small>
+                                        @endif
+                                    </a>
+                                @elseif($accommodation->address)
+                                    <span class="text-muted small">{{ $accommodation->address }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
                             <td>
                                 @if($accommodation->hasCoordinates())
                                     <div>
@@ -148,7 +157,7 @@
                             :has-filters="$search || $statusFilter"
                             clear-filters-action="wire:clearFilters"
                             :in-table="true"
-                            colspan="9"
+                            colspan="7"
                         />
                     @endforelse
                 </tbody>

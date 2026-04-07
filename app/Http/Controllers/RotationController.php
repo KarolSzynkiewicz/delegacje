@@ -2,20 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
-use App\Models\Rotation;
-use App\Services\RotationService;
 use App\Http\Requests\StoreRotationRequest;
 use App\Http\Requests\UpdateRotationRequest;
+use App\Models\Employee;
+use App\Models\Rotation;
+use App\Services\RotationFieldHistoryService;
+use App\Services\RotationService;
+use App\Services\RotationShowSummaryService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
 
 class RotationController extends Controller
 {
     public function __construct(
-        protected RotationService $rotationService
+        protected RotationService $rotationService,
+        protected RotationFieldHistoryService $rotationFieldHistoryService,
+        protected RotationShowSummaryService $rotationShowSummaryService
     ) {}
+
     /**
      * Display all rotations (global view).
      */
@@ -79,6 +84,7 @@ class RotationController extends Controller
     public function createGlobal(): View
     {
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
+
         return view('rotations.create', compact('employees'));
     }
 
@@ -101,7 +107,7 @@ class RotationController extends Controller
             $employee = Employee::findOrFail($validated['employee_id']);
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
             $endDate = \Carbon\Carbon::parse($validated['end_date']);
-            
+
             $this->rotationService->createRotation(
                 $employee,
                 $startDate,
@@ -129,7 +135,7 @@ class RotationController extends Controller
         try {
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
             $endDate = \Carbon\Carbon::parse($validated['end_date']);
-            
+
             $this->rotationService->createRotation(
                 $employee,
                 $startDate,
@@ -153,7 +159,10 @@ class RotationController extends Controller
     public function show(Employee $employee, Rotation $rotation): View
     {
         $rotation->load('employee');
-        return view('employees.rotations.show', compact('employee', 'rotation'));
+        $fieldHistoryTimeline = $this->rotationFieldHistoryService->timelineForRotation($employee, $rotation);
+        $rotationSummary = $this->rotationShowSummaryService->summarize($employee, $rotation);
+
+        return view('employees.rotations.show', compact('employee', 'rotation', 'fieldHistoryTimeline', 'rotationSummary'));
     }
 
     /**
@@ -174,7 +183,7 @@ class RotationController extends Controller
         try {
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
             $endDate = \Carbon\Carbon::parse($validated['end_date']);
-            
+
             $this->rotationService->updateRotation(
                 $rotation,
                 $startDate,

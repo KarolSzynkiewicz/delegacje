@@ -145,4 +145,9 @@
                         @endif
                     </div>
     </x-ui.card>
+
+    <x-comments
+        :commentable="$returnTrip"
+        commentable-type="logistics_event"
+    />
 </x-app-layout>

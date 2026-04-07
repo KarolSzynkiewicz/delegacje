@@ -2,15 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\Accommodation;
 use App\Models\EmployeeDocument;
 use App\Models\Vehicle;
-use App\Models\Accommodation;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
  * Service for retrieving expiring documents, insurance, and leases for the current month.
- * 
+ *
  * Returns:
  * - Employee documents expiring this month
  * - Vehicle inspections expiring this month
@@ -20,7 +20,7 @@ class ExpiringDocumentsService
 {
     /**
      * Get all expiring items for the current month.
-     * 
+     *
      * @return array{
      *     documents: Collection<EmployeeDocument>,
      *     vehicle_inspections: Collection<Vehicle>,
@@ -44,9 +44,7 @@ class ExpiringDocumentsService
     /**
      * Get employee documents expiring in the given month range.
      * Only returns documents with valid_to date (not bezokresowy).
-     * 
-     * @param Carbon $monthStart
-     * @param Carbon $monthEnd
+     *
      * @return Collection<EmployeeDocument>
      */
     public function getExpiringDocuments(Carbon $monthStart, Carbon $monthEnd): Collection
@@ -61,9 +59,7 @@ class ExpiringDocumentsService
 
     /**
      * Get vehicles with inspections expiring in the given month range.
-     * 
-     * @param Carbon $monthStart
-     * @param Carbon $monthEnd
+     *
      * @return Collection<Vehicle>
      */
     public function getExpiringVehicleInspections(Carbon $monthStart, Carbon $monthEnd): Collection
@@ -76,9 +72,7 @@ class ExpiringDocumentsService
 
     /**
      * Get vehicles with insurance expiring in the given month range.
-     * 
-     * @param Carbon $monthStart
-     * @param Carbon $monthEnd
+     *
      * @return Collection<Vehicle>
      */
     public function getExpiringVehicleInsurance(Carbon $monthStart, Carbon $monthEnd): Collection
@@ -92,26 +86,23 @@ class ExpiringDocumentsService
     /**
      * Get rented accommodations with leases expiring in the given month range.
      * Only returns accommodations with type='wynajmowany'.
-     * 
-     * @param Carbon $monthStart
-     * @param Carbon $monthEnd
+     *
      * @return Collection<Accommodation>
      */
     public function getExpiringLeases(Carbon $monthStart, Carbon $monthEnd): Collection
     {
-        return Accommodation::where('type', 'wynajmowany')
-            ->whereNotNull('lease_end_date')
-            ->whereBetween('lease_end_date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
-            ->orderBy('lease_end_date')
-            ->get();
+        return Accommodation::whereHas('leases', function ($q) use ($monthStart, $monthEnd) {
+            $q->where('type', 'wynajmowany')
+                ->whereNotNull('end_date')
+                ->whereBetween('end_date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')]);
+        })->with(['activeLease'])->get();
     }
 
     /**
      * Get expiring documents for a specific employee within the next N days.
      * Also includes expired required documents (within last N days).
-     * 
-     * @param \App\Models\Employee $employee
-     * @param int $days Number of days to look ahead (default: 30)
+     *
+     * @param  int  $days  Number of days to look ahead (default: 30)
      * @return Collection<EmployeeDocument>
      */
     public function getExpiringDocumentsForEmployee(\App\Models\Employee $employee, int $days = 30): Collection

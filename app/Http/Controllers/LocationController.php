@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LocationPurposeType;
-use App\Models\Location;
 use App\Http\Requests\StoreLocationRequest;
 use App\Http\Requests\UpdateLocationRequest;
-use Illuminate\View\View;
+use App\Models\Location;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class LocationController extends Controller
 {
@@ -17,6 +17,30 @@ class LocationController extends Controller
     public function index(): View
     {
         return view('locations.index');
+    }
+
+    /**
+     * Display locations on a map.
+     */
+    public function map(): View
+    {
+        $locations = Location::with('purposes')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get()
+            ->map(fn (Location $loc) => [
+                'id' => $loc->id,
+                'name' => $loc->name,
+                'address' => $loc->getFullAddress(),
+                'lat' => (float) $loc->latitude,
+                'lng' => (float) $loc->longitude,
+                'purposes' => $loc->purposes->map(fn ($p) => $p->purpose instanceof LocationPurposeType ? $p->purpose->value : (string) $p->purpose)->values()->toArray(),
+                'url' => route('locations.show', $loc),
+            ]);
+
+        $purposeTypes = LocationPurposeType::cases();
+
+        return view('locations.map', compact('locations', 'purposeTypes'));
     }
 
     /**
@@ -32,20 +56,20 @@ class LocationController extends Controller
      */
     public function store(StoreLocationRequest $request): RedirectResponse
     {
-        
+
         $validated = $request->validated();
         $isBase = $request->has('is_base') && $request->input('is_base') == '1';
-        
+
         // Sprawdź czy już istnieje baza (przed utworzeniem nowej)
         $hadExistingBase = false;
         if ($isBase) {
             $hadExistingBase = Location::where('is_base', true)->exists();
         }
-        
+
         // Normalize coordinates - convert empty strings to null
-        $latitude = !empty($validated['latitude']) ? (float)$validated['latitude'] : null;
-        $longitude = !empty($validated['longitude']) ? (float)$validated['longitude'] : null;
-        
+        $latitude = ! empty($validated['latitude']) ? (float) $validated['latitude'] : null;
+        $longitude = ! empty($validated['longitude']) ? (float) $validated['longitude'] : null;
+
         $location = app(\App\Services\LocationService::class)->createLocation(
             $validated['name'],
             $validated['address'],
@@ -78,6 +102,7 @@ class LocationController extends Controller
     public function show(Location $location): View
     {
         $location->load('projects');
+
         return view('locations.show', compact('location'));
     }
 
@@ -94,35 +119,35 @@ class LocationController extends Controller
      */
     public function update(UpdateLocationRequest $request, Location $location): RedirectResponse
     {
-        
+
         $validated = $request->validated();
         $isBase = $request->has('is_base') && $request->input('is_base') == '1';
-        
+
         // Sprawdź czy już istnieje inna baza (przed aktualizacją)
         $hadOtherBase = false;
-        if ($isBase && !$location->is_base) {
+        if ($isBase && ! $location->is_base) {
             $hadOtherBase = Location::where('is_base', true)
                 ->where('id', '!=', $location->id)
                 ->exists();
         }
-        
+
         // Normalize coordinates - convert empty strings to null
         // Check both validated array and raw request input
         $latitude = null;
         $longitude = null;
-        
+
         if (isset($validated['latitude']) && $validated['latitude'] !== '' && $validated['latitude'] !== null) {
-            $latitude = (float)$validated['latitude'];
+            $latitude = (float) $validated['latitude'];
         } elseif ($request->has('latitude') && $request->input('latitude') !== '' && $request->input('latitude') !== null) {
-            $latitude = (float)$request->input('latitude');
+            $latitude = (float) $request->input('latitude');
         }
-        
+
         if (isset($validated['longitude']) && $validated['longitude'] !== '' && $validated['longitude'] !== null) {
-            $longitude = (float)$validated['longitude'];
+            $longitude = (float) $validated['longitude'];
         } elseif ($request->has('longitude') && $request->input('longitude') !== '' && $request->input('longitude') !== null) {
-            $longitude = (float)$request->input('longitude');
+            $longitude = (float) $request->input('longitude');
         }
-        
+
         app(\App\Services\LocationService::class)->updateLocation(
             $location,
             $validated['name'],
@@ -156,7 +181,7 @@ class LocationController extends Controller
      */
     public function destroy(Location $location): RedirectResponse
     {
-        
+
         $location->delete();
 
         return redirect()->route('locations.index')->with('success', 'Lokalizacja została usunięta.');
@@ -170,7 +195,7 @@ class LocationController extends Controller
         $purposes = array_values(array_unique($validatedPurposes));
 
         if ($isBase) {
-            if (!in_array(LocationPurposeType::BASE->value, $purposes, true)) {
+            if (! in_array(LocationPurposeType::BASE->value, $purposes, true)) {
                 $purposes[] = LocationPurposeType::BASE->value;
             }
         } else {

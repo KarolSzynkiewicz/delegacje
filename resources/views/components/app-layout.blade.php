@@ -1,3 +1,9 @@
+@props([
+    'fullWidth' => false,
+    /** Pełna szerokość viewportu (bez container-xxl / zbędnych paddingów w main) — np. szerokie tabele */
+    'edgeToEdge' => false,
+])
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -24,14 +30,14 @@
                 <!-- Page Heading -->
                 @isset($header)
                     <header>
-                        <div class="container-xxl py-3 px-3 px-md-4 px-lg-5">
+                        <div class="{{ $edgeToEdge ? 'w-100 py-3 px-2 px-md-3' : ($fullWidth ? 'container-fluid py-3 px-2 px-md-3' : 'container-xxl py-3 px-3 px-md-4 px-lg-5') }}">
                             {{ $header }}
                         </div>
                     </header>
                 @endisset
 
                 <!-- Page Content -->
-                <main class="container-xxl py-4 px-3 px-md-4 px-lg-5">
+                <main class="{{ $edgeToEdge ? 'w-100 py-3 px-0' : ($fullWidth ? 'container-fluid py-3 px-2 px-md-3' : 'container-xxl py-4 px-3 px-md-4 px-lg-5') }}">
                     {{ $slot }}
                 </main>
             </div>

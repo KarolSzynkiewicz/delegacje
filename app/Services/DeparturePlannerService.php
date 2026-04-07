@@ -4,11 +4,8 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\Project;
-use App\Models\ProjectDemand;
 use App\Models\ProjectAssignment;
 use App\Models\Role;
-use App\Services\AssignmentQueryService;
-use App\Services\ExpiringDocumentsService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -21,16 +18,13 @@ class DeparturePlannerService
 
     /**
      * Get available employees for a specific date with full details.
-     * 
+     *
      * Returns employees with:
      * - Photos
      * - Roles
      * - Rotation info for the date
      * - Expiring documents (within a month)
      * - Availability status
-     * 
-     * @param Carbon $date
-     * @return Collection
      */
     public function getAvailableEmployeesForDate(Carbon $date): Collection
     {
@@ -39,13 +33,13 @@ class DeparturePlannerService
         return $availableEmployees->map(function (Employee $employee) use ($date) {
             // Get rotation for this date
             $rotation = $employee->getActiveRotationForDate($date);
-            
+
             // Get expiring documents (within a month)
             $expiringDocuments = $this->expiringDocumentsService->getExpiringDocumentsForEmployee($employee, 30);
-            
+
             // Get roles
             $roles = $employee->roles;
-            
+
             return [
                 'id' => $employee->id,
                 'full_name' => $employee->full_name,
@@ -53,7 +47,7 @@ class DeparturePlannerService
                 'last_name' => $employee->last_name,
                 'image_url' => $employee->image_url,
                 'image_path' => $employee->image_path,
-                'roles' => $roles->map(fn($role) => [
+                'roles' => $roles->map(fn ($role) => [
                     'id' => $role->id,
                     'name' => $role->name,
                 ])->toArray(),
@@ -77,10 +71,10 @@ class DeparturePlannerService
 
     /**
      * Get project gaps for 30 days starting from arrival date, extended to end of week (Sunday) if needed.
-     * 
+     *
      * Day 1 = arrival date (end of trip)
      * Days 2-30+ = next days (extended to Sunday if day 30 is not Sunday)
-     * 
+     *
      * Returns structure:
      * [
      *   'day_1' => [
@@ -101,18 +95,15 @@ class DeparturePlannerService
      *   ],
      *   ...
      * ]
-     * 
-     * @param Carbon $arrivalDate
-     * @return array
      */
     public function getProjectGapsForWeek(Carbon $arrivalDate): array
     {
         $days = [];
-        
+
         // Calculate end date: 30 days from arrival, but extend to Sunday if day 30 is not Sunday
         $day30Date = $arrivalDate->copy()->addDays(29); // Day 30 (0-indexed: 29 days after day 1)
         $day30DayOfWeek = $day30Date->dayOfWeek; // 0 = Sunday, 6 = Saturday
-        
+
         // If day 30 is not Sunday (dayOfWeek != 0), extend to next Sunday
         if ($day30DayOfWeek != 0) {
             $daysToAdd = 7 - $day30DayOfWeek; // Days to add to reach Sunday
@@ -120,7 +111,7 @@ class DeparturePlannerService
         } else {
             $weekEnd = $day30Date->copy();
         }
-        
+
         $weekStart = $arrivalDate->copy();
 
         // OPTIMIZATION: Load all projects with all demands and assignments for the entire period in one go
@@ -133,7 +124,7 @@ class DeparturePlannerService
                 },
                 'assignments' => function ($query) use ($weekStart, $weekEnd) {
                     $query->overlappingWith($weekStart, $weekEnd);
-                }
+                },
             ])
             ->get();
 
@@ -144,7 +135,7 @@ class DeparturePlannerService
         for ($dayNum = 1; $dayNum <= $totalDays; $dayNum++) {
             $dayDate = $arrivalDate->copy()->addDays($dayNum - 1);
             $dayKey = "day_{$dayNum}";
-            
+
             $dayData = [
                 'date' => $dayDate->format('Y-m-d'),
                 'day_number' => $dayNum,
@@ -167,7 +158,7 @@ class DeparturePlannerService
 
                 // OPTIMIZATION: Filter assignments in memory instead of querying
                 $assignmentsForDay = $project->assignments->filter(function ($assignment) use ($dayDate) {
-                    return $assignment->start_date <= $dayDate && 
+                    return $assignment->start_date <= $dayDate &&
                            ($assignment->end_date === null || $assignment->end_date >= $dayDate);
                 })->groupBy('role_id');
 
@@ -175,15 +166,15 @@ class DeparturePlannerService
                 foreach ($demandsForDay as $roleId => $demands) {
                     $role = $demands->first()->role;
                     $requiredCount = $demands->sum('required_count');
-                    
+
                     // Count unique employees assigned to this role on this day
                     $assignedEmployees = $assignmentsForDay->get($roleId, collect())
                         ->pluck('employee_id')
                         ->unique();
                     $assignedCount = $assignedEmployees->count();
-                    
+
                     $gaps = max(0, $requiredCount - $assignedCount);
-                    
+
                     if ($gaps > 0) {
                         $projectData['roles'][$roleId] = [
                             'id' => $role->id,
@@ -196,7 +187,7 @@ class DeparturePlannerService
                 }
 
                 // Only include project if it has gaps
-                if (!empty($projectData['roles'])) {
+                if (! empty($projectData['roles'])) {
                     $dayData['projects'][$project->id] = $projectData;
                 }
             }
@@ -209,12 +200,8 @@ class DeparturePlannerService
 
     /**
      * Validate if employee can be assigned to a project role on a specific date.
-     * 
-     * @param Employee $employee
-     * @param Project $project
-     * @param Role $role
-     * @param Carbon $date
-     * @param Carbon|null $endDate Optional end date for range validation (for documents)
+     *
+     * @param  Carbon|null  $endDate  Optional end date for range validation (for documents)
      * @return array ['valid' => bool, 'errors' => array]
      */
     public function validateEmployeeAssignment(Employee $employee, Project $project, Role $role, Carbon $date, ?Carbon $endDate = null): array
@@ -222,13 +209,13 @@ class DeparturePlannerService
         $errors = [];
 
         // 1. Check if employee has the required role
-        if (!$employee->hasRole($role->id)) {
+        if (! $employee->hasRole($role->id)) {
             $errors[] = "Pracownik nie ma wymaganej roli: {$role->name}";
         }
 
         // 2. Check if employee has rotation for this date
         $rotation = $employee->getActiveRotationForDate($date);
-        if (!$rotation) {
+        if (! $rotation) {
             $errors[] = "Pracownik nie ma aktywnej rotacji na dzień {$date->format('Y-m-d')}";
         }
 
@@ -237,7 +224,7 @@ class DeparturePlannerService
         // If endDate is null, skip document check (it was already checked for the entire range)
         if ($endDate !== null) {
             $docEndDate = $endDate;
-            if (!$employee->hasAllDocumentsActiveInDateRange($date, $docEndDate)) {
+            if (! $employee->hasAllDocumentsActiveInDateRange($date, $docEndDate)) {
                 if ($endDate->ne($date)) {
                     $errors[] = "Pracownik nie ma wszystkich wymaganych dokumentów w okresie od {$date->format('Y-m-d')} do {$docEndDate->format('Y-m-d')}";
                 } else {
@@ -254,7 +241,7 @@ class DeparturePlannerService
                 $query->where('start_date', '<=', $date)
                     ->where(function ($q) use ($date) {
                         $q->whereNull('end_date')
-                          ->orWhere('end_date', '>=', $date);
+                            ->orWhere('end_date', '>=', $date);
                     });
             })
             ->where('project_id', '!=', $project->id)
@@ -271,7 +258,7 @@ class DeparturePlannerService
                 $query->where('start_date', '<=', $date)
                     ->where(function ($q) use ($date) {
                         $q->whereNull('end_date')
-                          ->orWhere('end_date', '>=', $date);
+                            ->orWhere('end_date', '>=', $date);
                     });
             })
             ->exists();
@@ -288,7 +275,7 @@ class DeparturePlannerService
 
     /**
      * Get aggregated project gaps for 2 weeks (14 days) starting from arrival date.
-     * 
+     *
      * Returns structure with min-max gaps for each role in each project:
      * [
      *   'project_id' => [
@@ -305,9 +292,6 @@ class DeparturePlannerService
      *     ]
      *   ]
      * ]
-     * 
-     * @param Carbon $arrivalDate
-     * @return array
      */
     public function getProjectGapsForTwoWeeks(Carbon $arrivalDate, array $formAssignments = [], array $formAssignmentRanges = []): array
     {
@@ -324,7 +308,7 @@ class DeparturePlannerService
                 },
                 'assignments' => function ($query) use ($weekStart, $weekEnd) {
                     $query->overlappingWith($weekStart, $weekEnd);
-                }
+                },
             ])
             ->get();
 
@@ -353,7 +337,7 @@ class DeparturePlannerService
 
                 // OPTIMIZATION: Filter assignments in memory instead of querying
                 $assignmentsForDay = $project->assignments->filter(function ($assignment) use ($dayDate) {
-                    return $assignment->start_date <= $dayDate && 
+                    return $assignment->start_date <= $dayDate &&
                            ($assignment->end_date === null || $assignment->end_date >= $dayDate);
                 })->groupBy('role_id');
 
@@ -361,45 +345,45 @@ class DeparturePlannerService
                 foreach ($demandsForDay as $roleId => $demands) {
                     $role = $demands->first()->role;
                     $requiredCount = $demands->sum('required_count');
-                    
+
                     // Count unique employees assigned to this role on this day from database
                     $assignedEmployees = $assignmentsForDay->get($roleId, collect())
                         ->pluck('employee_id')
                         ->unique()
                         ->toArray();
-                    
+
                     // Add employees assigned in form for this day (days 1-7)
                     if ($dayNum <= 7) {
                         $dayKey = "day_{$dayNum}";
                         if (isset($formAssignments[$dayKey][$project->id][$roleId])) {
                             foreach ($formAssignments[$dayKey][$project->id][$roleId] as $employeeId) {
-                                if (!in_array($employeeId, $assignedEmployees)) {
+                                if (! in_array($employeeId, $assignedEmployees)) {
                                     $assignedEmployees[] = $employeeId;
                                 }
                             }
                         }
                     }
-                    
+
                     // Add employees assigned in form ranges for this day (days beyond 7)
                     foreach ($formAssignmentRanges as $rangeKey => $range) {
                         if ($range['project_id'] == $project->id && $range['role_id'] == $roleId) {
                             $rangeStart = Carbon::parse($range['start_date']);
                             $rangeEnd = Carbon::parse($range['end_date']);
-                            
+
                             if ($dayDate->gte($rangeStart) && $dayDate->lte($rangeEnd)) {
                                 $employeeId = $range['employee_id'];
-                                if (!in_array($employeeId, $assignedEmployees)) {
+                                if (! in_array($employeeId, $assignedEmployees)) {
                                     $assignedEmployees[] = $employeeId;
                                 }
                             }
                         }
                     }
-                    
+
                     $assignedCount = count($assignedEmployees);
                     $gaps = max(0, $requiredCount - $assignedCount);
-                    
+
                     if ($gaps > 0) {
-                        if (!isset($roleGaps[$roleId])) {
+                        if (! isset($roleGaps[$roleId])) {
                             $roleGaps[$roleId] = [
                                 'id' => $role->id,
                                 'name' => $role->name,
@@ -413,7 +397,7 @@ class DeparturePlannerService
 
             // Calculate min-max for each role
             foreach ($roleGaps as $roleId => $roleData) {
-                if (!empty($roleData['gaps'])) {
+                if (! empty($roleData['gaps'])) {
                     $projectData['roles'][$roleId] = [
                         'id' => $roleData['id'],
                         'name' => $roleData['name'],
@@ -424,7 +408,7 @@ class DeparturePlannerService
             }
 
             // Only include project if it has gaps
-            if (!empty($projectData['roles'])) {
+            if (! empty($projectData['roles'])) {
                 $result[$project->id] = $projectData;
             }
         }
@@ -434,7 +418,7 @@ class DeparturePlannerService
 
     /**
      * Get employee availability for a month starting from arrival date.
-     * 
+     *
      * Returns array with availability status for each day:
      * [
      *   '2024-01-15' => [
@@ -445,27 +429,22 @@ class DeparturePlannerService
      *   ],
      *   ...
      * ]
-     * 
-     * @param Employee $employee
-     * @param Project $project
-     * @param Role $role
-     * @param Carbon $arrivalDate
-     * @param array $formAssignments Optional: assignments from form [day_1 => [project_id => [role_id => [employee_id => ...]]]]
-     * @param array $formAssignmentRanges Optional: assignment ranges from form [employee_id_projectId_roleId => ['start_date' => ..., 'end_date' => ...]]
-     * @return array
+     *
+     * @param  array  $formAssignments  Optional: assignments from form [day_1 => [project_id => [role_id => [employee_id => ...]]]]
+     * @param  array  $formAssignmentRanges  Optional: assignment ranges from form [employee_id_projectId_roleId => ['start_date' => ..., 'end_date' => ...]]
      */
     public function getEmployeeAvailabilityForMonth(Employee $employee, Project $project, Role $role, Carbon $arrivalDate, array $formAssignments = [], array $formAssignmentRanges = []): array
     {
         $monthStart = $arrivalDate->copy();
         $monthEnd = $arrivalDate->copy()->addDays(29); // 30 days total
-        
+
         $availability = [];
 
         // For each day in the month
         for ($day = 0; $day < 30; $day++) {
             $date = $monthStart->copy()->addDays($day);
             $dateKey = $date->format('Y-m-d');
-            
+
             $dayAvailability = [
                 'date' => $dateKey,
                 'available' => false,
@@ -479,35 +458,39 @@ class DeparturePlannerService
                 ->where('role_id', $role->id)
                 ->exists();
 
-            if (!$hasDemand) {
+            if (! $hasDemand) {
                 $dayAvailability['reason'] = 'no_demand';
                 $dayAvailability['reason_text'] = 'Brak zapotrzebowania na tę rolę';
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
             // 2. Check if employee has the required role
-            if (!$employee->hasRole($role->id)) {
+            if (! $employee->hasRole($role->id)) {
                 $dayAvailability['reason'] = 'no_role';
                 $dayAvailability['reason_text'] = 'Pracownik nie ma wymaganej roli';
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
             // 3. Check if employee has rotation for this date
             $rotation = $employee->getActiveRotationForDate($date);
-            if (!$rotation) {
+            if (! $rotation) {
                 $dayAvailability['reason'] = 'no_rotation';
                 $dayAvailability['reason_text'] = 'Brak aktywnej rotacji';
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
             // 4. Check if employee has all required documents
-            if (!$employee->hasAllDocumentsActiveInDateRange($date, $date)) {
+            if (! $employee->hasAllDocumentsActiveInDateRange($date, $date)) {
                 $dayAvailability['reason'] = 'no_documents';
                 $dayAvailability['reason_text'] = 'Brak wymaganych dokumentów';
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
@@ -515,7 +498,7 @@ class DeparturePlannerService
             $isAssignedInForm = false;
             $dayNum = $day + 1; // day_1, day_2, etc.
             $dayKey = "day_{$dayNum}";
-            
+
             // Check form assignments for this day
             if (isset($formAssignments[$dayKey])) {
                 foreach ($formAssignments[$dayKey] as $formProjectId => $formRoles) {
@@ -530,14 +513,14 @@ class DeparturePlannerService
                     }
                 }
             }
-            
+
             // Check form assignment ranges
-            if (!$isAssignedInForm) {
+            if (! $isAssignedInForm) {
                 foreach ($formAssignmentRanges as $rangeKey => $range) {
                     if ($range['employee_id'] == $employee->id) {
                         $rangeStart = Carbon::parse($range['start_date']);
                         $rangeEnd = Carbon::parse($range['end_date']);
-                        
+
                         if ($date->gte($rangeStart) && $date->lte($rangeEnd)) {
                             // If assigned to different project or different role in same project
                             if ($range['project_id'] != $project->id || ($range['project_id'] == $project->id && $range['role_id'] != $role->id)) {
@@ -548,11 +531,12 @@ class DeparturePlannerService
                     }
                 }
             }
-            
+
             if ($isAssignedInForm) {
                 $dayAvailability['reason'] = 'already_assigned';
                 $dayAvailability['reason_text'] = 'Już przypisany do innego projektu/roli';
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
@@ -563,7 +547,7 @@ class DeparturePlannerService
                     $query->where('start_date', '<=', $date)
                         ->where(function ($q) use ($date) {
                             $q->whereNull('end_date')
-                              ->orWhere('end_date', '>=', $date);
+                                ->orWhere('end_date', '>=', $date);
                         });
                 })
                 ->exists();
@@ -572,6 +556,7 @@ class DeparturePlannerService
                 $dayAvailability['reason'] = 'already_assigned';
                 $dayAvailability['reason_text'] = 'Już przypisany do innego projektu';
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
@@ -582,7 +567,7 @@ class DeparturePlannerService
                     $query->where('start_date', '<=', $date)
                         ->where(function ($q) use ($date) {
                             $q->whereNull('end_date')
-                              ->orWhere('end_date', '>=', $date);
+                                ->orWhere('end_date', '>=', $date);
                         });
                 })
                 ->exists();
@@ -592,6 +577,7 @@ class DeparturePlannerService
                 $dayAvailability['reason_text'] = 'Już przypisany do tego projektu';
                 $dayAvailability['can_assign'] = false;
                 $availability[$dateKey] = $dayAvailability;
+
                 continue;
             }
 
@@ -603,30 +589,25 @@ class DeparturePlannerService
 
         return $availability;
     }
-    
+
     /**
      * Get employee availability for a date range (month).
      * Similar to getEmployeeAvailabilityForMonth but accepts start and end dates.
-     * 
-     * @param Employee $employee
-     * @param Project $project
-     * @param Role $role
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @param array $formAssignments Optional: assignments from form
-     * @param array $formAssignmentRanges Optional: assignment ranges from form
-     * @param Carbon|null $minDate Optional: minimum allowed date (e.g., arrival date)
-     * @return array
+     *
+     * @param  array  $formAssignments  Optional: assignments from form
+     * @param  array  $formAssignmentRanges  Optional: assignment ranges from form
+     * @param  Carbon|null  $minDate  Optional: minimum allowed date (e.g., arrival date)
+     * @param  bool  $ignoreExistingDbProjectAssignments  Transfer / przeniesienie: stare przypisania i tak zostaną zamknięte — nie traktuj ich jako konfliktu w kalendarzu.
      */
-    public function getEmployeeAvailabilityForMonthRange(Employee $employee, Project $project, Role $role, Carbon $startDate, Carbon $endDate, array $formAssignments = [], array $formAssignmentRanges = [], ?Carbon $minDate = null): array
+    public function getEmployeeAvailabilityForMonthRange(Employee $employee, Project $project, Role $role, Carbon $startDate, Carbon $endDate, array $formAssignments = [], array $formAssignmentRanges = [], ?Carbon $minDate = null, bool $ignoreExistingDbProjectAssignments = false): array
     {
         $availability = [];
         $currentDate = $startDate->copy();
-        
+
         // For each day in the range
         while ($currentDate->lte($endDate)) {
             $dateKey = $currentDate->format('Y-m-d');
-            
+
             $dayAvailability = [
                 'date' => $dateKey,
                 'available' => false,
@@ -640,6 +621,7 @@ class DeparturePlannerService
                 $dayAvailability['reason_text'] = 'Data przed przyjazdem';
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
+
                 continue;
             }
 
@@ -649,45 +631,49 @@ class DeparturePlannerService
                 ->where('role_id', $role->id)
                 ->exists();
 
-            if (!$hasDemand) {
+            if (! $hasDemand) {
                 $dayAvailability['reason'] = 'no_demand';
                 $dayAvailability['reason_text'] = 'Brak zapotrzebowania na tę rolę';
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
+
                 continue;
             }
 
             // 2. Check if employee has the required role
-            if (!$employee->hasRole($role->id)) {
+            if (! $employee->hasRole($role->id)) {
                 $dayAvailability['reason'] = 'no_role';
                 $dayAvailability['reason_text'] = 'Pracownik nie ma wymaganej roli';
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
+
                 continue;
             }
 
             // 3. Check if employee has rotation for this date
             $rotation = $employee->getActiveRotationForDate($currentDate);
-            if (!$rotation) {
+            if (! $rotation) {
                 $dayAvailability['reason'] = 'no_rotation';
                 $dayAvailability['reason_text'] = 'Brak aktywnej rotacji';
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
+
                 continue;
             }
 
             // 4. Check if employee has all required documents
-            if (!$employee->hasAllDocumentsActiveInDateRange($currentDate, $currentDate)) {
+            if (! $employee->hasAllDocumentsActiveInDateRange($currentDate, $currentDate)) {
                 $dayAvailability['reason'] = 'no_documents';
                 $dayAvailability['reason_text'] = 'Brak wymaganych dokumentów';
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
+
                 continue;
             }
 
             // 5. Check if employee is already assigned in form to another project/role on this date
             $isAssignedInForm = false;
-            
+
             // Calculate day number relative to arrival date (for day-based assignments)
             // We need to find which day this is relative to the original arrival date
             // For now, check all form assignments regardless of day number
@@ -704,14 +690,14 @@ class DeparturePlannerService
                     }
                 }
             }
-            
+
             // Check form assignment ranges
-            if (!$isAssignedInForm) {
+            if (! $isAssignedInForm) {
                 foreach ($formAssignmentRanges as $rangeKey => $range) {
                     if ($range['employee_id'] == $employee->id) {
                         $rangeStart = Carbon::parse($range['start_date']);
                         $rangeEnd = Carbon::parse($range['end_date']);
-                        
+
                         if ($currentDate->gte($rangeStart) && $currentDate->lte($rangeEnd)) {
                             // If assigned to different project or different role in same project
                             if ($range['project_id'] != $project->id || ($range['project_id'] == $project->id && $range['role_id'] != $role->id)) {
@@ -722,61 +708,66 @@ class DeparturePlannerService
                     }
                 }
             }
-            
+
             if ($isAssignedInForm) {
                 $dayAvailability['reason'] = 'already_assigned';
                 $dayAvailability['reason_text'] = 'Już przypisany do innego projektu/roli';
                 $availability[$dateKey] = $dayAvailability;
                 $currentDate->addDay();
+
                 continue;
             }
 
-            // 6. Check if employee is already assigned to another project on this date (in database)
-            $existingAssignment = ProjectAssignment::where('employee_id', $employee->id)
-                ->where('project_id', '!=', $project->id)
-                ->where(function ($query) use ($currentDate) {
-                    $query->where('start_date', '<=', $currentDate)
-                        ->where(function ($q) use ($currentDate) {
-                            $q->whereNull('end_date')
-                              ->orWhere('end_date', '>=', $currentDate);
-                        });
-                })
-                ->exists();
+            if (! $ignoreExistingDbProjectAssignments) {
+                // 6. Check if employee is already assigned to another project on this date (in database)
+                $existingAssignment = ProjectAssignment::where('employee_id', $employee->id)
+                    ->where('project_id', '!=', $project->id)
+                    ->where(function ($query) use ($currentDate) {
+                        $query->where('start_date', '<=', $currentDate)
+                            ->where(function ($q) use ($currentDate) {
+                                $q->whereNull('end_date')
+                                    ->orWhere('end_date', '>=', $currentDate);
+                            });
+                    })
+                    ->exists();
 
-            if ($existingAssignment) {
-                $dayAvailability['reason'] = 'already_assigned';
-                $dayAvailability['reason_text'] = 'Już przypisany do innego projektu';
-                $availability[$dateKey] = $dayAvailability;
-                $currentDate->addDay();
-                continue;
-            }
+                if ($existingAssignment) {
+                    $dayAvailability['reason'] = 'already_assigned';
+                    $dayAvailability['reason_text'] = 'Już przypisany do innego projektu';
+                    $availability[$dateKey] = $dayAvailability;
+                    $currentDate->addDay();
 
-            // 7. Check if employee is already assigned to this project on this date (in database)
-            $sameProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
-                ->where('project_id', $project->id)
-                ->where(function ($query) use ($currentDate) {
-                    $query->where('start_date', '<=', $currentDate)
-                        ->where(function ($q) use ($currentDate) {
-                            $q->whereNull('end_date')
-                              ->orWhere('end_date', '>=', $currentDate);
-                        });
-                })
-                ->exists();
+                    continue;
+                }
 
-            if ($sameProjectAssignment) {
-                $dayAvailability['reason'] = 'already_assigned_same_project';
-                $dayAvailability['reason_text'] = 'Już przypisany do tego projektu';
-                $dayAvailability['can_assign'] = false;
-                $availability[$dateKey] = $dayAvailability;
-                $currentDate->addDay();
-                continue;
+                // 7. Check if employee is already assigned to this project on this date (in database)
+                $sameProjectAssignment = ProjectAssignment::where('employee_id', $employee->id)
+                    ->where('project_id', $project->id)
+                    ->where(function ($query) use ($currentDate) {
+                        $query->where('start_date', '<=', $currentDate)
+                            ->where(function ($q) use ($currentDate) {
+                                $q->whereNull('end_date')
+                                    ->orWhere('end_date', '>=', $currentDate);
+                            });
+                    })
+                    ->exists();
+
+                if ($sameProjectAssignment) {
+                    $dayAvailability['reason'] = 'already_assigned_same_project';
+                    $dayAvailability['reason_text'] = 'Już przypisany do tego projektu';
+                    $dayAvailability['can_assign'] = false;
+                    $availability[$dateKey] = $dayAvailability;
+                    $currentDate->addDay();
+
+                    continue;
+                }
             }
 
             // All checks passed - employee is available
             $dayAvailability['available'] = true;
             $dayAvailability['can_assign'] = true;
             $availability[$dateKey] = $dayAvailability;
-            
+
             $currentDate->addDay();
         }
 

@@ -7,15 +7,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -83,11 +83,11 @@ class User extends Authenticatable
         if ($this->isAdmin()) {
             return true;
         }
-        
-        if (!$projectId) {
+
+        if (! $projectId) {
             return false;
         }
-        
+
         return $this->managedProjects()->where('project_id', $projectId)->exists();
     }
 
@@ -96,7 +96,8 @@ class User extends Authenticatable
      */
     public function delegations(): HasMany
     {
-        return $this->hasMany(Delegation::class, 'employee_id');
+        // NOTE: Delegation model is not present in this codebase; keep relation disabled.
+        return $this->hasMany(\App\Models\TimeLog::class, 'employee_id');
     }
 
     /**
@@ -113,7 +114,7 @@ class User extends Authenticatable
      */
     public function isManager(): bool
     {
-        return !empty($this->getManagedProjectIds());
+        return ! empty($this->getManagedProjectIds());
     }
 
     /**
@@ -127,7 +128,7 @@ class User extends Authenticatable
     /**
      * Check if user has a specific permission (using Spatie).
      * Wrapper method for backward compatibility.
-     * 
+     *
      * Logika:
      * 1. Rola - daje dostęp do zasobów bez scope (wszystkie projekty)
      * 2. Kierownik - daje dostęp do zasobów ze scope (tylko zarządzane projekty)
@@ -174,7 +175,7 @@ class User extends Authenticatable
             'time-logs.update', // Dla bulk-update
         ];
 
-        if (!in_array($permissionName, $managerPermissions)) {
+        if (! in_array($permissionName, $managerPermissions)) {
             return null; // Nie nasza akcja - kontynuuj standardowe sprawdzanie
         }
 
@@ -190,7 +191,7 @@ class User extends Authenticatable
                 // Jeśli user zarządza jakimkolwiek projektem, może widzieć listę ocen
                 // Szczegółowa autoryzacja dla konkretnej oceny jest w Policy
                 return true; // User zarządza projektami, więc może widzieć listę
-                
+
             case 'employee-evaluations.create':
                 // Sprawdź employee_id z requestu
                 $employeeId = request()->input('employee_id');
@@ -198,6 +199,7 @@ class User extends Authenticatable
                     $hasAccess = \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
                         ->where('employee_id', $employeeId)
                         ->exists();
+
                     return $hasAccess;
                 }
                 break;
@@ -212,6 +214,7 @@ class User extends Authenticatable
                         $hasAccess = \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
                             ->where('employee_id', $evaluation->employee_id)
                             ->exists();
+
                         return $hasAccess;
                     }
                 }
@@ -231,12 +234,13 @@ class User extends Authenticatable
             case 'time-logs.update':
                 // Sprawdź assignments z requestu (bulk-update)
                 $entries = request()->input('entries', []);
-                if (!empty($entries)) {
+                if (! empty($entries)) {
                     $assignmentIds = collect($entries)->pluck('assignment_id')->unique()->toArray();
                     $unauthorizedAssignments = \App\Models\ProjectAssignment::whereIn('id', $assignmentIds)
                         ->whereNotIn('project_id', $userProjectIds)
                         ->exists();
-                    return !$unauthorizedAssignments;
+
+                    return ! $unauthorizedAssignments;
                 }
                 break;
         }
@@ -250,11 +254,11 @@ class User extends Authenticatable
      */
     public function getImageUrlAttribute(): ?string
     {
-        if (!$this->image_path) {
+        if (! $this->image_path) {
             return null;
         }
 
-        return asset('storage/' . $this->image_path);
+        return asset('storage/'.$this->image_path);
     }
 
     /**
@@ -267,6 +271,7 @@ class User extends Authenticatable
         foreach ($parts as $part) {
             $initials .= strtoupper(substr($part, 0, 1));
         }
+
         return $initials;
     }
 }

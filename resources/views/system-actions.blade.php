@@ -199,6 +199,59 @@
             </div>
 
             <div class="col-lg-4">
+                <x-ui.card label="Dane i spójność" class="mb-4">
+                    <p class="text-muted mb-4 small">
+                        Jednorazowe akcje naprawcze dla danych w bazie.
+                    </p>
+
+                    <!-- Sync typów lokalizacji -->
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-geo-alt text-primary"></i>
+                                    Aktualizuj typy lokalizacji
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    Ustawia cele lokalizacji na podstawie powiązanych danych:
+                                    mieszkania → <strong>Kwatera</strong>,
+                                    projekty → <strong>Projekt</strong>,
+                                    naprawy → <strong>Warsztat</strong>.
+                                    Idempotentna.
+                                </p>
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ route('system-actions.sync-location-purposes') }}" class="mt-3">
+                            @csrf
+                            <x-ui.button variant="primary" type="submit" class="w-100">
+                                <i class="bi bi-arrow-repeat"></i> Aktualizuj typy
+                            </x-ui.button>
+                        </form>
+                    </div>
+
+                    <!-- Napraw nazwy lokalizacji -->
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-pencil-square text-warning"></i>
+                                    Napraw nazwy lokalizacji mieszkań
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    Gdy nazwa lokalizacji = adres ulicy (błąd ze starego geo-search),
+                                    zastępuje ją nazwą powiązanego mieszkania.
+                                </p>
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ route('system-actions.fix-location-names') }}" class="mt-3">
+                            @csrf
+                            <x-ui.button variant="warning" type="submit" class="w-100">
+                                <i class="bi bi-pencil-square"></i> Napraw nazwy
+                            </x-ui.button>
+                        </form>
+                    </div>
+                </x-ui.card>
+
                 <x-ui.card label="Informacje">
                     <dl class="mb-0">
                         <dt class="fw-semibold mb-1">Środowisko:</dt>

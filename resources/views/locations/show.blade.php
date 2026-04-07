@@ -107,9 +107,9 @@
             </x-ui.card>
             @endif
 
-            @php $locationAccommodations = $location->accommodations()->orderBy('lease_start_date', 'desc')->get(); @endphp
+            @php $locationAccommodations = $location->accommodations()->with('activeLease')->orderBy('name')->get(); @endphp
             @if($locationAccommodations->isNotEmpty())
-            <x-ui.card label="Wynajmy w tej lokalizacji ({{ $locationAccommodations->count() }})" class="mt-4">
+            <x-ui.card label="Mieszkania w tej lokalizacji ({{ $locationAccommodations->count() }})" class="mt-4">
                 <ul class="list-group-ui">
                     @foreach($locationAccommodations as $acc)
                         <li class="list-group-item-ui">
@@ -117,11 +117,10 @@
                                 <div class="flex-grow-1">
                                     <div class="fw-semibold">{{ $acc->name }}</div>
                                     <div class="small text-muted mt-1">
-                                        @if($acc->lease_start_date)
-                                            {{ $acc->lease_start_date->format('d.m.Y') }}
-                                            @if($acc->lease_end_date) – {{ $acc->lease_end_date->format('d.m.Y') }} @endif
+                                        @if($acc->activeLease)
+                                            {{ $acc->activeLease->period_label }}
                                         @else
-                                            Brak dat najmu
+                                            Własny / brak aktywnego najmu
                                         @endif
                                         · {{ $acc->capacity }} os.
                                     </div>

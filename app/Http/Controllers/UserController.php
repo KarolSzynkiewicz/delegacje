@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Project;
-use Spatie\Permission\Models\Role;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
+use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -18,8 +18,9 @@ class UserController extends Controller
      */
     public function index(): View
     {
-        
+
         $users = User::with(['roles', 'managedProjects'])->orderBy('name')->paginate(15);
+
         return view('users.index', compact('users'));
     }
 
@@ -28,8 +29,9 @@ class UserController extends Controller
      */
     public function create(): View
     {
-        
+
         $roles = Role::orderBy('name')->get();
+
         return view('users.create', compact('roles'));
     }
 
@@ -38,7 +40,7 @@ class UserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
@@ -69,8 +71,9 @@ class UserController extends Controller
      */
     public function show(User $user): View
     {
-        
+
         $user->load(['roles', 'permissions', 'managedProjects']);
+
         return view('users.show', compact('user'));
     }
 
@@ -79,11 +82,11 @@ class UserController extends Controller
      */
     public function edit(User $user): View
     {
-        
+
         $roles = Role::orderBy('name')->get();
         $projects = Project::orderBy('name')->get();
         $user->load(['roles', 'managedProjects']);
-        
+
         return view('users.edit', compact('user', 'roles', 'projects'));
     }
 
@@ -92,10 +95,10 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user): RedirectResponse
     {
-        
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:user_roles,id',
             'projects' => 'nullable|array',
@@ -132,7 +135,7 @@ class UserController extends Controller
      */
     public function destroy(User $user): RedirectResponse
     {
-        
+
         // Nie można usunąć samego siebie
         if ($user->id === auth()->id()) {
             return redirect()->route('users.index')
@@ -141,6 +144,6 @@ class UserController extends Controller
 
         $user->delete();
 
-        return redirect()->route('users.index')->with('success', 'Użytkownik został usunięty.');
+        return redirect()->route('users.index')->with('success', 'Użytkownik został dezaktywowany.');
     }
 }

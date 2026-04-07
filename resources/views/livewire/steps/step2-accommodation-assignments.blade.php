@@ -102,7 +102,13 @@
         <!-- Right Column: Accommodations (8/12) -->
         <div class="col-md-8">
             <x-ui.card>
-                <h6 class="mb-3">W jakich domach będą mieszkali po przyjeździe?</h6>
+                <h6 class="mb-3">
+                    @if($forTransfer)
+                        Do jakiego mieszkania przenosisz pracownika?
+                    @else
+                        W jakich domach będą mieszkali po przyjeździe?
+                    @endif
+                </h6>
 
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Szukaj po mieszkaniu</label>

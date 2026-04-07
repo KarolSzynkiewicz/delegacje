@@ -131,15 +131,13 @@
 
             <div class="mb-3">
                 <x-input-label for="location_name" value="Nazwa lokalizacji" />
-                <span class="text-danger">*</span>
                 <input
                     type="text"
                     id="location_name"
                     wire:model="location_name"
                     name="location_name"
                     class="form-control mt-1 @error('location_name') is-invalid @enderror"
-                    placeholder="np. Dom Kowalskiego, Hostel Słoneczna"
-                    required
+                    placeholder="Domyślnie: nazwa mieszkania"
                 />
                 <x-input-error :messages="$errors->get('location_name')" class="mt-2" />
             </div>
@@ -212,10 +210,10 @@
 
     <hr class="my-4" style="border-color: var(--glass-border);">
 
-    {{-- ===== DANE WYNAJMU (accommodation) ===== --}}
+    {{-- ===== DANE MIESZKANIA ===== --}}
 
     <div class="mb-3">
-        <x-input-label for="acc_name" value="Nazwa wynajmu / umowy" />
+        <x-input-label for="acc_name" value="Nazwa mieszkania" />
         <span class="text-danger">*</span>
         <input
             type="text"
@@ -223,7 +221,7 @@
             wire:model="name"
             name="name"
             class="form-control mt-1 @error('name') is-invalid @enderror"
-            placeholder="np. Wynajem lato 2026, Hostel Noc 3"
+            placeholder="np. Mieszkanie 1, Dom Kowalskiego"
             required
         />
         <x-input-error :messages="$errors->get('name')" class="mt-2" />
@@ -245,7 +243,7 @@
     </div>
 
     <div class="mb-3">
-        <x-input-label for="type" value="Typ wynajmu" />
+        <x-input-label for="type" value="Status własności" />
         <span class="text-danger">*</span>
         <select
             id="type"
@@ -261,6 +259,10 @@
     </div>
 
     @if($type === 'wynajmowany')
+        <p class="small text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            Pełna historia najmu dostępna na stronie szczegółów mieszkania. Tu edytujesz <strong>bieżący aktywny najem</strong>.
+        </p>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <x-input-label for="lease_start_date" value="Okres najmu — od" />

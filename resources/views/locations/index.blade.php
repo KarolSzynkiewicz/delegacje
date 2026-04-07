@@ -3,6 +3,12 @@
         <x-ui.page-header title="Lokalizacje">
             <x-slot name="right">
                 <x-ui.button
+                    variant="outline-secondary"
+                    href="{{ route('locations.map') }}"
+                >
+                    <i class="bi bi-map"></i> Mapa
+                </x-ui.button>
+                <x-ui.button
                     variant="primary"
                     href="{{ route('locations.create') }}"
                     routeName="locations.create"
