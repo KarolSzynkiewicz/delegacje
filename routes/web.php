@@ -375,7 +375,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         // Payroll
         Route::resource('payrolls', \App\Http\Controllers\PayrollController::class);
 
-        // Adjustments (Kary/Nagrody)
+        // Adjustments (obciążenia / uznania)
         Route::resource('adjustments', \App\Http\Controllers\AdjustmentController::class);
 
         // Advances (Zaliczki)
@@ -411,6 +411,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/dashboard', function () {
             return view('dashboard');
         })->name('dashboard');
+
+        Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
+            ->name('notifications.index')
+            // Powiadomienia są ściśle związane z zadaniami, więc opieramy dostęp o istniejące uprawnienie `tasks.view`
+            ->defaults('resource', 'tasks');
 
         Route::get('/system-actions', function () {
             return view('system-actions');

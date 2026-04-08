@@ -119,7 +119,7 @@ class EmployeeController extends Controller
                 if ($accommodationAssignmentsCount > 0) $deleted[] = "{$accommodationAssignmentsCount} przypisania do domów";
                 if ($payrollsCount > 0) $deleted[] = "{$payrollsCount} rekordów płac";
                 if ($advancesCount > 0) $deleted[] = "{$advancesCount} zaliczki";
-                if ($adjustmentsCount > 0) $deleted[] = "{$adjustmentsCount} kary i nagrody";
+                if ($adjustmentsCount > 0) $deleted[] = "{$adjustmentsCount} obciążeń i uznań";
                 if ($evaluationsCount > 0) $deleted[] = "{$evaluationsCount} oceny";
                 if ($rotationsCount > 0) $deleted[] = "{$rotationsCount} rotacje";
                 if ($employeeDocumentsCount > 0) $deleted[] = "{$employeeDocumentsCount} dokumenty";

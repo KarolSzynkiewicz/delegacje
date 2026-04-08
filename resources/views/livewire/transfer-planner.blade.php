@@ -443,7 +443,7 @@
     <!-- Kierowca i wynagrodzenie -->
     <x-ui.card label="Kierowca i wynagrodzenie" class="mb-4">
         <p class="text-muted small mb-3">
-            Opcjonalne. Bonus zostanie zapisany bez payrollu — można go przypisać później w widoku Kary/Nagrody.
+            Opcjonalne. Bonus zostanie zapisany bez payrollu — można go przypisać później w widoku Obciążenia i uznania.
         </p>
 
         <div class="row g-3">

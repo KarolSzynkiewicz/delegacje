@@ -37,7 +37,28 @@
             <!-- Dokument do wypłaty -->
             <div class="row justify-content-center">
                 <div class="col-lg-10 col-xl-9">
-                    <x-ui.card class="mb-4">
+                    <x-ui.card class="mb-4 payroll-doc-card">
+                        <style>
+                            .payroll-doc-card .payroll-doc-table thead th {
+                                background: rgba(15, 23, 42, 0.55) !important;
+                                color: var(--text-main) !important;
+                                border-color: var(--glass-border) !important;
+                                font-weight: 600;
+                            }
+                            .payroll-doc-card .payroll-doc-table tfoot th {
+                                background: rgba(15, 23, 42, 0.72) !important;
+                                color: var(--text-main) !important;
+                                border-color: var(--glass-border) !important;
+                            }
+                            .payroll-doc-card .payroll-doc-table.table-bordered > :not(caption) > * > * {
+                                border-color: var(--glass-border) !important;
+                            }
+                            .payroll-doc-card .payroll-doc-summary {
+                                background: rgba(15, 23, 42, 0.4) !important;
+                                border: 1px solid var(--glass-border) !important;
+                                color: var(--text-main);
+                            }
+                        </style>
                         <!-- Nagłówek dokumentu -->
                         <div class="text-center mb-4 pb-3 border-bottom">
                             <h1 class="h3 fw-bold mb-2">LISTA PŁAC</h1>
@@ -89,8 +110,8 @@
                                 <i class="bi bi-clock-history"></i> Rozliczenie godzin pracy
                             </h5>
                             <div class="table-responsive">
-                                <table class="table table-bordered table-hover">
-                                    <thead class="table-light">
+                                <table class="table table-bordered table-hover payroll-doc-table">
+                                    <thead>
                                         <tr>
                                             <th style="width: 15%">Data</th>
                                             <th style="width: 30%">Projekt</th>
@@ -123,7 +144,7 @@
                                             </tr>
                                         @endforelse
                                     </tbody>
-                                    <tfoot class="table-light">
+                                    <tfoot>
                                         <tr>
                                             <th colspan="2" class="text-end">RAZEM:</th>
                                             <th class="text-end">
@@ -139,20 +160,25 @@
                             </div>
                         </div>
 
-                        <!-- Korekty (kary, nagrody, zaliczki) -->
+                        @php
+                            $correctionTotalsByCurrency = $payroll->correctionTotalsByCurrency();
+                            $payoutTotalsByCurrency = $payroll->payoutTotalsByCurrency();
+                        @endphp
+
+                        <!-- Korekty (obciążenia, uznania, zaliczki) -->
                         @if($payroll->adjustments->count() > 0 || $payroll->advances->count() > 0)
                             <div class="mb-4">
                                 <h5 class="fw-semibold mb-3">
                                     <i class="bi bi-calculator"></i> Korekty i odliczenia
                                 </h5>
                                 <div class="table-responsive">
-                                    <table class="table table-bordered table-sm">
-                                        <thead class="table-light">
+                                    <table class="table table-bordered table-sm payroll-doc-table">
+                                        <thead>
                                             <tr>
                                                 <th style="width: 15%">Data</th>
                                                 <th style="width: 25%">Typ</th>
                                                 <th style="width: 40%">Opis</th>
-                                                <th class="text-end" style="width: 20%">Kwota ({{ $payroll->currency }})</th>
+                                                <th class="text-end" style="width: 20%">Kwota</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -161,19 +187,19 @@
                                                     <td>{{ $adjustment->date->format('d.m.Y') }}</td>
                                                     <td>
                                                         @if($adjustment->type === 'penalty')
-                                                            <x-ui.badge variant="danger">Kara</x-ui.badge>
+                                                            <x-ui.badge variant="danger">Obciążenie</x-ui.badge>
                                                         @else
-                                                            <x-ui.badge variant="success">Nagroda</x-ui.badge>
+                                                            <x-ui.badge variant="success">Uznanie</x-ui.badge>
                                                         @endif
                                                     </td>
                                                     <td>
-                                                        {{ $adjustment->notes ?: ($adjustment->type === 'penalty' ? 'Kara' : 'Nagroda') }}
-                                                        @if($adjustment->currency !== $payroll->currency)
-                                                            <small class="text-muted">({{ $adjustment->currency }})</small>
-                                                        @endif
+                                                        {{ $adjustment->notes ?: ($adjustment->type === 'penalty' ? 'Obciążenie' : 'Uznanie') }}
                                                     </td>
                                                     <td class="text-end {{ $adjustment->type === 'penalty' ? 'text-danger' : 'text-success' }}">
-                                                        {{ $adjustment->type === 'penalty' ? '-' : '+' }}{{ number_format(abs((float)$adjustment->amount), 2, ',', ' ') }}
+                                                        <span class="fw-semibold">
+                                                            {{ $adjustment->type === 'penalty' ? '-' : '+' }}{{ number_format(abs((float) $adjustment->getEffectiveAmount()), 2, ',', ' ') }}
+                                                        </span>
+                                                        <div class="small text-muted">{{ strtoupper((string) ($adjustment->currency ?: 'PLN')) }}</div>
                                                     </td>
                                                 </tr>
                                             @endforeach
@@ -193,28 +219,34 @@
                                                         @if($advance->notes)
                                                             <br><small class="text-muted">{{ $advance->notes }}</small>
                                                         @endif
-                                                        @if($advance->currency !== $payroll->currency)
-                                                            <small class="text-muted">({{ $advance->currency }})</small>
-                                                        @endif
                                                     </td>
                                                     <td class="text-end text-danger">
-                                                        -{{ number_format((float)$advance->amount, 2, ',', ' ') }}
-                                                        @if($advance->is_interest_bearing && $advance->interest_rate)
-                                                            <br><small class="text-muted">
-                                                                -{{ number_format($advance->getInterestAmount(), 2, ',', ' ') }} (odsetki)
-                                                            </small>
-                                                        @endif
+                                                        @php
+                                                            $advCur = strtoupper((string) ($advance->currency ?: 'PLN'));
+                                                            $advTotal = (float) $advance->amount + $advance->getInterestAmount();
+                                                        @endphp
+                                                        <span class="fw-semibold">-{{ number_format($advTotal, 2, ',', ' ') }}</span>
+                                                        <div class="small text-muted">{{ $advCur }}</div>
                                                     </td>
                                                 </tr>
                                             @endforeach
                                         </tbody>
-                                        <tfoot class="table-light">
-                                            <tr>
-                                                <th colspan="3" class="text-end">SUMA KOREKT:</th>
-                                                <th class="text-end {{ $payroll->adjustments_amount < 0 ? 'text-danger' : 'text-success' }}">
-                                                    {{ $payroll->adjustments_amount >= 0 ? '+' : '' }}{{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}
-                                                </th>
-                                            </tr>
+                                        <tfoot>
+                                            @forelse($correctionTotalsByCurrency as $sumCur => $sumAmt)
+                                                <tr>
+                                                    <th colspan="3" class="text-end">SUMA KOREKT ({{ $sumCur }}):</th>
+                                                    <th class="text-end {{ $sumAmt < 0 ? 'text-danger' : ($sumAmt > 0 ? 'text-success' : '') }}">
+                                                        {{ $sumAmt >= 0 ? '+' : '' }}{{ number_format($sumAmt, 2, ',', ' ') }} {{ $sumCur }}
+                                                    </th>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <th colspan="3" class="text-end">SUMA KOREKT:</th>
+                                                    <th class="text-end {{ $payroll->adjustments_amount < 0 ? 'text-danger' : 'text-success' }}">
+                                                        {{ $payroll->adjustments_amount >= 0 ? '+' : '' }}{{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}
+                                                    </th>
+                                                </tr>
+                                            @endforelse
                                         </tfoot>
                                     </table>
                                 </div>
@@ -233,7 +265,7 @@
                                     @endif
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="bg-light p-3 rounded border">
+                                    <div class="payroll-doc-summary p-3 rounded">
                                         <table class="table table-sm mb-0">
                                             <tr>
                                                 <td class="border-0"><strong>Kwota z godzin:</strong></td>
@@ -242,17 +274,37 @@
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td class="border-0"><strong>Korekty:</strong></td>
-                                                <td class="text-end border-0 {{ $payroll->adjustments_amount < 0 ? 'text-danger' : 'text-success' }}">
-                                                    <strong>{{ $payroll->adjustments_amount >= 0 ? '+' : '' }}{{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}</strong>
+                                                <td class="border-0 align-top"><strong>Korekty:</strong></td>
+                                                <td class="text-end border-0">
+                                                    @forelse($correctionTotalsByCurrency as $sumCur => $sumAmt)
+                                                        <div class="{{ $sumAmt < 0 ? 'text-danger' : ($sumAmt > 0 ? 'text-success' : '') }}">
+                                                            <strong>{{ $sumAmt >= 0 ? '+' : '' }}{{ number_format($sumAmt, 2, ',', ' ') }} {{ $sumCur }}</strong>
+                                                        </div>
+                                                    @empty
+                                                        <strong class="{{ $payroll->adjustments_amount < 0 ? 'text-danger' : 'text-success' }}">
+                                                            {{ $payroll->adjustments_amount >= 0 ? '+' : '' }}{{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}
+                                                        </strong>
+                                                    @endforelse
                                                 </td>
                                             </tr>
                                             <tr class="border-top">
-                                                <td class="pt-2"><strong class="fs-5">DO WYPŁATY:</strong></td>
+                                                <td class="pt-2 align-top"><strong class="fs-5">DO WYPŁATY:</strong></td>
                                                 <td class="text-end pt-2">
-                                                    <strong class="fs-4 text-primary">
-                                                        {{ number_format($payroll->total_amount, 2, ',', ' ') }} {{ $payroll->currency }}
-                                                    </strong>
+                                                    @foreach($payoutTotalsByCurrency as $pCur => $pAmt)
+                                                        <div class="mb-2 @if($loop->last) mb-0 @endif">
+                                                            <strong @class([
+                                                                'fs-4',
+                                                                'text-muted' => abs((float) $pAmt) < 0.00001,
+                                                                'text-primary' => (float) $pAmt > 0,
+                                                                'text-danger' => (float) $pAmt < 0,
+                                                            ])>
+                                                                @if(abs((float) $pAmt) >= 0.00001)
+                                                                    {{ (float) $pAmt >= 0 ? '+' : '' }}
+                                                                @endif
+                                                                {{ number_format((float) $pAmt, 2, ',', ' ') }} {{ $pCur }}
+                                                            </strong>
+                                                        </div>
+                                                    @endforeach
                                                 </td>
                                             </tr>
                                         </table>

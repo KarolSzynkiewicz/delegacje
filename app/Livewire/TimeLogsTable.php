@@ -119,6 +119,9 @@ class TimeLogsTable extends Component
             $query->whereDate('start_time', '<=', $this->dateTo);
         }
 
+        // Suma godzin dla aktualnych filtrów (bez paginacji)
+        $totalHours = (clone $query)->sum('hours_worked');
+
         $timeLogs = $query->orderBy('start_time', 'desc')
             ->paginate(20);
 
@@ -182,6 +185,6 @@ class TimeLogsTable extends Component
             $projects = Project::query()->orderBy('name')->get();
         }
 
-        return view('livewire.time-logs-table', compact('timeLogs', 'employees', 'projects'));
+        return view('livewire.time-logs-table', compact('timeLogs', 'employees', 'projects', 'totalHours'));
     }
 }

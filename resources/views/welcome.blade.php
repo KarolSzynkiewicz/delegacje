@@ -596,7 +596,7 @@
                             </div>
                             <h4 class="fw-bold mb-3">Ryzyko prawno-dokumentacyjne</h4>
                             <p class="text-muted mb-3">
-                                Przypisania bez ważnych dokumentów, kary, opóźnienia projektów
+                                Przypisania bez ważnych dokumentów, obciążenia, opóźnienia projektów
                             </p>
                             <div class="solution-icon">
                                 <i class="bi bi-check-circle-fill"></i>
@@ -1049,7 +1049,7 @@
                             <div>
                                 <h5 class="fw-bold mb-2">Bezpieczeństwo prawne</h5>
                                 <p class="mb-0 opacity-90">
-                                    Automatyczna walidacja dokumentów chroni przed karami i opóźnieniami
+                                    Automatyczna walidacja dokumentów chroni przed obciążeniami i opóźnieniami
                                 </p>
                             </div>
                         </div>

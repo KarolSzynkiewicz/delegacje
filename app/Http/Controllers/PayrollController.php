@@ -219,7 +219,7 @@ class PayrollController extends Controller
         try {
             $this->generatePayrollService->recalculate($payroll);
             
-            return back()->with('success', 'Payroll został przeliczony (godziny, kary, nagrody i zaliczki).');
+            return back()->with('success', 'Payroll został przeliczony (godziny, obciążenia, uznania i zaliczki).');
         } catch (\Exception $e) {
             return back()
                 ->withErrors(['error' => 'Błąd podczas przeliczania: ' . $e->getMessage()]);

@@ -609,7 +609,7 @@
                             {{-- Driver bonus --}}
                             <div class="col-md-7">
                                 <label class="form-label fw-semibold">
-                                    Nagroda dla kierowcy
+                                    Uznanie dla kierowcy
                                     <small class="text-muted fw-normal">(opcjonalnie)</small>
                                 </label>
                                 <input
@@ -622,7 +622,7 @@
                                 >
                             </div>
                             <div class="col-md-5">
-                                <label class="form-label fw-semibold">Waluta nagrody</label>
+                                <label class="form-label fw-semibold">Waluta uznania</label>
                                 <select wire:model.live="transferDriverBonusCurrency" class="form-select">
                                     @foreach($currencyCases as $currency)
                                         <option value="{{ $currency->value }}">{{ $currency->value }}</option>
@@ -632,8 +632,8 @@
                             <div class="col-12">
                                 <div class="alert alert-info py-2 mb-0">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Nagroda zostanie zapisana bez przypisanego payrollu.
-                                    Po zapisie możesz go przypisać w zakładce <strong>Nagrody/kary</strong>.
+                                    Uznanie zostanie zapisane bez przypisanego payrollu.
+                                    Po zapisie możesz je przypisać w zakładce <strong>Uznania/obciążenia</strong>.
                                 </div>
                             </div>
                         @endif

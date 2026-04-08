@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\LocationPurposeType;
+use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +11,7 @@ use Illuminate\Support\Collection;
 
 class Location extends Model
 {
-    use HasFactory;
+    use HasComments, HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -111,6 +112,7 @@ class Location extends Model
     public function hasPurpose(LocationPurposeType|string $purpose): bool
     {
         $value = $purpose instanceof LocationPurposeType ? $purpose->value : $purpose;
+
         return $this->purposes()->where('purpose', $value)->exists();
     }
 
@@ -126,8 +128,6 @@ class Location extends Model
 
     /**
      * Get the base location (singleton pattern).
-     * 
-     * @return Location
      */
     public static function getBase(): Location
     {
@@ -152,7 +152,7 @@ class Location extends Model
      */
     public function hasCoordinates(): bool
     {
-        return !is_null($this->latitude) && !is_null($this->longitude);
+        return ! is_null($this->latitude) && ! is_null($this->longitude);
     }
 
     /**
@@ -160,7 +160,7 @@ class Location extends Model
      */
     public function getCoordinates(): ?array
     {
-        if (!$this->hasCoordinates()) {
+        if (! $this->hasCoordinates()) {
             return null;
         }
 

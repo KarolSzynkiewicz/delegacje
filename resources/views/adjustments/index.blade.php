@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Kary i Nagrody">
+        <x-ui.page-header title="Obciążenia i uznania">
             <x-slot name="right">
                 <x-ui.button 
                     variant="primary" 
@@ -8,7 +8,7 @@
                     routeName="adjustments.create"
                     action="create"
                 >
-                    Dodaj Karę/Nagrodę
+                    Dodaj obciążenie / uznanie
                 </x-ui.button>
             </x-slot>
         </x-ui.page-header>
@@ -32,8 +32,8 @@
             <div class="col-md-3">
                 <x-ui.input type="select" name="type" label="Typ">
                     <option value="all" {{ ($typeFilter ?? request('type', 'all')) === 'all' ? 'selected' : '' }}>Wszystkie</option>
-                    <option value="penalty" {{ ($typeFilter ?? request('type', 'all')) === 'penalty' ? 'selected' : '' }}>Kara</option>
-                    <option value="bonus" {{ ($typeFilter ?? request('type', 'all')) === 'bonus' ? 'selected' : '' }}>Nagroda</option>
+                    <option value="penalty" {{ ($typeFilter ?? request('type', 'all')) === 'penalty' ? 'selected' : '' }}>Obciążenie</option>
+                    <option value="bonus" {{ ($typeFilter ?? request('type', 'all')) === 'bonus' ? 'selected' : '' }}>Uznanie</option>
                 </x-ui.input>
             </div>
             <div class="col-md-3">
@@ -77,7 +77,7 @@
                                 </td>
                                 <td>
                                     <x-ui.badge variant="{{ $adjustment->type === 'bonus' ? 'success' : 'danger' }}">
-                                        {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
+                                        {{ $adjustment->type === 'bonus' ? 'Uznanie' : 'Obciążenie' }}
                                     </x-ui.badge>
                                 </td>
                                 <td>
@@ -100,7 +100,7 @@
                                         viewRoute="{{ route('adjustments.show', $adjustment) }}"
                                         editRoute="{{ route('adjustments.edit', $adjustment) }}"
                                         deleteRoute="{{ route('adjustments.destroy', $adjustment) }}"
-                                        deleteMessage="Czy na pewno chcesz usunąć tę karę/nagrodę?"
+                                        deleteMessage="Czy na pewno chcesz usunąć to obciążenie/uznanie?"
                                     />
                                 </td>
                             </tr>
@@ -125,7 +125,7 @@
                     routeName="adjustments.create"
                     action="create"
                 >
-                    Dodaj pierwszą karę/nagrodę
+                    Dodaj pierwsze obciążenie lub uznanie
                 </x-ui.button>
             </x-ui.empty-state>
         @endif

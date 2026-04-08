@@ -180,43 +180,6 @@
                     if ($totalUserPages < 1) $totalUserPages = 1;
                 @endphp
 
-                @if(!empty($projectsData) && $totalUsersForPagination > 0 && $totalUserPages > 1)
-                    <div class="mb-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                        <div class="small text-muted">
-                            Strona <span class="fw-semibold">{{ $userPage }}</span> z <span class="fw-semibold">{{ $totalUserPages }}</span> (użytkownicy {{ $userOffset + 1 }}–{{ min($userOffset + $userPerPage, $totalUsersForPagination) }})
-                        </div>
-                        <div class="d-flex gap-2">
-                            @if($userPage > 1)
-                                <x-ui.button
-                                    variant="ghost"
-                                    class="btn-sm"
-                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => max(1, $userPage - 1)])) }}"
-                                >
-                                    <i class="bi bi-chevron-left"></i> Poprzedni
-                                </x-ui.button>
-                            @else
-                                <x-ui.button variant="ghost" class="btn-sm" disabled>
-                                    <i class="bi bi-chevron-left"></i> Poprzedni
-                                </x-ui.button>
-                            @endif
-
-                            @if($userPage < $totalUserPages)
-                                <x-ui.button
-                                    variant="primary"
-                                    class="btn-sm"
-                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => min($totalUserPages, $userPage + 1)])) }}"
-                                >
-                                    Następny <i class="bi bi-chevron-right"></i>
-                                </x-ui.button>
-                            @else
-                                <x-ui.button variant="primary" class="btn-sm" disabled>
-                                    Następny <i class="bi bi-chevron-right"></i>
-                                </x-ui.button>
-                            @endif
-                        </div>
-                    </div>
-                @endif
-
             <!-- Informacje o miesiącu - pod headerem -->
             <div class="text-center mb-4">
                 <div class="fw-bold mb-1">
@@ -455,7 +418,44 @@
                     </table>
                     </div>
                 </div>
-                
+
+                @if(!empty($projectsData) && $totalUsersForPagination > 0 && $totalUserPages > 1)
+                    <div class="mb-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                        <div class="small text-muted">
+                            Strona <span class="fw-semibold">{{ $userPage }}</span> z <span class="fw-semibold">{{ $totalUserPages }}</span> (użytkownicy {{ $userOffset + 1 }}–{{ min($userOffset + $userPerPage, $totalUsersForPagination) }})
+                        </div>
+                        <div class="d-flex gap-2">
+                            @if($userPage > 1)
+                                <x-ui.button
+                                    variant="ghost"
+                                    class="btn-sm"
+                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => max(1, $userPage - 1)])) }}"
+                                >
+                                    <i class="bi bi-chevron-left"></i> Poprzedni
+                                </x-ui.button>
+                            @else
+                                <x-ui.button variant="ghost" class="btn-sm" disabled>
+                                    <i class="bi bi-chevron-left"></i> Poprzedni
+                                </x-ui.button>
+                            @endif
+
+                            @if($userPage < $totalUserPages)
+                                <x-ui.button
+                                    variant="primary"
+                                    class="btn-sm"
+                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => min($totalUserPages, $userPage + 1)])) }}"
+                                >
+                                    Następny <i class="bi bi-chevron-right"></i>
+                                </x-ui.button>
+                            @else
+                                <x-ui.button variant="primary" class="btn-sm" disabled>
+                                    Następny <i class="bi bi-chevron-right"></i>
+                                </x-ui.button>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Przycisk zapisu - pod kartą tabelki, z prawej -->
                 <div class="d-flex justify-content-end mb-4">
                     <x-ui.button variant="primary" type="submit">

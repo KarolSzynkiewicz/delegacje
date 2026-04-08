@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Edytuj Karę/Nagrodę">
+        <x-ui.page-header title="Edytuj obciążenie / uznanie">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -15,7 +15,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Edytuj Karę/Nagrodę">
+            <x-ui.card label="Edytuj obciążenie / uznanie">
                 <form method="POST" action="{{ route('adjustments.update', $adjustment) }}">
                     @csrf
                     @method('PUT')
@@ -35,7 +35,7 @@
                                 </option>
                             @endforeach
                         </x-ui.input>
-                        <small class="form-text text-muted">Pracownik, którego dotyczy kara/nagroda</small>
+                        <small class="form-text text-muted">Pracownik, którego dotyczy obciążenie lub uznanie</small>
                     </div>
 
                     <div class="mb-3">
@@ -68,8 +68,8 @@
                                 label="Typ"
                                 required="true"
                             >
-                                <option value="penalty" {{ old('type', $adjustment->type) == 'penalty' ? 'selected' : '' }}>Kara</option>
-                                <option value="bonus" {{ old('type', $adjustment->type) == 'bonus' ? 'selected' : '' }}>Nagroda</option>
+                                <option value="penalty" {{ old('type', $adjustment->type) == 'penalty' ? 'selected' : '' }}>Obciążenie</option>
+                                <option value="bonus" {{ old('type', $adjustment->type) == 'bonus' ? 'selected' : '' }}>Uznanie</option>
                             </x-ui.input>
                         </div>
                         <div class="col-md-6">
@@ -95,7 +95,7 @@
                                 step="0.01"
                                 required="true"
                             />
-                            <small class="form-text text-muted">Dodatnia dla nagrody, ujemna dla kary</small>
+                            <small class="form-text text-muted">Dodatnia dla uznania, ujemna dla obciążenia</small>
                         </div>
                         <div class="col-md-6">
                             <x-ui.input 

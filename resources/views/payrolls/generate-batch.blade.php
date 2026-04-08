@@ -96,7 +96,7 @@
             </p>
             <ul class="mt-2 mb-0">
                 <li>Godziny pracy (z TimeLog) × stawka (z EmployeeRate)</li>
-                <li>Kary i nagrody (z Adjustments)</li>
+                <li>Obciążenia i uznania (z Adjustments)</li>
                 <li>Zaliczki (z Advances, z oprocentowaniem jeśli dotyczy)</li>
             </ul>
         </x-ui.card>

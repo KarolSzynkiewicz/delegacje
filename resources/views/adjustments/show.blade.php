@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Kara/Nagroda: {{ $adjustment->employee->full_name }}">
+        <x-ui.page-header title="Obciążenie/Uznanie: {{ $adjustment->employee->full_name }}">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -25,7 +25,7 @@
 
     <div class="row">
         <div class="col-lg-8">
-            <x-ui.card label="Szczegóły Kary/Nagrody">
+            <x-ui.card label="Szczegóły obciążenia / uznania">
                 <x-ui.detail-list>
                     <x-ui.detail-item label="Pracownik:">
                         <a href="{{ route('employees.show', $adjustment->employee) }}" class="text-primary text-decoration-none">
@@ -34,7 +34,7 @@
                     </x-ui.detail-item>
                     <x-ui.detail-item label="Typ:">
                         <x-ui.badge variant="{{ $adjustment->type === 'bonus' ? 'success' : 'danger' }}">
-                            {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
+                            {{ $adjustment->type === 'bonus' ? 'Uznanie' : 'Obciążenie' }}
                         </x-ui.badge>
                     </x-ui.detail-item>
                             <x-ui.detail-item label="Kwota:">

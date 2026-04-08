@@ -291,7 +291,7 @@
                             <x-ui.badge variant="warning">Bez payrollu</x-ui.badge>
                             <div class="small text-muted mt-1">
                                 Przypisz payroll w
-                                <a href="{{ route('adjustments.edit', $adj) }}">edycji nagrody</a>
+                                <a href="{{ route('adjustments.edit', $adj) }}">edycji uznania</a>
                             </div>
                         @endif
                     </div>

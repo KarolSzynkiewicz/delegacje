@@ -38,15 +38,32 @@
                         </div>
                         <div class="col-md-6">
                             <small class="text-muted d-block">Korekty:</small>
-                            <strong class="{{ $payroll->adjustments_amount >= 0 ? 'text-success' : 'text-danger' }}">
-                                {{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}
-                            </strong>
+                            @php $corrEditTotals = $payroll->correctionTotalsByCurrency(); @endphp
+                            @forelse($corrEditTotals as $c => $a)
+                                <div class="{{ $a < 0 ? 'text-danger' : ($a > 0 ? 'text-success' : '') }}">
+                                    <strong>{{ $a >= 0 ? '+' : '' }}{{ number_format($a, 2, ',', ' ') }} {{ $c }}</strong>
+                                </div>
+                            @empty
+                                <strong class="{{ $payroll->adjustments_amount >= 0 ? 'text-success' : 'text-danger' }}">
+                                    {{ number_format($payroll->adjustments_amount, 2, ',', ' ') }} {{ $payroll->currency }}
+                                </strong>
+                            @endforelse
                         </div>
                     </div>
                     <div class="row mt-2">
                         <div class="col-md-12">
-                            <small class="text-muted d-block">Razem:</small>
-                            <strong class="text-success fs-5">{{ number_format($payroll->total_amount, 2, ',', ' ') }} {{ $payroll->currency }}</strong>
+                            <small class="text-muted d-block">Razem (wg walut):</small>
+                            @php $payoutEdit = $payroll->payoutTotalsByCurrency(); @endphp
+                            @foreach($payoutEdit as $pc => $pa)
+                                <div @class(['fs-5', 'text-muted' => abs((float) $pa) < 0.00001, 'text-danger' => (float) $pa < 0, 'text-success' => (float) $pa > 0])>
+                                    <strong>
+                                        @if(abs((float) $pa) >= 0.00001)
+                                            {{ (float) $pa >= 0 ? '+' : '' }}
+                                        @endif
+                                        {{ number_format((float) $pa, 2, ',', ' ') }} {{ $pc }}
+                                    </strong>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
@@ -57,7 +74,7 @@
                     
                     @if($payroll->adjustments->count() > 0)
                     <div class="mb-3">
-                        <h6>Kary i nagrody:</h6>
+                        <h6>Obciążenia i uznania:</h6>
                         <div class="table-responsive">
                             <table class="table table-sm">
                                 <thead>
@@ -74,7 +91,7 @@
                                         <td>{{ $adjustment->date->format('d.m.Y') }}</td>
                                         <td>
                                             <span class="badge {{ $adjustment->type === 'bonus' ? 'bg-success' : 'bg-danger' }}">
-                                                {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
+                                                {{ $adjustment->type === 'bonus' ? 'Uznanie' : 'Obciążenie' }}
                                             </span>
                                         </td>
                                         <td class="{{ $adjustment->amount >= 0 ? 'text-success' : 'text-danger' }}">

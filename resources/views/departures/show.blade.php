@@ -322,7 +322,7 @@
                         </p>
                     </div>
                     <div class="col-md-6">
-                        <h6 class="text-muted small mb-1">Kierowca / nagroda</h6>
+                        <h6 class="text-muted small mb-1">Kierowca / uznanie</h6>
                         @if($transfer->driverAdjustments->isNotEmpty())
                             @php $adj = $transfer->driverAdjustments->first(); @endphp
                             <p class="fw-semibold mb-0">

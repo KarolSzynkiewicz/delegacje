@@ -83,6 +83,68 @@ class Payroll extends Model
     }
 
     /**
+     * Suma korekt (obciążenia/uznania + zaliczki z odsetkami) pogrupowana po walucie wpisu.
+     * Używaj do wyświetlania — pole adjustments_amount nadal jest jedną liczbą (historycznie).
+     *
+     * @return array<string, float> kod waluty (uppercase) => suma ze znakiem
+     */
+    public function correctionTotalsByCurrency(): array
+    {
+        $this->loadMissing(['adjustments', 'advances']);
+
+        $totals = [];
+
+        foreach ($this->adjustments as $adjustment) {
+            $currency = strtoupper((string) ($adjustment->currency ?: 'PLN'));
+            $totals[$currency] = ($totals[$currency] ?? 0.0) + $adjustment->getEffectiveAmount();
+        }
+
+        foreach ($this->advances as $advance) {
+            $currency = strtoupper((string) ($advance->currency ?: 'PLN'));
+            $deduction = (float) $advance->amount + $advance->getInterestAmount();
+            $totals[$currency] = ($totals[$currency] ?? 0.0) - $deduction;
+        }
+
+        foreach (array_keys($totals) as $c) {
+            $totals[$c] = round((float) $totals[$c], 2);
+        }
+
+        return array_filter($totals, fn (float $v) => abs($v) > 0.00001);
+    }
+
+    /**
+     * Kwota „do wypłaty” pogrupowana po walucie: godziny w walucie payrolla + korekty w walucie wpisu.
+     * (Bez przewalutowania — każda waluta osobno.)
+     *
+     * @return array<string, float> kod waluty (uppercase) => netto ze znakiem
+     */
+    public function payoutTotalsByCurrency(): array
+    {
+        $totals = $this->correctionTotalsByCurrency();
+
+        $payCur = strtoupper((string) ($this->currency ?: 'PLN'));
+        $hours = round((float) $this->hours_amount, 2);
+
+        if (abs($hours) > 0.00001) {
+            $totals[$payCur] = round(($totals[$payCur] ?? 0.0) + $hours, 2);
+        }
+
+        foreach (array_keys($totals) as $c) {
+            $totals[$c] = round((float) $totals[$c], 2);
+        }
+
+        $totals = array_filter($totals, fn (float $v) => abs($v) > 0.00001);
+
+        if ($totals === []) {
+            return [$payCur => 0.0];
+        }
+
+        ksort($totals);
+
+        return $totals;
+    }
+
+    /**
      * Get all adjustments for this payroll.
      */
     public function adjustments(): HasMany

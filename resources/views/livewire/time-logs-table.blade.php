@@ -9,8 +9,12 @@
                     <p class="small text-muted mb-0">
                         @if($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)
                             Znaleziono: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
+                            <span class="mx-1">•</span>
+                            Suma godzin: <span class="fw-semibold">{{ number_format((float) ($totalHours ?? 0), 2, ',', ' ') }}h</span>
                         @else
                             Łącznie: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
+                            <span class="mx-1">•</span>
+                            Suma godzin: <span class="fw-semibold">{{ number_format((float) ($totalHours ?? 0), 2, ',', ' ') }}h</span>
                         @endif
                     </p>
                 </div>

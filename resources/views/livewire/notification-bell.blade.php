@@ -22,13 +22,23 @@
     {{-- Dropdown z listą --}}
     @if($open)
         <div
-            class="dropdown-menu show position-absolute end-0 mt-1 p-0"
-            style="width:22rem;z-index:1080;top:100%;"
+            class="dropdown-menu show position-absolute end-0 mt-1 p-0 border-0"
+            style="
+                width: 22rem;
+                z-index: 1080;
+                top: 100%;
+                background: var(--bg-card);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid var(--glass-border);
+                border-radius: 20px;
+                color: var(--text-main);
+                box-shadow: 0 18px 55px rgba(0,0,0,.45);
+            "
             wire:click.stop
         >
-            <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+            <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom" style="border-color: var(--glass-border) !important;">
                 <span class="fw-semibold small">Powiadomienia</span>
-                <a href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="small text-decoration-none">Moje zadania</a>
             </div>
 
             @if($notifications->isEmpty())
@@ -44,7 +54,10 @@
                             $url  = $data['task_url'] ?? $data['url'] ?? null;
                             $read = $n->read_at !== null;
                         @endphp
-                        <li @class(['px-3 py-2 border-bottom', 'opacity-50' => $read])>
+                        <li
+                            @class(['px-3 py-2 border-bottom', 'opacity-50' => $read])
+                            style="border-color: var(--glass-border) !important;"
+                        >
                             <div class="d-flex align-items-start gap-2">
                                 <i @class([
                                     'bi flex-shrink-0 mt-1',
@@ -58,7 +71,7 @@
                                     <p class="mb-0 small lh-sm">
                                         {{ $data['message'] ?? 'Powiadomienie' }}
                                         @if($url)
-                                            — <a href="{{ $url }}" class="fw-semibold text-decoration-none">
+                                            — <a href="{{ $url }}" class="fw-semibold text-decoration-none" style="color: var(--text-main);">
                                                 {{ $data['task_name'] ?? $data['context_name'] ?? $data['subtask_name'] ?? 'otwórz' }}
                                             </a>
                                         @endif
@@ -76,10 +89,15 @@
                 </ul>
             @endif
 
-            <div class="px-3 py-2 border-top text-center">
-                <a href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="small text-decoration-none dropdown-item text-center">
-                    <i class="bi bi-list-check me-1"></i>Moje zadania
-                </a>
+            <div class="px-3 py-2 border-top text-center" style="border-color: var(--glass-border) !important;">
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <a href="{{ route('notifications.index') }}" class="small text-decoration-none" style="color: var(--text-main);">
+                        <i class="bi bi-inbox me-1"></i>Zobacz wszystkie
+                    </a>
+                    <a href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="small text-decoration-none" style="color: var(--text-main);">
+                        <i class="bi bi-list-check me-1"></i>Moje zadania
+                    </a>
+                </div>
             </div>
         </div>
     @endif

@@ -35,7 +35,7 @@ class EmployeeTabs extends Component
             'advances' => ['label' => 'Zaliczki', 'permission' => 'advances.view', 'icon' => 'bi bi-wallet2'],
             'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
             'evaluations' => ['label' => 'Oceny', 'permission' => 'employee-evaluations.view', 'icon' => 'bi bi-star-fill'],
-            'adjustments' => ['label' => 'Kary i nagrody', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
+            'adjustments' => ['label' => 'Obciążenia i uznania', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp

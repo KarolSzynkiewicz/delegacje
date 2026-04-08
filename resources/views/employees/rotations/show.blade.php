@@ -118,7 +118,7 @@
                 <p class="text-muted small mb-3">
                     Godziny z ewidencji czasu pracy w datach rotacji. Kwota z godzin = suma
                     (godziny × stawka obowiązująca w dniu wpisu), jak przy listach płac.
-                    Kary i nagrody: wpisy z datą w tym okresie.
+                    Obciążenia i uznania: wpisy z datą w tym okresie.
                 </p>
 
                 <div class="row g-3 mb-3">
@@ -147,7 +147,7 @@
 
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <div class="small text-muted mb-1">Nagrody (bonusy)</div>
+                        <div class="small text-muted mb-1">Uznania (bonus)</div>
                         @forelse($rotationSummary['bonus_by_currency'] as $cur => $amt)
                             <div class="d-flex justify-content-between">
                                 <span>{{ $cur }}</span>
@@ -158,7 +158,7 @@
                         @endforelse
                     </div>
                     <div class="col-md-6">
-                        <div class="small text-muted mb-1">Kary</div>
+                        <div class="small text-muted mb-1">Obciążenia</div>
                         @forelse($rotationSummary['penalty_by_currency'] as $cur => $amt)
                             <div class="d-flex justify-content-between">
                                 <span>{{ $cur }}</span>
@@ -172,7 +172,7 @@
 
                 @if(!empty($rotationSummary['net_by_currency']))
                     <div class="border-top pt-3">
-                        <div class="small text-muted mb-2">Łącznie (godziny + nagrody − kary), per waluta</div>
+                        <div class="small text-muted mb-2">Łącznie (godziny + uznania − obciążenia), per waluta</div>
                         @foreach($rotationSummary['net_by_currency'] as $cur => $amt)
                             <div class="d-flex justify-content-between align-items-center fs-5">
                                 <span>{{ $cur }}</span>
@@ -272,7 +272,7 @@
 
         @if($rotationSummary['adjustments']->isNotEmpty())
             <div class="col-12">
-                <x-ui.card label="Kary i nagrody (lista)">
+                <x-ui.card label="Obciążenia i uznania (lista)">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle mb-0">
                             <thead>
@@ -290,9 +290,9 @@
                                         <td class="text-nowrap">{{ $adj->date->format('d.m.Y') }}</td>
                                         <td>
                                             @if($adj->type === 'bonus')
-                                                <x-ui.badge variant="success">Nagroda</x-ui.badge>
+                                                <x-ui.badge variant="success">Uznanie</x-ui.badge>
                                             @else
-                                                <x-ui.badge variant="danger">Kara</x-ui.badge>
+                                                <x-ui.badge variant="danger">Obciążenie</x-ui.badge>
                                             @endif
                                         </td>
                                         <td class="text-nowrap">{{ $fmtMoney((float) $adj->amount, $adj->currency ?? 'PLN') }}</td>

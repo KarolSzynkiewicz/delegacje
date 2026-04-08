@@ -508,7 +508,7 @@
                                         <tr>
                                             <th>Okres</th>
                                             <th>Godziny</th>
-                                            <th>Kary/Nagrody</th>
+                                            <th>Obciążenia/uznania</th>
                                             <th>Suma</th>
                                             <th>Waluta</th>
                                             <th>Status</th>
@@ -804,14 +804,14 @@
             </div>
         </div>
     @elseif($activeTab === 'adjustments')
-        <!-- Zakładka Kary i Nagrody -->
+        <!-- Zakładka Obciążenia i uznania -->
         <div id="adjustments" role="tabpanel">
             <div class="card">
                 <div class="card-body">
                     <div class="mb-4">
-                        <x-ui.table-header title="Kary i Nagrody">
+                        <x-ui.table-header title="Obciążenia i uznania">
                             <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('adjustments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Karę/Nagrodę</x-ui.button>
+                                <x-ui.button variant="primary" href="{{ route('adjustments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj obciążenie / uznanie</x-ui.button>
                             </x-slot>
                         </x-ui.table-header>
                         @if($tabData && $tabData->count() > 0)
@@ -831,7 +831,7 @@
                                             <tr>
                                                 <td>
                                                     <x-ui.badge variant="{{ $adjustment->type === 'bonus' ? 'success' : 'danger' }}">
-                                                        {{ $adjustment->type === 'bonus' ? 'Nagroda' : 'Kara' }}
+                                                        {{ $adjustment->type === 'bonus' ? 'Uznanie' : 'Obciążenie' }}
                                                     </x-ui.badge>
                                                 </td>
                                                 <td>

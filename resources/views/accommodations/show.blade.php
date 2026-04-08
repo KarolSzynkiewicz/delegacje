@@ -222,6 +222,10 @@
                     />
                 @endif
             </x-ui.card>
+
+            <div class="mt-4">
+                <x-comments :commentable="$accommodation" />
+            </div>
         </div>
     </div>
 </x-app-layout>

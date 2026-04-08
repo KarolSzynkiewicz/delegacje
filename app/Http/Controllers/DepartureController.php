@@ -1126,7 +1126,7 @@ class DepartureController extends Controller
                         'type' => 'bonus',
                         'amount' => $transferBonusAmount,
                         'currency' => $transferBonusCurrency,
-                        'notes' => 'Nagroda za kierowanie transferem #'.$transfer->id,
+                        'notes' => 'Uznanie za kierowanie transferem #'.$transfer->id,
                         'date' => $departureDate->toDateString(),
                     ]);
                 }

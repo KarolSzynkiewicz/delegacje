@@ -150,7 +150,7 @@ return [
     'adjustments' => [
         'route' => 'adjustments.index',
         'icon' => 'bi bi-award',
-        'label' => 'Kary i nagrody',
+        'label' => 'Obciążenia i uznania',
     ],
     
     'time_logs' => [

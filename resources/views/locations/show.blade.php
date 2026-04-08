@@ -157,6 +157,10 @@
                 </ul>
             </x-ui.card>
             @endif
+
+            <div class="mt-4">
+                <x-comments :commentable="$location" />
+            </div>
         </div>
     </div>
 </x-app-layout>

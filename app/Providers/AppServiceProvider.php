@@ -3,8 +3,8 @@
 namespace App\Providers;
 
 use App\Services\SystemBootstrapService;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
         if (\Illuminate\Support\Facades\Cache::get('force_debug_mode', false)) {
             config(['app.debug' => true]);
         }
-        
+
         // Force HTTPS for all URLs in production (Railway uses HTTPS)
         if (config('app.env') === 'production' || request()->isSecure()) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
@@ -51,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
             'vehicle' => \App\Models\Vehicle::class,
             'accommodation' => \App\Models\Accommodation::class,
             'logistics_event' => \App\Models\LogisticsEvent::class,
+            'location' => \App\Models\Location::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

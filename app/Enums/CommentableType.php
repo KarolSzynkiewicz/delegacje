@@ -2,11 +2,12 @@
 
 namespace App\Enums;
 
+use App\Models\Accommodation;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\Vehicle;
-use App\Models\Accommodation;
-use App\Models\LogisticsEvent;
 use Illuminate\Database\Eloquent\Model;
 
 enum CommentableType: string
@@ -16,27 +17,30 @@ enum CommentableType: string
     case VEHICLE = 'vehicle';
     case ACCOMMODATION = 'accommodation';
     case LOGISTICS_EVENT = 'logistics_event';
+    case LOCATION = 'location';
 
     public function modelClass(): string
     {
-        return match($this) {
+        return match ($this) {
             self::PROJECT => Project::class,
             self::PROJECT_TASK => ProjectTask::class,
             self::VEHICLE => Vehicle::class,
             self::ACCOMMODATION => Accommodation::class,
             self::LOGISTICS_EVENT => LogisticsEvent::class,
+            self::LOCATION => Location::class,
         };
     }
 
     public static function fromModel(Model $model): self
     {
-        return match($model::class) {
+        return match ($model::class) {
             Project::class => self::PROJECT,
             ProjectTask::class => self::PROJECT_TASK,
             Vehicle::class => self::VEHICLE,
             Accommodation::class => self::ACCOMMODATION,
             LogisticsEvent::class => self::LOGISTICS_EVENT,
-            default => throw new \InvalidArgumentException("Model " . $model::class . " is not commentable"),
+            Location::class => self::LOCATION,
+            default => throw new \InvalidArgumentException('Model '.$model::class.' is not commentable'),
         };
     }
 

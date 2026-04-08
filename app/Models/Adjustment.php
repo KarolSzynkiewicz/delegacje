@@ -63,7 +63,7 @@ class Adjustment extends Model
 
     /**
      * Get the effective amount for payroll calculation.
-     * Penalties are negative, bonuses are positive.
+     * Obciążenia (penalty) są ujemne w rozliczeniu, uznania (bonus) dodatnie.
      * 
      * @return float
      */

@@ -45,6 +45,19 @@
     </select>
 @elseif($type === 'checkbox')
     @php
+        // Wartość: `:value` trafia do props `$value`, a nie zawsze do `$attributes` — bez tego
+        // wiele checkboxów z tym samym `name` dostaje domyślne value="1" (błąd Livewire).
+        $checkboxValue = $value ?? $attributes->get('value', '1');
+        $checkboxValue = $checkboxValue === '' || $checkboxValue === null ? '1' : $checkboxValue;
+
+        // Unikalny id: ten sam `name` na wielu wierszach nie może mieć jednego id (HTML + Livewire).
+        $checkboxId = $id;
+        if (! $checkboxId && $name) {
+            $safe = preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) $checkboxValue);
+            $checkboxId = $name.'-'.$safe;
+        }
+        $checkboxId = $checkboxId ?: 'checkbox-'.uniqid('', true);
+
         // Dla checkboxów, sprawdzamy czy value jest true/checked
         // Jeśli value jest przekazane jako atrybut, używamy go
         $isChecked = false;
@@ -60,14 +73,15 @@
         <input 
             type="checkbox" 
             name="{{ $name }}" 
-            id="{{ $inputId }}"
-            value="{{ $attributes->get('value', '1') }}"
+            id="{{ $checkboxId }}"
+            class="form-check-input"
+            value="{{ $checkboxValue }}"
             {{ $isChecked ? 'checked' : '' }}
-            {{ $attributes->except(['class', 'value', 'checked'])->merge([]) }}
+            {{ $attributes->except(['class', 'value', 'checked', 'id'])->merge([]) }}
             {{ $required ? 'required' : '' }}
         >
         @if($label)
-            <label for="{{ $inputId }}">{!! $label !!}</label>
+            <label class="form-check-label" for="{{ $checkboxId }}">{!! $label !!}</label>
         @endif
     </div>
 @else

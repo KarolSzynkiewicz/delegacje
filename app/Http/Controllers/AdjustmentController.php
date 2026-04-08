@@ -77,7 +77,7 @@ class AdjustmentController extends Controller
         Adjustment::create($validated);
 
         return redirect()->route('adjustments.index')
-            ->with('success', 'Kara/nagroda została dodana.');
+            ->with('success', 'Obciążenie/uznanie zostało dodane.');
     }
 
     /**
@@ -129,7 +129,7 @@ class AdjustmentController extends Controller
         }
 
         return redirect()->route('adjustments.index')
-            ->with('success', 'Kara/nagroda została zaktualizowana.');
+            ->with('success', 'Obciążenie/uznanie zostało zaktualizowane.');
     }
 
     /**
@@ -148,6 +148,6 @@ class AdjustmentController extends Controller
         }
 
         return redirect()->route('adjustments.index')
-            ->with('success', 'Kara/nagroda została usunięta.');
+            ->with('success', 'Obciążenie/uznanie zostało usunięte.');
     }
 }
