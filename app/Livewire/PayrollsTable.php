@@ -251,7 +251,7 @@ class PayrollsTable extends Component
         $query->orderBy($this->sortField, $this->sortDirection);
 
         /** @var \Illuminate\Pagination\LengthAwarePaginator $payrolls */
-        $payrolls = $query->paginate(20);
+        $payrolls = $query->paginate(100);
         $this->currentPagePayrollIds = collect($payrolls->items())->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         // Rate summary (memoized) for the current page
