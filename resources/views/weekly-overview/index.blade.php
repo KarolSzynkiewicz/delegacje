@@ -11,7 +11,7 @@
                 @endif
             </x-slot>
             <x-slot name="right">
-                <select id="project-search" class="form-select form-select" style="width: 200px;" onchange="(function() { const baseUrl = '{{ route('weekly-overview.index') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
+                <select id="project-search" class="form-select w-100 ms-md-auto" style="max-width: min(320px, 100%);" onchange="(function() { const baseUrl = '{{ route('weekly-overview.index') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
                     <option value="">Wszystkie projekty</option>
                     @foreach($allProjects as $project)
                         <option value="{{ $project->id }}" {{ $projectId && $projectId == $project->id ? 'selected' : '' }}>
@@ -47,12 +47,13 @@
     @endif
 
     <!-- Nawigacja między tygodniami -->
-    <div class="mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
-        <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" action="back">
-            Poprzedni tydzień
-        </x-ui.button>
-
-        <div class="text-center">
+    <x-ui.period-nav>
+        <x-slot name="prev">
+            <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" action="back" class="w-100">
+                Poprzedni tydzień
+            </x-ui.button>
+        </x-slot>
+        <div>
             <h3 class="fs-5 fw-bold mb-0">
                 Tydzień {{ $navigation['current']['number'] }}
             </h3>
@@ -60,11 +61,12 @@
                 {{ $navigation['current']['start']->format('d.m.Y') }} – {{ $navigation['current']['end']->format('d.m.Y') }}
             </p>
         </div>
-
-        <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}">
-            Następny tydzień
-        </x-ui.button>
-    </div>
+        <x-slot name="next">
+            <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}" class="w-100">
+                Następny tydzień
+            </x-ui.button>
+        </x-slot>
+    </x-ui.period-nav>
 
     <!-- Kończące się dokumenty i ubezpieczenia -->
     <div class="mt-4">
@@ -562,9 +564,7 @@
                                     class="btn-sm" 
                                     action="edit"
                                     title="Edytuj zapotrzebowanie"
-                                >
-                                    <i class="bi bi-pencil"></i>
-                                </x-ui.button>
+                                />
                             </div>
                             
                             @php

@@ -160,33 +160,37 @@
     </style>
 
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap flex-column flex-md-row text-center text-md-start">
-            @php
-                $monthlyGridRoute = isset($isMineRoute) && $isMineRoute ? 'mine.time-logs.monthly-grid' : 'time-logs.monthly-grid';
-                $selectedProjectParam = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
-                $selectedUserParam = isset($userPage) && $userPage ? ['user_page' => $userPage] : [];
-            @endphp
-            
-            @if(!($isMineRoute ?? false))
-                <!-- Przycisk poprzedni miesiąc -->
-                <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, array_merge(['month' => $prevMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm">
-                    <i class="bi bi-chevron-left"></i>
-                    <span>Poprzedni miesiąc</span>
-                </x-ui.button>
-            @endif
+        @php
+            $monthlyGridRoute = isset($isMineRoute) && $isMineRoute ? 'mine.time-logs.monthly-grid' : 'time-logs.monthly-grid';
+            $selectedProjectParam = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
+            $selectedUserParam = isset($userPage) && $userPage ? ['user_page' => $userPage] : [];
+        @endphp
 
-            <h2 class="fw-semibold fs-4 mb-0">
-                {{ isset($isMineRoute) && $isMineRoute ? 'Ewidencja Godzin Zespołu – Widok Miesięczny' : 'Ewidencja Godzin – Widok Miesięczny' }}
-            </h2>
-
-            @if(!($isMineRoute ?? false))
-                <!-- Przycisk następny miesiąc -->
-                <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, array_merge(['month' => $nextMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm">
-                    <span>Następny miesiąc</span>
-                    <i class="bi bi-chevron-right"></i>
-                </x-ui.button>
-            @endif
-        </div>
+        @if(!($isMineRoute ?? false))
+            <x-ui.period-nav class="mb-0">
+                <x-slot name="prev">
+                    <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, array_merge(['month' => $prevMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm w-100">
+                        <i class="bi bi-chevron-left"></i>
+                        <span>Poprzedni miesiąc</span>
+                    </x-ui.button>
+                </x-slot>
+                <h2 class="fw-semibold fs-4 mb-0">
+                    Ewidencja Godzin – Widok Miesięczny
+                </h2>
+                <x-slot name="next">
+                    <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, array_merge(['month' => $nextMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm w-100">
+                        <span>Następny miesiąc</span>
+                        <i class="bi bi-chevron-right"></i>
+                    </x-ui.button>
+                </x-slot>
+            </x-ui.period-nav>
+        @else
+            <div class="text-center mb-0">
+                <h2 class="fw-semibold fs-4 mb-0">
+                    Ewidencja Godzin Zespołu – Widok Miesięczny
+                </h2>
+            </div>
+        @endif
     </x-slot>
 
     <div class="time-logs-monthly-grid-root">
@@ -488,11 +492,11 @@
                 </div>
 
                 @if(!empty($projectsData) && $totalUsersForPagination > 0 && $totalUserPages > 1)
-                    <div class="mb-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                        <div class="small text-muted">
+                    <div class="mb-3 d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
+                        <div class="small text-muted text-center text-sm-start">
                             Strona <span class="fw-semibold">{{ $userPage }}</span> z <span class="fw-semibold">{{ $totalUserPages }}</span> (użytkownicy {{ $userOffset + 1 }}–{{ min($userOffset + $userPerPage, $totalUsersForPagination) }})
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 justify-content-center justify-content-sm-end flex-wrap">
                             @if($userPage > 1)
                                 <x-ui.button
                                     variant="ghost"

@@ -83,7 +83,7 @@
                         type="submit"
                         action="save"
                     >
-                        Generuj Payroll
+                        Wygeneruj dla wszystkich
                     </x-ui.button>
                 </div>
             </form>

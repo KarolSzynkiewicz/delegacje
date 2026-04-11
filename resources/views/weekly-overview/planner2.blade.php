@@ -1,18 +1,23 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex gap-2 align-items-center">
+        <div class="row g-3 align-items-center align-items-md-center">
+            <div class="col-12 col-md-4 order-2 order-md-1 text-md-start text-center">
                 @if($projectId)
-                    <x-ui.button variant="ghost" href="{{ route('weekly-overview.planner2', ['start_date' => $startDate->format('Y-m-d')]) }}" class="btn-sm">
+                    <x-ui.button variant="ghost" href="{{ route('weekly-overview.planner2', ['start_date' => $startDate->format('Y-m-d')]) }}" class="btn-sm w-100 w-md-auto">
                         <i class="bi bi-x-circle"></i> Wyczyść filtry
                     </x-ui.button>
                 @endif
             </div>
-            <div class="flex-grow-1 text-center">
+            <div class="col-12 col-md-4 order-1 order-md-2 text-center">
                 <h2 class="fw-semibold fs-4 mb-0">Planer Tygodnia 2</h2>
             </div>
-            <div class="d-flex align-items-center">
-                <select id="project-search" class="form-select form-select-sm" style="width: 200px;" onchange="(function() { const baseUrl = '{{ route('weekly-overview.planner2') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)">
+            <div class="col-12 col-md-4 order-3 order-md-3 text-md-end text-center">
+                <select
+                    id="project-search"
+                    class="form-select form-select-sm w-100 ms-md-auto"
+                    style="max-width: min(320px, 100%);"
+                    onchange="(function() { const baseUrl = '{{ route('weekly-overview.planner2') }}'; const params = new URLSearchParams(); params.set('start_date', '{{ $startDate->format('Y-m-d') }}'); if (this.value) { params.set('project_id', this.value); } window.location.href = baseUrl + '?' + params.toString(); }).call(this)"
+                >
                     <option value="">Wszystkie projekty</option>
                     @foreach($allProjects as $project)
                         <option value="{{ $project->id }}" {{ $projectId && $projectId == $project->id ? 'selected' : '' }}>
@@ -27,15 +32,14 @@
     <div class="py-4">
         <div class="container-xxl">
             <!-- Nawigacja między tygodniami -->
-            <div class="mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
-                <!-- Przycisk poprzedni tydzień -->
-                <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}">
-                    <i class="bi bi-chevron-left"></i>
-                    <span>Poprzedni tydzień</span>
-                </x-ui.button>
-
-                <!-- Aktualny tydzień -->
-                <div class="text-center">
+            <x-ui.period-nav>
+                <x-slot name="prev">
+                    <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" class="w-100">
+                        <i class="bi bi-chevron-left"></i>
+                        <span>Poprzedni tydzień</span>
+                    </x-ui.button>
+                </x-slot>
+                <div>
                     <h3 class="fs-5 fw-bold mb-0">
                         Tydzień {{ $navigation['current']['number'] }}
                     </h3>
@@ -43,13 +47,13 @@
                         {{ $navigation['current']['start']->format('d.m.Y') }} – {{ $navigation['current']['end']->format('d.m.Y') }}
                     </p>
                 </div>
-
-                <!-- Przycisk następny tydzień -->
-                <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}">
-                    <span>Następny tydzień</span>
-                    <i class="bi bi-chevron-right"></i>
-                </x-ui.button>
-            </div>
+                <x-slot name="next">
+                    <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}" class="w-100">
+                        <span>Następny tydzień</span>
+                        <i class="bi bi-chevron-right"></i>
+                    </x-ui.button>
+                </x-slot>
+            </x-ui.period-nav>
             @forelse($projectsWithCalendar as $projectData)
                 @php
                     $project = $projectData['project'];

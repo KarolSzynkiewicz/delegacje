@@ -51,7 +51,7 @@
                     @foreach($notifications as $n)
                         @php
                             $data = $n->data;
-                            $url  = $data['task_url'] ?? $data['url'] ?? null;
+                            $url  = $data['resource_url'] ?? $data['task_url'] ?? $data['url'] ?? null;
                             $read = $n->read_at !== null;
                         @endphp
                         <li
@@ -65,7 +65,8 @@
                                     'bi-chat-quote-fill text-info'       => ($data['type'] ?? '') === 'comment_mentioned',
                                     'bi-chat-left-text-fill text-success' => ($data['type'] ?? '') === 'task_comment_added',
                                     'bi-list-check text-info'            => ($data['type'] ?? '') === 'subtask_mentioned',
-                                    'bi-bell-fill text-secondary'        => !in_array($data['type'] ?? '', ['task_assigned', 'comment_mentioned', 'task_comment_added', 'subtask_mentioned']),
+                                    'bi-heart-fill text-danger'          => ($data['type'] ?? '') === 'comment_liked',
+                                    'bi-bell-fill text-secondary'        => !in_array($data['type'] ?? '', ['task_assigned', 'comment_mentioned', 'task_comment_added', 'subtask_mentioned', 'comment_liked']),
                                 ])></i>
                                 <div class="min-w-0 flex-grow-1">
                                     <p class="mb-0 small lh-sm">

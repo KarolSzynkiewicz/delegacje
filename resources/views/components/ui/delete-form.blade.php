@@ -7,14 +7,18 @@
     'buttonText' => 'Usuń',
 ])
 
+@php
+    use Illuminate\Support\Js;
+@endphp
+
 <form action="{{ $url }}" method="POST" class="d-inline">
     @csrf
     @method('DELETE')
-    <x-ui.button 
-        variant="{{ $buttonVariant }}" 
-        type="submit" 
+    <x-ui.button
+        variant="{{ $buttonVariant }}"
+        type="submit"
         class="{{ $buttonClass }} {{ $class }}"
-        onclick="return confirm('{{ $message }}')"
+        onclick='return confirm({{ Js::from($message) }})'
     >
         {{ $buttonText }}
     </x-ui.button>

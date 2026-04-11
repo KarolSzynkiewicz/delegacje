@@ -8,8 +8,8 @@
 
         <!-- Statystyki i Filtry -->
         <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-                <div>
+            <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center justify-content-between gap-3 mb-3">
+                <div class="text-center text-md-start min-w-0">
                     <h3 class="fs-5 fw-semibold mb-1">Payroll</h3>
                     <p class="small text-muted mb-0">
                         @if(!empty($search) || !empty($statusFilter) || !empty($dateFrom) || !empty($dateTo))
@@ -19,11 +19,11 @@
                         @endif
                     </p>
                 </div>
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex flex-column flex-md-row gap-2 flex-md-wrap justify-content-center justify-content-md-end flex-shrink-0">
                     <x-ui.button
                         variant="{{ $bulkMode ? 'warning' : 'ghost' }}"
                         wire:click="toggleBulkMode"
-                        class="btn-sm"
+                        class="btn-sm w-100 w-md-auto"
                     >
                         <i class="bi bi-check2-square me-1"></i> {{ $bulkMode ? 'Tryb wyboru: WŁ.' : 'Rozliczenie zbiorowe' }}
                     </x-ui.button>
@@ -31,7 +31,7 @@
                     <x-ui.button
                         variant="ghost"
                         wire:click="clearFilters"
-                        class="btn-sm"
+                        class="btn-sm w-100 w-md-auto"
                         :disabled="empty($search) && empty($statusFilter) && empty($dateFrom) && empty($dateTo)"
                     >
                         <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
@@ -100,18 +100,18 @@
         </div>
 
         @if($bulkMode)
-            <div class="mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                <div class="small text-muted">
+            <div class="mb-3 d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-2">
+                <div class="small text-muted text-center text-sm-start">
                     Zaznaczono: <span class="fw-semibold">{{ count($selectedPayrollIds) }}</span>
                     @error('selectedPayrollIds')
                         <span class="text-danger ms-2">{{ $message }}</span>
                     @enderror
                 </div>
-                <div class="d-flex gap-2 flex-wrap">
-                    <x-ui.button variant="primary" class="btn-sm" wire:click="openBulkWizard" :disabled="count($selectedPayrollIds) < 1">
+                <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center justify-content-sm-end">
+                    <x-ui.button variant="primary" class="btn-sm w-100 w-sm-auto" wire:click="openBulkWizard" :disabled="count($selectedPayrollIds) < 1">
                         <i class="bi bi-plus-circle me-1"></i> Utwórz wyrównanie
                     </x-ui.button>
-                    <x-ui.button variant="ghost" class="btn-sm" wire:click="toggleBulkMode">
+                    <x-ui.button variant="ghost" class="btn-sm w-100 w-sm-auto" wire:click="toggleBulkMode">
                         Zakończ
                     </x-ui.button>
                 </div>

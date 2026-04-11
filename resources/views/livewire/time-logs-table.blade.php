@@ -3,8 +3,8 @@
     <x-ui.card class="mb-4">
         <!-- Statystyki -->
         <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <div>
+            <div class="d-flex flex-column flex-sm-row flex-wrap align-items-stretch align-items-sm-center justify-content-between gap-3">
+                <div class="text-center text-sm-start">
                     <h3 class="fs-5 fw-semibold mb-1">Ewidencja Godzin</h3>
                     <p class="small text-muted mb-0">
                         @if($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)
@@ -21,7 +21,7 @@
                 <x-ui.button 
                     variant="ghost" 
                     wire:click="clearFilters" 
-                    class="btn-sm"
+                    class="btn-sm align-self-center align-self-sm-end w-100 w-sm-auto"
                     :disabled="!($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)"
                 >
                     <i class="bi bi-x-circle me-1"></i> Wyczyść filtry

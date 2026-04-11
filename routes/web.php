@@ -189,6 +189,8 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('comments.update');
         Route::delete('comments/{comment}', [\App\Http\Controllers\CommentController::class, 'destroy'])
             ->name('comments.destroy');
+        Route::post('comments/{comment}/like', [\App\Http\Controllers\CommentController::class, 'toggleLike'])
+            ->name('comments.like');
 
         Route::get('attachments/{attachment}/download', [\App\Http\Controllers\AttachmentController::class, 'download'])
             ->name('attachments.download');

@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2 class="fw-semibold fs-4 mb-0">Edytuj Payroll</h2>
-            <x-ui.button variant="ghost" href="{{ route('payrolls.index') }}">
+        <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
+            <h2 class="fw-semibold fs-4 mb-0 text-center text-sm-start">Edytuj Payroll</h2>
+            <x-ui.button variant="ghost" href="{{ route('payrolls.index') }}" class="w-100 w-sm-auto align-self-center align-self-sm-end">
                 <i class="bi bi-arrow-left"></i> Powrót
             </x-ui.button>
         </div>

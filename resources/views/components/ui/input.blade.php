@@ -17,7 +17,7 @@
     }
 @endphp
 
-@if($label)
+@if($label && $type !== 'checkbox')
     <label class="form-label" for="{{ $inputId }}">
         {{ $label }}
         @if($required)
@@ -81,7 +81,12 @@
             {{ $required ? 'required' : '' }}
         >
         @if($label)
-            <label class="form-check-label" for="{{ $checkboxId }}">{!! $label !!}</label>
+            <label class="form-check-label" for="{{ $checkboxId }}">
+                {!! $label !!}
+                @if($required)
+                    <span class="text-danger">*</span>
+                @endif
+            </label>
         @endif
     </div>
 @else

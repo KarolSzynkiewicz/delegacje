@@ -8,6 +8,10 @@
     'class' => '',
 ])
 
+@php
+    use Illuminate\Support\Js;
+@endphp
+
 @if($viewRoute || $editRoute || $deleteRoute)
     {{-- Tryb z parametrami route (backward compatible z action-buttons) --}}
     <div class="btn-group" role="group">
@@ -24,13 +28,16 @@
         @endif
         
         @if($deleteRoute)
-            <form action="{{ $deleteRoute }}" 
-                  method="POST" 
-                  class="d-inline"
-                  onsubmit="return confirm('{{ $deleteMessage }}')">
+            {{-- onclick zamiast onsubmit na formularzu: Livewire nie usuwa atrybutu; Js::from bezpiecznie escapuje tekst --}}
+            <form action="{{ $deleteRoute }}" method="POST" class="d-inline">
                 @csrf
                 @method('DELETE')
-                <x-ui.button variant="danger" type="submit" title="Usuń">
+                <x-ui.button
+                    variant="danger"
+                    type="submit"
+                    title="Usuń"
+                    onclick='return confirm({{ Js::from($deleteMessage) }})'
+                >
                     <i class="bi bi-trash"></i>
                 </x-ui.button>
             </form>

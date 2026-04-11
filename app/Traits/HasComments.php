@@ -18,11 +18,12 @@ trait HasComments
     /**
      * Add a comment to this model.
      */
-    public function addComment(?string $body, \App\Models\User $user): Comment
+    public function addComment(?string $body, \App\Models\User $user, ?Comment $parent = null): Comment
     {
         return $this->comments()->create([
             'user_id' => $user->id,
             'body' => $body,
+            'parent_id' => $parent?->id,
         ]);
     }
 

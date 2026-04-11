@@ -82,77 +82,30 @@
     </form>
 
     @php
-        // Ensure comments are loaded with user relationship
-        $comments = $commentable->comments()->with(['user', 'attachments'])->orderBy('created_at', 'desc')->get();
+        $allCommentsFlat = $commentable->comments()
+            ->with(['user', 'attachments', 'likes.user'])
+            ->withCount('likes')
+            ->withExists(['likes as liked_by_me' => fn ($q) => $q->where('user_id', auth()->id())])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        $commentRoots = $allCommentsFlat->whereNull('parent_id')->values();
+        $childrenOf = $allCommentsFlat->whereNotNull('parent_id')->groupBy('parent_id');
         $knownUsersForHighlight = \App\Models\User::orderBy('name')->get()
-            ->map(fn($u) => ['name' => $u->name, 'initials' => $u->initials])
+            ->map(fn ($u) => ['name' => $u->name, 'initials' => $u->initials])
             ->all();
     @endphp
-    
-    @if($comments->count() > 0)
+
+    @if($allCommentsFlat->count() > 0)
         <div class="comments-list">
-            @foreach($comments as $comment)
-                @php
-                    // Support both stored newlines and stored <br> tags (historical data)
-                    $commentBodyForDisplay = preg_replace('/<br\\s*\\/?\\s*>/i', "\n", (string) ($comment->body ?? ''));
-                    $commentBodyForEdit = $commentBodyForDisplay;
-                @endphp
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="d-flex align-items-center">
-                                <x-ui.avatar :name="$comment->user->name" size="sm" class="me-2" />
-                                <div>
-                                    <strong>{{ $comment->user->name }}</strong>
-                                    <br>
-                                    <small class="text-muted">{{ $comment->created_at->format('d.m.Y H:i') }}</small>
-                                </div>
-                            </div>
-                            @if($comment->user_id === auth()->id() || auth()->user()->isAdmin())
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editComment({{ $comment->id }})">
-                                        Edytuj
-                                    </button>
-                                    <x-ui.delete-form 
-                                        :url="route('comments.destroy', $comment)"
-                                        message="Czy na pewno chcesz usunąć ten komentarz?"
-                                        class="d-inline"
-                                    />
-                                </div>
-                            @endif
-                        </div>
-                        <div id="comment-body-{{ $comment->id }}">
-                            @if(filled($comment->body))
-                                <p class="mb-0">{!! \App\Services\UserMentionService::highlightMentions(
-                                    nl2br(e($commentBodyForDisplay)),
-                                    $knownUsersForHighlight
-                                ) !!}</p>
-                            @endif
-                            <x-attachment-list :attachments="$comment->attachments" :class="filled($comment->body) ? 'mt-2' : ''" />
-                        </div>
-                        <div id="comment-edit-{{ $comment->id }}" style="display: none;">
-                            <form action="{{ route('comments.update', $comment) }}" method="POST" enctype="multipart/form-data">
-                                @csrf
-                                @method('PUT')
-                                <x-ui.input 
-                                    type="textarea" 
-                                    name="body" 
-                                    :value="$commentBodyForEdit"
-                                    rows="3"
-                                />
-                                <div class="mt-2 mb-2">
-                                    <label class="form-label small">Dodaj kolejne załączniki</label>
-                                    <input type="file" name="attachments[]" class="form-control form-control-sm" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
-                                </div>
-                                <x-attachment-list :attachments="$comment->attachments" class="mt-1" />
-                                <div class="mt-2">
-                                    <x-ui.button variant="primary" type="submit" class="btn-sm">Zapisz</x-ui.button>
-                                    <x-ui.button variant="ghost" type="button" class="btn-sm" onclick="cancelEdit({{ $comment->id }})">Anuluj</x-ui.button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+            @foreach($commentRoots as $comment)
+                @include('components.comment-node', [
+                    'comment' => $comment,
+                    'depth' => 0,
+                    'commentable' => $commentable,
+                    'commentableTypeValue' => $commentableType->value,
+                    'knownUsersForHighlight' => $knownUsersForHighlight,
+                    'childrenOf' => $childrenOf,
+                ])
             @endforeach
         </div>
     @else
@@ -166,13 +119,17 @@
 @push('scripts')
 <script>
     function editComment(commentId) {
-        document.getElementById('comment-body-' + commentId).style.display = 'none';
-        document.getElementById('comment-edit-' + commentId).style.display = 'block';
+        const body = document.getElementById('comment-body-' + commentId);
+        const edit = document.getElementById('comment-edit-' + commentId);
+        if (body) { body.classList.add('d-none'); }
+        if (edit) { edit.classList.remove('d-none'); }
     }
 
     function cancelEdit(commentId) {
-        document.getElementById('comment-body-' + commentId).style.display = 'block';
-        document.getElementById('comment-edit-' + commentId).style.display = 'none';
+        const body = document.getElementById('comment-body-' + commentId);
+        const edit = document.getElementById('comment-edit-' + commentId);
+        if (body) { body.classList.remove('d-none'); }
+        if (edit) { edit.classList.add('d-none'); }
     }
 
     // Alpine.js component dla @mention autocomplete

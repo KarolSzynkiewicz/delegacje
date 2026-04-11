@@ -9,6 +9,7 @@
 
 @php
     use Illuminate\Support\Facades\Route;
+    use Illuminate\Support\Js;
     
     $sizeClass = $size === 'sm' ? 'btn-sm' : ($size === 'lg' ? 'btn-lg' : '');
     
@@ -80,19 +81,17 @@
     @endif
     
     @if($deleteRoute)
-        <form action="{{ $deleteRoute }}" 
-              method="POST" 
-              class="d-inline"
-              onsubmit="return confirm('{{ $deleteMessage }}')">
+        <form action="{{ $deleteRoute }}" method="POST" class="d-inline">
             @csrf
             @method('DELETE')
-            <x-ui.button 
-                variant="danger" 
-                type="submit" 
+            <x-ui.button
+                variant="danger"
+                type="submit"
                 routeName="{{ $deleteRouteName }}"
                 action="delete"
                 title="Usuń"
                 class="{{ $sizeClass }}"
+                onclick='return confirm({{ Js::from($deleteMessage) }})'
             />
         </form>
     @endif

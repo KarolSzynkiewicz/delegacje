@@ -2,16 +2,17 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithTaskQuickEdit;
 use App\Models\Project;
 use App\Models\ProjectTask;
-use App\Policies\ProjectTaskPolicy;
-use Illuminate\Support\Facades\Validator;
+use App\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class TasksTable extends Component
 {
     use WithPagination;
+    use WithTaskQuickEdit;
 
     public $searchProject = '';
 
@@ -25,9 +26,9 @@ class TasksTable extends Component
 
     public $myTasksOnly = false; // Toggle for filtering only my tasks
 
-    public $sortField = 'due_date';
+    public $sortField = 'created_at';
 
-    public $sortDirection = 'asc';
+    public $sortDirection = 'desc';
 
     // Optional filters for /mine/* routes
     public $filterProjectIds = null;
@@ -36,24 +37,6 @@ class TasksTable extends Component
 
     public $isMineView = false; // Flag to determine if we're in /mine/* context
 
-    /** @var int|null */
-    public $quickEditTaskId = null;
-
-    public string $qeProjectId = '';
-
-    public string $qeCategory = '';
-
-    public string $qeDueDate = '';
-
-    public ?string $quickEditFlash = null;
-
-    /** project|category|due_date */
-    public string $quickEditField = 'project';
-
-    public ?float $quickEditClientX = null;
-
-    public ?float $quickEditClientY = null;
-
     protected $queryString = [
         'searchProject' => ['except' => ''],
         'searchTask' => ['except' => ''],
@@ -61,8 +44,8 @@ class TasksTable extends Component
         'searchAssignedTo' => ['except' => ''],
         'status' => ['except' => ''],
         'myTasksOnly' => ['except' => false],
-        'sortField' => ['except' => 'due_date'],
-        'sortDirection' => ['except' => 'asc'],
+        'sortField' => ['except' => 'created_at'],
+        'sortDirection' => ['except' => 'desc'],
     ];
 
     protected $updatesQueryString = ['searchProject', 'searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly', 'sortField', 'sortDirection'];
@@ -91,8 +74,8 @@ class TasksTable extends Component
         $this->searchAssignedTo = '';
         $this->status = '';
         $this->myTasksOnly = false;
-        $this->sortField = 'due_date';
-        $this->sortDirection = 'asc';
+        $this->sortField = 'created_at';
+        $this->sortDirection = 'desc';
         $this->resetPage();
     }
 
@@ -111,118 +94,6 @@ class TasksTable extends Component
     public function paginationView()
     {
         return 'vendor.livewire.simple-pagination';
-    }
-
-    public function canQuickEditTask(ProjectTask $task): bool
-    {
-        $user = auth()->user();
-        if (! $user) {
-            return false;
-        }
-
-        return app(ProjectTaskPolicy::class)->updateStatus($user, $task);
-    }
-
-    public function openQuickEdit(int $taskId, string $field, ?float $clientX = null, ?float $clientY = null): void
-    {
-        $this->quickEditFlash = null;
-
-        if (! in_array($field, ['project', 'category', 'due_date'], true)) {
-            $field = 'project';
-        }
-
-        $this->quickEditField = $field;
-        $this->quickEditClientX = $clientX;
-        $this->quickEditClientY = $clientY;
-
-        $task = ProjectTask::query()->find($taskId);
-        if (! $task || ! $this->canQuickEditTask($task)) {
-            return;
-        }
-
-        $this->quickEditTaskId = $task->id;
-        $this->qeProjectId = $task->project_id ? (string) $task->project_id : '';
-        $this->qeCategory = (string) ($task->category ?? '');
-        $this->qeDueDate = $task->due_date ? $task->due_date->format('Y-m-d') : '';
-    }
-
-    public function closeQuickEdit(): void
-    {
-        $this->quickEditTaskId = null;
-        $this->qeProjectId = '';
-        $this->qeCategory = '';
-        $this->qeDueDate = '';
-        $this->quickEditField = 'project';
-        $this->quickEditClientX = null;
-        $this->quickEditClientY = null;
-    }
-
-    public function saveQuickEdit(): void
-    {
-        if (! $this->quickEditTaskId) {
-            return;
-        }
-
-        $task = ProjectTask::query()->find($this->quickEditTaskId);
-        if (! $task || ! $this->canQuickEditTask($task)) {
-            abort(403);
-        }
-
-        if (! in_array($this->quickEditField, ['project', 'category', 'due_date'], true)) {
-            $this->quickEditField = 'project';
-        }
-
-        match ($this->quickEditField) {
-            'project' => $this->saveQuickEditProject($task),
-            'category' => $this->saveQuickEditCategory($task),
-            'due_date' => $this->saveQuickEditDueDate($task),
-        };
-
-        $this->quickEditFlash = 'Zapisano zmiany.';
-        $this->closeQuickEdit();
-    }
-
-    protected function saveQuickEditProject(ProjectTask $task): void
-    {
-        Validator::make(
-            [
-                'qeProjectId' => $this->qeProjectId === '' ? null : $this->qeProjectId,
-            ],
-            [
-                'qeProjectId' => ['nullable', 'integer', 'exists:projects,id'],
-            ],
-            [
-                'qeProjectId.exists' => 'Wybrany projekt nie istnieje.',
-            ]
-        )->validate();
-
-        $projectId = $this->qeProjectId === '' ? null : (int) $this->qeProjectId;
-        $task->update(['project_id' => $projectId]);
-    }
-
-    protected function saveQuickEditCategory(ProjectTask $task): void
-    {
-        Validator::make(
-            ['qeCategory' => $this->qeCategory],
-            ['qeCategory' => ['nullable', 'string', 'max:255']],
-        )->validate();
-
-        $task->update([
-            'category' => $this->qeCategory === '' ? null : $this->qeCategory,
-        ]);
-    }
-
-    protected function saveQuickEditDueDate(ProjectTask $task): void
-    {
-        Validator::make(
-            ['qeDueDate' => $this->qeDueDate === '' ? null : $this->qeDueDate],
-            ['qeDueDate' => ['nullable', 'date']],
-            ['qeDueDate.date' => 'Nieprawidłowa data terminu.']
-        )->validate();
-
-        $task->update([
-            'due_date' => $this->qeDueDate === '' ? null : $this->qeDueDate,
-        ]);
     }
 
     public function render()
@@ -358,6 +229,7 @@ class TasksTable extends Component
             'tasks' => $tasks,
             'projects' => $projects,
             'allProjects' => $allProjects,
+            'allUsers' => User::orderBy('name')->get(),
             'statuses' => $statuses,
             'isMineView' => $isMineView,
         ]);

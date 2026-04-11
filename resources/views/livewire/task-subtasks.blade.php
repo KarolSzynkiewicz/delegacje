@@ -33,7 +33,7 @@
             </div>
         @endif
 
-        <!-- Formularz dodawania podzadania (@wzmianka jak w komentarzach) -->
+        <!-- Formularz dodawania podzadania (opcjonalna wzmianka @ jak w komentarzach) -->
         <div class="mb-4">
             <form wire:submit.prevent="addSubtask" class="d-flex gap-2 align-items-start">
                 <div
@@ -44,7 +44,7 @@
                         type="text"
                         wire:model.defer="newSubtaskName"
                         x-ref="inp"
-                        placeholder="Dodaj podzadanie… @NazwaUżytkownika"
+                        placeholder="Wpisz nazwę podzadania…"
                         class="form-control @error('newSubtaskName') is-invalid @enderror mb-0"
                         @input="onInput($event)"
                         @keydown.escape="close()"

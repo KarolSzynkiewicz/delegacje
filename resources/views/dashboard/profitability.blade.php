@@ -44,15 +44,14 @@
     <div class="py-4">
         <div class="container-xxl">
             <!-- Nawigacja między miesiącami -->
-            <div class="mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
-                <!-- Przycisk poprzedni miesiąc -->
-                <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}">
-                    <i class="bi bi-chevron-left"></i>
-                    <span>Poprzedni miesiąc</span>
-                </x-ui.button>
-
-                <!-- Aktualny miesiąc -->
-                <div class="text-center">
+            <x-ui.period-nav>
+                <x-slot name="prev">
+                    <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" class="w-100">
+                        <i class="bi bi-chevron-left"></i>
+                        <span>Poprzedni miesiąc</span>
+                    </x-ui.button>
+                </x-slot>
+                <div>
                     <h3 class="fs-5 fw-bold mb-0">
                         Dashboard zysków i strat
                     </h3>
@@ -60,13 +59,13 @@
                         {{ $navigation['current']['label'] }}
                     </p>
                 </div>
-
-                <!-- Przycisk następny miesiąc -->
-                <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}">
-                    <span>Następny miesiąc</span>
-                    <i class="bi bi-chevron-right"></i>
-                </x-ui.button>
-            </div>
+                <x-slot name="next">
+                    <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}" class="w-100">
+                        <span>Następny miesiąc</span>
+                        <i class="bi bi-chevron-right"></i>
+                    </x-ui.button>
+                </x-slot>
+            </x-ui.period-nav>
 
     <!-- Summary Card -->
     <div class="row mb-4">

@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\ProjectTask;
 use App\Models\User;
+use App\Notifications\CommentLiked;
 use App\Notifications\TaskCommentAdded;
 use App\Services\UserMentionService;
 use Illuminate\Http\RedirectResponse;
@@ -31,8 +32,13 @@ class CommentController extends Controller
         $bodyRaw = $request->input('body');
         $body = is_string($bodyRaw) && trim($bodyRaw) !== '' ? $bodyRaw : null;
 
+        $parent = null;
+        if ($request->filled('parent_id')) {
+            $parent = Comment::query()->findOrFail((int) $request->input('parent_id'));
+        }
+
         // Add comment using domain method
-        $comment = $commentable->addComment($body, auth()->user());
+        $comment = $commentable->addComment($body, auth()->user(), $parent);
 
         $files = $request->file('attachments', []);
         if (! is_array($files)) {
@@ -125,5 +131,25 @@ class CommentController extends Controller
         $comment->delete();
 
         return redirect()->back()->with('success', 'Komentarz został usunięty.');
+    }
+
+    /**
+     * Polub / cofnij polubienie komentarza.
+     */
+    public function toggleLike(Comment $comment): RedirectResponse
+    {
+        $user = auth()->user();
+        $existing = $comment->likes()->where('user_id', $user->id)->first();
+        if ($existing) {
+            $existing->delete();
+        } else {
+            $comment->likes()->create(['user_id' => $user->id]);
+            if ($comment->user_id !== $user->id) {
+                $author = User::query()->find($comment->user_id);
+                $author?->notify(new CommentLiked($comment, $user));
+            }
+        }
+
+        return redirect()->back();
     }
 }
