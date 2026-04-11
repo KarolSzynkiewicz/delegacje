@@ -29,7 +29,7 @@
     <!-- Modal do dodawania zadań -->
     <x-modal name="add-task-modal" :show="$errors->any() || session('error')" focusable>
         <x-ui.card label="Dodaj nowe zadanie">
-            <form action="{{ route('tasks.store') }}" method="POST" id="add-task-form">
+            <form action="{{ route('tasks.store') }}" method="POST" id="add-task-form" enctype="multipart/form-data">
                 @csrf
                 <div class="mb-3">
                     <x-ui.input 
@@ -117,6 +117,12 @@
                         rows="3"
                         value="{{ old('description') }}"
                     />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Załączniki (opcjonalnie)</label>
+                    <input type="file" name="attachments[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
+                    <small class="text-muted d-block mt-1">Do 15 plików, każdy max. 15 MB.</small>
                 </div>
                 
                 <x-ui.errors />

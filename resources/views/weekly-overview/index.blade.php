@@ -1149,10 +1149,10 @@
                             @endif
                             <button
                                 type="button"
-                                class="weekly-overview-assigned-toggle btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 collapsed"
+                                class="weekly-overview-assigned-toggle btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#{{ $assignedCollapseId }}"
-                                aria-expanded="false"
+                                aria-expanded="true"
                                 aria-controls="{{ $assignedCollapseId }}"
                                 title="Pokaż lub ukryj listę pracowników"
                             >
@@ -1170,7 +1170,7 @@
                         </div>
                     </div>
 
-                    <div class="collapse" id="{{ $assignedCollapseId }}">
+                    <div class="collapse show" id="{{ $assignedCollapseId }}">
                         @if($assignedList->isNotEmpty())
                         <div class="table-responsive">
                             <table class="table align-middle">

@@ -3,7 +3,6 @@
 namespace App\Traits;
 
 use App\Models\Comment;
-use App\Enums\CommentableType;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 trait HasComments
@@ -19,10 +18,9 @@ trait HasComments
     /**
      * Add a comment to this model.
      */
-    public function addComment(string $body, \App\Models\User $user): Comment
+    public function addComment(?string $body, \App\Models\User $user): Comment
     {
         return $this->comments()->create([
-            'commentable_type' => CommentableType::fromModel($this),
             'user_id' => $user->id,
             'body' => $body,
         ]);

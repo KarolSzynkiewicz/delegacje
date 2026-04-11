@@ -46,6 +46,15 @@
                                 <div class="text-break">{{ $task->description }}</div>
                             </div>
                         @endif
+
+                        @if($task->attachments->count() > 0)
+                            <div class="mt-3">
+                                <small class="text-muted d-block mb-1">
+                                    <i class="bi bi-paperclip me-1"></i>Załączniki
+                                </small>
+                                <x-attachment-list :attachments="$task->attachments" />
+                            </div>
+                        @endif
                     </div>
                     
                     <!-- Prawa strona: Badge (Status, Projekt, Due Date) -->

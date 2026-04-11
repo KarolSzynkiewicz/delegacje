@@ -23,7 +23,7 @@
         @endif
         {{ $cardLabel }}
     </span>
-    <form action="{{ route('comments.store') }}" method="POST" class="mb-4">
+    <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data" class="mb-4">
         @csrf
         <input type="hidden" name="commentable_type" value="{{ $commentableType->value }}">
         <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
@@ -34,8 +34,7 @@
                 name="body"
                 rows="3"
                 class="form-control"
-                required
-                placeholder="Możesz wspomnieć o użytkowniku pisząc @NazwaUzytkownika"
+                placeholder="Możesz wspomnieć o użytkowniku pisząc @NazwaUzytkownika (treść lub załącznik — wymagane jest przynajmniej jedno)"
                 x-ref="textarea"
                 @input="onInput($event)"
                 @keydown.escape="close()"
@@ -69,6 +68,12 @@
             </ul>
         </div>
 
+        <div class="mb-3">
+            <label class="form-label">Załączniki (opcjonalnie)</label>
+            <input type="file" name="attachments[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
+            <small class="text-muted d-block mt-1">Do 15 plików, każdy max. 15 MB.</small>
+        </div>
+
         <div class="mt-1">
             <x-ui.button variant="primary" type="submit" action="save">
                 {{ $buttonTextValue }}
@@ -78,7 +83,7 @@
 
     @php
         // Ensure comments are loaded with user relationship
-        $comments = $commentable->comments()->with('user')->orderBy('created_at', 'desc')->get();
+        $comments = $commentable->comments()->with(['user', 'attachments'])->orderBy('created_at', 'desc')->get();
         $knownUsersForHighlight = \App\Models\User::orderBy('name')->get()
             ->map(fn($u) => ['name' => $u->name, 'initials' => $u->initials])
             ->all();
@@ -89,7 +94,7 @@
             @foreach($comments as $comment)
                 @php
                     // Support both stored newlines and stored <br> tags (historical data)
-                    $commentBodyForDisplay = preg_replace('/<br\\s*\\/?\\s*>/i', "\n", (string) $comment->body);
+                    $commentBodyForDisplay = preg_replace('/<br\\s*\\/?\\s*>/i', "\n", (string) ($comment->body ?? ''));
                     $commentBodyForEdit = $commentBodyForDisplay;
                 @endphp
                 <div class="card mb-3">
@@ -117,13 +122,16 @@
                             @endif
                         </div>
                         <div id="comment-body-{{ $comment->id }}">
-                            <p class="mb-0">{!! \App\Services\UserMentionService::highlightMentions(
-                                nl2br(e($commentBodyForDisplay)),
-                                $knownUsersForHighlight
-                            ) !!}</p>
+                            @if(filled($comment->body))
+                                <p class="mb-0">{!! \App\Services\UserMentionService::highlightMentions(
+                                    nl2br(e($commentBodyForDisplay)),
+                                    $knownUsersForHighlight
+                                ) !!}</p>
+                            @endif
+                            <x-attachment-list :attachments="$comment->attachments" :class="filled($comment->body) ? 'mt-2' : ''" />
                         </div>
                         <div id="comment-edit-{{ $comment->id }}" style="display: none;">
-                            <form action="{{ route('comments.update', $comment) }}" method="POST">
+                            <form action="{{ route('comments.update', $comment) }}" method="POST" enctype="multipart/form-data">
                                 @csrf
                                 @method('PUT')
                                 <x-ui.input 
@@ -132,6 +140,11 @@
                                     :value="$commentBodyForEdit"
                                     rows="3"
                                 />
+                                <div class="mt-2 mb-2">
+                                    <label class="form-label small">Dodaj kolejne załączniki</label>
+                                    <input type="file" name="attachments[]" class="form-control form-control-sm" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
+                                </div>
+                                <x-attachment-list :attachments="$comment->attachments" class="mt-1" />
                                 <div class="mt-2">
                                     <x-ui.button variant="primary" type="submit" class="btn-sm">Zapisz</x-ui.button>
                                     <x-ui.button variant="ghost" type="button" class="btn-sm" onclick="cancelEdit({{ $comment->id }})">Anuluj</x-ui.button>

@@ -30,6 +30,8 @@ class StoreProjectTaskRequest extends FormRequest
             'status' => ['nullable', 'in:pending,in_progress,completed,cancelled'],
             'priority' => ['nullable', 'integer', 'min:1', 'max:5'],
             'category' => ['nullable', 'string', 'max:255'],
+            'attachments' => ['nullable', 'array', 'max:15'],
+            'attachments.*' => ['file', 'max:15360', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,txt,zip'],
         ];
     }
 

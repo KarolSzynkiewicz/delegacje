@@ -18,7 +18,7 @@
             <x-ui.card label="Edytuj Zadanie">
                 <x-ui.errors />
 
-                <form action="{{ route('tasks.update', $task) }}" method="POST">
+                <form action="{{ route('tasks.update', $task) }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
 
@@ -118,6 +118,19 @@
                             value="{{ old('category', $task->category) }}"
                             placeholder="np. Bug, Feature, Dokumentacja..."
                         />
+                    </div>
+
+                    @if($task->attachments->count() > 0)
+                        <div class="mb-3">
+                            <label class="form-label">Obecne załączniki</label>
+                            <x-attachment-list :attachments="$task->attachments" />
+                        </div>
+                    @endif
+
+                    <div class="mb-3">
+                        <label class="form-label">Dodaj załączniki</label>
+                        <input type="file" name="attachments[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
+                        <small class="text-muted d-block mt-1">Do 15 plików, każdy max. 15 MB.</small>
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">

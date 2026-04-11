@@ -3,6 +3,7 @@
         :tabs="$tabsForComponent" 
         :activeTab="$activeTab" 
         id="employeeTabs"
+        :compact-mobile="true"
     />
 
 <div id="employeeTabsContent">

@@ -39,10 +39,10 @@ class UserMentionService
             static function (array $m) use ($names): string {
                 $handle = $m[1]; // część po @
                 if (in_array($handle, $names, true)) {
-                    return '<strong class="text-primary">@' . $handle . '</strong>';
+                    return '<strong class="text-primary">@'.$handle.'</strong>';
                 }
 
-                return '@' . $handle;
+                return '@'.$handle;
             },
             $escapedText
         ) ?? $escapedText;
@@ -59,7 +59,7 @@ class UserMentionService
 
         $comment->loadMissing('commentable');
 
-        foreach (self::extractHandles($comment->body) as $name) {
+        foreach (self::extractHandles((string) ($comment->body ?? '')) as $name) {
             $user = User::where('name', $name)->first();
 
             if (! $user) {

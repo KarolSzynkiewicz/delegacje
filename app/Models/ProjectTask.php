@@ -4,15 +4,23 @@ namespace App\Models;
 
 use App\Enums\TaskStatus;
 use App\Traits\HasComments;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class ProjectTask extends Model
 {
-    use HasFactory, HasComments;
+    use HasComments, HasFactory;
+
+    protected static function booted(): void
+    {
+        static::deleting(function (ProjectTask $task) {
+            $task->attachments->each->delete();
+        });
+    }
 
     protected $fillable = [
         'project_id',
@@ -133,6 +141,14 @@ class ProjectTask extends Model
     }
 
     /**
+     * Załączniki do zadania (np. specyfikacja, zdjęcia).
+     */
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /**
      * Get the subtasks for this task.
      */
     public function subtasks(): HasMany
@@ -149,8 +165,9 @@ class ProjectTask extends Model
         if ($total === 0) {
             return 0;
         }
-        
+
         $completed = $this->subtasks()->where('is_completed', true)->count();
+
         return round(($completed / $total) * 100, 2);
     }
 }

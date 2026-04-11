@@ -50,6 +50,14 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
+                            <th class="text-start text-nowrap">
+                                <a href="{{ $sortLink('id') }}" class="text-decoration-none">
+                                    ID
+                                    @if($sortBy === 'id')
+                                        <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                    @endif
+                                </a>
+                            </th>
                             <th class="text-start">
                                 <a href="{{ $sortLink('event_date') }}" class="text-decoration-none">
                                     Daty
@@ -58,8 +66,14 @@
                                     @endif
                                 </a>
                             </th>
-                            <th class="text-start">Trasa</th>
-                            <th class="text-start">Pojazd / Uczestnicy</th>
+                            <th class="text-start text-nowrap">
+                                <a href="{{ $sortLink('status') }}" class="text-decoration-none">
+                                    Status
+                                    @if($sortBy === 'status')
+                                        <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                    @endif
+                                </a>
+                            </th>
                             <th class="text-start">
                                 <a href="{{ $sortLink('route_distance') }}" class="text-decoration-none">
                                     Dystans
@@ -68,13 +82,23 @@
                                     @endif
                                 </a>
                             </th>
-                            <th class="text-start">
-                                <a href="{{ $sortLink('costs_count') }}" class="text-decoration-none">
-                                    Koszty
-                                    @if($sortBy === 'costs_count')
-                                        <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
-                                    @endif
-                                </a>
+                            <th class="text-start" style="min-width: 420px;">
+                                <div class="fw-semibold mb-1">Koszty</div>
+                                <div class="small fw-normal">
+                                    <a href="{{ $sortLink('costs_count') }}" class="text-decoration-none">
+                                        wg liczby pozycji
+                                        @if($sortBy === 'costs_count')
+                                            <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                        @endif
+                                    </a>
+                                    <span class="text-muted px-1">·</span>
+                                    <a href="{{ $sortLink('costs_amount') }}" class="text-decoration-none">
+                                        wg sumy kwot
+                                        @if($sortBy === 'costs_amount')
+                                            <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                                        @endif
+                                    </a>
+                                </div>
                             </th>
                             <th class="text-start">Koszt / os.</th>
                             <th>Akcje</th>
@@ -121,23 +145,31 @@
                                         ->map(fn($items, $currency) => number_format($items->sum('amount') / $participantCount, 2) . ' ' . $currency)
                                         ->values()
                                     : collect();
+                                $statusBadgeVariant = match ($event->status) {
+                                    \App\Enums\LogisticsEventStatus::PLANNED => 'info',
+                                    \App\Enums\LogisticsEventStatus::COMPLETED => 'success',
+                                    \App\Enums\LogisticsEventStatus::CANCELLED => 'danger',
+                                    \App\Enums\LogisticsEventStatus::IN_PROGRESS => 'warning',
+                                };
                             @endphp
                             <tr>
+                                <td class="text-nowrap">
+                                    <a href="{{ $eventShowRoute }}" class="text-decoration-none fw-semibold">{{ $event->id }}</a>
+                                </td>
                                 <td>
                                     <div class="fw-semibold">
                                         <a href="{{ $eventShowRoute }}" class="text-decoration-none">
-                                            {{ $event->type->label() }} #{{ $event->id }}
+                                            {{ $event->type->label() }}
                                         </a>
                                     </div>
-                                    <small class="text-muted d-block">Start: {{ $event->event_date?->format('d.m.Y H:i') ?? '-' }}</small>
-                                    <small class="text-muted d-block">Koniec: {{ $event->end_date?->format('d.m.Y H:i') ?? '-' }}</small>
+                                    <small class="text-muted d-block">Start: {{ $event->event_date?->format('d.m.Y') ?? '-' }}</small>
+                                    <small class="text-muted d-block">Koniec: {{ $event->end_date?->format('d.m.Y') ?? '-' }}</small>
                                 </td>
                                 <td>
-                                    <div>{{ $event->fromLocation->name ?? '-' }} <span class="text-muted">→</span> {{ $event->toLocation->name ?? '-' }}</div>
-                                </td>
-                                <td>
-                                    <div>{{ $event->vehicle?->registration_number ?? 'Brak auta' }}</div>
-                                    <small class="text-muted">{{ $event->participants->pluck('employee_id')->unique()->count() }} uczestników</small>
+                                    <x-ui.badge
+                                        :variant="$statusBadgeVariant"
+                                        title="{{ e($event->status->helpText()) }}"
+                                    >{{ $event->status->label() }}</x-ui.badge>
                                 </td>
                                 <td>
                                     @if(!is_null($event->route_distance))
@@ -165,42 +197,52 @@
                                                         ->values()->join(', ');
                                                 @endphp
                                                 <div class="border rounded px-2 py-1">
-                                                    <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="mb-2">
+                                                        <span class="fw-semibold"><i class="bi bi-ticket-perforated me-1"></i>Bilety</span>
+                                                        <span class="text-muted ms-1">— łącznie: {{ $ticketSumByCur }}</span>
+                                                    </div>
+                                                    @foreach($tickets as $index => $cost)
+                                                        @if($index > 0)
+                                                            <hr class="my-2 border-secondary opacity-50">
+                                                        @endif
                                                         <div>
-                                                            <span class="fw-semibold"><i class="bi bi-ticket-perforated me-1"></i>Cena biletów (łącznie)</span>
-                                                            <span class="text-muted ms-1">— {{ $ticketSumByCur }}</span>
-                                                        </div>
-                                                        <div class="d-flex gap-1 ms-2 flex-shrink-0">
-                                                            @foreach($tickets as $cost)
+                                                            <div style="font-size: 0.875rem;">
+                                                                {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
+                                                                @if($cost->description) — {{ $cost->description }} @endif
+                                                            </div>
+                                                            <div class="mt-1">
                                                                 <x-action-buttons
                                                                     viewRoute="{{ route('transport-costs.show', $cost) }}"
                                                                     editRoute="{{ route('transport-costs.edit', $cost) }}"
                                                                     deleteRoute="{{ route('transport-costs.destroy', $cost) }}"
                                                                     deleteMessage="Czy na pewno chcesz usunąć ten koszt?"
                                                                 />
-                                                            @endforeach
-                                                        </div>
-                                                    </div>
-                                                    @foreach($tickets as $cost)
-                                                        <div class="text-muted mt-1" style="font-size: 0.75rem;">
-                                                            {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
-                                                            @if($cost->description) — {{ $cost->description }} @endif
+                                                            </div>
                                                         </div>
                                                     @endforeach
                                                 </div>
                                             @endif
 
-                                            {{-- Wynagrodzenie kierowcy (Adjustment) --}}
-                                            @foreach($driverAdjs as $adj)
+                                            {{-- Wynagrodzenie kierowcy (Adjustment) — jak bilety: tytuł, potem kwota | osoba, potem akcje --}}
+                                            @foreach($driverAdjs as $index => $adj)
+                                                @if($index > 0)
+                                                    <hr class="my-2 border-secondary opacity-50">
+                                                @endif
                                                 <div class="border rounded px-2 py-1" style="border-color: rgba(99,102,241,0.4) !important;">
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <div>
-                                                            <span class="fw-semibold"><i class="bi bi-person-badge me-1"></i>Wynagrodzenie za transfer</span>
-                                                            <span class="text-muted ms-1">— {{ number_format((float) $adj->amount, 2) }} {{ $adj->currency }}</span>
-                                                            @if($adj->employee)
-                                                                <span class="text-muted ms-1">| {{ $adj->employee->full_name }}</span>
-                                                            @endif
-                                                        </div>
+                                                    <div class="fw-semibold">
+                                                        <i class="bi bi-person-badge me-1"></i>Wynagrodzenie za transfer
+                                                    </div>
+                                                    <br>
+                                                    <div style="font-size: 0.875rem;">
+                                                        {{ number_format((float) $adj->amount, 2) }} {{ $adj->currency }}@if($adj->employee) | {{ $adj->employee->full_name }}@endif
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <x-action-buttons
+                                                            viewRoute="{{ route('adjustments.show', $adj) }}"
+                                                            editRoute="{{ route('adjustments.edit', $adj) }}"
+                                                            deleteRoute="{{ route('adjustments.destroy', $adj) }}"
+                                                            deleteMessage="Czy na pewno chcesz usunąć to uznanie (wynagrodzenie za transfer)?"
+                                                        />
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -214,26 +256,27 @@
                                                         ->values()->join(', ');
                                                 @endphp
                                                 <div class="border rounded px-2 py-1">
-                                                    <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="mb-2">
+                                                        <span class="fw-semibold"><i class="bi bi-fuel-pump me-1"></i>Paliwo</span>
+                                                        <span class="text-muted ms-1">— łącznie: {{ $fuelSumByCur }}</span>
+                                                    </div>
+                                                    @foreach($fuels as $index => $cost)
+                                                        @if($index > 0)
+                                                            <hr class="my-2 border-secondary opacity-50">
+                                                        @endif
                                                         <div>
-                                                            <span class="fw-semibold"><i class="bi bi-fuel-pump me-1"></i>Paliwo</span>
-                                                            <span class="text-muted ms-1">— {{ $fuelSumByCur }}</span>
-                                                        </div>
-                                                        <div class="d-flex gap-1 ms-2 flex-shrink-0">
-                                                            @foreach($fuels as $cost)
+                                                            <div style="font-size: 0.875rem;">
+                                                                {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
+                                                                @if($cost->description) — {{ $cost->description }} @endif
+                                                            </div>
+                                                            <div class="mt-1">
                                                                 <x-action-buttons
                                                                     viewRoute="{{ route('transport-costs.show', $cost) }}"
                                                                     editRoute="{{ route('transport-costs.edit', $cost) }}"
                                                                     deleteRoute="{{ route('transport-costs.destroy', $cost) }}"
                                                                     deleteMessage="Czy na pewno chcesz usunąć ten koszt?"
                                                                 />
-                                                            @endforeach
-                                                        </div>
-                                                    </div>
-                                                    @foreach($fuels as $cost)
-                                                        <div class="text-muted mt-1" style="font-size: 0.75rem;">
-                                                            {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
-                                                            @if($cost->description) — {{ $cost->description }} @endif
+                                                            </div>
                                                         </div>
                                                     @endforeach
                                                 </div>
@@ -251,26 +294,27 @@
                                                             ->values()->join(', ');
                                                     @endphp
                                                     <div class="border rounded px-2 py-1">
-                                                        <div class="d-flex justify-content-between align-items-start">
+                                                        <div class="mb-2">
+                                                            <span class="fw-semibold"><i class="bi bi-{{ $otherIcon }} me-1"></i>{{ $otherLabel }}</span>
+                                                            <span class="text-muted ms-1">— łącznie: {{ $otherSum }}</span>
+                                                        </div>
+                                                        @foreach($otherItems as $index => $cost)
+                                                            @if($index > 0)
+                                                                <hr class="my-2 border-secondary opacity-50">
+                                                            @endif
                                                             <div>
-                                                                <span class="fw-semibold"><i class="bi bi-{{ $otherIcon }} me-1"></i>{{ $otherLabel }}</span>
-                                                                <span class="text-muted ms-1">— {{ $otherSum }}</span>
-                                                            </div>
-                                                            <div class="d-flex gap-1 ms-2 flex-shrink-0">
-                                                                @foreach($otherItems as $cost)
+                                                                <div style="font-size: 0.875rem;">
+                                                                    {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
+                                                                    @if($cost->description) — {{ $cost->description }} @endif
+                                                                </div>
+                                                                <div class="mt-1">
                                                                     <x-action-buttons
                                                                         viewRoute="{{ route('transport-costs.show', $cost) }}"
                                                                         editRoute="{{ route('transport-costs.edit', $cost) }}"
                                                                         deleteRoute="{{ route('transport-costs.destroy', $cost) }}"
                                                                         deleteMessage="Czy na pewno chcesz usunąć ten koszt?"
                                                                     />
-                                                                @endforeach
-                                                            </div>
-                                                        </div>
-                                                        @foreach($otherItems as $cost)
-                                                            <div class="text-muted mt-1" style="font-size: 0.75rem;">
-                                                                {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
-                                                                @if($cost->description) — {{ $cost->description }} @endif
+                                                                </div>
                                                             </div>
                                                         @endforeach
                                                     </div>

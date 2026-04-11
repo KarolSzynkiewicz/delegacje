@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\CommentableType;
 use App\Http\Requests\StoreCommentRequest;
+use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\ProjectTask;
 use App\Models\User;
@@ -27,8 +28,17 @@ class CommentController extends Controller
         // Find the commentable model
         $commentable = $modelClass::findOrFail($request->input('commentable_id'));
 
+        $bodyRaw = $request->input('body');
+        $body = is_string($bodyRaw) && trim($bodyRaw) !== '' ? $bodyRaw : null;
+
         // Add comment using domain method
-        $comment = $commentable->addComment($request->input('body'), auth()->user());
+        $comment = $commentable->addComment($body, auth()->user());
+
+        $files = $request->file('attachments', []);
+        if (! is_array($files)) {
+            $files = $files ? [$files] : [];
+        }
+        Attachment::storeManyFor($comment, $files, auth()->id(), 'comments');
 
         if ($comment instanceof Comment) {
             $mentionNotifiedIds = app(UserMentionService::class)->notifyCommentMentions($comment, auth()->user());
@@ -48,13 +58,30 @@ class CommentController extends Controller
             abort(403);
         }
 
-        $request->validate([
-            'body' => ['required', 'string', 'min:1', 'max:5000'],
+        $validated = $request->validate([
+            'body' => ['nullable', 'string', 'max:5000'],
+            'attachments' => ['nullable', 'array', 'max:15'],
+            'attachments.*' => ['file', 'max:15360', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx,txt,zip'],
         ]);
 
+        $bodyRaw = $validated['body'] ?? null;
+        $body = is_string($bodyRaw) && trim($bodyRaw) !== '' ? $bodyRaw : null;
+
+        $files = $request->file('attachments', []);
+        if (! is_array($files)) {
+            $files = $files ? [$files] : [];
+        }
+        $hasNewFiles = collect($files)->filter(fn ($f) => $f && $f->isValid())->isNotEmpty();
+
+        if ($body === null && $comment->attachments()->count() === 0 && ! $hasNewFiles) {
+            return redirect()->back()->withErrors(['body' => 'Dodaj treść albo załącznik.'])->withInput();
+        }
+
         $comment->update([
-            'body' => $request->input('body'),
+            'body' => $body,
         ]);
+
+        Attachment::storeManyFor($comment, $files, auth()->id(), 'comments');
 
         return redirect()->back()->with('success', 'Komentarz został zaktualizowany.');
     }

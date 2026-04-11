@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\TaskStatus;
 use App\Http\Requests\StoreProjectTaskRequest;
 use App\Http\Requests\UpdateProjectTaskRequest;
+use App\Models\Attachment;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
@@ -28,8 +29,8 @@ class TaskController extends Controller
     public function store(StoreProjectTaskRequest $request): RedirectResponse
     {
         try {
-            $status = $request->input('status') 
-                ? TaskStatus::from($request->input('status')) 
+            $status = $request->input('status')
+                ? TaskStatus::from($request->input('status'))
                 : TaskStatus::PENDING;
 
             $projectId = $request->input('project_id');
@@ -49,9 +50,9 @@ class TaskController extends Controller
                 'due_date' => $request->input('due_date') ?: null,
                 'created_by' => auth()->id(),
             ];
-            
+
             \Log::info('Creating task', ['data' => $taskData]);
-            
+
             $task = ProjectTask::create($taskData);
 
             \Log::info('Task created', ['task_id' => $task->id, 'project_id' => $task->project_id]);
@@ -63,13 +64,13 @@ class TaskController extends Controller
             }
 
             // Jeśli status to COMPLETED, ustaw completed_at
-            if ($status === TaskStatus::COMPLETED && !$task->completed_at) {
+            if ($status === TaskStatus::COMPLETED && ! $task->completed_at) {
                 $task->update(['completed_at' => now()]);
             }
 
-            $message = 'Zadanie "' . $task->name . '" zostało utworzone.';
+            $message = 'Zadanie "'.$task->name.'" zostało utworzone.';
             if ($task->project) {
-                $message .= ' Przypisane do projektu: ' . $task->project->name;
+                $message .= ' Przypisane do projektu: '.$task->project->name;
             } else {
                 $message .= ' (bez projektu)';
             }
@@ -82,13 +83,13 @@ class TaskController extends Controller
                 ->withErrors($e->errors())
                 ->withInput();
         } catch (\Exception $e) {
-            \Log::error('Task creation error: ' . $e->getMessage(), [
+            \Log::error('Task creation error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'input' => $request->except(['_token'])
+                'input' => $request->except(['_token']),
             ]);
-            
+
             return redirect()->route('tasks.index')
-                ->with('error', 'Wystąpił błąd podczas tworzenia zadania: ' . $e->getMessage())
+                ->with('error', 'Wystąpił błąd podczas tworzenia zadania: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -98,9 +99,9 @@ class TaskController extends Controller
      */
     public function show(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks']);
+        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks', 'attachments.uploader']);
         $users = \App\Models\User::orderBy('name')->get();
-        
+
         return view('tasks.show', compact('task', 'users'));
     }
 
@@ -109,9 +110,9 @@ class TaskController extends Controller
      */
     public function edit(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project']);
+        $task->load(['assignedTo', 'createdBy', 'project', 'attachments.uploader']);
         $users = \App\Models\User::orderBy('name')->get();
-        
+
         return view('tasks.edit', compact('task', 'users'));
     }
 
@@ -121,8 +122,8 @@ class TaskController extends Controller
     public function update(UpdateProjectTaskRequest $request, ProjectTask $task): RedirectResponse
     {
         $oldStatus = $task->status;
-        $newStatus = $request->input('status') 
-            ? TaskStatus::from($request->input('status')) 
+        $newStatus = $request->input('status')
+            ? TaskStatus::from($request->input('status'))
             : $task->status;
 
         $previousAssignee = $task->assigned_to;
@@ -162,6 +163,12 @@ class TaskController extends Controller
             }
         }
 
+        $uploads = $request->file('attachments', []);
+        if (! is_array($uploads)) {
+            $uploads = $uploads ? [$uploads] : [];
+        }
+        Attachment::storeManyFor($task, $uploads, auth()->id(), 'tasks');
+
         return redirect()->route('tasks.show', $task)->with('success', 'Zadanie zostało zaktualizowane.');
     }
 
@@ -185,7 +192,7 @@ class TaskController extends Controller
 
         $task->markInProgress();
 
-        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako w trakcie.')->withFragment('task-' . $task->id);
+        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako w trakcie.')->withFragment('task-'.$task->id);
     }
 
     /**
@@ -198,7 +205,7 @@ class TaskController extends Controller
 
         $task->markCompleted();
 
-        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako zakończone.')->withFragment('task-' . $task->id);
+        return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako zakończone.')->withFragment('task-'.$task->id);
     }
 
     /**
@@ -211,6 +218,6 @@ class TaskController extends Controller
 
         $task->cancel();
 
-        return redirect()->back()->with('success', 'Zadanie zostało anulowane.')->withFragment('task-' . $task->id);
+        return redirect()->back()->with('success', 'Zadanie zostało anulowane.')->withFragment('task-'.$task->id);
     }
 }

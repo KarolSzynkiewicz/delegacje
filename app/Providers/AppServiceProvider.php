@@ -52,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
             'accommodation' => \App\Models\Accommodation::class,
             'logistics_event' => \App\Models\LogisticsEvent::class,
             'location' => \App\Models\Location::class,
+            'comment' => \App\Models\Comment::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

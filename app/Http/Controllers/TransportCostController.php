@@ -20,7 +20,7 @@ class TransportCostController extends Controller
         $sortBy = $request->query('sort_by', 'event_date');
         $sortDir = $request->query('sort_dir', 'desc');
 
-        $allowedSorts = ['event_date', 'route_distance', 'costs_count'];
+        $allowedSorts = ['id', 'event_date', 'status', 'route_distance', 'costs_count', 'costs_amount'];
         if (! in_array($sortBy, $allowedSorts, true)) {
             $sortBy = 'event_date';
         }
@@ -29,9 +29,6 @@ class TransportCostController extends Controller
         }
 
         $eventsQuery = LogisticsEvent::with([
-            'fromLocation',
-            'toLocation',
-            'vehicle',
             'participants',
             'transportCosts' => fn ($query) => $query->with('creator')->latest('cost_date')->latest('id'),
             'driverAdjustments' => fn ($query) => $query->with('employee')->where('type', 'bonus'),
@@ -46,6 +43,20 @@ class TransportCostController extends Controller
 
         if ($sortBy === 'costs_count') {
             $eventsQuery->orderBy('costs_count', $sortDir)->orderBy('event_date', 'desc');
+        } elseif ($sortBy === 'costs_amount') {
+            // Sortowanie wg sum kwot osobno dla każdej waluty (bez mieszania PLN z EUR itd.).
+            foreach (['PLN', 'EUR', 'USD', 'GBP'] as $currency) {
+                $eventsQuery->orderBy(
+                    TransportCost::query()
+                        ->selectRaw('COALESCE(SUM(transport_costs.amount), 0)')
+                        ->whereColumn('transport_costs.logistics_event_id', 'logistics_events.id')
+                        ->where('transport_costs.currency', $currency),
+                    $sortDir
+                );
+            }
+            $eventsQuery->orderBy('event_date', 'desc');
+        } elseif ($sortBy === 'id') {
+            $eventsQuery->orderBy('id', $sortDir);
         } else {
             $eventsQuery->orderBy($sortBy, $sortDir)->orderBy('event_date', 'desc');
         }

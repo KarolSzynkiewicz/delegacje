@@ -1,4 +1,11 @@
 <div>
+    @if($quickEditFlash)
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            {{ $quickEditFlash }}
+            <button type="button" class="btn-close" wire:click="$set('quickEditFlash', null)" aria-label="Zamknij"></button>
+        </div>
+    @endif
+
     <x-ui.card class="mb-4">     
         <!-- Search bar -->
         <div class="row">
@@ -167,14 +174,26 @@
                                             <small class="text-muted d-block mb-1">
                                                 <i class="bi bi-folder me-1"></i>Projekt
                                             </small>
-                                            @if($task->project)
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
-                                                </span>
+                                            @if($this->canQuickEditTask($task))
+                                                @if($task->project)
+                                                    <button type="button" class="badge bg-secondary border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'project', $event.clientX, $event.clientY)">
+                                                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
+                                                    </button>
+                                                @else
+                                                    <button type="button" class="badge bg-light text-dark border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'project', $event.clientX, $event.clientY)">
+                                                        <i class="bi bi-x-circle me-1"></i>Brak projektu
+                                                    </button>
+                                                @endif
                                             @else
-                                                <span class="badge bg-light text-dark">
-                                                    <i class="bi bi-x-circle me-1"></i>Brak projektu
-                                                </span>
+                                                @if($task->project)
+                                                    <span class="badge bg-secondary">
+                                                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-light text-dark">
+                                                        <i class="bi bi-x-circle me-1"></i>Brak projektu
+                                                    </span>
+                                                @endif
                                             @endif
                                         </div>
                                         
@@ -183,14 +202,28 @@
                                                 <small class="text-muted d-block mb-1">
                                                     <i class="bi bi-tag me-1"></i>Kategoria
                                                 </small>
-                                                @if($task->category)
-                                                    <x-ui.badge variant="info">
-                                                        <i class="bi bi-tag me-1"></i>{{ Str::limit($task->category, 15) }}
-                                                    </x-ui.badge>
+                                                @if($this->canQuickEditTask($task))
+                                                    @if($task->category)
+                                                        <button type="button" class="btn btn-link p-0 text-decoration-none border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'category', $event.clientX, $event.clientY)">
+                                                            <x-ui.badge variant="info" class="text-start">
+                                                                <i class="bi bi-tag me-1"></i>{{ Str::limit($task->category, 15) }}
+                                                            </x-ui.badge>
+                                                        </button>
+                                                    @else
+                                                        <button type="button" class="badge bg-light text-dark border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'category', $event.clientX, $event.clientY)">
+                                                            <i class="bi bi-x-circle me-1"></i>Brak
+                                                        </button>
+                                                    @endif
                                                 @else
-                                                    <span class="badge bg-light text-dark">
-                                                        <i class="bi bi-x-circle me-1"></i>Brak
-                                                    </span>
+                                                    @if($task->category)
+                                                        <x-ui.badge variant="info">
+                                                            <i class="bi bi-tag me-1"></i>{{ Str::limit($task->category, 15) }}
+                                                        </x-ui.badge>
+                                                    @else
+                                                        <span class="badge bg-light text-dark">
+                                                            <i class="bi bi-x-circle me-1"></i>Brak
+                                                        </span>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </div>
@@ -217,13 +250,27 @@
                                                     $dueDateBadgeVariant = 'warning'; // Żółty - w ciągu najbliższych 3 dni
                                                 }
                                             @endphp
-                                                    <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
-                                                        <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
-                                                    </x-ui.badge>
+                                                    @if($this->canQuickEditTask($task))
+                                                        <button type="button" class="btn btn-link p-0 text-decoration-none border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'due_date', $event.clientX, $event.clientY)">
+                                                            <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
+                                                                <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
+                                                            </x-ui.badge>
+                                                        </button>
+                                                    @else
+                                                        <x-ui.badge variant="{{ $dueDateBadgeVariant }}">
+                                                            <i class="bi bi-calendar-event me-1"></i>{{ $dueDate->format('d.m.Y') }}
+                                                        </x-ui.badge>
+                                                    @endif
                                                 @else
-                                                    <span class="badge bg-light text-dark">
-                                                        <i class="bi bi-x-circle me-1"></i>Nie ustawiono
-                                                    </span>
+                                                    @if($this->canQuickEditTask($task))
+                                                        <button type="button" class="badge bg-light text-dark border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'due_date', $event.clientX, $event.clientY)">
+                                                            <i class="bi bi-x-circle me-1"></i>Nie ustawiono
+                                                        </button>
+                                                    @else
+                                                        <span class="badge bg-light text-dark">
+                                                            <i class="bi bi-x-circle me-1"></i>Nie ustawiono
+                                                        </span>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </div>
@@ -391,5 +438,101 @@
             icon="list-check"
             message="Brak zadań"
         />
+    @endif
+
+    @if($quickEditTaskId)
+        <div
+            class="position-fixed top-0 start-0 w-100 h-100"
+            style="background: rgba(0, 0, 0, 0.4); z-index: 1050;"
+            wire:click="closeQuickEdit"
+            x-data="{
+                placePanel(el) {
+                    if (!el) return;
+                    const x = @js($quickEditClientX);
+                    const y = @js($quickEditClientY);
+                    el.style.position = 'fixed';
+                    el.style.zIndex = '1051';
+                    el.style.maxWidth = 'min(420px, calc(100vw - 24px))';
+                    if (x === null || y === null) {
+                        el.style.left = '50%';
+                        el.style.top = '50%';
+                        el.style.transform = 'translate(-50%, -50%)';
+                        return;
+                    }
+                    let left = x;
+                    let top = y + 8;
+                    el.style.left = left + 'px';
+                    el.style.top = top + 'px';
+                    el.style.transform = 'translate(-50%, 0)';
+                    this.$nextTick(() => {
+                        const r = el.getBoundingClientRect();
+                        let sx = 0;
+                        let sy = 0;
+                        if (r.left < 8) sx = 8 - r.left;
+                        if (r.right > window.innerWidth - 8) sx = window.innerWidth - 8 - r.right;
+                        if (r.top < 8) sy = 8 - r.top;
+                        if (r.bottom > window.innerHeight - 8) sy = window.innerHeight - 8 - r.bottom;
+                        if (sx !== 0 || sy !== 0) {
+                            el.style.left = (left + sx) + 'px';
+                            el.style.top = (top + sy) + 'px';
+                        }
+                    });
+                },
+                focusField(el) {
+                    this.$nextTick(() => {
+                        const panel = el?.querySelector?.('[data-quick-focus]');
+                        panel?.focus?.();
+                    });
+                }
+            }"
+            x-init="$nextTick(() => { placePanel($refs.qePanel); focusField($refs.qePanel); })"
+            wire:key="qe-{{ $quickEditTaskId }}-{{ $quickEditField }}-{{ (int) ($quickEditClientX ?? -1) }}-{{ (int) ($quickEditClientY ?? -1) }}"
+            x-on:keydown.escape.window="$wire.closeQuickEdit()"
+        >
+            <div
+                class="bg-white rounded shadow p-3"
+                style="width: min(420px, calc(100vw - 24px));"
+                wire:click.stop
+                x-ref="qePanel"
+            >
+                <h6 class="mb-3 fw-semibold">
+                    @if($quickEditField === 'project')
+                        Projekt
+                    @elseif($quickEditField === 'category')
+                        Kategoria
+                    @else
+                        Termin wykonania
+                    @endif
+                </h6>
+                @if($quickEditField === 'project')
+                    <div class="mb-3">
+                        <label class="form-label small text-muted mb-1">Wybierz projekt</label>
+                        <select class="form-select form-select-sm" wire:model="qeProjectId" data-quick-focus>
+                            <option value="">— Bez projektu —</option>
+                            @foreach($allProjects as $p)
+                                <option value="{{ $p->id }}">{{ $p->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('qeProjectId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                    </div>
+                @elseif($quickEditField === 'category')
+                    <div class="mb-3">
+                        <label class="form-label small text-muted mb-1">Nazwa kategorii</label>
+                        <input type="text" class="form-control form-control-sm" wire:model="qeCategory" placeholder="Opcjonalnie" maxlength="255" data-quick-focus>
+                        @error('qeCategory') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                    </div>
+                @else
+                    <div class="mb-3">
+                        <label class="form-label small text-muted mb-1">Data</label>
+                        <input type="date" class="form-control form-control-sm" wire:model="qeDueDate" data-quick-focus>
+                        @error('qeDueDate') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                    </div>
+                @endif
+                <div class="d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="closeQuickEdit">Anuluj</button>
+                    <button type="button" class="btn btn-sm btn-primary" wire:click="saveQuickEdit">Zapisz</button>
+                </div>
+            </div>
+        </div>
     @endif
 </div>

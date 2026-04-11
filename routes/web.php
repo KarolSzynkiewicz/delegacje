@@ -190,6 +190,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::delete('comments/{comment}', [\App\Http\Controllers\CommentController::class, 'destroy'])
             ->name('comments.destroy');
 
+        Route::get('attachments/{attachment}/download', [\App\Http\Controllers\AttachmentController::class, 'download'])
+            ->name('attachments.download');
+        Route::delete('attachments/{attachment}', [\App\Http\Controllers\AttachmentController::class, 'destroy'])
+            ->name('attachments.destroy');
+
         Route::resource('projects.demands', ProjectDemandController::class)
             ->shallow()
             ->names([

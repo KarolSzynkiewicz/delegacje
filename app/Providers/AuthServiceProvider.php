@@ -13,6 +13,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
+        \App\Models\Attachment::class => \App\Policies\AttachmentPolicy::class,
         \App\Models\EmployeeEvaluation::class => \App\Policies\EmployeeEvaluationPolicy::class,
         \App\Models\ProjectTask::class => \App\Policies\ProjectTaskPolicy::class,
         \App\Models\TimeLog::class => \App\Policies\TimeLogPolicy::class,
@@ -45,12 +46,12 @@ class AuthServiceProvider extends ServiceProvider
             ];
 
             // Sprawdź czy to jedna z akcji dla kierownika
-            if (!isset($managerAbilities[$ability])) {
+            if (! isset($managerAbilities[$ability])) {
                 return null; // Nie nasza akcja - kontynuuj standardowe sprawdzanie
             }
 
             $modelClass = $managerAbilities[$ability][0];
-            
+
             // Sprawdź czy user zarządza jakimkolwiek projektem
             $userProjectIds = $user->getManagedProjectIds();
             if (empty($userProjectIds)) {
@@ -74,6 +75,7 @@ class AuthServiceProvider extends ServiceProvider
                             $hasAccess = \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
                                 ->where('employee_id', $evaluation->employee_id)
                                 ->exists();
+
                             return $hasAccess ? true : null;
                         }
                     }
@@ -87,6 +89,7 @@ class AuthServiceProvider extends ServiceProvider
                             $hasAccess = \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
                                 ->where('employee_id', $employeeId)
                                 ->exists();
+
                             return $hasAccess ? true : null;
                         }
                     }
@@ -101,6 +104,7 @@ class AuthServiceProvider extends ServiceProvider
                             $hasAccess = \App\Models\ProjectAssignment::whereIn('project_id', $userProjectIds)
                                 ->where('employee_id', $evaluation->employee_id)
                                 ->exists();
+
                             return $hasAccess ? true : null;
                         }
                     }
@@ -122,12 +126,13 @@ class AuthServiceProvider extends ServiceProvider
                     // Dla TimeLog - sprawdź assignments z requestu
                     if ($modelClass === \App\Models\TimeLog::class) {
                         $entries = $arguments[1] ?? request()->input('entries', []);
-                        if (!empty($entries)) {
+                        if (! empty($entries)) {
                             $assignmentIds = collect($entries)->pluck('assignment_id')->unique()->toArray();
                             $unauthorizedAssignments = \App\Models\ProjectAssignment::whereIn('id', $assignmentIds)
                                 ->whereNotIn('project_id', $userProjectIds)
                                 ->exists();
-                            return !$unauthorizedAssignments ? true : null;
+
+                            return ! $unauthorizedAssignments ? true : null;
                         }
                     }
                     break;
