@@ -90,8 +90,11 @@
 
             {{-- ── Historia najmu ── --}}
             <x-ui.card label="Historia najmu" class="mt-4">
+                @php
+                    $openLeaseEditId = old('lease_edit') !== null && old('lease_edit') !== '' ? (int) old('lease_edit') : null;
+                @endphp
                 @if($accommodation->leases->isNotEmpty())
-                    <div class="table-responsive mb-3">
+                    <div class="table-responsive mb-3" x-data="{ leaseEditId: @json($openLeaseEditId) }">
                         <table class="table table-sm align-middle">
                             <thead>
                                 <tr>
@@ -100,6 +103,7 @@
                                     <th>Do</th>
                                     <th>Status</th>
                                     <th>Uwagi</th>
+                                    <th class="text-end">Akcje</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -122,6 +126,77 @@
                                             @endif
                                         </td>
                                         <td><small class="text-muted">{{ $lease->notes ?? '—' }}</small></td>
+                                        <td class="text-end text-nowrap">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                @click="leaseEditId = leaseEditId === {{ $lease->id }} ? null : {{ $lease->id }}"
+                                            >
+                                                <span x-show="leaseEditId !== {{ $lease->id }}">Edytuj</span>
+                                                <span x-show="leaseEditId === {{ $lease->id }}" x-cloak>Zwiń</span>
+                                            </button>
+                                            <form
+                                                action="{{ route('accommodations.leases.destroy', [$accommodation, $lease]) }}"
+                                                method="POST"
+                                                class="d-inline"
+                                                onsubmit="return confirm('Usunąć ten okres najmu? Tej operacji nie można cofnąć.');"
+                                            >
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Usuń</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <tr x-show="leaseEditId === {{ $lease->id }}" x-cloak>
+                                        <td colspan="6" class="bg-body-secondary bg-opacity-10 border-bottom">
+                                            <form
+                                                method="POST"
+                                                action="{{ route('accommodations.leases.update', [$accommodation, $lease]) }}"
+                                                class="p-2"
+                                            >
+                                                @csrf
+                                                @method('PUT')
+                                                <input type="hidden" name="lease_edit" value="{{ $lease->id }}">
+                                                <div class="row g-2 align-items-end">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small mb-1">Od <span class="text-danger">*</span></label>
+                                                        <input
+                                                            type="date"
+                                                            name="start_date"
+                                                            class="form-control form-control-sm @error('start_date') is-invalid @enderror"
+                                                            value="{{ old('lease_edit') == $lease->id ? old('start_date', $lease->start_date?->format('Y-m-d')) : $lease->start_date?->format('Y-m-d') }}"
+                                                            required
+                                                        >
+                                                        <x-input-error :messages="$errors->get('start_date')" class="mt-1" />
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small mb-1">Do</label>
+                                                        <input
+                                                            type="date"
+                                                            name="end_date"
+                                                            class="form-control form-control-sm @error('end_date') is-invalid @enderror"
+                                                            value="{{ old('lease_edit') == $lease->id ? old('end_date', $lease->end_date?->format('Y-m-d')) : $lease->end_date?->format('Y-m-d') }}"
+                                                        >
+                                                        <x-input-error :messages="$errors->get('end_date')" class="mt-1" />
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small mb-1">Uwagi</label>
+                                                        <input
+                                                            type="text"
+                                                            name="notes"
+                                                            class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                                                            value="{{ old('lease_edit') == $lease->id ? old('notes', $lease->notes) : $lease->notes }}"
+                                                            placeholder="Uwagi"
+                                                        >
+                                                        <x-input-error :messages="$errors->get('notes')" class="mt-1" />
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2 d-flex gap-2 justify-content-end">
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="leaseEditId = null">Anuluj</button>
+                                                    <x-ui.button type="submit" variant="primary" class="btn-sm">Zapisz</x-ui.button>
+                                                </div>
+                                            </form>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>

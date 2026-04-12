@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\AccommodationAssignment;
+use App\Models\LogisticsEvent;
+use App\Models\ProjectAssignment;
+use App\Models\VehicleAssignment;
+use App\Observers\AuditableModelObserver;
 use App\Services\SystemBootstrapService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
@@ -40,6 +45,11 @@ class AppServiceProvider extends ServiceProvider
         // Custom morph map for assignment models and User (for Spatie Permission)
         // This ensures polymorphic assignments only point to valid assignment models
         // User is included because Spatie Permission uses morphedByMany for User model
+        LogisticsEvent::observe(AuditableModelObserver::class);
+        VehicleAssignment::observe(AuditableModelObserver::class);
+        ProjectAssignment::observe(AuditableModelObserver::class);
+        AccommodationAssignment::observe(AuditableModelObserver::class);
+
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,
             'vehicle_assignment' => \App\Models\VehicleAssignment::class,

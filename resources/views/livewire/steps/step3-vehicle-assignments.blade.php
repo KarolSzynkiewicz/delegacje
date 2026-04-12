@@ -359,7 +359,35 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" wire:click="closeVehicleModal">Anuluj</button>
                         @if($selectedStartDate)
-                            <button type="button" class="btn btn-primary" wire:click="confirmVehicleAssignment">
+                            @php
+                                $vehicleDocConfirmFlags = [
+                                    'oc' => $selectedVehicle->hasExpiredInsurance(),
+                                    'przeglad' => $selectedVehicle->hasExpiredInspection(),
+                                ];
+                            @endphp
+                            <button
+                                type="button"
+                                class="btn btn-primary"
+                                @click="
+                                    const flags = @json($vehicleDocConfirmFlags);
+                                    const needsDocConfirm = flags && (flags.oc || flags.przeglad);
+                                    if (!needsDocConfirm) {
+                                        $wire.confirmVehicleAssignment();
+                                    } else if (typeof window.confirmVehicleDocumentsIfNeeded === 'function') {
+                                        if (window.confirmVehicleDocumentsIfNeeded(flags)) {
+                                            $wire.confirmVehicleAssignment();
+                                        }
+                                    } else {
+                                        const parts = [];
+                                        if (flags.oc) parts.push('nieważne OC');
+                                        if (flags.przeglad) parts.push('nieważny przegląd');
+                                        const msg = 'Uwaga: wybrane auto ma ' + parts.join(' oraz ') + '. Czy na pewno chcesz kontynuować?';
+                                        if (window.confirm(msg)) {
+                                            $wire.confirmVehicleAssignment();
+                                        }
+                                    }
+                                "
+                            >
                                 Potwierdź przypisanie
                             </button>
                         @endif

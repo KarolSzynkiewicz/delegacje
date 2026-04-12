@@ -76,4 +76,78 @@ document.addEventListener('alpine:init', () => {
             this.results = [];
         },
     }));
+
+    /** Panel „przed/po” na /audit-logs — musi być w alpine:init (przed Alpine.start), nie w @stack po Livewire. */
+    window.Alpine.data('auditDiffPanel', () => ({
+        openState: false,
+        payload: null,
+        showDiff(detail) {
+            this.payload = detail;
+            this.openState = true;
+        },
+        close() {
+            this.openState = false;
+            this.payload = null;
+        },
+    }));
 });
+
+/**
+ * Potwierdzenie przy wyborze auta z przeterminowanym OC lub przeglądem.
+ * @param {{ oc?: boolean, przeglad?: boolean }} flags
+ * @returns {boolean} true = można kontynuować
+ */
+window.confirmVehicleDocumentsIfNeeded = function (flags) {
+    if (!flags || (!flags.oc && !flags.przeglad)) {
+        return true;
+    }
+    const parts = [];
+    if (flags.oc) {
+        parts.push('nieważne OC');
+    }
+    if (flags.przeglad) {
+        parts.push('nieważny przegląd');
+    }
+    const msg =
+        'Uwaga: wybrane auto ma ' +
+        parts.join(' oraz ') +
+        '. Czy na pewno chcesz kontynuować?';
+    return window.confirm(msg);
+};
+
+/**
+ * Podpięcie pod formularz (select name=vehicle_id): przed submit — confirm.
+ */
+window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payload) {
+    if (!formEl || !payload) {
+        return;
+    }
+    const sel = formEl.querySelector(`select[name="${selectName || 'vehicle_id'}"]`);
+    if (!sel) {
+        return;
+    }
+    formEl.addEventListener(
+        'submit',
+        function (e) {
+            if (formEl.dataset.vehicleDocConfirmOk === '1') {
+                delete formEl.dataset.vehicleDocConfirmOk;
+                return;
+            }
+            const id = sel.value;
+            if (!id || !payload[id]) {
+                return;
+            }
+            const row = payload[id];
+            if (!row.oc && !row.przeglad) {
+                return;
+            }
+            if (!window.confirmVehicleDocumentsIfNeeded(row)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            formEl.dataset.vehicleDocConfirmOk = '1';
+        },
+        true
+    );
+};

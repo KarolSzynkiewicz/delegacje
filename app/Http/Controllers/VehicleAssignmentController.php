@@ -1,13 +1,16 @@
 <?php
-//review 
+
+// review
+
 namespace App\Http\Controllers;
 
-use App\Models\VehicleAssignment;
-use App\Models\Employee;
-use App\Models\Vehicle;
-use App\Services\VehicleAssignmentService;
 use App\Http\Requests\StoreVehicleAssignmentRequest;
 use App\Http\Requests\UpdateVehicleAssignmentRequest;
+use App\Models\Employee;
+use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
+use App\Services\VehicleAssignmentService;
+use App\Support\VehicleDocumentExpiry;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -16,6 +19,7 @@ class VehicleAssignmentController extends Controller
     public function __construct(
         protected VehicleAssignmentService $assignmentService
     ) {}
+
     /**
      * Display all vehicle assignments (global view).
      */
@@ -24,7 +28,7 @@ class VehicleAssignmentController extends Controller
         $assignments = VehicleAssignment::with('employee', 'vehicle')
             ->orderBy('start_date', 'desc')
             ->paginate(20);
-        
+
         return view('vehicle-assignments.index', compact('assignments'));
     }
 
@@ -37,7 +41,7 @@ class VehicleAssignmentController extends Controller
             ->with('vehicle')
             ->orderBy('start_date', 'desc')
             ->paginate(20);
-        
+
         return view('vehicle-assignments.index', compact('employee', 'assignments'));
     }
 
@@ -48,26 +52,28 @@ class VehicleAssignmentController extends Controller
     {
         $employeeId = $request->query('employee_id');
         $employee = null;
-        
+
         if ($employeeId) {
             $employee = Employee::findOrFail($employeeId);
         }
-        
+
         // Jeśli nie ma pracownika, pobierz listę pracowników do wyboru
         $employees = $employee ? collect([$employee]) : Employee::orderBy('last_name')->orderBy('first_name')->get();
-        
+
         $vehicles = Vehicle::orderBy('registration_number')->get();
-        
+
         // Pobierz daty z query string jeśli są przekazane (z widoku tygodniowego)
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
-        
+
         // If employee_id is provided, set it in old input for pre-selection
         if ($employeeId) {
             session()->flash('_old_input.employee_id', $employeeId);
         }
-        
-        return view('vehicle-assignments.create', compact('employee', 'employees', 'vehicles', 'dateFrom', 'dateTo'));
+
+        $vehicleDocConfirmPayload = VehicleDocumentExpiry::confirmPayload($vehicles);
+
+        return view('vehicle-assignments.create', compact('employee', 'employees', 'vehicles', 'dateFrom', 'dateTo', 'vehicleDocConfirmPayload'));
     }
 
     /**
@@ -76,13 +82,13 @@ class VehicleAssignmentController extends Controller
     public function store(StoreVehicleAssignmentRequest $request)
     {
         $validated = $request->validated();
-        
+
         $employeeId = $validated['employee_id'] ?? $request->input('employee_id');
-        if (!$employeeId) {
+        if (! $employeeId) {
             return redirect()->route('employees.index')
                 ->with('error', 'Musisz wybrać pracownika');
         }
-        
+
         $employee = Employee::findOrFail($employeeId);
 
         try {
@@ -90,7 +96,7 @@ class VehicleAssignmentController extends Controller
             $position = \App\Enums\VehiclePosition::from($validated['position']);
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
             $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
-            
+
             $this->assignmentService->createAssignment(
                 $employee,
                 $vehicle,
@@ -109,11 +115,12 @@ class VehicleAssignmentController extends Controller
         $referer = $request->header('referer');
         if ($referer && str_contains($referer, 'weekly-overview')) {
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
+
             return redirect()
                 ->route('weekly-overview.index', ['start_date' => $startDate->format('Y-m-d')])
                 ->with('success', 'Pojazd został przypisany do pracownika.');
         }
-        
+
         return redirect()
             ->route('employees.show', $employee)
             ->with('success', 'Pojazd został przypisany do pracownika.');
@@ -125,7 +132,7 @@ class VehicleAssignmentController extends Controller
     public function show(VehicleAssignment $vehicleAssignment)
     {
         $vehicleAssignment->load('employee', 'vehicle');
-        
+
         return view('vehicle-assignments.show', compact('vehicleAssignment'));
     }
 
@@ -136,7 +143,7 @@ class VehicleAssignmentController extends Controller
     {
         $employees = Employee::orderBy('last_name')->get();
         $vehicles = Vehicle::orderBy('registration_number')->get();
-        
+
         return view('vehicle-assignments.edit', compact('vehicleAssignment', 'employees', 'vehicles'));
     }
 
@@ -147,12 +154,12 @@ class VehicleAssignmentController extends Controller
     {
         try {
             $validated = $request->validated();
-            
+
             $vehicle = Vehicle::findOrFail($validated['vehicle_id']);
             $position = \App\Enums\VehiclePosition::from($validated['position']);
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
             $endDate = isset($validated['end_date']) ? \Carbon\Carbon::parse($validated['end_date']) : null;
-            
+
             $this->assignmentService->updateAssignment(
                 $vehicleAssignment,
                 $vehicle,

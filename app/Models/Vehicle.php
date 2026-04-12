@@ -2,17 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\VehicleType;
 use App\Traits\HasComments;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vehicle extends Model
 {
-    use HasFactory, HasComments;
+    use HasComments, HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -41,11 +40,11 @@ class Vehicle extends Model
      */
     public function getImageUrlAttribute(): ?string
     {
-        if (!$this->image_path) {
+        if (! $this->image_path) {
             return null;
         }
 
-        return asset('storage/' . $this->image_path);
+        return asset('storage/'.$this->image_path);
     }
 
     /**
@@ -108,17 +107,15 @@ class Vehicle extends Model
      */
     public function isAvailableInDateRange($startDate, $endDate): bool
     {
-        return !$this->assignments()
+        return ! $this->assignments()
             ->overlappingWith($startDate, $endDate)
             ->exists();
     }
 
     /**
      * Get the current location of this vehicle.
-     * 
+     *
      * Delegates to LocationTrackingService for business logic.
-     * 
-     * @return \App\Models\Location|null
      */
     public function getCurrentLocation(): ?Location
     {
@@ -127,35 +124,37 @@ class Vehicle extends Model
 
     /**
      * Get the location of this vehicle on a specific date.
-     * 
+     *
      * Delegates to LocationTrackingService for business logic.
-     * 
-     * @param \Carbon\Carbon|string $date
+     *
+     * @param  \Carbon\Carbon|string  $date
      * @return \App\Models\Location|string|null Returns Location, "W PODRÓŻY" string, or null
      */
     public function getLocationOnDate($date): Location|string|null
     {
         $carbonDate = \Carbon\Carbon::parse($date);
+
         return app(\App\Services\LocationTrackingService::class)->getVehicleLocationOnDate($this, $carbonDate);
     }
 
     /**
      * Get comprehensive location status for this vehicle on a specific date.
-     * 
+     *
      * Delegates to LocationTrackingService for business logic.
-     * 
-     * @param \Carbon\Carbon|string $date
+     *
+     * @param  \Carbon\Carbon|string  $date
      * @return array Returns comprehensive status with locations, occupancy, etc.
      */
     public function getLocationStatusOnDate($date): array
     {
         $carbonDate = \Carbon\Carbon::parse($date);
+
         return app(\App\Services\LocationTrackingService::class)->getVehicleLocationStatus($this, $carbonDate);
     }
 
     /**
      * Get the last departure event that set outside_base flag.
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function lastDeparture()
@@ -165,7 +164,7 @@ class Vehicle extends Model
 
     /**
      * Get the current location relationship.
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function currentLocation()
@@ -175,37 +174,35 @@ class Vehicle extends Model
 
     /**
      * Get projects where this vehicle is currently being used.
-     * 
+     *
      * A vehicle is used in a project if:
      * - There's an active vehicle assignment for this vehicle
      * - The assigned employee has an active project assignment
-     * 
+     *
      * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getCurrentProjectsAttribute()
     {
         $activeAssignments = $this->assignments()->active()->with('employee')->get();
-        
+
         if ($activeAssignments->isEmpty()) {
             return collect();
         }
 
         $employeeIds = $activeAssignments->pluck('employee_id')->unique();
-        
+
         $projectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $employeeIds)
             ->active()
             ->with('project')
             ->get();
-        
+
         return $projectAssignments->pluck('project')->filter()->unique('id')->values();
     }
 
     /**
      * Get the number of currently assigned people to this vehicle.
-     * 
+     *
      * Counts unique employees, not assignments (one employee can have multiple assignments).
-     * 
-     * @return int
      */
     public function getCurrentOccupancyAttribute(): int
     {
@@ -213,7 +210,7 @@ class Vehicle extends Model
         if (isset($this->attributes['unique_employees_count'])) {
             return (int) $this->attributes['unique_employees_count'];
         }
-        
+
         // Otherwise, query directly - count unique employees using groupBy
         return $this->assignments()
             ->active()
@@ -221,5 +218,22 @@ class Vehicle extends Model
             ->groupBy('employee_id')
             ->get()
             ->count();
+    }
+
+    /**
+     * OC / przegląd — „po terminie” wg dnia kalendarzowego (jak w widoku pojazdu).
+     */
+    public function hasExpiredInsurance(?\Carbon\Carbon $asOf = null): bool
+    {
+        $asOf ??= \Carbon\Carbon::today();
+
+        return (bool) ($this->insurance_valid_to && $this->insurance_valid_to->lt($asOf));
+    }
+
+    public function hasExpiredInspection(?\Carbon\Carbon $asOf = null): bool
+    {
+        $asOf ??= \Carbon\Carbon::today();
+
+        return (bool) ($this->inspection_valid_to && $this->inspection_valid_to->lt($asOf));
     }
 }

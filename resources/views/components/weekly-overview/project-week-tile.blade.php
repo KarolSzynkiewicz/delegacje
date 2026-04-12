@@ -244,6 +244,7 @@
                                                     </div>
                                                 @endif
                                             </div>
+                                            <x-weekly-overview.vehicle-doc-captions :vehicle="$vehicleData['vehicle']" />
                                             <div class="d-flex flex-column">
                                                 <h6 class="card-title mb-0">
                                                     {{ $vehicleData['vehicle_name'] }}

@@ -516,7 +516,38 @@
         <x-ui.button variant="ghost" href="{{ route('transfers.index') }}">
             Anuluj
         </x-ui.button>
-        <x-ui.button variant="primary" wire:click="save" wire:loading.attr="disabled">
+        <x-ui.button
+            variant="primary"
+            type="button"
+            wire:target="save"
+            wire:loading.attr="disabled"
+            x-data
+            @click="
+                (function () {
+                    const p = @json($vehicleDocConfirmPayload ?? []);
+                    const id = $wire.vehicleId;
+                    const row = id != null && id !== '' ? (p[id] ?? p[String(id)]) : null;
+                    const needsDocConfirm = row && (row.oc || row.przeglad);
+                    if (!needsDocConfirm) {
+                        $wire.save();
+                        return;
+                    }
+                    let ok = false;
+                    if (typeof window.confirmVehicleDocumentsIfNeeded === 'function') {
+                        ok = window.confirmVehicleDocumentsIfNeeded(row);
+                    } else {
+                        const parts = [];
+                        if (row.oc) parts.push('nieważne OC');
+                        if (row.przeglad) parts.push('nieważny przegląd');
+                        const msg = 'Uwaga: wybrane auto ma ' + parts.join(' oraz ') + '. Czy na pewno chcesz kontynuować?';
+                        ok = window.confirm(msg);
+                    }
+                    if (ok) {
+                        $wire.save();
+                    }
+                })();
+            "
+        >
             <span wire:loading.remove wire:target="save">
                 <i class="bi bi-check-lg me-1"></i> Zapisz transfer
             </span>

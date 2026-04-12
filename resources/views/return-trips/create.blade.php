@@ -18,7 +18,7 @@
             <x-ui.card label="Utwórz Nowy Zjazd">
                 <x-ui.errors />
 
-                <form method="POST" action="{{ route('return-trips.prepare-form') }}">
+                <form id="return-trip-create-form" method="POST" action="{{ route('return-trips.prepare-form') }}">
                     @csrf
 
                     <div class="mb-3">
@@ -79,4 +79,15 @@
             </x-ui.card>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('return-trip-create-form');
+            if (form && typeof window.attachVehicleDocumentConfirmToForm === 'function') {
+                window.attachVehicleDocumentConfirmToForm(form, 'vehicle_id', @json($vehicleDocConfirmPayload ?? []));
+            }
+        });
+    </script>
+    @endpush
 </x-app-layout>

@@ -20,6 +20,7 @@ use App\Services\DepartureService;
 use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\VehicleValidationService;
+use App\Support\VehicleDocumentExpiry;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,7 +103,9 @@ class DepartureController extends Controller
             $isDateInPast = Carbon::parse($endDate)->startOfDay()->isPast();
         }
 
-        return view('departures.create', compact('vehicles', 'baseLocation', 'isDateInPast'));
+        $vehicleDocConfirmPayload = VehicleDocumentExpiry::confirmPayload($vehicles);
+
+        return view('departures.create', compact('vehicles', 'baseLocation', 'isDateInPast', 'vehicleDocConfirmPayload'));
     }
 
     /**

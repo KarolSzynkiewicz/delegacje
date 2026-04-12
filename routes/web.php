@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccommodationAssignmentController;
 use App\Http\Controllers\AccommodationController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDocumentController;
@@ -307,6 +308,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::resource('accommodations', AccommodationController::class);
         Route::post('accommodations/{accommodation}/leases', [AccommodationController::class, 'storeLease'])
             ->name('accommodations.leases.store');
+        Route::put('accommodations/{accommodation}/leases/{lease}', [AccommodationController::class, 'updateLease'])
+            ->name('accommodations.leases.update');
+        Route::delete('accommodations/{accommodation}/leases/{lease}', [AccommodationController::class, 'destroyLease'])
+            ->name('accommodations.leases.destroy');
 
         // Vehicle Repairs (książka serwisowa)
         Route::get('vehicle-repairs/{vehicleRepair}/complete', [\App\Http\Controllers\VehicleRepairController::class, 'completeForm'])
@@ -415,9 +420,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
     // ===== VIEW ROUTES =====
     Route::group(['defaults' => ['permission_type' => 'view']], function () {
-        Route::get('/dashboard', function () {
-            return view('dashboard');
-        })->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'home'])->name('dashboard');
 
         Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
             ->name('notifications.index')
@@ -427,6 +430,15 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/system-actions', function () {
             return view('system-actions');
         })->name('system-actions.index');
+
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])
+            ->name('audit-logs.index')
+            ->defaults('resource', 'audit-logs');
+
+        Route::get('/changelog', function () {
+            return view('changelog.index');
+        })->name('changelog.index')
+            ->defaults('resource', 'audit-logs');
 
         // Redirect old route to new one
         Route::get('/dashboard/profitability', function () {

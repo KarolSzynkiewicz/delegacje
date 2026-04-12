@@ -13,6 +13,7 @@ use App\Services\GeocodingService;
 use App\Services\LocationTrackingService;
 use App\Services\RoutePlanningService;
 use App\Services\TransferService;
+use App\Support\VehicleDocumentExpiry;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -1213,25 +1214,36 @@ class TransferPlanner extends Component
         $fromLocationId = $this->waypointLocationIds[0];
         $toLocationId = $this->waypointLocationIds[count($this->waypointLocationIds) - 1];
 
-        $this->transferService->commitTransfer([
-            'employee_ids' => $this->selectedEmployeeIds,
-            'from_location_id' => $fromLocationId,
-            'to_location_id' => $toLocationId,
-            'transfer_date' => \Carbon\Carbon::parse($this->transferDate),
-            'vehicle_id' => $this->vehicleId ?: null,
-            'notes' => $this->notes ?: null,
-            'route_distance' => $this->routeData['distance'] ?? null,
-            'route_duration' => $this->routeData ? (int) $this->routeData['duration'] : null,
-            'route_waypoints' => count($this->waypointLocationIds) > 2
-                ? array_slice($this->waypointLocationIds, 1, -1)
-                : null,
-            'has_reassignment' => $this->hasReassignment,
-            'reassignments' => $this->reassignments,
-            'driver_employee_id' => $this->driverEmployeeId,
-            'driver_payment_amount' => $this->driverPaymentAmount !== '' ? (float) $this->driverPaymentAmount : null,
-            'driver_payment_currency' => $this->driverPaymentCurrency,
-            'driver_payroll_id' => $this->driverPayrollId,
-        ]);
+        try {
+            $this->transferService->commitTransfer([
+                'employee_ids' => $this->selectedEmployeeIds,
+                'from_location_id' => $fromLocationId,
+                'to_location_id' => $toLocationId,
+                'transfer_date' => \Carbon\Carbon::parse($this->transferDate),
+                'vehicle_id' => $this->vehicleId ?: null,
+                'notes' => $this->notes ?: null,
+                'route_distance' => $this->routeData['distance'] ?? null,
+                'route_duration' => $this->routeData ? (int) $this->routeData['duration'] : null,
+                'route_waypoints' => count($this->waypointLocationIds) > 2
+                    ? array_slice($this->waypointLocationIds, 1, -1)
+                    : null,
+                'has_reassignment' => $this->hasReassignment,
+                'reassignments' => $this->reassignments,
+                'driver_employee_id' => $this->driverEmployeeId,
+                'driver_payment_amount' => $this->driverPaymentAmount !== '' ? (float) $this->driverPaymentAmount : null,
+                'driver_payment_currency' => $this->driverPaymentCurrency,
+                'driver_payroll_id' => $this->driverPayrollId,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('TransferPlanner::save commitTransfer failed', [
+                'exception' => $e,
+            ]);
+            $this->addError('save', $e->getMessage());
+
+            return;
+        }
 
         session()->flash('success', $this->hasReassignment
             ? 'Transfer z przeniesieniem został zapisany.'
@@ -1241,6 +1253,10 @@ class TransferPlanner extends Component
 
     public function render()
     {
-        return view('livewire.transfer-planner');
+        $vehicleDocConfirmPayload = VehicleDocumentExpiry::confirmPayload(
+            Vehicle::where('type', 'company_vehicle')->orderBy('registration_number')->get()
+        );
+
+        return view('livewire.transfer-planner', compact('vehicleDocConfirmPayload'));
     }
 }

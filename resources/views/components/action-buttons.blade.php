@@ -81,7 +81,12 @@
     @endif
     
     @if($deleteRoute)
-        <form action="{{ $deleteRoute }}" method="POST" class="d-inline">
+        <form
+            action="{{ $deleteRoute }}"
+            method="POST"
+            class="d-inline"
+            onsubmit="return confirm({{ Js::from($deleteMessage) }})"
+        >
             @csrf
             @method('DELETE')
             <x-ui.button
@@ -91,7 +96,6 @@
                 action="delete"
                 title="Usuń"
                 class="{{ $sizeClass }}"
-                onclick='return confirm({{ Js::from($deleteMessage) }})'
             />
         </form>
     @endif

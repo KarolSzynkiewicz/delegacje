@@ -18,7 +18,7 @@
             <x-ui.card label="Przypisz Auto do Pracownika">
                 <x-ui.errors />
 
-                <form method="POST" action="{{ route('vehicle-assignments.store') }}">
+                <form id="vehicle-assignment-create-form" method="POST" action="{{ route('vehicle-assignments.store') }}">
                     @csrf
 
                     <div class="mb-3">
@@ -122,4 +122,15 @@
             </x-ui.card>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('vehicle-assignment-create-form');
+            if (form && typeof window.attachVehicleDocumentConfirmToForm === 'function') {
+                window.attachVehicleDocumentConfirmToForm(form, 'vehicle_id', @json($vehicleDocConfirmPayload ?? []));
+            }
+        });
+    </script>
+    @endpush
 </x-app-layout>

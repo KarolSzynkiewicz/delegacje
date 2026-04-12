@@ -30,7 +30,7 @@
             <x-ui.card label="Krok 1: Wybierz uczestników i podstawowe informacje">
                 <x-ui.errors />
 
-                <form method="POST" action="{{ route('departures.prepare-bulk-assignment') }}">
+                <form id="departure-create-form" method="POST" action="{{ route('departures.prepare-bulk-assignment') }}">
                     @csrf
 
                     <div class="mb-3">
@@ -113,6 +113,10 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeTooltips();
             setupVehicleValidation();
+            const departureForm = document.getElementById('departure-create-form');
+            if (departureForm && typeof window.attachVehicleDocumentConfirmToForm === 'function') {
+                window.attachVehicleDocumentConfirmToForm(departureForm, 'vehicle_id', @json($vehicleDocConfirmPayload ?? []));
+            }
         });
 
         // Reinitialize tooltips after Livewire updates

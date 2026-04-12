@@ -23,16 +23,37 @@
         </x-ui.page-header>
     </x-slot>
 
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <x-ui.card label="Szczegóły Pojazdu">
-                @if($vehicle->image_path)
-                    <div class="mb-4 text-center">
-                        <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->registration_number }}" class="img-fluid rounded">
-                    </div>
-                @endif
+    @php
+        $today = \Carbon\Carbon::today();
+        $overduePrzeglad = $vehicle->inspection_valid_to && $vehicle->inspection_valid_to->lt($today);
+        $overdueOc = $vehicle->insurance_valid_to && $vehicle->insurance_valid_to->lt($today);
+        $overdueAc = $vehicle->ac_wazne_do && $vehicle->ac_wazne_do->lt($today);
+    @endphp
 
-                <div class="row mb-3">
+    @if($overduePrzeglad || $overdueOc || $overdueAc)
+        <x-ui.alert variant="danger" title="Dokumenty po terminie" class="mb-4">
+            <ul class="mb-0 ps-3 small">
+                @if($overduePrzeglad)
+                    <li><strong>Przegląd</strong> — ważny był do {{ $vehicle->inspection_valid_to->format('d.m.Y') }}</li>
+                @endif
+                @if($overdueOc)
+                    <li><strong>OC</strong> — ważne było do {{ $vehicle->insurance_valid_to->format('d.m.Y') }}</li>
+                @endif
+                @if($overdueAc)
+                    <li><strong>AC</strong> — ważne było do {{ $vehicle->ac_wazne_do->format('d.m.Y') }}</li>
+                @endif
+            </ul>
+        </x-ui.alert>
+    @endif
+
+    <x-ui.card label="Szczegóły Pojazdu">
+        @if($vehicle->image_path)
+            <div class="mb-4 text-center">
+                <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->registration_number }}" class="img-fluid rounded">
+            </div>
+        @endif
+
+        <div class="row mb-3">
                     <div class="col-md-6">
                         <h5>Numer Rejestracyjny</h5>
                         <p><strong>{{ $vehicle->registration_number }}</strong></p>
@@ -76,7 +97,7 @@
                         <h5>Przegląd Ważny Do</h5>
                         <p>
                             @if ($vehicle->inspection_valid_to)
-                                <x-ui.badge variant="{{ $vehicle->inspection_valid_to < now() ? 'danger' : 'success' }}">
+                                <x-ui.badge variant="{{ $vehicle->inspection_valid_to->lt($today) ? 'danger' : 'success' }}">
                                     {{ $vehicle->inspection_valid_to->format('Y-m-d') }}
                                 </x-ui.badge>
                             @else
@@ -91,7 +112,7 @@
                         <h5>OC Ważne Do</h5>
                         <p>
                             @if ($vehicle->insurance_valid_to)
-                                <x-ui.badge variant="{{ $vehicle->insurance_valid_to < now() ? 'danger' : 'success' }}">
+                                <x-ui.badge variant="{{ $vehicle->insurance_valid_to->lt($today) ? 'danger' : 'success' }}">
                                     {{ $vehicle->insurance_valid_to->format('Y-m-d') }}
                                 </x-ui.badge>
                             @else
@@ -103,7 +124,7 @@
                         <h5>AC Ważne Do</h5>
                         <p>
                             @if ($vehicle->ac_wazne_do)
-                                <x-ui.badge variant="{{ $vehicle->ac_wazne_do < now() ? 'danger' : 'success' }}">
+                                <x-ui.badge variant="{{ $vehicle->ac_wazne_do->lt($today) ? 'danger' : 'success' }}">
                                     {{ $vehicle->ac_wazne_do->format('Y-m-d') }}
                                 </x-ui.badge>
                             @else
@@ -275,9 +296,7 @@
                 @endif
             </x-ui.card>
 
-            <x-ui.card class="mt-4">
-                <x-comments :commentable="$vehicle" />
-            </x-ui.card>
-        </div>
-    </div>
+    <x-ui.card class="mt-4">
+        <x-comments :commentable="$vehicle" />
+    </x-ui.card>
 </x-app-layout>

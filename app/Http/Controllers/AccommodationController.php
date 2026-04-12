@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreAccommodationRequest;
 use App\Http\Requests\UpdateAccommodationRequest;
 use App\Models\Accommodation;
+use App\Models\AccommodationLease;
 use App\Models\Location;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -140,7 +141,42 @@ class AccommodationController extends Controller
             ->with('success', 'Nowy okres najmu został dodany.');
     }
 
+    public function updateLease(Request $request, Accommodation $accommodation, AccommodationLease $lease): RedirectResponse
+    {
+        $this->assertLeaseBelongsToAccommodation($accommodation, $lease);
+
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $lease->update([
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->route('accommodations.show', $accommodation)
+            ->with('success', 'Okres najmu został zaktualizowany.');
+    }
+
+    public function destroyLease(Accommodation $accommodation, AccommodationLease $lease): RedirectResponse
+    {
+        $this->assertLeaseBelongsToAccommodation($accommodation, $lease);
+
+        $lease->delete();
+
+        return redirect()->route('accommodations.show', $accommodation)
+            ->with('success', 'Okres najmu został usunięty.');
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function assertLeaseBelongsToAccommodation(Accommodation $accommodation, AccommodationLease $lease): void
+    {
+        abort_if((int) $lease->accommodation_id !== (int) $accommodation->id, 404);
+    }
 
     private function resolveLocation(array $data): ?Location
     {

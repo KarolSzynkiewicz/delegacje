@@ -11,6 +11,7 @@ use App\Models\LogisticsEvent;
 use App\Models\Vehicle;
 use App\Services\AssignmentQueryService;
 use App\Services\ReturnTripService;
+use App\Support\VehicleDocumentExpiry;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,7 +94,9 @@ class ReturnTripController extends Controller
 
         $baseLocation = Location::getBase();
 
-        return view('return-trips.create', compact('vehicles', 'baseLocation'));
+        $vehicleDocConfirmPayload = VehicleDocumentExpiry::confirmPayload($vehicles);
+
+        return view('return-trips.create', compact('vehicles', 'baseLocation', 'vehicleDocConfirmPayload'));
     }
 
     /**

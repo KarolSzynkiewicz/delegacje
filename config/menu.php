@@ -3,7 +3,7 @@
 return [
     'weekly_overview',
     'tasks',
-    
+
     [
         'label' => 'Mój zespół',
         'icon' => 'bi bi-people-fill',
@@ -16,7 +16,7 @@ return [
             'mine_employee_evaluations',
         ],
     ],
-    
+
     [
         'label' => 'Zasoby',
         'icon' => 'bi bi-boxes',
@@ -26,7 +26,7 @@ return [
             'accommodations',
         ],
     ],
-    
+
     [
         'label' => 'Historia',
         'icon' => 'bi bi-clock-history',
@@ -38,7 +38,7 @@ return [
             'vehicle_repairs',
         ],
     ],
-    
+
     [
         'label' => 'Logistyka',
         'icon' => 'bi bi-tools',
@@ -52,7 +52,7 @@ return [
             'transfers',
         ],
     ],
-    
+
     [
         'label' => 'Finanse',
         'icon' => 'bi bi-cash-stack',
@@ -63,7 +63,7 @@ return [
             'transport_costs',
         ],
     ],
-    
+
     [
         'label' => 'Kadry',
         'icon' => 'bi bi-briefcase',
@@ -74,7 +74,7 @@ return [
             'employee_documents',
         ],
     ],
-    
+
     [
         'label' => 'Rozliczenia',
         'icon' => 'bi bi-calculator',
@@ -86,7 +86,7 @@ return [
             'employee_rates',
         ],
     ],
-    
+
     [
         'label' => 'Administracja',
         'icon' => 'bi bi-shield-lock',
@@ -94,6 +94,8 @@ return [
             'users',
             'user_roles',
             'system_actions',
+            'audit_logs',
+            'system_changelog',
         ],
     ],
 ];

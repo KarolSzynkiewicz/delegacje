@@ -28,16 +28,15 @@
         @endif
         
         @if($deleteRoute)
-            {{-- onclick zamiast onsubmit na formularzu: Livewire nie usuwa atrybutu; Js::from bezpiecznie escapuje tekst --}}
-            <form action="{{ $deleteRoute }}" method="POST" class="d-inline">
+            <form
+                action="{{ $deleteRoute }}"
+                method="POST"
+                class="d-inline"
+                onsubmit="return confirm({{ Js::from($deleteMessage) }})"
+            >
                 @csrf
                 @method('DELETE')
-                <x-ui.button
-                    variant="danger"
-                    type="submit"
-                    title="Usuń"
-                    onclick='return confirm({{ Js::from($deleteMessage) }})'
-                >
+                <x-ui.button variant="danger" type="submit" title="Usuń">
                     <i class="bi bi-trash"></i>
                 </x-ui.button>
             </form>
