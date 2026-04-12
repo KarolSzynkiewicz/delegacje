@@ -168,6 +168,14 @@ class TaskSubtasks extends Component
         return is_numeric($progress) ? (float) $progress : 0.0;
     }
 
+    /**
+     * @return array<int, int> subtask id => 1-based display number (stable order: created_at asc)
+     */
+    public function getSubtaskDisplayNumbersProperty(): array
+    {
+        return $this->task->subtaskDisplayNumbers();
+    }
+
     public function render()
     {
         return view('livewire.task-subtasks', [

@@ -117,8 +117,9 @@ class WeeklyOverviewController extends Controller
             ->get();
 
         $employeesInFieldCount = $this->weeklyDashboardKpiService->countEmployeesInFieldForWeek($weekStart, $weekEnd);
+        $employeesInFieldByProject = $this->weeklyDashboardKpiService->employeesInFieldByProjectForWeek($weekStart, $weekEnd);
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'expiringItems', 'employeesInFieldCount', 'projectsEndingThisMonth'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'expiringItems', 'employeesInFieldCount', 'employeesInFieldByProject', 'projectsEndingThisMonth'));
     }
 
     /**

@@ -1,8 +1,30 @@
 @php
+    $commentAutocompletePayload = $commentAutocompletePayload ?? ['users' => [], 'subtasks' => []];
     $commentBodyForDisplay = preg_replace('/<br\s*\/?\s*>/i', "\n", (string) ($comment->body ?? ''));
     $commentBodyForEdit = $commentBodyForDisplay;
     $children = ($childrenOf->get($comment->id) ?? collect())->sortBy('created_at');
     $marginRem = min($depth * 1.0, 4.0);
+    $commentBodyHtml = \App\Services\UserMentionService::highlightMentions(
+        nl2br(e($commentBodyForDisplay)),
+        $knownUsersForHighlight
+    );
+    if ($commentable instanceof \App\Models\ProjectTask) {
+        $commentBodyHtml = \App\Services\UserMentionService::highlightSubtaskRefs($commentBodyHtml, $commentable);
+    }
+
+    $likersForTooltip = collect();
+    if (($comment->likes_count ?? 0) > 0 && $comment->relationLoaded('likes')) {
+        $likersForTooltip = $comment->likes
+            ->map(fn ($like) => $like->user)
+            ->filter()
+            ->unique('id')
+            ->sortBy(fn ($u) => mb_strtolower($u->name))
+            ->values();
+    }
+    $likeActionHint = ($comment->liked_by_me ?? false) ? 'Cofnij polubienie' : 'Polub';
+    $likeButtonTitle = $likersForTooltip->isNotEmpty()
+        ? 'Polubili: '.$likersForTooltip->pluck('name')->implode(', ').' — '.$likeActionHint
+        : $likeActionHint;
 @endphp
 
 <div
@@ -30,7 +52,7 @@
                     <button
                         type="submit"
                         class="btn btn-sm btn-outline-secondary border-0 px-2"
-                        title="{{ ($comment->liked_by_me ?? false) ? 'Cofnij polubienie' : 'Polub' }}"
+                        title="{{ $likeButtonTitle }}"
                     >
                         <i class="bi {{ ($comment->liked_by_me ?? false) ? 'bi-heart-fill text-danger' : 'bi-heart' }} me-1"></i>
                         <span class="small">{{ (int) ($comment->likes_count ?? 0) }}</span>
@@ -54,30 +76,9 @@
             </div>
         </div>
 
-        @if(($comment->likes_count ?? 0) > 0 && $comment->relationLoaded('likes'))
-            @php
-                $likers = $comment->likes
-                    ->map(fn ($like) => $like->user)
-                    ->filter()
-                    ->unique('id')
-                    ->sortBy(fn ($u) => mb_strtolower($u->name));
-            @endphp
-            @if($likers->isNotEmpty())
-                <div class="small mb-2 text-break">
-                    <span class="text-muted me-1">Polubili:</span>
-                    @foreach($likers as $u)
-                        <span class="text-body">{{ $u->name }}</span>@if(!$loop->last)<span class="text-muted">, </span>@endif
-                    @endforeach
-                </div>
-            @endif
-        @endif
-
         <div id="comment-body-{{ $comment->id }}">
             @if(filled($comment->body))
-                <p class="mb-0">{!! \App\Services\UserMentionService::highlightMentions(
-                    nl2br(e($commentBodyForDisplay)),
-                    $knownUsersForHighlight
-                ) !!}</p>
+                <div class="mb-0 text-break comment-body">{!! $commentBodyHtml !!}</div>
             @endif
             <x-attachment-list :attachments="$comment->attachments" :class="filled($comment->body) ? 'mt-2' : ''" />
         </div>
@@ -111,16 +112,19 @@
                 <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
                 <input type="hidden" name="parent_id" value="{{ $comment->id }}">
 
-                <div class="mb-2 position-relative" x-data="mentionAutocomplete()">
+                <div class="mb-2 position-relative" x-data="commentBodyAutocomplete(@js($commentAutocompletePayload))">
                     <label class="form-label small">Twoja odpowiedź</label>
                     <textarea
                         name="body"
                         rows="2"
                         class="form-control form-control-sm"
-                        placeholder="@wzmianka lub treść / załącznik"
+                        placeholder="{{ $commentable instanceof \App\Models\ProjectTask ? '@wzmianka, #1 … lub treść / załącznik' : '@wzmianka lub treść / załącznik' }}"
                         x-ref="textarea"
-                        @input="onInput($event)"
+                        @input="onInput()"
                         @keydown.escape="close()"
+                        @keydown.arrow-down="if (show && results.length) { $event.preventDefault(); moveActive(1); }"
+                        @keydown.arrow-up="if (show && results.length) { $event.preventDefault(); moveActive(-1); }"
+                        @keydown.enter="if (show && results.length) { $event.preventDefault(); pickActive(); }"
                     ></textarea>
                     <ul
                         x-show="show && results.length > 0"
@@ -128,21 +132,27 @@
                         class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
                         style="z-index:1090;min-width:14rem;max-height:12rem;overflow-y:auto;top:100%;left:0;"
                     >
-                        <template x-for="(user, idx) in results" :key="user.name">
+                        <template x-for="(item, idx) in results" :key="item.kind === 'user' ? ('u-' + item.name) : ('s-' + item.num)">
                             <li>
                                 <button
                                     type="button"
                                     class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
                                     :class="idx === activeIdx ? 'active' : ''"
-                                    @click="selectUser(user)"
+                                    @click="selectItem(item)"
                                     @mouseenter="activeIdx = idx"
                                 >
-                                    <span
-                                        class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
-                                        style="width:1.5rem;height:1.5rem;font-size:.6rem;"
-                                        x-text="user.initials"
-                                    ></span>
-                                    <span class="small fw-medium" x-text="user.name"></span>
+                                    <span x-show="item.kind === 'user'" class="d-flex align-items-center gap-2 w-100 min-w-0">
+                                        <span
+                                            class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
+                                            style="width:1.5rem;height:1.5rem;font-size:.6rem;"
+                                            x-text="item.initials"
+                                        ></span>
+                                        <span class="small fw-medium text-truncate" x-text="item.name"></span>
+                                    </span>
+                                    <span x-show="item.kind === 'subtask'" class="d-flex align-items-center gap-2 w-100 min-w-0">
+                                        <span class="badge bg-secondary bg-opacity-50 text-body flex-shrink-0" x-text="'#' + item.num"></span>
+                                        <span class="small text-truncate" style="max-width:12rem;" x-text="item.name"></span>
+                                    </span>
                                 </button>
                             </li>
                         </template>
@@ -165,5 +175,6 @@
         'commentableTypeValue' => $commentableTypeValue,
         'knownUsersForHighlight' => $knownUsersForHighlight,
         'childrenOf' => $childrenOf,
+        'commentAutocompletePayload' => $commentAutocompletePayload,
     ])
 @endforeach

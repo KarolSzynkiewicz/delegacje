@@ -37,6 +37,29 @@ body {
     display: none !important;
 }
 
+/* Karta podzadania w treści komentarza (#n → podgląd jak na liście podzadań) */
+.comment-body .subtask-ref-card {
+    padding: 0 !important;
+    border-radius: 12px !important;
+    transition: none;
+}
+.comment-body .subtask-ref-card:hover {
+    transform: none;
+    box-shadow: none !important;
+}
+.comment-body .subtask-ref-card-inner {
+    padding: 0.5rem 0.75rem;
+}
+.comment-body .subtask-ref-card-title {
+    color: var(--text-main) !important;
+    font-weight: 500;
+    line-height: 1.35;
+}
+.comment-body .subtask-ref-card .badge {
+    color: var(--text-muted) !important;
+    align-self: center;
+}
+
 /* Z-index dla Livewire loading overlays */
 .z-3 {
     z-index: 3;

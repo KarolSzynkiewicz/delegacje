@@ -14,6 +14,29 @@
     $cardLabel = $label ?? ($isTask ? 'Dziennik operacyjny' : 'Komentarze');
     $inputLabelText = $inputLabel ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
     $buttonTextValue = $buttonText ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
+
+    $commentAutocompleteUsers = \App\Models\User::orderBy('name')
+        ->get()
+        ->map(fn ($u) => ['name' => $u->name, 'initials' => $u->initials])
+        ->values()
+        ->all();
+
+    $hashAutocompleteSubtasks = [];
+    if ($isTask) {
+        $commentable->loadMissing('subtasks');
+        $idToNum = $commentable->subtaskDisplayNumbers();
+        foreach ($commentable->subtasks->sortBy(['created_at', 'id']) as $st) {
+            $hashAutocompleteSubtasks[] = [
+                'num' => $idToNum[$st->id],
+                'name' => (string) $st->name,
+            ];
+        }
+    }
+
+    $commentAutocompletePayload = [
+        'users' => $commentAutocompleteUsers,
+        'subtasks' => $hashAutocompleteSubtasks,
+    ];
 @endphp
 
 <x-ui.card>
@@ -28,16 +51,19 @@
         <input type="hidden" name="commentable_type" value="{{ $commentableType->value }}">
         <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
 
-        <div class="mb-3 position-relative" x-data="mentionAutocomplete()">
+        <div class="mb-3 position-relative" x-data="commentBodyAutocomplete(@js($commentAutocompletePayload))">
             <label class="form-label">{{ $inputLabelText }}</label>
             <textarea
                 name="body"
                 rows="3"
                 class="form-control"
-                placeholder="Możesz wspomnieć o użytkowniku pisząc @NazwaUzytkownika (treść lub załącznik — wymagane jest przynajmniej jedno)"
+                placeholder="{{ $isTask ? 'Możesz użyć @NazwaUzytkownika oraz #1, #2 … (odwołanie do podzadania). Treść lub załącznik — wymagane jest przynajmniej jedno' : 'Możesz wspomnieć o użytkowniku pisząc @NazwaUzytkownika (treść lub załącznik — wymagane jest przynajmniej jedno)' }}"
                 x-ref="textarea"
-                @input="onInput($event)"
+                @input="onInput()"
                 @keydown.escape="close()"
+                @keydown.arrow-down="if (show && results.length) { $event.preventDefault(); moveActive(1); }"
+                @keydown.arrow-up="if (show && results.length) { $event.preventDefault(); moveActive(-1); }"
+                @keydown.enter="if (show && results.length) { $event.preventDefault(); pickActive(); }"
             ></textarea>
 
             {{-- Dropdown z podpowiedziami --}}
@@ -47,21 +73,27 @@
                 class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
                 style="z-index:1090;min-width:16rem;max-height:14rem;overflow-y:auto;top:100%;left:0;right:auto;"
             >
-                <template x-for="(user, idx) in results" :key="user.name">
+                <template x-for="(item, idx) in results" :key="item.kind === 'user' ? ('u-' + item.name) : ('s-' + item.num)">
                     <li>
                         <button
                             type="button"
                             class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
                             :class="idx === activeIdx ? 'active' : ''"
-                            @click="selectUser(user)"
+                            @click="selectItem(item)"
                             @mouseenter="activeIdx = idx"
                         >
-                            <span
-                                class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
-                                style="width:1.75rem;height:1.75rem;font-size:.65rem;"
-                                x-text="user.initials"
-                            ></span>
-                            <span class="small fw-medium" x-text="user.name"></span>
+                            <span x-show="item.kind === 'user'" class="d-flex align-items-center gap-2 w-100 min-w-0">
+                                <span
+                                    class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
+                                    style="width:1.75rem;height:1.75rem;font-size:.65rem;"
+                                    x-text="item.initials"
+                                ></span>
+                                <span class="small fw-medium text-truncate" x-text="item.name"></span>
+                            </span>
+                            <span x-show="item.kind === 'subtask'" class="d-flex align-items-center gap-2 w-100 min-w-0">
+                                <span class="badge bg-secondary bg-opacity-50 text-body flex-shrink-0" x-text="'#' + item.num"></span>
+                                <span class="small text-truncate" style="max-width:14rem;" x-text="item.name"></span>
+                            </span>
                         </button>
                     </li>
                 </template>
@@ -90,9 +122,10 @@
             ->get();
         $commentRoots = $allCommentsFlat->whereNull('parent_id')->values();
         $childrenOf = $allCommentsFlat->whereNotNull('parent_id')->groupBy('parent_id');
-        $knownUsersForHighlight = \App\Models\User::orderBy('name')->get()
-            ->map(fn ($u) => ['name' => $u->name, 'initials' => $u->initials])
-            ->all();
+        $knownUsersForHighlight = $commentAutocompleteUsers;
+        if ($commentable instanceof \App\Models\ProjectTask) {
+            $commentable->loadMissing('subtasks');
+        }
     @endphp
 
     @if($allCommentsFlat->count() > 0)
@@ -105,6 +138,7 @@
                     'commentableTypeValue' => $commentableType->value,
                     'knownUsersForHighlight' => $knownUsersForHighlight,
                     'childrenOf' => $childrenOf,
+                    'commentAutocompletePayload' => $commentAutocompletePayload,
                 ])
             @endforeach
         </div>
@@ -132,50 +166,83 @@
         if (edit) { edit.classList.add('d-none'); }
     }
 
-    // Alpine.js component dla @mention autocomplete
-    function mentionAutocomplete() {
-        const allUsers = @json(\App\Models\User::orderBy('name')->get()->map(fn($u) => [
-            'name'     => $u->name,
-            'initials' => $u->initials,
-        ]));
+    // Alpine: @wzmianki oraz #n → podpowiedzi podzadań (tylko gdy payload.subtasks niepuste)
+    function commentBodyAutocomplete(payload) {
+        const allUsers = payload.users || [];
+        const subtasks = payload.subtasks || [];
 
         return {
             show: false,
             results: [],
             activeIdx: 0,
-            query: '',
-            mentionStart: -1,
+            triggerStart: -1,
 
-            onInput(event) {
+            onInput() {
                 const ta = this.$refs.textarea;
                 const pos = ta.selectionStart;
                 const text = ta.value.substring(0, pos);
 
-                // Znajdź ostatnie @ poprzedzone spacją lub początkiem tekstu
-                const triggerMatch = text.match(/(^|(?<=\s))@(\S*)$/u);
+                const atMatch = text.match(/(^|(?<=\s))@(\S*)$/u);
+                if (atMatch) {
+                    const fragment = atMatch[2];
+                    if (fragment.length > 0) {
+                        this.triggerStart = pos - fragment.length - 1;
+                        const q = fragment.toLowerCase();
+                        this.results = allUsers
+                            .filter((u) => u.name.toLowerCase().includes(q))
+                            .slice(0, 8)
+                            .map((u) => ({ kind: 'user', name: u.name, initials: u.initials }));
+                        this.activeIdx = 0;
+                        this.show = this.results.length > 0;
+                        return;
+                    }
+                }
 
-                if (! triggerMatch) { this.close(); return; }
+                const hashMatch = subtasks.length ? text.match(/(^|(?<=\s))#(\d*)$/u) : null;
+                if (hashMatch) {
+                    const fragment = hashMatch[2];
+                    this.triggerStart = pos - fragment.length - 1;
+                    const q = fragment;
+                    this.results = subtasks
+                        .filter((s) => q === '' || String(s.num).startsWith(q))
+                        .slice(0, 8)
+                        .map((s) => ({ kind: 'subtask', num: s.num, name: s.name }));
+                    this.activeIdx = 0;
+                    this.show = this.results.length > 0;
+                    return;
+                }
 
-                // Indeks znaku @ w oryginalnym tekście
-                const fragment = triggerMatch[2]; // to co po @
-                this.mentionStart = pos - fragment.length - 1; // pozycja @
-
-                if (fragment.length === 0) { this.close(); return; }
-
-                const q = fragment.toLowerCase();
-                this.results = allUsers.filter(u => u.name.toLowerCase().includes(q)).slice(0, 8);
-                this.activeIdx = 0;
-                this.show = this.results.length > 0;
+                this.close();
             },
 
-            selectUser(user) {
+            moveActive(delta) {
+                if (!this.show || this.results.length === 0) {
+                    return;
+                }
+                const n = this.results.length;
+                this.activeIdx = (this.activeIdx + delta + n) % n;
+            },
+
+            pickActive() {
+                if (!this.show || this.results.length === 0) {
+                    return;
+                }
+                this.selectItem(this.results[this.activeIdx]);
+            },
+
+            selectItem(item) {
                 const ta = this.$refs.textarea;
-                const before = ta.value.substring(0, this.mentionStart);
-                const after  = ta.value.substring(ta.selectionStart);
-                ta.value = before + '@' + user.name + ' ' + after;
-                // Przesuń kursor za wstawioną wzmiankę
-                const newPos = before.length + user.name.length + 2;
-                ta.setSelectionRange(newPos, newPos);
+                const before = ta.value.substring(0, this.triggerStart);
+                const after = ta.value.substring(ta.selectionStart);
+                if (item.kind === 'user') {
+                    ta.value = before + '@' + item.name + ' ' + after;
+                    const newPos = before.length + item.name.length + 2;
+                    ta.setSelectionRange(newPos, newPos);
+                } else {
+                    ta.value = before + '#' + item.num + ' ' + after;
+                    const newPos = before.length + String(item.num).length + 2;
+                    ta.setSelectionRange(newPos, newPos);
+                }
                 ta.focus();
                 this.close();
             },
@@ -183,7 +250,7 @@
             close() {
                 this.show = false;
                 this.results = [];
-                this.mentionStart = -1;
+                this.triggerStart = -1;
             },
         };
     }

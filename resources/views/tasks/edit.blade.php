@@ -37,7 +37,7 @@
                             type="textarea" 
                             name="description" 
                             label="Opis"
-                            value="{{ old('description', $task->description) }}"
+                            value="{{ old('description', $task->plainDescription()) }}"
                             rows="4"
                         />
                     </div>

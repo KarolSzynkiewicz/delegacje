@@ -12,6 +12,7 @@
         $pendingCount = $pendingSubtasks->count();
         $progressPercentage = is_numeric($this->progressPercentage) ? (float)$this->progressPercentage : 0;
         $progressVariant = $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default');
+        $subtaskNumbers = $this->subtaskDisplayNumbers;
     @endphp
 
     <x-ui.card label="Podzadania">
@@ -30,6 +31,9 @@
                     max="{{ $totalSubtasks }}" 
                     variant="{{ $progressVariant }}"
                 />
+                <p class="small text-muted mb-0 mt-2">
+                    Numery <span class="fw-semibold">#1, #2, …</span> według kolejności dodania — w komentarzu do zadania <span class="fw-semibold">#n</span> zamieni się na kartę z odznaką i nazwą podzadania (jak poniżej na liście).
+                </p>
             </div>
         @endif
 
@@ -96,8 +100,14 @@
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="pending-{{ $subtask->id }}">
                             <div class="flex-grow-1">
                                 @if($editingSubtaskId === $subtask->id)
+                                    <div class="d-flex align-items-start gap-2 w-100">
+                                        <span
+                                            class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold flex-shrink-0 mt-1"
+                                            style="min-width: 2.35rem;"
+                                            title="Numer podzadania w tym zadaniu"
+                                        >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                     <div
-                                        class="w-100 position-relative"
+                                        class="flex-grow-1 position-relative"
                                         x-data="subtaskMention(@js($mentionUsersForAutocomplete), 'editingSubtaskName')"
                                     >
                                         <input
@@ -134,6 +144,7 @@
                                             </template>
                                         </ul>
                                     </div>
+                                    </div>
                                     @error('editingSubtaskName')
                                         <span class="text-danger small d-block mt-1">{{ $message }}</span>
                                     @enderror
@@ -146,6 +157,10 @@
                                             wire:click="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label" for="subtask-{{ $subtask->id }}">
+                                            <span
+                                                class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold me-1"
+                                                title="Numer podzadania w tym zadaniu"
+                                            >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                             {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
                                         </label>
                                     </div>
@@ -188,8 +203,14 @@
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="completed-{{ $subtask->id }}" style="opacity: 0.7;">
                             <div class="flex-grow-1">
                                 @if($editingSubtaskId === $subtask->id)
+                                    <div class="d-flex align-items-start gap-2 w-100">
+                                        <span
+                                            class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold flex-shrink-0 mt-1"
+                                            style="min-width: 2.35rem;"
+                                            title="Numer podzadania w tym zadaniu"
+                                        >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                     <div
-                                        class="w-100 position-relative"
+                                        class="flex-grow-1 position-relative"
                                         x-data="subtaskMention(@js($mentionUsersForAutocomplete), 'editingSubtaskName')"
                                     >
                                         <input
@@ -226,6 +247,7 @@
                                             </template>
                                         </ul>
                                     </div>
+                                    </div>
                                     @error('editingSubtaskName')
                                         <span class="text-danger small d-block mt-1">{{ $message }}</span>
                                     @enderror
@@ -238,8 +260,12 @@
                                             checked
                                             wire:click="toggleSubtask({{ $subtask->id }})"
                                         >
-                                        <label class="form-check-label text-decoration-line-through text-muted" for="subtask-{{ $subtask->id }}">
-                                            {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
+                                        <label class="form-check-label text-muted" for="subtask-{{ $subtask->id }}">
+                                            <span
+                                                class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold me-1"
+                                                title="Numer podzadania w tym zadaniu"
+                                            >#{{ $subtaskNumbers[$subtask->id] }}</span>
+                                            <span class="text-decoration-line-through">{!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}</span>
                                         </label>
                                     </div>
                                 @endif

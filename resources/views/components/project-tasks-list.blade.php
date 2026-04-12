@@ -20,7 +20,7 @@
                         <td>
                             <strong>{{ $task->name }}</strong>
                             @if($task->description)
-                                <br><small class="text-muted">{{ Str::limit($task->description, 50) }}</small>
+                                <br><small class="text-muted">{{ Str::limit($task->plainDescription(), 50) }}</small>
                             @endif
                         </td>
                         @if(!$isMineView)

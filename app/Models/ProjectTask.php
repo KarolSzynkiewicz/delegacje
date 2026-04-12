@@ -149,6 +149,15 @@ class ProjectTask extends Model
     }
 
     /**
+     * Opis do wyświetlenia w UI: dekoduje encje HTML zapisane w bazie (&gt; → >),
+     * żeby Blade {{ }} nie dublował ich do widocznego „&gt;”.
+     */
+    public function plainDescription(): string
+    {
+        return html_entity_decode((string) ($this->description ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    /**
      * Get the subtasks for this task.
      */
     public function subtasks(): HasMany
@@ -169,5 +178,22 @@ class ProjectTask extends Model
         $completed = $this->subtasks()->where('is_completed', true)->count();
 
         return round(($completed / $total) * 100, 2);
+    }
+
+    /**
+     * Mapa id podzadania → numer wyświetlany (#1, #2, …), kolejność: data utworzenia, potem id.
+     *
+     * @return array<int, int>
+     */
+    public function subtaskDisplayNumbers(): array
+    {
+        $this->loadMissing('subtasks');
+
+        $map = [];
+        foreach ($this->subtasks->sortBy(['created_at', 'id'])->values() as $index => $subtask) {
+            $map[$subtask->id] = $index + 1;
+        }
+
+        return $map;
     }
 }

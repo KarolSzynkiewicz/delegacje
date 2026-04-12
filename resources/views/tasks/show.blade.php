@@ -43,7 +43,7 @@
                                 <small class="text-muted d-block mb-1">
                                     <i class="bi bi-card-text me-1"></i>Opis
                                 </small>
-                                <div class="text-break">{{ $task->description }}</div>
+                                <div class="text-break">{{ $task->plainDescription() }}</div>
                             </div>
                         @endif
 

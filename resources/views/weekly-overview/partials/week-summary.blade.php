@@ -131,15 +131,16 @@
                 </button>
             </div>
             <div class="col-6 col-lg-3">
-                <div
-                    class="weekly-logistics-metric p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center"
-                    style="cursor: help;"
-                    title="Liczba unikalnych pracowników przypisanych do projektów przecinających ten tydzień."
+                <button
+                    type="button"
+                    class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
+                    title="Ile osób w którym projekcie (przypisanie przecina ten tydzień)"
+                    @click.prevent="openPanel('employees-by-project', $event)"
                 >
                     <i class="bi bi-people weekly-logistics-metric__icon" aria-hidden="true"></i>
                     <div class="weekly-logistics-metric__label">Pracownicy</div>
                     <div class="weekly-logistics-metric__value">{{ $employeesInFieldCount }}</div>
-                </div>
+                </button>
             </div>
         </div>
 
@@ -270,6 +271,26 @@
                         </ul>
                     @else
                         <p class="text-muted small mb-0">Brak zjazdów w tym tygodniu.</p>
+                    @endif
+                </div>
+
+                <div x-show="active === 'employees-by-project'" x-cloak>
+                    @if($employeesInFieldByProject->isNotEmpty())
+                        <ul class="mb-0 small list-unstyled">
+                            @foreach($employeesInFieldByProject as $row)
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                    <a href="{{ route('projects.show', $row->project_id) }}" class="text-decoration-none min-w-0 flex-grow-1">
+                                        <span class="fw-semibold">{{ $row->project_name }}</span>
+                                    </a>
+                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ (int) $row->employee_count }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <p class="text-muted small mb-0 mt-2 pt-2 border-top" style="border-color: var(--glass-border) !important;">
+                            Suma po projektach może być wyższa niż liczba na kafelku, jeśli ta sama osoba jest w kilku projektach.
+                        </p>
+                    @else
+                        <p class="text-muted small mb-0">Brak przypisań do projektów przecinających ten tydzień.</p>
                     @endif
                 </div>
 
@@ -457,6 +478,7 @@ document.addEventListener('alpine:init', () => {
                 transfers: 'Transfery (tydzień)',
                 returns: 'Zjazdy (tydzień)',
                 departures: 'Wyjazdy (tydzień)',
+                'employees-by-project': 'Pracownicy wg projektu (tydzień)',
                 'expiring-documents': 'Dokumenty (miesiąc)',
                 'expiring-leases': 'Najmy (miesiąc)',
                 'expiring-vehicles': 'Auta (OC / przegląd)',
@@ -470,6 +492,7 @@ document.addEventListener('alpine:init', () => {
                 transfers: 'bi-arrow-left-right',
                 returns: 'bi-arrow-return-left',
                 departures: 'bi-arrow-right',
+                'employees-by-project': 'bi-people',
                 'expiring-documents': 'bi-file-earmark-text',
                 'expiring-leases': 'bi-house',
                 'expiring-vehicles': 'bi-car-front',

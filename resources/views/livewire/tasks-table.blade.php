@@ -134,9 +134,9 @@
                     };
                     $createdAt = \Carbon\Carbon::parse($task->created_at);
                     $updatedAt = \Carbon\Carbon::parse($task->updated_at);
-                    // Support both stored newlines and stored <br> tags (historical data)
+                    // Support both stored newlines and stored <br> tags (historical data); plainDescription = bez encji &gt; itd.
                     $taskDescriptionForDisplay = $task->description
-                        ? preg_replace('/<br\\s*\\/?\\s*>/i', "\n", (string) $task->description)
+                        ? preg_replace('/<br\\s*\\/?\\s*>/i', "\n", $task->plainDescription())
                         : null;
                 @endphp
                 <div class="col-12" wire:key="task-{{ $task->id }}" id="task-{{ $task->id }}">

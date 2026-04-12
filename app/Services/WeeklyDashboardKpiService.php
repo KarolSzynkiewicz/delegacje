@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Models\LogisticsEvent;
+use App\Models\Project;
 use App\Models\ProjectAssignment;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 final class WeeklyDashboardKpiService
 {
@@ -71,6 +73,42 @@ final class WeeklyDashboardKpiService
             ->toBase()
             ->selectRaw('count(distinct employee_id) as c')
             ->value('c');
+    }
+
+    /**
+     * Liczba unikalnych pracowników w polu, pogrupowana po projekcie (tydzień przecina przypisanie).
+     *
+     * @return Collection<int, object{project_id: int, project_name: string, employee_count: int}>
+     */
+    public function employeesInFieldByProjectForWeek(Carbon $weekStart, Carbon $weekEnd): Collection
+    {
+        $rangeStart = $weekStart->copy()->startOfDay();
+        $rangeEnd = $weekEnd->copy()->endOfDay();
+
+        // Bez JOIN do projects w tym samym zapytaniu co overlappingWith — obie tabele mają
+        // start_date/end_date i MySQL zgłasza „Column 'start_date' … is ambiguous”.
+        $rows = ProjectAssignment::query()
+            ->overlappingWith($rangeStart, $rangeEnd)
+            ->selectRaw('project_assignments.project_id, COUNT(DISTINCT project_assignments.employee_id) as employee_count')
+            ->groupBy('project_assignments.project_id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $names = Project::query()
+            ->whereIn('id', $rows->pluck('project_id'))
+            ->pluck('name', 'id');
+
+        return $rows
+            ->map(fn ($row) => (object) [
+                'project_id' => (int) $row->project_id,
+                'project_name' => (string) ($names[$row->project_id] ?? '?'),
+                'employee_count' => (int) $row->employee_count,
+            ])
+            ->sortBy('project_name')
+            ->values();
     }
 
     /**

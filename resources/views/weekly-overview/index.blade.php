@@ -73,6 +73,7 @@
         'allDepartures' => $allDepartures,
         'transferEvents' => $transferEvents,
         'employeesInFieldCount' => $employeesInFieldCount,
+        'employeesInFieldByProject' => $employeesInFieldByProject,
         'expiringItems' => $expiringItems,
         'projectsEndingThisMonth' => $projectsEndingThisMonth,
     ])
