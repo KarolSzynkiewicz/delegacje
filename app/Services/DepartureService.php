@@ -2,19 +2,20 @@
 
 namespace App\Services;
 
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
+use App\Models\Adjustment;
+use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
-use App\Models\Location;
+use App\Models\TransportCost;
 use App\Models\Vehicle;
-use App\Enums\LogisticsEventType;
-use App\Enums\LogisticsEventStatus;
-use App\Services\LogisticsEventService;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Service for handling departures (wyjazdy) - employees going from base to project location.
- * 
+ *
  * This service implements the domain model where Departure is a domain event
  * that records employees leaving base for a project location.
  */
@@ -23,20 +24,16 @@ class DepartureService
     public function __construct(
         protected LogisticsEventService $logisticsEventService
     ) {}
+
     /**
      * Commit the departure (create the logistics event).
-     * 
+     *
      * Creates a LogisticsEvent of type DEPARTURE with participants.
-     * 
-     * @param array $employeeIds
-     * @param Carbon $departureDate Start of the trip
-     * @param Carbon $endDate End of the trip (when employees arrive at destination) - REQUIRED
-     * @param int $toLocationId
-     * @param int|null $vehicleId
-     * @param string|null $notes
-     * @param LogisticsEvent|null $existingEvent If provided, updates existing event instead of creating new one
-     * @param LogisticsEventStatus|null $status If provided, sets this status (only for updates)
-     * @return LogisticsEvent
+     *
+     * @param  Carbon  $departureDate  Start of the trip
+     * @param  Carbon  $endDate  End of the trip (when employees arrive at destination) - REQUIRED
+     * @param  LogisticsEvent|null  $existingEvent  If provided, updates existing event instead of creating new one
+     * @param  LogisticsEventStatus|null  $status  If provided, sets this status (only for updates)
      */
     public function commitDeparture(
         array $employeeIds,
@@ -49,7 +46,7 @@ class DepartureService
         ?LogisticsEventStatus $status = null
     ): LogisticsEvent {
         $baseLocation = Location::getBase();
-        
+
         // Validate vehicle availability if vehicle is provided
         if ($vehicleId) {
             $vehicle = Vehicle::find($vehicleId);
@@ -74,14 +71,14 @@ class DepartureService
                     'to_location_id' => $toLocationId,
                     'notes' => $notes,
                 ];
-                
+
                 // Update status if provided
                 if ($status !== null) {
                     $updateData['status'] = $status;
                 }
-                
+
                 $event->update($updateData);
-                
+
                 // Delete old participants
                 $event->participants()->delete();
             } else {
@@ -131,9 +128,8 @@ class DepartureService
 
     /**
      * Reverse a departure - clean up before editing.
-     * 
-     * @param LogisticsEvent $departure The departure to reverse
-     * @return void
+     *
+     * @param  LogisticsEvent  $departure  The departure to reverse
      */
     public function reverseDeparture(LogisticsEvent $departure): void
     {
@@ -145,5 +141,108 @@ class DepartureService
             // Delete all participants (they will be recreated with new data)
             $departure->participants()->delete();
         });
+    }
+
+    /**
+     * Transfer „lotnisko → domy” tworzony przy wyjeździe V2 (transport zbiorowy) — identyfikacja po treści notatki.
+     */
+    public function findLinkedAirportTransfer(LogisticsEvent $departure, bool $onlyActive = true): ?LogisticsEvent
+    {
+        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+            return null;
+        }
+
+        $query = LogisticsEvent::query()
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('notes', 'like', '%wyjazdu #'.$departure->id.'%');
+
+        if ($onlyActive) {
+            $query->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED]);
+        }
+
+        return $query->orderByDesc('id')->first();
+    }
+
+    /**
+     * Usuwa z ewidencji tylko te koszty i korekty, które użytkownik zaznaczył.
+     * Zawsze anuluje powiązany transfer (jeśli jest) i czyści jego uczestników.
+     *
+     * @param  array{
+     *     remove_fuel?: bool,
+     *     remove_other_costs?: bool,
+     *     remove_transfer_reward?: bool,
+     *     remove_ticket_ids?: array<int>,
+     * }  $selection
+     * @return array{
+     *     transport_costs_deleted: int,
+     *     transfer_cancelled: bool,
+     *     adjustments_deleted: int,
+     *     adjustments_skipped_payroll: int,
+     * }
+     */
+    public function cancelDepartureLinkedTransferAndCosts(LogisticsEvent $departure, array $selection): array
+    {
+        $removeFuel = ! empty($selection['remove_fuel']);
+        $removeOther = ! empty($selection['remove_other_costs']);
+        $removeReward = ! empty($selection['remove_transfer_reward']);
+        $removeTicketIds = array_map('intval', $selection['remove_ticket_ids'] ?? []);
+
+        $result = [
+            'transport_costs_deleted' => 0,
+            'transfer_cancelled' => false,
+            'adjustments_deleted' => 0,
+            'adjustments_skipped_payroll' => 0,
+        ];
+
+        $transfer = $this->findLinkedAirportTransfer($departure, true);
+        $eventIds = [$departure->id];
+        if ($transfer) {
+            $eventIds[] = $transfer->id;
+        }
+
+        $allowedTicketIds = TransportCost::query()
+            ->whereIn('logistics_event_id', $eventIds)
+            ->where('cost_type', 'ticket')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $removeTicketIds = array_values(array_intersect($removeTicketIds, $allowedTicketIds));
+
+        foreach (TransportCost::query()->whereIn('logistics_event_id', $eventIds)->get() as $cost) {
+            $delete = false;
+            if ($cost->cost_type === 'ticket') {
+                $delete = in_array((int) $cost->id, $removeTicketIds, true);
+            } elseif ($cost->cost_type === 'fuel') {
+                $delete = $removeFuel;
+            } elseif (in_array($cost->cost_type, ['parking', 'toll', 'other'], true)) {
+                $delete = $removeOther;
+            }
+
+            if ($delete) {
+                $cost->delete();
+                $result['transport_costs_deleted']++;
+            }
+        }
+
+        if ($transfer) {
+            foreach (Adjustment::query()->where('logistics_event_id', $transfer->id)->get() as $adjustment) {
+                if ($adjustment->payroll_id !== null) {
+                    $result['adjustments_skipped_payroll']++;
+
+                    continue;
+                }
+                if ($removeReward) {
+                    $adjustment->delete();
+                    $result['adjustments_deleted']++;
+                }
+            }
+
+            $transfer->update(['status' => LogisticsEventStatus::CANCELLED]);
+            $transfer->load('participants');
+            $transfer->participants->each->delete();
+            $result['transfer_cancelled'] = true;
+        }
+
+        return $result;
     }
 }

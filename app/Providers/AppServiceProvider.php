@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use App\Models\AccommodationAssignment;
+use App\Models\Adjustment;
 use App\Models\LogisticsEvent;
+use App\Models\LogisticsEventParticipant;
 use App\Models\ProjectAssignment;
+use App\Models\TransportCost;
 use App\Models\VehicleAssignment;
 use App\Observers\AuditableModelObserver;
 use App\Services\SystemBootstrapService;
@@ -49,6 +52,9 @@ class AppServiceProvider extends ServiceProvider
         VehicleAssignment::observe(AuditableModelObserver::class);
         ProjectAssignment::observe(AuditableModelObserver::class);
         AccommodationAssignment::observe(AuditableModelObserver::class);
+        TransportCost::observe(AuditableModelObserver::class);
+        Adjustment::observe(AuditableModelObserver::class);
+        LogisticsEventParticipant::observe(AuditableModelObserver::class);
 
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,

@@ -9,6 +9,9 @@ return [
         \App\Models\VehicleAssignment::class => 'Przypisanie pojazdu',
         \App\Models\ProjectAssignment::class => 'Przypisanie do projektu',
         \App\Models\AccommodationAssignment::class => 'Przypisanie do zakwaterowania',
+        \App\Models\TransportCost::class => 'Koszt transportu',
+        \App\Models\Adjustment::class => 'Korekta wynagrodzenia',
+        \App\Models\LogisticsEventParticipant::class => 'Uczestnik zdarzenia logistycznego',
     ],
 
     'event_labels' => [
@@ -44,5 +47,17 @@ return [
         'role_id' => 'Rola',
         'start_date' => 'Data od',
         'logistics_event_id' => 'Zdarzenie logistyczne',
+        'cost_type' => 'Typ kosztu',
+        'amount' => 'Kwota',
+        'currency' => 'Waluta',
+        'cost_date' => 'Data kosztu',
+        'description' => 'Opis',
+        'file_path' => 'Plik',
+        'transport_id' => 'Rezerwacja transportu',
+        'date' => 'Data',
+        'payroll_id' => 'Rozliczenie płac',
+        'assignment_type' => 'Typ przypisania',
+        'assignment_id' => 'ID przypisania',
+        'original_end_date' => 'Pierwotna data zakończenia',
     ],
 ];
