@@ -179,9 +179,11 @@
                                     <button type="button" class="btn btn-sm btn-outline-primary" wire:click="startEditSubtask({{ $subtask->id }})">
                                         Edytuj
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger"
-                                            wire:click="deleteSubtask({{ $subtask->id }})"
-                                            onclick="return confirm('Na pewno usunąć to podzadanie?')">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        x-on:click.stop.prevent="if (window.confirm('Na pewno usunąć to podzadanie?')) { $wire.deleteSubtask({{ $subtask->id }}) }"
+                                    >
                                         Usuń
                                     </button>
                                 @endif
@@ -283,9 +285,11 @@
                                     <button type="button" class="btn btn-sm btn-outline-primary" wire:click="startEditSubtask({{ $subtask->id }})">
                                         Edytuj
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger"
-                                            wire:click="deleteSubtask({{ $subtask->id }})"
-                                            onclick="return confirm('Na pewno usunąć to podzadanie?')">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        x-on:click.stop.prevent="if (window.confirm('Na pewno usunąć to podzadanie?')) { $wire.deleteSubtask({{ $subtask->id }}) }"
+                                    >
                                         Usuń
                                     </button>
                                 @endif
