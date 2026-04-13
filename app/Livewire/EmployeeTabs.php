@@ -27,7 +27,7 @@ class EmployeeTabs extends Component
             'info' => ['label' => 'Informacje', 'permission' => null, 'icon' => 'bi bi-info-circle'],
             'documents' => ['label' => 'Dokumenty', 'permission' => 'employee-documents.view', 'icon' => 'bi bi-file-earmark-medical'],
             'rotations' => ['label' => 'Rotacje', 'permission' => 'rotations.view', 'icon' => 'bi bi-arrow-repeat'],
-            'assignments' => ['label' => 'Przypisania do projektów', 'permission' => 'assignments.view', 'icon' => 'bi bi-person-check'],
+            'assignments' => ['label' => 'Przypisania do projektów', 'permission' => 'project-assignments.view', 'icon' => 'bi bi-person-check'],
             'vehicle-assignments' => ['label' => 'Przypisania do aut', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
             'accommodation-assignments' => ['label' => 'Przypisania do domów', 'permission' => 'accommodation-assignments.view', 'icon' => 'bi bi-house-fill'],
             'payrolls' => ['label' => 'Płace', 'permission' => 'payrolls.view', 'icon' => 'bi bi-cash-stack'],

@@ -383,6 +383,7 @@
                                                 $dayNumber = $day['number'];
                                                 $date = $day['date'];
                                                 $isToday = $date->isToday();
+                                                $isFuture = $date->isAfter(\Carbon\Carbon::today());
                                                 $isInAssignment = isset($daysInAssignment[$dayNumber]);
                                                 $timeLog = $timeLogs[$dayNumber] ?? null;
                                                 $hours = $timeLog['hours'] ?? '';
@@ -443,8 +444,18 @@
                                                     $assignmentId = $assignmentData['assignments'][0]->id;
                                                 }
                                             @endphp
-                                            <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }} {{ !$isInAssignment ? 'disabled-cell' : '' }}">
-                                                @if($isInAssignment && $assignmentId)
+                                            <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }} {{ (!$isInAssignment || $isFuture) ? 'disabled-cell' : '' }}">
+                                                @if($isFuture)
+                                                    {{-- Przyszłe dni: nie pozwalamy wpisywać czasu pracy. --}}
+                                                    <input
+                                                        type="text"
+                                                        class="form-control form-control-sm text-center time-input disabled-input"
+                                                        value=""
+                                                        readonly
+                                                        tabindex="-1"
+                                                        title="Nie można wpisywać godzin na przyszłe dni"
+                                                    >
+                                                @elseif($isInAssignment && $assignmentId)
                                                     {{-- Aktywne przypisanie - pole edytowalne.
                                                          Uwaga: trzymamy tylko 1 input na komórkę, żeby nie przekraczać `max_input_vars` na dużych siatkach. --}}
                                                     <input

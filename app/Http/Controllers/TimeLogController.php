@@ -269,10 +269,11 @@ class TimeLogController extends Controller
             ], [
                 'entries' => 'required|array',
                 'entries.*.assignment_id' => 'required|integer|exists:project_assignments,id',
-                'entries.*.date' => 'required|date',
+                'entries.*.date' => 'required|date|before_or_equal:today',
                 'entries.*.hours' => 'nullable|numeric|min:0|max:24',
             ], [
                 'entries.*.hours.numeric' => 'Dozwolone są jedynie następujące części godzin: 15, 30 lub 45 minut (kroki co 15 minut).',
+                'entries.*.date.before_or_equal' => 'Nie można wpisywać godzin na dzień większy niż dziś.',
             ])->validate();
         } catch (\Illuminate\Validation\ValidationException $e) {
             if ($request->expectsJson()) {

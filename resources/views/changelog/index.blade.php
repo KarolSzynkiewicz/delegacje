@@ -8,6 +8,13 @@
             Krótki opis zmian wdrożonych w aplikacji (aktualizowane ręcznie). Format jak wpisy w commicie — bez szczegółów technicznych dla użytkownika końcowego.
         </p>
 
+        <x-ui.card label="2026-04-13">
+            <ul class="small mb-0 ps-3" style="line-height: 1.75;">
+                <li><strong>Pracownicy:</strong> poprawiono widoczność zakładki <strong>Przypisania do projektów</strong> zgodnie z uprawnieniami.</li>
+                <li><strong>Ewidencja godzin (miesięczna siatka):</strong> zablokowano możliwość wpisywania godzin na daty w przyszłości (maksymalnie do dziś).</li>
+            </ul>
+        </x-ui.card>
+
         <x-ui.card label="2026-04-11 — weekend (od piątku 10.04)">
             <ul class="small mb-0 ps-3" style="line-height: 1.75;">
                 <li><strong>Zadania:</strong> szybka edycja na liście; załączniki; komentarze w wątkach i polubienia; porządki w nagłówkach i zakładkach projektu.</li>
