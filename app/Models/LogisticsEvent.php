@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * LogisticsEvent - fakt biznesowy (co, kiedy, kto, gdzie)
@@ -35,6 +36,7 @@ class LogisticsEvent extends Model
         'route_distance',
         'route_duration',
         'route_waypoints',
+        'location_stop_notes',
         'destination_stop_location',
         'has_reassignment',
     ];
@@ -49,6 +51,7 @@ class LogisticsEvent extends Model
         'route_distance' => 'decimal:2',
         'route_duration' => 'integer',
         'route_waypoints' => 'array',
+        'location_stop_notes' => 'array',
     ];
 
     /**
@@ -319,25 +322,171 @@ class LogisticsEvent extends Model
     }
 
     /**
-     * Get waypoint accommodations (in order).
+     * Rozpoznaje pojedynczy wpis trasy z planera (acc: / loc:) lub legacy sam identyfikator akomodacji.
+     *
+     * @return array{type: string, id: int}|null
      */
-    public function getWaypointAccommodations(): \Illuminate\Support\Collection
+    public static function parseRouteWaypointKey(mixed $waypoint): ?array
     {
-        if (empty($this->route_waypoints)) {
+        if ($waypoint === null || $waypoint === '') {
+            return null;
+        }
+        if (is_int($waypoint) || (is_string($waypoint) && ctype_digit((string) $waypoint))) {
+            return ['type' => 'acc', 'id' => (int) $waypoint];
+        }
+        $s = strtolower((string) $waypoint);
+        if (! str_contains($s, ':')) {
+            return null;
+        }
+        [$type, $rest] = explode(':', $s, 2);
+        $id = (int) $rest;
+        if ($id <= 0) {
+            return null;
+        }
+        if ($type === 'loc') {
+            return ['type' => 'loc', 'id' => $id];
+        }
+        if ($type === 'acc') {
+            return ['type' => 'acc', 'id' => $id];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, mixed>|null  $waypoints
+     * @return list<string>
+     */
+    public static function normalizeRouteWaypointsFromPayload(?array $waypoints): array
+    {
+        if (empty($waypoints)) {
+            return [];
+        }
+        $out = [];
+        foreach ($waypoints as $w) {
+            $p = self::parseRouteWaypointKey($w);
+            if ($p !== null) {
+                $out[] = $p['type'].':'.$p['id'];
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $raw
+     * @param  list<string>  $normalizedWaypointKeys
+     */
+    public static function sanitizeLocationStopNotes(?array $raw, array $normalizedWaypointKeys): ?array
+    {
+        if (empty($raw) || ! is_array($raw)) {
+            return null;
+        }
+        $allowedLocIds = [];
+        foreach ($normalizedWaypointKeys as $key) {
+            $p = self::parseRouteWaypointKey($key);
+            if (($p['type'] ?? '') === 'loc') {
+                $allowedLocIds[] = (string) $p['id'];
+            }
+        }
+        $out = [];
+        foreach ($allowedLocIds as $lid) {
+            if (! array_key_exists($lid, $raw)) {
+                continue;
+            }
+            $text = mb_substr(trim((string) $raw[$lid]), 0, 5000);
+            if ($text !== '') {
+                $out[$lid] = $text;
+            }
+        }
+
+        return empty($out) ? null : $out;
+    }
+
+    /**
+     * Get waypoint accommodations (in order), tylko przystanki typu mieszkanie (acc).
+     */
+    public function getWaypointAccommodations(): Collection
+    {
+        $ids = [];
+        foreach ($this->route_waypoints ?? [] as $w) {
+            $p = self::parseRouteWaypointKey($w);
+            if (($p['type'] ?? '') === 'acc') {
+                $ids[] = $p['id'];
+            }
+        }
+        if ($ids === []) {
             return collect();
         }
 
-        // Get accommodations in the order specified by route_waypoints
-        $accommodations = Accommodation::whereIn('id', $this->route_waypoints)->get()->keyBy('id');
-
-        // Return in the correct order
+        $accommodations = Accommodation::whereIn('id', $ids)->get()->keyBy('id');
         $ordered = collect();
-        foreach ($this->route_waypoints as $accommodationId) {
-            if ($accommodations->has($accommodationId)) {
-                $ordered->push($accommodations->get($accommodationId));
+        foreach ($ids as $id) {
+            if ($accommodations->has($id)) {
+                $ordered->push($accommodations->get($id));
             }
         }
 
         return $ordered;
+    }
+
+    /**
+     * Przystanki w kolejności do widoku szczegółów (mieszkania + lokalizacje dodane ręcznie).
+     *
+     * @return Collection<int, array{position: int, kind: string, model_id: int, name: string, address_line: string, employees_label: ?string, purpose: ?string}>
+     */
+    public function getRouteStopsForDetailView(): Collection
+    {
+        $notes = $this->location_stop_notes ?? [];
+        $items = collect();
+        $pos = 0;
+
+        foreach ($this->route_waypoints ?? [] as $w) {
+            $p = self::parseRouteWaypointKey($w);
+            if ($p === null) {
+                continue;
+            }
+            $pos++;
+            if ($p['type'] === 'acc') {
+                $acc = Accommodation::find($p['id']);
+                if (! $acc) {
+                    continue;
+                }
+                $emps = $this->relationLoaded('accommodationAssignments')
+                    ? $this->accommodationAssignments->where('accommodation_id', $acc->id)->map(fn ($a) => $a->employee?->full_name)->filter()
+                    : collect();
+                $addressLine = trim(implode(', ', array_filter([$acc->address, $acc->city ?? null])));
+                $items->push([
+                    'position' => $pos,
+                    'kind' => 'accommodation',
+                    'model_id' => $acc->id,
+                    'name' => $acc->name,
+                    'address_line' => $addressLine,
+                    'employees_label' => $emps->isNotEmpty() ? $emps->join(', ') : null,
+                    'purpose' => null,
+                ]);
+            } else {
+                $loc = Location::find($p['id']);
+                if (! $loc) {
+                    continue;
+                }
+                $noteKey = (string) $p['id'];
+                $purpose = isset($notes[$noteKey]) && trim((string) $notes[$noteKey]) !== ''
+                    ? trim((string) $notes[$noteKey])
+                    : null;
+                $addressLine = trim(implode(', ', array_filter([$loc->address, $loc->city ?? null])));
+                $items->push([
+                    'position' => $pos,
+                    'kind' => 'extra_location',
+                    'model_id' => $loc->id,
+                    'name' => $loc->name,
+                    'address_line' => $addressLine,
+                    'employees_label' => null,
+                    'purpose' => $purpose,
+                ]);
+            }
+        }
+
+        return $items;
     }
 }

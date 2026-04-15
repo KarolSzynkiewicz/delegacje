@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
-use App\Services\DateRangeService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -22,9 +21,18 @@ class AccommodationAssignmentService
         Carbon $startDate,
         ?Carbon $endDate = null,
         ?string $notes = null,
-        ?int $logisticsEventId = null
+        ?int $logisticsEventId = null,
+        ?Carbon $arrivalDate = null
     ): AccommodationAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
+
+        // Validate start date is not before arrival (if provided)
+        if ($arrivalDate) {
+            $this->validateStartDateAfterArrival($startDate, $arrivalDate);
+        }
+
+        // Validate lease covers the assignment period (for rented accommodations)
+        $this->validateLeaseCoversRange($accommodation, $startDate, $endDate);
 
         // Validate employee doesn't have overlapping assignment to the same accommodation
         $this->validateNoOverlappingAssignment($employee, $accommodation, $startDate, $endDate);
@@ -54,6 +62,9 @@ class AccommodationAssignmentService
         ?string $notes = null
     ): AccommodationAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
+
+        // Validate lease covers the assignment period (for rented accommodations)
+        $this->validateLeaseCoversRange($accommodation, $startDate, $endDate);
 
         // Validate employee doesn't have overlapping assignment to the same accommodation (excluding current)
         $this->validateNoOverlappingAssignment($assignment->employee, $accommodation, $startDate, $endDate, $assignment->id);
@@ -103,9 +114,55 @@ class AccommodationAssignmentService
      */
     protected function validateAccommodationCapacity(Accommodation $accommodation, Carbon $startDate, Carbon $endDate, ?int $excludeAssignmentId = null): void
     {
-        if (!$accommodation->hasAvailableSpace($startDate, $endDate, $excludeAssignmentId)) {
+        if (! $accommodation->hasAvailableSpace($startDate, $endDate, $excludeAssignmentId)) {
             throw ValidationException::withMessages([
-                'accommodation_id' => 'Brak wolnych miejsc w tym mieszkaniu w wybranym okresie.'
+                'accommodation_id' => 'Brak wolnych miejsc w tym mieszkaniu w wybranym okresie.',
+            ]);
+        }
+    }
+
+    /**
+     * Validate that a rented accommodation's active lease covers the assignment range.
+     * Own accommodations (no active lease or type !== 'wynajmowany') are always allowed.
+     *
+     * @throws ValidationException
+     */
+    protected function validateLeaseCoversRange(Accommodation $accommodation, Carbon $startDate, Carbon $endDate): void
+    {
+        $accommodation->loadMissing('activeLease');
+        $lease = $accommodation->activeLease;
+
+        // Own accommodations have no lease restriction
+        if (! $lease || $lease->type !== 'wynajmowany') {
+            return;
+        }
+
+        $leaseEnd = $lease->end_date ? Carbon::parse($lease->end_date) : null;
+        $leaseStart = $lease->start_date ? Carbon::parse($lease->start_date) : null;
+
+        if ($leaseStart && $startDate->lt($leaseStart)) {
+            throw ValidationException::withMessages([
+                'start_date' => 'Data rozpoczęcia przypisania ('.$startDate->format('d.m.Y').') jest przed początkiem najmu mieszkania ('.$leaseStart->format('d.m.Y').').',
+            ]);
+        }
+
+        if ($leaseEnd && $endDate->gt($leaseEnd)) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Data zakończenia przypisania ('.$endDate->format('d.m.Y').') wykracza poza datę końca najmu mieszkania ('.$leaseEnd->format('d.m.Y').'). Przedłuż najem lub skróć przypisanie.',
+            ]);
+        }
+    }
+
+    /**
+     * Validate that assignment start date is not before the logistics event arrival date.
+     *
+     * @throws ValidationException
+     */
+    protected function validateStartDateAfterArrival(Carbon $startDate, Carbon $arrivalDate): void
+    {
+        if ($startDate->lt($arrivalDate)) {
+            throw ValidationException::withMessages([
+                'start_date' => 'Data rozpoczęcia przypisania ('.$startDate->format('d.m.Y').') nie może być wcześniejsza niż data przybycia ('.$arrivalDate->format('d.m.Y').').',
             ]);
         }
     }

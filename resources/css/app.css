@@ -263,13 +263,14 @@ body {
     padding: 0.25rem 2rem 0.25rem 0.5rem !important;
     font-size: 0.875rem !important;
     line-height: 1.5 !important;
-    height: calc(1.5rem + 0.5rem);
+    min-height: calc(1.5em + 0.5rem + 2px) !important;
     background-color: var(--bg-input) !important;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
     background-position: right 0.5rem center !important;
     background-size: 14px 14px !important;
     color: white !important;
+    -webkit-text-fill-color: white !important;
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
@@ -288,6 +289,143 @@ body {
     background: var(--bg-input);
     color: var(--text-main);
     padding: 6px;
+}
+
+/* Ticket costs table (Departure v2 header) */
+.ticket-costs-table th,
+.ticket-costs-table td {
+    vertical-align: middle !important;
+}
+.ticket-costs-table .ticket-employee {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    white-space: nowrap;
+}
+.ticket-costs-table .ticket-col-amount { width: 140px; }
+.ticket-costs-table .ticket-col-currency { width: 110px; }
+.ticket-costs-table .ticket-col-attachment { min-width: 220px; }
+.ticket-costs-table .ticket-input-amount,
+.ticket-costs-table .ticket-input-currency,
+.ticket-costs-table .ticket-input-attachment {
+    width: 100%;
+}
+
+/* Dark-glass file input */
+.ticket-costs-table input[type="file"].form-control-sm {
+    padding: 0.25rem 0.5rem !important;
+    color: var(--text-main) !important;
+}
+.ticket-costs-table input[type="file"].form-control-sm::file-selector-button {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    border-radius: 10px;
+    padding: 0.25rem 0.6rem;
+    margin-right: 0.5rem;
+}
+.ticket-costs-table input[type="file"].form-control-sm::file-selector-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+.ticket-costs-table input[type="file"].form-control-sm::-webkit-file-upload-button {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    border-radius: 10px;
+    padding: 0.25rem 0.6rem;
+    margin-right: 0.5rem;
+}
+.ticket-costs-table input[type="file"].form-control-sm::-webkit-file-upload-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Ticket cards (Departure v2 header) */
+.ticket-grid{
+    display:grid;
+    grid-template-columns: repeat(7, minmax(140px, 1fr));
+    gap: 10px;
+}
+.ticket-card{
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    padding: 10px 10px;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.20);
+}
+.ticket-card:hover{
+    border-color: rgba(59,130,246,0.35);
+    background: rgba(59,130,246,0.06);
+}
+.ticket-icon{
+    width: 28px; height: 28px;
+    border-radius: 10px;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(34,211,238,0.10);
+    border: 1px solid rgba(34,211,238,0.25);
+    color: #67e8f9;
+    flex: 0 0 auto;
+}
+.ticket-employee-name{
+    font-weight: 600;
+    font-size: .78rem;
+    display:flex;
+    gap: 6px;
+    align-items:center;
+}
+.ticket-person-icon{ color: rgba(148,163,184,0.9); }
+.ticket-subtext{ font-size: .72rem; opacity: .75; }
+.ticket-form-row{
+    display:flex;
+    gap: 8px;
+    align-items: start;
+}
+.ticket-amount{ flex: 1 1 auto; min-width: 0; }
+.ticket-currency{ flex: 0 0 68px; }
+.ticket-card .form-control-sm,
+.ticket-card .form-select-sm{
+    border-radius: 10px !important;
+    font-size: .75rem !important;
+    padding: 0.2rem 0.45rem !important;
+}
+.ticket-file-input{
+    position:absolute;
+    left:-9999px;
+    width:1px;
+    height:1px;
+    opacity:0;
+}
+.ticket-attach-btn{
+    width: 30px; height: 30px;
+    border-radius: 12px;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(148,163,184,0.95);
+    cursor: pointer;
+    transition: all .15s ease;
+    flex: 0 0 auto;
+}
+.ticket-attach-btn:hover{
+    background: rgba(59,130,246,0.10);
+    border-color: rgba(59,130,246,0.35);
+    color: #93c5fd;
+}
+.ticket-attach-btn.is-attached{
+    background: rgba(16,185,129,0.12);
+    border-color: rgba(16,185,129,0.35);
+    color: #6ee7b7;
+}
+
+/* Responsive: reduce columns on smaller widths */
+@media (max-width: 1400px){
+    .ticket-grid{ grid-template-columns: repeat(5, minmax(140px, 1fr)); }
+}
+@media (max-width: 1100px){
+    .ticket-grid{ grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+}
+@media (max-width: 700px){
+    .ticket-grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
 }
 
 /* Nadpisujemy input[type="date"] - kalendarz */
@@ -1279,6 +1417,49 @@ p {
     background: rgba(59, 130, 246, 0.05);
     border-color: var(--glass-border);
     border-bottom-color: transparent;
+}
+
+/* Sekcja z niekompletnymi danymi (np. kroki 2–4 planera wyjazdu) */
+.nav-link-ui.nav-link-ui--warning {
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fecaca;
+}
+
+.nav-link-ui.nav-link-ui--warning:hover {
+    border-color: rgba(239, 68, 68, 0.55);
+    color: #fee2e2;
+}
+
+.nav-link-ui.nav-link-ui--warning.active {
+    color: var(--primary);
+    border-color: rgba(239, 68, 68, 0.45);
+    box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.55);
+}
+
+/* Ikona „brakuje danych” przy tabach — czerwone kółko jak przy walidacji */
+.ui-tab-warn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    font-size: 0.6rem !important;
+    line-height: 1;
+    color: #fff !important;
+    background: rgba(220, 38, 38, 0.92);
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45);
+}
+
+.nav-link-ui.active .ui-tab-warn-icon {
+    background: rgba(220, 38, 38, 0.95);
+    color: #fff !important;
+}
+
+.dropdown-item.dropdown-item--tab-warning:not(.active) {
+    border-left: 3px solid rgba(239, 68, 68, 0.65);
+    padding-left: calc(0.75rem - 3px);
 }
 
 .tab-content-ui {
@@ -2368,6 +2549,27 @@ html .text-muted,
     min-height: calc(100% - 3.5rem);
 }
 
+/* Departure planner v2: @teleport('body') — wyśrodkowanie w widocznym oknie (viewport), nie w środku całej wysokości przewijanej treści */
+.departure-planner-teleport-modal.modal,
+.departure-planner-teleport-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    min-height: 100vh !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    z-index: 1060 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
+.departure-planner-teleport-modal .modal-dialog-centered {
+    min-height: min(100vh, 100%);
+}
+
 .modal-xl {
     max-width: 1140px;
 }
@@ -2596,4 +2798,41 @@ html .text-muted,
 
 .border-glass {
     border-color: var(--glass-border) !important;
+}
+
+/* Widok szczegółów wyjazdu */
+.departure-show .departure-status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+.departure-show .departure-status-pill--pending {
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--primary);
+    border-color: rgba(59, 130, 246, 0.35);
+}
+.departure-show .departure-status-pill--active {
+    background: rgba(245, 158, 11, 0.1);
+    color: #fcd34d;
+    border-color: rgba(251, 191, 36, 0.35);
+}
+.departure-show .departure-status-pill--done {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+.departure-show .departure-status-pill--cancelled {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.35);
+}
+.departure-show .departure-participants-table thead th {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.departure-show .departure-participants-table tbody tr:last-child td {
+    border-bottom: none;
 }

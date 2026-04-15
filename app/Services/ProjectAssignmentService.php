@@ -2,12 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\ProjectAssignment;
-use App\Models\Project;
 use App\Models\Employee;
+use App\Models\Project;
+use App\Models\ProjectAssignment;
 use App\Models\Role;
-use App\Services\DateRangeService;
-use App\Services\EmployeeLocationValidator;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -16,7 +14,7 @@ class ProjectAssignmentService
     public function __construct(
         protected EmployeeLocationValidator $locationValidator
     ) {}
-    
+
     /**
      * Create a new project assignment with business logic validation.
      */
@@ -84,7 +82,7 @@ class ProjectAssignmentService
         // For updates, use existing logistics_event_id if assignment has one
         // This allows editing assignment that already has a departure
         $existingLogisticsEventId = $assignment->logistics_event_id;
-        
+
         // If editing and assignment already has logistics_event_id, pass it to validator
         // Also pass assignment ID to exclude it from checks
         $this->locationValidator->validateForAssignment($employee, $project, $startDate, $existingLogisticsEventId, $assignment->id);
@@ -111,11 +109,11 @@ class ProjectAssignmentService
      */
     protected function validateEmployeeHasRole(Employee $employee, int $roleId): void
     {
-        if (!$employee->hasRole($roleId)) {
+        if (! $employee->hasRole($roleId)) {
             $role = \App\Models\Role::find($roleId);
             $roleName = $role ? $role->name : 'nieznana';
             throw ValidationException::withMessages([
-                'role_id' => "Pracownik {$employee->full_name} nie posiada roli: {$roleName}. Nie można przypisać go do projektu z tą rolą."
+                'role_id' => "Pracownik {$employee->full_name} nie posiada roli: {$roleName}. Nie można przypisać go do projektu z tą rolą.",
             ]);
         }
     }
@@ -129,58 +127,58 @@ class ProjectAssignmentService
     {
         // Sprawdź czy dokument is required
         $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
-        
+
         // Jeśli kolumna nie istnieje, nie ma wymaganych dokumentów - nie blokuj
-        if (!$hasIsRequiredColumn) {
+        if (! $hasIsRequiredColumn) {
             return;
         }
-        
+
         // Sprawdź czy są wymagane dokumenty
         $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
-        
+
         // Jeśli nie ma żadnych wymaganych dokumentów, nie blokuj przypisania
         if ($requiredDocuments->isEmpty()) {
             return; // Nie ma wymaganych dokumentów - wszystko OK
         }
-        
+
         // Sprawdź czy pracownik ma wszystkie wymagane dokumenty
-        if (!$employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
+        if (! $employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
             // Znajdź brakujące wymagane dokumenty
             $missingDocuments = [];
-            
+
             foreach ($requiredDocuments as $document) {
                 $hasActiveDocument = $employee->employeeDocuments()
                     ->where('document_id', $document->id)
                     ->where(function ($q) use ($startDate, $endDate) {
-                        $q->where(function ($q2) use ($startDate, $endDate) {
+                        $q->where(function ($q2) use ($endDate) {
                             $q2->where('kind', 'bezokresowy')
-                               ->where('valid_from', '<=', $endDate);
+                                ->where('valid_from', '<=', $endDate);
                         })->orWhere(function ($q2) use ($startDate, $endDate) {
                             $q2->where('kind', 'okresowy')
-                               ->where('valid_from', '<=', $startDate)
-                               ->where(function ($q3) use ($endDate) {
-                                   $q3->whereNull('valid_to')
-                                      ->orWhere('valid_to', '>=', $endDate);
-                               });
+                                ->where('valid_from', '<=', $startDate)
+                                ->where(function ($q3) use ($endDate) {
+                                    $q3->whereNull('valid_to')
+                                        ->orWhere('valid_to', '>=', $endDate);
+                                });
                         });
                     })
                     ->exists();
-                
-                if (!$hasActiveDocument) {
+
+                if (! $hasActiveDocument) {
                     $missingDocuments[] = $document->name;
                 }
             }
-            
+
             // Jeśli nie ma brakujących wymaganych dokumentów, nie blokuj
             if (empty($missingDocuments)) {
                 return;
             }
-            
+
             $missingList = implode(', ', $missingDocuments);
             $message = "Pracownik {$employee->full_name} nie ma wszystkich wymaganych dokumentów aktywnych w okresie od {$startDate} do {$endDate}. Brakuje wymaganych dokumentów: {$missingList}.";
-            
+
             throw ValidationException::withMessages([
-                'employee_id' => $message
+                'employee_id' => $message,
             ]);
         }
     }
@@ -197,9 +195,9 @@ class ProjectAssignmentService
         ?int $excludeAssignmentId = null
     ): void {
         // Check if employee has active rotation covering the entire period
-        if (!$employee->hasActiveRotationInDateRange($startDate, $endDate)) {
+        if (! $employee->hasActiveRotationInDateRange($startDate, $endDate)) {
             throw ValidationException::withMessages([
-                'employee_id' => "Pracownik nie ma aktywnej rotacji pokrywającej cały okres przypisania (od {$startDate->format('Y-m-d')} do {$endDate->format('Y-m-d')}). Rotacja musi pokrywać cały okres przypisania."
+                'employee_id' => "Pracownik nie ma aktywnej rotacji pokrywającej cały okres przypisania (od {$startDate->format('Y-m-d')} do {$endDate->format('Y-m-d')}). Rotacja musi pokrywać cały okres przypisania.",
             ]);
         }
 
@@ -227,9 +225,9 @@ class ProjectAssignmentService
         Carbon $startDate,
         Carbon $endDate
     ): void {
-        if (!$project->hasDemandForRoleInDateRange($roleId, $startDate, $endDate)) {
+        if (! $project->hasDemandForRoleInDateRange($roleId, $startDate, $endDate)) {
             throw ValidationException::withMessages([
-                'role_id' => "Brak zapotrzebowania dla roli w tym projekcie w okresie od {$startDate->format('Y-m-d')} do {$endDate->format('Y-m-d')}."
+                'role_id' => "Brak zapotrzebowania dla roli w tym projekcie w okresie od {$startDate->format('Y-m-d')} do {$endDate->format('Y-m-d')}.",
             ]);
         }
     }
@@ -247,46 +245,91 @@ class ProjectAssignmentService
             $employees = $employees->map(function ($employee) use ($startDate, $endDate, $excludeAssignmentId, $roleId, $projectId) {
                 $status = $employee->getAvailabilityStatus($startDate, $endDate, $excludeAssignmentId, $roleId, $projectId);
                 // Upewnij się, że missing_documents jest zawsze tablicą
-                if (!isset($status['missing_documents'])) {
+                if (! isset($status['missing_documents'])) {
                     $status['missing_documents'] = [];
                 }
                 $employee->availability_status = $status;
+
                 return $employee;
             });
-            
+
             // Sortuj pracowników:
             // 1. Najpierw dostępni, potem niedostępni
             // 2. W ramach każdej grupy: najpierw ci z wybraną rolą (jeśli rola jest podana)
             $employees = $employees->sortBy(function ($employee) use ($roleId) {
                 $isAvailable = $employee->availability_status['available'] ?? true;
                 $hasRole = $roleId !== null ? $employee->roles->contains('id', $roleId) : false;
-                
+
                 // Priorytet: dostępność (0 = dostępny, 1 = niedostępny), potem rola (0 = ma rolę, 1 = nie ma)
                 // Używamy liczby zamiast stringa dla lepszego sortowania
                 return ($isAvailable ? 0 : 100) + ($hasRole ? 0 : 10);
             })->values();
-            
+
             return $employees;
         }
 
         // If no dates, all employees are available
         $employees = $employees->map(function ($employee) {
             $employee->availability_status = [
-                'available' => true, 
+                'available' => true,
                 'reasons' => [],
-                'missing_documents' => []
+                'missing_documents' => [],
             ];
+
             return $employee;
         });
-        
+
         // Sortuj pracowników - najpierw ci z wybraną rolą (jeśli rola jest podana)
         if ($roleId !== null) {
             $employees = $employees->sortBy(function ($employee) use ($roleId) {
                 $hasRole = $employee->roles->contains('id', $roleId);
+
                 return $hasRole ? 0 : 1; // 0 = ma rolę (pierwsze), 1 = nie ma (później)
             })->values();
         }
-        
+
         return $employees;
+    }
+
+    /**
+     * Validate that assignment end date does not exceed project end date.
+     *
+     * @throws ValidationException
+     */
+    public function validateProjectEndDate(Project $project, Carbon $endDate): void
+    {
+        if (! $project->end_date) {
+            return;
+        }
+
+        $projectEnd = Carbon::parse($project->end_date)->endOfDay();
+
+        if ($endDate->gt($projectEnd)) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Data zakończenia przypisania ('.$endDate->format('d.m.Y').') nie może być późniejsza niż data zakończenia projektu ('.$projectEnd->format('d.m.Y').').',
+            ]);
+        }
+    }
+
+    /**
+     * Validate there are no time logs outside the new assignment date range.
+     * This prevents data corruption when shortening an assignment.
+     *
+     * @throws ValidationException
+     */
+    public function validateNoTimeLogsOutsideRange(ProjectAssignment $assignment, Carbon $startDate, Carbon $endDate): void
+    {
+        $outOfRangeLogs = $assignment->timeLogs()
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->where('start_time', '<', $startDate->startOfDay())
+                    ->orWhere('start_time', '>', $endDate->endOfDay());
+            })
+            ->count();
+
+        if ($outOfRangeLogs > 0) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Istnieje '.$outOfRangeLogs.' wpis(ów) czasu pracy poza nowym zakresem dat przypisania. Usuń je przed skróceniem okresu.',
+            ]);
+        }
     }
 }

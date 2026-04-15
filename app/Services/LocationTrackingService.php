@@ -30,15 +30,22 @@ class LocationTrackingService
 
     public function getLocationStatus(Employee $employee, Carbon $date): array
     {
-        $lastEvent = $this->findLastEvent($employee, $date);
-        $state = $this->deriveStateFromEvent($lastEvent, $date);
+        $dateDay = $date->copy()->startOfDay();
 
-        $projectAssignment = $this->findActiveProjectAssignment($employee, $date);
+        // Jedno źródło prawdy jak scope inTransitOn(): tylko PLANNED/COMPLETED, bez anulowanych i bez „legacy” IN_PROGRESS
+        if (LogisticsEvent::isEmployeeInTransit($employee, $dateDay)) {
+            $state = EmployeeLocationState::IN_TRANSIT;
+        } else {
+            $lastEvent = $this->findLastEvent($employee, $dateDay);
+            $state = $this->deriveStateFromEvent($lastEvent, $dateDay);
+        }
+
+        $projectAssignment = $this->findActiveProjectAssignment($employee, $dateDay);
         if ($projectAssignment && $state === EmployeeLocationState::IN_BASE) {
             $state = EmployeeLocationState::OUTSIDE_BASE;
         }
 
-        $accommodationAssignment = $this->findActiveAccommodationAssignment($employee, $date);
+        $accommodationAssignment = $this->findActiveAccommodationAssignment($employee, $dateDay);
 
         return [
             'state' => $state,
@@ -337,33 +344,38 @@ class LocationTrackingService
                 fn ($q) => $q->where('employee_id', $employee->id)
             )
             ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN])
-            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+            ->whereIn('status', [
+                LogisticsEventStatus::PLANNED,
+                LogisticsEventStatus::COMPLETED,
+            ])
             ->where('event_date', '<=', $date)
             ->orderBy('event_date', 'desc')
             ->orderBy('id', 'desc')
             ->first();
     }
 
+    /**
+     * Stan „baza / poza bazą” z ostatniego zakończonego odcinka — bez „w podróży”
+     * (to wyłącznie przez {@see LogisticsEvent::isEmployeeInTransit} w {@see getLocationStatus}).
+     */
     protected function deriveStateFromEvent(?LogisticsEvent $event, Carbon $date): EmployeeLocationState
     {
         if (! $event) {
             return EmployeeLocationState::IN_BASE;
         }
 
-        if ($event->type === LogisticsEventType::DEPARTURE) {
-            if ($event->end_date && $event->event_date <= $date && $date < $event->end_date) {
-                return EmployeeLocationState::IN_TRANSIT;
-            }
+        $dateDay = $date->copy()->startOfDay();
 
+        if ($event->type === LogisticsEventType::DEPARTURE) {
             return EmployeeLocationState::OUTSIDE_BASE;
         }
 
         if ($event->type === LogisticsEventType::RETURN) {
-            if ($event->end_date && $event->end_date <= $date) {
+            if ($event->end_date && $event->end_date->copy()->startOfDay()->lte($dateDay)) {
                 return EmployeeLocationState::IN_BASE;
             }
 
-            return EmployeeLocationState::IN_TRANSIT;
+            return EmployeeLocationState::OUTSIDE_BASE;
         }
 
         return EmployeeLocationState::IN_BASE;

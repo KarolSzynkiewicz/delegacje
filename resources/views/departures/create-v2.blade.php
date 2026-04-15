@@ -45,7 +45,7 @@
         @endif
 
         <livewire:departure-planner-v2 
-            :departureDate="old('departure_date', date('Y-m-d'))"
+            :departureDate="old('departure_date')"
             :endDate="old('end_date')"
             :vehicleId="old('vehicle_id')"
         />

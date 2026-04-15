@@ -429,4 +429,85 @@ class ReturnTripController extends Controller
                 ->with('error', 'Wystąpił błąd podczas anulowania zjazdu: '.$e->getMessage());
         }
     }
+
+    /**
+     * Create a return trip from Livewire planner session data (v2 flow).
+     */
+    public function storeV2(Request $request): RedirectResponse
+    {
+        $data = session('return_trip_v2_data', []);
+        session()->forget('return_trip_v2_data');
+
+        if (empty($data['return_date']) || empty($data['employee_ids'])) {
+            return redirect()->route('return-trips.create')
+                ->with('error', 'Brak danych zjazdu. Spróbuj ponownie.');
+        }
+
+        try {
+            $returnDate = Carbon::parse($data['return_date']);
+            $endDate = ! empty($data['end_date']) ? Carbon::parse($data['end_date']) : null;
+            $vehicle = ! empty($data['vehicle_id']) ? Vehicle::find($data['vehicle_id']) : null;
+            $employeeIds = $data['employee_ids'];
+
+            $preparation = $this->returnTripService->prepareZjazd(
+                $employeeIds,
+                $returnDate,
+                $vehicle,
+                $endDate,
+            );
+
+            $returnTrip = $this->returnTripService->commitZjazd(
+                $preparation,
+                $data['notes'] ?? null,
+                endDate: $endDate,
+            );
+
+            // Create ticket costs for public transport
+            if (! empty($data['is_public_transport']) && ! empty($data['ticket_costs_per_employee'])) {
+                $this->createReturnTripTicketCosts($returnTrip, $data);
+            }
+
+            return redirect()->route('return-trips.show', $returnTrip)
+                ->with('success', 'Zjazd został pomyślnie zapisany.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?? 'Błąd walidacji.';
+
+            return redirect()->route('return-trips.create')
+                ->with('error', $msg);
+        } catch (\Exception $e) {
+            return redirect()->route('return-trips.create')
+                ->with('error', 'Błąd podczas zapisu zjazdu: '.$e->getMessage());
+        }
+    }
+
+    private function createReturnTripTicketCosts(\App\Models\LogisticsEvent $returnTrip, array $data): void
+    {
+        $startAirportId = $data['start_airport_location_id'] ?? null;
+        $endAirportId = $data['end_airport_location_id'] ?? null;
+
+        foreach (($data['ticket_costs_per_employee'] ?? []) as $employeeId => $costData) {
+            $amount = $costData['amount'] ?? null;
+            $currency = $costData['currency'] ?? 'PLN';
+
+            if (! $amount) {
+                continue;
+            }
+
+            $employee = \App\Models\Employee::find($employeeId);
+            if (! $employee) {
+                continue;
+            }
+
+            \App\Models\TransportCost::create([
+                'logistics_event_id' => $returnTrip->id,
+                'cost_type' => 'ticket',
+                'amount' => $amount,
+                'currency' => $currency,
+                'employee_id' => $employeeId,
+                'from_location_id' => $startAirportId,
+                'to_location_id' => $endAirportId,
+                'notes' => 'Bilet powrotny – '.$employee->full_name,
+            ]);
+        }
+    }
 }

@@ -10,6 +10,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\DeparturePlannerService;
 use Carbon\Carbon;
+use Livewire\Attributes\Reactive;
 use Livewire\Component;
 
 class Step3VehicleAssignments extends Component
@@ -19,7 +20,8 @@ class Step3VehicleAssignments extends Component
 
     public $endDate;
 
-    public $vehicleId; // Vehicle selected in step 1
+    #[Reactive]
+    public $vehicleId; // Vehicle selected in step 1 (reactive - updates when parent changes it)
 
     public $assignments = []; // Read-only z rodzica
 
@@ -86,7 +88,13 @@ class Step3VehicleAssignments extends Component
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
-        $this->arrivalDate = Carbon::parse($endDate);
+        if (! empty($endDate)) {
+            $this->arrivalDate = Carbon::parse($endDate);
+        } elseif (! empty($departureDate)) {
+            $this->arrivalDate = Carbon::parse($departureDate);
+        } else {
+            $this->arrivalDate = now()->startOfDay();
+        }
         $this->vehicleId = $vehicleId;
         $this->assignments = $assignments;
         $this->assignmentRanges = $assignmentRanges;
@@ -107,6 +115,12 @@ class Step3VehicleAssignments extends Component
     {
         // Keep it reactive and predictable
         $this->dispatch('$refresh');
+    }
+
+    public function updatedVehicleId()
+    {
+        // Reload vehicle list when departure vehicle changes (reactive prop updated by parent)
+        $this->loadVehicles();
     }
 
     public function getFilteredVehiclesProperty(): array
@@ -459,26 +473,36 @@ class Step3VehicleAssignments extends Component
         return $projects;
     }
 
+    /**
+     * Czy przypisanie z kreatora (zakres dat) obejmuje dany dzień.
+     */
+    protected function vehicleFormAssignmentOverlapsDate(array $assignment, Carbon $date): bool
+    {
+        if (empty($assignment['start_date']) || empty($assignment['end_date'])) {
+            return false;
+        }
+        $start = Carbon::parse($assignment['start_date'])->startOfDay();
+        $end = Carbon::parse($assignment['end_date'])->endOfDay();
+
+        return $date->gte($start) && $date->lte($end);
+    }
+
     public function getVehicleOccupancy($vehicleId): array
     {
         $vehicleId = (int) $vehicleId;
         $vehicle = $this->getVehicle($vehicleId);
         $capacity = $vehicle?->capacity ?? 0;
 
-        // Count from form assignments
+        // Formularz: tylko osoby, których zakres obejmuje dzień przyjazdu (spójnie z kalendarzem)
         $employeeIds = [];
         foreach ($this->vehicleAssignments as $employeeId => $assignment) {
             $assignmentVehicleId = isset($assignment['vehicle_id']) ? (int) $assignment['vehicle_id'] : null;
-            if ($assignmentVehicleId === $vehicleId) {
-                $assignmentStart = Carbon::parse($assignment['start_date']);
-                $assignmentEnd = Carbon::parse($assignment['end_date']);
-                if ($this->arrivalDate->gte($assignmentStart) && $this->arrivalDate->lte($assignmentEnd)) {
-                    $employeeIds[] = (int) $employeeId;
-                }
+            if ($assignmentVehicleId === $vehicleId && $this->vehicleFormAssignmentOverlapsDate($assignment, $this->arrivalDate)) {
+                $employeeIds[] = (int) $employeeId;
             }
         }
 
-        // Count from existing database assignments
+        // Baza: przypisania aktywne w dniu przyjazdu
         $dbAssignments = VehicleAssignment::where('vehicle_id', $vehicleId)
             ->where('start_date', '<=', $this->arrivalDate)
             ->where(function ($query) {
@@ -500,9 +524,140 @@ class Step3VehicleAssignments extends Component
         ];
     }
 
+    /**
+     * Get vehicle occupancy excluding a specific employee (used when re-assigning or editing).
+     */
+    public function getVehicleOccupancyExcluding(int $vehicleId, int $excludeEmployeeId): array
+    {
+        $vehicle = $this->getVehicle($vehicleId);
+        $capacity = $vehicle?->capacity ?? 0;
+
+        $employeeIds = [];
+        foreach ($this->vehicleAssignments as $employeeId => $assignment) {
+            $assignmentVehicleId = isset($assignment['vehicle_id']) ? (int) $assignment['vehicle_id'] : null;
+            if (
+                $assignmentVehicleId === $vehicleId
+                && (int) $employeeId !== $excludeEmployeeId
+                && $this->vehicleFormAssignmentOverlapsDate($assignment, $this->arrivalDate)
+            ) {
+                $employeeIds[] = (int) $employeeId;
+            }
+        }
+
+        $dbAssignments = VehicleAssignment::where('vehicle_id', $vehicleId)
+            ->where('employee_id', '!=', $excludeEmployeeId)
+            ->where('start_date', '<=', $this->arrivalDate)
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $this->arrivalDate);
+            })
+            ->pluck('employee_id')
+            ->toArray();
+
+        $employeeIds = array_unique(array_merge($employeeIds, $dbAssignments));
+        $totalOccupied = count($employeeIds);
+        $available = max(0, $capacity - $totalOccupied);
+
+        return [
+            'occupied' => $totalOccupied,
+            'capacity' => $capacity,
+            'available' => $available,
+        ];
+    }
+
+    /**
+     * Metryki miejsc dla pojazdu w jednym dniu (ta sama logika co kalendarz).
+     *
+     * @return array{available_capacity: int, available_driver_slots: int, available_passenger_slots: int}
+     */
+    protected function computeVehicleDaySeatMetrics(Vehicle $vehicle, Carbon $date, int $employeeId): array
+    {
+        $vehicleCapacity = $vehicle->capacity ?? 0;
+
+        $existingAssignments = $vehicle->assignments()
+            ->where('employee_id', '!=', $employeeId)
+            ->where('start_date', '<=', $date)
+            ->where(function ($q) use ($date) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $date);
+            })
+            ->get();
+
+        $formAssignmentsCount = 0;
+        $formDriverCount = 0;
+        $formPassengerCount = 0;
+
+        foreach ($this->vehicleAssignments as $empId => $assignment) {
+            if ((int) $assignment['vehicle_id'] !== (int) $vehicle->id) {
+                continue;
+            }
+            if ((int) $empId === $employeeId) {
+                continue;
+            }
+
+            $assignmentStart = Carbon::parse($assignment['start_date']);
+            $assignmentEnd = Carbon::parse($assignment['end_date']);
+            if ($date->gte($assignmentStart) && $date->lte($assignmentEnd)) {
+                $formAssignmentsCount++;
+                if (($assignment['position'] ?? '') === 'driver') {
+                    $formDriverCount++;
+                } else {
+                    $formPassengerCount++;
+                }
+            }
+        }
+
+        $existingDriverCount = $existingAssignments->where('position', VehiclePosition::DRIVER)->count();
+        $existingPassengerCount = $existingAssignments->where('position', VehiclePosition::PASSENGER)->count();
+
+        $totalDriverCount = $existingDriverCount + $formDriverCount;
+        $totalPassengerCount = $existingPassengerCount + $formPassengerCount;
+        $totalOccupied = $existingAssignments->count() + $formAssignmentsCount;
+
+        $availableDriverSlots = ($totalDriverCount < 1) ? 1 : 0;
+        $availablePassengerSlots = max(0, $vehicleCapacity - 1 - $totalPassengerCount);
+        $availableCapacity = max(0, $vehicleCapacity - $totalOccupied);
+
+        return [
+            'available_capacity' => $availableCapacity,
+            'available_driver_slots' => $availableDriverSlots,
+            'available_passenger_slots' => $availablePassengerSlots,
+        ];
+    }
+
     public function loadVehicles()
     {
+        // Show only vehicles that will be outside base on arrival date:
+        // 1. The departure vehicle itself (if set)
+        // 2. Vehicles with existing VehicleAssignments active on the arrival date
+        //    (i.e., already deployed to worksite from previous operations)
+        $outsideBaseIds = VehicleAssignment::where('start_date', '<=', $this->arrivalDate)
+            ->where(function ($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $this->arrivalDate);
+            })
+            ->distinct()
+            ->pluck('vehicle_id')
+            ->toArray();
+
+        // Always include the departure vehicle
+        if ($this->vehicleId) {
+            $outsideBaseIds[] = (int) $this->vehicleId;
+        }
+
+        $outsideBaseIds = array_unique($outsideBaseIds);
+
+        if (empty($outsideBaseIds)) {
+            // Fallback: show all company vehicles if no filter matches
+            $this->vehicles = Vehicle::where('type', 'company_vehicle')
+                ->orderBy('registration_number')
+                ->get()
+                ->toArray();
+
+            return;
+        }
+
         $this->vehicles = Vehicle::where('type', 'company_vehicle')
+            ->whereIn('id', $outsideBaseIds)
             ->orderBy('registration_number')
             ->get()
             ->toArray();
@@ -608,22 +763,84 @@ class Step3VehicleAssignments extends Component
 
     public function confirmVehicleAssignment()
     {
-        if (! $this->selectedEmployee || ! $this->selectedVehicle || ! $this->selectedStartDate) {
-            return;
+        try {
+            if (! $this->selectedEmployee) {
+                $this->addError('confirmation', 'Brak wybranego pracownika.');
+
+                return;
+            }
+            if (! $this->selectedVehicle) {
+                $this->addError('confirmation', 'Wybierz pojazd.');
+
+                return;
+            }
+            if (! $this->selectedStartDate) {
+                $this->addError('confirmation', 'Wybierz datę rozpoczęcia w kalendarzu.');
+
+                return;
+            }
+
+            $endDate = $this->selectedEndDate ?: $this->selectedStartDate;
+            $vehicleId = is_object($this->selectedVehicle) ? $this->selectedVehicle->id : ($this->selectedVehicle['id'] ?? null);
+
+            if (! $vehicleId) {
+                $this->addError('confirmation', 'Błąd: nie można odczytać ID pojazdu.');
+
+                return;
+            }
+
+            $selectedEmployeeId = (int) ($this->selectedEmployee['id'] ?? 0);
+
+            $vehicle = $this->getVehicle((int) $vehicleId);
+            if (! $vehicle) {
+                $this->addError('confirmation', 'Nie znaleziono pojazdu.');
+
+                return;
+            }
+
+            // Walidacja jak w kalendarzu: każdy dzień zakresu musi mieć wolne miejsce (kierowca vs pasażer)
+            $rangeStart = Carbon::parse($this->selectedStartDate)->startOfDay();
+            $rangeEnd = Carbon::parse($endDate)->startOfDay();
+            if ($rangeEnd->lt($rangeStart)) {
+                $this->addError('confirmation', 'Nieprawidłowy zakres dat.');
+
+                return;
+            }
+
+            $isDriver = ($this->selectedPosition === 'driver');
+            for ($d = $rangeStart->copy(); $d->lte($rangeEnd); $d->addDay()) {
+                if ($d->lt($this->arrivalDate->copy()->startOfDay())) {
+                    $this->addError('confirmation', 'Zakres nie może zaczynać się przed dniem przyjazdu ('.$this->arrivalDate->format('d.m.Y').').');
+
+                    return;
+                }
+
+                $m = $this->computeVehicleDaySeatMetrics($vehicle, $d, $selectedEmployeeId);
+                if ($isDriver) {
+                    if ($m['available_driver_slots'] < 1) {
+                        $this->addError('confirmation', 'Brak wolnego miejsca dla kierowcy w dniu '.$d->format('d.m.Y').'.');
+
+                        return;
+                    }
+                } elseif ($m['available_capacity'] < 1) {
+                    $this->addError('confirmation', 'Pojazd jest pełny w dniu '.$d->format('d.m.Y').' — brak wolnego miejsca dla pasażera.');
+
+                    return;
+                }
+            }
+
+            $this->dispatch('vehicle-assigned', [
+                'employee_id' => $selectedEmployeeId,
+                'vehicle_id' => $vehicleId,
+                'position' => $this->selectedPosition,
+                'start_date' => $this->selectedStartDate,
+                'end_date' => $endDate,
+            ]);
+
+            $this->closeVehicleModal();
+        } catch (\Throwable $e) {
+            $this->addError('confirmation', 'Błąd: '.$e->getMessage());
         }
-
-        $endDate = $this->selectedEndDate ?: $this->selectedStartDate;
-
-        // Wysyła event do rodzica
-        $this->dispatch('vehicle-assigned', [
-            'employee_id' => $this->selectedEmployee['id'],
-            'vehicle_id' => $this->selectedVehicle->id,
-            'position' => $this->selectedPosition,
-            'start_date' => $this->selectedStartDate,
-            'end_date' => $endDate,
-        ]);
-
-        $this->closeVehicleModal();
     }
 
     public function removeVehicleAssignment($employeeId)
@@ -667,55 +884,21 @@ class Step3VehicleAssignments extends Component
                 'has_projects' => ! $hasNoProjects,
             ];
 
-            // Check available capacity from database
-            $vehicleCapacity = $vehicle->capacity ?? 0;
+            // Hard-block dates before arrival
+            if ($date->lt($this->arrivalDate->copy()->startOfDay())) {
+                $dayAvailability['available'] = false;
+                $dayAvailability['can_assign'] = false;
+                $dayAvailability['reason'] = 'before_arrival';
+                $dayAvailability['reason_text'] = 'Niedostępne (przed przyjazdem)';
+                $availability[$dateKey] = $dayAvailability;
 
-            // Get existing assignments for this vehicle on this date
-            $existingAssignments = $vehicle->assignments()
-                ->where('start_date', '<=', $date)
-                ->where(function ($q) use ($date) {
-                    $q->whereNull('end_date')
-                        ->orWhere('end_date', '>=', $date);
-                })
-                ->get();
-
-            // Count form assignments for this vehicle on this date (excluding current employee if editing)
-            $formAssignmentsCount = 0;
-            $formDriverCount = 0;
-            $formPassengerCount = 0;
-
-            foreach ($this->vehicleAssignments as $empId => $assignment) {
-                if ($assignment['vehicle_id'] == $vehicle->id) {
-                    // If this is the current employee being edited, don't count it (allows editing)
-                    if ($empId == $employeeId) {
-                        continue;
-                    }
-
-                    $assignmentStart = Carbon::parse($assignment['start_date']);
-                    $assignmentEnd = Carbon::parse($assignment['end_date']);
-                    if ($date->gte($assignmentStart) && $date->lte($assignmentEnd)) {
-                        $formAssignmentsCount++;
-                        if ($assignment['position'] === 'driver') {
-                            $formDriverCount++;
-                        } else {
-                            $formPassengerCount++;
-                        }
-                    }
-                }
+                continue;
             }
 
-            // Count existing assignments by position
-            $existingDriverCount = $existingAssignments->where('position', VehiclePosition::DRIVER)->count();
-            $existingPassengerCount = $existingAssignments->where('position', VehiclePosition::PASSENGER)->count();
-
-            // Calculate available slots
-            $totalDriverCount = $existingDriverCount + $formDriverCount;
-            $totalPassengerCount = $existingPassengerCount + $formPassengerCount;
-            $totalOccupied = $existingAssignments->count() + $formAssignmentsCount;
-
-            $availableDriverSlots = ($totalDriverCount < 1) ? 1 : 0;
-            $availablePassengerSlots = max(0, $vehicleCapacity - 1 - $totalPassengerCount);
-            $availableCapacity = max(0, $vehicleCapacity - $totalOccupied);
+            $metrics = $this->computeVehicleDaySeatMetrics($vehicle, $date, $employeeId);
+            $availableCapacity = $metrics['available_capacity'];
+            $availableDriverSlots = $metrics['available_driver_slots'];
+            $availablePassengerSlots = $metrics['available_passenger_slots'];
 
             $dayAvailability['available_capacity'] = $availableCapacity;
             $dayAvailability['available_driver_slots'] = $availableDriverSlots;
@@ -724,7 +907,8 @@ class Step3VehicleAssignments extends Component
             // Block if no capacity
             if ($availableCapacity <= 0) {
                 $dayAvailability['reason'] = 'no_capacity';
-                $dayAvailability['reason_text'] = 'Brak wolnych miejsc ('.$vehicleCapacity.' miejsc zajętych)';
+                $cap = (int) ($vehicle->capacity ?? 0);
+                $dayAvailability['reason_text'] = 'Brak wolnych miejsc ('.$cap.' miejsc zajętych)';
                 $dayAvailability['can_assign'] = false;
                 $dayAvailability['available'] = false;
             } else {

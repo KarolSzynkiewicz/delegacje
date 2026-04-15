@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -160,8 +161,9 @@ class DepartureController extends Controller
             'toLocation',
             'creator',
             'participants.employee',
-            'projectAssignments.project',
+            'projectAssignments.project.location',
             'vehicleAssignments.vehicle',
+            'accommodationAssignments.employee',
             'accommodationAssignments.accommodation',
             'transportCosts.creator',
         ]);
@@ -169,7 +171,9 @@ class DepartureController extends Controller
         // If this was a public transport departure, it may have an auto-created transfer
         $transfer = $this->departureService->findLinkedAirportTransfer($departure, false);
 
-        $transferRouteStops = collect();
+        $transferDrivingStops = collect();
+        $transferTicketFlightLine = null;
+        $transferEndAirportLocation = null;
         if ($transfer) {
             $transfer->load([
                 'vehicle',
@@ -181,28 +185,28 @@ class DepartureController extends Controller
                 'driverAdjustments.payroll',
             ]);
 
-            $waypointIds = array_values(array_filter(array_map('intval', (array) ($transfer->route_waypoints ?? []))));
-            $waypointsById = empty($waypointIds)
-                ? collect()
-                : Location::whereIn('id', $waypointIds)->get()->keyBy('id');
+            // Pełna kolejność przystanków + notatki (loc:) z zapisu wyjazdu — ten sam model co „Przebieg trasy”
+            $transferDrivingStops = $departure->getRouteStopsForDetailView();
 
-            $orderedWaypoints = collect();
-            foreach ($waypointIds as $id) {
-                if ($waypointsById->has($id)) {
-                    $orderedWaypoints->push($waypointsById->get($id));
-                }
+            $firstTicket = $departure->transportCosts->where('cost_type', 'ticket')->first();
+            if ($firstTicket && $firstTicket->notes && preg_match('/Lotnisko:\s*(.+?)\s*→\s*(.+?)(?:\s*\||$)/u', $firstTicket->notes, $m)) {
+                $transferTicketFlightLine = trim($m[1]).' → '.trim($m[2]);
+                $arrivalAirportName = trim($m[2]);
+                $transferEndAirportLocation = Location::query()
+                    ->where(function ($q) use ($arrivalAirportName) {
+                        $q->where('name', $arrivalAirportName)
+                            ->orWhere('name', 'like', '%'.addcslashes($arrivalAirportName, '%_\\').'%');
+                    })
+                    ->first();
             }
-
-            $transferRouteStops = collect()
-                ->when($transfer->fromLocation, fn ($c) => $c->push($transfer->fromLocation))
-                ->concat($orderedWaypoints)
-                ->when($transfer->toLocation, fn ($c) => $c->push($transfer->toLocation));
         }
 
         return view('departures.show', [
             'departure' => $departure,
             'transfer' => $transfer,
-            'transferRouteStops' => $transferRouteStops,
+            'transferDrivingStops' => $transferDrivingStops,
+            'transferTicketFlightLine' => $transferTicketFlightLine,
+            'transferEndAirportLocation' => $transferEndAirportLocation,
         ]);
     }
 
@@ -828,6 +832,7 @@ class DepartureController extends Controller
             'route_data.route_distance' => 'nullable|numeric|min:0',
             'route_data.route_duration' => 'nullable|numeric|min:0', // float from OpenRouteService
             'route_data.route_waypoints' => 'nullable|array',
+            'route_data.location_stop_notes' => 'nullable|array',
             'ticket_costs_per_employee' => 'nullable|array',
             'transfer_config' => 'nullable|array',
         ]);
@@ -947,27 +952,44 @@ class DepartureController extends Controller
             // We do NOT require projects to be in the same location.
             $destinationLocationId = null;
 
-            // Prepare route data if available
+            // Prepare route data if available (acc: / loc: + notatki przy lokalizacjach dodanych ręcznie)
             $routeData = $validated['route_data'] ?? null;
-            $routeWaypointAccommodationIds = null;
+            $normalizedRouteWaypoints = [];
 
             if ($routeData && ! empty($routeData['route_waypoints'])) {
-                // Ensure route_waypoints is an array (should be already, but double-check)
                 $waypoints = $routeData['route_waypoints'];
                 if (is_string($waypoints)) {
                     $waypoints = json_decode($waypoints, true);
                 }
                 if (is_array($waypoints)) {
-                    // Filter out any null/empty values and ensure all are integers
-                    $routeWaypointAccommodationIds = array_values(array_filter(array_map('intval', $waypoints)));
+                    $normalizedRouteWaypoints = LogisticsEvent::normalizeRouteWaypointsFromPayload($waypoints);
                 }
             }
 
-            if (! empty($routeWaypointAccommodationIds)) {
-                $lastAccommodationId = end($routeWaypointAccommodationIds);
-                $lastAccommodationId = $lastAccommodationId ? (int) $lastAccommodationId : null;
+            $locationStopNotesPayload = LogisticsEvent::sanitizeLocationStopNotes(
+                isset($routeData['location_stop_notes']) && is_array($routeData['location_stop_notes'])
+                    ? $routeData['location_stop_notes']
+                    : null,
+                $normalizedRouteWaypoints
+            );
 
-                if ($lastAccommodationId) {
+            if ($normalizedRouteWaypoints !== []) {
+                $lastKey = end($normalizedRouteWaypoints);
+                $lastParsed = LogisticsEvent::parseRouteWaypointKey($lastKey);
+
+                if ($lastParsed && $lastParsed['type'] === 'loc') {
+                    $lastLocation = Location::find($lastParsed['id']);
+                    if (! $lastLocation) {
+                        DB::rollBack();
+
+                        return redirect()
+                            ->back()
+                            ->withInput()
+                            ->with('error', 'Nie znaleziono lokalizacji będącej ostatnim przystankiem trasy.');
+                    }
+                    $destinationLocationId = $lastLocation->id;
+                } elseif ($lastParsed && $lastParsed['type'] === 'acc') {
+                    $lastAccommodationId = $lastParsed['id'];
                     $lastAccommodation = Accommodation::find($lastAccommodationId);
 
                     if (! $lastAccommodation) {
@@ -1037,8 +1059,8 @@ class DepartureController extends Controller
                     ->with('error', 'Brak skonfigurowanej lokalizacji bazy. Przejdź do Lokalizacje i oznacz jedną jako bazę (is_base = true).');
             }
 
-            // Create departure
-            $departure = LogisticsEvent::create([
+            // Create departure (location_stop_notes wymaga migracji — patrz add_location_stop_notes_to_logistics_events)
+            $departureAttributes = [
                 'type' => LogisticsEventType::DEPARTURE,
                 'event_date' => $departureDate,
                 'end_date' => $endDate,
@@ -1052,9 +1074,18 @@ class DepartureController extends Controller
                 // Route data
                 'route_distance' => $routeData['route_distance'] ?? null,
                 'route_duration' => isset($routeData['route_duration']) ? (int) $routeData['route_duration'] : null,
-                'route_waypoints' => ! empty($routeWaypointAccommodationIds) ? $routeWaypointAccommodationIds : null,
+                'route_waypoints' => $normalizedRouteWaypoints !== [] ? $normalizedRouteWaypoints : null,
                 'destination_stop_location' => null,
-            ]);
+            ];
+            if (Schema::hasColumn('logistics_events', 'location_stop_notes')) {
+                $departureAttributes['location_stop_notes'] = $locationStopNotesPayload;
+            } elseif ($locationStopNotesPayload !== null && $locationStopNotesPayload !== []) {
+                Log::warning('location_stop_notes pominięte przy zapisie wyjazdu — brak kolumny w bazie. Uruchom migracje.', [
+                    'keys' => array_keys($locationStopNotesPayload),
+                ]);
+            }
+
+            $departure = LogisticsEvent::create($departureAttributes);
 
             // Get unique employee IDs from both assignments and ranges
             $employeeIds = collect($validated['assignments'])->pluck('employee_id')->unique();
@@ -1240,13 +1271,23 @@ class DepartureController extends Controller
                 $transferPickupLocationId = ! empty($transferConfig['pickup_location_id']) ? (int) $transferConfig['pickup_location_id'] : null;
                 $transferRouteDistance = $transferConfig['route_distance'] ?? null;
                 $transferRouteDuration = $transferConfig['route_duration'] ?? null;
-                $transferRouteWaypoints = ! empty($transferConfig['route_waypoints']) ? array_map('intval', (array) $transferConfig['route_waypoints']) : null;
+                $normalizedTransferWaypoints = LogisticsEvent::normalizeRouteWaypointsFromPayload(
+                    ! empty($transferConfig['route_waypoints']) && is_array($transferConfig['route_waypoints'])
+                        ? $transferConfig['route_waypoints']
+                        : null
+                );
+                $transferLocationStopNotes = LogisticsEvent::sanitizeLocationStopNotes(
+                    isset($transferConfig['location_stop_notes']) && is_array($transferConfig['location_stop_notes'])
+                        ? $transferConfig['location_stop_notes']
+                        : null,
+                    $normalizedTransferWaypoints
+                );
                 $endAirportLocationId = ! empty($transferConfig['end_airport_location_id']) ? (int) $transferConfig['end_airport_location_id'] : null;
 
                 // from_location = pickup location (or end airport if no pickup), to_location = destination (last accommodation)
                 $transferFromLocationId = $transferPickupLocationId ?? $endAirportLocationId ?? $destinationLocationId;
 
-                $transfer = LogisticsEvent::create([
+                $transferAttributes = [
                     'type' => \App\Enums\LogisticsEventType::TRANSFER,
                     'event_date' => $departureDate,
                     'end_date' => $departureDate,
@@ -1259,9 +1300,14 @@ class DepartureController extends Controller
                     'created_by' => auth()->id() ?? 1,
                     'route_distance' => $transferRouteDistance,
                     'route_duration' => $transferRouteDuration ? (int) $transferRouteDuration : null,
-                    'route_waypoints' => $transferRouteWaypoints,
+                    'route_waypoints' => $normalizedTransferWaypoints !== [] ? $normalizedTransferWaypoints : null,
                     'destination_stop_location' => null,
-                ]);
+                ];
+                if (Schema::hasColumn('logistics_events', 'location_stop_notes')) {
+                    $transferAttributes['location_stop_notes'] = $transferLocationStopNotes;
+                }
+
+                $transfer = LogisticsEvent::create($transferAttributes);
 
                 // Link participants to transfer
                 foreach ($employeeIds as $employeeId) {
@@ -1314,6 +1360,8 @@ class DepartureController extends Controller
                 $errorMessage = 'Błąd zapisu: Niektóre z wybranych danych nie istnieją w systemie. Odśwież stronę i spróbuj ponownie.';
             } elseif (str_contains($e->getMessage(), 'Integrity constraint violation')) {
                 $errorMessage = 'Błąd zapisu: Niektóre dane są nieprawidłowe lub już istnieją w systemie.';
+            } elseif (str_contains($e->getMessage(), 'location_stop_notes')) {
+                $errorMessage = 'Baza wymaga aktualizacji: uruchom na serwerze `php artisan migrate` (brakuje kolumny notatek przy przystankach).';
             }
 
             return redirect()

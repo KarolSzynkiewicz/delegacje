@@ -305,6 +305,11 @@
                         <button type="button" class="btn-close" wire:click="closeVehicleModal"></button>
                     </div>
                     <div class="modal-body">
+                        @error('confirmation')
+                            <div class="alert alert-danger mb-3 py-2" style="font-size: 0.875rem;">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ $message }}
+                            </div>
+                        @enderror
                         <!-- Role Selection -->
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Rola w pojeździe:</label>
@@ -357,40 +362,30 @@
                         />
                     </div>
                     <div class="modal-footer">
+                        <div class="d-flex gap-2 justify-content-end w-100">
                         <button type="button" class="btn btn-secondary" wire:click="closeVehicleModal">Anuluj</button>
                         @if($selectedStartDate)
                             @php
-                                $vehicleDocConfirmFlags = [
-                                    'oc' => $selectedVehicle->hasExpiredInsurance(),
-                                    'przeglad' => $selectedVehicle->hasExpiredInspection(),
-                                ];
+                                $hasExpiredOC = is_object($selectedVehicle) && $selectedVehicle->hasExpiredInsurance();
+                                $hasExpiredPrzeglad = is_object($selectedVehicle) && $selectedVehicle->hasExpiredInspection();
+                                $docWarning = '';
+                                if ($hasExpiredOC) $docWarning .= 'nieważne OC';
+                                if ($hasExpiredPrzeglad) $docWarning .= ($docWarning ? ' oraz ' : '').'nieważny przegląd';
                             @endphp
+                            @if($docWarning)
+                                <small class="text-warning me-auto">
+                                    <i class="bi bi-exclamation-triangle"></i> Uwaga: {{ $docWarning }}
+                                </small>
+                            @endif
                             <button
                                 type="button"
                                 class="btn btn-primary"
-                                @click="
-                                    const flags = @json($vehicleDocConfirmFlags);
-                                    const needsDocConfirm = flags && (flags.oc || flags.przeglad);
-                                    if (!needsDocConfirm) {
-                                        $wire.confirmVehicleAssignment();
-                                    } else if (typeof window.confirmVehicleDocumentsIfNeeded === 'function') {
-                                        if (window.confirmVehicleDocumentsIfNeeded(flags)) {
-                                            $wire.confirmVehicleAssignment();
-                                        }
-                                    } else {
-                                        const parts = [];
-                                        if (flags.oc) parts.push('nieważne OC');
-                                        if (flags.przeglad) parts.push('nieważny przegląd');
-                                        const msg = 'Uwaga: wybrane auto ma ' + parts.join(' oraz ') + '. Czy na pewno chcesz kontynuować?';
-                                        if (window.confirm(msg)) {
-                                            $wire.confirmVehicleAssignment();
-                                        }
-                                    }
-                                "
+                                wire:click="confirmVehicleAssignment"
                             >
                                 Potwierdź przypisanie
                             </button>
                         @endif
+                        </div>
                     </div>
                 </div>
             </div>

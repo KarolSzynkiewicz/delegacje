@@ -1,5 +1,5 @@
 @props([
-    'tabs' => [], // Array of tabs: ['key' => ['label' => '...', 'icon' => '...', 'count' => 0, 'wireClick' => '...', 'href' => '...']]
+    'tabs' => [], // Array of tabs: ['key' => ['label' => '...', 'icon' => '...', 'count' => 0, 'wireClick' => '...', 'href' => '...', 'warning' => bool]]
     'activeTab' => null, // Key of active tab
     'id' => 'tabs', // ID for the tabs container
     'compactMobile' => false, // Na < md: jeden wiersz + dropdown zamiast wielu rzędów tabów
@@ -31,6 +31,9 @@
                     @if(! empty($activeConfig['icon']))
                         <i class="{{ $activeConfig['icon'] }} flex-shrink-0" aria-hidden="true"></i>
                     @endif
+                    @if(! empty($activeConfig['warning']))
+                        <i class="bi bi-exclamation-lg ui-tab-warn-icon flex-shrink-0" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>
+                    @endif
                     <span class="text-truncate fw-semibold">{{ $activeConfig['label'] ?? '' }}</span>
                     @php
                         $activeCount = $activeConfig['count'] ?? null;
@@ -55,6 +58,7 @@
                         $count = $tab['count'] ?? null;
                         $wireClick = $tab['wireClick'] ?? null;
                         $href = $tab['href'] ?? null;
+                        $warning = ! empty($tab['warning']);
                     @endphp
                     <li role="none">
                         @if($wireClick)
@@ -62,7 +66,7 @@
                                 type="button"
                                 wire:click="{{ $wireClick }}"
                                 wire:key="{{ $id }}-m-{{ $tabKey }}"
-                                @class(['dropdown-item d-flex align-items-center gap-2 rounded py-2', 'active' => $isActive])
+                                @class(['dropdown-item d-flex align-items-center gap-2 rounded py-2', 'active' => $isActive, 'dropdown-item--tab-warning' => $warning])
                                 role="option"
                                 aria-selected="{{ $isActive ? 'true' : 'false' }}"
                             >
@@ -70,6 +74,9 @@
                                     <i class="{{ $icon }} flex-shrink-0" aria-hidden="true"></i>
                                 @endif
                                 <span class="text-truncate flex-grow-1 text-start">{{ $label }}</span>
+                                @if($warning)
+                                    <i class="bi bi-exclamation-lg ui-tab-warn-icon flex-shrink-0" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>
+                                @endif
                                 @if($count !== null && $count > 0)
                                     <span class="badge badge-accent flex-shrink-0">{{ $count }}</span>
                                 @endif
@@ -80,7 +87,7 @@
                         @elseif($href)
                             <a
                                 href="{{ $href }}"
-                                @class(['dropdown-item d-flex align-items-center gap-2 rounded py-2', 'active' => $isActive])
+                                @class(['dropdown-item d-flex align-items-center gap-2 rounded py-2', 'active' => $isActive, 'dropdown-item--tab-warning' => $warning])
                                 role="option"
                                 aria-current="{{ $isActive ? 'true' : 'false' }}"
                             >
@@ -88,6 +95,9 @@
                                     <i class="{{ $icon }} flex-shrink-0" aria-hidden="true"></i>
                                 @endif
                                 <span class="text-truncate flex-grow-1">{{ $label }}</span>
+                                @if($warning)
+                                    <i class="bi bi-exclamation-lg ui-tab-warn-icon flex-shrink-0" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>
+                                @endif
                                 @if($count !== null && $count > 0)
                                     <span class="badge badge-accent flex-shrink-0">{{ $count }}</span>
                                 @endif
@@ -111,18 +121,23 @@
             $count = $tab['count'] ?? null;
             $wireClick = $tab['wireClick'] ?? null;
             $href = $tab['href'] ?? null;
+            $warning = ! empty($tab['warning']);
+            $navLinkClass = 'nav-link-ui '.($isActive ? 'active' : '').($warning ? ' nav-link-ui--warning' : '');
         @endphp
         <li class="nav-item-ui" role="presentation">
             @if($wireClick)
                 <button
                     type="button"
                     wire:click="{{ $wireClick }}"
-                    class="nav-link-ui {{ $isActive ? 'active' : '' }}"
+                    class="{{ trim($navLinkClass) }}"
                     role="tab"
                     aria-selected="{{ $isActive ? 'true' : 'false' }}"
                 >
                     @if($icon)
                         <i class="{{ $icon }}"></i>
+                    @endif
+                    @if($warning)
+                        <i class="bi bi-exclamation-lg ui-tab-warn-icon" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>
                     @endif
                     <span>{{ $label }}</span>
                     @if($count !== null && $count > 0)
@@ -132,12 +147,15 @@
             @elseif($href)
                 <a
                     href="{{ $href }}"
-                    class="nav-link-ui {{ $isActive ? 'active' : '' }}"
+                    class="{{ trim($navLinkClass) }}"
                     role="tab"
                     aria-selected="{{ $isActive ? 'true' : 'false' }}"
                 >
                     @if($icon)
                         <i class="{{ $icon }}"></i>
+                    @endif
+                    @if($warning)
+                        <i class="bi bi-exclamation-lg ui-tab-warn-icon" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>
                     @endif
                     <span>{{ $label }}</span>
                     @if($count !== null && $count > 0)
@@ -147,12 +165,15 @@
             @else
                 <button
                     type="button"
-                    class="nav-link-ui {{ $isActive ? 'active' : '' }}"
+                    class="{{ trim($navLinkClass) }}"
                     role="tab"
                     aria-selected="{{ $isActive ? 'true' : 'false' }}"
                 >
                     @if($icon)
                         <i class="{{ $icon }}"></i>
+                    @endif
+                    @if($warning)
+                        <i class="bi bi-exclamation-lg ui-tab-warn-icon" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>
                     @endif
                     <span>{{ $label }}</span>
                     @if($count !== null && $count > 0)

@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
 use App\Services\GeocodingService;
+use App\Services\LocationTrackingService;
 use App\Services\RoutePlanningService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -55,6 +56,12 @@ class Step4RoutePlanning extends Component
 
     public $transferPickupLocationId = null; // optional: where transfer car departs from before airport
 
+    // Optional manual extra stop (user-added)
+    public $extraStopLocationId = null;
+
+    /** Notatki do przystanków ręcznych (loc) — klucz: id lokalizacji jako string */
+    public array $locationStopNotes = [];
+
     // Manual distance fallback (mainly for transfer when ORS cannot route)
     public $manualRouteDistanceKm = null;
 
@@ -89,6 +96,12 @@ class Step4RoutePlanning extends Component
         $ticketCostsByEmployee = [],
         $sharedStartAirportLocationId = null,
         $sharedEndAirportLocationId = null,
+        $initialRouteWaypoints = [],
+        $initialLocationStopNotes = [],
+        $initialRouteDistance = null,
+        $initialRouteDuration = null,
+        $initialRouteManual = false,
+        $initialTransferConfig = [],
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
@@ -101,7 +114,111 @@ class Step4RoutePlanning extends Component
         $this->sharedEndAirportLocationId = $sharedEndAirportLocationId;
 
         $this->loadLocations();
-        $this->initializeWaypoints();
+
+        $initialRouteWaypoints = is_array($initialRouteWaypoints) ? $initialRouteWaypoints : [];
+        $this->locationStopNotes = is_array($initialLocationStopNotes) ? $initialLocationStopNotes : [];
+        $initialTransferConfig = is_array($initialTransferConfig) ? $initialTransferConfig : [];
+
+        $this->hydrateTransferFieldsFromParent($initialTransferConfig);
+
+        if (! empty($initialRouteWaypoints)) {
+            $this->routeWaypoints = array_values($initialRouteWaypoints);
+        } else {
+            $this->initializeWaypoints();
+        }
+
+        $restored = $this->hydrateRouteMetricsFromParent($initialRouteDistance, $initialRouteDuration, (bool) $initialRouteManual);
+
+        // Bez automatycznego wywołania API przy wejściu — użytkownik klika „Przelicz trasę”.
+        if ($restored || ! empty($this->routeWaypoints)) {
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        }
+
+        $this->dispatchTransferConfig();
+    }
+
+    /**
+     * Po zmianie przystanków / pickupu: kasuj stare km/czas i zsynchronizuj kolejność do rodzica (bez API).
+     */
+    protected function invalidateRouteMetricsAndSyncToParent(): void
+    {
+        $this->routeData = null;
+        $this->isManualRouteDistance = false;
+        $this->manualRouteDistanceKm = null;
+        $this->manualRouteDurationMinutes = null;
+        $this->routeError = null;
+        $this->manualRouteHint = null;
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    protected function hydrateTransferFieldsFromParent(array $tc): void
+    {
+        if (! empty($this->vehicleId)) {
+            return;
+        }
+
+        if (array_key_exists('vehicle_id', $tc) && $tc['vehicle_id'] !== null && $tc['vehicle_id'] !== '') {
+            $this->transferVehicleId = (int) $tc['vehicle_id'];
+        }
+        if (array_key_exists('driver_employee_id', $tc) && $tc['driver_employee_id'] !== null && $tc['driver_employee_id'] !== '') {
+            $this->transferDriverEmployeeId = (int) $tc['driver_employee_id'];
+        }
+        if (array_key_exists('bonus_amount', $tc) && $tc['bonus_amount'] !== null && $tc['bonus_amount'] !== '') {
+            $this->transferDriverBonusAmount = $tc['bonus_amount'];
+        }
+        if (! empty($tc['bonus_currency'])) {
+            $this->transferDriverBonusCurrency = (string) $tc['bonus_currency'];
+        }
+        if (array_key_exists('pickup_location_id', $tc) && $tc['pickup_location_id'] !== null && $tc['pickup_location_id'] !== '') {
+            $this->transferPickupLocationId = (int) $tc['pickup_location_id'];
+        }
+    }
+
+    /**
+     * Odtwarzanie dystansu/czasu z rodzica (po powrocie z innego kroku — bez wymuszania nowego planowania API).
+     */
+    protected function hydrateRouteMetricsFromParent($distance, $duration, bool $manual): bool
+    {
+        if ($distance === null || $distance === '' || $duration === null || $duration === '') {
+            return false;
+        }
+        if (! is_numeric($distance) || (float) $distance <= 0) {
+            return false;
+        }
+        if (! is_numeric($duration) || (int) $duration <= 0) {
+            return false;
+        }
+
+        $this->routeData = [
+            'distance' => (float) $distance,
+            'duration' => (int) $duration,
+        ];
+        $this->isManualRouteDistance = $manual;
+        $this->syncManualFieldsFromRouteData();
+
+        return true;
+    }
+
+    protected function buildRoutePlannedPayload(): array
+    {
+        return [
+            'route_distance' => $this->routeData['distance'] ?? null,
+            'route_duration' => $this->routeData['duration'] ?? null,
+            'route_waypoints' => $this->routeWaypoints,
+            'location_stop_notes' => $this->getLocationStopNotesPayload(),
+            'route_distance_is_manual' => (bool) $this->isManualRouteDistance,
+        ];
+    }
+
+    protected function syncManualFieldsFromRouteData(): void
+    {
+        if (empty($this->routeData) || ! isset($this->routeData['distance'], $this->routeData['duration'])) {
+            return;
+        }
+        $this->manualRouteDistanceKm = round((float) $this->routeData['distance'], 3);
+        $secs = (int) $this->routeData['duration'];
+        $this->manualRouteDurationMinutes = max(1, (int) round($secs / 60));
     }
 
     // ─── Location loading ──────────────────────────────────────────────────────
@@ -138,9 +255,10 @@ class Step4RoutePlanning extends Component
         // Collect unique accommodation IDs
         $accommodationIds = [];
         foreach ($this->accommodationAssignments as $assignment) {
-            if (! empty($assignment['accommodation_id'])) {
-                $accommodationIds[] = (int) $assignment['accommodation_id'];
+            if (! is_array($assignment) || empty($assignment['accommodation_id'])) {
+                continue;
             }
+            $accommodationIds[] = (int) $assignment['accommodation_id'];
         }
         $accommodationIds = array_values(array_unique($accommodationIds));
 
@@ -168,13 +286,49 @@ class Step4RoutePlanning extends Component
         $this->accommodationIds = $accommodationIds;
     }
 
+    /** Notatki przy przystankach loc — wysyłane do rodzica razem z trasą */
+    protected function getLocationStopNotesPayload(): array
+    {
+        $out = [];
+        foreach ($this->routeWaypoints as $key) {
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc') {
+                $id = (string) $p['id'];
+                $out[$id] = trim((string) ($this->locationStopNotes[$id] ?? ''));
+            }
+        }
+
+        return $out;
+    }
+
+    public function saveLocationStopNotesToParent(): void
+    {
+        if (empty($this->routeData) || ! isset($this->routeData['distance'], $this->routeData['duration'])) {
+            return;
+        }
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+    }
+
+    public function updatedLocationStopNotes(): void
+    {
+        $this->saveLocationStopNotesToParent();
+    }
+
+    protected function pruneLocationStopNotes(): void
+    {
+        $allowed = [];
+        foreach ($this->routeWaypoints as $key) {
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc') {
+                $allowed[] = (string) $p['id'];
+            }
+        }
+        $this->locationStopNotes = array_intersect_key($this->locationStopNotes, array_flip($allowed));
+    }
+
     protected function initializeWaypoints(): void
     {
-        $this->routeWaypoints = $this->accommodationIds;
-
-        if (! empty($this->routeWaypoints)) {
-            $this->planRoute();
-        }
+        $this->routeWaypoints = array_values(array_map(fn ($id) => 'acc:'.((int) $id), $this->accommodationIds));
     }
 
     // ─── Computed properties ───────────────────────────────────────────────────
@@ -281,36 +435,180 @@ class Step4RoutePlanning extends Component
         return $result;
     }
 
-    public function getWaypointAccommodationsProperty(): array
+    protected function parseWaypointKey(string|int $key): array
     {
-        $accommodationsData = $this->accommodationsData;
-        $result = [];
-        foreach ($this->routeWaypoints as $accommodationId) {
-            if (! isset($accommodationsData[$accommodationId])) {
-                continue;
-            }
-            $employees = $this->getEmployeesForAccommodation($accommodationId);
-            $result[] = [
-                'id' => $accommodationId,
-                'accommodation' => $accommodationsData[$accommodationId],
-                'employees' => $employees->map(fn ($e) => [
-                    'id' => $e->id,
-                    'full_name' => $e->full_name,
-                ])->values()->toArray(),
-            ];
+        if (is_int($key) || ctype_digit((string) $key)) {
+            return ['type' => 'acc', 'id' => (int) $key];
         }
 
-        return $result;
+        $key = (string) $key;
+        if (str_starts_with($key, 'acc:')) {
+            return ['type' => 'acc', 'id' => (int) substr($key, 4)];
+        }
+        if (str_starts_with($key, 'loc:')) {
+            return ['type' => 'loc', 'id' => (int) substr($key, 4)];
+        }
+
+        return ['type' => 'acc', 'id' => (int) $key];
+    }
+
+    protected function getWaypointAccommodationIds(): array
+    {
+        return collect($this->routeWaypoints)
+            ->map(fn ($k) => $this->parseWaypointKey($k))
+            ->filter(fn ($p) => $p['type'] === 'acc' && $p['id'] > 0)
+            ->map(fn ($p) => (int) $p['id'])
+            ->values()
+            ->all();
+    }
+
+    protected function getWaypointLocationIds(): array
+    {
+        return collect($this->routeWaypoints)
+            ->map(fn ($k) => $this->parseWaypointKey($k))
+            ->filter(fn ($p) => $p['type'] === 'loc' && $p['id'] > 0)
+            ->map(fn ($p) => (int) $p['id'])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Waypoints for UI: accommodations + extra locations in the chosen order.
+     */
+    public function getWaypointStopsProperty(): array
+    {
+        try {
+            $accommodationsData = $this->accommodationsData;
+            $locationIds = $this->getWaypointLocationIds();
+            $locations = $locationIds ? Location::whereIn('id', $locationIds)->get()->keyBy('id') : collect();
+            $result = [];
+            foreach ((array) $this->routeWaypoints as $key) {
+                $parsed = $this->parseWaypointKey($key);
+                if ($parsed['type'] === 'acc') {
+                    $accId = (int) $parsed['id'];
+                    if (! isset($accommodationsData[$accId])) {
+                        continue;
+                    }
+                    $employees = $this->getEmployeesForAccommodation($accId);
+                    $result[] = [
+                        'key' => 'acc:'.$accId,
+                        'type' => 'acc',
+                        'id' => $accId,
+                        'label' => $accommodationsData[$accId]['name'],
+                        'accommodation' => $accommodationsData[$accId],
+                        'location' => null,
+                        'employees' => $employees->map(fn ($e) => [
+                            'id' => $e->id,
+                            'full_name' => $e->full_name,
+                        ])->values()->toArray(),
+                    ];
+                } elseif ($parsed['type'] === 'loc') {
+                    $loc = $locations->get((int) $parsed['id']);
+                    if (! $loc) {
+                        continue;
+                    }
+                    $result[] = [
+                        'key' => 'loc:'.$loc->id,
+                        'type' => 'loc',
+                        'id' => $loc->id,
+                        'label' => $loc->name,
+                        'accommodation' => null,
+                        'location' => [
+                            'id' => $loc->id,
+                            'name' => $loc->name,
+                            'address' => $loc->address,
+                            'city' => $loc->city,
+                            'latitude' => $loc->latitude ? (float) $loc->latitude : null,
+                            'longitude' => $loc->longitude ? (float) $loc->longitude : null,
+                        ],
+                        'employees' => [],
+                    ];
+                }
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('getWaypointStopsProperty failed', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    // Back-compat alias
+    public function getWaypointAccommodationsProperty(): array
+    {
+        return $this->waypointStops;
+    }
+
+    public function addExtraStop(): void
+    {
+        // Odczytaj ID po synchronizacji (np. po submit formularza — pewniejsze niż samo kliknięcie przy wire:model)
+        $raw = $this->extraStopLocationId;
+        $id = is_numeric($raw) ? (int) $raw : 0;
+        if ($id <= 0) {
+            return;
+        }
+
+        $key = 'loc:'.$id;
+        if (in_array($key, $this->routeWaypoints, true)) {
+            $this->extraStopLocationId = null;
+
+            return;
+        }
+
+        $loc = Location::find($id);
+        if ($loc && ! $loc->hasCoordinates()) {
+            $this->geocodingService->geocodeLocation($loc);
+        }
+
+        $this->routeWaypoints[] = $key;
+        $this->routeWaypoints = array_values($this->routeWaypoints);
+        $this->extraStopLocationId = null;
+        $this->locationStopNotes[(string) $id] = $this->locationStopNotes[(string) $id] ?? '';
+        $this->invalidateRouteMetricsAndSyncToParent();
+    }
+
+    public function removeWaypoint(int $index): void
+    {
+        if ($index < 0 || $index >= count($this->routeWaypoints)) {
+            return;
+        }
+        $waypoints = $this->routeWaypoints;
+        array_splice($waypoints, $index, 1);
+        $this->routeWaypoints = array_values($waypoints);
+        $this->pruneLocationStopNotes();
+        $this->invalidateRouteMetricsAndSyncToParent();
     }
 
     public function getAvailableVehiclesProperty()
     {
-        return Vehicle::where('type', 'company_vehicle')->orderBy('registration_number')->get();
+        $arrivalDate = $this->endDate ? \Carbon\Carbon::parse($this->endDate) : now();
+        $locationTrackingService = app(LocationTrackingService::class);
+
+        return Vehicle::where('type', 'company_vehicle')
+            ->orderBy('registration_number')
+            ->get()
+            ->filter(function (Vehicle $vehicle) use ($arrivalDate, $locationTrackingService) {
+                $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $arrivalDate);
+
+                // Transfer vehicle should be outside base on arrival date
+                return ! $status['in_transit'] && $status['outside_base'];
+            });
     }
 
     public function getAvailableEmployeesProperty()
     {
-        return Employee::orderBy('last_name')->orderBy('first_name')->get();
+        $arrivalDate = $this->endDate ? \Carbon\Carbon::parse($this->endDate) : now();
+        $locationTrackingService = app(LocationTrackingService::class);
+
+        return Employee::orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->filter(function (Employee $employee) use ($arrivalDate, $locationTrackingService) {
+                $status = $locationTrackingService->getLocationStatus($employee, $arrivalDate);
+
+                return $status['state'] === \App\Enums\EmployeeLocationState::OUTSIDE_BASE;
+            });
     }
 
     public function getAvailableLocationsProperty()
@@ -323,6 +621,58 @@ class Step4RoutePlanning extends Component
         return Currency::cases();
     }
 
+    /** Czy brak zapisanego dystansu/czasu trasy (tak samo jak w DeparturePlannerV2::getStep4TabIncompleteProperty). */
+    protected function routeMetricsComplete(): bool
+    {
+        $rd = $this->routeData;
+        if (! is_array($rd)) {
+            return false;
+        }
+        $dist = data_get($rd, 'route_distance', data_get($rd, 'distance'));
+        $dur = data_get($rd, 'route_duration', data_get($rd, 'duration'));
+
+        return $dist !== null && $dist !== '' && is_numeric($dist) && (float) $dist > 0
+            && $dur !== null && $dur !== '' && (int) $dur > 0;
+    }
+
+    public function getRouteBlockIncompleteProperty(): bool
+    {
+        return ! $this->routeMetricsComplete();
+    }
+
+    public function getPickupIncompleteProperty(): bool
+    {
+        if (! $this->isPublicTransport) {
+            return false;
+        }
+
+        return empty($this->transferPickupLocationId);
+    }
+
+    public function getTransferVehicleIncompleteProperty(): bool
+    {
+        return $this->isPublicTransport && empty($this->transferVehicleId);
+    }
+
+    public function getTransferDriverIncompleteProperty(): bool
+    {
+        return $this->isPublicTransport && empty($this->transferDriverEmployeeId);
+    }
+
+    public function getTransferBonusIncompleteProperty(): bool
+    {
+        if (! $this->isPublicTransport || empty($this->transferDriverEmployeeId)) {
+            return false;
+        }
+        $bonus = $this->transferDriverBonusAmount;
+        if ($bonus === null || $bonus === '' || ! is_numeric($bonus) || (float) $bonus <= 0) {
+            return true;
+        }
+        $cur = strtoupper(trim((string) ($this->transferDriverBonusCurrency ?? 'PLN')));
+
+        return strlen($cur) !== 3;
+    }
+
     // ─── Route planning ────────────────────────────────────────────────────────
 
     public function moveUp(int $index): void
@@ -333,7 +683,7 @@ class Step4RoutePlanning extends Component
         $waypoints = $this->routeWaypoints;
         [$waypoints[$index - 1], $waypoints[$index]] = [$waypoints[$index], $waypoints[$index - 1]];
         $this->routeWaypoints = array_values($waypoints);
-        $this->planRoute();
+        $this->invalidateRouteMetricsAndSyncToParent();
     }
 
     public function moveDown(int $index): void
@@ -344,7 +694,7 @@ class Step4RoutePlanning extends Component
         $waypoints = $this->routeWaypoints;
         [$waypoints[$index], $waypoints[$index + 1]] = [$waypoints[$index + 1], $waypoints[$index]];
         $this->routeWaypoints = array_values($waypoints);
-        $this->planRoute();
+        $this->invalidateRouteMetricsAndSyncToParent();
     }
 
     public function updatedTransferPickupLocationId(): void
@@ -356,8 +706,7 @@ class Step4RoutePlanning extends Component
                 $this->geocodingService->geocodeLocation($pickup);
             }
         }
-        $this->planRoute();
-        $this->dispatchTransferConfig();
+        $this->invalidateRouteMetricsAndSyncToParent();
     }
 
     public function updatedTransferVehicleId(): void
@@ -414,11 +763,7 @@ class Step4RoutePlanning extends Component
         $this->routeError = null;
 
         // Dispatch to parent so it can be saved
-        $this->dispatch('route-planned', [
-            'route_distance' => (float) $km,
-            'route_duration' => $durationSeconds,
-            'route_waypoints' => $this->routeWaypoints,
-        ]);
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
         $this->dispatchTransferConfig();
     }
 
@@ -433,6 +778,7 @@ class Step4RoutePlanning extends Component
             'route_distance' => $this->routeData['distance'] ?? null,
             'route_duration' => $this->routeData['duration'] ?? null,
             'route_waypoints' => $this->routeWaypoints,
+            'location_stop_notes' => $this->getLocationStopNotesPayload(),
             'end_airport_location_id' => $this->sharedEndAirportLocationId,
             'route_distance_is_manual' => (bool) $this->isManualRouteDistance,
         ]);
@@ -447,13 +793,24 @@ class Step4RoutePlanning extends Component
             return;
         }
 
-        $accommodations = Accommodation::whereIn('id', $this->routeWaypoints)->get()->keyBy('id');
+        $accIds = $this->getWaypointAccommodationIds();
+        $locIds = $this->getWaypointLocationIds();
+        $accommodations = Accommodation::whereIn('id', $accIds)->get()->keyBy('id');
+        $locations = Location::whereIn('id', $locIds)->get()->keyBy('id');
 
         $missingCoords = [];
-        foreach ($this->routeWaypoints as $accId) {
-            $acc = $accommodations->get($accId);
-            if (! $acc || ! $acc->hasCoordinates()) {
-                $missingCoords[] = $acc ? $acc->name : "ID:{$accId}";
+        foreach ($this->routeWaypoints as $key) {
+            $parsed = $this->parseWaypointKey($key);
+            if ($parsed['type'] === 'acc') {
+                $acc = $accommodations->get((int) $parsed['id']);
+                if (! $acc || ! $acc->hasCoordinates()) {
+                    $missingCoords[] = $acc ? $acc->name : "Dom ID:{$parsed['id']}";
+                }
+            } elseif ($parsed['type'] === 'loc') {
+                $loc = $locations->get((int) $parsed['id']);
+                if (! $loc || ! $loc->hasCoordinates()) {
+                    $missingCoords[] = $loc ? $loc->name : "Lokacja ID:{$parsed['id']}";
+                }
             }
         }
         if (! empty($missingCoords)) {
@@ -463,13 +820,34 @@ class Step4RoutePlanning extends Component
         }
 
         if ($this->isPublicTransport) {
-            $this->planTransferRoute($accommodations);
+            $this->planTransferRoute($accommodations, $locations);
         } else {
-            $this->planCarRoute($accommodations);
+            $this->planCarRoute($accommodations, $locations);
         }
     }
 
-    protected function planCarRoute($accommodations): void
+    protected function resolveWaypointObjects($accommodations, $locations): array
+    {
+        $list = [];
+        foreach ($this->routeWaypoints as $key) {
+            $parsed = $this->parseWaypointKey($key);
+            if ($parsed['type'] === 'acc') {
+                $obj = $accommodations->get((int) $parsed['id']);
+                if ($obj) {
+                    $list[] = $obj;
+                }
+            } elseif ($parsed['type'] === 'loc') {
+                $obj = $locations->get((int) $parsed['id']);
+                if ($obj) {
+                    $list[] = $obj;
+                }
+            }
+        }
+
+        return $list;
+    }
+
+    protected function planCarRoute($accommodations, $locations): void
     {
         if (! $this->baseLocationId) {
             $this->routeError = 'Brak lokalizacji bazy.';
@@ -485,12 +863,10 @@ class Step4RoutePlanning extends Component
 
         $this->isPlanningRoute = true;
         $this->routeError = null;
+        $previousRouteData = $this->routeData;
 
         try {
-            $waypointList = [];
-            foreach ($this->routeWaypoints as $accId) {
-                $waypointList[] = $accommodations->get($accId);
-            }
+            $waypointList = $this->resolveWaypointObjects($accommodations, $locations);
 
             $lastWaypoint = array_pop($waypointList);
             $intermediateWaypoints = $waypointList;
@@ -499,24 +875,24 @@ class Step4RoutePlanning extends Component
 
             if ($route) {
                 $this->routeData = ['distance' => $route['distance'], 'duration' => $route['duration']];
+                $this->isManualRouteDistance = false;
+                $this->syncManualFieldsFromRouteData();
                 $this->routeError = null;
-                $this->dispatch('route-planned', [
-                    'route_distance' => $route['distance'],
-                    'route_duration' => $route['duration'],
-                    'route_waypoints' => $this->routeWaypoints,
-                ]);
+                $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+                $this->dispatchTransferConfig();
                 $this->dispatch('route-updated',
                     baseLocationData: $this->baseLocationData,
-                    waypointAccommodations: $this->waypointAccommodations,
+                    waypointAccommodations: $this->waypointStops,
                     routeData: $this->routeData,
                 );
             } else {
                 $this->routeError = 'Nie udało się zaplanować trasy.';
-                $this->routeData = null;
+                $this->routeData = $previousRouteData;
             }
         } catch (\Exception $e) {
             Log::error('Route planning exception (car)', ['message' => $e->getMessage()]);
             $this->routeError = 'Błąd podczas planowania trasy: '.$e->getMessage();
+            $this->routeData = $previousRouteData;
         } finally {
             $this->isPlanningRoute = false;
         }
@@ -577,7 +953,7 @@ class Step4RoutePlanning extends Component
         return 'https://www.google.com/maps/dir/?'.http_build_query($params);
     }
 
-    protected function planTransferRoute($accommodations): void
+    protected function planTransferRoute($accommodations, $locations): void
     {
         // Transfer route: [optional pickup] → end airport → accommodations
         $endAirport = $this->sharedEndAirportLocationId
@@ -618,11 +994,8 @@ class Step4RoutePlanning extends Component
             $intermediateWaypoints[] = $endAirport;
         }
 
-        // Remaining accommodations: all except last become intermediates
-        $waypointList = [];
-        foreach ($this->routeWaypoints as $accId) {
-            $waypointList[] = $accommodations->get($accId);
-        }
+        // Remaining waypoints: all except last become intermediates
+        $waypointList = $this->resolveWaypointObjects($accommodations, $locations);
         $lastWaypoint = array_pop($waypointList);
         if (! $lastWaypoint) {
             $this->routeError = 'Brak domów do zaplanowania transferu. Wróć do kroku 2 i przypisz mieszkania.';
@@ -635,6 +1008,7 @@ class Step4RoutePlanning extends Component
 
         $this->isPlanningRoute = true;
         $this->routeError = null;
+        $previousRouteData = $this->routeData;
 
         try {
             // Build a debug map of coordinate index -> point (matches RoutePlanningService coordinate order)
@@ -669,17 +1043,14 @@ class Step4RoutePlanning extends Component
                 $this->isManualRouteDistance = false;
                 $this->manualRouteHint = null;
                 $this->routeData = ['distance' => $route['distance'], 'duration' => $route['duration']];
+                $this->syncManualFieldsFromRouteData();
                 $this->routeError = null;
                 // Also dispatch to parent
-                $this->dispatch('route-planned', [
-                    'route_distance' => $route['distance'],
-                    'route_duration' => $route['duration'],
-                    'route_waypoints' => $this->routeWaypoints,
-                ]);
+                $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
                 $this->dispatchTransferConfig();
             } else {
                 $this->routeError = 'Nie udało się zaplanować trasy transferu. Najczęściej powód to brak współrzędnych lub błąd w usłudze wyznaczania trasy. Sprawdź lotnisko docelowe, miejsce startowe transferu oraz domy.';
-                $this->routeData = null;
+                $this->routeData = $previousRouteData;
             }
         } catch (\Exception $e) {
             $extraHint = null;
@@ -705,6 +1076,7 @@ class Step4RoutePlanning extends Component
                 'debug_points' => $debugPoints ?? null,
             ]);
             $this->routeError = 'Błąd podczas planowania trasy transferu: '.$e->getMessage().($extraHint ?? '');
+            $this->routeData = $previousRouteData;
         } finally {
             $this->isPlanningRoute = false;
         }
@@ -718,9 +1090,12 @@ class Step4RoutePlanning extends Component
         $isPublicTransport = $this->isPublicTransport;
 
         $employeeIds = array_keys($this->accommodationAssignments);
-        $accommodationIds = array_unique(array_filter(array_column($this->accommodationAssignments, 'accommodation_id')));
-        $projectIds = array_unique(array_filter(array_column($this->assignmentRanges, 'project_id')));
-        $vehicleIds = array_unique(array_filter(array_column($this->vehicleAssignments, 'vehicle_id')));
+        $accommodationRows = array_values(array_filter($this->accommodationAssignments, 'is_array'));
+        $rangeRows = array_values(array_filter($this->assignmentRanges, 'is_array'));
+        $vehicleRows = array_values(array_filter($this->vehicleAssignments, 'is_array'));
+        $accommodationIds = array_unique(array_filter(array_column($accommodationRows, 'accommodation_id')));
+        $projectIds = array_unique(array_filter(array_column($rangeRows, 'project_id')));
+        $vehicleIds = array_unique(array_filter(array_column($vehicleRows, 'vehicle_id')));
 
         $employees = Employee::whereIn('id', $employeeIds)->get()->keyBy('id');
         $accommodations = Accommodation::whereIn('id', $accommodationIds)->get()->keyBy('id');
@@ -740,11 +1115,20 @@ class Step4RoutePlanning extends Component
 
         $employeeToProject = [];
         foreach ($this->assignmentRanges as $range) {
-            $employeeId = (int) $range['employee_id'];
+            if (! is_array($range)) {
+                continue;
+            }
+            $employeeId = (int) ($range['employee_id'] ?? 0);
+            if ($employeeId <= 0) {
+                continue;
+            }
             $employeeToProject[$employeeId] = $range['project_id'] ?? null;
         }
 
         foreach ($this->accommodationAssignments as $employeeId => $accommodationAssignment) {
+            if (! is_array($accommodationAssignment)) {
+                continue;
+            }
             $accommodationId = $accommodationAssignment['accommodation_id'] ?? null;
             if (! $accommodationId) {
                 continue;
@@ -760,7 +1144,7 @@ class Step4RoutePlanning extends Component
             $project = $projectId ? $projects->get($projectId) : null;
             $projectName = $project ? $project->name : null;
 
-            $vehicleId = $this->vehicleAssignments[$employeeId]['vehicle_id'] ?? null;
+            $vehicleId = data_get($this->vehicleAssignments, $employeeId.'.vehicle_id');
             $vehicle = $vehicleId ? $vehicles->get($vehicleId) : null;
             $vehicleName = $vehicle ? ($vehicle->registration_number.' - '.$vehicle->brand.' '.$vehicle->model) : null;
 
@@ -805,10 +1189,14 @@ class Step4RoutePlanning extends Component
             ];
         }
 
+        // Sort plan by routeWaypoints order, using parsed IDs (waypoints are 'acc:ID' strings)
         $sortedPlan = [];
-        foreach ($this->routeWaypoints as $accommodationId) {
-            if (isset($plan[$accommodationId])) {
-                $sortedPlan[] = $plan[$accommodationId];
+        foreach ($this->routeWaypoints as $routeIdx => $waypointKey) {
+            $parsed = $this->parseWaypointKey($waypointKey);
+            if ($parsed['type'] === 'acc' && isset($plan[$parsed['id']])) {
+                $stop = $plan[$parsed['id']];
+                $stop['route_index'] = $routeIdx; // actual index in routeWaypoints for moveUp/moveDown
+                $sortedPlan[] = $stop;
             }
         }
 
@@ -821,6 +1209,9 @@ class Step4RoutePlanning extends Component
     {
         $employeeIds = [];
         foreach ($this->accommodationAssignments as $employeeId => $assignment) {
+            if (! is_array($assignment)) {
+                continue;
+            }
             if (isset($assignment['accommodation_id']) && (int) $assignment['accommodation_id'] === (int) $accommodationId) {
                 $employeeIds[] = $employeeId;
             }
@@ -850,14 +1241,17 @@ class Step4RoutePlanning extends Component
 
     public function render()
     {
+        $waypointStops = $this->waypointStops;
+
         return view('livewire.steps.step4-route-planning', [
             'baseLocationData' => $this->baseLocationData,
             'startAirportData' => $this->startAirportData,
             'endAirportData' => $this->endAirportData,
             'pickupLocationData' => $this->pickupLocationData,
-            // Back-compat: some Blade fragments may still reference $waypointStops.
-            'waypointStops' => $this->waypointAccommodations,
             'waypointAccommodations' => $this->waypointAccommodations,
+            'waypointStops' => $waypointStops,
+            'routeWaypoints' => $this->routeWaypoints,
+            'extraStopLocationId' => $this->extraStopLocationId,
             'tripPlan' => $this->tripPlan,
             'isPublicTransport' => $this->isPublicTransport,
             'currencyCases' => $this->currencyCases,

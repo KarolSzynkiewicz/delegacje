@@ -384,6 +384,14 @@ class Step1ProjectAssignments extends Component
         $this->loadEmployeesPage();
     }
 
+    public function loadPrevEmployees()
+    {
+        if ($this->employeesPage > 1) {
+            $this->employeesPage--;
+            $this->loadEmployeesPage();
+        }
+    }
+
     public function loadProjectGaps()
     {
         if (! $this->endDate) {
@@ -909,12 +917,39 @@ class Step1ProjectAssignments extends Component
 
     public function confirmAssignment()
     {
-        if (! $this->selectedEmployee || ! $this->selectedProject || ! $this->selectedRole) {
+        if (! $this->selectedEmployee) {
+            $this->addError('confirmation', 'Wybierz pracownika.');
+
+            return;
+        }
+        if (! $this->selectedProject) {
+            $this->addError('confirmation', 'Wybierz projekt.');
+
+            return;
+        }
+        if (! $this->selectedRole) {
+            $this->addError('confirmation', 'Wybierz rolę.');
+
+            return;
+        }
+        if (! $this->selectedStartDate) {
+            $this->addError('confirmation', 'Wybierz datę rozpoczęcia w kalendarzu.');
+
             return;
         }
 
-        $startDate = $this->selectedStartDate ? Carbon::parse($this->selectedStartDate) : Carbon::parse($this->endDate);
+        $startDate = Carbon::parse($this->selectedStartDate);
         $endDate = $this->selectedEndDate ? Carbon::parse($this->selectedEndDate) : $startDate;
+
+        // Validate against project end date
+        if ($this->selectedProject->end_date) {
+            $projectEnd = Carbon::parse($this->selectedProject->end_date)->endOfDay();
+            if ($startDate->gt($projectEnd) || $endDate->gt($projectEnd)) {
+                $this->addError('confirmation', 'Wybrane daty wykraczają poza datę końca projektu ('.$projectEnd->format('d.m.Y').'). Projekt nie jest aktywny w wybranym okresie.');
+
+                return;
+            }
+        }
 
         // Always use range-based assignment (single assignment from start to end)
         $this->dispatch('assignment-range-added', [
@@ -930,6 +965,15 @@ class Step1ProjectAssignments extends Component
         // Wait a moment for parent to update, then refresh
         // The parent will dispatch 'refresh-assignments' event
         $this->dispatch('refresh-parent');
+    }
+
+    public function removeAssignmentRange(int $employeeId, int $projectId, int $roleId): void
+    {
+        $this->dispatch('assignment-range-removed', [
+            'employee_id' => $employeeId,
+            'project_id' => $projectId,
+            'role_id' => $roleId,
+        ]);
     }
 
     public function updateVehicleSeat($seatIndex, $employeeId)

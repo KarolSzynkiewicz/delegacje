@@ -6,6 +6,7 @@ use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
 use App\Models\Project;
+use App\Models\ProjectAssignment;
 use App\Models\Role;
 use App\Services\DeparturePlannerService;
 use Carbon\Carbon;
@@ -77,7 +78,13 @@ class Step2AccommodationAssignments extends Component
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
-        $this->arrivalDate = Carbon::parse($endDate);
+        if (! empty($endDate)) {
+            $this->arrivalDate = Carbon::parse($endDate);
+        } elseif (! empty($departureDate)) {
+            $this->arrivalDate = Carbon::parse($departureDate);
+        } else {
+            $this->arrivalDate = now()->startOfDay();
+        }
         $this->assignments = $assignments;
         $this->assignmentRanges = $assignmentRanges;
         $this->accommodationAssignments = $accommodationAssignments;
@@ -445,67 +452,123 @@ class Step2AccommodationAssignments extends Component
         ];
     }
 
+    /**
+     * Projekty, w których pracownik ma przypisanie w dniu przyjazdu (wg planera lub — gdy nie ma go w sesji — z bazy).
+     *
+     * @return array<int>
+     */
+    protected function getProjectIdsForEmployeeOnArrivalDate(int $employeeId): array
+    {
+        $dateStr = $this->arrivalDate->format('Y-m-d');
+        $fromPlanner = $this->getEmployeeProjectAssignments($employeeId);
+        $ids = [];
+
+        foreach ($fromPlanner as $row) {
+            if (in_array($dateStr, $row['dates'] ?? [], true)) {
+                $ids[(int) $row['project_id']] = true;
+            }
+        }
+
+        if (! empty($ids)) {
+            return array_keys($ids);
+        }
+
+        if (! empty($fromPlanner)) {
+            return [];
+        }
+
+        return ProjectAssignment::query()
+            ->where('employee_id', $employeeId)
+            ->where('start_date', '<=', $this->arrivalDate)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $this->arrivalDate))
+            ->pluck('project_id')
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Unikalne ID pracowników mieszkających w danym domu w dniu przyjazdu (formularz + baza).
+     *
+     * @return array<int, true>
+     */
+    protected function getResidentEmployeeIdsForAccommodationOnArrival(int $accommodationId): array
+    {
+        $residentIds = [];
+        $arrival = $this->arrivalDate->copy()->startOfDay();
+
+        foreach ($this->accommodationAssignments as $employeeId => $accRow) {
+            $accId = isset($accRow['accommodation_id']) ? (int) $accRow['accommodation_id'] : null;
+            if ($accId !== $accommodationId) {
+                continue;
+            }
+            $start = Carbon::parse($accRow['start_date'])->startOfDay();
+            $end = Carbon::parse($accRow['end_date'])->startOfDay();
+            if ($arrival->gte($start) && $arrival->lte($end)) {
+                $residentIds[(int) $employeeId] = true;
+            }
+        }
+
+        $dbIds = AccommodationAssignment::query()
+            ->where('accommodation_id', $accommodationId)
+            ->where('start_date', '<=', $this->arrivalDate)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $this->arrivalDate))
+            ->pluck('employee_id');
+
+        foreach ($dbIds as $eid) {
+            $residentIds[(int) $eid] = true;
+        }
+
+        return $residentIds;
+    }
+
+    /**
+     * Nazwy projektów mieszkańców tego domu w dniu przyjazdu (end_date wyjazdu / dzień wejścia na mieszkanie).
+     *
+     * @return array<int, array{id: int, name: string}>
+     */
     public function getAccommodationProjects($accommodationId): array
     {
         $accommodationId = (int) $accommodationId;
         $projects = [];
 
-        // Get projects from form assignments
-        foreach ($this->accommodationAssignments as $employeeId => $assignment) {
-            $assignmentAccommodationId = isset($assignment['accommodation_id']) ? (int) $assignment['accommodation_id'] : null;
-            if ($assignmentAccommodationId === $accommodationId) {
-                // Get employee's project assignments
-                $employeeProjects = $this->getEmployeeProjectAssignments($employeeId);
-                foreach ($employeeProjects as $assignment) {
-                    $projectId = $assignment['project_id'];
-                    if (! isset($projects[$projectId])) {
-                        $project = $this->getProject($projectId);
-                        if ($project) {
-                            $projects[$projectId] = [
-                                'id' => $project->id,
-                                'name' => $project->name,
-                            ];
-                        }
+        foreach (array_keys($this->getResidentEmployeeIdsForAccommodationOnArrival($accommodationId)) as $employeeId) {
+            foreach ($this->getProjectIdsForEmployeeOnArrivalDate($employeeId) as $projectId) {
+                if (! isset($projects[$projectId])) {
+                    $project = $this->getProject($projectId);
+                    if ($project) {
+                        $projects[$projectId] = [
+                            'id' => $project->id,
+                            'name' => $project->name,
+                        ];
                     }
                 }
             }
         }
 
-        // Get projects from existing database assignments
-        $dbAssignments = AccommodationAssignment::where('accommodation_id', $accommodationId)
-            ->where('start_date', '<=', $this->arrivalDate)
-            ->where(function ($query) {
-                $query->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $this->arrivalDate);
-            })
-            ->with('employee.projectAssignments.project')
-            ->get();
-
-        foreach ($dbAssignments as $assignment) {
-            $employee = $assignment->employee;
-            if ($employee) {
-                $employeeProjects = $this->getEmployeeProjectAssignments($employee->id);
-                foreach ($employeeProjects as $empAssignment) {
-                    $projectId = $empAssignment['project_id'];
-                    if (! isset($projects[$projectId])) {
-                        $project = $this->getProject($projectId);
-                        if ($project) {
-                            $projects[$projectId] = [
-                                'id' => $project->id,
-                                'name' => $project->name,
-                            ];
-                        }
-                    }
-                }
-            }
-        }
+        uasort($projects, fn ($a, $b) => strcmp((string) $a['name'], (string) $b['name']));
 
         return array_values($projects);
     }
 
     public function loadAccommodations()
     {
+        $arrivalDate = $this->arrivalDate;
+
         $this->accommodations = Accommodation::with('activeLease')
+            ->where(function ($query) use ($arrivalDate) {
+                // Include company-owned accommodations (no leases at all)
+                $query->whereDoesntHave('leases')
+                    // OR accommodations with a lease active on the arrival date
+                    ->orWhereHas('leases', function ($q) use ($arrivalDate) {
+                        $q->where('start_date', '<=', $arrivalDate)
+                            ->where(function ($inner) use ($arrivalDate) {
+                                $inner->whereNull('end_date')
+                                    ->orWhere('end_date', '>=', $arrivalDate);
+                            });
+                    });
+            })
             ->orderBy('name')
             ->get()
             ->map(function (Accommodation $a) {
@@ -667,6 +730,24 @@ class Step2AccommodationAssignments extends Component
         while ($currentDate->lte($maxDate)) {
             $dateKey = $currentDate->format('Y-m-d');
 
+            // Hard block: dates before arrival are completely unavailable
+            $beforeArrival = $currentDate->lt($this->arrivalDate);
+            if ($beforeArrival) {
+                $availability[$dateKey] = [
+                    'available' => false,
+                    'canAssign' => false,
+                    'warning' => false,
+                    'reason' => 'Niedostępne (przed przyjazdem)',
+                    'warningText' => '',
+                    'occupied' => 0,
+                    'capacity' => 0,
+                    'available_spots' => 0,
+                ];
+                $currentDate->addDay();
+
+                continue;
+            }
+
             // Check if employee has project assignment for this date
             $hasProjectOnDate = in_array($dateKey, $projectDates);
 
@@ -700,7 +781,7 @@ class Step2AccommodationAssignments extends Component
             if ($isOverbooked) {
                 $reasonText = 'Brak miejsc ('.$occupancy['capacity'].' miejsc zajętych)';
             } elseif ($leaseEnded) {
-                $reasonText = 'Koniec wynajmu';
+                $reasonText = 'Koniec najmu – brak dostępności';
             } else {
                 $reasonText = 'Wolne miejsca: '.$availableSpots.' / '.$occupancy['capacity'];
             }

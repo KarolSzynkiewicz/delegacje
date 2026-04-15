@@ -29,8 +29,8 @@ class TimeLogService
         // Assignment jest już świeży - nie trzeba refresh()
 
         // Validate work date is within assignment period
-        // WYŁĄCZONE - wykomentowane na prośbę użytkownika
-        // $this->validateWorkDateWithinAssignment($assignment, $workDate);
+        $this->validateWorkDateWithinAssignment($assignment, $workDate);
+
         // Validate hours worked
         $this->validateHoursWorked($hoursWorked);
 
@@ -93,8 +93,7 @@ class TimeLogService
         // Nie trzeba refresh() - może powodować problemy z cast 'date'
 
         // Validate work date is within assignment period
-        // WYŁĄCZONE - wykomentowane na prośbę użytkownika
-        // $this->validateWorkDateWithinAssignment($assignment, $workDate);
+        $this->validateWorkDateWithinAssignment($assignment, $workDate);
 
         // Validate hours worked
         $this->validateHoursWorked($hoursWorked);

@@ -127,6 +127,23 @@
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <div>
                                         <span class="fw-semibold">{{ $accommodation['name'] }}</span>
+                                        @php
+                                            $projects = $this->getAccommodationProjects($accommodation['id']);
+                                        @endphp
+                                        @if(!empty($projects))
+                                            <div class="small mt-1 mb-2">
+                                                <div class="text-muted mb-1" style="font-size: 0.72rem;">
+                                                    <i class="bi bi-briefcase me-1"></i>Projekty mieszkańców ({{ $this->arrivalDate->format('d.m.Y') }}):
+                                                </div>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @foreach($projects as $project)
+                                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">
+                                                            {{ $project['name'] }}
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
                                         @if($accommodation['capacity'])
                                             @php
                                                 $occupancy = $this->getAccommodationOccupancy($accommodation['id']);
@@ -144,25 +161,6 @@
                                             <div class="small text-warning">
                                                 <i class="bi bi-calendar-x"></i> 
                                                 Wynajem do: {{ \Carbon\Carbon::parse($accommodation['lease_end_date'])->format('d.m.Y') }}
-                                            </div>
-                                        @endif
-                                        
-                                        @php
-                                            // Get unique projects from both form assignments and existing database assignments
-                                            $projects = $this->getAccommodationProjects($accommodation['id']);
-                                        @endphp
-                                        @if(!empty($projects))
-                                            <div class="small mt-2">
-                                                <div class="text-muted mb-1">
-                                                    <i class="bi bi-briefcase"></i> Projekty:
-                                                </div>
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    @foreach($projects as $project)
-                                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">
-                                                            {{ $project['name'] }}
-                                                        </span>
-                                                    @endforeach
-                                                </div>
                                             </div>
                                         @endif
                                     </div>
