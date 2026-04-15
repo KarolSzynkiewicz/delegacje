@@ -855,6 +855,8 @@ class Step4RoutePlanning extends Component
             'startAirportData' => $this->startAirportData,
             'endAirportData' => $this->endAirportData,
             'pickupLocationData' => $this->pickupLocationData,
+            // Back-compat: some Blade fragments may still reference $waypointStops.
+            'waypointStops' => $this->waypointAccommodations,
             'waypointAccommodations' => $this->waypointAccommodations,
             'tripPlan' => $this->tripPlan,
             'isPublicTransport' => $this->isPublicTransport,
