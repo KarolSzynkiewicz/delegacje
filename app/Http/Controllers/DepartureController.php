@@ -945,6 +945,8 @@ class DepartureController extends Controller
                     'vehicle_id' => $transferVehicleId,
                     'status' => LogisticsEventStatus::COMPLETED,
                     'notes' => 'Transfer z lotniska – automatycznie z wyjazdu #'.$departure->id,
+                    'related_departure_id' => $departure->id,
+                    'has_reassignment' => false,
                     'has_transport' => ! empty($transferVehicleId),
                     'created_by' => auth()->id() ?? 1,
                     'route_distance' => $transferRouteDistance,

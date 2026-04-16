@@ -39,6 +39,7 @@ class LogisticsEvent extends Model
         'location_stop_notes',
         'destination_stop_location',
         'has_reassignment',
+        'related_departure_id',
     ];
 
     protected $casts = [
@@ -142,6 +143,22 @@ class LogisticsEvent extends Model
     public function driverAdjustments(): HasMany
     {
         return $this->hasMany(Adjustment::class);
+    }
+
+    /**
+     * Wyjazd (DEPARTURE), z którego utworzono ten transfer (np. lotnisko → baza).
+     */
+    public function relatedDeparture(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'related_departure_id');
+    }
+
+    /**
+     * Transfery powiązane z tym wyjazdem (np. transfer z lotniska przy transporcie zbiorowym).
+     */
+    public function transfersLinkedFromThisDeparture(): HasMany
+    {
+        return $this->hasMany(self::class, 'related_departure_id');
     }
 
     /**

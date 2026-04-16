@@ -144,7 +144,8 @@ class DepartureService
     }
 
     /**
-     * Transfer „lotnisko → domy” tworzony przy wyjeździe V2 (transport zbiorowy) — identyfikacja po treści notatki.
+     * Transfer „lotnisko → domy” tworzony przy wyjeździe V2 (transport zbiorowy).
+     * Preferuje {@see LogisticsEvent::$related_departure_id}; dla starych rekordów — notatka z ID wyjazdu.
      */
     public function findLinkedAirportTransfer(LogisticsEvent $departure, bool $onlyActive = true): ?LogisticsEvent
     {
@@ -152,15 +153,23 @@ class DepartureService
             return null;
         }
 
-        $query = LogisticsEvent::query()
+        $scoped = LogisticsEvent::query()
             ->where('type', LogisticsEventType::TRANSFER)
-            ->where('notes', 'like', '%wyjazdu #'.$departure->id.'%');
+            ->when($onlyActive, fn ($q) => $q->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED]));
 
-        if ($onlyActive) {
-            $query->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED]);
+        $byFk = (clone $scoped)
+            ->where('related_departure_id', $departure->id)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($byFk) {
+            return $byFk;
         }
 
-        return $query->orderByDesc('id')->first();
+        return (clone $scoped)
+            ->where('notes', 'like', '%wyjazdu #'.$departure->id.'%')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**
