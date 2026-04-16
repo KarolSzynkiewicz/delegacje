@@ -30,8 +30,8 @@ class ReturnTripPlanner extends Component
     /** Jak w planerze wyjazdu: [idx => ['employee_id' => ?int, 'position' => string, 'external_driver' => bool]] */
     public array $vehicleSeats = [];
 
-    /** @var 'public'|'own' */
-    public string $transportMode = 'public';
+    /** @var 'public'|'own'|null */
+    public ?string $transportMode = null;
 
     public bool $showTransportSwitchModal = false;
 
@@ -63,7 +63,7 @@ class ReturnTripPlanner extends Component
     {
         $this->returnDate = '';
         $this->endDate = '';
-        $this->transportMode = 'public';
+        $this->transportMode = null;
     }
 
     // ─── Computed properties ───────────────────────────────────────────────────
@@ -424,6 +424,11 @@ class ReturnTripPlanner extends Component
         if ($mode === $this->transportMode) {
             return;
         }
+        if ($this->transportMode === null) {
+            $this->setTransportMode($mode);
+
+            return;
+        }
         $this->pendingTransportMode = $mode;
         $this->showTransportSwitchModal = true;
     }
@@ -492,6 +497,12 @@ class ReturnTripPlanner extends Component
 
         if (empty($this->endDate)) {
             $this->addError('endDate', 'Wybierz datę zakończenia zjazdu.');
+
+            return;
+        }
+
+        if ($this->transportMode === null) {
+            $this->addError('transportMode', 'Wybierz sposób transportu (Publiczny / Własny).');
 
             return;
         }
@@ -566,6 +577,12 @@ class ReturnTripPlanner extends Component
 
         if (empty($this->endDate)) {
             $this->addError('endDate', 'Wybierz datę zakończenia zjazdu.');
+
+            return;
+        }
+
+        if ($this->transportMode === null) {
+            $this->addError('transportMode', 'Wybierz sposób transportu (Publiczny / Własny).');
 
             return;
         }

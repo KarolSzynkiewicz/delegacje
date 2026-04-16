@@ -22,7 +22,8 @@ class DeparturePlannerV2 extends Component
 
     public $vehicleId;
 
-    public string $transportMode = 'public'; // 'public' | 'own'
+    /** @var 'public'|'own'|null */
+    public ?string $transportMode = null;
 
     public $currentStep = 1;
 
@@ -245,6 +246,11 @@ class DeparturePlannerV2 extends Component
     {
         $mode = $mode === 'own' ? 'own' : 'public';
         if ($mode === $this->transportMode) {
+            return;
+        }
+        if ($this->transportMode === null) {
+            $this->setTransportMode($mode);
+
             return;
         }
         $this->pendingTransportMode = $mode;
@@ -717,6 +723,12 @@ class DeparturePlannerV2 extends Component
             return;
         }
 
+        if ($step >= 2 && $this->transportMode === null) {
+            $this->dispatch('error', message: 'Wybierz sposób transportu (Publiczny / Własny).');
+
+            return;
+        }
+
         // Walidacja przed przejściem do następnego kroku
         if ($step === 2) {
             $hasAssignments = ! empty($this->assignments) || ! empty($this->assignmentRanges);
@@ -786,6 +798,10 @@ class DeparturePlannerV2 extends Component
             $out[] = 'Ustal zakres dat przejazdu (data wyjazdu i data zakończenia).';
         }
 
+        if ($this->transportMode === null) {
+            $out[] = 'Wybierz sposób transportu (Publiczny / Własny).';
+        }
+
         if ($this->step2TabIncomplete) {
             $out[] = 'Krok 2: część osób nie ma przypisanego mieszkania (domu).';
         }
@@ -803,7 +819,7 @@ class DeparturePlannerV2 extends Component
             if ($this->headerTicketsIncomplete) {
                 $out[] = 'Bilety lotnicze: dla części osób brakuje kwoty, waluty lub załącznika.';
             }
-        } else {
+        } elseif ($this->transportMode === 'own') {
             if (empty($this->vehicleId)) {
                 $out[] = 'Nie wybrano pojazdu wyjazdu (sekcja „Czym” / własny transport).';
             }
@@ -821,6 +837,13 @@ class DeparturePlannerV2 extends Component
         if (empty($this->departureDate) || empty($this->endDate)) {
             $this->addError('departureDate', 'Wybierz datę wyjazdu i datę zakończenia w sekcji „Szczegóły wyjazdu”.');
             $this->dispatch('error', message: 'Ustal zakres dat przejazdu przed zapisem wyjazdu.');
+
+            return;
+        }
+
+        if ($this->transportMode === null) {
+            $this->addError('transportMode', 'Wybierz sposób transportu (Publiczny / Własny).');
+            $this->dispatch('error', message: 'Wybierz sposób transportu przed zapisem wyjazdu.');
 
             return;
         }

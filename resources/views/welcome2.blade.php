@@ -28,6 +28,12 @@
             @endphp
 
             <div class="rounded-3 p-3 mb-3" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Transport (wariant wymagany, bez wyboru na start):</div>
+                    <div style="max-width: 360px;">
+                        <x-logistics.transport-mode-toggle :mode="null" />
+                    </div>
+                </div>
                 <x-logistics.vehicle-seat-grid
                     :vehicle="$demoVehicle"
                     :vehicle-seats="$demoSeats"

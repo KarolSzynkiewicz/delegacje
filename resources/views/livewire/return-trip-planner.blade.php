@@ -109,23 +109,18 @@
             </div>
 
             <div class="col-md-3">
-                <label class="form-label small text-muted mb-1">Czym</label>
-                <div class="d-flex gap-2">
-                    <button type="button"
-                            wire:click="requestSetTransportMode('public')"
-                            class="btn btn-sm flex-fill {{ $transportMode === 'public' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                        <i class="bi bi-airplane me-1"></i> Publiczny
-                    </button>
-                    <button type="button"
-                            wire:click="requestSetTransportMode('own')"
-                            class="btn btn-sm flex-fill {{ $transportMode === 'own' ? 'btn-success' : 'btn-outline-secondary' }}">
-                        <i class="bi bi-car-front me-1"></i> Własny
-                    </button>
-                </div>
+                <x-logistics.transport-mode-toggle :mode="$transportMode" />
             </div>
 
             <div class="col-md-5">
-                @if($transportMode === 'public')
+                @if($transportMode === null)
+                    <div class="rounded-3 p-2 transition-all"
+                         style="border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);">
+                        <div class="small text-danger" style="font-size: 0.72rem;">
+                            <i class="bi bi-exclamation-circle me-1"></i>Najpierw wybierz sposób transportu.
+                        </div>
+                    </div>
+                @elseif($transportMode === 'public')
                     @php
                         $missingStartAirport = empty($sharedStartAirportLocationId);
                         $missingEndAirport = empty($sharedEndAirportLocationId);
