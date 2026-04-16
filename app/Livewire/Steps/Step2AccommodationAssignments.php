@@ -370,86 +370,70 @@ class Step2AccommodationAssignments extends Component
         $accommodation = $this->getAccommodation($accommodationId);
         $capacity = $accommodation?->capacity ?? 0;
 
-        // Count from form assignments
-        $formOccupied = 0;
+        $employeeIds = [];
+
         foreach ($this->accommodationAssignments as $employeeId => $assignment) {
             $assignmentAccommodationId = isset($assignment['accommodation_id']) ? (int) $assignment['accommodation_id'] : null;
             if ($assignmentAccommodationId === $accommodationId) {
                 $assignmentStart = Carbon::parse($assignment['start_date']);
                 $assignmentEnd = Carbon::parse($assignment['end_date']);
                 if ($this->arrivalDate->gte($assignmentStart) && $this->arrivalDate->lte($assignmentEnd)) {
-                    $formOccupied++;
+                    $employeeIds[(int) $employeeId] = true;
                 }
             }
         }
 
-        // Count from existing database assignments
-        $dbOccupied = AccommodationAssignment::where('accommodation_id', $accommodationId)
+        $dbIds = AccommodationAssignment::query()
+            ->where('accommodation_id', $accommodationId)
             ->where('start_date', '<=', $this->arrivalDate)
-            ->where(function ($query) {
-                $query->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $this->arrivalDate);
-            })
-            ->count();
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $this->arrivalDate))
+            ->pluck('employee_id');
 
-        // Total occupied (form + database, but avoid double counting)
-        $totalOccupied = max($formOccupied, $dbOccupied);
-
-        if ($formOccupied > 0) {
-            $totalOccupied = $formOccupied + $dbOccupied;
-        } else {
-            $totalOccupied = $dbOccupied;
+        foreach ($dbIds as $eid) {
+            $employeeIds[(int) $eid] = true;
         }
 
-        $available = $capacity - $totalOccupied;
+        $totalOccupied = count($employeeIds);
 
         return [
             'occupied' => $totalOccupied,
             'capacity' => $capacity,
-            'available' => max(0, $available),
+            'available' => max(0, $capacity - $totalOccupied),
         ];
     }
 
     /**
-     * Get accommodation occupancy for a specific date
+     * Wolne miejsca w danym dniu dla pracownika otwierającego modal — zgodnie z {@see Accommodation::getAvailableCapacity}
+     * oraz przypisaniami z bieżącego formularza (bez podwajanego liczenia tego samego pracownika z bazy i z formularza).
      */
-    protected function getAccommodationOccupancyForDate($accommodationId, Carbon $date): array
+    protected function getAvailableCapacityForEmployeeOnDate(Accommodation $accommodation, Carbon $date, int $employeeId): int
     {
-        $accommodationId = (int) $accommodationId;
-        $accommodation = $this->getAccommodation($accommodationId);
-        $capacity = $accommodation?->capacity ?? 0;
+        $excludeAssignmentId = AccommodationAssignment::query()
+            ->where('accommodation_id', $accommodation->id)
+            ->where('employee_id', $employeeId)
+            ->where('start_date', '<=', $date)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
+            ->orderByDesc('id')
+            ->value('id');
 
-        // Count from form assignments for this specific date
-        $formOccupied = 0;
-        foreach ($this->accommodationAssignments as $employeeId => $assignment) {
-            $assignmentAccommodationId = isset($assignment['accommodation_id']) ? (int) $assignment['accommodation_id'] : null;
-            if ($assignmentAccommodationId === $accommodationId) {
-                $assignmentStart = Carbon::parse($assignment['start_date']);
-                $assignmentEnd = Carbon::parse($assignment['end_date']);
-                if ($date->gte($assignmentStart) && $date->lte($assignmentEnd)) {
-                    $formOccupied++;
-                }
+        $availableFromDb = $accommodation->getAvailableCapacity($date, $date, $excludeAssignmentId);
+
+        $formCount = 0;
+        foreach ($this->accommodationAssignments as $empId => $assignment) {
+            if ((int) ($assignment['accommodation_id'] ?? 0) !== (int) $accommodation->id) {
+                continue;
+            }
+            if ((int) $empId === (int) $employeeId) {
+                continue;
+            }
+            $assignmentStart = Carbon::parse($assignment['start_date']);
+            $assignmentEnd = Carbon::parse($assignment['end_date']);
+            if ($date->gte($assignmentStart) && $date->lte($assignmentEnd)) {
+                $formCount++;
             }
         }
 
-        // Count from existing database assignments for this specific date
-        $dbOccupied = AccommodationAssignment::where('accommodation_id', $accommodationId)
-            ->where('start_date', '<=', $date)
-            ->where(function ($query) use ($date) {
-                $query->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $date);
-            })
-            ->count();
-
-        // Total occupied (form + database)
-        $totalOccupied = $formOccupied + $dbOccupied;
-        $available = $capacity - $totalOccupied;
-
-        return [
-            'occupied' => $totalOccupied,
-            'capacity' => $capacity,
-            'available' => max(0, $available),
-        ];
+        return max(0, $availableFromDb - $formCount);
     }
 
     /**
@@ -751,10 +735,9 @@ class Step2AccommodationAssignments extends Component
             // Check if employee has project assignment for this date
             $hasProjectOnDate = in_array($dateKey, $projectDates);
 
-            // Check capacity for this specific date
-            $occupancy = $this->getAccommodationOccupancyForDate($accommodation->id, $currentDate);
-            $isOverbooked = $occupancy['occupied'] >= $occupancy['capacity'];
-            $availableSpots = $occupancy['available'];
+            $capacity = (int) ($accommodation->capacity ?? 0);
+            $availableSpots = $this->getAvailableCapacityForEmployeeOnDate($accommodation, $currentDate, $employeeId);
+            $isOverbooked = $availableSpots <= 0;
 
             // Check lease end date
             $leaseEnded = false;
@@ -779,11 +762,11 @@ class Step2AccommodationAssignments extends Component
             // Build reason text for tooltip
             $reasonText = '';
             if ($isOverbooked) {
-                $reasonText = 'Brak miejsc ('.$occupancy['capacity'].' miejsc zajętych)';
+                $reasonText = 'Brak wolnych miejsc (pełne obłożenie: '.$capacity.' miejsc)';
             } elseif ($leaseEnded) {
                 $reasonText = 'Koniec najmu – brak dostępności';
             } else {
-                $reasonText = 'Wolne miejsca: '.$availableSpots.' / '.$occupancy['capacity'];
+                $reasonText = 'Wolne miejsca: '.$availableSpots.' / '.$capacity;
             }
 
             // Add warning info to reason text if applicable

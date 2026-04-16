@@ -84,7 +84,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepare'])
             ->name('return-trips.prepare')
             ->defaults('resource', 'return-trips');
-        Route::get('return-trips/store-v2', [\App\Http\Controllers\ReturnTripController::class, 'storeV2'])
+        Route::match(['get', 'post'], 'return-trips/store-v2', [\App\Http\Controllers\ReturnTripController::class, 'storeV2'])
             ->name('return-trips.store-v2')
             ->defaults('resource', 'return-trips');
 

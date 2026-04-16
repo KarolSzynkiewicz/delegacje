@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
 use App\Services\ReturnTripService;
+use App\Services\VehicleValidationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +26,17 @@ class ReturnTripPlanner extends Component
     public string $endDate = '';
 
     public $vehicleId = '';
+
+    /** Jak w planerze wyjazdu: [idx => ['employee_id' => ?int, 'position' => string, 'external_driver' => bool]] */
+    public array $vehicleSeats = [];
+
+    /** @var 'public'|'own' */
+    public string $transportMode = 'public';
+
+    public bool $showTransportSwitchModal = false;
+
+    /** @var 'public'|'own'|null */
+    public ?string $pendingTransportMode = null;
 
     public array $selectedEmployeeIds = [];
 
@@ -42,12 +54,16 @@ class ReturnTripPlanner extends Component
 
     public array $previewData = [];
 
+    /** Wymagane przy skróceniu przypisań innych osób do auta powrotnego */
+    public bool $acceptReturnConsequences = false;
+
     public string $errorMessage = '';
 
     public function mount(): void
     {
-        $this->returnDate = now()->toDateString();
-        $this->endDate = now()->toDateString();
+        $this->returnDate = '';
+        $this->endDate = '';
+        $this->transportMode = 'public';
     }
 
     // ─── Computed properties ───────────────────────────────────────────────────
@@ -97,23 +113,101 @@ class ReturnTripPlanner extends Component
         }
 
         $returnDate = Carbon::parse($this->returnDate);
+        $effectiveEndDate = $this->endDate ? Carbon::parse($this->endDate) : $returnDate;
         $locationTrackingService = app(LocationTrackingService::class);
+        $vehicleValidationService = app(VehicleValidationService::class);
 
         return Vehicle::where('type', 'company_vehicle')
             ->orderBy('registration_number')
             ->get()
-            ->filter(function (Vehicle $vehicle) use ($returnDate, $locationTrackingService) {
+            ->filter(function (Vehicle $vehicle) use ($returnDate, $effectiveEndDate, $locationTrackingService, $vehicleValidationService) {
                 $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $returnDate);
+                if (! $status['outside_base']) {
+                    return false;
+                }
 
-                return $status['outside_base'];
+                $result = $vehicleValidationService->validateForLogisticsEvent(
+                    $vehicle,
+                    $returnDate,
+                    $effectiveEndDate,
+                    null,
+                    true
+                );
+
+                return $result['valid'];
             });
+    }
+
+    /**
+     * Liczba osób w aucie dla tego zjazdu (kierowca zewnętrzny liczy się osobno od uczestników).
+     */
+    public function getVehicleOccupantCountForCapacity(): int
+    {
+        if ($this->transportMode !== 'own' || empty($this->vehicleId)) {
+            return count($this->selectedEmployeeIds);
+        }
+        if (empty($this->vehicleSeats)) {
+            return count($this->selectedEmployeeIds);
+        }
+        $external = (bool) ($this->vehicleSeats[0]['external_driver'] ?? true);
+
+        return $external ? count($this->selectedEmployeeIds) + 1 : count($this->selectedEmployeeIds);
+    }
+
+    /**
+     * Blokada „Podgląd zjazdu” — przepełnienie lub brak kierowcy przy kierowcy wewnętrznym.
+     */
+    public function getReturnTripPrepareBlockedProperty(): bool
+    {
+        if ($this->transportMode !== 'own' || empty($this->vehicleId) || empty($this->vehicleSeats)) {
+            return false;
+        }
+        $vehicle = Vehicle::find($this->vehicleId);
+        $capacity = (int) ($vehicle?->capacity ?? 0);
+        $occ = $this->getVehicleOccupantCountForCapacity();
+        if ($capacity > 0 && $occ > $capacity) {
+            return true;
+        }
+        $driverSeat = $this->vehicleSeats[0] ?? null;
+        $isExternal = (bool) ($driverSeat['external_driver'] ?? true);
+        $driverId = (int) ($driverSeat['employee_id'] ?? 0);
+
+        return ! $isExternal && $driverId === 0;
+    }
+
+    /**
+     * Podgląd licznika miejsc (capacity / zajęte) — używany w Blade; spójny z getVehicleOccupantCountForCapacity().
+     *
+     * @return array{capacity: int, occupied: int, over_capacity: bool, available: int|null}|null
+     */
+    public function getReturnVehicleSeatSummaryProperty(): ?array
+    {
+        if ($this->transportMode !== 'own' || empty($this->vehicleId)) {
+            return null;
+        }
+
+        $vehicle = Vehicle::find($this->vehicleId);
+        if (! $vehicle) {
+            return null;
+        }
+
+        $capacity = (int) ($vehicle->capacity ?? 0);
+        $occupied = $this->getVehicleOccupantCountForCapacity();
+        $over = $capacity > 0 && $occupied > $capacity;
+
+        return [
+            'capacity' => $capacity,
+            'occupied' => $occupied,
+            'available' => $capacity > 0 ? max(0, $capacity - $occupied) : null,
+            'over_capacity' => $over,
+        ];
     }
 
     public function getAvailableAirportsProperty()
     {
         return Location::whereHas('purposes', function ($q) {
-                $q->where('purpose', LocationPurposeType::AIRPORT);
-            })
+            $q->where('purpose', LocationPurposeType::AIRPORT);
+        })
             ->orderBy('name')
             ->get();
     }
@@ -133,7 +227,7 @@ class ReturnTripPlanner extends Component
 
     public function getIsPublicTransportProperty(): bool
     {
-        return empty($this->vehicleId);
+        return $this->transportMode === 'public';
     }
 
     public function getCurrencyCasesProperty(): array
@@ -141,44 +235,290 @@ class ReturnTripPlanner extends Component
         return Currency::cases();
     }
 
+    // ─── Miejsca w aucie (jak DeparturePlannerV2) ───────────────────────────────
+
+    protected function initVehicleSeats(): void
+    {
+        $previousDriverId = null;
+        if (
+            ! empty($this->vehicleSeats[0])
+            && ! ($this->vehicleSeats[0]['external_driver'] ?? true)
+            && ! empty($this->vehicleSeats[0]['employee_id'])
+        ) {
+            $previousDriverId = (int) $this->vehicleSeats[0]['employee_id'];
+        }
+
+        $this->vehicleSeats = [];
+        if (! $this->vehicleId) {
+            return;
+        }
+
+        $vehicle = Vehicle::find($this->vehicleId);
+        if (! $vehicle) {
+            return;
+        }
+
+        $capacity = (int) ($vehicle->capacity ?? 0);
+        if ($capacity < 1) {
+            $capacity = 1;
+        }
+
+        $selectedIds = array_map(fn ($id) => (int) $id, $this->selectedEmployeeIds);
+
+        $driverIsEmployee = $previousDriverId && in_array($previousDriverId, $selectedIds, true);
+        $this->vehicleSeats[0] = [
+            'employee_id' => $driverIsEmployee ? $previousDriverId : null,
+            'position' => 'driver',
+            'external_driver' => ! $driverIsEmployee,
+        ];
+
+        for ($i = 1; $i < $capacity; $i++) {
+            $this->vehicleSeats[$i] = [
+                'employee_id' => null,
+                'position' => 'passenger',
+                'external_driver' => false,
+            ];
+        }
+
+        $seatIndex = 1;
+        foreach ($selectedIds as $empId) {
+            if ($driverIsEmployee && $empId === $previousDriverId) {
+                continue;
+            }
+            $alreadyIn = collect($this->vehicleSeats)->contains(fn ($s) => (int) ($s['employee_id'] ?? 0) === $empId);
+            if (! $alreadyIn && $seatIndex < $capacity) {
+                $this->vehicleSeats[$seatIndex]['employee_id'] = $empId;
+                $seatIndex++;
+            }
+        }
+    }
+
+    protected function compactPassengerSeats(): void
+    {
+        $capacity = count($this->vehicleSeats);
+        if ($capacity <= 1) {
+            return;
+        }
+        $occupied = [];
+        for ($i = 1; $i < $capacity; $i++) {
+            $eid = $this->vehicleSeats[$i]['employee_id'] ?? null;
+            if ($eid) {
+                $occupied[] = $eid;
+            }
+        }
+        $idx = 0;
+        for ($i = 1; $i < $capacity; $i++) {
+            $this->vehicleSeats[$i] = [
+                'employee_id' => $occupied[$idx] ?? null,
+                'position' => 'passenger',
+                'external_driver' => false,
+            ];
+            $idx++;
+        }
+    }
+
+    public function assignDriverSeatEmployee(?int $employeeId): void
+    {
+        if (! isset($this->vehicleSeats[0])) {
+            return;
+        }
+
+        if ($employeeId) {
+            foreach ($this->vehicleSeats as $i => $seat) {
+                if ($i > 0 && (int) ($seat['employee_id'] ?? 0) === $employeeId) {
+                    $this->vehicleSeats[$i]['employee_id'] = null;
+                }
+            }
+            $this->compactPassengerSeats();
+        }
+
+        $this->vehicleSeats[0]['employee_id'] = $employeeId;
+        $this->vehicleSeats[0]['external_driver'] = $employeeId === null;
+        $this->vehicleSeats[0]['position'] = 'driver';
+    }
+
+    public function toggleExternalDriver(): void
+    {
+        if (! isset($this->vehicleSeats[0])) {
+            return;
+        }
+        $current = (bool) ($this->vehicleSeats[0]['external_driver'] ?? true);
+        $this->vehicleSeats[0]['external_driver'] = ! $current;
+        if (! $current === false) {
+            $this->vehicleSeats[0]['employee_id'] = null;
+        }
+    }
+
+    protected function addEmployeeToReturnVehicleSeats(int $employeeId): void
+    {
+        if (empty($this->vehicleId) || $this->transportMode !== 'own') {
+            return;
+        }
+        if (empty($this->vehicleSeats)) {
+            $this->initVehicleSeats();
+        }
+        $alreadyIn = collect($this->vehicleSeats)->contains(
+            fn ($s) => (int) ($s['employee_id'] ?? 0) === $employeeId
+        );
+        if ($alreadyIn) {
+            return;
+        }
+        for ($i = 1; $i < count($this->vehicleSeats); $i++) {
+            if (empty($this->vehicleSeats[$i]['employee_id'])) {
+                $this->vehicleSeats[$i]['employee_id'] = $employeeId;
+
+                return;
+            }
+        }
+    }
+
+    protected function removeEmployeeFromReturnVehicleSeats(int $employeeId): void
+    {
+        if (empty($this->vehicleId) || empty($this->vehicleSeats)) {
+            return;
+        }
+        if ((int) ($this->vehicleSeats[0]['employee_id'] ?? 0) === $employeeId) {
+            $this->vehicleSeats[0]['employee_id'] = null;
+            $this->vehicleSeats[0]['external_driver'] = true;
+        }
+        for ($i = 1; $i < count($this->vehicleSeats); $i++) {
+            if ((int) ($this->vehicleSeats[$i]['employee_id'] ?? 0) === $employeeId) {
+                $this->vehicleSeats[$i]['employee_id'] = null;
+            }
+        }
+        $this->compactPassengerSeats();
+    }
+
     // ─── Actions ───────────────────────────────────────────────────────────────
 
     public function toggleEmployee(int $employeeId): void
     {
-        if (in_array($employeeId, $this->selectedEmployeeIds)) {
+        $employeeId = (int) $employeeId;
+        if (in_array($employeeId, $this->selectedEmployeeIds, true)) {
             $this->selectedEmployeeIds = array_values(array_filter(
                 $this->selectedEmployeeIds,
-                fn ($id) => $id !== $employeeId
+                fn ($id) => (int) $id !== $employeeId
             ));
+            $this->removeEmployeeFromReturnVehicleSeats($employeeId);
         } else {
             $this->selectedEmployeeIds[] = $employeeId;
+            $this->addEmployeeToReturnVehicleSeats($employeeId);
         }
         $this->showPreview = false;
         $this->previewData = [];
+        $this->acceptReturnConsequences = false;
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->showPreview = false;
+        $this->previewData = [];
+        $this->acceptReturnConsequences = false;
     }
 
     public function updatedReturnDate(): void
     {
         $this->showPreview = false;
         $this->previewData = [];
+        $this->acceptReturnConsequences = false;
         // Reset endDate if before returnDate
-        if ($this->endDate && $this->endDate < $this->returnDate) {
+        if (! empty($this->returnDate) && ! empty($this->endDate) && $this->endDate < $this->returnDate) {
             $this->endDate = $this->returnDate;
         }
     }
 
-    public function updatedVehicleId(): void
+    public function updatedVehicleId($value): void
     {
         $this->showPreview = false;
         $this->previewData = [];
+        $this->acceptReturnConsequences = false;
+
+        if (! empty($value)) {
+            $this->transportMode = 'own';
+            $this->sharedStartAirportLocationId = null;
+            $this->sharedEndAirportLocationId = null;
+            $this->ticketCostsByEmployee = [];
+            $this->initVehicleSeats();
+        } else {
+            $this->transportMode = 'public';
+            $this->vehicleSeats = [];
+        }
+    }
+
+    public function requestSetTransportMode(string $mode): void
+    {
+        $mode = $mode === 'own' ? 'own' : 'public';
+        if ($mode === $this->transportMode) {
+            return;
+        }
+        $this->pendingTransportMode = $mode;
+        $this->showTransportSwitchModal = true;
+    }
+
+    public function confirmTransportModeSwitch(): void
+    {
+        if ($this->pendingTransportMode === null) {
+            return;
+        }
+        $mode = $this->pendingTransportMode;
+        $this->showTransportSwitchModal = false;
+        $this->pendingTransportMode = null;
+        $this->setTransportMode($mode);
+    }
+
+    public function cancelTransportModeSwitch(): void
+    {
+        $this->showTransportSwitchModal = false;
+        $this->pendingTransportMode = null;
+    }
+
+    public function setTransportMode(string $mode): void
+    {
+        $mode = $mode === 'own' ? 'own' : 'public';
+        if ($mode === $this->transportMode) {
+            return;
+        }
+
+        if ($mode === 'public') {
+            $this->vehicleId = '';
+            $this->vehicleSeats = [];
+            $this->sharedStartAirportLocationId = null;
+            $this->sharedEndAirportLocationId = null;
+            $this->ticketCostsByEmployee = [];
+        } else {
+            $this->sharedStartAirportLocationId = null;
+            $this->sharedEndAirportLocationId = null;
+            $this->ticketCostsByEmployee = [];
+            if (empty($this->vehicleId)) {
+                $first = $this->availableVehicles->first();
+                if ($first) {
+                    $this->vehicleId = $first->id;
+                }
+            }
+            if ($this->vehicleId) {
+                $this->initVehicleSeats();
+            }
+        }
+
+        $this->transportMode = $mode;
+        $this->showPreview = false;
+        $this->previewData = [];
+        $this->acceptReturnConsequences = false;
     }
 
     public function prepareReturn(): void
     {
         $this->errorMessage = '';
+        $this->acceptReturnConsequences = false;
 
         if (empty($this->returnDate)) {
             $this->addError('returnDate', 'Wybierz datę zjazdu.');
+
+            return;
+        }
+
+        if (empty($this->endDate)) {
+            $this->addError('endDate', 'Wybierz datę zakończenia zjazdu.');
 
             return;
         }
@@ -193,12 +533,28 @@ class ReturnTripPlanner extends Component
             $service = app(ReturnTripService::class);
             $vehicle = $this->vehicleId ? Vehicle::find($this->vehicleId) : null;
 
+            $occupantCount = $this->getVehicleOccupantCountForCapacity();
+
             $preparation = $service->prepareZjazd(
                 $this->selectedEmployeeIds,
                 Carbon::parse($this->returnDate),
                 $vehicle,
-                $this->endDate ? Carbon::parse($this->endDate) : null,
+                Carbon::parse($this->endDate),
+                null,
+                $occupantCount,
             );
+
+            $ui = $service->buildReturnTripPreviewUi($preparation);
+
+            $vehicleFill = null;
+            if ($vehicle) {
+                $cap = (int) ($vehicle->capacity ?? 0);
+                $vehicleFill = [
+                    'capacity' => $cap,
+                    'occupied' => $occupantCount,
+                    'over_capacity' => $cap > 0 && $occupantCount > $cap,
+                ];
+            }
 
             $this->previewData = [
                 'is_valid' => $preparation->isValid,
@@ -208,8 +564,13 @@ class ReturnTripPlanner extends Component
                 ])->toArray(),
                 'employees_count' => count($this->selectedEmployeeIds),
                 'return_date' => Carbon::parse($this->returnDate)->format('d.m.Y'),
+                'return_date_iso' => $this->returnDate,
                 'end_date' => $this->endDate ? Carbon::parse($this->endDate)->format('d.m.Y') : null,
                 'vehicle' => $vehicle ? $vehicle->registration_number.' – '.$vehicle->brand.' '.$vehicle->model : null,
+                'vehicle_fill' => $vehicleFill,
+                'participant_rows' => $ui['participant_rows'],
+                'displaced_without_vehicle' => $ui['displaced_without_vehicle'],
+                'requires_consequences_confirm' => $ui['requires_consequences_confirm'],
             ];
 
             $this->showPreview = true;
@@ -230,8 +591,26 @@ class ReturnTripPlanner extends Component
             return;
         }
 
+        if (empty($this->endDate)) {
+            $this->addError('endDate', 'Wybierz datę zakończenia zjazdu.');
+
+            return;
+        }
+
         if (empty($this->selectedEmployeeIds)) {
             $this->addError('selectedEmployeeIds', 'Wybierz co najmniej jednego pracownika.');
+
+            return;
+        }
+
+        if (! $this->showPreview || empty($this->previewData)) {
+            $this->addError('preview', 'Najpierw wygeneruj podgląd zjazdu (przycisk „Podgląd zjazdu”).');
+
+            return;
+        }
+
+        if (! empty($this->previewData['requires_consequences_confirm']) && ! $this->acceptReturnConsequences) {
+            $this->addError('acceptReturnConsequences', 'Zaznacz potwierdzenie, że akceptujesz skrócenie przypisań do auta powrotnego dla osób spoza tego zjazdu.');
 
             return;
         }
@@ -246,7 +625,8 @@ class ReturnTripPlanner extends Component
 
             foreach ($this->selectedEmployeeIds as $empId) {
                 $cost = $this->ticketCostsByEmployee[$empId] ?? [];
-                if (empty($cost['amount'])) {
+                $amount = $cost['amount'] ?? null;
+                if ($amount === null || $amount === '' || ! is_numeric($amount)) {
                     $this->addError('ticketCostsByEmployee.'.$empId.'.amount', 'Uzupełnij koszt biletu.');
 
                     return;
@@ -275,6 +655,7 @@ class ReturnTripPlanner extends Component
             'ticket_costs_per_employee' => $ticketCostsToSave,
             'start_airport_location_id' => $this->sharedStartAirportLocationId,
             'end_airport_location_id' => $this->sharedEndAirportLocationId,
+            'vehicle_occupant_count' => $this->getVehicleOccupantCountForCapacity(),
         ]);
 
         $this->redirect(route('return-trips.store-v2'), navigate: false);
