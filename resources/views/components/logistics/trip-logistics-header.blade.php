@@ -2,8 +2,8 @@
   Wspólny nagłówek: daty + tryb transportu + szczegóły (lotniska / pojazd).
   Używany w widokach Livewire wyjazd/zjazd — wywołaj przez @include z tablicą $tripLogisticsHeader.
 
-  Wymaga w scope rodzica: $endDate, $transportMode, $sharedStartAirportLocationId, $sharedEndAirportLocationId,
-  $vehicleId, $vehicleSeats (opcj.), oraz computed $this->availableAirports, $this->availableVehicles.
+  Wymaga w scope rodzica: $endDate, $transportMode, $publicTransportHubKind, $sharedStartAirportLocationId, $sharedEndAirportLocationId,
+  $vehicleId, $vehicleSeats (opcj.), oraz computed $this->availablePublicTransportHubs, $this->availableVehicles.
   Dodatkowo nazwa pierwszej daty: departureDate albo returnDate (zgodnie z firstWire).
 --}}
 @php
@@ -89,53 +89,81 @@
             </div>
         @elseif($transportMode === 'public')
             @php
+                $hubKind = $publicTransportHubKind ?? 'airport';
                 $missingStartAirport = empty($sharedStartAirportLocationId);
                 $missingEndAirport = empty($sharedEndAirportLocationId);
                 $airportsIncomplete = $missingStartAirport || $missingEndAirport;
+                $hubListLabel = $hubKind === 'station' ? 'Dworce' : 'Lotniska';
             @endphp
-            <div class="row g-2 rounded-3 p-2 transition-all w-100"
-                 style="{{ $airportsIncomplete ? 'border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);' : '' }}">
-                <div class="col-6">
-                    <label class="form-label small mb-1 {{ $missingStartAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        Start (lotnisko / dworzec) <span class="text-danger">*</span>
-                    </label>
-                    <select wire:model.live="sharedStartAirportLocationId"
-                            class="form-select form-select-sm logistics-trip-header-control @if($errors->has('sharedStartAirportLocationId') || $missingStartAirport) is-invalid @endif"
-                            style="min-height: 2.125rem;">
-                        <option value="">— wybierz —</option>
-                        @foreach($this->availableAirports as $airport)
-                            <option value="{{ $airport->id }}"
-                                @disabled(!empty($sharedEndAirportLocationId) && (int)$sharedEndAirportLocationId === (int)$airport->id)>
-                                {{ $airport->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('sharedStartAirportLocationId') <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div> @enderror
+            <div class="d-flex flex-column w-100">
+                <div class="mb-2">
+                    <span class="form-label small text-muted mb-1 d-block">Typ punktu</span>
+                    <div class="btn-group btn-group-sm w-100" role="group" aria-label="Lotnisko lub dworzec">
+                        <button type="button"
+                                class="btn {{ $hubKind === 'airport' ? 'btn-primary' : 'btn-outline-primary' }}"
+                                wire:click="$set('publicTransportHubKind', 'airport')">
+                            <i class="bi bi-airplane me-1"></i>Lotnisko
+                        </button>
+                        <button type="button"
+                                class="btn {{ $hubKind === 'station' ? 'btn-primary' : 'btn-outline-primary' }}"
+                                wire:click="$set('publicTransportHubKind', 'station')">
+                            <i class="bi bi-train-front me-1"></i>Dworzec
+                        </button>
+                    </div>
                 </div>
-                <div class="col-6">
-                    <label class="form-label small mb-1 {{ $missingEndAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        Cel (lotnisko / dworzec) <span class="text-danger">*</span>
-                    </label>
-                    <select wire:model.live="sharedEndAirportLocationId"
-                            class="form-select form-select-sm logistics-trip-header-control @if($errors->has('sharedEndAirportLocationId') || $missingEndAirport) is-invalid @endif"
-                            style="min-height: 2.125rem;">
-                        <option value="">— wybierz —</option>
-                        @foreach($this->availableAirports as $airport)
-                            <option value="{{ $airport->id }}"
-                                @disabled(!empty($sharedStartAirportLocationId) && (int)$sharedStartAirportLocationId === (int)$airport->id)>
-                                {{ $airport->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('sharedEndAirportLocationId') <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div> @enderror
-                </div>
-                @if($airportsIncomplete)
-                    <div class="col-12">
-                        <div class="small text-danger" style="font-size: 0.72rem;">
-                            <i class="bi bi-exclamation-circle me-1"></i>Wybierz punkt startowy i docelowy (wymagane przy transporcie publicznym).
-                        </div>
+                <h6 class="small fw-semibold mb-2 pb-1 border-bottom border-secondary border-opacity-25"
+                    style="font-size: 0.8rem; letter-spacing: .02em;">
+                    {{ $hubListLabel }}
+                </h6>
+                @if($this->availablePublicTransportHubs->isEmpty())
+                    <div class="small text-warning mb-2">
+                        <i class="bi bi-info-circle me-1"></i>Brak lokalizacji tego typu — dodaj cel w kartotece lokalizacji.
                     </div>
                 @endif
+                <div class="row g-2 rounded-3 p-2 transition-all w-100"
+                     style="{{ $airportsIncomplete ? 'border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);' : '' }}">
+                    <div class="col-6">
+                        <label class="form-label small mb-1 {{ $missingStartAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
+                            Start <span class="text-danger">*</span>
+                        </label>
+                        <select wire:model.live="sharedStartAirportLocationId"
+                                class="form-select form-select-sm logistics-trip-header-control @if($errors->has('sharedStartAirportLocationId') || $missingStartAirport) is-invalid @endif"
+                                style="min-height: 2.125rem;">
+                            <option value="">— wybierz —</option>
+                            @foreach($this->availablePublicTransportHubs as $hub)
+                                <option value="{{ $hub->id }}"
+                                    @disabled(!empty($sharedEndAirportLocationId) && (int)$sharedEndAirportLocationId === (int)$hub->id)>
+                                    {{ $hub->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('sharedStartAirportLocationId') <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1 {{ $missingEndAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
+                            Cel <span class="text-danger">*</span>
+                        </label>
+                        <select wire:model.live="sharedEndAirportLocationId"
+                                class="form-select form-select-sm logistics-trip-header-control @if($errors->has('sharedEndAirportLocationId') || $missingEndAirport) is-invalid @endif"
+                                style="min-height: 2.125rem;">
+                            <option value="">— wybierz —</option>
+                            @foreach($this->availablePublicTransportHubs as $hub)
+                                <option value="{{ $hub->id }}"
+                                    @disabled(!empty($sharedStartAirportLocationId) && (int)$sharedStartAirportLocationId === (int)$hub->id)>
+                                    {{ $hub->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('sharedEndAirportLocationId') <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div> @enderror
+                    </div>
+                    @if($airportsIncomplete)
+                        <div class="col-12">
+                            <div class="small text-danger" style="font-size: 0.72rem;">
+                                <i class="bi bi-exclamation-circle me-1"></i>Wybierz punkt startowy i docelowy (wymagane przy transporcie publicznym).
+                            </div>
+                        </div>
+                    @endif
+                </div>
             </div>
         @else
             <div class="w-100">

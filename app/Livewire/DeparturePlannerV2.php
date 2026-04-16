@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Enums\LocationPurposeType;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
@@ -46,6 +47,9 @@ class DeparturePlannerV2 extends Component
     public $sharedStartAirportLocationId = null;
 
     public $sharedEndAirportLocationId = null;
+
+    /** @var 'airport'|'station' Filtr listy punktów (lotniska vs dworce). */
+    public string $publicTransportHubKind = 'airport';
 
     // Transfer config (created alongside departure for public transport)
     public $transferConfig = []; // [vehicle_id, driver_employee_id, bonus_amount, bonus_currency, pickup_location_id, route_distance, route_duration, route_waypoints]
@@ -825,12 +829,26 @@ class DeparturePlannerV2 extends Component
             $startAirportLocationId = $this->sharedStartAirportLocationId;
             $endAirportLocationId = $this->sharedEndAirportLocationId;
 
-            if (empty($startAirportLocationId) || ! Location::isPublicTransportHub((int) $startAirportLocationId)) {
-                $this->addError('sharedStartAirportLocationId', 'Wybierz punkt startowy (lotnisko lub dworzec) dla całej grupy.');
+            $hubPurpose = $this->publicTransportHubKind === 'station'
+                ? LocationPurposeType::STATION
+                : LocationPurposeType::AIRPORT;
+
+            if (empty($startAirportLocationId) || ! Location::matchesPurpose((int) $startAirportLocationId, $hubPurpose)) {
+                $this->addError(
+                    'sharedStartAirportLocationId',
+                    $hubPurpose === LocationPurposeType::STATION
+                        ? 'Wybierz dworzec startowy z listy.'
+                        : 'Wybierz lotnisko startowe z listy.'
+                );
             }
 
-            if (empty($endAirportLocationId) || ! Location::isPublicTransportHub((int) $endAirportLocationId)) {
-                $this->addError('sharedEndAirportLocationId', 'Wybierz punkt docelowy (lotnisko lub dworzec) dla całej grupy.');
+            if (empty($endAirportLocationId) || ! Location::matchesPurpose((int) $endAirportLocationId, $hubPurpose)) {
+                $this->addError(
+                    'sharedEndAirportLocationId',
+                    $hubPurpose === LocationPurposeType::STATION
+                        ? 'Wybierz dworzec docelowy z listy.'
+                        : 'Wybierz lotnisko docelowe z listy.'
+                );
             }
 
             if (! empty($startAirportLocationId) && ! empty($endAirportLocationId) && (int) $startAirportLocationId === (int) $endAirportLocationId) {
@@ -967,12 +985,27 @@ class DeparturePlannerV2 extends Component
         return Location::orderBy('name')->get();
     }
 
-    public function getAvailableAirportsProperty()
+    public function getAvailablePublicTransportHubsProperty()
     {
+        $purpose = $this->publicTransportHubKind === 'station'
+            ? LocationPurposeType::STATION
+            : LocationPurposeType::AIRPORT;
+
         return Location::query()
-            ->forPublicTransportHubs()
+            ->whereHas('purposes', fn ($q) => $q->where('purpose', $purpose))
             ->orderBy('name')
             ->get();
+    }
+
+    public function updatedPublicTransportHubKind(): void
+    {
+        $ids = $this->availablePublicTransportHubs->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (! empty($this->sharedStartAirportLocationId) && ! in_array((int) $this->sharedStartAirportLocationId, $ids, true)) {
+            $this->sharedStartAirportLocationId = null;
+        }
+        if (! empty($this->sharedEndAirportLocationId) && ! in_array((int) $this->sharedEndAirportLocationId, $ids, true)) {
+            $this->sharedEndAirportLocationId = null;
+        }
     }
 
     protected function getSelectedEmployeeIds(): array

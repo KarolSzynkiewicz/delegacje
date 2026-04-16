@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Enums\Currency;
 use App\Enums\EmployeeLocationState;
+use App\Enums\LocationPurposeType;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
@@ -47,6 +48,9 @@ class ReturnTripPlanner extends Component
     public $sharedStartAirportLocationId = null;
 
     public $sharedEndAirportLocationId = null;
+
+    /** @var 'airport'|'station' Filtr listy punktów (lotniska vs dworce). */
+    public string $publicTransportHubKind = 'airport';
 
     public string $notes = '';
 
@@ -176,12 +180,27 @@ class ReturnTripPlanner extends Component
         return ! $isExternal && $driverId === 0;
     }
 
-    public function getAvailableAirportsProperty()
+    public function getAvailablePublicTransportHubsProperty()
     {
+        $purpose = $this->publicTransportHubKind === 'station'
+            ? LocationPurposeType::STATION
+            : LocationPurposeType::AIRPORT;
+
         return Location::query()
-            ->forPublicTransportHubs()
+            ->whereHas('purposes', fn ($q) => $q->where('purpose', $purpose))
             ->orderBy('name')
             ->get();
+    }
+
+    public function updatedPublicTransportHubKind(): void
+    {
+        $ids = $this->availablePublicTransportHubs->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (! empty($this->sharedStartAirportLocationId) && ! in_array((int) $this->sharedStartAirportLocationId, $ids, true)) {
+            $this->sharedStartAirportLocationId = null;
+        }
+        if (! empty($this->sharedEndAirportLocationId) && ! in_array((int) $this->sharedEndAirportLocationId, $ids, true)) {
+            $this->sharedEndAirportLocationId = null;
+        }
     }
 
     public function getSelectedEmployeesProperty(): \Illuminate\Support\Collection
@@ -572,8 +591,34 @@ class ReturnTripPlanner extends Component
 
         // Validate ticket costs for public transport
         if ($this->isPublicTransport) {
-            if (empty($this->sharedStartAirportLocationId) || empty($this->sharedEndAirportLocationId)) {
-                $this->addError('sharedStartAirportLocationId', 'Wybierz lotnisko startowe i docelowe dla transportu publicznego.');
+            $hubPurpose = $this->publicTransportHubKind === 'station'
+                ? LocationPurposeType::STATION
+                : LocationPurposeType::AIRPORT;
+
+            if (
+                empty($this->sharedStartAirportLocationId)
+                || ! Location::matchesPurpose((int) $this->sharedStartAirportLocationId, $hubPurpose)
+            ) {
+                $this->addError(
+                    'sharedStartAirportLocationId',
+                    $hubPurpose === LocationPurposeType::STATION
+                        ? 'Wybierz dworzec startowy z listy.'
+                        : 'Wybierz lotnisko startowe z listy.'
+                );
+
+                return;
+            }
+
+            if (
+                empty($this->sharedEndAirportLocationId)
+                || ! Location::matchesPurpose((int) $this->sharedEndAirportLocationId, $hubPurpose)
+            ) {
+                $this->addError(
+                    'sharedEndAirportLocationId',
+                    $hubPurpose === LocationPurposeType::STATION
+                        ? 'Wybierz dworzec docelowy z listy.'
+                        : 'Wybierz lotnisko docelowe z listy.'
+                );
 
                 return;
             }

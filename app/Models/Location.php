@@ -82,6 +82,21 @@ class Location extends Model
     }
 
     /**
+     * Czy lokalizacja ma wskazany cel (np. wyłącznie lotnisko przy przełączniku w planerze PT).
+     */
+    public static function matchesPurpose(?int $locationId, LocationPurposeType $purpose): bool
+    {
+        if ($locationId === null || $locationId <= 0) {
+            return false;
+        }
+
+        return static::query()
+            ->whereKey($locationId)
+            ->whereHas('purposes', fn ($q) => $q->where('purpose', $purpose))
+            ->exists();
+    }
+
+    /**
      * Get accommodations (lease records) linked to this location.
      */
     public function accommodations(): HasMany
