@@ -5,6 +5,45 @@
     </x-slot>
 
     <div class="container-fluid">
+        {{-- Logistyka (DRY): wspólne widoki z planerami wyjazdu / zjazdu — źródło: resources/views/components/logistics/ --}}
+        <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
+            <h3 class="mb-2">Komponenty logistyki <span class="text-muted small fw-normal">(<code>x-logistics.*</code>)</span></h3>
+            <p class="text-muted small mb-3">
+                Używane w <code>/departures/create-v2</code> oraz zjeździe. Podgląd statyczny (<code>:interactive=&quot;false&quot;</code>) — bez Livewire; w planerach działają przeciągnięcia i akcje na rodzicu.
+            </p>
+
+            @php
+                $demoVehicle = (object) ['capacity' => 5, 'brand' => 'Volkswagen', 'model' => 'Transporter'];
+                $demoSeats = [
+                    0 => ['employee_id' => null, 'position' => 'driver', 'external_driver' => true],
+                    1 => ['employee_id' => 101, 'position' => 'passenger', 'external_driver' => false],
+                    2 => ['employee_id' => 102, 'position' => 'passenger', 'external_driver' => false],
+                    3 => ['employee_id' => null, 'position' => 'passenger', 'external_driver' => false],
+                    4 => ['employee_id' => null, 'position' => 'passenger', 'external_driver' => false],
+                ];
+                $demoEmployees = collect([
+                    (object) ['id' => 101, 'first_name' => 'Anna', 'last_name' => 'Kowalska', 'full_name' => 'Anna Kowalska', 'image_url' => null],
+                    (object) ['id' => 102, 'first_name' => 'Jan', 'last_name' => 'Nowak', 'full_name' => 'Jan Nowak', 'image_url' => null],
+                ]);
+            @endphp
+
+            <div class="rounded-3 p-3 mb-3" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                <x-logistics.vehicle-seat-grid
+                    :vehicle="$demoVehicle"
+                    :vehicle-seats="$demoSeats"
+                    :selected-employees="$demoEmployees"
+                    wire-key-prefix="catalog-lvs"
+                    :interactive="false"
+                />
+            </div>
+            <pre class="small text-muted mb-0 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>&lt;x-logistics.vehicle-seat-grid
+    :vehicle="$selectedVehicle"
+    :vehicle-seats="$vehicleSeats"
+    :selected-employees="$this->selectedEmployees"
+    wire-key-prefix="vs"
+/&gt;</code></pre>
+        </div>
+
         {{-- Hero Card Example --}}
         <div class="mb-5">
             <h3 class="mb-4">Komponent x-ui.hero-card</h3>
