@@ -49,8 +49,8 @@ class ReturnTripPlanner extends Component
 
     public $sharedEndAirportLocationId = null;
 
-    /** @var 'airport'|'station' Filtr listy punktów (lotniska vs dworce). */
-    public string $publicTransportHubKind = 'airport';
+    /** @var 'airport'|'station'|null Po wyborze typu pokazujemy listy; null = tylko przełącznik. */
+    public ?string $publicTransportHubKind = null;
 
     public string $notes = '';
 
@@ -182,6 +182,10 @@ class ReturnTripPlanner extends Component
 
     public function getAvailablePublicTransportHubsProperty()
     {
+        if ($this->publicTransportHubKind === null) {
+            return collect();
+        }
+
         $purpose = $this->publicTransportHubKind === 'station'
             ? LocationPurposeType::STATION
             : LocationPurposeType::AIRPORT;
@@ -194,6 +198,10 @@ class ReturnTripPlanner extends Component
 
     public function updatedPublicTransportHubKind(): void
     {
+        if ($this->publicTransportHubKind === null) {
+            return;
+        }
+
         $ids = $this->availablePublicTransportHubs->pluck('id')->map(fn ($id) => (int) $id)->all();
         if (! empty($this->sharedStartAirportLocationId) && ! in_array((int) $this->sharedStartAirportLocationId, $ids, true)) {
             $this->sharedStartAirportLocationId = null;
@@ -201,6 +209,13 @@ class ReturnTripPlanner extends Component
         if (! empty($this->sharedEndAirportLocationId) && ! in_array((int) $this->sharedEndAirportLocationId, $ids, true)) {
             $this->sharedEndAirportLocationId = null;
         }
+    }
+
+    public function resetPublicTransportHubSelection(): void
+    {
+        $this->publicTransportHubKind = null;
+        $this->sharedStartAirportLocationId = null;
+        $this->sharedEndAirportLocationId = null;
     }
 
     public function getSelectedEmployeesProperty(): \Illuminate\Support\Collection
@@ -433,6 +448,9 @@ class ReturnTripPlanner extends Component
         } else {
             $this->transportMode = 'public';
             $this->vehicleSeats = [];
+            $this->publicTransportHubKind = null;
+            $this->sharedStartAirportLocationId = null;
+            $this->sharedEndAirportLocationId = null;
         }
     }
 
@@ -442,6 +460,7 @@ class ReturnTripPlanner extends Component
         $this->vehicleSeats = [];
         $this->sharedStartAirportLocationId = null;
         $this->sharedEndAirportLocationId = null;
+        $this->publicTransportHubKind = null;
         $this->ticketCostsByEmployee = [];
     }
 
@@ -449,6 +468,7 @@ class ReturnTripPlanner extends Component
     {
         $this->sharedStartAirportLocationId = null;
         $this->sharedEndAirportLocationId = null;
+        $this->publicTransportHubKind = null;
         $this->ticketCostsByEmployee = [];
         if (empty($this->vehicleId)) {
             $first = $this->availableVehicles->first();
@@ -591,6 +611,12 @@ class ReturnTripPlanner extends Component
 
         // Validate ticket costs for public transport
         if ($this->isPublicTransport) {
+            if ($this->publicTransportHubKind === null) {
+                $this->addError('publicTransportHubKind', 'Wybierz typ punktu: lotnisko lub dworzec.');
+
+                return;
+            }
+
             $hubPurpose = $this->publicTransportHubKind === 'station'
                 ? LocationPurposeType::STATION
                 : LocationPurposeType::AIRPORT;
