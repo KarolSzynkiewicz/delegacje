@@ -54,12 +54,16 @@ class TransferService
                 ? $data['transfer_date']
                 : Carbon::parse($data['transfer_date']);
 
-            foreach ($data['employee_ids'] as $employeeId) {
-                $employee = Employee::findOrFail($employeeId);
-                if (! $this->locationTracking->isEmployeeEligibleForTransfer($employee, $transferDate)) {
-                    throw ValidationException::withMessages([
-                        'selectedEmployeeIds' => "Pracownik {$employee->full_name} jest w bazie w dniu transferu — użyj wyjazdu lub zjazdu, nie transferu.",
-                    ]);
+            // Ze zmianą przypisań: uczestnik musi być już poza bazą (inaczej wyjazd/zjazd).
+            // Bez zmiany przypisań: dozwolone osoby w bazie (np. podjazd i powrót bez zmiany stanu).
+            if ($data['has_reassignment']) {
+                foreach ($data['employee_ids'] as $employeeId) {
+                    $employee = Employee::findOrFail($employeeId);
+                    if (! $this->locationTracking->isEmployeeEligibleForTransfer($employee, $transferDate)) {
+                        throw ValidationException::withMessages([
+                            'selectedEmployeeIds' => "Pracownik {$employee->full_name} jest w bazie w dniu transferu — użyj wyjazdu lub zjazdu, nie transferu.",
+                        ]);
+                    }
                 }
             }
 

@@ -267,7 +267,9 @@ class VehicleValidationService
         Carbon $endDate,
         ?int $excludeEventId = null
     ): array {
-        $query = LogisticsEvent::where('vehicle_id', $vehicle->id)
+        // Transfery bez zmiany przypisań nie blokują pojazdu (logistyka lokalna) — spójnie z forLocationTracking().
+        $query = LogisticsEvent::forLocationTracking()
+            ->where('vehicle_id', $vehicle->id)
             ->where('status', '!=', LogisticsEventStatus::CANCELLED->value)
             ->where(function ($q) use ($startDate, $endDate) {
                 // Wyjazd zajmuje pojazd od event_date do end_date (włącznie)

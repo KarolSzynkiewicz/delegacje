@@ -2,16 +2,16 @@
 
 namespace App\Services;
 
-use App\Models\Vehicle;
-use App\Models\LogisticsEvent;
-use App\Models\VehicleAssignment;
 use App\Enums\LogisticsEventStatus;
+use App\Models\LogisticsEvent;
+use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Service for validating logistics events (departures/returns).
- * 
+ *
  * Ensures vehicles are not double-booked between:
  * - Multiple logistics events
  * - Logistics events and vehicle assignments (projects)
@@ -21,13 +21,14 @@ class LogisticsEventService
     public function __construct(
         protected VehicleValidationService $vehicleValidationService
     ) {}
+
     /**
      * Validate vehicle availability for logistics event.
-     * 
+     *
      * Checks:
      * - No overlapping LogisticsEvents using same vehicle
      * - No VehicleAssignments (projects) using this vehicle
-     * 
+     *
      * @throws ValidationException
      */
     public function validateVehicleAvailability(
@@ -36,10 +37,10 @@ class LogisticsEventService
         Carbon $endDate,
         ?int $excludeEventId = null
     ): void {
-        if (!$vehicle) {
+        if (! $vehicle) {
             return; // No vehicle = no validation needed
         }
-        
+
         // Use centralized validation service
         $this->vehicleValidationService->validateForLogisticsEventOrFail(
             $vehicle,
@@ -60,6 +61,7 @@ class LogisticsEventService
     ): bool {
         try {
             $this->validateVehicleAvailability($vehicle, $startDate, $endDate, $excludeEventId);
+
             return true;
         } catch (ValidationException $e) {
             return false;
@@ -78,14 +80,15 @@ class LogisticsEventService
     ): array {
         $conflicts = [];
 
-        // Check logistics events
-        $events = LogisticsEvent::where('vehicle_id', $vehicle->id)
+        // Check logistics events (transfer „tylko logistyka” nie zajmuje pojazdu w tej walidacji)
+        $events = LogisticsEvent::forLocationTracking()
+            ->where('vehicle_id', $vehicle->id)
             ->where('status', '!=', LogisticsEventStatus::CANCELLED->value)
-            ->when($excludeEventId, fn($q) => $q->where('id', '!=', $excludeEventId))
-            ->where(function($q) use ($startDate, $endDate) {
-                $q->where(function($query) use ($startDate, $endDate) {
+            ->when($excludeEventId, fn ($q) => $q->where('id', '!=', $excludeEventId))
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->where(function ($query) use ($startDate, $endDate) {
                     $query->where('event_date', '<=', $endDate)
-                          ->whereRaw('COALESCE(end_date, event_date) >= ?', [$startDate]);
+                        ->whereRaw('COALESCE(end_date, event_date) >= ?', [$startDate]);
                 });
             })
             ->with(['toLocation', 'fromLocation'])
@@ -95,18 +98,18 @@ class LogisticsEventService
             $conflicts[] = [
                 'type' => 'logistics_event',
                 'model' => $event,
-                'description' => "{$event->type->label()} {$event->event_date->format('d.m.Y')} - {$event->toLocation->name}"
+                'description' => "{$event->type->label()} {$event->event_date->format('d.m.Y')} - {$event->toLocation->name}",
             ];
         }
 
         // Check vehicle assignments
         $assignments = VehicleAssignment::where('vehicle_id', $vehicle->id)
-            ->where(function($q) use ($startDate, $endDate) {
+            ->where(function ($q) use ($startDate, $endDate) {
                 $q->where('start_date', '<=', $endDate)
-                  ->where(function($q2) use ($startDate) {
-                      $q2->whereNull('end_date')
-                         ->orWhere('end_date', '>=', $startDate);
-                  });
+                    ->where(function ($q2) use ($startDate) {
+                        $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $startDate);
+                    });
             })
             ->with('employee')
             ->get();
@@ -115,7 +118,7 @@ class LogisticsEventService
             $conflicts[] = [
                 'type' => 'vehicle_assignment',
                 'model' => $assignment,
-                'description' => "Przypisanie do projektu: {$assignment->employee->full_name}"
+                'description' => "Przypisanie do projektu: {$assignment->employee->full_name}",
             ];
         }
 

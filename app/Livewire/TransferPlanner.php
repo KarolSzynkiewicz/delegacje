@@ -212,13 +212,17 @@ class TransferPlanner extends Component
             return Employee::query()->whereRaw('0 = 1')->paginate(12);
         }
 
-        $eligibleIds = Employee::whereIn('id', $ids)
+        $employees = Employee::whereIn('id', $ids)
             ->orderBy('last_name')
             ->orderBy('first_name')
-            ->get()
-            ->filter(fn (Employee $e) => $this->locationTracking->isEmployeeEligibleForTransfer($e, $date))
-            ->pluck('id')
-            ->values();
+            ->get();
+
+        $eligibleIds = $this->hasReassignment
+            ? $employees
+                ->filter(fn (Employee $e) => $this->locationTracking->isEmployeeEligibleForTransfer($e, $date))
+                ->pluck('id')
+                ->values()
+            : $employees->pluck('id')->values();
 
         if ($eligibleIds->isEmpty()) {
             return Employee::query()->whereRaw('0 = 1')->paginate(12);
