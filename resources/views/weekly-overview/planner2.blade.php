@@ -345,20 +345,51 @@
                                                                         @if($resOverlap)
                                                                             <div class="text-warning fw-semibold mb-1" title="Więcej niż jedno aktywne przypisanie (projekt / dom / auto) w tym dniu">⚠ Konflikt przypisań</div>
                                                                         @endif
+                                                                        @php
+                                                                            $transferEv = $dayData['transfer_event'] ?? null;
+                                                                            $transferNewProjects = collect();
+                                                                            if ($transferEv && $transferEv->relationLoaded('projectAssignments') && $transferEv->projectAssignments->isNotEmpty()) {
+                                                                                $transferNewProjects = $transferEv->projectAssignments
+                                                                                    ->where('employee_id', $employeeData['employee']->id)
+                                                                                    ->map(fn ($pa) => $pa->project)
+                                                                                    ->filter()
+                                                                                    ->unique('id')
+                                                                                    ->values();
+                                                                            }
+                                                                        @endphp
                                                                         @if($hasProject)
                                                                             @foreach($paList as $projectAssignment)
                                                                                 @php
                                                                                     $proj = $projectAssignment->project;
-                                                                                    $roleName = $projectAssignment->role?->name ?? 'Brak roli';
-                                                                                    $projectTitle = ($proj?->name ?? '?') . ($roleName !== 'Brak roli' ? ' (' . $roleName . ')' : '');
+                                                                                    $roleName = $projectAssignment->role?->name ?? '';
+                                                                                    $projectTitle = ($proj?->name ?? '?') . ($roleName !== '' ? ' — ' . $roleName : '');
                                                                                 @endphp
                                                                                 <div class="text-primary fw-semibold" title="{{ $projectTitle }}">
                                                                                     <i class="bi bi-briefcase-fill"></i>
                                                                                     <a href="{{ route('project-assignments.edit', $projectAssignment) }}" class="text-decoration-none text-primary">
-                                                                                        <span class="d-none d-lg-inline">{{ $roleName !== 'Brak roli' ? Str::limit($roleName, 12) : Str::limit($proj?->name ?? '?', 12) }}</span>
+                                                                                        <span class="d-none d-lg-inline">{{ Str::limit($proj?->name ?? '?', 14) }}</span>
                                                                                     </a>
                                                                                 </div>
                                                                             @endforeach
+                                                                        @elseif($transferNewProjects->isNotEmpty())
+                                                                            @foreach($transferNewProjects as $destProject)
+                                                                                @php
+                                                                                    $transferPa = $transferEv->projectAssignments
+                                                                                        ->where('employee_id', $employeeData['employee']->id)
+                                                                                        ->firstWhere('project_id', $destProject->id);
+                                                                                @endphp
+                                                                                <div class="text-primary fw-semibold" title="Transfer — przypisanie do projektu: {{ $destProject->name }}">
+                                                                                    <i class="bi bi-briefcase-fill"></i>
+                                                                                    <a href="{{ $transferPa ? route('project-assignments.edit', $transferPa) : route('projects.show', $destProject) }}" class="text-decoration-none text-primary">
+                                                                                        <span class="d-none d-lg-inline">{{ Str::limit($destProject->name, 14) }}</span>
+                                                                                    </a>
+                                                                                </div>
+                                                                            @endforeach
+                                                                        @elseif($transferEv)
+                                                                            <div class="text-secondary fw-semibold" title="Transfer (brak nowego przypisania projektu w systemie)">
+                                                                                <i class="bi bi-briefcase"></i>
+                                                                                <span class="d-none d-lg-inline text-muted">Transfer</span>
+                                                                            </div>
                                                                         @else
                                                                             <div class="text-danger fw-bold" title="Brak projektu">
                                                                                 <i class="bi bi-briefcase"></i>

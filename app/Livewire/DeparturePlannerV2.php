@@ -13,6 +13,7 @@ use Livewire\WithFileUploads;
 
 class DeparturePlannerV2 extends Component
 {
+    use Concerns\InteractsWithLogisticsTransportMode;
     use WithFileUploads;
 
     // Podstawowe dane formularza
@@ -240,74 +241,36 @@ class DeparturePlannerV2 extends Component
         $this->pendingEndDate = null;
     }
 
-    // ─── Transport mode toggle (public vs own vehicle) ─────────────────────────
+    // ─── Transport mode toggle (public vs own vehicle) — trait + hooki poniżej ──
 
-    public function requestSetTransportMode(string $mode): void
+    protected function onSwitchingToPublicTransportMode(): void
     {
-        $mode = $mode === 'own' ? 'own' : 'public';
-        if ($mode === $this->transportMode) {
-            return;
-        }
-        if ($this->transportMode === null) {
-            $this->setTransportMode($mode);
-
-            return;
-        }
-        $this->pendingTransportMode = $mode;
-        $this->showTransportSwitchModal = true;
+        // Z poprzedniego trybu (własny pojazd): czyść auto, miejsca, dojazdy w kroku 3, trasę
+        $this->vehicleId = null;
+        $this->vehicleSeats = [];
+        $this->vehicleAssignments = [];
+        $this->routeData = null;
+        $this->transferConfig = [];
+        $this->ticketCostsByEmployee = [];
     }
 
-    public function confirmTransportModeSwitch(): void
+    protected function onSwitchingToOwnTransportMode(): void
     {
-        if ($this->pendingTransportMode === null) {
-            return;
-        }
-        $mode = $this->pendingTransportMode;
-        $this->showTransportSwitchModal = false;
-        $this->pendingTransportMode = null;
-        $this->setTransportMode($mode);
-    }
-
-    public function cancelTransportModeSwitch(): void
-    {
-        $this->showTransportSwitchModal = false;
-        $this->pendingTransportMode = null;
-    }
-
-    public function setTransportMode(string $mode): void
-    {
-        $mode = $mode === 'own' ? 'own' : 'public';
-        if ($mode === $this->transportMode) {
-            return;
-        }
-
-        if ($mode === 'public') {
-            // Z poprzedniego trybu (własny pojazd): czyść auto, miejsca, dojazdy w kroku 3, trasę
-            $this->vehicleId = null;
-            $this->vehicleSeats = [];
-            $this->vehicleAssignments = [];
-            $this->routeData = null;
-            $this->transferConfig = [];
-            $this->ticketCostsByEmployee = [];
-        } else {
-            // Z transportu publicznego: czyść lotniska, bilety, transfer
-            $this->sharedStartAirportLocationId = null;
-            $this->sharedEndAirportLocationId = null;
-            $this->ticketCostsByEmployee = [];
-            $this->transferConfig = [];
-            $this->routeData = null;
-            if (empty($this->vehicleId)) {
-                $first = $this->availableVehicles->first();
-                if ($first) {
-                    $this->vehicleId = $first->id;
-                }
-            }
-            if ($this->vehicleId) {
-                $this->initVehicleSeats();
+        // Z transportu publicznego: czyść lotniska, bilety, transfer
+        $this->sharedStartAirportLocationId = null;
+        $this->sharedEndAirportLocationId = null;
+        $this->ticketCostsByEmployee = [];
+        $this->transferConfig = [];
+        $this->routeData = null;
+        if (empty($this->vehicleId)) {
+            $first = $this->availableVehicles->first();
+            if ($first) {
+                $this->vehicleId = $first->id;
             }
         }
-
-        $this->transportMode = $mode;
+        if ($this->vehicleId) {
+            $this->initVehicleSeats();
+        }
     }
 
     /**

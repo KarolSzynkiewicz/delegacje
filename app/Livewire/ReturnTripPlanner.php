@@ -19,6 +19,7 @@ use Livewire\WithFileUploads;
 
 class ReturnTripPlanner extends Component
 {
+    use Concerns\InteractsWithLogisticsTransportMode;
     use WithFileUploads;
 
     public string $returnDate = '';
@@ -418,67 +419,33 @@ class ReturnTripPlanner extends Component
         }
     }
 
-    public function requestSetTransportMode(string $mode): void
+    protected function onSwitchingToPublicTransportMode(): void
     {
-        $mode = $mode === 'own' ? 'own' : 'public';
-        if ($mode === $this->transportMode) {
-            return;
-        }
-        if ($this->transportMode === null) {
-            $this->setTransportMode($mode);
-
-            return;
-        }
-        $this->pendingTransportMode = $mode;
-        $this->showTransportSwitchModal = true;
+        $this->vehicleId = '';
+        $this->vehicleSeats = [];
+        $this->sharedStartAirportLocationId = null;
+        $this->sharedEndAirportLocationId = null;
+        $this->ticketCostsByEmployee = [];
     }
 
-    public function confirmTransportModeSwitch(): void
+    protected function onSwitchingToOwnTransportMode(): void
     {
-        if ($this->pendingTransportMode === null) {
-            return;
-        }
-        $mode = $this->pendingTransportMode;
-        $this->showTransportSwitchModal = false;
-        $this->pendingTransportMode = null;
-        $this->setTransportMode($mode);
-    }
-
-    public function cancelTransportModeSwitch(): void
-    {
-        $this->showTransportSwitchModal = false;
-        $this->pendingTransportMode = null;
-    }
-
-    public function setTransportMode(string $mode): void
-    {
-        $mode = $mode === 'own' ? 'own' : 'public';
-        if ($mode === $this->transportMode) {
-            return;
-        }
-
-        if ($mode === 'public') {
-            $this->vehicleId = '';
-            $this->vehicleSeats = [];
-            $this->sharedStartAirportLocationId = null;
-            $this->sharedEndAirportLocationId = null;
-            $this->ticketCostsByEmployee = [];
-        } else {
-            $this->sharedStartAirportLocationId = null;
-            $this->sharedEndAirportLocationId = null;
-            $this->ticketCostsByEmployee = [];
-            if (empty($this->vehicleId)) {
-                $first = $this->availableVehicles->first();
-                if ($first) {
-                    $this->vehicleId = $first->id;
-                }
-            }
-            if ($this->vehicleId) {
-                $this->initVehicleSeats();
+        $this->sharedStartAirportLocationId = null;
+        $this->sharedEndAirportLocationId = null;
+        $this->ticketCostsByEmployee = [];
+        if (empty($this->vehicleId)) {
+            $first = $this->availableVehicles->first();
+            if ($first) {
+                $this->vehicleId = $first->id;
             }
         }
+        if ($this->vehicleId) {
+            $this->initVehicleSeats();
+        }
+    }
 
-        $this->transportMode = $mode;
+    protected function afterTransportModeChanged(string $mode): void
+    {
         $this->showPreview = false;
         $this->previewData = [];
         $this->acceptReturnConsequences = false;

@@ -728,6 +728,14 @@ class WeeklyOverviewService
         // Get unique employee IDs
         $employeeIds = $assignments->pluck('employee_id')->unique();
 
+        // Wiersze kalendarza pochodzą z przypisań do wybranego projektu, ale komórka „projekt”
+        // musi pokazywać faktyczne przypisanie tego dnia (np. po transferze do innej budowy),
+        // więc ładujemy wszystkie nakładające się ProjectAssignment dla tych pracowników.
+        $allProjectAssignmentsForWeek = ProjectAssignment::whereIn('employee_id', $employeeIds)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with(['employee', 'role', 'project'])
+            ->get();
+
         // Get return trips for employees in this week (exclude CANCELLED)
         // Use end_date (arrival date) instead of event_date (departure date)
         $returnTrips = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
@@ -785,7 +793,14 @@ class WeeklyOverviewService
             ->whereHas('participants', function ($q) use ($employeeIds) {
                 $q->whereIn('employee_id', $employeeIds);
             })
-            ->with(['participants.employee', 'vehicle', 'fromLocation', 'toLocation'])
+            ->with([
+                'participants.employee',
+                'vehicle',
+                'fromLocation',
+                'toLocation',
+                'projectAssignments.project',
+                'projectAssignments.role',
+            ])
             ->get();
 
         $transfersByEmployeeAndDate = collect();
@@ -938,14 +953,14 @@ class WeeklyOverviewService
         }
 
         // For each employee, get daily data (using pre-loaded data)
-        $employees = $employeeIds->map(function ($employeeId) use ($assignments, $days, $returnTripsByEmployeeAndDate, $departuresByEmployeeAndDate, $transfersByEmployeeAndDate, $employeesCollection, $accommodationAssignmentsByEmployeeAndDate, $vehicleAssignmentsByEmployeeAndDate, $accommodationOccupancyMap, $vehicleOccupancyMap) {
+        $employees = $employeeIds->map(function ($employeeId) use ($allProjectAssignmentsForWeek, $days, $returnTripsByEmployeeAndDate, $departuresByEmployeeAndDate, $transfersByEmployeeAndDate, $employeesCollection, $accommodationAssignmentsByEmployeeAndDate, $vehicleAssignmentsByEmployeeAndDate, $accommodationOccupancyMap, $vehicleOccupancyMap) {
             $employee = $employeesCollection->get($employeeId);
             if (! $employee) {
                 return null;
             }
 
             // Get daily data for each day
-            $dailyData = $days->map(function ($day) use ($employee, $assignments, $returnTripsByEmployeeAndDate, $departuresByEmployeeAndDate, $transfersByEmployeeAndDate, $accommodationAssignmentsByEmployeeAndDate, $vehicleAssignmentsByEmployeeAndDate, $accommodationOccupancyMap, $vehicleOccupancyMap) {
+            $dailyData = $days->map(function ($day) use ($employee, $allProjectAssignmentsForWeek, $returnTripsByEmployeeAndDate, $departuresByEmployeeAndDate, $transfersByEmployeeAndDate, $accommodationAssignmentsByEmployeeAndDate, $vehicleAssignmentsByEmployeeAndDate, $accommodationOccupancyMap, $vehicleOccupancyMap) {
                 $dayDate = $day['date']->copy()->startOfDay();
                 $dayDateString = $dayDate->format('Y-m-d');
 
@@ -954,8 +969,8 @@ class WeeklyOverviewService
                 $departureEvent = $departuresByEmployeeAndDate->get($employee->id)?->get($dayDateString);
                 $transferEvent = $transfersByEmployeeAndDate->get($employee->id)?->get($dayDateString);
 
-                // Wszystkie aktywne przypisania projektowe tego dnia (ta sama kolejność co w LocationTrackingService)
-                $projectAssignmentsForDay = $assignments
+                // Wszystkie aktywne przypisania projektowe tego dnia (wszystkie projekty; ta sama kolejność co w LocationTrackingService)
+                $projectAssignmentsForDay = $allProjectAssignmentsForWeek
                     ->filter(function ($assignment) use ($employee, $dayDate) {
                         if ($assignment->employee_id !== $employee->id) {
                             return false;

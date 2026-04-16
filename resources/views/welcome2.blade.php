@@ -9,7 +9,7 @@
         <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
             <h3 class="mb-2">Komponenty logistyki <span class="text-muted small fw-normal">(<code>x-logistics.*</code>)</span></h3>
             <p class="text-muted small mb-3">
-                Używane w <code>/departures/create-v2</code> oraz zjeździe. Podgląd statyczny (<code>:interactive=&quot;false&quot;</code>) — bez Livewire; w planerach działają przeciągnięcia i akcje na rodzicu.
+                Używane w <code>/departures/create-v2</code>, zjeździe i transferze. Nagłówek sekcji: <code>x-logistics.section-header</code>; ramka kroku trasy: <code>x-logistics.route-planning-frame</code>; wiersz dat + transport: partial <code>trip-logistics-header</code> (tylko w kontekście Livewire).
             </p>
 
             @php
@@ -27,11 +27,18 @@
                 ]);
             @endphp
 
+            <div class="mb-3">
+                <x-logistics.section-header title="Przykład nagłówka sekcji (jak wyjazd / zjazd)" />
+                <x-logistics.route-planning-frame title="Przykład ramy planowania trasy (slot)" class="mb-3">
+                    <p class="text-muted small mb-0">Tu trafi zawartość komponentu trasy (np. <code>step4-route-planning</code> w planerze wyjazdu) lub odpowiednik w transferze — jedna spójna obwódka.</p>
+                </x-logistics.route-planning-frame>
+            </div>
+
             <div class="rounded-3 p-3 mb-3" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
                 <div class="mb-3">
                     <div class="text-muted small mb-1">Transport (wariant wymagany, bez wyboru na start):</div>
                     <div style="max-width: 360px;">
-                        <x-logistics.transport-mode-toggle :mode="null" />
+                        <x-logistics.transport-mode-toggle :mode="null" :interactive="false" />
                     </div>
                 </div>
                 <x-logistics.vehicle-seat-grid

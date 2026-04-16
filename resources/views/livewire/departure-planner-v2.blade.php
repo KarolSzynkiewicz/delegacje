@@ -103,163 +103,17 @@
         </x-ui.alert>
     @endif
 
-    {{-- ── Szczegóły wyjazdu (header card) ── --}}
+    {{-- ── Szczegóły wyjazdu (wspólny partial z zjazdem) ── --}}
     <x-ui.card class="mb-4">
-        <div class="d-flex align-items-center gap-2 mb-3">
-            <div class="rounded-circle d-flex align-items-center justify-content-center"
-                 style="width: 32px; height: 32px; background: rgba(99,102,241,0.2);">
-                <i class="bi bi-suitcase-lg" style="font-size: 0.9rem; color: #a5b4fc;"></i>
-            </div>
-            <h6 class="mb-0 fw-bold" style="letter-spacing: .02em;">Szczegóły wyjazdu</h6>
-        </div>
-
-        <div class="row g-3 align-items-end">
-            {{-- Kiedy (jak lotniska: jedna linia pól, etykiety nad polami) --}}
-            @php
-                $missingDepartureDate = empty($departureDate);
-                $missingEndDate = empty($endDate);
-                $datesIncomplete = $missingDepartureDate || $missingEndDate;
-            @endphp
-            <div class="col-md-4">
-                <div class="rounded-3 p-2 transition-all"
-                     style="{{ $datesIncomplete ? 'border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);' : '' }}">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-6 min-w-0">
-                            <label class="form-label small mb-1 {{ $missingDepartureDate ? 'text-danger fw-semibold' : 'text-muted' }}">
-                                Data wyjazdu <span class="text-danger">*</span>
-                            </label>
-                            <input type="date"
-                                   wire:model.live="departureDate"
-                                   class="form-control form-control-sm w-100 @if($errors->has('departureDate') || $missingDepartureDate) is-invalid @endif">
-                        </div>
-                        <div class="col-6 min-w-0">
-                            <label class="form-label small mb-1 {{ $missingEndDate ? 'text-danger fw-semibold' : 'text-muted' }}">
-                                Data zakończenia <span class="text-danger">*</span>
-                            </label>
-                            <input type="date"
-                                   wire:model.live="endDate"
-                                   class="form-control form-control-sm w-100 @if($errors->has('departureDate') || $missingEndDate) is-invalid @endif"
-                                   @if($departureDate) min="{{ $departureDate }}" @endif>
-                        </div>
-                        @if($datesIncomplete)
-                            <div class="col-12">
-                                <div class="small text-danger mb-0" style="font-size: 0.72rem;">
-                                    <i class="bi bi-exclamation-circle me-1"></i>Wybierz datę wyjazdu i datę zakończenia.
-                                </div>
-                            </div>
-                        @endif
-                        @error('departureDate')
-                            <div class="col-12">
-                                <div class="invalid-feedback d-block" style="font-size:.72rem;">{{ $message }}</div>
-                            </div>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-
-            {{-- Czym — wspólny komponent (start: brak wyboru) --}}
-            <div class="col-md-3">
-                <x-logistics.transport-mode-toggle :mode="$transportMode" />
-            </div>
-
-            {{-- Trzecia karta: lotniska lub numer auta --}}
-            <div class="col-md-5">
-                @if($transportMode === null)
-                    <div class="rounded-3 p-2 transition-all"
-                         style="border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);">
-                        <div class="small text-danger" style="font-size: 0.72rem;">
-                            <i class="bi bi-exclamation-circle me-1"></i>Najpierw wybierz sposób transportu.
-                        </div>
-                    </div>
-                @elseif($transportMode === 'public')
-                    @php
-                        $missingStartAirport = empty($sharedStartAirportLocationId);
-                        $missingEndAirport = empty($sharedEndAirportLocationId);
-                        $airportsIncomplete = $missingStartAirport || $missingEndAirport;
-                    @endphp
-                    {{-- Transport publiczny: lotniska --}}
-                    <div class="row g-2 rounded-3 p-2 transition-all"
-                         style="{{ $airportsIncomplete ? 'border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);' : '' }}">
-                        <div class="col-6">
-                            <label class="form-label small mb-1 {{ $missingStartAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
-                                Lotnisko startowe <span class="text-danger">*</span>
-                            </label>
-                            <select wire:model.live="sharedStartAirportLocationId"
-                                    class="form-select form-select-sm @if($errors->has('sharedStartAirportLocationId') || $missingStartAirport) is-invalid @endif">
-                                <option value="">— wybierz —</option>
-                                @foreach($this->availableAirports as $airport)
-                                    <option value="{{ $airport->id }}"
-                                        @disabled(!empty($sharedEndAirportLocationId) && (int)$sharedEndAirportLocationId === (int)$airport->id)>
-                                        {{ $airport->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('sharedStartAirportLocationId') <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small mb-1 {{ $missingEndAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
-                                Lotnisko docelowe <span class="text-danger">*</span>
-                            </label>
-                            <select wire:model.live="sharedEndAirportLocationId"
-                                    class="form-select form-select-sm @if($errors->has('sharedEndAirportLocationId') || $missingEndAirport) is-invalid @endif">
-                                <option value="">— wybierz —</option>
-                                @foreach($this->availableAirports as $airport)
-                                    <option value="{{ $airport->id }}"
-                                        @disabled(!empty($sharedStartAirportLocationId) && (int)$sharedStartAirportLocationId === (int)$airport->id)>
-                                        {{ $airport->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('sharedEndAirportLocationId') <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div> @enderror
-                        </div>
-                        @if($airportsIncomplete)
-                            <div class="col-12">
-                                <div class="small text-danger" style="font-size: 0.72rem;">
-                                    <i class="bi bi-exclamation-circle me-1"></i>Wybierz lotnisko startowe i docelowe (wymagane przy locie).
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-                @else
-                    {{-- Własny transport: wybór pojazdu (obowiązkowy) --}}
-                    <label class="form-label small text-muted mb-1">Pojazd <span class="text-danger">*</span></label>
-                    <select wire:model.live="vehicleId" class="form-select form-select-sm @error('vehicleId') is-invalid @enderror">
-                        <option value="" disabled {{ empty($vehicleId) ? 'selected' : '' }}>— wybierz pojazd —</option>
-                        @foreach($this->availableVehicles as $v)
-                            <option value="{{ $v->id }}">
-                                {{ $v->registration_number }} – {{ $v->brand }} {{ $v->model }}
-                                @if($v->capacity) ({{ $v->capacity }} m.) @endif
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('vehicleId') <div class="invalid-feedback d-block" style="font-size:.72rem;">{{ $message }}</div> @enderror
-                    @if(!empty($vehicleId))
-                        @php
-                            $headerTransportVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId);
-                            $headerExpiredOc = $headerTransportVehicle && $headerTransportVehicle->hasExpiredInsurance();
-                            $headerExpiredPrzeglad = $headerTransportVehicle && $headerTransportVehicle->hasExpiredInspection();
-                            $headerDocWarning = '';
-                            if ($headerExpiredOc) {
-                                $headerDocWarning .= 'nieważne OC';
-                            }
-                            if ($headerExpiredPrzeglad) {
-                                $headerDocWarning .= ($headerDocWarning !== '' ? ' oraz ' : '').'nieważny przegląd';
-                            }
-                        @endphp
-                        @if($headerDocWarning !== '')
-                            <small class="text-warning d-block mt-1">
-                                <i class="bi bi-exclamation-triangle me-1"></i>Uwaga: {{ $headerDocWarning }}
-                            </small>
-                        @endif
-                    @endif
-                    @if($this->availableVehicles->isEmpty())
-                        <div class="small text-warning mt-1">
-                            <i class="bi bi-exclamation-triangle me-1"></i>Brak aut dostępnych w bazie
-                        </div>
-                    @endif
-                @endif
-            </div>
-        </div>
+        @include('components.logistics.trip-logistics-header', [
+            'tripLogisticsHeader' => [
+                'title' => 'Szczegóły wyjazdu',
+                'firstWire' => 'departureDate',
+                'firstLabel' => 'Data wyjazdu',
+                'datesHelp' => 'Wybierz datę wyjazdu i datę zakończenia.',
+                'vehiclePoolHint' => 'departure',
+            ],
+        ])
 
         {{-- Miejsca w pojeździe (gdy wybrany pojazd) — komponent Blade: x-logistics.vehicle-seat-grid --}}
         @if($transportMode === 'own' && ! empty($vehicleId))
@@ -540,23 +394,25 @@
             key="step3-{{ $departureDate }}-{{ $vehicleId }}-{{ md5(json_encode($assignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
         />
     @elseif($currentStep === 4)
-        <livewire:steps.step4-route-planning
-            :departure-date="$departureDate"
-            :end-date="$endDate"
-            :vehicle-id="$vehicleId"
-            :accommodation-assignments="$accommodationAssignments"
-            :assignment-ranges="$assignmentRanges"
-            :vehicle-assignments="$vehicleAssignments"
-            :ticket-costs-by-employee="$ticketCostsByEmployee"
-            :shared-start-airport-location-id="$sharedStartAirportLocationId"
-            :shared-end-airport-location-id="$sharedEndAirportLocationId"
-            :initial-route-waypoints="data_get($routeData, 'route_waypoints', [])"
-            :initial-location-stop-notes="data_get($routeData, 'location_stop_notes', [])"
-            :initial-route-distance="data_get($routeData, 'route_distance')"
-            :initial-route-duration="data_get($routeData, 'route_duration')"
-            :initial-route-manual="(bool) data_get($routeData, 'route_distance_is_manual', false)"
-            :initial-transfer-config="$transferConfig"
-            key="step4-{{ $departureDate }}-{{ $transportMode }}-{{ md5(json_encode(data_get($routeData, 'route_waypoints', []))) }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}-{{ $sharedStartAirportLocationId }}-{{ $sharedEndAirportLocationId }}"
-        />
+        <x-logistics.route-planning-frame title="Trasa, przystanki i transfer" icon="bi-signpost-split">
+            <livewire:steps.step4-route-planning
+                :departure-date="$departureDate"
+                :end-date="$endDate"
+                :vehicle-id="$vehicleId"
+                :accommodation-assignments="$accommodationAssignments"
+                :assignment-ranges="$assignmentRanges"
+                :vehicle-assignments="$vehicleAssignments"
+                :ticket-costs-by-employee="$ticketCostsByEmployee"
+                :shared-start-airport-location-id="$sharedStartAirportLocationId"
+                :shared-end-airport-location-id="$sharedEndAirportLocationId"
+                :initial-route-waypoints="data_get($routeData, 'route_waypoints', [])"
+                :initial-location-stop-notes="data_get($routeData, 'location_stop_notes', [])"
+                :initial-route-distance="data_get($routeData, 'route_distance')"
+                :initial-route-duration="data_get($routeData, 'route_duration')"
+                :initial-route-manual="(bool) data_get($routeData, 'route_distance_is_manual', false)"
+                :initial-transfer-config="$transferConfig"
+                key="step4-{{ $departureDate }}-{{ $transportMode }}-{{ md5(json_encode(data_get($routeData, 'route_waypoints', []))) }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}-{{ $sharedStartAirportLocationId }}-{{ $sharedEndAirportLocationId }}"
+            />
+        </x-logistics.route-planning-frame>
     @endif
 </div>

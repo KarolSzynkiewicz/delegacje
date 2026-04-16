@@ -9,8 +9,9 @@
         </x-ui.alert>
     @endif
 
-    <!-- Uczestnicy (na górze) -->
-    <x-ui.card label="Uczestnicy" class="mb-4">
+    <!-- Uczestnicy (na górze) — ten sam nagłówek sekcji co wyjazd/zjazd -->
+    <x-ui.card class="mb-4">
+        <x-logistics.section-header title="Uczestnicy transferu" icon="bi-people-fill" />
         <p class="text-muted small mb-3">
             Lista zawiera wyłącznie osoby <strong>poza bazą</strong> w dniu transferu (w bazie są wyjazd i zjazd, nie transfer).
         </p>
@@ -139,7 +140,8 @@
     </x-ui.card>
 
     <!-- Podstawowe dane (niżej) -->
-    <x-ui.card label="Dane transferu" class="mb-4">
+    <x-ui.card class="mb-4">
+        <x-logistics.section-header title="Szczegóły transferu" icon="bi-arrow-left-right" />
         <div class="row g-3">
             <div class="col-md-4">
                 <x-ui.input
