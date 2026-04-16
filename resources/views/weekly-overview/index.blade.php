@@ -879,7 +879,7 @@
                             <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
                                 Przypisz osoby
                             </x-ui.button>
-                            <x-ui.button variant="success" href="{{ route('departures.create', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
+                            <x-ui.button variant="success" href="{{ route('departures.create-v2', ['departure_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}" action="create" class="btn-sm">
                                 Utwórz wyjazd
                             </x-ui.button>
                         </div>

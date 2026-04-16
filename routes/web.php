@@ -104,14 +104,6 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('departures.prepare-cancellation')
             ->defaults('resource', 'departures');
 
-        // Two-step departure creation with bulk assignments
-        Route::post('departures/prepare-bulk-assignment', [\App\Http\Controllers\DepartureController::class, 'prepareBulkAssignment'])
-            ->name('departures.prepare-bulk-assignment')
-            ->defaults('resource', 'departures');
-        Route::post('departures/store-with-assignments', [\App\Http\Controllers\DepartureController::class, 'storeWithAssignments'])
-            ->name('departures.store-with-assignments')
-            ->defaults('resource', 'departures');
-
         // New V2 departure form with Livewire
         Route::match(['get', 'post'], 'departures/store-v2', [\App\Http\Controllers\DepartureController::class, 'storeV2'])
             ->name('departures.store-v2')
@@ -404,7 +396,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('departures/create-v2', [\App\Http\Controllers\DepartureController::class, 'createV2'])
             ->name('departures.create-v2');
 
-        Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy', 'edit', 'update']);
+        Route::resource('departures', \App\Http\Controllers\DepartureController::class)->except(['destroy', 'edit', 'update', 'create', 'store']);
 
         // Transfers
         Route::group(['defaults' => ['resource' => 'transfers']], function () {

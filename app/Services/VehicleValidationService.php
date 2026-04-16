@@ -72,8 +72,7 @@ class VehicleValidationService
         // 3. Check vehicle not used in logistics events
         // Note: Wyjazd zajmuje pojazd od event_date do end_date (włącznie)
         // Ale przypisania mogą zaczynać się od end_date (dzień przyjazdu), bo wtedy pojazd już jest dostępny
-        $pendingDepartureData = session('pending_departure');
-        $logisticsConflicts = $this->checkVehicleLogisticsEvents($vehicle, $startDate, $endDate, $excludeEventId, $pendingDepartureData);
+        $logisticsConflicts = $this->checkVehicleLogisticsEvents($vehicle, $startDate, $endDate, $excludeEventId);
         if (! empty($logisticsConflicts)) {
             $errors[] = 'Pojazd jest już zajęty przez inny wyjazd/zjazd w tym okresie.';
             $conflicts = array_merge($conflicts, $logisticsConflicts);
@@ -111,8 +110,7 @@ class VehicleValidationService
         $conflicts = [];
 
         // 1. Check vehicle not used in other logistics events
-        $pendingDepartureData = session('pending_departure');
-        $logisticsConflicts = $this->checkVehicleLogisticsEvents($vehicle, $startDate, $endDate, $excludeEventId, $pendingDepartureData);
+        $logisticsConflicts = $this->checkVehicleLogisticsEvents($vehicle, $startDate, $endDate, $excludeEventId);
         if (! empty($logisticsConflicts)) {
             $errors[] = 'Pojazd jest już zajęty przez inny wyjazd/zjazd w tym okresie.';
             $conflicts = array_merge($conflicts, $logisticsConflicts);
@@ -262,16 +260,12 @@ class VehicleValidationService
 
     /**
      * Check if vehicle is used in logistics events.
-     *
-     * @param  array|null  $pendingDepartureData  Optional: data from session for departure being created
-     *                                            ['vehicle_id' => int, 'event_date' => string, 'end_date' => string]
      */
     protected function checkVehicleLogisticsEvents(
         Vehicle $vehicle,
         Carbon $startDate,
         Carbon $endDate,
-        ?int $excludeEventId = null,
-        ?array $pendingDepartureData = null
+        ?int $excludeEventId = null
     ): array {
         $query = LogisticsEvent::where('vehicle_id', $vehicle->id)
             ->where('status', '!=', LogisticsEventStatus::CANCELLED->value)
@@ -292,11 +286,6 @@ class VehicleValidationService
         }
 
         $conflicts = $query->with(['toLocation', 'fromLocation'])->get();
-
-        // Note: pending departure from Step 1 doesn't exist in DB yet, so it won't be in query results
-        // The SQL logic already handles it: if assignment starts from end_date, condition
-        // "event_end_date > assignment_start_date" won't match (because end_date == start_date, not >)
-        // So no conflict will be detected for pending departure if assignment starts from its end_date
 
         return $conflicts->map(function ($event) {
             $dates = $event->event_date->format('d.m.Y');

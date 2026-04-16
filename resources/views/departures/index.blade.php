@@ -7,17 +7,8 @@
                     href="{{ route('departures.create-v2') }}"
                     routeName="departures.create-v2"
                     action="create"
-                    class="me-2"
                 >
-                    Utwórz Wyjazd (V2)
-                </x-ui.button>
-                <x-ui.button 
-                    variant="ghost" 
-                    href="{{ route('departures.create') }}"
-                    routeName="departures.create"
-                    action="create"
-                >
-                    Utwórz Wyjazd (Stary)
+                    Utwórz wyjazd
                 </x-ui.button>
             </x-slot>
         </x-ui.page-header>

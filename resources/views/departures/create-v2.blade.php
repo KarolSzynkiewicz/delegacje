@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Utwórz Wyjazd V2 (Nowy Formularz)">
+        <x-ui.page-header title="Utwórz wyjazd">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -8,13 +8,6 @@
                     action="back"
                 >
                     Powrót
-                </x-ui.button>
-                <x-ui.button 
-                    variant="ghost" 
-                    href="{{ route('departures.create') }}"
-                    class="ms-2"
-                >
-                    Stary formularz
                 </x-ui.button>
             </x-slot>
             
@@ -45,9 +38,9 @@
         @endif
 
         <livewire:departure-planner-v2 
-            :departureDate="old('departure_date')"
-            :endDate="old('end_date')"
-            :vehicleId="old('vehicle_id')"
+            :departureDate="old('departure_date', request('departure_date'))"
+            :endDate="old('end_date', request('end_date'))"
+            :vehicleId="old('vehicle_id', request('vehicle_id'))"
         />
         
         <!-- Modal: Employee Assignment Calendar (outside Livewire component to avoid nesting issues) -->
