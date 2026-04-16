@@ -135,11 +135,6 @@
                 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                     <i class="bi bi-ticket-perforated {{ $ticketsIncomplete ? 'text-danger' : 'text-info' }}" style="font-size:0.9rem;"></i>
                     <span class="small fw-semibold {{ $ticketsIncomplete ? 'text-danger' : '' }}">Bilety lotnicze</span>
-                    @if($ticketsIncomplete)
-                        <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fecaca; border: 1px solid rgba(239,68,68,0.4);">
-                            Uzupełnij kwoty, waluty i załączniki
-                        </span>
-                    @endif
                 </div>
 
                 <style>
