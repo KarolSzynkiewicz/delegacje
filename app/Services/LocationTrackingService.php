@@ -40,17 +40,46 @@ class LocationTrackingService
             $state = $this->deriveStateFromEvent($lastEvent, $dateDay);
         }
 
-        $projectAssignment = $this->findActiveProjectAssignment($employee, $dateDay);
-        if ($projectAssignment && $state === EmployeeLocationState::IN_BASE) {
+        $projectAssignments = $this->findActiveProjectAssignments($employee, $dateDay);
+        if ($projectAssignments->isNotEmpty() && $state === EmployeeLocationState::IN_BASE) {
             $state = EmployeeLocationState::OUTSIDE_BASE;
         }
 
-        $accommodationAssignment = $this->findActiveAccommodationAssignment($employee, $dateDay);
+        $accommodationAssignments = $this->findActiveAccommodationAssignments($employee, $dateDay);
+        $vehicleAssignments = $this->findActiveVehicleAssignments($employee, $dateDay);
+
+        $projectNames = $projectAssignments->map(function (ProjectAssignment $pa) {
+            $n = $pa->project?->name;
+            if (! $n) {
+                return null;
+            }
+            $roleName = $pa->relationLoaded('role') ? $pa->role?->name : null;
+
+            return $roleName ? $n.' ('.$roleName.')' : $n;
+        })->filter()->values()->all();
+
+        $accommodationNames = $accommodationAssignments->map(fn (AccommodationAssignment $a) => $a->accommodation?->name)
+            ->filter()
+            ->values()
+            ->all();
+
+        $vehicleLabels = $vehicleAssignments->map(fn (VehicleAssignment $va) => $va->vehicle?->registration_number)
+            ->filter()
+            ->values()
+            ->all();
+
+        $overlap = $projectAssignments->count() > 1
+            || $accommodationAssignments->count() > 1
+            || $vehicleAssignments->count() > 1;
 
         return [
             'state' => $state,
-            'project_name' => $projectAssignment?->project?->name,
-            'accommodation_name' => $accommodationAssignment?->accommodation?->name,
+            'project_name' => $projectAssignments->first()?->project?->name,
+            'accommodation_name' => $accommodationAssignments->first()?->accommodation?->name,
+            'project_names' => $projectNames,
+            'accommodation_names' => $accommodationNames,
+            'vehicle_labels' => $vehicleLabels,
+            'has_assignment_overlap' => $overlap,
         ];
     }
 
@@ -126,7 +155,7 @@ class LocationTrackingService
             return 'W PODRÓŻY';
         }
 
-        // Zwróć nazwę lokalizacji stacjonowania (dom kierowcy lub baza)
+        // Zwróć nazwę stacjonowania (zakwaterowanie kierowcy lub baza)
         // Jeśli to string, zwróć go, jeśli null, zwróć Location::getBase() dla kompatybilności
         if ($status['stationing_location']) {
             return $status['stationing_location'];
@@ -141,11 +170,11 @@ class LocationTrackingService
      * Returns:
      * - in_transit: bool - czy pojazd jest w podróży (podczas eventu logistycznego)
      * - outside_base: bool - czy pojazd był w wyjeździe (analogicznie do outside_base dla pracownika)
-     * - project_locations: Collection<string> - unikatowe nazwy lokalizacji projektów przypisanych osób
-     * - accommodation_locations: Collection<string> - unikatowe nazwy lokalizacji domów przypisanych osób
-     * - driver_accommodation: string|null - nazwa domu kierowcy
+     * - project_names: Collection<string> - unikatowe nazwy projektów przypisanych osobom w pojeździe
+     * - accommodation_names: Collection<string> - unikatowe nazwy zakwaterowań (domów) przypisanych osobom
+     * - driver_accommodation: string|null - nazwa zakwaterowania kierowcy
      * - driver_project: string|null - nazwa projektu kierowcy
-     * - stationing_location: string|null - gdzie stacjonuje (nazwa domu kierowcy lub baza)
+     * - stationing_location: string|null - gdzie stacjonuje (nazwa zakwaterowania kierowcy lub baza)
      * - occupancy: int - liczba przypisanych osób na daną datę
      * - capacity: int|null - pojemność pojazdu
      * - occupancy_percentage: float|null - procent zapełnienia (0-100)
@@ -165,8 +194,8 @@ class LocationTrackingService
             return [
                 'in_transit' => true,
                 'outside_base' => $outsideBase,
-                'project_locations' => collect(),
-                'accommodation_locations' => collect(),
+                'project_names' => collect(),
+                'accommodation_names' => collect(),
                 'driver_accommodation' => null,
                 'driver_project' => null,
                 'stationing_location' => null,
@@ -188,8 +217,8 @@ class LocationTrackingService
         $occupancy = $uniqueEmployeeIds->count();
 
         // 6. Zbierz unikatowe nazwy lokalizacji projektów i domów
-        $projectLocationNames = collect();
-        $accommodationLocationNames = collect();
+        $projectNames = collect();
+        $accommodationNames = collect();
         $driverAccommodationName = null;
         $driverProjectName = null;
 
@@ -200,32 +229,36 @@ class LocationTrackingService
                 continue;
             }
 
-            // Projekty (gdzie pracują)
-            $projectAssignment = $this->findActiveProjectAssignment($employee, $date);
-            if ($projectAssignment?->project?->location?->name) {
-                $projectLocationNames->push($projectAssignment->project->location->name);
-            }
-
-            // Zakwaterowania (gdzie mieszkają)
-            $accommodationAssignment = $this->findActiveAccommodationAssignment($employee, $date);
-            if ($accommodationAssignment?->accommodation?->location?->name) {
-                $accommodationLocationNames->push($accommodationAssignment->accommodation->location->name);
-            }
-
-            // Jeśli to kierowca - zapisz jego lokalizacje
-            if ($assignment->position === VehiclePosition::DRIVER) {
-                if ($accommodationAssignment?->accommodation?->location?->name) {
-                    $driverAccommodationName = $accommodationAssignment->accommodation->location->name;
+            // Projekty — wszystkie aktywne tego dnia (nazwa projektu, nie lokalizacji)
+            foreach ($this->findActiveProjectAssignments($employee, $date) as $projectAssignment) {
+                if ($projectAssignment->project?->name) {
+                    $projectNames->push($projectAssignment->project->name);
                 }
-                if ($projectAssignment?->project?->location?->name) {
-                    $driverProjectName = $projectAssignment->project->location->name;
+            }
+
+            // Zakwaterowania (nazwa domu, nie lokalizacji)
+            foreach ($this->findActiveAccommodationAssignments($employee, $date) as $accommodationAssignment) {
+                if ($accommodationAssignment->accommodation?->name) {
+                    $accommodationNames->push($accommodationAssignment->accommodation->name);
+                }
+            }
+
+            // Jeśli to kierowca - zapisz pierwsze przypisanie z ustalonej kolejności
+            if ($assignment->position === VehiclePosition::DRIVER) {
+                $driverPa = $this->findActiveProjectAssignments($employee, $date)->first();
+                $driverAa = $this->findActiveAccommodationAssignments($employee, $date)->first();
+                if ($driverAa?->accommodation?->name) {
+                    $driverAccommodationName = $driverAa->accommodation->name;
+                }
+                if ($driverPa?->project?->name) {
+                    $driverProjectName = $driverPa->project->name;
                 }
             }
         }
 
-        // 7. Usuń duplikaty z nazw lokalizacji
-        $projectLocationNames = $projectLocationNames->unique()->values();
-        $accommodationLocationNames = $accommodationLocationNames->unique()->values();
+        // 7. Usuń duplikaty
+        $projectNames = $projectNames->unique()->values();
+        $accommodationNames = $accommodationNames->unique()->values();
 
         // 8. Określ lokalizację stacjonowania (dom kierowcy lub baza)
         $stationingLocation = null;
@@ -244,8 +277,8 @@ class LocationTrackingService
         return [
             'in_transit' => false,
             'outside_base' => $outsideBase,
-            'project_locations' => $projectLocationNames,
-            'accommodation_locations' => $accommodationLocationNames,
+            'project_names' => $projectNames,
+            'accommodation_names' => $accommodationNames,
             'driver_accommodation' => $driverAccommodationName,
             'driver_project' => $driverProjectName,
             'stationing_location' => $stationingLocation,
@@ -383,19 +416,28 @@ class LocationTrackingService
 
     protected function findActiveProjectAssignment(Employee $employee, Carbon $date): ?ProjectAssignment
     {
+        return $this->findActiveProjectAssignments($employee, $date)->first();
+    }
+
+    /**
+     * Wszystkie aktywne przypisania projektowe w danym dniu (posortowane: nowszy start, wyższe id).
+     *
+     * @return Collection<int, ProjectAssignment>
+     */
+    protected function findActiveProjectAssignments(Employee $employee, Carbon $date): Collection
+    {
+        $inRange = fn (ProjectAssignment $a) => $a->start_date <= $date
+            && ($a->end_date === null || $a->end_date >= $date);
+
         if ($employee->relationLoaded('assignments')) {
-            $assignment = $employee->assignments
-                ->filter(fn ($a) => $a->start_date <= $date
-                    && ($a->end_date === null || $a->end_date >= $date))
-                ->sortByDesc('start_date')
-                ->sortByDesc('id')
-                ->first();
+            $assignments = $employee->assignments
+                ->filter($inRange)
+                ->sort($this->sortAssignmentsByStartThenId(...))
+                ->values();
 
-            if ($assignment && ! $assignment->relationLoaded('project')) {
-                $assignment->load('project');
-            }
+            $assignments->loadMissing(['project', 'role']);
 
-            return $assignment;
+            return $assignments;
         }
 
         return $employee->assignments()
@@ -403,25 +445,32 @@ class LocationTrackingService
             ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
             ->orderBy('start_date', 'desc')
             ->orderBy('id', 'desc')
-            ->with('project')
-            ->first();
+            ->with(['project', 'role'])
+            ->get();
     }
 
     protected function findActiveAccommodationAssignment(Employee $employee, Carbon $date): ?AccommodationAssignment
     {
+        return $this->findActiveAccommodationAssignments($employee, $date)->first();
+    }
+
+    /**
+     * @return Collection<int, AccommodationAssignment>
+     */
+    protected function findActiveAccommodationAssignments(Employee $employee, Carbon $date): Collection
+    {
+        $inRange = fn (AccommodationAssignment $a) => $a->start_date <= $date
+            && ($a->end_date === null || $a->end_date >= $date);
+
         if ($employee->relationLoaded('accommodationAssignments')) {
-            $assignment = $employee->accommodationAssignments
-                ->filter(fn ($a) => $a->start_date <= $date
-                    && ($a->end_date === null || $a->end_date >= $date))
-                ->sortByDesc('start_date')
-                ->sortByDesc('id')
-                ->first();
+            $assignments = $employee->accommodationAssignments
+                ->filter($inRange)
+                ->sort($this->sortAssignmentsByStartThenId(...))
+                ->values();
 
-            if ($assignment && ! $assignment->relationLoaded('accommodation')) {
-                $assignment->load('accommodation');
-            }
+            $assignments->loadMissing('accommodation');
 
-            return $assignment;
+            return $assignments;
         }
 
         return $employee->accommodationAssignments()
@@ -430,6 +479,48 @@ class LocationTrackingService
             ->orderBy('start_date', 'desc')
             ->orderBy('id', 'desc')
             ->with('accommodation')
-            ->first();
+            ->get();
+    }
+
+    /**
+     * Aktywne przypisania pojazdu (bez „nóg” zjazdowych).
+     *
+     * @return Collection<int, VehicleAssignment>
+     */
+    protected function findActiveVehicleAssignments(Employee $employee, Carbon $date): Collection
+    {
+        if ($employee->relationLoaded('vehicleAssignments')) {
+            $filtered = $employee->vehicleAssignments
+                ->filter(fn (VehicleAssignment $a) => ! $a->is_return_trip
+                    && $a->start_date <= $date
+                    && ($a->end_date === null || $a->end_date >= $date))
+                ->sort($this->sortAssignmentsByStartThenId(...))
+                ->values();
+            foreach ($filtered as $va) {
+                $va->loadMissing('vehicle');
+            }
+
+            return $filtered;
+        }
+
+        return $employee->vehicleAssignments()
+            ->where('is_return_trip', false)
+            ->where('start_date', '<=', $date)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
+            ->orderBy('start_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->with('vehicle')
+            ->get();
+    }
+
+    /**
+     * @param  ProjectAssignment|AccommodationAssignment|VehicleAssignment  $a
+     * @param  ProjectAssignment|AccommodationAssignment|VehicleAssignment  $b
+     */
+    protected function sortAssignmentsByStartThenId($a, $b): int
+    {
+        $c = $b->start_date <=> $a->start_date;
+
+        return $c !== 0 ? $c : $b->id <=> $a->id;
     }
 }

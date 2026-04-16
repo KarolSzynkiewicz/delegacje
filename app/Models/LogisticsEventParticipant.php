@@ -9,9 +9,9 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * LogisticsEventParticipant - uczestnik zdarzenia logistycznego
- * 
+ *
  * Uses polymorphic relationship to assignment models.
- * 
+ *
  * IMPORTANT: assignment_type + assignment_id MUST point to assignment models.
  * Custom morph map enforces this.
  */
@@ -26,11 +26,13 @@ class LogisticsEventParticipant extends Model
         'assignment_id',
         'status',
         'original_end_date',
+        'restoration_payload',
     ];
 
     protected $casts = [
         'status' => 'string', // pending, in_transit, completed
         'original_end_date' => 'date',
+        'restoration_payload' => 'array',
     ];
 
     /**
@@ -51,7 +53,7 @@ class LogisticsEventParticipant extends Model
 
     /**
      * Get the assignment (polymorphic).
-     * 
+     *
      * Returns ProjectAssignment, VehicleAssignment, or AccommodationAssignment.
      */
     public function assignment(): MorphTo

@@ -69,28 +69,21 @@
                                     <x-tooltip title="Pracownik jest w bazie">
                                         <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
                                     </x-tooltip>
-                                @elseif($locationStatus['accommodation_name'] && $locationStatus['project_name'])
-                                    <x-tooltip title="Mieszka: {{ $locationStatus['accommodation_name'] }}, Pracuje: {{ $locationStatus['project_name'] }}{{ $projectsList ? ' (' . $projectsList . ')' : '' }}">
-                                        @if($locationStatus['accommodation_name'] === $locationStatus['project_name'])
-                                            <x-ui.badge variant="info">🏡🏢 {{ $locationStatus['accommodation_name'] }}</x-ui.badge>
-                                        @else
-                                            <x-ui.badge variant="info">🏡 {{ $locationStatus['accommodation_name'] }}</x-ui.badge>
-                                            <x-ui.badge variant="info">🏢 {{ $locationStatus['project_name'] }}</x-ui.badge>
-                                        @endif
-                                    </x-tooltip>
-                                    @if($projectsList)
-                                        <div class="small text-muted mt-1">
-                                            Projekt: {{ $projectsList }}
-                                        </div>
+                                @elseif(count($locationStatus['accommodation_names'] ?? []) > 0 || count($locationStatus['project_names'] ?? []) > 0 || count($locationStatus['vehicle_labels'] ?? []) > 0)
+                                    @if($locationStatus['has_assignment_overlap'] ?? false)
+                                        <div class="small text-warning mb-1">⚠ Wiele aktywnych przypisań tego dnia — sprawdź dane.</div>
                                     @endif
-                                @elseif($locationStatus['accommodation_name'])
-                                    <x-tooltip title="Mieszka w: {{ $locationStatus['accommodation_name'] }}">
-                                        <x-ui.badge variant="info">🏡 {{ $locationStatus['accommodation_name'] }}</x-ui.badge>
-                                    </x-tooltip>
-                                @elseif($locationStatus['project_name'])
-                                    <x-tooltip title="{{ $projectsList ? 'Projekt: ' . $projectsList . ' (' . $locationStatus['project_name'] . ')' : 'Pracuje w: ' . $locationStatus['project_name'] }}">
-                                        <x-ui.badge variant="info">🏢 {{ $locationStatus['project_name'] }}</x-ui.badge>
-                                    </x-tooltip>
+                                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                                        @foreach($locationStatus['accommodation_names'] ?? [] as $n)
+                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏡 {{ $n }}</x-ui.badge>
+                                        @endforeach
+                                        @foreach($locationStatus['vehicle_labels'] ?? [] as $reg)
+                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🚗 {{ $reg }}</x-ui.badge>
+                                        @endforeach
+                                        @foreach($locationStatus['project_names'] ?? [] as $pn)
+                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏢 {{ $pn }}</x-ui.badge>
+                                        @endforeach
+                                    </div>
                                     @if($projectsList)
                                         <div class="small text-muted mt-1">
                                             Projekt: {{ $projectsList }}

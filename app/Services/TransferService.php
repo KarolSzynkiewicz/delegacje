@@ -12,7 +12,9 @@ use App\Models\LogisticsEventParticipant;
 use App\Models\ProjectAssignment;
 use App\Models\Role;
 use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
 use Carbon\Carbon;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -38,7 +40,7 @@ class TransferService
      *     route_duration: int|null,
      *     route_waypoints: int[]|null,
      *     has_reassignment: bool,
-     *     reassignments: array<int, array{project_id: int|null, accommodation_id: int|null, start_date: string, end_date: string|null, keep_current: bool}>,
+     *     reassignments: array<int, array{project_id: int|null, accommodation_id: int|null, vehicle_id: int|null, vehicle_position?: string, role_id?: int, start_date: string, end_date: string|null, keep_current?: bool, source_project_assignment_id?: int, skip_old_accommodation_shorten?: bool, skip_old_vehicle_shorten?: bool}>,
      *     driver_employee_id: int|null,
      *     driver_payment_amount: float|null,
      *     driver_payment_currency: string|null,
@@ -136,61 +138,179 @@ class TransferService
             return;
         }
 
-        $oldProject = ProjectAssignment::where('employee_id', $employeeId)
-            ->where('start_date', '<=', $transferDate)
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $transferDate))
-            ->orderByDesc('start_date')
-            ->orderByDesc('id')
-            ->first();
+        $skipOldAccommodationShorten = ! empty($reassignment['skip_old_accommodation_shorten']);
+        $skipOldVehicleShorten = ! empty($reassignment['skip_old_vehicle_shorten']);
+
+        $oldProject = null;
+        if (! empty($reassignment['source_project_assignment_id'])) {
+            $candidate = ProjectAssignment::query()->find((int) $reassignment['source_project_assignment_id']);
+            if (
+                $candidate
+                && (int) $candidate->employee_id === $employeeId
+                && $candidate->start_date <= $transferDate
+                && ($candidate->end_date === null || $candidate->end_date >= $transferDate)
+            ) {
+                $oldProject = $candidate;
+            }
+        }
+
+        if (! $oldProject) {
+            $oldProject = ProjectAssignment::where('employee_id', $employeeId)
+                ->where('start_date', '<=', $transferDate)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $transferDate))
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        $deletedOldProjectRoleId = null;
 
         if ($oldProject) {
-            $originalEnd = $oldProject->end_date;
-            $oldProject->update(['end_date' => $transferDate]);
+            $shortenEnd = DateRangeService::normalizeDate($transferDate)->copy()->subDay();
+            $oldStart = DateRangeService::normalizeDate($oldProject->start_date);
 
-            LogisticsEventParticipant::create([
-                'logistics_event_id' => $event->id,
-                'employee_id' => $employeeId,
-                'assignment_type' => 'project_assignment',
-                'assignment_id' => $oldProject->id,
-                'original_end_date' => $originalEnd?->format('Y-m-d'),
-                'status' => 'pending',
-            ]);
+            if ($shortenEnd->lt($oldStart)) {
+                $snapshot = [
+                    'project_id' => (int) $oldProject->project_id,
+                    'employee_id' => (int) $oldProject->employee_id,
+                    'role_id' => (int) $oldProject->role_id,
+                    'start_date' => DateRangeService::normalizeDate($oldProject->start_date)->format('Y-m-d'),
+                    'end_date' => $oldProject->end_date
+                        ? DateRangeService::normalizeDate($oldProject->end_date)->format('Y-m-d')
+                        : null,
+                    'notes' => $oldProject->notes,
+                    'logistics_event_id' => $oldProject->logistics_event_id,
+                ];
+                $deletedOldProjectRoleId = (int) $oldProject->role_id;
+                $oldProject->delete();
+                $oldProject = null;
+
+                LogisticsEventParticipant::create([
+                    'logistics_event_id' => $event->id,
+                    'employee_id' => $employeeId,
+                    'assignment_type' => 'project_assignment',
+                    'assignment_id' => null,
+                    'original_end_date' => null,
+                    'restoration_payload' => ['project_assignment' => $snapshot],
+                    'status' => 'pending',
+                ]);
+            } else {
+                $originalEnd = $oldProject->end_date;
+                $oldProject->update(['end_date' => $shortenEnd]);
+
+                LogisticsEventParticipant::create([
+                    'logistics_event_id' => $event->id,
+                    'employee_id' => $employeeId,
+                    'assignment_type' => 'project_assignment',
+                    'assignment_id' => $oldProject->id,
+                    'original_end_date' => $originalEnd?->format('Y-m-d'),
+                    'status' => 'pending',
+                ]);
+            }
         }
 
-        $oldAccommodation = AccommodationAssignment::where('employee_id', $employeeId)
-            ->where('start_date', '<=', $transferDate)
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $transferDate))
-            ->orderByDesc('start_date')
-            ->orderByDesc('id')
-            ->first();
+        if (! $skipOldAccommodationShorten) {
+            $oldAccommodation = AccommodationAssignment::where('employee_id', $employeeId)
+                ->where('start_date', '<=', $transferDate)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $transferDate))
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
+                ->first();
 
-        if ($oldAccommodation) {
-            $originalEnd = $oldAccommodation->end_date;
-            $oldAccommodation->update(['end_date' => $transferDate]);
+            if ($oldAccommodation) {
+                $shortenEndAcc = DateRangeService::normalizeDate($transferDate)->copy()->subDay();
+                $oldAccStart = DateRangeService::normalizeDate($oldAccommodation->start_date);
 
-            LogisticsEventParticipant::create([
-                'logistics_event_id' => $event->id,
-                'employee_id' => $employeeId,
-                'assignment_type' => 'accommodation_assignment',
-                'assignment_id' => $oldAccommodation->id,
-                'original_end_date' => $originalEnd?->format('Y-m-d'),
-                'status' => 'pending',
-            ]);
+                if ($shortenEndAcc->lt($oldAccStart)) {
+                    $accSnapshot = [
+                        'accommodation_id' => (int) $oldAccommodation->accommodation_id,
+                        'employee_id' => (int) $oldAccommodation->employee_id,
+                        'start_date' => DateRangeService::normalizeDate($oldAccommodation->start_date)->format('Y-m-d'),
+                        'end_date' => $oldAccommodation->end_date
+                            ? DateRangeService::normalizeDate($oldAccommodation->end_date)->format('Y-m-d')
+                            : null,
+                        'notes' => $oldAccommodation->notes,
+                        'logistics_event_id' => $oldAccommodation->logistics_event_id,
+                    ];
+                    $oldAccommodation->delete();
+
+                    LogisticsEventParticipant::create([
+                        'logistics_event_id' => $event->id,
+                        'employee_id' => $employeeId,
+                        'assignment_type' => 'accommodation_assignment',
+                        'assignment_id' => null,
+                        'original_end_date' => null,
+                        'restoration_payload' => ['accommodation_assignment' => $accSnapshot],
+                        'status' => 'pending',
+                    ]);
+                } else {
+                    $originalEnd = $oldAccommodation->end_date;
+                    $oldAccommodation->update(['end_date' => $shortenEndAcc]);
+
+                    LogisticsEventParticipant::create([
+                        'logistics_event_id' => $event->id,
+                        'employee_id' => $employeeId,
+                        'assignment_type' => 'accommodation_assignment',
+                        'assignment_id' => $oldAccommodation->id,
+                        'original_end_date' => $originalEnd?->format('Y-m-d'),
+                        'status' => 'pending',
+                    ]);
+                }
+            }
         }
 
-        $oldVehicle = $this->assignmentQueryService->getActiveVehicleAssignment($employeeId, $transferDate);
-        if ($oldVehicle) {
-            $originalEnd = $oldVehicle->end_date;
-            $oldVehicle->update(['end_date' => $transferDate]);
+        if (! $skipOldVehicleShorten) {
+            $oldVehicle = VehicleAssignment::query()
+                ->where('employee_id', $employeeId)
+                ->where('is_return_trip', false)
+                ->where('start_date', '<=', $transferDate)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $transferDate))
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
+                ->first();
 
-            LogisticsEventParticipant::create([
-                'logistics_event_id' => $event->id,
-                'employee_id' => $employeeId,
-                'assignment_type' => 'vehicle_assignment',
-                'assignment_id' => $oldVehicle->id,
-                'original_end_date' => $originalEnd?->format('Y-m-d'),
-                'status' => 'pending',
-            ]);
+            if ($oldVehicle) {
+                $shortenEndVeh = DateRangeService::normalizeDate($transferDate)->copy()->subDay();
+                $oldVehStart = DateRangeService::normalizeDate($oldVehicle->start_date);
+
+                if ($shortenEndVeh->lt($oldVehStart)) {
+                    $vehSnapshot = [
+                        'vehicle_id' => (int) $oldVehicle->vehicle_id,
+                        'employee_id' => (int) $oldVehicle->employee_id,
+                        'position' => $oldVehicle->position instanceof VehiclePosition ? $oldVehicle->position->value : $oldVehicle->position,
+                        'start_date' => DateRangeService::normalizeDate($oldVehicle->start_date)->format('Y-m-d'),
+                        'end_date' => $oldVehicle->end_date
+                            ? DateRangeService::normalizeDate($oldVehicle->end_date)->format('Y-m-d')
+                            : null,
+                        'notes' => $oldVehicle->notes,
+                        'is_return_trip' => false,
+                        'logistics_event_id' => $oldVehicle->logistics_event_id,
+                    ];
+                    $oldVehicle->delete();
+
+                    LogisticsEventParticipant::create([
+                        'logistics_event_id' => $event->id,
+                        'employee_id' => $employeeId,
+                        'assignment_type' => 'vehicle_assignment',
+                        'assignment_id' => null,
+                        'original_end_date' => null,
+                        'restoration_payload' => ['vehicle_assignment' => $vehSnapshot],
+                        'status' => 'pending',
+                    ]);
+                } else {
+                    $originalEnd = $oldVehicle->end_date;
+                    $oldVehicle->update(['end_date' => $shortenEndVeh]);
+
+                    LogisticsEventParticipant::create([
+                        'logistics_event_id' => $event->id,
+                        'employee_id' => $employeeId,
+                        'assignment_type' => 'vehicle_assignment',
+                        'assignment_id' => $oldVehicle->id,
+                        'original_end_date' => $originalEnd?->format('Y-m-d'),
+                        'status' => 'pending',
+                    ]);
+                }
+            }
         }
 
         $newProjectId = $reassignment['project_id'] ?? null;
@@ -199,11 +319,13 @@ class TransferService
         $newVehiclePosition = $reassignment['vehicle_position'] ?? VehiclePosition::PASSENGER->value;
         $startDate = $reassignment['start_date'] ?? $transferDate->format('Y-m-d');
         $endDate = ! empty($reassignment['end_date']) ? $reassignment['end_date'] : null;
+        $newProjectStartDate = DateRangeService::normalizeDate($transferDate)->format('Y-m-d');
 
         if ($newProjectId) {
             $roleId = ! empty($reassignment['role_id'])
                 ? (int) $reassignment['role_id']
                 : ($oldProject?->role_id
+                    ?? $deletedOldProjectRoleId
                     ?? Employee::find($employeeId)?->roles()->orderBy('id')->first()?->id
                     ?? Role::query()->orderBy('id')->value('id'));
 
@@ -217,7 +339,7 @@ class TransferService
                 'project_id' => $newProjectId,
                 'employee_id' => $employeeId,
                 'role_id' => $roleId,
-                'start_date' => $startDate,
+                'start_date' => $newProjectStartDate,
                 'end_date' => $endDate,
                 'logistics_event_id' => $event->id,
                 'notes' => 'Przeniesienie (transfer #'.$event->id.')',
@@ -289,8 +411,10 @@ class TransferService
      *
      * - Przypisania utworzone przy tym transferze (`logistics_event_id` = ten event)
      *   są usuwane w całości.
-     * - Wcześniejsze przypisania tylko skrócone na datę transferu są przywracane:
+     * - Wcześniejsze przypisania tylko skrócone (np. projekt: dzień przed transferem) są przywracane:
      *   `end_date` = `original_end_date` uczestnika (w tym `null`, gdy wcześniej było bez końca).
+     * - Przypisanie do projektu / mieszkania / pojazdu usunięte zamiast skrócenia (start w dniu transferu)
+     *   jest odtwarzane z `restoration_payload` na uczestniku (`project_assignment`, `accommodation_assignment`, `vehicle_assignment`).
      *
      * Rozróżnienie po `logistics_event_id` jest konieczne, bo przy skróceniu otwartego
      * przypisania `original_end_date` na uczestniku też jest null — wtedy błędna logika
@@ -313,6 +437,10 @@ class TransferService
             $transferId = (int) $transfer->id;
 
             foreach ($participants as $participant) {
+                if ($participant->restoration_payload) {
+                    continue;
+                }
+
                 if (! $participant->assignment_type || ! $participant->assignment_id) {
                     continue;
                 }
@@ -333,6 +461,58 @@ class TransferService
                 $assignment->update([
                     'end_date' => $participant->original_end_date,
                 ]);
+            }
+
+            foreach ($participants as $participant) {
+                $payload = $participant->restoration_payload;
+                if (! is_array($payload)) {
+                    continue;
+                }
+
+                if (! empty($payload['project_assignment']) && is_array($payload['project_assignment'])) {
+                    ProjectAssignment::create(Arr::only(
+                        $payload['project_assignment'],
+                        [
+                            'project_id',
+                            'employee_id',
+                            'role_id',
+                            'start_date',
+                            'end_date',
+                            'notes',
+                            'logistics_event_id',
+                        ]
+                    ));
+                }
+
+                if (! empty($payload['accommodation_assignment']) && is_array($payload['accommodation_assignment'])) {
+                    AccommodationAssignment::create(Arr::only(
+                        $payload['accommodation_assignment'],
+                        [
+                            'accommodation_id',
+                            'employee_id',
+                            'start_date',
+                            'end_date',
+                            'notes',
+                            'logistics_event_id',
+                        ]
+                    ));
+                }
+
+                if (! empty($payload['vehicle_assignment']) && is_array($payload['vehicle_assignment'])) {
+                    VehicleAssignment::create(Arr::only(
+                        $payload['vehicle_assignment'],
+                        [
+                            'vehicle_id',
+                            'employee_id',
+                            'position',
+                            'start_date',
+                            'end_date',
+                            'notes',
+                            'is_return_trip',
+                            'logistics_event_id',
+                        ]
+                    ));
+                }
             }
 
             $transfer->participants()->delete();

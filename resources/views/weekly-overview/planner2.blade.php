@@ -321,114 +321,115 @@
                                                         </td>
                                                         @foreach($employeeData['daily_data'] as $dayData)
                                                             @php
-                                                                $hasAnyAssignment = ($dayData['project'] ?? null) || ($dayData['accommodation'] ?? null) || ($dayData['vehicle'] ?? null);
-                                                                $hasProject = ($dayData['project'] ?? null) !== null;
-                                                                $hasAccommodation = ($dayData['accommodation'] ?? null) !== null;
-                                                                $hasVehicle = ($dayData['vehicle'] ?? null) !== null;
+                                                                $paList = $dayData['project_assignments'] ?? collect();
+                                                                $aaList = $dayData['accommodation_assignments'] ?? collect();
+                                                                $vaList = $dayData['vehicle_assignments'] ?? collect();
+                                                                $hasAnyAssignment = $paList->isNotEmpty()
+                                                                    || $aaList->isNotEmpty()
+                                                                    || $vaList->isNotEmpty()
+                                                                    || ($dayData['return_trip'] ?? null)
+                                                                    || ($dayData['departure_event'] ?? null)
+                                                                    || ($dayData['transfer_event'] ?? null);
+                                                                $hasProject = $paList->isNotEmpty();
+                                                                $hasAccommodation = $aaList->isNotEmpty();
+                                                                $hasVehicle = $vaList->isNotEmpty();
+                                                                $resOverlap = $dayData['resources_overlap'] ?? false;
+                                                                $accOccById = $dayData['accommodation_occupancy_by_id'] ?? [];
+                                                                $vehOccById = $dayData['vehicle_occupancy_by_id'] ?? [];
                                                             @endphp
                                                             <td class="text-center align-middle p-2" 
                                                                 style="min-height: 80px;">
                                                                 @if($hasAnyAssignment)
                                                                     <div class="d-flex flex-column gap-1 small">
-                                                                        <!-- Projekt - zawsze pokazuj jeśli jest jakiekolwiek przypisanie -->
+                                                                        @if($hasProject || $hasAccommodation || $hasVehicle)
+                                                                        @if($resOverlap)
+                                                                            <div class="text-warning fw-semibold mb-1" title="Więcej niż jedno aktywne przypisanie (projekt / dom / auto) w tym dniu">⚠ Konflikt przypisań</div>
+                                                                        @endif
                                                                         @if($hasProject)
-                                                                            @php
-                                                                                $roleName = $dayData['project_assignment']?->role?->name ?? 'Brak roli';
-                                                                                $projectTitle = $dayData['project']->name . ($roleName !== 'Brak roli' ? ' (' . $roleName . ')' : '');
-                                                                                $projectAssignment = $dayData['project_assignment'];
-                                                                            @endphp
-                                                                            <div class="text-primary fw-semibold" title="{{ $projectTitle }}">
-                                                                                <i class="bi bi-briefcase-fill"></i>
-                                                                                @if($projectAssignment)
-                                                                                    @php
-                                                                                        $assignmentId = is_object($projectAssignment) ? $projectAssignment->id : $projectAssignment;
-                                                                                    @endphp
-                                                                                    <a href="{{ route('project-assignments.edit', $assignmentId) }}" class="text-decoration-none text-primary">
-                                                                                        <span class="d-none d-lg-inline">{{ $roleName !== 'Brak roli' ? Str::limit($roleName, 12) : Str::limit($dayData['project']->name, 12) }}</span>
+                                                                            @foreach($paList as $projectAssignment)
+                                                                                @php
+                                                                                    $proj = $projectAssignment->project;
+                                                                                    $roleName = $projectAssignment->role?->name ?? 'Brak roli';
+                                                                                    $projectTitle = ($proj?->name ?? '?') . ($roleName !== 'Brak roli' ? ' (' . $roleName . ')' : '');
+                                                                                @endphp
+                                                                                <div class="text-primary fw-semibold" title="{{ $projectTitle }}">
+                                                                                    <i class="bi bi-briefcase-fill"></i>
+                                                                                    <a href="{{ route('project-assignments.edit', $projectAssignment) }}" class="text-decoration-none text-primary">
+                                                                                        <span class="d-none d-lg-inline">{{ $roleName !== 'Brak roli' ? Str::limit($roleName, 12) : Str::limit($proj?->name ?? '?', 12) }}</span>
                                                                                     </a>
-                                                                                @else
-                                                                                    <span class="d-none d-lg-inline">{{ $roleName !== 'Brak roli' ? Str::limit($roleName, 12) : Str::limit($dayData['project']->name, 12) }}</span>
-                                                                                @endif
-                                                                            </div>
+                                                                                </div>
+                                                                            @endforeach
                                                                         @else
                                                                             <div class="text-danger fw-bold" title="Brak projektu">
                                                                                 <i class="bi bi-briefcase"></i>
                                                                                 <span class="d-none d-lg-inline">⚠️ Brak</span>
                                                                             </div>
                                                                         @endif
-                                                                        
-                                                                        <!-- Mieszkanie - zawsze pokazuj jeśli jest jakiekolwiek przypisanie -->
+
                                                                         @if($hasAccommodation)
-                                                                            @php
-                                                                                $occupancy = $dayData['accommodation_occupancy'] ?? 0;
-                                                                                $capacity = $dayData['accommodation_capacity'] ?? null;
-                                                                                $accommodationTitle = '';
-                                                                                if ($occupancy > 0 && $capacity !== null) {
-                                                                                    $accommodationTitle = $occupancy . '/' . $capacity . ' osób';
-                                                                                } elseif ($occupancy > 0) {
-                                                                                    $accommodationTitle = $occupancy . ' ' . ($occupancy == 1 ? 'osoba' : ($occupancy < 5 ? 'osoby' : 'osób'));
-                                                                                }
-                                                                                $accommodationAssignment = $dayData['accommodation_assignment'] ?? null;
-                                                                            @endphp
-                                                                            <div class="text-success" title="{{ $accommodationTitle }}">
-                                                                                <i class="bi bi-house-fill"></i>
-                                                                                @if($accommodationAssignment)
+                                                                            @foreach($aaList as $accommodationAssignment)
+                                                                                @php
+                                                                                    $acc = $accommodationAssignment->accommodation;
+                                                                                    $occupancy = $acc ? ($accOccById[$acc->id] ?? 0) : 0;
+                                                                                    $capacity = $acc?->capacity;
+                                                                                    $accommodationTitle = '';
+                                                                                    if ($occupancy > 0 && $capacity !== null) {
+                                                                                        $accommodationTitle = $occupancy . '/' . $capacity . ' osób';
+                                                                                    } elseif ($occupancy > 0) {
+                                                                                        $accommodationTitle = $occupancy . ' ' . ($occupancy == 1 ? 'osoba' : ($occupancy < 5 ? 'osoby' : 'osób'));
+                                                                                    }
+                                                                                @endphp
+                                                                                <div class="text-success" title="{{ $accommodationTitle }}">
+                                                                                    <i class="bi bi-house-fill"></i>
                                                                                     <a href="{{ route('accommodation-assignments.edit', $accommodationAssignment) }}" class="text-decoration-none text-success">
-                                                                                        <span class="d-none d-lg-inline">{{ Str::limit($dayData['accommodation']->name, 12) }}</span>
+                                                                                        <span class="d-none d-lg-inline">{{ Str::limit($acc?->name ?? '?', 12) }}</span>
                                                                                     </a>
-                                                                                @else
-                                                                                    <span class="d-none d-lg-inline">{{ Str::limit($dayData['accommodation']->name, 12) }}</span>
-                                                                                @endif
-                                                                            </div>
+                                                                                </div>
+                                                                            @endforeach
                                                                         @else
                                                                             <div class="text-danger fw-bold" title="Brak domu">
                                                                                 <i class="bi bi-house-exclamation"></i>
                                                                                 <span class="d-none d-lg-inline">⚠️ Brak</span>
                                                                             </div>
                                                                         @endif
-                                                                        
-                                                                        <!-- Auto - zawsze pokazuj jeśli jest jakiekolwiek przypisanie -->
+
                                                                         @if($hasVehicle)
-                                                                            @php
-                                                                                $position = $dayData['vehicle_assignment']?->position ?? null;
-                                                                                $positionText = '';
-                                                                                if ($position instanceof \App\Enums\VehiclePosition) {
-                                                                                    $positionText = $position->label();
-                                                                                }
-                                                                                $occupancy = $dayData['vehicle_occupancy'] ?? 0;
-                                                                                $capacity = $dayData['vehicle_capacity'] ?? null;
-                                                                                $vehicleTitle = '';
-                                                                                if ($positionText) {
-                                                                                    $vehicleTitle = $positionText;
-                                                                                    if ($occupancy > 0 && $capacity !== null) {
-                                                                                        $vehicleTitle .= ', ' . $occupancy . '/' . $capacity . ' osób';
+                                                                            @foreach($vaList as $vehicleAssignment)
+                                                                                @php
+                                                                                    $veh = $vehicleAssignment->vehicle;
+                                                                                    $position = $vehicleAssignment->position ?? null;
+                                                                                    $positionText = $position instanceof \App\Enums\VehiclePosition ? $position->label() : '';
+                                                                                    $occupancy = $veh ? ($vehOccById[$veh->id] ?? 0) : 0;
+                                                                                    $capacity = $veh?->capacity;
+                                                                                    $vehicleTitle = '';
+                                                                                    if ($positionText) {
+                                                                                        $vehicleTitle = $positionText;
+                                                                                        if ($occupancy > 0 && $capacity !== null) {
+                                                                                            $vehicleTitle .= ', ' . $occupancy . '/' . $capacity . ' osób';
+                                                                                        } elseif ($occupancy > 0) {
+                                                                                            $vehicleTitle .= ', ' . $occupancy . ' ' . ($occupancy == 1 ? 'osoba' : ($occupancy < 5 ? 'osoby' : 'osób'));
+                                                                                        }
+                                                                                    } elseif ($occupancy > 0 && $capacity !== null) {
+                                                                                        $vehicleTitle = $occupancy . '/' . $capacity . ' osób';
                                                                                     } elseif ($occupancy > 0) {
-                                                                                        $vehicleTitle .= ', ' . $occupancy . ' ' . ($occupancy == 1 ? 'osoba' : ($occupancy < 5 ? 'osoby' : 'osób'));
+                                                                                        $vehicleTitle = $occupancy . ' ' . ($occupancy == 1 ? 'osoba' : ($occupancy < 5 ? 'osoby' : 'osób'));
                                                                                     }
-                                                                                } elseif ($occupancy > 0 && $capacity !== null) {
-                                                                                    $vehicleTitle = $occupancy . '/' . $capacity . ' osób';
-                                                                                } elseif ($occupancy > 0) {
-                                                                                    $vehicleTitle = $occupancy . ' ' . ($occupancy == 1 ? 'osoba' : ($occupancy < 5 ? 'osoby' : 'osób'));
-                                                                                }
-                                                                                $vehicleAssignment = $dayData['vehicle_assignment'] ?? null;
-                                                                            @endphp
-                                                                            <div class="text-info" title="{{ $vehicleTitle }}">
-                                                                                <i class="bi bi-car-front-fill"></i>
-                                                                                @if($vehicleAssignment)
+                                                                                @endphp
+                                                                                <div class="text-info" title="{{ $vehicleTitle }}">
+                                                                                    <i class="bi bi-car-front-fill"></i>
                                                                                     <a href="{{ route('vehicle-assignments.edit', $vehicleAssignment) }}" class="text-decoration-none text-info">
-                                                                                        <span class="d-none d-lg-inline">{{ Str::limit($dayData['vehicle']->registration_number, 10) }}</span>
+                                                                                        <span class="d-none d-lg-inline">{{ Str::limit($veh?->registration_number ?? '?', 10) }}</span>
                                                                                     </a>
-                                                                                @else
-                                                                                    <span class="d-none d-lg-inline">{{ Str::limit($dayData['vehicle']->registration_number, 10) }}</span>
-                                                                                @endif
-                                                                            </div>
+                                                                                </div>
+                                                                            @endforeach
                                                                         @else
                                                                             <div class="text-danger fw-bold" title="Brak auta">
                                                                                 <i class="bi bi-car-front-slash"></i>
                                                                                 <span class="d-none d-lg-inline">⚠️ Brak</span>
                                                                             </div>
                                                                         @endif
-                                                                        
+                                                                        @endif
+
                                                                         @if($dayData['return_trip'])
                                                                             @php
                                                                                 $returnTrip = $dayData['return_trip'];
@@ -459,6 +460,72 @@
                                                                             <div class="text-warning fw-semibold" title="{{ $returnTitle }}">
                                                                                 <i class="bi bi-arrow-return-left"></i>
                                                                                 <span class="d-none d-lg-inline">Zjazd</span>
+                                                                            </div>
+                                                                        @endif
+
+                                                                        @if($dayData['departure_event'] ?? null)
+                                                                            @php
+                                                                                $depEv = $dayData['departure_event'];
+                                                                                $depVehicle = $depEv->vehicle;
+                                                                                $depTransport = $depEv->transport;
+                                                                                $depParticipants = $depEv->participants;
+                                                                                $depTooltip = ['Wyjazd'];
+                                                                                if ($depVehicle) {
+                                                                                    $depTooltip[] = 'Auto: ' . trim($depVehicle->brand . ' ' . $depVehicle->model . ' ' . $depVehicle->registration_number);
+                                                                                } elseif ($depTransport) {
+                                                                                    $modeLabel = $depTransport->mode ? $depTransport->mode->label() : '';
+                                                                                    $depTooltip[] = 'Transport: ' . trim(($depTransport->carrier ?? '') . ($modeLabel ? ' ('.$modeLabel.')' : ''));
+                                                                                } else {
+                                                                                    $depTooltip[] = 'Pojazd/transport: brak';
+                                                                                }
+                                                                                if ($depParticipants && $depParticipants->isNotEmpty()) {
+                                                                                    $depNames = $depParticipants->map(fn ($p) => $p->employee?->full_name)->filter()->values()->join(', ');
+                                                                                    if ($depNames) {
+                                                                                        $depTooltip[] = 'Z kim: ' . $depNames;
+                                                                                    }
+                                                                                }
+                                                                                if ($depEv->fromLocation) {
+                                                                                    $depTooltip[] = 'Z: ' . $depEv->fromLocation->name;
+                                                                                }
+                                                                                if ($depEv->toLocation) {
+                                                                                    $depTooltip[] = 'Do: ' . $depEv->toLocation->name;
+                                                                                }
+                                                                                $departureTitle = implode(' | ', $depTooltip);
+                                                                            @endphp
+                                                                            <div class="text-success fw-semibold" title="{{ $departureTitle }}">
+                                                                                <i class="bi bi-box-arrow-up"></i>
+                                                                                <span class="d-none d-lg-inline">Wyjazd</span>
+                                                                            </div>
+                                                                        @endif
+
+                                                                        @if($dayData['transfer_event'] ?? null)
+                                                                            @php
+                                                                                $trEv = $dayData['transfer_event'];
+                                                                                $trVehicle = $trEv->vehicle;
+                                                                                $trParticipants = $trEv->participants;
+                                                                                $trTooltip = ['Transfer'];
+                                                                                if ($trVehicle) {
+                                                                                    $trTooltip[] = 'Auto: ' . trim($trVehicle->brand . ' ' . $trVehicle->model . ' ' . $trVehicle->registration_number);
+                                                                                } else {
+                                                                                    $trTooltip[] = 'Auto: brak (transport własny / inny)';
+                                                                                }
+                                                                                if ($trParticipants && $trParticipants->isNotEmpty()) {
+                                                                                    $trNames = $trParticipants->map(fn ($p) => $p->employee?->full_name)->filter()->values()->join(', ');
+                                                                                    if ($trNames) {
+                                                                                        $trTooltip[] = 'Z kim: ' . $trNames;
+                                                                                    }
+                                                                                }
+                                                                                if ($trEv->fromLocation) {
+                                                                                    $trTooltip[] = 'Z: ' . $trEv->fromLocation->name;
+                                                                                }
+                                                                                if ($trEv->toLocation) {
+                                                                                    $trTooltip[] = 'Do: ' . $trEv->toLocation->name;
+                                                                                }
+                                                                                $transferTitle = implode(' | ', $trTooltip);
+                                                                            @endphp
+                                                                            <div class="text-secondary fw-semibold" title="{{ $transferTitle }}">
+                                                                                <i class="bi bi-arrow-left-right"></i>
+                                                                                <span class="d-none d-lg-inline">Transfer</span>
                                                                             </div>
                                                                         @endif
                                                                     </div>

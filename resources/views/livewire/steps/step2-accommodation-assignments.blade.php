@@ -2,14 +2,25 @@
     <!-- Form Header: Dates Info -->
     <x-ui.card class="mb-4">
         <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold text-muted">Data wyjazdu</label>
-                <div class="fw-semibold">{{ \Carbon\Carbon::parse($departureDate)->format('d.m.Y') }}</div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold text-muted">Data przybycia</label>
-                <div class="fw-semibold">{{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}</div>
-            </div>
+            @if($forTransferBoard)
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold text-muted">Data transferu</label>
+                    <div class="fw-semibold">{{ \Carbon\Carbon::parse($departureDate)->format('d.m.Y') }}</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold text-muted">Dzień zakwaterowania (przyjazd)</label>
+                    <div class="fw-semibold">{{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}</div>
+                </div>
+            @else
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold text-muted">Data wyjazdu</label>
+                    <div class="fw-semibold">{{ \Carbon\Carbon::parse($departureDate)->format('d.m.Y') }}</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold text-muted">Data przybycia</label>
+                    <div class="fw-semibold">{{ \Carbon\Carbon::parse($endDate)->format('d.m.Y') }}</div>
+                </div>
+            @endif
             <div class="col-md-4">
                 <label class="form-label fw-semibold text-muted">Liczba przypisanych pracowników</label>
                 <div class="fw-semibold">{{ count($assignedEmployees) }} ({{ count($this->unassignedEmployees) }} do przypisania)</div>
@@ -21,8 +32,11 @@
         <!-- Left Column: Assigned Employees (4/12) -->
         <div class="col-md-4">
             <x-ui.card>
-                <h6 class="mb-3">Bez przypisanego domu</h6>
-                
+                <h6 @class(['mb-3' => ! $forTransferBoard, 'mb-1' => $forTransferBoard])">Bez przypisanego domu</h6>
+                @if($forTransferBoard)
+                    <p class="small text-muted mb-3">Wybierz nowe zakwaterowanie dla osób ze szkicu.</p>
+                @endif
+
                 <div class="employee-list">
                     @forelse($this->unassignedEmployees as $employee)
                         <div 
@@ -103,7 +117,9 @@
         <div class="col-md-8">
             <x-ui.card>
                 <h6 class="mb-3">
-                    @if($forTransfer)
+                    @if($forTransferBoard)
+                        W jakich domach będą mieszkali po transferze?
+                    @elseif($forTransfer)
                         Do jakiego mieszkania przenosisz pracownika?
                     @else
                         W jakich domach będą mieszkali po przyjeździe?
@@ -256,26 +272,49 @@
     <div class="row mt-4">
         <div class="col-12">
             <div class="d-flex justify-content-end gap-2">
-                <x-ui.button 
-                    variant="ghost" 
-                    wire:click="$dispatch('go-to-step', { step: 1 })"
-                    action="cancel"
-                >
-                    ← Wróć do poprzedniej karty
-                </x-ui.button>
-                <x-ui.button 
-                    variant="primary" 
-                    wire:click="goToNextStep"
-                    wire:loading.attr="disabled"
-                >
-                    <span wire:loading.remove wire:target="goToNextStep">
-                        Dalej do kroku 3
-                    </span>
-                    <span wire:loading wire:target="goToNextStep">
-                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        Przetwarzanie...
-                    </span>
-                </x-ui.button>
+                @if($transferWizardEmbed)
+                    <x-ui.button
+                        variant="ghost"
+                        wire:click="$dispatch('transfer-wizard-back', { screen: 'accommodation' })"
+                        action="cancel"
+                    >
+                        ← Wróć
+                    </x-ui.button>
+                    <x-ui.button
+                        variant="primary"
+                        wire:click="goToNextStep"
+                        wire:loading.attr="disabled"
+                    >
+                        <span wire:loading.remove wire:target="goToNextStep">
+                            Dalej
+                        </span>
+                        <span wire:loading wire:target="goToNextStep">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            Przetwarzanie...
+                        </span>
+                    </x-ui.button>
+                @else
+                    <x-ui.button 
+                        variant="ghost" 
+                        wire:click="$dispatch('go-to-step', { step: 1 })"
+                        action="cancel"
+                    >
+                        ← Wróć do poprzedniej karty
+                    </x-ui.button>
+                    <x-ui.button 
+                        variant="primary" 
+                        wire:click="goToNextStep"
+                        wire:loading.attr="disabled"
+                    >
+                        <span wire:loading.remove wire:target="goToNextStep">
+                            Dalej do kroku 3
+                        </span>
+                        <span wire:loading wire:target="goToNextStep">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            Przetwarzanie...
+                        </span>
+                    </x-ui.button>
+                @endif
             </div>
         </div>
     </div>

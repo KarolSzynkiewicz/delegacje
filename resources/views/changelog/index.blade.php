@@ -8,6 +8,13 @@
             Krótki opis zmian wdrożonych w aplikacji (aktualizowane ręcznie). Format jak wpisy w commicie — bez szczegółów technicznych dla użytkownika końcowego.
         </p>
 
+        <x-ui.card label="2026-04-16">
+            <ul class="small mb-0 ps-3" style="line-height: 1.75;">
+                <li><strong>Planer wyjazdu — mieszkania:</strong> kalendarz przy wyborze terminu od razu blokuje dni, gdy nie ma wolnych miejsc (zgodnie z faktyczną dostępnością), zamiast komunikatu dopiero przy zapisie. Na karcie mieszkania czytelniejsze podsumowanie zajętości w dniu przyjazdu.</li>
+                <li><strong>Planer zwrotu:</strong> dopracowania w kreatorze zwrotu (logika zapisu i widok).</li>
+            </ul>
+        </x-ui.card>
+
         <x-ui.card label="2026-04-13">
             <ul class="small mb-0 ps-3" style="line-height: 1.75;">
                 <li><strong>Pracownicy:</strong> poprawiono widoczność zakładki <strong>Przypisania do projektów</strong> zgodnie z uprawnieniami.</li>

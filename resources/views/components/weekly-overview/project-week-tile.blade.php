@@ -257,21 +257,59 @@
                                                     <br><span class="text-danger fw-semibold"><i class="bi bi-car-front-fill"></i> Brak kierowcy</span>
                                                 @endif
                                             </p>
-                                            @if(isset($vehicleData['return_trip']) && $vehicleData['return_trip'] && isset($vehicleData['return_trip_assignments']) && $vehicleData['return_trip_assignments']->isNotEmpty())
+                                            @php
+                                                $returnPassengers = $vehicleData['return_trip_passengers'] ?? collect();
+                                            @endphp
+                                            @if(isset($vehicleData['return_trip']) && $vehicleData['return_trip'] && $returnPassengers->isNotEmpty())
                                                 <div class="alert alert-info mb-2">
                                                     <i class="bi bi-arrow-down-circle"></i>
                                                     <div>
                                                         <div class="fw-bold">Zjazd: {{ $vehicleData['return_trip']->event_date->format('d.m.Y') }}</div>
                                                         <div class="text-muted small">
-                                                            @foreach($vehicleData['return_trip_assignments'] as $returnAssignment)
-                                                                <a href="{{ route('vehicle-assignments.show', $returnAssignment) }}" class="text-decoration-none">
-                                                                    {{ $returnAssignment->employee->full_name }}
+                                                            @foreach($returnPassengers as $passenger)
+                                                                <a href="{{ route('employees.show', $passenger) }}" class="text-decoration-none">
+                                                                    {{ $passenger->full_name }}
                                                                 </a>@if(!$loop->last), @endif
                                                             @endforeach
                                                         </div>
                                                     </div>
                                                 </div>
                                             @endif
+                                            @foreach(($vehicleData['departure_events'] ?? collect()) as $depEvent)
+                                                <div class="mt-2 pt-2 border-top small" onclick="event.preventDefault(); event.stopPropagation(); window.location.href='{{ route('departures.show', $depEvent) }}'" style="cursor: pointer;">
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <i class="bi bi-box-arrow-right text-info"></i>
+                                                        <span class="text-dark fw-semibold">
+                                                            Wyjazd: {{ $depEvent->event_date->format('d.m.Y') }}
+                                                            @if($vehicleData['vehicle'])
+                                                                - {{ $vehicleData['vehicle']->registration_number }}
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                            @foreach(($vehicleData['transfer_events'] ?? collect()) as $transferEvent)
+                                                @php
+                                                    $fromName = $transferEvent->fromLocation?->name;
+                                                    $toName = $transferEvent->toLocation?->name;
+                                                @endphp
+                                                <div class="mt-2 pt-2 border-top small" onclick="event.preventDefault(); event.stopPropagation(); window.location.href='{{ route('transfers.show', $transferEvent) }}'" style="cursor: pointer;">
+                                                    <div class="d-flex align-items-start gap-1">
+                                                        <i class="bi bi-arrow-left-right text-primary mt-1"></i>
+                                                        <div>
+                                                            <span class="text-dark fw-semibold d-block">
+                                                                Transfer: {{ $transferEvent->event_date->format('d.m.Y') }}
+                                                                @if($vehicleData['vehicle'])
+                                                                    - {{ $vehicleData['vehicle']->registration_number }}
+                                                                @endif
+                                                            </span>
+                                                            @if($fromName || $toName)
+                                                                <div class="text-muted small">- {{ $fromName ?? '?' }} → {{ $toName ?? '?' }}</div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
                                             @if(isset($vehicleData['assignments']) && $vehicleData['assignments']->count() > 0)
                                                 <div class="mt-auto" wire:ignore.self onclick="event.stopPropagation();">
                                                     <button class="btn-link w-100" type="button" data-bs-toggle="collapse" data-bs-target="#vehicle-{{ $vehicleData['vehicle']->id }}-assignments" aria-expanded="false" style="background: none; border: 1px solid var(--glass-border); color: var(--text-main); padding: 0.375rem 0.75rem; border-radius: 6px;">

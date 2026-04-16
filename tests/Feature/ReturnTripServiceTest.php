@@ -2,41 +2,40 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Services\ReturnTripService;
+use App\Enums\LogisticsEventType;
+use App\Models\Accommodation;
+use App\Models\AccommodationAssignment;
 use App\Models\Employee;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
-use App\Models\AccommodationAssignment;
-use App\Models\VehicleAssignment;
-use App\Models\Vehicle;
-use App\Models\Location;
-use App\Models\Accommodation;
 use App\Models\Role;
 use App\Models\Rotation;
-use App\Models\LogisticsEvent;
-use App\Enums\LogisticsEventType;
-use Carbon\Carbon;
+use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
+use App\Services\ReturnTripService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
+use Tests\TestCase;
 
 class ReturnTripServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected ReturnTripService $service;
+
     protected Location $baseLocation;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create authenticated user
         $user = \App\Models\User::factory()->create();
         $this->actingAs($user);
-        
+
         $this->service = app(ReturnTripService::class);
-        
+
         // Create base location
         $this->baseLocation = Location::factory()->create(['is_base' => true]);
     }
@@ -92,11 +91,16 @@ class ReturnTripServiceTest extends TestCase
         $projectAssignment->refresh();
         $this->assertEquals($returnDate->format('Y-m-d'), $projectAssignment->end_date->format('Y-m-d'));
 
-        // Check vehicle assignment is created
-        $vehicleAssignment = VehicleAssignment::where('employee_id', $employee->id)
-            ->where('vehicle_id', $vehicle->id)
-            ->where('is_return_trip', true)
-            ->first();
-        $this->assertNotNull($vehicleAssignment);
+        // Zjazd nie tworzy już VehicleAssignment legu powrotnego (tylko zdarzenie + uczestnicy)
+        $this->assertFalse(
+            VehicleAssignment::where('employee_id', $employee->id)
+                ->where('vehicle_id', $vehicle->id)
+                ->where('is_return_trip', true)
+                ->exists()
+        );
+
+        $this->assertTrue(
+            $event->participants()->where('employee_id', $employee->id)->exists()
+        );
     }
 }

@@ -143,7 +143,7 @@ class Vehicle extends Model
      * Delegates to LocationTrackingService for business logic.
      *
      * @param  \Carbon\Carbon|string  $date
-     * @return array Returns comprehensive status with locations, occupancy, etc.
+     * @return array Returns comprehensive status (project/accommodation names, occupancy, etc.)
      */
     public function getLocationStatusOnDate($date): array
     {

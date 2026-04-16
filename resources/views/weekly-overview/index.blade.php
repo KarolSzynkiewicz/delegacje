@@ -536,6 +536,43 @@
                                                             </div>
                                                         </div>
                                                     @endif
+
+                                                    @foreach(($vehicleData['departure_events'] ?? collect()) as $depEvent)
+                                                        <div class="mt-2 pt-2 border-top">
+                                                            <div class="d-flex align-items-center gap-1 small">
+                                                                <i class="bi bi-box-arrow-right text-info"></i>
+                                                                <a href="{{ route('departures.show', $depEvent) }}" class="text-decoration-none text-dark fw-semibold">
+                                                                    Wyjazd: {{ $depEvent->event_date->format('d.m.Y') }}
+                                                                    @if($vehicleData['vehicle'])
+                                                                        - {{ $vehicleData['vehicle']->registration_number }}
+                                                                    @endif
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+
+                                                    @foreach(($vehicleData['transfer_events'] ?? collect()) as $transferEvent)
+                                                        @php
+                                                            $fromName = $transferEvent->fromLocation?->name;
+                                                            $toName = $transferEvent->toLocation?->name;
+                                                        @endphp
+                                                        <div class="mt-2 pt-2 border-top">
+                                                            <div class="d-flex align-items-start gap-1 small">
+                                                                <i class="bi bi-arrow-left-right text-primary mt-1"></i>
+                                                                <div>
+                                                                    <a href="{{ route('transfers.show', $transferEvent) }}" class="text-decoration-none text-dark fw-semibold d-block">
+                                                                        Transfer: {{ $transferEvent->event_date->format('d.m.Y') }}
+                                                                        @if($vehicleData['vehicle'])
+                                                                            - {{ $vehicleData['vehicle']->registration_number }}
+                                                                        @endif
+                                                                    </a>
+                                                                    @if($fromName || $toName)
+                                                                        <div class="text-muted small">- {{ $fromName ?? '?' }} → {{ $toName ?? '?' }}</div>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
                                                 </div>
                                             </div>
                                             

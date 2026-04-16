@@ -33,6 +33,10 @@ class Step3VehicleAssignments extends Component
 
     public bool $forTransfer = false;
 
+    public bool $forTransferBoard = false;
+
+    public bool $transferWizardEmbed = false;
+
     public array $allowedEmployeeIds = [];
 
     // Własne dane (ciężkie obliczenia)
@@ -84,7 +88,9 @@ class Step3VehicleAssignments extends Component
         $accommodationAssignments = [],
         $vehicleAssignments = [],
         $forTransfer = false,
-        $allowedEmployeeIds = []
+        $allowedEmployeeIds = [],
+        $forTransferBoard = false,
+        $transferWizardEmbed = false
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
@@ -101,6 +107,8 @@ class Step3VehicleAssignments extends Component
         $this->accommodationAssignments = $accommodationAssignments;
         $this->vehicleAssignments = $vehicleAssignments;
         $this->forTransfer = (bool) $forTransfer;
+        $this->forTransferBoard = (bool) $forTransferBoard;
+        $this->transferWizardEmbed = (bool) $transferWizardEmbed;
         $this->allowedEmployeeIds = is_array($allowedEmployeeIds)
             ? array_values(array_map('intval', $allowedEmployeeIds))
             : [];
@@ -942,6 +950,27 @@ class Step3VehicleAssignments extends Component
 
         // Wysyła event do rodzica
         $this->dispatch('save-departure');
+    }
+
+    /**
+     * Przejście dalej z kroku 3 (wyjazd) lub zakończenie kreatora transferu z tablicy.
+     */
+    public function confirmProceedToNextPlannerStep(): void
+    {
+        if ($this->transferWizardEmbed) {
+            $unassignedEmployees = $this->getUnassignedEmployeesProperty();
+            if (! empty($unassignedEmployees)) {
+                $names = array_column($unassignedEmployees, 'full_name');
+                $this->dispatch('error', message: 'Następujący pracownicy nie mają przypisanego pojazdu: '.implode(', ', $names));
+
+                return;
+            }
+            $this->dispatch('transfer-wizard-vehicle-done');
+
+            return;
+        }
+
+        $this->dispatch('go-to-step', step: 4);
     }
 
     public function render()

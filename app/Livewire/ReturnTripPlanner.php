@@ -139,7 +139,8 @@ class ReturnTripPlanner extends Component
     }
 
     /**
-     * Liczba osób w aucie dla tego zjazdu (kierowca zewnętrzny liczy się osobno od uczestników).
+     * Liczba zajętych miejsc w zaplanowanym zjeździe: uczestnicy + 1 gdy kierowca zewnętrzny (fotel kierowcy).
+     * Spójne z badge „X/Y zajęte” i siatką miejsc jak w planerze wyjazdu.
      */
     public function getVehicleOccupantCountForCapacity(): int
     {
@@ -173,34 +174,6 @@ class ReturnTripPlanner extends Component
         $driverId = (int) ($driverSeat['employee_id'] ?? 0);
 
         return ! $isExternal && $driverId === 0;
-    }
-
-    /**
-     * Podgląd licznika miejsc (capacity / zajęte) — używany w Blade; spójny z getVehicleOccupantCountForCapacity().
-     *
-     * @return array{capacity: int, occupied: int, over_capacity: bool, available: int|null}|null
-     */
-    public function getReturnVehicleSeatSummaryProperty(): ?array
-    {
-        if ($this->transportMode !== 'own' || empty($this->vehicleId)) {
-            return null;
-        }
-
-        $vehicle = Vehicle::find($this->vehicleId);
-        if (! $vehicle) {
-            return null;
-        }
-
-        $capacity = (int) ($vehicle->capacity ?? 0);
-        $occupied = $this->getVehicleOccupantCountForCapacity();
-        $over = $capacity > 0 && $occupied > $capacity;
-
-        return [
-            'capacity' => $capacity,
-            'occupied' => $occupied,
-            'available' => $capacity > 0 ? max(0, $capacity - $occupied) : null,
-            'over_capacity' => $over,
-        ];
     }
 
     public function getAvailableAirportsProperty()

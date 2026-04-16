@@ -144,9 +144,9 @@
                             <td class="text-center d-none d-lg-table-cell">
                                 @if($locationStatus['in_transit'] || !$locationStatus['outside_base'])
                                     <span class="text-muted">─</span>
-                                @elseif($locationStatus['project_locations']->isNotEmpty())
+                                @elseif($locationStatus['project_names']->isNotEmpty())
                                     <x-ui.badge variant="info">
-                                        🏢 {{ $locationStatus['project_locations']->join(', ') }}
+                                        🏢 {{ $locationStatus['project_names']->join(', ') }}
                                     </x-ui.badge>
                                 @else
                                     <x-ui.badge variant="danger">❌ Brak</x-ui.badge>
@@ -157,9 +157,9 @@
                             <td class="text-center d-none d-lg-table-cell">
                                 @if($locationStatus['in_transit'] || !$locationStatus['outside_base'])
                                     <span class="text-muted">─</span>
-                                @elseif($locationStatus['accommodation_locations']->isNotEmpty())
+                                @elseif($locationStatus['accommodation_names']->isNotEmpty())
                                     <x-ui.badge variant="info">
-                                        🏡 {{ $locationStatus['accommodation_locations']->join(', ') }}
+                                        🏡 {{ $locationStatus['accommodation_names']->join(', ') }}
                                     </x-ui.badge>
                                 @else
                                     <x-ui.badge variant="danger">❌ Brak</x-ui.badge>

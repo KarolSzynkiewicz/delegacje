@@ -27,6 +27,12 @@ class Step2AccommodationAssignments extends Component
 
     public bool $forTransfer = false;
 
+    /** Nagłówki / data — wariant kreatora transferu z tablicy (szkic). */
+    public bool $forTransferBoard = false;
+
+    /** Osadzenie w kreatorze transferu: inna nawigacja (bez kart wyjazdu). */
+    public bool $transferWizardEmbed = false;
+
     public array $allowedEmployeeIds = [];
 
     // Własne dane (ciężkie obliczenia)
@@ -74,7 +80,9 @@ class Step2AccommodationAssignments extends Component
         $assignmentRanges = [],
         $accommodationAssignments = [],
         $forTransfer = false,
-        $allowedEmployeeIds = []
+        $allowedEmployeeIds = [],
+        $forTransferBoard = false,
+        $transferWizardEmbed = false
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
@@ -89,6 +97,8 @@ class Step2AccommodationAssignments extends Component
         $this->assignmentRanges = $assignmentRanges;
         $this->accommodationAssignments = $accommodationAssignments;
         $this->forTransfer = (bool) $forTransfer;
+        $this->forTransferBoard = (bool) $forTransferBoard;
+        $this->transferWizardEmbed = (bool) $transferWizardEmbed;
         $this->allowedEmployeeIds = is_array($allowedEmployeeIds)
             ? array_values(array_map('intval', $allowedEmployeeIds))
             : [];
@@ -820,13 +830,23 @@ class Step2AccommodationAssignments extends Component
             return;
         }
 
-        // Wysyła event do rodzica
+        if ($this->transferWizardEmbed) {
+            $this->dispatch('transfer-wizard-accommodation-done');
+
+            return;
+        }
+
         $this->dispatch('go-to-step', step: 3);
     }
 
     public function confirmGoToNextStep()
     {
-        // User confirmed, proceed to step 3
+        if ($this->transferWizardEmbed) {
+            $this->dispatch('transfer-wizard-accommodation-done');
+
+            return;
+        }
+
         $this->dispatch('go-to-step', step: 3);
     }
 

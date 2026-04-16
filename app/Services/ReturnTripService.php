@@ -22,6 +22,10 @@ use Illuminate\Validation\ValidationException;
  *
  * This service implements the domain model where Return Trip is a superior domain event
  * that affects assignments. It uses prepare/commit pattern for atomic operations.
+ *
+ * Zjazd nie tworzy już rekordów VehicleAssignment dla „nogi powrotnej” (is_return_trip);
+ * transport jest opisany przez LogisticsEvent + uczestników. Skracane są wyłącznie
+ * operacyjne przypisania (projekt / mieszkanie / auto bez flagi zjazdu).
  */
 class ReturnTripService
 {
@@ -126,6 +130,7 @@ class ReturnTripService
         $returnVehicleAssignments = collect();
         if ($returnVehicle) {
             $returnVehicleAssignments = VehicleAssignment::where('vehicle_id', $returnVehicle->id)
+                ->where('is_return_trip', false)
                 ->activeAtDate($returnDate)
                 ->get();
         }
@@ -309,6 +314,7 @@ class ReturnTripService
             // Ensure return vehicle has no active assignments after return date for employees NOT in return trip
             if ($preparation->returnVehicle) {
                 $conflictingAssignments = VehicleAssignment::where('vehicle_id', $preparation->returnVehicle->id)
+                    ->where('is_return_trip', false)
                     ->whereNotIn('employee_id', $preparation->employeeIds)
                     ->where(function ($query) use ($preparation) {
                         $query->whereNull('end_date')
@@ -396,29 +402,24 @@ class ReturnTripService
                 ]);
             }
 
-            // Create vehicle assignments for return transport (if vehicle specified)
-            if ($preparation->returnVehicle) {
-                foreach ($preparation->employeeIds as $employeeId) {
-                    $newVehicleAssignment = VehicleAssignment::create([
-                        'employee_id' => $employeeId,
-                        'vehicle_id' => $preparation->returnVehicle->id,
-                        'start_date' => $preparation->returnDate,
-                        'end_date' => $preparation->returnDate->copy()->addDays(1),
-                        'notes' => 'Zjazd do bazy',
-                        'is_return_trip' => true,
-                    ]);
+            // Zjazd nie tworzy już VehicleAssignment (leg powrotu) — samo zdarzenie + uczestnicy.
+            // Upewnij się, że każdy wracający ma wpis uczestnika (np. inTransitOn, lista osób).
+            foreach ($preparation->employeeIds as $employeeId) {
+                $exists = LogisticsEventParticipant::query()
+                    ->where('logistics_event_id', $event->id)
+                    ->where('employee_id', $employeeId)
+                    ->exists();
 
+                if (! $exists) {
                     LogisticsEventParticipant::create([
                         'logistics_event_id' => $event->id,
                         'employee_id' => $employeeId,
-                        'assignment_type' => 'vehicle_assignment',
-                        'assignment_id' => $newVehicleAssignment->id,
-                        'original_end_date' => null, // New assignment, no original end_date
                         'status' => 'pending',
                     ]);
                 }
+            }
 
-                // Update vehicle location to base
+            if ($preparation->returnVehicle) {
                 $preparation->returnVehicle->update([
                     'current_location_id' => $baseLocation->id,
                 ]);
@@ -450,7 +451,7 @@ class ReturnTripService
      *
      * This method:
      * 1. Restores original end_date values for all shortened assignments
-     * 2. Deletes return trip vehicle assignments (is_return_trip = true)
+     * 2. Deletes legacy return trip vehicle assignments (is_return_trip = true), jeśli istnieją
      * 3. Deletes all participants
      *
      * @param  LogisticsEvent  $returnTrip  The return trip to reverse

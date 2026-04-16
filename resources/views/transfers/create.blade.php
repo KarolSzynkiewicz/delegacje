@@ -13,5 +13,5 @@
         </x-ui.page-header>
     </x-slot>
 
-    @livewire('transfer-planner')
+    @livewire('transfer-create-board')
 </x-app-layout>

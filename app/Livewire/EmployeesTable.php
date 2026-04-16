@@ -100,7 +100,10 @@ class EmployeesTable extends Component
         $query = Employee::with([
             'roles',
             'assignments.project.location',
+            'assignments.role',
             'accommodationAssignments.accommodation',
+            'vehicleAssignments' => fn ($q) => $q->where('is_return_trip', false),
+            'vehicleAssignments.vehicle',
             'rotations',
             'rates' => fn ($q) => $q->active()->orderByDesc('start_date'),
         ]);
