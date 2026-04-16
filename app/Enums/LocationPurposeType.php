@@ -8,7 +8,7 @@ enum LocationPurposeType: string
     case PROJECT = 'project';
     case QUARTER = 'quarter';
     case AIRPORT = 'airport';
-    /** Dworzec autobusowy / kolejowy — ten sam wariant co lot w planerze transportu zbiorowego. */
+    /** Dworzec (np. autobus, pociąg) — jak lotnisko w planerze transportu zbiorowego. */
     case STATION = 'station';
     case BASE = 'base';
     case OTHER = 'other';
@@ -20,7 +20,7 @@ enum LocationPurposeType: string
             self::PROJECT => 'Projekt',
             self::QUARTER => 'Kwatera',
             self::AIRPORT => 'Lotnisko',
-            self::STATION => 'Dworzec (PKP/PKS)',
+            self::STATION => 'Dworzec',
             self::BASE => 'Baza (siedziba główna)',
             self::OTHER => 'Inne',
         };
