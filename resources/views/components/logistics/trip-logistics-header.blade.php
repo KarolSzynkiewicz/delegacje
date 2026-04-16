@@ -218,7 +218,16 @@
                         </small>
                     @endif
                 @endif
-                @if($this->availableVehicles->isEmpty())
+                @if($datesIncomplete)
+                    <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        @if(($cfg['vehiclePoolHint'] ?? 'departure') === 'return')
+                            Wybierz datę zjazdu i datę zakończenia — wtedy wczytamy listę pojazdów.
+                        @else
+                            Wybierz datę wyjazdu i datę zakończenia — wtedy wczytamy listę pojazdów.
+                        @endif
+                    </div>
+                @elseif($this->availableVehicles->isEmpty())
                     @if(($cfg['vehiclePoolHint'] ?? 'departure') === 'return')
                         @if(! empty($returnDate))
                             <div class="small text-warning mt-1">
