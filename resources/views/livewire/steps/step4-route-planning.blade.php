@@ -26,7 +26,7 @@
         <div class="ms-auto">
             @if($isPublicTransport)
                 <span class="badge rounded-pill px-3 py-2" style="background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); font-size: 0.8rem;">
-                    <i class="bi bi-airplane me-1"></i> Transport publiczny (lot)
+                    <i class="bi bi-airplane me-1"></i> Transport publiczny (lot / dworzec)
                 </span>
             @else
                 <span class="badge rounded-pill px-3 py-2" style="background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.25); font-size: 0.8rem;">

@@ -97,7 +97,7 @@
                  style="{{ $airportsIncomplete ? 'border: 1px solid rgba(239,68,68,0.65) !important; background: rgba(239,68,68,0.12) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.15);' : '' }}">
                 <div class="col-6">
                     <label class="form-label small mb-1 {{ $missingStartAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        Lotnisko startowe <span class="text-danger">*</span>
+                        Start (lotnisko / dworzec) <span class="text-danger">*</span>
                     </label>
                     <select wire:model.live="sharedStartAirportLocationId"
                             class="form-select form-select-sm logistics-trip-header-control @if($errors->has('sharedStartAirportLocationId') || $missingStartAirport) is-invalid @endif"
@@ -114,7 +114,7 @@
                 </div>
                 <div class="col-6">
                     <label class="form-label small mb-1 {{ $missingEndAirport ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        Lotnisko docelowe <span class="text-danger">*</span>
+                        Cel (lotnisko / dworzec) <span class="text-danger">*</span>
                     </label>
                     <select wire:model.live="sharedEndAirportLocationId"
                             class="form-select form-select-sm logistics-trip-header-control @if($errors->has('sharedEndAirportLocationId') || $missingEndAirport) is-invalid @endif"
@@ -132,7 +132,7 @@
                 @if($airportsIncomplete)
                     <div class="col-12">
                         <div class="small text-danger" style="font-size: 0.72rem;">
-                            <i class="bi bi-exclamation-circle me-1"></i>Wybierz lotnisko startowe i docelowe (wymagane przy locie).
+                            <i class="bi bi-exclamation-circle me-1"></i>Wybierz punkt startowy i docelowy (wymagane przy transporcie publicznym).
                         </div>
                     </div>
                 @endif

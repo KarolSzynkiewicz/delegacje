@@ -5,21 +5,24 @@ namespace App\Enums;
 enum LocationPurposeType: string
 {
     case WORKSHOP = 'workshop';
-    case PROJECT  = 'project';
-    case QUARTER  = 'quarter';
-    case AIRPORT  = 'airport';
-    case BASE     = 'base';
-    case OTHER    = 'other';
+    case PROJECT = 'project';
+    case QUARTER = 'quarter';
+    case AIRPORT = 'airport';
+    /** Dworzec autobusowy / kolejowy — ten sam wariant co lot w planerze transportu zbiorowego. */
+    case STATION = 'station';
+    case BASE = 'base';
+    case OTHER = 'other';
 
     public function label(): string
     {
         return match ($this) {
             self::WORKSHOP => 'Warsztat',
-            self::PROJECT  => 'Projekt',
-            self::QUARTER  => 'Kwatera',
-            self::AIRPORT  => 'Lotnisko',
-            self::BASE     => 'Baza (siedziba główna)',
-            self::OTHER    => 'Inne',
+            self::PROJECT => 'Projekt',
+            self::QUARTER => 'Kwatera',
+            self::AIRPORT => 'Lotnisko',
+            self::STATION => 'Dworzec (PKP/PKS)',
+            self::BASE => 'Baza (siedziba główna)',
+            self::OTHER => 'Inne',
         };
     }
 
@@ -27,11 +30,12 @@ enum LocationPurposeType: string
     {
         return match ($this) {
             self::WORKSHOP => 'secondary',
-            self::PROJECT  => 'primary',
-            self::QUARTER  => 'info',
-            self::AIRPORT  => 'accent',
-            self::BASE     => 'success',
-            self::OTHER    => 'warning',
+            self::PROJECT => 'primary',
+            self::QUARTER => 'info',
+            self::AIRPORT => 'accent',
+            self::STATION => 'info',
+            self::BASE => 'success',
+            self::OTHER => 'warning',
         };
     }
 

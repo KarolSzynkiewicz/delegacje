@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\LocationPurposeType;
 use App\Traits\HasComments;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -56,6 +57,28 @@ class Location extends Model
     public function purposes(): HasMany
     {
         return $this->hasMany(LocationPurpose::class);
+    }
+
+    /**
+     * Lotniska i dworce — wybór punktów przy locie / transporcie zbiorowym w planerze.
+     */
+    public function scopeForPublicTransportHubs(Builder $query): Builder
+    {
+        return $query->whereHas('purposes', function ($q) {
+            $q->whereIn('purpose', [
+                LocationPurposeType::AIRPORT,
+                LocationPurposeType::STATION,
+            ]);
+        });
+    }
+
+    public static function isPublicTransportHub(?int $locationId): bool
+    {
+        if ($locationId === null || $locationId <= 0) {
+            return false;
+        }
+
+        return static::query()->whereKey($locationId)->forPublicTransportHubs()->exists();
     }
 
     /**

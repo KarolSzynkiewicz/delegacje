@@ -51,6 +51,7 @@
             project:  '#0d6efd',
             quarter:  '#0dcaf0',
             airport:  '#6610f2',
+            station:  '#fd7e14',
             base:     '#198754',
             other:    '#ffc107',
             none:     '#adb5bd',
@@ -60,6 +61,7 @@
         document.documentElement.style.setProperty('--pin-project',  purposeColors.project);
         document.documentElement.style.setProperty('--pin-quarter',  purposeColors.quarter);
         document.documentElement.style.setProperty('--pin-airport',  purposeColors.airport);
+        document.documentElement.style.setProperty('--pin-station',  purposeColors.station);
         document.documentElement.style.setProperty('--pin-base',     purposeColors.base);
         document.documentElement.style.setProperty('--pin-other',    purposeColors.other);
 

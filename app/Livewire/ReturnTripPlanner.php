@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 use App\Enums\Currency;
 use App\Enums\EmployeeLocationState;
-use App\Enums\LocationPurposeType;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
@@ -179,9 +178,8 @@ class ReturnTripPlanner extends Component
 
     public function getAvailableAirportsProperty()
     {
-        return Location::whereHas('purposes', function ($q) {
-            $q->where('purpose', LocationPurposeType::AIRPORT);
-        })
+        return Location::query()
+            ->forPublicTransportHubs()
             ->orderBy('name')
             ->get();
     }

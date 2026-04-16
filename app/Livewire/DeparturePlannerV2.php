@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Enums\LocationPurposeType;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
@@ -826,17 +825,17 @@ class DeparturePlannerV2 extends Component
             $startAirportLocationId = $this->sharedStartAirportLocationId;
             $endAirportLocationId = $this->sharedEndAirportLocationId;
 
-            if (empty($startAirportLocationId) || ! Location::whereKey($startAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
-                $this->addError('sharedStartAirportLocationId', 'Wybierz lotnisko startowe dla całej grupy.');
+            if (empty($startAirportLocationId) || ! Location::isPublicTransportHub((int) $startAirportLocationId)) {
+                $this->addError('sharedStartAirportLocationId', 'Wybierz punkt startowy (lotnisko lub dworzec) dla całej grupy.');
             }
 
-            if (empty($endAirportLocationId) || ! Location::whereKey($endAirportLocationId)->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))->exists()) {
-                $this->addError('sharedEndAirportLocationId', 'Wybierz lotnisko docelowe dla całej grupy.');
+            if (empty($endAirportLocationId) || ! Location::isPublicTransportHub((int) $endAirportLocationId)) {
+                $this->addError('sharedEndAirportLocationId', 'Wybierz punkt docelowy (lotnisko lub dworzec) dla całej grupy.');
             }
 
             if (! empty($startAirportLocationId) && ! empty($endAirportLocationId) && (int) $startAirportLocationId === (int) $endAirportLocationId) {
-                $this->addError('sharedStartAirportLocationId', 'Lotnisko startowe i docelowe nie mogą być takie same.');
-                $this->addError('sharedEndAirportLocationId', 'Lotnisko startowe i docelowe nie mogą być takie same.');
+                $this->addError('sharedStartAirportLocationId', 'Punkt startowy i docelowy nie mogą być takie same.');
+                $this->addError('sharedEndAirportLocationId', 'Punkt startowy i docelowy nie mogą być takie same.');
             }
 
             // Krok 1: waliduj pola per-pracownik (bez uploadu pliku)
@@ -971,7 +970,7 @@ class DeparturePlannerV2 extends Component
     public function getAvailableAirportsProperty()
     {
         return Location::query()
-            ->whereHas('purposes', fn ($q) => $q->where('purpose', LocationPurposeType::AIRPORT))
+            ->forPublicTransportHubs()
             ->orderBy('name')
             ->get();
     }
