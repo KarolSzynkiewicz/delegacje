@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
+use App\Support\DepartureRoutePlan;
+use App\Support\PublicTransportTicketCosts;
 use Carbon\Carbon;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -53,6 +55,9 @@ class DeparturePlannerV2 extends Component
 
     // Transfer config (created alongside departure for public transport)
     public $transferConfig = []; // [vehicle_id, driver_employee_id, bonus_amount, bonus_currency, pickup_location_id, route_distance, route_duration, route_waypoints]
+
+    /** Segmenty trasy (transport publiczny): loty + transfer(y) ziemne — kolejność ma znaczenie. */
+    public array $routeSegments = [];
 
     /** Modal: zapis mimo brakujących danych */
     public bool $showIncompleteSaveModal = false;
@@ -102,6 +107,7 @@ class DeparturePlannerV2 extends Component
         // Step 4 - Route Planning
         'route-planned' => 'handleRoutePlanned',
         'transfer-config-updated' => 'handleTransferConfigUpdated',
+        'sync-route-segments' => 'handleSyncRouteSegments',
     ];
 
     public function mount($departureDate = null, $endDate = null, $vehicleId = null)
@@ -159,7 +165,7 @@ class DeparturePlannerV2 extends Component
     {
         if (! empty($this->assignments) || ! empty($this->assignmentRanges) || ! empty($this->accommodationAssignments)
             || ! empty($this->vehicleAssignments) || ! empty($this->routeData) || ! empty($this->ticketCostsByEmployee)
-            || ! empty($this->transferConfig)) {
+            || ! empty($this->transferConfig) || ! empty($this->routeSegments)) {
             return true;
         }
 
@@ -184,6 +190,7 @@ class DeparturePlannerV2 extends Component
         $this->routeData = null;
         $this->ticketCostsByEmployee = [];
         $this->transferConfig = [];
+        $this->routeSegments = [];
 
         if ($this->transportMode === 'own' && ! empty($this->vehicleId)) {
             $this->initVehicleSeats();
@@ -258,6 +265,7 @@ class DeparturePlannerV2 extends Component
         $this->sharedStartAirportLocationId = null;
         $this->sharedEndAirportLocationId = null;
         $this->publicTransportHubKind = null;
+        $this->routeSegments = [];
     }
 
     protected function onSwitchingToOwnTransportMode(): void
@@ -269,6 +277,7 @@ class DeparturePlannerV2 extends Component
         $this->ticketCostsByEmployee = [];
         $this->transferConfig = [];
         $this->routeData = null;
+        $this->routeSegments = [];
         if (empty($this->vehicleId)) {
             $first = $this->availableVehicles->first();
             if ($first) {
@@ -710,6 +719,116 @@ class DeparturePlannerV2 extends Component
         }
 
         $this->currentStep = $step;
+
+        if ($step === 4 && $this->transportMode === 'public' && empty($this->vehicleId)) {
+            $this->ensureRouteSegmentsForPublicStep();
+        }
+    }
+
+    /**
+     * Domyślny plan 2 segmentów (lot + transfer) — zgodny ze starym kreatorem.
+     */
+    public function ensureRouteSegmentsForPublicStep(): void
+    {
+        if ($this->transportMode !== 'public' || ! empty($this->vehicleId) || ! empty($this->routeSegments)) {
+            return;
+        }
+
+        $this->routeSegments = DepartureRoutePlan::defaultTwoSegmentPlan(
+            $this->publicTransportHubKind,
+            $this->sharedStartAirportLocationId,
+            $this->sharedEndAirportLocationId,
+            is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : [],
+            is_array($this->transferConfig) ? $this->transferConfig : [],
+            data_get($this->routeData, 'route_waypoints', []) ?: [],
+            data_get($this->routeData, 'location_stop_notes', []) ?: [],
+        );
+    }
+
+    public function handleSyncRouteSegments(array $segments): void
+    {
+        $this->routeSegments = $segments;
+        $this->deriveLegacyFieldsFromRouteSegments();
+    }
+
+    /**
+     * Utrzymuje zgodność z polami używanymi w nagłówku i walidacji (pierwszy segment publiczny, ostatni własny).
+     */
+    protected function deriveLegacyFieldsFromRouteSegments(): void
+    {
+        if (empty($this->routeSegments)) {
+            return;
+        }
+
+        foreach ($this->routeSegments as $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                if (array_key_exists('hub_kind', $seg)) {
+                    $this->publicTransportHubKind = $seg['hub_kind'];
+                }
+                $this->sharedStartAirportLocationId = $seg['start_location_id'] ?? $this->sharedStartAirportLocationId;
+                $this->sharedEndAirportLocationId = $seg['end_location_id'] ?? $this->sharedEndAirportLocationId;
+                $this->ticketCostsByEmployee = is_array($seg['ticket_costs_by_employee'] ?? null)
+                    ? $seg['ticket_costs_by_employee']
+                    : [];
+
+                break;
+            }
+        }
+
+        $ground = DepartureRoutePlan::primaryPostAirportOwnSegment($this->routeSegments);
+        if ($ground !== null) {
+            $this->transferConfig = is_array($ground['transfer_config'] ?? null) ? $ground['transfer_config'] : [];
+            $rd = is_array($this->routeData) ? $this->routeData : [];
+            $this->routeData = array_merge($rd, [
+                'route_waypoints' => $ground['route_waypoints'] ?? ($rd['route_waypoints'] ?? []),
+                'location_stop_notes' => $ground['location_stop_notes'] ?? ($rd['location_stop_notes'] ?? []),
+            ]);
+        }
+    }
+
+    protected function pushTicketsToFirstPublicSegment(): void
+    {
+        if (empty($this->routeSegments)) {
+            return;
+        }
+        foreach ($this->routeSegments as $i => $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                $this->routeSegments[$i]['ticket_costs_by_employee'] = $this->ticketCostsByEmployee;
+
+                return;
+            }
+        }
+    }
+
+    protected function pushAirportsToFirstPublicSegment(): void
+    {
+        if (empty($this->routeSegments)) {
+            return;
+        }
+        foreach ($this->routeSegments as $i => $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                $this->routeSegments[$i]['hub_kind'] = $this->publicTransportHubKind;
+                $this->routeSegments[$i]['start_location_id'] = $this->sharedStartAirportLocationId;
+                $this->routeSegments[$i]['end_location_id'] = $this->sharedEndAirportLocationId;
+
+                return;
+            }
+        }
+    }
+
+    public function updatedTicketCostsByEmployee(): void
+    {
+        $this->pushTicketsToFirstPublicSegment();
+    }
+
+    public function updatedSharedStartAirportLocationId(): void
+    {
+        $this->pushAirportsToFirstPublicSegment();
+    }
+
+    public function updatedSharedEndAirportLocationId(): void
+    {
+        $this->pushAirportsToFirstPublicSegment();
     }
 
     public function handleRoutePlanned($data)
@@ -728,11 +847,41 @@ class DeparturePlannerV2 extends Component
                 ? (bool) $data['route_distance_is_manual']
                 : (bool) ($prev['route_distance_is_manual'] ?? false),
         ];
+
+        if (! empty($data['route_segments']) && is_array($data['route_segments'])) {
+            $this->routeSegments = $data['route_segments'];
+        } elseif (! empty($this->routeSegments) && $this->transportMode === 'public' && empty($this->vehicleId)) {
+            $idx = DepartureRoutePlan::primaryPostAirportOwnSegmentIndex($this->routeSegments);
+            if ($idx !== null) {
+                $tc = is_array($this->routeSegments[$idx]['transfer_config'] ?? null)
+                    ? $this->routeSegments[$idx]['transfer_config']
+                    : [];
+                $this->routeSegments[$idx]['transfer_config'] = array_merge($tc, [
+                    'route_distance' => $this->routeData['route_distance'] ?? null,
+                    'route_duration' => $this->routeData['route_duration'] ?? null,
+                    'route_waypoints' => $this->routeData['route_waypoints'] ?? [],
+                    'location_stop_notes' => $this->routeData['location_stop_notes'] ?? [],
+                ]);
+                $this->routeSegments[$idx]['route_waypoints'] = $this->routeData['route_waypoints'] ?? [];
+                $this->routeSegments[$idx]['location_stop_notes'] = $this->routeData['location_stop_notes'] ?? [];
+            }
+        }
+
+        if (! empty($this->routeSegments)) {
+            $this->deriveLegacyFieldsFromRouteSegments();
+        }
     }
 
     public function handleTransferConfigUpdated($data)
     {
         $this->transferConfig = $data;
+        if (empty($this->routeSegments) || $this->transportMode !== 'public' || ! empty($this->vehicleId)) {
+            return;
+        }
+        $idx = DepartureRoutePlan::primaryPostAirportOwnSegmentIndex($this->routeSegments);
+        if ($idx !== null) {
+            $this->routeSegments[$idx]['transfer_config'] = $data;
+        }
     }
 
     public function requestSaveDeparture(): void
@@ -800,6 +949,135 @@ class DeparturePlannerV2 extends Component
         return array_values(array_unique($out));
     }
 
+    protected function uploadTicketAttachmentsToRouteSegments(): void
+    {
+        foreach ($this->routeSegments as $si => $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                $tickets = $seg['ticket_costs_by_employee'] ?? [];
+                foreach ($tickets as $eid => $cost) {
+                    if (! is_array($cost)) {
+                        continue;
+                    }
+                    $att = $cost['attachment'] ?? null;
+                    if ($att) {
+                        $path = $att->store('transport_costs', 'public');
+                        $eidKey = is_numeric($eid) ? (int) $eid : $eid;
+                        $this->routeSegments[$si]['ticket_costs_by_employee'][$eidKey]['attachment_path'] = $path;
+                        unset($this->routeSegments[$si]['ticket_costs_by_employee'][$eidKey]['attachment']);
+                    }
+                }
+
+                continue;
+            }
+
+            // Odcinki ziemne: bilety w public_leg_ticket_costs_by_employee (transport publiczny lub „inny transport”)
+            $lk = $seg['leg_kind'] ?? '';
+            $gm = $seg['ground_mode'] ?? 'car';
+            $groundTickets = ($lk === 'public') || ($lk === 'own' && $gm === 'other');
+            if (($seg['mode'] ?? '') === 'own' && $groundTickets) {
+                $tickets = $seg['public_leg_ticket_costs_by_employee'] ?? [];
+                foreach ($tickets as $eid => $cost) {
+                    if (! is_array($cost)) {
+                        continue;
+                    }
+                    $att = $cost['attachment'] ?? null;
+                    if ($att) {
+                        $path = $att->store('transport_costs', 'public');
+                        $eidKey = is_numeric($eid) ? (int) $eid : $eid;
+                        $this->routeSegments[$si]['public_leg_ticket_costs_by_employee'][$eidKey]['attachment_path'] = $path;
+                        unset($this->routeSegments[$si]['public_leg_ticket_costs_by_employee'][$eidKey]['attachment']);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param  array<int>  $employeeIds
+     * @param  list<array<string, mixed>>  $ticketCostsLineItems
+     * @param  list<array<string, mixed>>  $transferConfigsList
+     */
+    protected function validateAndBuildTicketsForRouteSegments(array $employeeIds, array &$ticketCostsLineItems, array &$transferConfigsList): void
+    {
+        $transferConfigsList = [];
+        foreach ($this->routeSegments as $seg) {
+            if (($seg['mode'] ?? '') === 'own') {
+                $tc = $seg['transfer_config'] ?? [];
+                if (is_array($tc) && $tc !== []) {
+                    $transferConfigsList[] = $tc;
+                }
+            }
+        }
+
+        foreach ($this->routeSegments as $segIndex => $seg) {
+            if (($seg['mode'] ?? '') !== 'public') {
+                continue;
+            }
+            $hk = $seg['hub_kind'] ?? $this->publicTransportHubKind;
+            if ($hk === null) {
+                $this->addError('publicTransportHubKind', 'Wybierz typ punktu (lotnisko / dworzec) dla odcinka lotu #'.($segIndex + 1).'.');
+
+                continue;
+            }
+            $purpose = $hk === 'station' ? LocationPurposeType::STATION : LocationPurposeType::AIRPORT;
+            $s = $seg['start_location_id'] ?? null;
+            $e = $seg['end_location_id'] ?? null;
+            if (empty($s) || ! Location::matchesPurpose((int) $s, $purpose)) {
+                $this->addError('routeSegments', 'Nieprawidłowy punkt startowy odcinka lotu #'.($segIndex + 1).'.');
+            }
+            if (empty($e) || ! Location::matchesPurpose((int) $e, $purpose)) {
+                $this->addError('routeSegments', 'Nieprawidłowy punkt docelowy odcinka lotu #'.($segIndex + 1).'.');
+            }
+            if (! empty($s) && ! empty($e) && (int) $s === (int) $e) {
+                $this->addError('routeSegments', 'Punkty start i meta odcinka #'.($segIndex + 1).' nie mogą być identyczne.');
+            }
+
+            $tickets = $seg['ticket_costs_by_employee'] ?? [];
+            foreach ($employeeIds as $employeeId) {
+                $employeeCost = $tickets[$employeeId] ?? $tickets[(string) $employeeId] ?? [];
+                $amount = $employeeCost['amount'] ?? null;
+                $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                $attachment = $employeeCost['attachment'] ?? null;
+
+                if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu (odcinek #'.($segIndex + 1).').');
+                }
+
+                if (strlen($currency) !== 3) {
+                    $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć 3 znaki (odcinek #'.($segIndex + 1).').');
+                }
+
+                if ($attachment) {
+                    $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
+                        ['attachment' => $attachment],
+                        ['attachment' => 'file|max:10240'],
+                        [
+                            'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
+                            'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
+                        ]
+                    );
+                    if ($attachmentValidator->fails()) {
+                        foreach ($attachmentValidator->errors()->all() as $message) {
+                            $this->addError("ticketCostsByEmployee.{$employeeId}.attachment", $message);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
+        $this->uploadTicketAttachmentsToRouteSegments();
+        $ticketCostsLineItems = DepartureRoutePlan::buildTicketLineItems($this->routeSegments, $employeeIds);
+        $publicCount = count(array_filter($this->routeSegments, fn ($s) => ($s['mode'] ?? '') === 'public'));
+        $need = count($employeeIds) * max(1, $publicCount);
+        if (count($ticketCostsLineItems) < $need) {
+            $this->addError('routeSegments', 'Uzupełnij bilety dla każdej osoby i każdego odcinka lotu.');
+        }
+    }
+
     public function saveDeparture()
     {
         // Wyczyść błędy z poprzedniej próby zapisu
@@ -827,103 +1105,116 @@ class DeparturePlannerV2 extends Component
         }
 
         $ticketCostsPerEmployee = [];
+        $ticketCostsLineItems = [];
+        $transferConfigsList = [];
 
         if (empty($this->vehicleId)) {
             $employeeIds = $this->getSelectedEmployeeIds();
 
-            // Validate shared airports (once for all employees)
-            $startAirportLocationId = $this->sharedStartAirportLocationId;
-            $endAirportLocationId = $this->sharedEndAirportLocationId;
+            if (! empty($this->routeSegments)) {
+                $this->pushTicketsToFirstPublicSegment();
+                $this->pushAirportsToFirstPublicSegment();
+                $this->validateAndBuildTicketsForRouteSegments($employeeIds, $ticketCostsLineItems, $transferConfigsList);
+            } else {
+                $startAirportLocationId = $this->sharedStartAirportLocationId;
+                $endAirportLocationId = $this->sharedEndAirportLocationId;
 
-            if ($this->publicTransportHubKind === null) {
-                $this->addError('publicTransportHubKind', 'Wybierz typ punktu: lotnisko lub dworzec.');
-            }
-
-            $hubPurpose = $this->publicTransportHubKind === 'station'
-                ? LocationPurposeType::STATION
-                : LocationPurposeType::AIRPORT;
-
-            if ($this->publicTransportHubKind !== null && (empty($startAirportLocationId) || ! Location::matchesPurpose((int) $startAirportLocationId, $hubPurpose))) {
-                $this->addError(
-                    'sharedStartAirportLocationId',
-                    $hubPurpose === LocationPurposeType::STATION
-                        ? 'Wybierz dworzec startowy z listy.'
-                        : 'Wybierz lotnisko startowe z listy.'
-                );
-            }
-
-            if ($this->publicTransportHubKind !== null && (empty($endAirportLocationId) || ! Location::matchesPurpose((int) $endAirportLocationId, $hubPurpose))) {
-                $this->addError(
-                    'sharedEndAirportLocationId',
-                    $hubPurpose === LocationPurposeType::STATION
-                        ? 'Wybierz dworzec docelowy z listy.'
-                        : 'Wybierz lotnisko docelowe z listy.'
-                );
-            }
-
-            if (! empty($startAirportLocationId) && ! empty($endAirportLocationId) && (int) $startAirportLocationId === (int) $endAirportLocationId) {
-                $this->addError('sharedStartAirportLocationId', 'Punkt startowy i docelowy nie mogą być takie same.');
-                $this->addError('sharedEndAirportLocationId', 'Punkt startowy i docelowy nie mogą być takie same.');
-            }
-
-            // Krok 1: waliduj pola per-pracownik (bez uploadu pliku)
-            foreach ($employeeIds as $employeeId) {
-                $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
-                $amount = $employeeCost['amount'] ?? null;
-                $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
-                $attachment = $employeeCost['attachment'] ?? null;
-
-                if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
-                    $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu dla tego pracownika.');
+                if ($this->publicTransportHubKind === null) {
+                    $this->addError('publicTransportHubKind', 'Wybierz typ punktu: lotnisko lub dworzec.');
                 }
 
-                if (strlen($currency) !== 3) {
-                    $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
-                }
+                $hubPurpose = $this->publicTransportHubKind === 'station'
+                    ? LocationPurposeType::STATION
+                    : LocationPurposeType::AIRPORT;
 
-                if ($attachment) {
-                    $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
-                        ['attachment' => $attachment],
-                        ['attachment' => 'file|max:10240'],
-                        [
-                            'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
-                            'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
-                        ]
+                if ($this->publicTransportHubKind !== null && (empty($startAirportLocationId) || ! Location::matchesPurpose((int) $startAirportLocationId, $hubPurpose))) {
+                    $this->addError(
+                        'sharedStartAirportLocationId',
+                        $hubPurpose === LocationPurposeType::STATION
+                            ? 'Wybierz dworzec startowy z listy.'
+                            : 'Wybierz lotnisko startowe z listy.'
                     );
-                    if ($attachmentValidator->fails()) {
-                        foreach ($attachmentValidator->errors()->all() as $message) {
-                            $this->addError("ticketCostsByEmployee.{$employeeId}.attachment", $message);
+                }
+
+                if ($this->publicTransportHubKind !== null && (empty($endAirportLocationId) || ! Location::matchesPurpose((int) $endAirportLocationId, $hubPurpose))) {
+                    $this->addError(
+                        'sharedEndAirportLocationId',
+                        $hubPurpose === LocationPurposeType::STATION
+                            ? 'Wybierz dworzec docelowy z listy.'
+                            : 'Wybierz lotnisko docelowe z listy.'
+                    );
+                }
+
+                if (! empty($startAirportLocationId) && ! empty($endAirportLocationId) && (int) $startAirportLocationId === (int) $endAirportLocationId) {
+                    $this->addError('sharedStartAirportLocationId', 'Punkt startowy i docelowy nie mogą być takie same.');
+                    $this->addError('sharedEndAirportLocationId', 'Punkt startowy i docelowy nie mogą być takie same.');
+                }
+
+                foreach ($employeeIds as $employeeId) {
+                    $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
+                    $amount = $employeeCost['amount'] ?? null;
+                    $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                    $attachment = $employeeCost['attachment'] ?? null;
+
+                    if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
+                        $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu dla tego pracownika.');
+                    }
+
+                    if (strlen($currency) !== 3) {
+                        $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
+                    }
+
+                    if ($attachment) {
+                        $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
+                            ['attachment' => $attachment],
+                            ['attachment' => 'file|max:10240'],
+                            [
+                                'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
+                                'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
+                            ]
+                        );
+                        if ($attachmentValidator->fails()) {
+                            foreach ($attachmentValidator->errors()->all() as $message) {
+                                $this->addError("ticketCostsByEmployee.{$employeeId}.attachment", $message);
+                            }
                         }
                     }
                 }
+
+                if ($this->getErrorBag()->isNotEmpty()) {
+                    return;
+                }
+
+                foreach ($employeeIds as $employeeId) {
+                    $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
+                    $amount = $employeeCost['amount'] ?? null;
+                    $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                    $attachment = $employeeCost['attachment'] ?? null;
+
+                    $attachmentPath = null;
+                    if ($attachment) {
+                        $attachmentPath = $attachment->store('transport_costs', 'public');
+                    }
+
+                    $ticketCostsPerEmployee[$employeeId] = [
+                        'amount' => (float) $amount,
+                        'currency' => $currency,
+                        'attachment_path' => $attachmentPath,
+                        'start_airport_location_id' => (int) $startAirportLocationId,
+                        'end_airport_location_id' => (int) $endAirportLocationId,
+                    ];
+                }
             }
 
-            // Jeśli walidacja nie przeszła — zatrzymaj, pokaż błędy w UI
             if ($this->getErrorBag()->isNotEmpty()) {
                 return;
             }
+        }
 
-            // Krok 2: walidacja OK — uploaduj pliki i buduj tablicę kosztów
-            // Shared airports are copied to every employee
-            foreach ($employeeIds as $employeeId) {
-                $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
-                $amount = $employeeCost['amount'] ?? null;
-                $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
-                $attachment = $employeeCost['attachment'] ?? null;
-
-                $attachmentPath = null;
-                if ($attachment) {
-                    $attachmentPath = $attachment->store('transport_costs', 'public');
-                }
-
-                $ticketCostsPerEmployee[$employeeId] = [
-                    'amount' => (float) $amount,
-                    'currency' => $currency,
-                    'attachment_path' => $attachmentPath,
-                    'start_airport_location_id' => (int) $startAirportLocationId,
-                    'end_airport_location_id' => (int) $endAirportLocationId,
-                ];
-            }
+        $routeDataForSession = is_array($this->routeData) ? $this->routeData : [];
+        if (! empty($this->routeSegments)) {
+            $routeDataForSession['route_segments'] = $this->routeSegments;
+            $routeDataForSession['merged_own_route_waypoints'] = DepartureRoutePlan::mergeOwnSegmentWaypoints($this->routeSegments);
         }
 
         // Zapisz dane w sesji (route_data może być duże, więc lepiej przez sesję)
@@ -936,11 +1227,12 @@ class DeparturePlannerV2 extends Component
                 'assignment_ranges' => $this->assignmentRanges,
                 'vehicle_seats' => ! empty($this->vehicleId) ? $this->vehicleSeats : [],
                 'accommodation_assignments' => $this->accommodationAssignments,
-                // vehicle_assignments (krok 3) są niezależne od sposobu wyjazdu (auto vs transport publiczny)
                 'vehicle_assignments' => $this->vehicleAssignments,
-                'route_data' => $this->routeData, // route_distance, route_duration, route_waypoints, location_stop_notes
-                'ticket_costs_per_employee' => $ticketCostsPerEmployee ?? [],
+                'route_data' => $routeDataForSession,
+                'ticket_costs_per_employee' => $ticketCostsPerEmployee,
+                'ticket_costs_line_items' => $ticketCostsLineItems,
                 'transfer_config' => ! empty($this->vehicleId) ? [] : $this->transferConfig,
+                'transfer_configs_list' => $transferConfigsList,
             ],
         ]);
 
@@ -990,6 +1282,12 @@ class DeparturePlannerV2 extends Component
             ->get();
     }
 
+    /** Dla kroku 4 (np. bilety na odcinki ziemne transportu publicznego). */
+    public function getSelectedEmployeeIdsProperty(): array
+    {
+        return $this->getSelectedEmployeeIds();
+    }
+
     public function getAvailableLocationsProperty()
     {
         return Location::orderBy('name')->get();
@@ -1013,17 +1311,17 @@ class DeparturePlannerV2 extends Component
 
     public function updatedPublicTransportHubKind(): void
     {
-        if ($this->publicTransportHubKind === null) {
-            return;
+        if ($this->publicTransportHubKind !== null) {
+            $ids = $this->availablePublicTransportHubs->pluck('id')->map(fn ($id) => (int) $id)->all();
+            if (! empty($this->sharedStartAirportLocationId) && ! in_array((int) $this->sharedStartAirportLocationId, $ids, true)) {
+                $this->sharedStartAirportLocationId = null;
+            }
+            if (! empty($this->sharedEndAirportLocationId) && ! in_array((int) $this->sharedEndAirportLocationId, $ids, true)) {
+                $this->sharedEndAirportLocationId = null;
+            }
         }
 
-        $ids = $this->availablePublicTransportHubs->pluck('id')->map(fn ($id) => (int) $id)->all();
-        if (! empty($this->sharedStartAirportLocationId) && ! in_array((int) $this->sharedStartAirportLocationId, $ids, true)) {
-            $this->sharedStartAirportLocationId = null;
-        }
-        if (! empty($this->sharedEndAirportLocationId) && ! in_array((int) $this->sharedEndAirportLocationId, $ids, true)) {
-            $this->sharedEndAirportLocationId = null;
-        }
+        $this->pushAirportsToFirstPublicSegment();
     }
 
     /** Wraca do wyboru typu punktu (lotnisko/dworzec); czyści wybrane lokalizacje. */
@@ -1111,16 +1409,21 @@ class DeparturePlannerV2 extends Component
             return ! $routeOk;
         }
 
+        $fromSeg = DepartureRoutePlan::primaryPostAirportOwnSegment($this->routeSegments);
+        if ($fromSeg === null) {
+            return false;
+        }
+
         if (! $routeOk) {
             return true;
         }
 
-        $tc = $this->transferConfig;
-        if (! is_array($tc) || empty($tc['vehicle_id']) || empty($tc['driver_employee_id'])) {
-            return true;
+        if (($fromSeg['leg_kind'] ?? 'own') === 'public') {
+            return false;
         }
 
-        if (empty($tc['pickup_location_id'])) {
+        $tc = $this->transferConfig;
+        if (! is_array($tc) || empty($tc['vehicle_id']) || empty($tc['driver_employee_id'])) {
             return true;
         }
 
@@ -1134,6 +1437,14 @@ class DeparturePlannerV2 extends Component
         return strlen($cur) !== 3;
     }
 
+    /** Tytuł sekcji biletów: lotnisko vs dworzec. */
+    public function getPublicTransportTicketsSectionTitleProperty(): string
+    {
+        return $this->publicTransportHubKind === 'airport'
+            ? 'Bilety lotnicze'
+            : 'Bilety';
+    }
+
     /** Bilety w nagłówku: kwota, waluta, załącznik dla każdej osoby. */
     public function getHeaderTicketsIncompleteProperty(): bool
     {
@@ -1141,22 +1452,29 @@ class DeparturePlannerV2 extends Component
             return false;
         }
 
-        foreach ($this->getSelectedEmployeeIds() as $empId) {
-            $t = $this->ticketCostsByEmployee[$empId] ?? [];
-            $amount = $t['amount'] ?? null;
-            if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
-                return true;
+        if (! empty($this->routeSegments)) {
+            foreach ($this->routeSegments as $seg) {
+                if (($seg['mode'] ?? '') !== 'public') {
+                    continue;
+                }
+                $tickets = $seg['ticket_costs_by_employee'] ?? [];
+                if (PublicTransportTicketCosts::areIncompleteForEmployees(
+                    $this->getSelectedEmployeeIds(),
+                    $tickets,
+                    true
+                )) {
+                    return true;
+                }
             }
-            $cur = strtoupper(trim((string) ($t['currency'] ?? 'PLN')));
-            if (strlen($cur) !== 3) {
-                return true;
-            }
-            if (empty($t['attachment'])) {
-                return true;
-            }
+
+            return false;
         }
 
-        return false;
+        return PublicTransportTicketCosts::areIncompleteForEmployees(
+            $this->getSelectedEmployeeIds(),
+            $this->ticketCostsByEmployee,
+            true
+        );
     }
 
     public function render()

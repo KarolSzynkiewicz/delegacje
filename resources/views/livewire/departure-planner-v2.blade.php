@@ -1,4 +1,4 @@
-<div>
+<div data-livewire-preserve-scroll>
     @if($showIncompleteSaveModal)
         @teleport('body')
             <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
@@ -126,161 +126,17 @@
             />
         @endif
 
-        {{-- Bilety (transport publiczny + pracownicy przypisani) --}}
+        {{-- Bilety (transport publiczny + pracownicy przypisani) — wspólny komponent z planerem zjazdu --}}
         @if($transportMode === 'public' && $this->selectedEmployees->isNotEmpty())
-            @php $ticketsIncomplete = $this->headerTicketsIncomplete; @endphp
-            <div class="mt-3 pt-3 rounded-3 px-2 py-2 px-md-3 transition-all"
-                 style="border-top: 1px solid rgba(255,255,255,0.08);
-                        {{ $ticketsIncomplete ? 'border: 1px solid rgba(239,68,68,0.55) !important; background: rgba(239,68,68,0.07); box-shadow: 0 0 0 1px rgba(239,68,68,0.12);' : '' }}">
-                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                    <i class="bi bi-ticket-perforated {{ $ticketsIncomplete ? 'text-danger' : 'text-info' }}" style="font-size:0.9rem;"></i>
-                    <span class="small fw-semibold {{ $ticketsIncomplete ? 'text-danger' : '' }}">Bilety lotnicze</span>
-                </div>
-
-                <style>
-                    /* Inline styles to avoid CSS cache/build issues */
-                    .ticket-grid{
-                        display:grid;
-                        grid-template-columns: repeat(7, minmax(140px, 1fr));
-                        gap: 10px;
-                    }
-                    @media (max-width: 1400px){ .ticket-grid{ grid-template-columns: repeat(5, minmax(140px, 1fr)); } }
-                    @media (max-width: 1100px){ .ticket-grid{ grid-template-columns: repeat(3, minmax(160px, 1fr)); } }
-                    @media (max-width: 700px){ .ticket-grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); } }
-
-                    .ticket-card{
-                        background: rgba(255,255,255,0.04);
-                        border: 1px solid rgba(255,255,255,0.10);
-                        border-radius: 14px;
-                        padding: 10px;
-                        box-shadow: 0 10px 26px rgba(0,0,0,0.20);
-                        min-height: 110px;
-                    }
-                    .ticket-card:hover{
-                        border-color: rgba(59,130,246,0.35);
-                        background: rgba(59,130,246,0.06);
-                    }
-                    .ticket-card.ticket-card--incomplete{
-                        border-color: rgba(239,68,68,0.55) !important;
-                        background: rgba(239,68,68,0.06) !important;
-                        box-shadow: 0 0 0 1px rgba(239,68,68,0.12);
-                    }
-                    .ticket-icon{
-                        width: 28px; height: 28px;
-                        border-radius: 10px;
-                        display:flex; align-items:center; justify-content:center;
-                        background: rgba(34,211,238,0.10);
-                        border: 1px solid rgba(34,211,238,0.25);
-                        color: #67e8f9;
-                        flex: 0 0 auto;
-                    }
-                    .ticket-employee-name{
-                        font-weight: 600;
-                        font-size: .78rem;
-                        display:flex;
-                        gap: 6px;
-                        align-items:center;
-                    }
-                    .ticket-person-icon{ color: rgba(148,163,184,0.9); }
-                    .ticket-subtext{ font-size: .72rem; opacity: .75; }
-                    .ticket-form-row{ display:flex; gap: 8px; align-items: start; }
-                    .ticket-amount{ flex: 1 1 auto; min-width: 0; }
-                    .ticket-currency{ flex: 0 0 68px; }
-                    .ticket-card .form-control-sm,
-                    .ticket-card .form-select-sm{
-                        border-radius: 10px !important;
-                        font-size: .75rem !important;
-                        padding: 0.2rem 0.45rem !important;
-                    }
-                    .ticket-file-input{
-                        position:absolute !important;
-                        left:-9999px !important;
-                        width:1px !important;
-                        height:1px !important;
-                        opacity:0 !important;
-                    }
-                    .ticket-attach-btn{
-                        width: 30px; height: 30px;
-                        border-radius: 12px;
-                        display:flex; align-items:center; justify-content:center;
-                        background: rgba(255,255,255,0.06);
-                        border: 1px solid rgba(255,255,255,0.12);
-                        color: rgba(148,163,184,0.95);
-                        cursor: pointer;
-                        transition: all .15s ease;
-                        flex: 0 0 auto;
-                    }
-                    .ticket-attach-btn:hover{
-                        background: rgba(59,130,246,0.10);
-                        border-color: rgba(59,130,246,0.35);
-                        color: #93c5fd;
-                    }
-                    .ticket-attach-btn.is-attached{
-                        background: rgba(16,185,129,0.12);
-                        border-color: rgba(16,185,129,0.35);
-                        color: #6ee7b7;
-                    }
-                </style>
-
-                <div class="ticket-grid">
-                    @foreach($this->selectedEmployees as $employee)
-                        @php
-                            $ticket = $ticketCostsByEmployee[$employee->id] ?? [];
-                            $hasAttachment = !empty($ticket['attachment']);
-                            $fileInputId = 'ticket-attachment-'.$employee->id;
-                            $amt = $ticket['amount'] ?? null;
-                            $cur = strtoupper(trim((string) ($ticket['currency'] ?? 'PLN')));
-                            $ticketRowIncomplete = $amt === null || $amt === '' || !is_numeric($amt) || (float) $amt <= 0
-                                || strlen($cur) !== 3
-                                || !$hasAttachment;
-                        @endphp
-                        <div class="ticket-card {{ $ticketRowIncomplete ? 'ticket-card--incomplete' : '' }}" wire:key="header-ticket-{{ $employee->id }}">
-                            <div class="ticket-employee-name" title="{{ $employee->full_name }}">
-                                <span class="ticket-person-icon"><i class="bi bi-person-circle"></i></span>
-                                <span class="text-truncate d-inline-block" style="max-width: 110px;">{{ $employee->full_name }}</span>
-                            </div>
-
-                            <div class="ticket-form-row mt-2">
-                                <div class="ticket-amount">
-                                    <input type="number" step="0.01" min="0"
-                                           wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.amount"
-                                           class="form-control form-control-sm @error('ticketCostsByEmployee.'.$employee->id.'.amount') is-invalid @enderror"
-                                           placeholder="0.00">
-                                    @error('ticketCostsByEmployee.'.$employee->id.'.amount')
-                                        <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                                <div class="ticket-currency">
-                                    <select wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.currency" class="form-select form-select-sm">
-                                        <option value="PLN">PLN</option>
-                                        <option value="EUR">EUR</option>
-                                        <option value="USD">USD</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="mt-2 d-flex align-items-center justify-content-between gap-2">
-                                <label class="ticket-attach-btn {{ $hasAttachment ? 'is-attached' : '' }}"
-                                       for="{{ $fileInputId }}"
-                                       title="{{ $hasAttachment ? 'Załącznik dodany (kliknij aby zmienić)' : 'Dodaj załącznik' }}">
-                                    <i class="bi bi-paperclip"></i>
-                                </label>
-                                <span class="small text-muted text-truncate" style="font-size:.72rem; max-width: 180px;">
-                                    @if($hasAttachment)
-                                        Załącznik dodany
-                                    @else
-                                        Dodaj bilet
-                                    @endif
-                                </span>
-                                <input id="{{ $fileInputId }}"
-                                       type="file"
-                                       wire:model="ticketCostsByEmployee.{{ $employee->id }}.attachment"
-                                       class="ticket-file-input">
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
+            <x-logistics.public-transport-tickets
+                variant="cards"
+                :section-title="$this->publicTransportTicketsSectionTitle"
+                :employees="$this->selectedEmployees"
+                :ticket-costs-by-employee="$ticketCostsByEmployee"
+                :tickets-incomplete="$this->headerTicketsIncomplete"
+                :require-attachment="true"
+                wire-key-prefix="header-ticket"
+            />
         @endif
     </x-ui.card>
 
@@ -406,7 +262,10 @@
                 :initial-route-duration="data_get($routeData, 'route_duration')"
                 :initial-route-manual="(bool) data_get($routeData, 'route_distance_is_manual', false)"
                 :initial-transfer-config="$transferConfig"
-                key="step4-{{ $departureDate }}-{{ $transportMode }}-{{ md5(json_encode(data_get($routeData, 'route_waypoints', []))) }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}-{{ $sharedStartAirportLocationId }}-{{ $sharedEndAirportLocationId }}"
+                :initial-route-segments="$routeSegments"
+                :selected-employee-ids="$this->selectedEmployeeIds"
+                {{-- Bez hashu segmentów / waypointów: aktualizacja trasy z kroku 4 zmieniałaby key i remountowała komponent — znikałyby m.in. otwarte modale. --}}
+                key="step4-{{ $departureDate }}-{{ $transportMode }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}-{{ $sharedStartAirportLocationId }}-{{ $sharedEndAirportLocationId }}"
             />
         </x-logistics.route-planning-frame>
     @endif

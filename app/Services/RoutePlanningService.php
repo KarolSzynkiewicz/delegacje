@@ -212,6 +212,91 @@ class RoutePlanningService
     }
 
     /**
+     * Trasa po kolejnych punktach (np. baza → przystanki → lotnisko albo pierwszy przystanek → … → lotnisko).
+     *
+     * @param  list<Location>  $locations  Co najmniej 2 lokalizacje w kolejności przejazdu
+     * @return array|null ['distance' => float km, 'duration' => int seconds, ...]
+     */
+    public function planRouteAlongOrderedLocations(array $locations, array $options = []): ?array
+    {
+        if (count($locations) < 2) {
+            return null;
+        }
+        foreach ($locations as $location) {
+            if (! method_exists($location, 'hasCoordinates') || ! $location->hasCoordinates()) {
+                Log::warning('Cannot plan ordered route: location missing coordinates', [
+                    'location_id' => $location->id ?? 'unknown',
+                ]);
+
+                return null;
+            }
+        }
+
+        $profile = $options['profile'] ?? 'driving-car';
+        $coordinates = [];
+        foreach ($locations as $location) {
+            $coords = $location->getCoordinates();
+            $coordinates[] = [$coords[1], $coords[0]];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $this->apiKey,
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/directions/{$profile}", [
+                'coordinates' => $coordinates,
+                'format' => 'json',
+                'geometry' => true,
+                'instructions' => true,
+                'extra_info' => [
+                    'steepness',
+                    'waytype',
+                    'surface',
+                    'waycategory',
+                    'tollways',
+                ],
+            ]);
+
+            if (! $response->successful()) {
+                Log::error('Ordered route planning failed', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                    'points' => count($coordinates),
+                ]);
+
+                return null;
+            }
+
+            $data = $response->json();
+
+            if (empty($data['routes'])) {
+                Log::warning('Ordered route: no routes', [
+                    'points' => count($coordinates),
+                ]);
+
+                return null;
+            }
+
+            $route = $data['routes'][0];
+            $summary = $route['summary'];
+
+            return [
+                'distance' => $summary['distance'] / 1000,
+                'duration' => $summary['duration'],
+                'geometry' => $route['geometry'] ?? null,
+                'segments' => $route['segments'] ?? [],
+                'way_points' => $route['way_points'] ?? [],
+            ];
+        } catch (\Exception $e) {
+            Log::error('Ordered route planning exception', [
+                'message' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Calculate distance and duration between two locations.
      *
      * @return array|null ['distance' => float (km), 'duration' => int (seconds)]

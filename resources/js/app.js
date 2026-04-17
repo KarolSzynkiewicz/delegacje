@@ -2,6 +2,52 @@ import './bootstrap';
 import 'bootstrap'; // Bootstrap JS (dla modals, dropdowns, etc.)
 
 /**
+ * Livewire po morphowaniu DOM potrafi „zsunąć” stronę w dół (focus / przeliczenie layoutu).
+ * Przywracamy scroll okna po udanym commicie tylko dla komponentów oznaczonych
+ * `data-livewire-preserve-scroll` (np. planery wyjazdu — długie formularze).
+ * Dodatkowo `morph.updated` — morph bywa kończony po callbacku `succeed`.
+ */
+document.addEventListener('livewire:init', () => {
+    let preserveScrollPending = null;
+
+    const restorePreserveScroll = () => {
+        if (!preserveScrollPending) {
+            return;
+        }
+        const { x, y } = preserveScrollPending;
+        window.scrollTo(x, y);
+    };
+
+    Livewire.hook('commit', ({ component, succeed }) => {
+        if (!component?.el?.closest?.('[data-livewire-preserve-scroll]')) {
+            return;
+        }
+        const pos = { x: window.scrollX, y: window.scrollY };
+        preserveScrollPending = pos;
+        succeed(() => {
+            const run = () => {
+                restorePreserveScroll();
+                queueMicrotask(restorePreserveScroll);
+                requestAnimationFrame(() => {
+                    restorePreserveScroll();
+                    requestAnimationFrame(restorePreserveScroll);
+                });
+                setTimeout(restorePreserveScroll, 0);
+            };
+            run();
+        });
+    });
+
+    Livewire.hook('morph.updated', ({ component }) => {
+        if (!component?.el?.closest?.('[data-livewire-preserve-scroll]')) {
+            return;
+        }
+        restorePreserveScroll();
+        requestAnimationFrame(restorePreserveScroll);
+    });
+});
+
+/**
  * NIE przenosimy `.modal-portal-to-body` na document.body.
  * appendChild(portal) wyrywa modal z drzewa DOM komponentu Livewire — wtedy
  * `wire:click` / `closest('[wire:id]')` nie znajduje komponentu i przestają

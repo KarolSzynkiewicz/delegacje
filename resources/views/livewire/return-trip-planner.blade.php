@@ -1,4 +1,4 @@
-<div>
+<div data-livewire-preserve-scroll>
     @if($showTransportSwitchModal && $pendingTransportMode)
         @teleport('body')
             <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
@@ -164,62 +164,16 @@
             {{-- Koszty biletów (transport publiczny) --}}
             @if($this->isPublicTransport && $this->selectedEmployees->isNotEmpty())
                 <div class="rtp-section mb-3">
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <div class="rounded-circle d-flex align-items-center justify-content-center"
-                             style="width: 32px; height: 32px; background: rgba(59,130,246,0.2);">
-                            <i class="bi bi-ticket-perforated text-info" style="font-size: 0.85rem;"></i>
-                        </div>
-                        <h6 class="mb-0 fw-semibold">Bilety lotnicze</h6>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0" style="font-size: 0.875rem;">
-                            <thead>
-                                <tr class="text-muted" style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em;">
-                                    <th class="fw-semibold ps-0">Pracownik</th>
-                                    <th class="fw-semibold">Kwota</th>
-                                    <th class="fw-semibold">Waluta</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($this->selectedEmployees as $employee)
-                                    <tr wire:key="ticket-{{ $employee->id }}">
-                                        <td class="ps-0 align-middle">
-                                            <div class="d-flex align-items-center gap-2">
-                                                @if($employee->image_url)
-                                                    <img src="{{ $employee->image_url }}" class="rtp-avatar" style="width:28px;height:28px;" alt="">
-                                                @else
-                                                    <div class="rtp-avatar-placeholder" style="width:28px;height:28px;font-size:0.65rem;">
-                                                        {{ mb_strtoupper(mb_substr($employee->first_name,0,1).mb_substr($employee->last_name,0,1)) }}
-                                                    </div>
-                                                @endif
-                                                <span class="fw-semibold">{{ $employee->full_name }}</span>
-                                            </div>
-                                        </td>
-                                        <td class="align-middle" style="min-width: 110px;">
-                                            <input type="number" step="0.01" min="0"
-                                                   wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.amount"
-                                                   class="form-control form-control-sm @error('ticketCostsByEmployee.'.$employee->id.'.amount') is-invalid @enderror"
-                                                   placeholder="0.00">
-                                            @error('ticketCostsByEmployee.'.$employee->id.'.amount')
-                                                <div class="invalid-feedback" style="font-size:0.72rem;">{{ $message }}</div>
-                                            @enderror
-                                        </td>
-                                        <td class="align-middle" style="min-width: 90px;">
-                                            <select wire:model.live="ticketCostsByEmployee.{{ $employee->id }}.currency"
-                                                    class="form-select form-select-sm">
-                                                @foreach($this->currencyCases as $currency)
-                                                    <option value="{{ $currency->value }}" {{ ($ticketCostsByEmployee[$employee->id]['currency'] ?? 'PLN') === $currency->value ? 'selected' : '' }}>
-                                                        {{ $currency->value }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    <x-logistics.public-transport-tickets
+                        variant="table"
+                        :section-title="$this->publicTransportTicketsSectionTitle"
+                        :employees="$this->selectedEmployees"
+                        :ticket-costs-by-employee="$ticketCostsByEmployee"
+                        :tickets-incomplete="$this->headerTicketsIncomplete"
+                        :require-attachment="true"
+                        :currencies="$this->currencyCases"
+                        wire-key-prefix="ticket"
+                    />
                 </div>
             @endif
 

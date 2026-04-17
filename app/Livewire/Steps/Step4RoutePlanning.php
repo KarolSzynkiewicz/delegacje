@@ -10,12 +10,18 @@ use App\Models\Vehicle;
 use App\Services\GeocodingService;
 use App\Services\LocationTrackingService;
 use App\Services\RoutePlanningService;
+use App\Support\PublicTransportTicketCosts;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Reactive;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Step4RoutePlanning extends Component
 {
+    use WithFileUploads;
+
     // Dane otrzymane z rodzica (read-only)
     public $departureDate;
 
@@ -29,6 +35,8 @@ class Step4RoutePlanning extends Component
 
     public $vehicleAssignments = [];
 
+    /** Bilety lotnicze z nagłówka wyjazdu — reactive, żeby przebudowa kroku 4 nie rozjeżdżała załączników względem rodzica. */
+    #[Reactive]
     public $ticketCostsByEmployee = [];
 
     // Shared airports (for public transport)
@@ -45,6 +53,9 @@ class Step4RoutePlanning extends Component
 
     public $routeError = null;
 
+    /** Błędy planowania / walidacji odcinka „na lotnisko” (osobno od routeError = transfer po locie). */
+    public $preRouteError = null;
+
     // Transfer config (only for public transport)
     public $transferVehicleId = null;
 
@@ -56,8 +67,100 @@ class Step4RoutePlanning extends Component
 
     public $transferPickupLocationId = null; // optional: where transfer car departs from before airport
 
-    // Optional manual extra stop (user-added)
+    // Optional manual extra stop (user-added) — tylko tryb własny samochód (nie transport publiczny)
     public $extraStopLocationId = null;
+
+    /** null = nie skonfigurowano karty; public = powszechny; own = pojazd firmy (car/other poniżej) */
+    public ?string $transferToAirportLegKind = null;
+
+    public bool $transferToAirportModePickerOpen = false;
+
+    /** car = liczenie ORS; other = bez km (np. autobus prywatnie) — tylko przy transferToAirportLegKind === 'own' */
+    public string $transferToAirportGroundMode = 'car';
+
+    /** Zwinięty widok po „Zatwierdź” — transfer własny przed lotem, tryb samochód. */
+    public bool $preTransferCarSectionCollapsed = false;
+
+    /** Zwinięty widok po „Zatwierdź” — transfer własny przed lotem, tryb inny transport (bilety). */
+    public bool $preTransferOtherSectionCollapsed = false;
+
+    /** Modal: konfiguracja środka (samochód / inny transport, bilety, pojazd). */
+    public bool $showPreTransferConfigModal = false;
+
+    /**
+     * Roboczy tryb środka w modalu (Samochód / Inny transport).
+     * Osobno od {@see $transferToAirportGroundMode}, żeby przełączanie w oknie nie wywoływało
+     * `updatedTransferToAirportGroundMode` ani nie znikało okna. Zapis do właściwego pola przy „Zatwierdź”.
+     */
+    public ?string $preTransferConfigModalGroundMode = null;
+
+    /** Potwierdzenie przełączenia Samochód ↔ Inny transport w modalu (zeruje dane drugiego typu w tym oknie). */
+    public bool $showPreTransferGroundModeSwitchModal = false;
+
+    /** @var 'car'|'other'|null */
+    public ?string $pendingPreTransferModalGroundMode = null;
+
+    /** Modal: trasa na lotnisko startowe (przystanki / przelicz / km). */
+    public bool $showPreTransferRouteModal = false;
+
+    /** Modal: konfiguracja transferu z lotniska docelowego (własny środek). */
+    public bool $showPostTransferConfigModal = false;
+
+    /** @var 'car'|'other'|null Roboczy tryb w modalu — zapis do {@see} przy „Zatwierdź”. */
+    public ?string $postTransferConfigModalGroundMode = null;
+
+    public bool $showPostTransferGroundModeSwitchModal = false;
+
+    /** @var 'car'|'other'|null */
+    public ?string $pendingPostTransferModalGroundMode = null;
+
+    public bool $postTransferCarSectionCollapsed = false;
+
+    public bool $postTransferOtherSectionCollapsed = false;
+
+    /** Karta „Lotnisko” — opcjonalne podsumowanie (UI); null = pusty stan */
+    public ?string $airportHubLegKind = null;
+
+    public bool $airportHubModePickerOpen = false;
+
+    /**
+     * Kolejność odcinka „na lotnisko”: tokeny `base`, `sap` (lotnisko startowe z nagłówka), `loc:ID`.
+     * Dowolna kolejność — `sap` jest wymagany dokładnie raz (nieusuwalny), `base` opcjonalny.
+     */
+    public array $transferToAirportWaypoints = [];
+
+    public $transferToAirportExtraStopLocationId = null;
+
+    /** Notatki loc: tylko dla przystanków w transferToAirportWaypoints */
+    public array $transferToAirportLocationStopNotes = [];
+
+    /**
+     * Odcinek zawiera token `base` — synchronizowane z transferToAirportWaypoints; zapis do segmentu jako starts_from_base.
+     */
+    public bool $transferToAirportStartsFromBase = true;
+
+    /** Metryki odcinka przed lotem (distance km, duration sek.) */
+    public $preRouteData = null;
+
+    public bool $isManualPreRouteDistance = false;
+
+    public $preManualRouteDistanceKm = null;
+
+    public $preManualRouteDurationMinutes = null;
+
+    /** null = przy pierwszym renderze uzupełniane z tras; public / own — transfer po locie */
+    public ?string $transferFromAirportLegKind = null;
+
+    /**
+     * Czy użytkownik włączył kartę transferu lotnisko docelowe → domy (odpowiada segmentowi from_airport).
+     * false = opcjonalny odcinek pominięty (jak transfer przed lotem) — bez wymuszania km/biletów.
+     */
+    public bool $postAirportTransferUserEnabled = false;
+
+    public bool $transferFromAirportModePickerOpen = false;
+
+    /** Odcinek po locie (own): samochód vs inny transport — przy public ignorowane (jak „inny”) */
+    public string $transferFromAirportGroundMode = 'car';
 
     /** Notatki do przystanków ręcznych (loc) — klucz: id lokalizacji jako string */
     public array $locationStopNotes = [];
@@ -70,6 +173,40 @@ class Step4RoutePlanning extends Component
     public $isManualRouteDistance = false;
 
     public $manualRouteHint = null; // e.g. failing location name from ORS
+
+    /** Segmenty trasy (z rodzica) — kolejność lot ↔ transfer ziemny. */
+    public array $routeSegments = [];
+
+    /** ID pracowników wybranych w wyjeździe (bilety odcinków ziemnych). */
+    public array $selectedEmployeeIds = [];
+
+    /**
+     * Koszty „ziemne” (kwota, waluta, załącznik) — transport publiczny na odcinek przed/po locie.
+     * Struktura jak ticketCostsByEmployee w nagłówku.
+     *
+     * @var array<int|string, array<string, mixed>>
+     */
+    public array $toAirportPublicTicketCostsByEmployee = [];
+
+    /** @var array<int|string, array<string, mixed>> */
+    public array $fromAirportPublicTicketCostsByEmployee = [];
+
+    /** Pojazd/kierowca tylko dla odcinka baza → lotnisko startowe (gdy „Autem”). */
+    public $preTransferVehicleId = null;
+
+    public $preTransferDriverEmployeeId = null;
+
+    public $preTransferDriverBonusAmount = null;
+
+    public $preTransferDriverBonusCurrency = 'PLN';
+
+    /** Inny transport (przed lotem): opis odcinka kolejowy — bez mapy waypointów. */
+    public ?string $preTransferPublicStationStart = null;
+
+    public ?string $preTransferPublicStationEnd = null;
+
+    /** airport | station — z planu trasy (do podpisu karty środkowej). */
+    public ?string $publicTransportHubKind = null;
 
     // Internal IDs (no Eloquent objects as public props)
     public $baseLocationId = null;
@@ -93,7 +230,6 @@ class Step4RoutePlanning extends Component
         $accommodationAssignments = [],
         $assignmentRanges = [],
         $vehicleAssignments = [],
-        $ticketCostsByEmployee = [],
         $sharedStartAirportLocationId = null,
         $sharedEndAirportLocationId = null,
         $initialRouteWaypoints = [],
@@ -102,6 +238,8 @@ class Step4RoutePlanning extends Component
         $initialRouteDuration = null,
         $initialRouteManual = false,
         $initialTransferConfig = [],
+        $initialRouteSegments = [],
+        $selectedEmployeeIds = [],
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
@@ -109,17 +247,23 @@ class Step4RoutePlanning extends Component
         $this->accommodationAssignments = $accommodationAssignments;
         $this->assignmentRanges = $assignmentRanges;
         $this->vehicleAssignments = $vehicleAssignments;
-        $this->ticketCostsByEmployee = $ticketCostsByEmployee;
         $this->sharedStartAirportLocationId = $sharedStartAirportLocationId;
         $this->sharedEndAirportLocationId = $sharedEndAirportLocationId;
+        $this->selectedEmployeeIds = array_values(array_map('intval', is_array($selectedEmployeeIds) ? $selectedEmployeeIds : []));
 
         $this->loadLocations();
 
         $initialRouteWaypoints = is_array($initialRouteWaypoints) ? $initialRouteWaypoints : [];
         $this->locationStopNotes = is_array($initialLocationStopNotes) ? $initialLocationStopNotes : [];
         $initialTransferConfig = is_array($initialTransferConfig) ? $initialTransferConfig : [];
+        $initialRouteSegments = is_array($initialRouteSegments) ? $initialRouteSegments : [];
+        if ($initialRouteSegments !== []) {
+            $this->routeSegments = $initialRouteSegments;
+            $this->hydrateOptionalLegsFromRouteSegments();
+        }
 
         $this->hydrateTransferFieldsFromParent($initialTransferConfig);
+        $this->syncPostTransferCollapsedFromStoredState();
 
         if (! empty($initialRouteWaypoints)) {
             $this->routeWaypoints = array_values($initialRouteWaypoints);
@@ -130,7 +274,7 @@ class Step4RoutePlanning extends Component
         $restored = $this->hydrateRouteMetricsFromParent($initialRouteDistance, $initialRouteDuration, (bool) $initialRouteManual);
 
         // Bez automatycznego wywołania API przy wejściu — użytkownik klika „Przelicz trasę”.
-        if ($restored || ! empty($this->routeWaypoints)) {
+        if ($restored || ! empty($this->routeWaypoints) || ! empty($this->routeSegments)) {
             $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
         }
 
@@ -138,7 +282,7 @@ class Step4RoutePlanning extends Component
     }
 
     /**
-     * Po zmianie przystanków / pickupu: kasuj stare km/czas i zsynchronizuj kolejność do rodzica (bez API).
+     * Po zmianie przystanków odcinka „z lotniska”: kasuj km/czas tego odcinka (bez API).
      */
     protected function invalidateRouteMetricsAndSyncToParent(): void
     {
@@ -148,8 +292,45 @@ class Step4RoutePlanning extends Component
         $this->manualRouteDurationMinutes = null;
         $this->routeError = null;
         $this->manualRouteHint = null;
+        $this->rebuildRouteSegmentsFromUiState();
         $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
         $this->dispatchTransferConfig();
+    }
+
+    /**
+     * Po zmianie przystanków odcinka „na lotnisko”.
+     */
+    protected function invalidatePreRouteMetricsAndSyncToParent(): void
+    {
+        $this->preRouteData = null;
+        $this->isManualPreRouteDistance = false;
+        $this->preManualRouteDistanceKm = null;
+        $this->preManualRouteDurationMinutes = null;
+        $this->preRouteError = null;
+        $this->manualRouteHint = null;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    /**
+     * Po wczytaniu kroku 4 z zapisu: zwinięty widok (jak po „Zatwierdź” w modalu), jeśli dane są kompletne.
+     */
+    protected function syncPostTransferCollapsedFromStoredState(): void
+    {
+        if (! $this->isPublicTransport || ! $this->postAirportTransferUserEnabled) {
+            return;
+        }
+        if (($this->transferFromAirportLegKind ?? null) !== 'own') {
+            return;
+        }
+        if ($this->transferFromAirportGroundMode === 'car') {
+            if (! $this->transferVehicleIncomplete && ! $this->transferDriverIncomplete && ! $this->transferBonusIncomplete) {
+                $this->postTransferCarSectionCollapsed = true;
+            }
+        } elseif (! $this->fromAirportGroundTicketsIncomplete) {
+            $this->postTransferOtherSectionCollapsed = true;
+        }
     }
 
     protected function hydrateTransferFieldsFromParent(array $tc): void
@@ -173,6 +354,595 @@ class Step4RoutePlanning extends Component
         if (array_key_exists('pickup_location_id', $tc) && $tc['pickup_location_id'] !== null && $tc['pickup_location_id'] !== '') {
             $this->transferPickupLocationId = (int) $tc['pickup_location_id'];
         }
+    }
+
+    protected function hydrateOptionalLegsFromRouteSegments(): void
+    {
+        foreach ($this->routeSegments as $seg) {
+            if (($seg['mode'] ?? '') !== 'own') {
+                continue;
+            }
+            $leg = $seg['leg'] ?? '';
+            if ($leg === 'to_airport') {
+                $this->transferToAirportLegKind = $seg['leg_kind'] ?? 'own';
+                $preGm = (($seg['ground_mode'] ?? 'car') === 'other') ? 'other' : 'car';
+                $this->transferToAirportGroundMode = $preGm;
+                $legacyStarts = array_key_exists('starts_from_base', $seg)
+                    ? (bool) $seg['starts_from_base']
+                    : true;
+                $ownOther = ($this->transferToAirportLegKind === 'own' && $preGm === 'other');
+                if ($ownOther) {
+                    $this->transferToAirportWaypoints = [];
+                    $this->transferToAirportLocationStopNotes = [];
+                    $this->transferToAirportStartsFromBase = false;
+                } else {
+                    $this->transferToAirportWaypoints = $this->migratePreTransferWaypointsFromSegment(
+                        array_values($seg['route_waypoints'] ?? []),
+                        $legacyStarts
+                    );
+                    $this->ensureSingleSapInPreTransferWaypoints();
+                    $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+                    $notes = $seg['location_stop_notes'] ?? [];
+                    $this->transferToAirportLocationStopNotes = is_array($notes) ? $notes : [];
+                }
+                $gt = $seg['public_leg_ticket_costs_by_employee'] ?? [];
+                $this->toAirportPublicTicketCostsByEmployee = is_array($gt) ? $gt : [];
+                $preTc = $seg['transfer_config'] ?? [];
+                if (is_array($preTc) && ($this->transferToAirportLegKind ?? 'own') === 'own' && $preGm === 'car') {
+                    if (array_key_exists('vehicle_id', $preTc) && $preTc['vehicle_id'] !== null && $preTc['vehicle_id'] !== '') {
+                        $this->preTransferVehicleId = (int) $preTc['vehicle_id'];
+                    }
+                    if (array_key_exists('driver_employee_id', $preTc) && $preTc['driver_employee_id'] !== null && $preTc['driver_employee_id'] !== '') {
+                        $this->preTransferDriverEmployeeId = (int) $preTc['driver_employee_id'];
+                    }
+                    if (array_key_exists('bonus_amount', $preTc) && $preTc['bonus_amount'] !== null && $preTc['bonus_amount'] !== '') {
+                        $this->preTransferDriverBonusAmount = $preTc['bonus_amount'];
+                    }
+                    if (! empty($preTc['bonus_currency'])) {
+                        $this->preTransferDriverBonusCurrency = (string) $preTc['bonus_currency'];
+                    }
+                }
+                if ($ownOther && is_array($preTc)) {
+                    $this->preTransferPublicStationStart = isset($preTc['public_station_start']) ? (string) $preTc['public_station_start'] : null;
+                    $this->preTransferPublicStationEnd = isset($preTc['public_station_end']) ? (string) $preTc['public_station_end'] : null;
+                } elseif (! $ownOther) {
+                    $this->preTransferPublicStationStart = null;
+                    $this->preTransferPublicStationEnd = null;
+                }
+                $m = $seg['route_metrics'] ?? null;
+                if (is_array($m) && isset($m['distance'], $m['duration'])) {
+                    $this->preRouteData = [
+                        'distance' => (float) $m['distance'],
+                        'duration' => (int) $m['duration'],
+                    ];
+                    $this->isManualPreRouteDistance = (bool) ($m['is_manual'] ?? false);
+                    $this->syncPreManualFieldsFromPreRouteData();
+                }
+            }
+            if ($leg === 'from_airport' || $leg === '') {
+                $this->transferFromAirportLegKind = $seg['leg_kind'] ?? 'own';
+                $this->transferFromAirportGroundMode = (($seg['ground_mode'] ?? 'car') === 'other') ? 'other' : 'car';
+                $gf = $seg['public_leg_ticket_costs_by_employee'] ?? [];
+                $this->fromAirportPublicTicketCostsByEmployee = is_array($gf) ? $gf : [];
+                $fromTc = $seg['transfer_config'] ?? [];
+                if (is_array($fromTc) && array_key_exists('pickup_location_id', $fromTc) && $fromTc['pickup_location_id'] !== null && $fromTc['pickup_location_id'] !== '') {
+                    $this->transferPickupLocationId = (int) $fromTc['pickup_location_id'];
+                }
+            }
+        }
+
+        $this->postAirportTransferUserEnabled = $this->detectPostAirportSegmentInRouteSegments();
+    }
+
+    /** Czy w planie jest segment „ziemny” po locie (lotnisko docelowe → domy). */
+    protected function detectPostAirportSegmentInRouteSegments(): bool
+    {
+        foreach ($this->routeSegments as $seg) {
+            if (($seg['mode'] ?? '') !== 'own') {
+                continue;
+            }
+            $leg = $seg['leg'] ?? '';
+            if ($leg === 'to_airport') {
+                continue;
+            }
+            if ($leg === 'from_airport' || $leg === '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function syncPreManualFieldsFromPreRouteData(): void
+    {
+        if (empty($this->preRouteData) || ! isset($this->preRouteData['distance'], $this->preRouteData['duration'])) {
+            return;
+        }
+        $this->preManualRouteDistanceKm = round((float) $this->preRouteData['distance'], 3);
+        $secs = (int) $this->preRouteData['duration'];
+        $this->preManualRouteDurationMinutes = max(1, (int) round($secs / 60));
+    }
+
+    /**
+     * @param  list<string>  $raw
+     * @return list<string>
+     */
+    protected function migratePreTransferWaypointsFromSegment(array $raw, ?bool $legacyStartsFromBase): array
+    {
+        $raw = array_values(array_filter(array_map(
+            static fn ($w) => ($w === null || $w === '') ? null : (string) $w,
+            $raw
+        )));
+        $hasSap = in_array('sap', $raw, true);
+        $hasBaseToken = in_array('base', $raw, true);
+        $onlyLegacyLocs = ! $hasSap && ! $hasBaseToken
+            && (empty($raw) || collect($raw)->every(fn ($k) => str_starts_with((string) $k, 'loc:')));
+        if ($onlyLegacyLocs) {
+            if ($raw === []) {
+                return ($legacyStartsFromBase ?? true) ? ['base', 'sap'] : ['sap'];
+            }
+            if ($legacyStartsFromBase ?? true) {
+                return array_merge(['base'], $raw, ['sap']);
+            }
+
+            return array_merge($raw, ['sap']);
+        }
+        if ($raw === []) {
+            return ['base', 'sap'];
+        }
+        if (! $hasSap) {
+            $raw[] = 'sap';
+        }
+
+        return $this->dedupeSapTokens(array_values($raw));
+    }
+
+    /**
+     * @param  list<string>  $raw
+     * @return list<string>
+     */
+    protected function dedupeSapTokens(array $raw): array
+    {
+        $out = [];
+        $keptSap = false;
+        foreach ($raw as $k) {
+            $k = (string) $k;
+            if ($k === 'sap') {
+                if ($keptSap) {
+                    continue;
+                }
+                $keptSap = true;
+            }
+            $out[] = $k;
+        }
+
+        return array_values($out);
+    }
+
+    protected function ensureSingleSapInPreTransferWaypoints(): void
+    {
+        $wps = $this->transferToAirportWaypoints;
+        $sapCount = 0;
+        foreach ($wps as $k) {
+            if ((string) $k === 'sap') {
+                $sapCount++;
+            }
+        }
+        if ($sapCount === 0) {
+            $this->transferToAirportWaypoints[] = 'sap';
+            $this->transferToAirportWaypoints = array_values($this->transferToAirportWaypoints);
+
+            return;
+        }
+        if ($sapCount > 1) {
+            $this->transferToAirportWaypoints = $this->dedupeSapTokens($wps);
+        }
+    }
+
+    protected function syncTransferToAirportStartsFromBaseFromWaypoints(): void
+    {
+        $this->transferToAirportStartsFromBase = in_array('base', $this->transferToAirportWaypoints, true);
+    }
+
+    /**
+     * Składa routeSegments z UI (lot + opcjonalny transfer przed lotem + transfer po locie).
+     */
+    protected function rebuildRouteSegmentsFromUiState(): void
+    {
+        if (! $this->isPublicTransport) {
+            return;
+        }
+
+        $publicSeg = null;
+        foreach ($this->routeSegments as $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                $publicSeg = $seg;
+
+                break;
+            }
+        }
+        if ($publicSeg === null) {
+            return;
+        }
+
+        $publicSeg['hub_kind'] = $publicSeg['hub_kind'] ?? null;
+        $this->publicTransportHubKind = $publicSeg['hub_kind'];
+        $publicSeg['start_location_id'] = $this->sharedStartAirportLocationId;
+        $publicSeg['end_location_id'] = $this->sharedEndAirportLocationId;
+
+        // Lot (segment publiczny): bilety z nagłówka — nie mieszają się z transferami ziemnymi; bez tego segment tracił
+        // ticket_costs_by_employee przy zmianie trybu transferu na lotnisko i rodzic nadpisywał nagłówek pustą tablicą.
+        $publicSeg['ticket_costs_by_employee'] = $this->mergePublicFlightTicketCostsForSegment(
+            is_array($publicSeg['ticket_costs_by_employee'] ?? null) ? $publicSeg['ticket_costs_by_employee'] : [],
+            is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : []
+        );
+
+        $fromSeg = null;
+        if ($this->postAirportTransferUserEnabled) {
+            $fromId = null;
+            foreach ($this->routeSegments as $seg) {
+                if (($seg['mode'] ?? '') === 'own' && (($seg['leg'] ?? '') === 'from_airport' || ($seg['leg'] ?? '') === '')) {
+                    $fromId = $seg['id'] ?? null;
+
+                    break;
+                }
+            }
+            if ($fromId === null) {
+                $fromId = (string) Str::uuid();
+            }
+
+            $postKind = $this->transferFromAirportLegKind
+                ?? (count($this->routeWaypoints) > 0 ? 'own' : 'public');
+            $fromGround = ($postKind === 'public') ? 'other' : $this->transferFromAirportGroundMode;
+
+            $fromSeg = [
+                'id' => $fromId,
+                'mode' => 'own',
+                'leg' => 'from_airport',
+                'leg_kind' => $postKind,
+                'ground_mode' => $fromGround,
+                'route_waypoints' => array_values($this->routeWaypoints),
+                'location_stop_notes' => $this->getLocationStopNotesPayload(),
+                'transfer_config' => ($postKind === 'own' && $this->transferFromAirportGroundMode === 'car')
+                    ? $this->buildTransferConfigSnapshot()
+                    : [],
+                'route_metrics' => null,
+                'public_leg_ticket_costs_by_employee' => ($postKind === 'public'
+                    || ($postKind === 'own' && $this->transferFromAirportGroundMode === 'other'))
+                    ? $this->fromAirportPublicTicketCostsByEmployee
+                    : [],
+            ];
+            if (is_array($this->routeData) && isset($this->routeData['distance'], $this->routeData['duration'])) {
+                $fromSeg['route_metrics'] = [
+                    'distance' => (float) $this->routeData['distance'],
+                    'duration' => (int) $this->routeData['duration'],
+                    'is_manual' => (bool) $this->isManualRouteDistance,
+                ];
+            }
+        }
+
+        if ($this->transferToAirportLegKind !== null) {
+            $ownCarPre = $this->transferToAirportLegKind === 'own' && $this->transferToAirportGroundMode === 'car';
+            if ($ownCarPre) {
+                $this->ensureSingleSapInPreTransferWaypoints();
+                $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+            }
+
+            $toId = null;
+            foreach ($this->routeSegments as $seg) {
+                if (($seg['mode'] ?? '') === 'own' && ($seg['leg'] ?? '') === 'to_airport') {
+                    $toId = $seg['id'] ?? null;
+
+                    break;
+                }
+            }
+            if ($toId === null) {
+                $toId = (string) Str::uuid();
+            }
+
+            $preKind = $this->transferToAirportLegKind;
+            $preGround = ($preKind === 'public') ? 'other' : $this->transferToAirportGroundMode;
+
+            $toSeg = [
+                'id' => $toId,
+                'mode' => 'own',
+                'leg' => 'to_airport',
+                'leg_kind' => $preKind,
+                'ground_mode' => $preGround,
+                'route_waypoints' => array_values($this->transferToAirportWaypoints),
+                'location_stop_notes' => $this->getPreLocationStopNotesPayload(),
+                'transfer_config' => ($preKind === 'own' && $this->transferToAirportGroundMode === 'car')
+                    ? $this->buildPreAirportTransferConfigSnapshot()
+                    : (($preKind === 'own' && $this->transferToAirportGroundMode === 'other')
+                        ? $this->buildPreAirportPublicOtherTransferConfigSnapshot()
+                        : []),
+                'route_metrics' => null,
+                'public_leg_ticket_costs_by_employee' => ($preKind === 'public'
+                    || ($preKind === 'own' && $this->transferToAirportGroundMode === 'other'))
+                    ? $this->toAirportPublicTicketCostsByEmployee
+                    : [],
+                'starts_from_base' => $this->transferToAirportStartsFromBase,
+            ];
+            if (is_array($this->preRouteData) && isset($this->preRouteData['distance'], $this->preRouteData['duration'])) {
+                $toSeg['route_metrics'] = [
+                    'distance' => (float) $this->preRouteData['distance'],
+                    'duration' => (int) $this->preRouteData['duration'],
+                    'is_manual' => (bool) $this->isManualPreRouteDistance,
+                ];
+            }
+
+            $pieces = [$toSeg, $publicSeg];
+            if ($fromSeg !== null) {
+                $pieces[] = $fromSeg;
+            }
+            $this->routeSegments = $pieces;
+        } else {
+            $pieces = [$publicSeg];
+            if ($fromSeg !== null) {
+                $pieces[] = $fromSeg;
+            }
+            $this->routeSegments = $pieces;
+        }
+    }
+
+    /**
+     * @param  array<int|string, array<string, mixed>>  $fromSegment
+     * @param  array<int|string, array<string, mixed>>  $fromHeader
+     * @return array<int|string, array<string, mixed>>
+     */
+    protected function mergePublicFlightTicketCostsForSegment(array $fromSegment, array $fromHeader): array
+    {
+        if ($fromHeader !== []) {
+            return $fromHeader;
+        }
+
+        return $fromSegment;
+    }
+
+    protected function getPreLocationStopNotesPayload(): array
+    {
+        $out = [];
+        foreach ($this->transferToAirportWaypoints as $key) {
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc') {
+                $id = (string) $p['id'];
+                $out[$id] = trim((string) ($this->transferToAirportLocationStopNotes[$id] ?? ''));
+            }
+        }
+
+        return $out;
+    }
+
+    protected function buildPreAirportTransferConfigSnapshot(): array
+    {
+        return [
+            'vehicle_id' => $this->preTransferVehicleId,
+            'driver_employee_id' => $this->preTransferDriverEmployeeId,
+            'bonus_amount' => $this->preTransferDriverBonusAmount,
+            'bonus_currency' => $this->preTransferDriverBonusCurrency,
+            'pickup_location_id' => null,
+            'route_distance' => is_array($this->preRouteData) ? ($this->preRouteData['distance'] ?? null) : null,
+            'route_duration' => is_array($this->preRouteData) ? ($this->preRouteData['duration'] ?? null) : null,
+            'route_waypoints' => $this->transferToAirportWaypoints,
+            'location_stop_notes' => $this->getPreLocationStopNotesPayload(),
+            'end_airport_location_id' => $this->sharedStartAirportLocationId,
+            'route_distance_is_manual' => (bool) $this->isManualPreRouteDistance,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildPreAirportPublicOtherTransferConfigSnapshot(): array
+    {
+        return [
+            'public_station_start' => mb_substr(trim((string) ($this->preTransferPublicStationStart ?? '')), 0, 500),
+            'public_station_end' => mb_substr(trim((string) ($this->preTransferPublicStationEnd ?? '')), 0, 500),
+        ];
+    }
+
+    protected function buildTransferConfigSnapshot(): array
+    {
+        return [
+            'vehicle_id' => $this->transferVehicleId,
+            'driver_employee_id' => $this->transferDriverEmployeeId,
+            'bonus_amount' => $this->transferDriverBonusAmount,
+            'bonus_currency' => $this->transferDriverBonusCurrency,
+            'pickup_location_id' => $this->transferPickupLocationId ? (int) $this->transferPickupLocationId : null,
+            'route_distance' => $this->routeData['distance'] ?? null,
+            'route_duration' => $this->routeData['duration'] ?? null,
+            'route_waypoints' => $this->routeWaypoints,
+            'location_stop_notes' => $this->getLocationStopNotesPayload(),
+            'end_airport_location_id' => $this->sharedEndAirportLocationId,
+            'route_distance_is_manual' => (bool) $this->isManualRouteDistance,
+        ];
+    }
+
+    public function addTransferToAirportCard(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== null) {
+            return;
+        }
+        $this->transferToAirportModePickerOpen = true;
+    }
+
+    public function cancelTransferToAirportPicker(): void
+    {
+        $this->transferToAirportModePickerOpen = false;
+    }
+
+    public function selectTransferToAirportLegKind(string $kind): void
+    {
+        if (! $this->isPublicTransport || ! in_array($kind, ['public', 'own'], true)) {
+            return;
+        }
+        $this->preTransferCarSectionCollapsed = false;
+        $this->preTransferOtherSectionCollapsed = false;
+        $this->transferToAirportLegKind = $kind;
+        $this->transferToAirportModePickerOpen = false;
+        if ($kind === 'own') {
+            $this->transferToAirportGroundMode = 'car';
+            $this->toAirportPublicTicketCostsByEmployee = [];
+            $this->preTransferConfigModalGroundMode = 'car';
+            $this->transferToAirportStartsFromBase = true;
+            $this->showPreTransferGroundModeSwitchModal = false;
+            $this->pendingPreTransferModalGroundMode = null;
+            $this->showPreTransferConfigModal = true;
+        } else {
+            $this->transferToAirportGroundMode = 'other';
+            $this->preTransferVehicleId = null;
+            $this->preTransferDriverEmployeeId = null;
+            $this->preTransferDriverBonusAmount = null;
+            $this->showPreTransferConfigModal = false;
+            $this->showPreTransferRouteModal = false;
+            $this->preTransferConfigModalGroundMode = null;
+            $this->invalidatePreRouteMetricsAndSyncToParent();
+
+            return;
+        }
+        $this->transferToAirportWaypoints = ['base', 'sap'];
+        $this->ensureSingleSapInPreTransferWaypoints();
+        $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        $this->preRouteData = null;
+        $this->isManualPreRouteDistance = false;
+        $this->preRouteError = null;
+        $this->preTransferPublicStationStart = null;
+        $this->preTransferPublicStationEnd = null;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function removeTransferToAirportCard(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind === null) {
+            return;
+        }
+        $this->preTransferCarSectionCollapsed = false;
+        $this->preTransferOtherSectionCollapsed = false;
+        $this->showPreTransferConfigModal = false;
+        $this->showPreTransferRouteModal = false;
+        $this->showPreTransferGroundModeSwitchModal = false;
+        $this->pendingPreTransferModalGroundMode = null;
+        $this->preTransferConfigModalGroundMode = null;
+        $this->transferToAirportLegKind = null;
+        $this->transferToAirportModePickerOpen = false;
+        $this->transferToAirportWaypoints = [];
+        $this->transferToAirportStartsFromBase = true;
+        $this->transferToAirportLocationStopNotes = [];
+        $this->toAirportPublicTicketCostsByEmployee = [];
+        $this->preTransferVehicleId = null;
+        $this->preTransferDriverEmployeeId = null;
+        $this->preTransferDriverBonusAmount = null;
+        $this->preRouteData = null;
+        $this->isManualPreRouteDistance = false;
+        $this->preRouteError = null;
+        $this->preTransferPublicStationStart = null;
+        $this->preTransferPublicStationEnd = null;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function addAirportHubCard(): void
+    {
+        if (! $this->isPublicTransport || $this->airportHubLegKind !== null) {
+            return;
+        }
+        $this->airportHubModePickerOpen = true;
+    }
+
+    public function cancelAirportHubPicker(): void
+    {
+        $this->airportHubModePickerOpen = false;
+    }
+
+    public function selectAirportHubLegKind(string $kind): void
+    {
+        if (! $this->isPublicTransport || ! in_array($kind, ['public', 'own'], true)) {
+            return;
+        }
+        $this->airportHubLegKind = $kind;
+        $this->airportHubModePickerOpen = false;
+    }
+
+    public function removeAirportHubCard(): void
+    {
+        $this->airportHubLegKind = null;
+        $this->airportHubModePickerOpen = false;
+    }
+
+    public function addTransferFromAirportCard(): void
+    {
+        if (! $this->isPublicTransport) {
+            return;
+        }
+        $this->postAirportTransferUserEnabled = true;
+        $this->transferFromAirportModePickerOpen = true;
+    }
+
+    public function cancelTransferFromAirportPicker(): void
+    {
+        $this->transferFromAirportModePickerOpen = false;
+    }
+
+    public function selectTransferFromAirportLegKind(string $kind): void
+    {
+        if (! $this->isPublicTransport || ! in_array($kind, ['public', 'own'], true)) {
+            return;
+        }
+        $this->postAirportTransferUserEnabled = true;
+        $this->transferFromAirportLegKind = $kind;
+        $this->transferFromAirportModePickerOpen = false;
+        if ($kind === 'own') {
+            $this->transferFromAirportGroundMode = 'car';
+            $this->fromAirportPublicTicketCostsByEmployee = [];
+            $this->postTransferConfigModalGroundMode = 'car';
+            $this->postTransferCarSectionCollapsed = false;
+            $this->postTransferOtherSectionCollapsed = false;
+            $this->showPostTransferGroundModeSwitchModal = false;
+            $this->pendingPostTransferModalGroundMode = null;
+            $this->showPostTransferConfigModal = true;
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+
+            return;
+        }
+
+        $this->transferFromAirportGroundMode = 'other';
+        $this->transferVehicleId = null;
+        $this->transferDriverEmployeeId = null;
+        $this->transferDriverBonusAmount = null;
+        $this->fromAirportPublicTicketCostsByEmployee = [];
+        $this->postTransferCarSectionCollapsed = false;
+        $this->postTransferOtherSectionCollapsed = false;
+        $this->showPostTransferConfigModal = false;
+        $this->postTransferConfigModalGroundMode = null;
+        $this->invalidateRouteMetricsAndSyncToParent();
+    }
+
+    public function removeTransferFromAirportCard(): void
+    {
+        if (! $this->isPublicTransport) {
+            return;
+        }
+        $this->postAirportTransferUserEnabled = false;
+        $this->transferFromAirportModePickerOpen = false;
+        $this->transferFromAirportLegKind = null;
+        $this->transferFromAirportGroundMode = 'car';
+        $this->transferVehicleId = null;
+        $this->transferDriverEmployeeId = null;
+        $this->transferDriverBonusAmount = null;
+        $this->transferPickupLocationId = null;
+        $this->fromAirportPublicTicketCostsByEmployee = [];
+        $this->showPostTransferConfigModal = false;
+        $this->postTransferConfigModalGroundMode = null;
+        $this->showPostTransferGroundModeSwitchModal = false;
+        $this->pendingPostTransferModalGroundMode = null;
+        $this->postTransferCarSectionCollapsed = false;
+        $this->postTransferOtherSectionCollapsed = false;
+        $this->invalidateRouteMetricsAndSyncToParent();
     }
 
     /**
@@ -202,13 +972,33 @@ class Step4RoutePlanning extends Component
 
     protected function buildRoutePlannedPayload(): array
     {
+        if ($this->isPublicTransport) {
+            $this->rebuildRouteSegmentsFromUiState();
+        }
+
         return [
             'route_distance' => $this->routeData['distance'] ?? null,
             'route_duration' => $this->routeData['duration'] ?? null,
             'route_waypoints' => $this->routeWaypoints,
             'location_stop_notes' => $this->getLocationStopNotesPayload(),
             'route_distance_is_manual' => (bool) $this->isManualRouteDistance,
+            'route_segments' => $this->routeSegments,
+            'pre_route_distance' => is_array($this->preRouteData) ? ($this->preRouteData['distance'] ?? null) : null,
+            'pre_route_duration' => is_array($this->preRouteData) ? ($this->preRouteData['duration'] ?? null) : null,
+            'pre_route_distance_is_manual' => (bool) $this->isManualPreRouteDistance,
         ];
+    }
+
+    /**
+     * Zamiana kolejności dwóch segmentów (np. transfer → lot zamiast lot → transfer).
+     */
+    public function swapFirstTwoRouteSegments(): void
+    {
+        if (count($this->routeSegments) !== 2) {
+            return;
+        }
+        $this->routeSegments = [$this->routeSegments[1], $this->routeSegments[0]];
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
     }
 
     protected function syncManualFieldsFromRouteData(): void
@@ -312,6 +1102,12 @@ class Step4RoutePlanning extends Component
     public function updatedLocationStopNotes(): void
     {
         $this->saveLocationStopNotesToParent();
+    }
+
+    public function updatedTransferToAirportLocationStopNotes(): void
+    {
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
     }
 
     protected function pruneLocationStopNotes(): void
@@ -442,6 +1238,9 @@ class Step4RoutePlanning extends Component
         }
 
         $key = (string) $key;
+        if ($key === 'base' || $key === 'sap') {
+            return ['type' => 'pre_transfer_token', 'id' => 0];
+        }
         if (str_starts_with($key, 'acc:')) {
             return ['type' => 'acc', 'id' => (int) substr($key, 4)];
         }
@@ -473,8 +1272,114 @@ class Step4RoutePlanning extends Component
     }
 
     /**
-     * Waypoints for UI: accommodations + extra locations in the chosen order.
+     * Czy są przystanki typu loc (dodatkowe lokalizacje) na odcinku przed lotem.
      */
+    public function getHasPreTransferLocationStopsProperty(): bool
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind === null) {
+            return false;
+        }
+        foreach ($this->transferToAirportWaypoints as $k) {
+            if (str_starts_with((string) $k, 'loc:')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Jedna lista kafelków UI: baza, przystanki loc, lotnisko startowe — w kolejności z transferToAirportWaypoints.
+     *
+     * @return list<array{kind: string, key: string, index: int, can_remove: bool, can_move_up: bool, can_move_down: bool, location?: array<string, mixed>, display_name?: string}>
+     */
+    public function getPreTransferRouteTilesProperty(): array
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind === null) {
+            return [];
+        }
+        if ($this->transferToAirportLegKind === 'own' && $this->transferToAirportGroundMode === 'other') {
+            return [];
+        }
+        $keys = $this->transferToAirportWaypoints;
+        $locIds = [];
+        foreach ($keys as $key) {
+            if ($key === 'base' || $key === 'sap') {
+                continue;
+            }
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc' && $p['id'] > 0) {
+                $locIds[] = (int) $p['id'];
+            }
+        }
+        $locations = $locIds !== [] ? Location::whereIn('id', array_unique($locIds))->get()->keyBy('id') : collect();
+        $airportName = $this->startAirportData['name'] ?? 'Lotnisko startowe';
+        $baseName = $this->baseLocationData['name'] ?? 'Baza';
+        $n = count($keys);
+        $tiles = [];
+        foreach ($keys as $index => $key) {
+            $key = (string) $key;
+            $canMoveUp = $index > 0;
+            $canMoveDown = $index < $n - 1;
+            if ($key === 'base') {
+                $tiles[] = [
+                    'kind' => 'base',
+                    'key' => 'base',
+                    'index' => $index,
+                    'display_name' => $baseName,
+                    'can_remove' => true,
+                    'can_move_up' => $canMoveUp,
+                    'can_move_down' => $canMoveDown,
+                ];
+
+                continue;
+            }
+            if ($key === 'sap') {
+                $tiles[] = [
+                    'kind' => 'sap',
+                    'key' => 'sap',
+                    'index' => $index,
+                    'display_name' => $airportName,
+                    'can_remove' => false,
+                    'can_move_up' => $canMoveUp,
+                    'can_move_down' => $canMoveDown,
+                ];
+
+                continue;
+            }
+            $parsed = $this->parseWaypointKey($key);
+            if ($parsed['type'] !== 'loc') {
+                continue;
+            }
+            $loc = $locations->get((int) $parsed['id']);
+            $tiles[] = [
+                'kind' => 'loc',
+                'key' => $key,
+                'index' => $index,
+                'can_remove' => true,
+                'can_move_up' => $canMoveUp,
+                'can_move_down' => $canMoveDown,
+                'location' => $loc ? [
+                    'id' => $loc->id,
+                    'name' => $loc->name,
+                    'address' => $loc->address,
+                    'city' => $loc->city,
+                    'latitude' => $loc->latitude ? (float) $loc->latitude : null,
+                    'longitude' => $loc->longitude ? (float) $loc->longitude : null,
+                ] : [
+                    'id' => (int) $parsed['id'],
+                    'name' => '—',
+                    'address' => null,
+                    'city' => null,
+                    'latitude' => null,
+                    'longitude' => null,
+                ],
+            ];
+        }
+
+        return $tiles;
+    }
+
     public function getWaypointStopsProperty(): array
     {
         try {
@@ -542,6 +1447,10 @@ class Step4RoutePlanning extends Component
 
     public function addExtraStop(): void
     {
+        if ($this->isPublicTransport) {
+            return;
+        }
+
         // Odczytaj ID po synchronizacji (np. po submit formularza — pewniejsze niż samo kliknięcie przy wire:model)
         $raw = $this->extraStopLocationId;
         $id = is_numeric($raw) ? (int) $raw : 0;
@@ -566,6 +1475,118 @@ class Step4RoutePlanning extends Component
         $this->extraStopLocationId = null;
         $this->locationStopNotes[(string) $id] = $this->locationStopNotes[(string) $id] ?? '';
         $this->invalidateRouteMetricsAndSyncToParent();
+    }
+
+    /** Dodatkowe lokalizacje na odcinku lotnisko docelowe → domy (transport publiczny + własny transfer). */
+    public function addExtraLocationToPostTransfer(): void
+    {
+        if (! $this->isPublicTransport) {
+            return;
+        }
+
+        $raw = $this->extraStopLocationId;
+        $id = is_numeric($raw) ? (int) $raw : 0;
+        if ($id <= 0) {
+            return;
+        }
+
+        $key = 'loc:'.$id;
+        if (in_array($key, $this->routeWaypoints, true)) {
+            $this->extraStopLocationId = null;
+
+            return;
+        }
+
+        $loc = Location::find($id);
+        if ($loc && ! $loc->hasCoordinates()) {
+            $this->geocodingService->geocodeLocation($loc);
+        }
+
+        $this->routeWaypoints[] = $key;
+        $this->routeWaypoints = array_values($this->routeWaypoints);
+        $this->extraStopLocationId = null;
+        $this->locationStopNotes[(string) $id] = $this->locationStopNotes[(string) $id] ?? '';
+        $this->invalidateRouteMetricsAndSyncToParent();
+    }
+
+    public function addExtraStopToPreTransfer(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind === null
+            || $this->transferToAirportLegKind !== 'own' || $this->transferToAirportGroundMode !== 'car') {
+            return;
+        }
+
+        $raw = $this->transferToAirportExtraStopLocationId;
+        $id = is_numeric($raw) ? (int) $raw : 0;
+        if ($id <= 0) {
+            return;
+        }
+
+        $key = 'loc:'.$id;
+
+        $loc = Location::find($id);
+        if ($loc && ! $loc->hasCoordinates()) {
+            $this->geocodingService->geocodeLocation($loc);
+        }
+
+        $this->transferToAirportWaypoints[] = $key;
+        $this->transferToAirportWaypoints = array_values($this->transferToAirportWaypoints);
+        $this->transferToAirportLocationStopNotes[(string) $id] = $this->transferToAirportLocationStopNotes[(string) $id] ?? '';
+        $this->transferToAirportExtraStopLocationId = null;
+        $this->invalidatePreRouteMetricsAndSyncToParent();
+    }
+
+    public function removePreWaypoint(int $index): void
+    {
+        if ($index < 0 || $index >= count($this->transferToAirportWaypoints)) {
+            return;
+        }
+        if (($this->transferToAirportWaypoints[$index] ?? null) === 'sap') {
+            return;
+        }
+        $waypoints = $this->transferToAirportWaypoints;
+        array_splice($waypoints, $index, 1);
+        $this->transferToAirportWaypoints = array_values($waypoints);
+        $this->ensureSingleSapInPreTransferWaypoints();
+        $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        $this->prunePreLocationStopNotes();
+        $this->invalidatePreRouteMetricsAndSyncToParent();
+    }
+
+    public function movePreWaypointUp(int $index): void
+    {
+        if ($index <= 0 || $index >= count($this->transferToAirportWaypoints)) {
+            return;
+        }
+        $w = $this->transferToAirportWaypoints;
+        [$w[$index - 1], $w[$index]] = [$w[$index], $w[$index - 1]];
+        $this->transferToAirportWaypoints = array_values($w);
+        $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        $this->invalidatePreRouteMetricsAndSyncToParent();
+    }
+
+    public function movePreWaypointDown(int $index): void
+    {
+        if ($index < 0 || $index >= count($this->transferToAirportWaypoints) - 1) {
+            return;
+        }
+        $w = $this->transferToAirportWaypoints;
+        [$w[$index], $w[$index + 1]] = [$w[$index + 1], $w[$index]];
+        $this->transferToAirportWaypoints = array_values($w);
+        $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        $this->invalidatePreRouteMetricsAndSyncToParent();
+    }
+
+    protected function prunePreLocationStopNotes(): void
+    {
+        $allowed = [];
+        foreach ($this->transferToAirportWaypoints as $key) {
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc') {
+                $allowed[] = (string) $p['id'];
+            }
+        }
+        $this->transferToAirportLocationStopNotes = array_intersect_key($this->transferToAirportLocationStopNotes, array_flip($allowed));
     }
 
     public function removeWaypoint(int $index): void
@@ -621,6 +1642,161 @@ class Step4RoutePlanning extends Component
         return Currency::cases();
     }
 
+    public function getSelectedEmployeesForTicketsProperty(): Collection
+    {
+        if ($this->selectedEmployeeIds === []) {
+            return collect();
+        }
+
+        return Employee::whereIn('id', $this->selectedEmployeeIds)->orderBy('last_name')->orderBy('first_name')->get();
+    }
+
+    /**
+     * Tryb „Samochód / Inny transport” widoczny w UI — w otwartym modalu bierzemy draft,
+     * żeby walidacja i podświetlenia zgadzały się z przełącznikami zanim użytkownik zatwierdzi.
+     */
+    protected function effectivePreTransferGroundModeForUi(): string
+    {
+        if ($this->showPreTransferConfigModal
+            && $this->preTransferConfigModalGroundMode !== null
+            && in_array($this->preTransferConfigModalGroundMode, ['car', 'other'], true)) {
+            return $this->preTransferConfigModalGroundMode;
+        }
+
+        return $this->transferToAirportGroundMode;
+    }
+
+    /**
+     * Tryb Samochód / Inny transport w modalu transferu z lotniska (draft).
+     */
+    protected function effectivePostTransferGroundModeForUi(): string
+    {
+        if ($this->showPostTransferConfigModal
+            && $this->postTransferConfigModalGroundMode !== null
+            && in_array($this->postTransferConfigModalGroundMode, ['car', 'other'], true)) {
+            return $this->postTransferConfigModalGroundMode;
+        }
+
+        return $this->transferFromAirportGroundMode;
+    }
+
+    public function getToAirportGroundTicketsIncompleteProperty(): bool
+    {
+        if (! $this->isPublicTransport || $this->selectedEmployeeIds === []) {
+            return false;
+        }
+        $g = $this->effectivePreTransferGroundModeForUi();
+        $needTickets = $this->transferToAirportLegKind === 'public'
+            || ($this->transferToAirportLegKind === 'own' && $g === 'other');
+        if (! $needTickets) {
+            return false;
+        }
+
+        return PublicTransportTicketCosts::areIncompleteForEmployees(
+            $this->selectedEmployeeIds,
+            $this->toAirportPublicTicketCostsByEmployee,
+            true
+        );
+    }
+
+    public function getFromAirportGroundTicketsIncompleteProperty(): bool
+    {
+        if (! $this->isPublicTransport || $this->selectedEmployeeIds === [] || ! $this->postAirportTransferUserEnabled) {
+            return false;
+        }
+        $eff = $this->effectiveTransferFromAirportLegKind;
+        if ($eff === null) {
+            return false;
+        }
+        $g = $this->effectivePostTransferGroundModeForUi();
+        $needTickets = $eff === 'public'
+            || ($eff === 'own' && $g === 'other');
+        if (! $needTickets) {
+            return false;
+        }
+
+        return PublicTransportTicketCosts::areIncompleteForEmployees(
+            $this->selectedEmployeeIds,
+            $this->fromAirportPublicTicketCostsByEmployee,
+            true
+        );
+    }
+
+    public function getPreTransferVehicleIncompleteProperty(): bool
+    {
+        $g = $this->effectivePreTransferGroundModeForUi();
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own'
+            || $g !== 'car') {
+            return false;
+        }
+
+        return empty($this->preTransferVehicleId);
+    }
+
+    public function getPreTransferDriverIncompleteProperty(): bool
+    {
+        $g = $this->effectivePreTransferGroundModeForUi();
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own'
+            || $g !== 'car') {
+            return false;
+        }
+
+        return empty($this->preTransferDriverEmployeeId);
+    }
+
+    public function getPreTransferBonusIncompleteProperty(): bool
+    {
+        $g = $this->effectivePreTransferGroundModeForUi();
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own'
+            || $g !== 'car' || empty($this->preTransferDriverEmployeeId)) {
+            return false;
+        }
+        $bonus = $this->preTransferDriverBonusAmount;
+        if ($bonus === null || $bonus === '' || ! is_numeric($bonus) || (float) $bonus <= 0) {
+            return true;
+        }
+        $cur = strtoupper(trim((string) ($this->preTransferDriverBonusCurrency ?? 'PLN')));
+
+        return strlen($cur) !== 3;
+    }
+
+    public function updated($name): void
+    {
+        if (! $this->isPublicTransport) {
+            return;
+        }
+        $n = (string) $name;
+        $syncSegments = str_starts_with($n, 'toAirportPublicTicketCostsByEmployee')
+            || str_starts_with($n, 'fromAirportPublicTicketCostsByEmployee')
+            || str_starts_with($n, 'preTransfer')
+            || $n === 'transferPickupLocationId';
+        if ($syncSegments) {
+            // W otwartym modalu „Konfiguruj transfer” nie przebudowuj segmentów przy każdym polu —
+            // synchronizacja na Zatwierdź / Anuluj (mniej obciążenia i stabilne okno).
+            if ($this->showPreTransferConfigModal
+                && $this->transferToAirportLegKind === 'own'
+                && (
+                    str_starts_with($n, 'preTransfer')
+                    || str_starts_with($n, 'toAirportPublicTicketCostsByEmployee')
+                )) {
+                return;
+            }
+            if ($this->showPostTransferConfigModal
+                && $this->postAirportTransferUserEnabled
+                && $this->effectiveTransferFromAirportLegKind === 'own'
+                && (
+                    str_starts_with($n, 'transferVehicle')
+                    || str_starts_with($n, 'transferDriver')
+                    || str_starts_with($n, 'fromAirportPublicTicketCostsByEmployee')
+                )) {
+                return;
+            }
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+        }
+    }
+
     /** Czy brak zapisanego dystansu/czasu trasy (tak samo jak w DeparturePlannerV2::getStep4TabIncompleteProperty). */
     protected function routeMetricsComplete(): bool
     {
@@ -635,33 +1811,130 @@ class Step4RoutePlanning extends Component
             && $dur !== null && $dur !== '' && (int) $dur > 0;
     }
 
+    protected function preRouteMetricsComplete(): bool
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind === null
+            || $this->transferToAirportLegKind === 'public') {
+            return true;
+        }
+        if ($this->transferToAirportLegKind !== 'own') {
+            return true;
+        }
+        $rd = $this->preRouteData;
+        if (! is_array($rd)) {
+            return false;
+        }
+
+        return isset($rd['distance'], $rd['duration'])
+            && is_numeric($rd['distance']) && (float) $rd['distance'] > 0
+            && is_numeric($rd['duration']) && (int) $rd['duration'] > 0;
+    }
+
+    public function getEffectiveTransferFromAirportLegKindProperty(): ?string
+    {
+        if (! $this->postAirportTransferUserEnabled) {
+            return null;
+        }
+
+        return $this->transferFromAirportLegKind
+            ?? (count($this->routeWaypoints) > 0 ? 'own' : 'public');
+    }
+
+    public function getRoutePreBlockIncompleteProperty(): bool
+    {
+        return $this->isPublicTransport && $this->transferToAirportLegKind === 'own'
+            && ! $this->preRouteMetricsComplete();
+    }
+
+    /**
+     * Karta 1 (transfer przed lotem): wymaga uwagi — brak zatwierdzenia lub brak wymaganych pól / km.
+     */
+    public function getPreTransferCardNeedsAttentionProperty(): bool
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return false;
+        }
+        $compact = ($this->preTransferCarSectionCollapsed && $this->transferToAirportGroundMode === 'car')
+            || ($this->preTransferOtherSectionCollapsed && $this->transferToAirportGroundMode === 'other');
+        if (! $compact) {
+            return true;
+        }
+        if ($this->transferToAirportGroundMode === 'car') {
+            return $this->preTransferVehicleIncomplete || $this->preTransferDriverIncomplete || $this->preTransferBonusIncomplete
+                || $this->routePreBlockIncomplete;
+        }
+        $ps = trim((string) ($this->preTransferPublicStationStart ?? ''));
+        $pe = trim((string) ($this->preTransferPublicStationEnd ?? ''));
+
+        return $this->toAirportGroundTicketsIncomplete || $this->routePreBlockIncomplete || $ps === '' || $pe === '';
+    }
+
+    /**
+     * Karta 3 (transfer z lotniska, własny środek): uwaga — brak zatwierdzenia lub braki w polach / km.
+     */
+    public function getPostTransferCardNeedsAttentionProperty(): bool
+    {
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own') {
+            return false;
+        }
+        $compact = ($this->postTransferCarSectionCollapsed && $this->transferFromAirportGroundMode === 'car')
+            || ($this->postTransferOtherSectionCollapsed && $this->transferFromAirportGroundMode === 'other');
+        if (! $compact) {
+            return true;
+        }
+        if ($this->transferFromAirportGroundMode === 'car') {
+            return $this->transferVehicleIncomplete || $this->transferDriverIncomplete || $this->transferBonusIncomplete
+                || ! $this->routeMetricsComplete();
+        }
+
+        return $this->fromAirportGroundTicketsIncomplete || ! $this->routeMetricsComplete();
+    }
+
     public function getRouteBlockIncompleteProperty(): bool
     {
-        return ! $this->routeMetricsComplete();
+        if ($this->isPublicTransport && ! $this->postAirportTransferUserEnabled) {
+            return (bool) $this->routePreBlockIncomplete;
+        }
+
+        if (! $this->routeMetricsComplete()) {
+            return true;
+        }
+
+        return $this->routePreBlockIncomplete;
     }
 
     public function getPickupIncompleteProperty(): bool
     {
-        if (! $this->isPublicTransport) {
-            return false;
-        }
-
-        return empty($this->transferPickupLocationId);
+        return false;
     }
 
     public function getTransferVehicleIncompleteProperty(): bool
     {
-        return $this->isPublicTransport && empty($this->transferVehicleId);
+        $g = $this->effectivePostTransferGroundModeForUi();
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own'
+            || $g !== 'car') {
+            return false;
+        }
+
+        return empty($this->transferVehicleId);
     }
 
     public function getTransferDriverIncompleteProperty(): bool
     {
-        return $this->isPublicTransport && empty($this->transferDriverEmployeeId);
+        $g = $this->effectivePostTransferGroundModeForUi();
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own'
+            || $g !== 'car') {
+            return false;
+        }
+
+        return empty($this->transferDriverEmployeeId);
     }
 
     public function getTransferBonusIncompleteProperty(): bool
     {
-        if (! $this->isPublicTransport || empty($this->transferDriverEmployeeId)) {
+        $g = $this->effectivePostTransferGroundModeForUi();
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own'
+            || $g !== 'car' || empty($this->transferDriverEmployeeId)) {
             return false;
         }
         $bonus = $this->transferDriverBonusAmount;
@@ -734,8 +2007,38 @@ class Step4RoutePlanning extends Component
         // Do not auto-apply; user must confirm with applyManualRouteDistance()
     }
 
-    public function applyManualRouteDistance(): void
+    public function applyManualRouteDistance(?string $leg = null): void
     {
+        $leg = $leg ?? 'post';
+
+        if ($leg === 'pre') {
+            $km = $this->preManualRouteDistanceKm;
+            if ($km === null || $km === '' || ! is_numeric($km) || (float) $km <= 0) {
+                $this->preRouteError = 'Podaj poprawną liczbę kilometrów dla odcinka na lotnisko.';
+
+                return;
+            }
+            $minutes = $this->preManualRouteDurationMinutes;
+            if ($minutes === null || $minutes === '' || ! is_numeric($minutes) || (float) $minutes <= 0) {
+                $this->preRouteError = 'Podaj czas przejazdu (min) dla odcinka na lotnisko.';
+
+                return;
+            }
+            $durationSeconds = (int) round((float) $minutes * 60);
+            $this->isManualPreRouteDistance = true;
+            $this->manualRouteHint = null;
+            $this->preRouteData = [
+                'distance' => (float) $km,
+                'duration' => $durationSeconds,
+            ];
+            $this->preRouteError = null;
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+
+            return;
+        }
+
         $km = $this->manualRouteDistanceKm;
         if ($km === null || $km === '' || ! is_numeric($km) || (float) $km <= 0) {
             $this->routeError = 'Podaj poprawną liczbę kilometrów (większą od 0), aby ustawić dystans ręcznie.';
@@ -763,6 +2066,7 @@ class Step4RoutePlanning extends Component
         $this->routeError = null;
 
         // Dispatch to parent so it can be saved
+        $this->rebuildRouteSegmentsFromUiState();
         $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
         $this->dispatchTransferConfig();
     }
@@ -774,7 +2078,7 @@ class Step4RoutePlanning extends Component
             'driver_employee_id' => $this->transferDriverEmployeeId,
             'bonus_amount' => $this->transferDriverBonusAmount,
             'bonus_currency' => $this->transferDriverBonusCurrency,
-            'pickup_location_id' => $this->transferPickupLocationId,
+            'pickup_location_id' => null,
             'route_distance' => $this->routeData['distance'] ?? null,
             'route_duration' => $this->routeData['duration'] ?? null,
             'route_waypoints' => $this->routeWaypoints,
@@ -953,6 +2257,683 @@ class Step4RoutePlanning extends Component
         return 'https://www.google.com/maps/dir/?'.http_build_query($params);
     }
 
+    protected function getPreWaypointLocationIds(): array
+    {
+        $ids = [];
+        foreach ($this->transferToAirportWaypoints as $key) {
+            $key = (string) $key;
+            if ($key === 'base' || $key === 'sap') {
+                continue;
+            }
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc' && $p['id'] > 0) {
+                $ids[] = (int) $p['id'];
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    protected function resolvePreWaypointObjects($locations): array
+    {
+        $list = [];
+        foreach ($this->transferToAirportWaypoints as $key) {
+            $key = (string) $key;
+            if ($key === 'base' || $key === 'sap') {
+                continue;
+            }
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc') {
+                $obj = $locations->get((int) $p['id']);
+                if ($obj) {
+                    $list[] = $obj;
+                }
+            }
+        }
+
+        return $list;
+    }
+
+    /**
+     * Kolejność lokalizacji do API (ORS): dokładnie jak tokeny w transferToAirportWaypoints (baza / loc / lotnisko startowe).
+     *
+     * @return list<Location>
+     */
+    protected function resolvePreTransferOrderedLocationModels(): array
+    {
+        $startAirport = $this->sharedStartAirportLocationId ? Location::find($this->sharedStartAirportLocationId) : null;
+        if (! $startAirport || ! $startAirport->hasCoordinates()) {
+            return [];
+        }
+
+        $base = $this->baseLocationId ? Location::find($this->baseLocationId) : null;
+        $locIds = $this->getPreWaypointLocationIds();
+        $byId = $locIds !== [] ? Location::whereIn('id', $locIds)->get()->keyBy('id') : collect();
+
+        $ordered = [];
+        foreach ($this->transferToAirportWaypoints as $key) {
+            $key = (string) $key;
+            if ($key === 'base') {
+                if ($base && $base->hasCoordinates()) {
+                    $ordered[] = $base;
+                }
+
+                continue;
+            }
+            if ($key === 'sap') {
+                $ordered[] = $startAirport;
+
+                continue;
+            }
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] !== 'loc') {
+                continue;
+            }
+            $loc = $byId->get((int) $p['id']);
+            if ($loc && $loc->hasCoordinates()) {
+                $ordered[] = $loc;
+            }
+        }
+
+        return $ordered;
+    }
+
+    public function omitPreTransferBase(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return;
+        }
+        $this->transferToAirportWaypoints = array_values(array_filter(
+            $this->transferToAirportWaypoints,
+            static fn ($k) => (string) $k !== 'base'
+        ));
+        $this->ensureSingleSapInPreTransferWaypoints();
+        $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        $this->invalidatePreRouteMetricsAndSyncToParent();
+    }
+
+    public function restorePreTransferBase(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return;
+        }
+        if (! in_array('base', $this->transferToAirportWaypoints, true)) {
+            array_unshift($this->transferToAirportWaypoints, 'base');
+            $this->transferToAirportWaypoints = array_values($this->transferToAirportWaypoints);
+        }
+        $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        $this->invalidatePreRouteMetricsAndSyncToParent();
+    }
+
+    public function savePreTransferRouteModal(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return;
+        }
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function planPreAirportRoute(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind === null) {
+            return;
+        }
+
+        if ($this->transferToAirportLegKind === 'public' || $this->transferToAirportGroundMode !== 'car') {
+            $this->preRouteError = 'Automatyczne liczenie działa w trybie „Samochód”. Wpisz km ręcznie albo przełącz tryb.';
+
+            return;
+        }
+
+        if (in_array('base', $this->transferToAirportWaypoints, true)) {
+            if (! $this->baseLocationId) {
+                $this->preRouteError = 'Brak lokalizacji bazy.';
+
+                return;
+            }
+            $base = Location::find($this->baseLocationId);
+            if (! $base || ! $base->hasCoordinates()) {
+                $this->preRouteError = 'Brak współrzędnych dla lokalizacji bazy.';
+
+                return;
+            }
+        }
+
+        $startAirport = $this->sharedStartAirportLocationId ? Location::find($this->sharedStartAirportLocationId) : null;
+        if (! $startAirport || ! $startAirport->hasCoordinates()) {
+            $this->preRouteError = 'Wybierz lotnisko startowe w nagłówku i uzupełnij współrzędne.';
+
+            return;
+        }
+
+        $locIds = $this->getPreWaypointLocationIds();
+        $locations = $locIds !== [] ? Location::whereIn('id', $locIds)->get()->keyBy('id') : collect();
+
+        $missingCoords = [];
+        foreach ($this->transferToAirportWaypoints as $key) {
+            $p = $this->parseWaypointKey($key);
+            if ($p['type'] === 'loc') {
+                $loc = $locations->get((int) $p['id']);
+                if (! $loc || ! $loc->hasCoordinates()) {
+                    $missingCoords[] = $loc ? $loc->name : 'Lokacja';
+                }
+            }
+        }
+        if (! empty($missingCoords)) {
+            $this->preRouteError = 'Brak współrzędnych dla: '.implode(', ', $missingCoords).'.';
+
+            return;
+        }
+
+        $orderedChain = $this->resolvePreTransferOrderedLocationModels();
+        if (count($orderedChain) < 2) {
+            $this->preRouteError = 'Potrzebne są co najmniej dwa punkty z współrzędnymi w ustalonej kolejności (np. przystanek i lotnisko startowe).';
+
+            return;
+        }
+
+        $this->isPlanningRoute = true;
+        $this->preRouteError = null;
+        $previousPre = $this->preRouteData;
+
+        try {
+            $route = $this->routePlanningService->planRouteAlongOrderedLocations($orderedChain, []);
+            if ($route) {
+                $this->isManualPreRouteDistance = false;
+                $this->preRouteData = ['distance' => $route['distance'], 'duration' => $route['duration']];
+                $this->syncPreManualFieldsFromPreRouteData();
+                $this->preRouteError = null;
+                $this->rebuildRouteSegmentsFromUiState();
+                $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+                $this->dispatchTransferConfig();
+            } else {
+                $this->preRouteError = 'Nie udało się zaplanować trasy na lotnisko startowe.';
+                $this->preRouteData = $previousPre;
+            }
+        } catch (\Exception $e) {
+            Log::error('Route planning exception (pre-airport)', ['message' => $e->getMessage()]);
+            $this->preRouteError = 'Błąd planowania trasy na lotnisko: '.$e->getMessage();
+            $this->preRouteData = $previousPre;
+        } finally {
+            $this->isPlanningRoute = false;
+        }
+    }
+
+    public function confirmPreTransferCarSection(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own' || $this->transferToAirportGroundMode !== 'car') {
+            return;
+        }
+        if ($this->preTransferVehicleIncomplete || $this->preTransferDriverIncomplete || $this->preTransferBonusIncomplete) {
+            return;
+        }
+        $this->preTransferCarSectionCollapsed = true;
+        $this->showPreTransferConfigModal = false;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function confirmPreTransferOtherSection(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own' || $this->transferToAirportGroundMode !== 'other') {
+            return;
+        }
+        if ($this->toAirportGroundTicketsIncomplete) {
+            return;
+        }
+        $this->preTransferOtherSectionCollapsed = true;
+        $this->showPreTransferConfigModal = false;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function confirmPreTransferModal(): void
+    {
+        $draft = $this->preTransferConfigModalGroundMode;
+        if ($draft !== null && in_array($draft, ['car', 'other'], true) && $draft !== $this->transferToAirportGroundMode) {
+            $this->transferToAirportGroundMode = $draft;
+            $this->applyTransferToAirportGroundModeChanged();
+        }
+        $this->preTransferConfigModalGroundMode = null;
+
+        if ($this->transferToAirportGroundMode === 'other') {
+            $this->confirmPreTransferOtherSection();
+        } else {
+            $this->confirmPreTransferCarSection();
+        }
+    }
+
+    public function openPreTransferConfigModal(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return;
+        }
+        $this->showPreTransferGroundModeSwitchModal = false;
+        $this->pendingPreTransferModalGroundMode = null;
+        $this->preTransferConfigModalGroundMode = $this->transferToAirportGroundMode;
+        $this->showPreTransferConfigModal = true;
+    }
+
+    /**
+     * Zmiana roboczego trybu w modalu — przy utracie dany drugiego typu: potwierdzenie (jak przełącznik transportu w planie wyjazdu).
+     */
+    public function requestPreTransferModalGroundMode(string $mode): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own' || ! $this->showPreTransferConfigModal) {
+            return;
+        }
+        if (! in_array($mode, ['car', 'other'], true)) {
+            return;
+        }
+        $current = $this->preTransferConfigModalGroundMode ?? $this->transferToAirportGroundMode;
+        if ($mode === $current) {
+            return;
+        }
+        if ($this->preTransferModalSwitchWouldLoseData($current, $mode)) {
+            $this->pendingPreTransferModalGroundMode = $mode;
+            $this->showPreTransferGroundModeSwitchModal = true;
+
+            return;
+        }
+        $this->applyPreTransferModalDraftGroundMode($mode);
+    }
+
+    public function confirmPreTransferGroundModeSwitch(): void
+    {
+        if ($this->pendingPreTransferModalGroundMode === null
+            || ! in_array($this->pendingPreTransferModalGroundMode, ['car', 'other'], true)) {
+            $this->showPreTransferGroundModeSwitchModal = false;
+            $this->pendingPreTransferModalGroundMode = null;
+
+            return;
+        }
+        $mode = $this->pendingPreTransferModalGroundMode;
+        $this->pendingPreTransferModalGroundMode = null;
+        $this->showPreTransferGroundModeSwitchModal = false;
+        $this->applyPreTransferModalDraftGroundMode($mode);
+    }
+
+    public function cancelPreTransferGroundModeSwitch(): void
+    {
+        $this->pendingPreTransferModalGroundMode = null;
+        $this->showPreTransferGroundModeSwitchModal = false;
+    }
+
+    protected function preTransferModalSwitchWouldLoseData(string $from, string $to): bool
+    {
+        if ($from === $to) {
+            return false;
+        }
+        if ($from === 'car') {
+            return $this->preTransferModalHasCarData();
+        }
+
+        return $this->preTransferModalHasOtherData();
+    }
+
+    protected function preTransferModalHasCarData(): bool
+    {
+        if (! empty($this->preTransferVehicleId) || ! empty($this->preTransferDriverEmployeeId)) {
+            return true;
+        }
+        $bonus = $this->preTransferDriverBonusAmount;
+
+        if ($bonus !== null && $bonus !== '' && is_numeric($bonus) && (float) $bonus > 0) {
+            return true;
+        }
+
+        foreach ($this->transferToAirportWaypoints as $k) {
+            if (str_starts_with((string) $k, 'loc:')) {
+                return true;
+            }
+        }
+        $wps = array_values($this->transferToAirportWaypoints);
+
+        return $wps !== ['base', 'sap'] && $wps !== [];
+    }
+
+    protected function preTransferModalHasOtherData(): bool
+    {
+        if (trim((string) ($this->preTransferPublicStationStart ?? '')) !== ''
+            || trim((string) ($this->preTransferPublicStationEnd ?? '')) !== '') {
+            return true;
+        }
+        foreach ($this->toAirportPublicTicketCostsByEmployee as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            if (! empty($row['attachment'] ?? null) || ! empty($row['attachment_path'] ?? null)) {
+                return true;
+            }
+            $amount = $row['amount'] ?? null;
+            if ($amount !== null && $amount !== '' && is_numeric($amount) && (float) $amount > 0) {
+                return true;
+            }
+            if (trim((string) ($row['notes'] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Tylko stan pól w tym modalu — bez zmiany zapisanego {@see $transferToAirportGroundMode} ani segmentów.
+     */
+    protected function applyPreTransferModalDraftGroundMode(string $mode): void
+    {
+        if (! in_array($mode, ['car', 'other'], true)) {
+            return;
+        }
+        $this->preTransferConfigModalGroundMode = $mode;
+        if ($mode === 'car') {
+            $this->toAirportPublicTicketCostsByEmployee = [];
+            $this->preTransferPublicStationStart = null;
+            $this->preTransferPublicStationEnd = null;
+            $this->transferToAirportWaypoints = ['base', 'sap'];
+            $this->ensureSingleSapInPreTransferWaypoints();
+            $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+        } else {
+            $this->preTransferVehicleId = null;
+            $this->preTransferDriverEmployeeId = null;
+            $this->preTransferDriverBonusAmount = null;
+            $this->preTransferDriverBonusCurrency = 'PLN';
+            $this->transferToAirportWaypoints = [];
+            $this->transferToAirportLocationStopNotes = [];
+            $this->transferToAirportStartsFromBase = false;
+        }
+    }
+
+    public function closePreTransferConfigModal(): void
+    {
+        if (! $this->showPreTransferConfigModal) {
+            return;
+        }
+        $this->showPreTransferConfigModal = false;
+        $this->showPreTransferGroundModeSwitchModal = false;
+        $this->pendingPreTransferModalGroundMode = null;
+        $this->preTransferConfigModalGroundMode = null;
+        if ($this->transferToAirportLegKind === 'own') {
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+        }
+    }
+
+    public function openPreTransferRouteModal(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return;
+        }
+        $preOwnCompact = ($this->preTransferCarSectionCollapsed && $this->transferToAirportGroundMode === 'car')
+            || ($this->preTransferOtherSectionCollapsed && $this->transferToAirportGroundMode === 'other');
+        if (! $preOwnCompact) {
+            return;
+        }
+        $this->showPreTransferRouteModal = true;
+    }
+
+    public function closePreTransferRouteModal(): void
+    {
+        $this->showPreTransferRouteModal = false;
+    }
+
+    public function confirmPreTransferRouteModal(): void
+    {
+        $this->savePreTransferRouteModal();
+        $this->closePreTransferRouteModal();
+    }
+
+    public function expandPreTransferOwnCollapsedSection(): void
+    {
+        $this->openPreTransferConfigModal();
+    }
+
+    protected function applyTransferToAirportGroundModeChanged(): void
+    {
+        $this->preTransferCarSectionCollapsed = false;
+        $this->preTransferOtherSectionCollapsed = false;
+        if ($this->transferToAirportGroundMode === 'other') {
+            $this->preTransferVehicleId = null;
+            $this->preTransferDriverEmployeeId = null;
+            $this->preTransferDriverBonusAmount = null;
+            $this->transferToAirportWaypoints = [];
+            $this->transferToAirportLocationStopNotes = [];
+            $this->transferToAirportStartsFromBase = false;
+            $this->invalidatePreRouteMetricsAndSyncToParent();
+        } else {
+            $this->toAirportPublicTicketCostsByEmployee = [];
+            $this->preTransferPublicStationStart = null;
+            $this->preTransferPublicStationEnd = null;
+            $this->transferToAirportWaypoints = ['base', 'sap'];
+            $this->ensureSingleSapInPreTransferWaypoints();
+            $this->syncTransferToAirportStartsFromBaseFromWaypoints();
+            $this->invalidatePreRouteMetricsAndSyncToParent();
+        }
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function updatedTransferToAirportGroundMode(): void
+    {
+        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+            return;
+        }
+        $this->applyTransferToAirportGroundModeChanged();
+    }
+
+    protected function applyTransferFromAirportGroundModeSideEffects(): void
+    {
+        if (! $this->isPublicTransport || ! $this->postAirportTransferUserEnabled) {
+            return;
+        }
+        if ($this->transferFromAirportGroundMode === 'other') {
+            $this->transferVehicleId = null;
+            $this->transferDriverEmployeeId = null;
+            $this->transferDriverBonusAmount = null;
+            $this->invalidateRouteMetricsAndSyncToParent();
+        } else {
+            $this->fromAirportPublicTicketCostsByEmployee = [];
+            $this->invalidateRouteMetricsAndSyncToParent();
+        }
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function updatedTransferFromAirportGroundMode(): void
+    {
+        if (! $this->isPublicTransport || ! $this->postAirportTransferUserEnabled) {
+            return;
+        }
+        $this->applyTransferFromAirportGroundModeSideEffects();
+    }
+
+    public function confirmPostTransferModal(): void
+    {
+        $draft = $this->postTransferConfigModalGroundMode;
+        if ($draft !== null && in_array($draft, ['car', 'other'], true) && $draft !== $this->transferFromAirportGroundMode) {
+            $this->transferFromAirportGroundMode = $draft;
+            $this->applyTransferFromAirportGroundModeSideEffects();
+        }
+        $this->postTransferConfigModalGroundMode = null;
+
+        if ($this->transferFromAirportGroundMode === 'other') {
+            $this->confirmPostTransferOtherSection();
+        } else {
+            $this->confirmPostTransferCarSection();
+        }
+    }
+
+    public function confirmPostTransferCarSection(): void
+    {
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own' || $this->transferFromAirportGroundMode !== 'car') {
+            return;
+        }
+        if ($this->transferVehicleIncomplete || $this->transferDriverIncomplete || $this->transferBonusIncomplete) {
+            return;
+        }
+        $this->postTransferCarSectionCollapsed = true;
+        $this->showPostTransferConfigModal = false;
+        $this->postTransferConfigModalGroundMode = null;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function confirmPostTransferOtherSection(): void
+    {
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own' || $this->transferFromAirportGroundMode !== 'other') {
+            return;
+        }
+        if ($this->fromAirportGroundTicketsIncomplete) {
+            return;
+        }
+        $this->postTransferOtherSectionCollapsed = true;
+        $this->showPostTransferConfigModal = false;
+        $this->postTransferConfigModalGroundMode = null;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function openPostTransferConfigModal(): void
+    {
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own') {
+            return;
+        }
+        $this->showPostTransferGroundModeSwitchModal = false;
+        $this->pendingPostTransferModalGroundMode = null;
+        $this->postTransferConfigModalGroundMode = $this->transferFromAirportGroundMode;
+        $this->showPostTransferConfigModal = true;
+    }
+
+    public function closePostTransferConfigModal(): void
+    {
+        if (! $this->showPostTransferConfigModal) {
+            return;
+        }
+        $this->showPostTransferConfigModal = false;
+        $this->showPostTransferGroundModeSwitchModal = false;
+        $this->pendingPostTransferModalGroundMode = null;
+        $this->postTransferConfigModalGroundMode = null;
+        if ($this->postAirportTransferUserEnabled && $this->effectiveTransferFromAirportLegKind === 'own') {
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+        }
+    }
+
+    public function requestPostTransferModalGroundMode(string $mode): void
+    {
+        if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own' || ! $this->showPostTransferConfigModal) {
+            return;
+        }
+        if (! in_array($mode, ['car', 'other'], true)) {
+            return;
+        }
+        $current = $this->postTransferConfigModalGroundMode ?? $this->transferFromAirportGroundMode;
+        if ($mode === $current) {
+            return;
+        }
+        if ($this->postTransferModalSwitchWouldLoseData($current, $mode)) {
+            $this->pendingPostTransferModalGroundMode = $mode;
+            $this->showPostTransferGroundModeSwitchModal = true;
+
+            return;
+        }
+        $this->applyPostTransferModalDraftGroundMode($mode);
+    }
+
+    public function confirmPostTransferGroundModeSwitch(): void
+    {
+        if ($this->pendingPostTransferModalGroundMode === null
+            || ! in_array($this->pendingPostTransferModalGroundMode, ['car', 'other'], true)) {
+            $this->showPostTransferGroundModeSwitchModal = false;
+            $this->pendingPostTransferModalGroundMode = null;
+
+            return;
+        }
+        $mode = $this->pendingPostTransferModalGroundMode;
+        $this->pendingPostTransferModalGroundMode = null;
+        $this->showPostTransferGroundModeSwitchModal = false;
+        $this->applyPostTransferModalDraftGroundMode($mode);
+    }
+
+    public function cancelPostTransferGroundModeSwitch(): void
+    {
+        $this->pendingPostTransferModalGroundMode = null;
+        $this->showPostTransferGroundModeSwitchModal = false;
+    }
+
+    protected function postTransferModalSwitchWouldLoseData(string $from, string $to): bool
+    {
+        if ($from === $to) {
+            return false;
+        }
+        if ($from === 'car') {
+            return $this->postTransferModalHasCarData();
+        }
+
+        return $this->postTransferModalHasOtherData();
+    }
+
+    protected function postTransferModalHasCarData(): bool
+    {
+        if (! empty($this->transferVehicleId) || ! empty($this->transferDriverEmployeeId)) {
+            return true;
+        }
+        $bonus = $this->transferDriverBonusAmount;
+        if ($bonus !== null && $bonus !== '' && is_numeric($bonus) && (float) $bonus > 0) {
+            return true;
+        }
+
+        return count($this->routeWaypoints) > 0;
+    }
+
+    protected function postTransferModalHasOtherData(): bool
+    {
+        foreach ($this->fromAirportPublicTicketCostsByEmployee as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            if (! empty($row['attachment'] ?? null) || ! empty($row['attachment_path'] ?? null)) {
+                return true;
+            }
+            $amount = $row['amount'] ?? null;
+            if ($amount !== null && $amount !== '' && is_numeric($amount) && (float) $amount > 0) {
+                return true;
+            }
+            if (trim((string) ($row['notes'] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function applyPostTransferModalDraftGroundMode(string $mode): void
+    {
+        if (! in_array($mode, ['car', 'other'], true)) {
+            return;
+        }
+        $this->postTransferConfigModalGroundMode = $mode;
+        if ($mode === 'car') {
+            $this->fromAirportPublicTicketCostsByEmployee = [];
+            $this->invalidateRouteMetricsAndSyncToParent();
+        } else {
+            $this->transferVehicleId = null;
+            $this->transferDriverEmployeeId = null;
+            $this->transferDriverBonusAmount = null;
+            $this->invalidateRouteMetricsAndSyncToParent();
+        }
+    }
+
     protected function planTransferRoute($accommodations, $locations): void
     {
         // Transfer route: [optional pickup] → end airport → accommodations
@@ -972,29 +2953,17 @@ class Step4RoutePlanning extends Component
             return;
         }
 
-        // Determine start: pickup location or end airport itself
+        if ($this->effectiveTransferFromAirportLegKind === 'public' || $this->transferFromAirportGroundMode === 'other') {
+            $this->routeError = 'Odcinek „z lotniska” jest bez automatycznego liczenia km — wpisz dystans ręcznie albo wybierz transfer własny (firma) z trybem „Samochód”.';
+
+            return;
+        }
+
+        // Lotnisko przylotu → przystanki → ostatnie mieszkanie
         $startPoint = $endAirport;
         $intermediateWaypoints = [];
 
-        if ($this->transferPickupLocationId) {
-            $pickup = Location::find($this->transferPickupLocationId);
-            if (! $pickup) {
-                $this->routeError = 'Wybrane miejsce startowe transferu nie istnieje (odśwież stronę i wybierz ponownie).';
-
-                return;
-            }
-            if (! $pickup->hasCoordinates()) {
-                $this->routeError = 'Brak współrzędnych dla miejsca startowego transferu: '.$pickup->name.'. Edytuj lokalizację i uzupełnij współrzędne.';
-
-                return;
-            }
-
-            $startPoint = $pickup;
-            // airport becomes intermediate between pickup and first accommodation
-            $intermediateWaypoints[] = $endAirport;
-        }
-
-        // Remaining waypoints: all except last become intermediates
+        // Pozostałe przystanki: wszystkie poza ostatnim jako pośrednie
         $waypointList = $this->resolveWaypointObjects($accommodations, $locations);
         $lastWaypoint = array_pop($waypointList);
         if (! $lastWaypoint) {
@@ -1049,7 +3018,7 @@ class Step4RoutePlanning extends Component
                 $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
                 $this->dispatchTransferConfig();
             } else {
-                $this->routeError = 'Nie udało się zaplanować trasy transferu. Najczęściej powód to brak współrzędnych lub błąd w usłudze wyznaczania trasy. Sprawdź lotnisko docelowe, miejsce startowe transferu oraz domy.';
+                $this->routeError = 'Nie udało się zaplanować trasy transferu. Sprawdź lotnisko docelowe oraz domy / przystanki.';
                 $this->routeData = $previousRouteData;
             }
         } catch (\Exception $e) {
@@ -1070,7 +3039,6 @@ class Step4RoutePlanning extends Component
 
             Log::error('Route planning exception (transfer)', [
                 'message' => $e->getMessage(),
-                'pickup_location_id' => $this->transferPickupLocationId,
                 'end_airport_location_id' => $this->sharedEndAirportLocationId,
                 'route_waypoints' => $this->routeWaypoints,
                 'debug_points' => $debugPoints ?? null,
@@ -1250,6 +3218,7 @@ class Step4RoutePlanning extends Component
             'pickupLocationData' => $this->pickupLocationData,
             'waypointAccommodations' => $this->waypointAccommodations,
             'waypointStops' => $waypointStops,
+            'preTransferRouteTiles' => $this->preTransferRouteTiles,
             'routeWaypoints' => $this->routeWaypoints,
             'extraStopLocationId' => $this->extraStopLocationId,
             'tripPlan' => $this->tripPlan,
@@ -1258,6 +3227,18 @@ class Step4RoutePlanning extends Component
             'availableVehicles' => $this->availableVehicles,
             'availableEmployees' => $this->availableEmployees,
             'availableLocations' => $this->availableLocations,
+            'transferToAirportLegKind' => $this->transferToAirportLegKind,
+            'transferToAirportGroundMode' => $this->transferToAirportGroundMode,
+            'airportHubLegKind' => $this->airportHubLegKind,
+            'transferFromAirportLegKind' => $this->transferFromAirportLegKind,
+            'transferFromAirportGroundMode' => $this->transferFromAirportGroundMode,
+            'transferToAirportModePickerOpen' => $this->transferToAirportModePickerOpen,
+            'airportHubModePickerOpen' => $this->airportHubModePickerOpen,
+            'transferFromAirportModePickerOpen' => $this->transferFromAirportModePickerOpen,
+            'postAirportTransferUserEnabled' => $this->postAirportTransferUserEnabled,
+            'effectiveTransferFromAirportLegKind' => $this->effectiveTransferFromAirportLegKind,
+            'selectedEmployeesForTickets' => $this->selectedEmployeesForTickets,
+            'publicTransportHubKind' => $this->publicTransportHubKind,
         ]);
     }
 }

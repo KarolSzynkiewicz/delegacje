@@ -103,45 +103,35 @@ class DepartureController extends Controller
             'transportCosts.creator',
         ]);
 
-        // If this was a public transport departure, it may have an auto-created transfer
-        $transfer = $this->departureService->findLinkedAirportTransfer($departure, false);
+        // Transfer(y) powiązane z wyjazdem (FK), z fallbackiem do heurystyki dla starych zapisów
+        $linkedTransfers = LogisticsEvent::query()
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('related_departure_id', $departure->id)
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->orderBy('id')
+            ->get();
 
-        $transferDrivingStops = collect();
-        $transferTicketFlightLine = null;
-        $transferEndAirportLocation = null;
-        if ($transfer) {
-            $transfer->load([
-                'vehicle',
-                'fromLocation',
-                'toLocation',
-                'creator',
-                'participants.employee',
-                'driverAdjustments.employee',
-                'driverAdjustments.payroll',
-            ]);
-
-            // Pełna kolejność przystanków + notatki (loc:) z zapisu wyjazdu — ten sam model co „Przebieg trasy”
-            $transferDrivingStops = $departure->getRouteStopsForDetailView();
-
-            $firstTicket = $departure->transportCosts->where('cost_type', 'ticket')->first();
-            if ($firstTicket && $firstTicket->notes && preg_match('/Lotnisko:\s*(.+?)\s*→\s*(.+?)(?:\s*\||$)/u', $firstTicket->notes, $m)) {
-                $transferTicketFlightLine = trim($m[1]).' → '.trim($m[2]);
-                $arrivalAirportName = trim($m[2]);
-                $transferEndAirportLocation = Location::query()
-                    ->where(function ($q) use ($arrivalAirportName) {
-                        $q->where('name', $arrivalAirportName)
-                            ->orWhere('name', 'like', '%'.addcslashes($arrivalAirportName, '%_\\').'%');
-                    })
-                    ->first();
-            }
+        if ($linkedTransfers->isEmpty()) {
+            $legacy = $this->departureService->findLinkedAirportTransfer($departure, false);
+            $linkedTransfers = $legacy ? collect([$legacy]) : collect();
         }
+
+        $linkedTransfers->load([
+            'vehicle',
+            'fromLocation',
+            'toLocation',
+            'creator',
+            'participants.employee',
+            'driverAdjustments.employee',
+            'driverAdjustments.payroll',
+        ]);
+
+        $transfer = $linkedTransfers->last();
 
         return view('departures.show', [
             'departure' => $departure,
             'transfer' => $transfer,
-            'transferDrivingStops' => $transferDrivingStops,
-            'transferTicketFlightLine' => $transferTicketFlightLine,
-            'transferEndAirportLocation' => $transferEndAirportLocation,
+            'linkedTransfers' => $linkedTransfers,
         ]);
     }
 
@@ -482,8 +472,12 @@ class DepartureController extends Controller
             'route_data.route_duration' => 'nullable|numeric|min:0', // float from OpenRouteService
             'route_data.route_waypoints' => 'nullable|array',
             'route_data.location_stop_notes' => 'nullable|array',
+            'route_data.route_segments' => 'nullable|array',
+            'route_data.merged_own_route_waypoints' => 'nullable|array',
             'ticket_costs_per_employee' => 'nullable|array',
+            'ticket_costs_line_items' => 'nullable|array',
             'transfer_config' => 'nullable|array',
+            'transfer_configs_list' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -498,8 +492,12 @@ class DepartureController extends Controller
 
         if (empty($validated['vehicle_id'])) {
             $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
+            $ticketCostsLineItems = $validated['ticket_costs_line_items'] ?? [];
 
-            if (empty($ticketCostsPerEmployee) || ! is_array($ticketCostsPerEmployee)) {
+            if (
+                (empty($ticketCostsLineItems) || ! is_array($ticketCostsLineItems))
+                && (empty($ticketCostsPerEmployee) || ! is_array($ticketCostsPerEmployee))
+            ) {
                 return redirect()
                     ->route('departures.create-v2')
                     ->with('error', 'Przy wyjeździe bez auta musisz uzupełnić koszty biletów dla każdej osoby.');
@@ -605,12 +603,16 @@ class DepartureController extends Controller
             $routeData = $validated['route_data'] ?? null;
             $normalizedRouteWaypoints = [];
 
-            if ($routeData && ! empty($routeData['route_waypoints'])) {
-                $waypoints = $routeData['route_waypoints'];
-                if (is_string($waypoints)) {
-                    $waypoints = json_decode($waypoints, true);
+            if ($routeData) {
+                $waypoints = null;
+                $mergedOwn = $routeData['merged_own_route_waypoints'] ?? null;
+                if (is_array($mergedOwn) && $mergedOwn !== []) {
+                    $waypoints = $mergedOwn;
+                } elseif (! empty($routeData['route_waypoints'])) {
+                    $w = $routeData['route_waypoints'];
+                    $waypoints = is_string($w) ? json_decode($w, true) : $w;
                 }
-                if (is_array($waypoints)) {
+                if (is_array($waypoints) && $waypoints !== []) {
                     $normalizedRouteWaypoints = LogisticsEvent::normalizeRouteWaypointsFromPayload($waypoints);
                 }
             }
@@ -733,6 +735,9 @@ class DepartureController extends Controller
                     'keys' => array_keys($locationStopNotesPayload),
                 ]);
             }
+            if (Schema::hasColumn('logistics_events', 'route_segments') && $routeData && isset($routeData['route_segments'])) {
+                $departureAttributes['route_segments'] = $routeData['route_segments'];
+            }
 
             $departure = LogisticsEvent::create($departureAttributes);
 
@@ -747,20 +752,40 @@ class DepartureController extends Controller
 
             if (empty($validated['vehicle_id'])) {
                 $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
-                foreach ($employeeIds as $employeeId) {
-                    $costData = $ticketCostsPerEmployee[$employeeId] ?? null;
-                    if (
-                        ! $costData
-                        || empty($costData['amount'])
-                        || empty($costData['currency'])
-                        || empty($costData['start_airport_location_id'])
-                        || empty($costData['end_airport_location_id'])
-                    ) {
-                        DB::rollBack();
+                $ticketCostsLineItems = $validated['ticket_costs_line_items'] ?? [];
+                if (! empty($ticketCostsLineItems) && is_array($ticketCostsLineItems)) {
+                    foreach ($ticketCostsLineItems as $row) {
+                        if (
+                            ! is_array($row)
+                            || empty($row['employee_id'])
+                            || empty($row['amount'])
+                            || empty($row['currency'])
+                            || empty($row['start_airport_location_id'])
+                            || empty($row['end_airport_location_id'])
+                        ) {
+                            DB::rollBack();
 
-                        return redirect()
-                            ->route('departures.create-v2')
-                            ->with('error', 'Uzupełnij koszt biletu, walutę oraz lotnisko startowe i docelowe dla każdej osoby.');
+                            return redirect()
+                                ->route('departures.create-v2')
+                                ->with('error', 'Uzupełnij koszt biletu, walutę oraz lotnisko startowe i docelowe dla każdej osoby i każdego odcinka lotu.');
+                        }
+                    }
+                } else {
+                    foreach ($employeeIds as $employeeId) {
+                        $costData = $ticketCostsPerEmployee[$employeeId] ?? null;
+                        if (
+                            ! $costData
+                            || empty($costData['amount'])
+                            || empty($costData['currency'])
+                            || empty($costData['start_airport_location_id'])
+                            || empty($costData['end_airport_location_id'])
+                        ) {
+                            DB::rollBack();
+
+                            return redirect()
+                                ->route('departures.create-v2')
+                                ->with('error', 'Uzupełnij koszt biletu, walutę oraz lotnisko startowe i docelowe dla każdej osoby.');
+                        }
                     }
                 }
             }
@@ -775,50 +800,94 @@ class DepartureController extends Controller
             if (empty($validated['vehicle_id']) && $employeeIds->isNotEmpty()) {
                 $employeeNames = Employee::whereIn('id', $employeeIds)->get()->pluck('full_name', 'id');
                 $ticketCostsPerEmployee = $validated['ticket_costs_per_employee'] ?? [];
+                $ticketCostsLineItems = $validated['ticket_costs_line_items'] ?? [];
                 $destinationStopLocationName = Location::whereKey($destinationLocationId)->value('name');
-                $airportLocationIds = collect($ticketCostsPerEmployee)
-                    ->flatMap(function ($row) {
-                        $start = $row['start_airport_location_id'] ?? null;
-                        $end = $row['end_airport_location_id'] ?? null;
 
-                        return array_filter([(int) $start, (int) $end]);
-                    })
-                    ->unique()
-                    ->values();
-                $airportNames = Location::whereIn('id', $airportLocationIds)->pluck('name', 'id');
+                if (! empty($ticketCostsLineItems) && is_array($ticketCostsLineItems)) {
+                    $airportLocationIds = collect($ticketCostsLineItems)
+                        ->flatMap(function ($row) {
+                            $start = $row['start_airport_location_id'] ?? null;
+                            $end = $row['end_airport_location_id'] ?? null;
 
-                foreach ($employeeIds as $employeeId) {
-                    $employeeName = $employeeNames[$employeeId] ?? ('ID: '.$employeeId);
-                    $costData = $ticketCostsPerEmployee[$employeeId] ?? [];
-                    $startAirportName = null;
-                    $endAirportName = null;
-                    if (! empty($costData['start_airport_location_id'])) {
-                        $startAirportName = $airportNames[(int) $costData['start_airport_location_id']] ?? null;
-                    }
-                    if (! empty($costData['end_airport_location_id'])) {
-                        $endAirportName = $airportNames[(int) $costData['end_airport_location_id']] ?? null;
-                    }
-                    $airportText = null;
-                    if ($startAirportName && $endAirportName) {
-                        $airportText = 'Lotnisko: '.$startAirportName.' → '.$endAirportName;
-                    }
+                            return array_filter([(int) $start, (int) $end]);
+                        })
+                        ->unique()
+                        ->values();
+                    $airportNames = Location::whereIn('id', $airportLocationIds)->pluck('name', 'id');
 
-                    TransportCost::create([
-                        'logistics_event_id' => $departure->id,
-                        'vehicle_id' => null,
-                        'transport_id' => null,
-                        'cost_type' => 'ticket',
-                        'amount' => (float) ($costData['amount'] ?? 0),
-                        'currency' => strtoupper((string) ($costData['currency'] ?? 'PLN')),
-                        'cost_date' => $departureDate->toDateString(),
-                        'description' => 'Bilet - '.$employeeName,
-                        'file_path' => $costData['attachment_path'] ?? null,
-                        'notes' => collect([
-                            ! empty($destinationStopLocationName) ? ('Przystanek docelowy: '.$destinationStopLocationName) : null,
-                            $airportText,
-                        ])->filter()->implode(' | ') ?: null,
-                        'created_by' => auth()->id() ?? 1,
-                    ]);
+                    foreach ($ticketCostsLineItems as $line) {
+                        $employeeId = (int) ($line['employee_id'] ?? 0);
+                        $employeeName = $employeeNames[$employeeId] ?? ('ID: '.$employeeId);
+                        $segIndex = (int) ($line['segment_index'] ?? 0);
+                        $startAirportName = $airportNames[(int) ($line['start_airport_location_id'] ?? 0)] ?? null;
+                        $endAirportName = $airportNames[(int) ($line['end_airport_location_id'] ?? 0)] ?? null;
+                        $airportText = null;
+                        if ($startAirportName && $endAirportName) {
+                            $airportText = 'Lotnisko: '.$startAirportName.' → '.$endAirportName;
+                        }
+
+                        TransportCost::create([
+                            'logistics_event_id' => $departure->id,
+                            'vehicle_id' => null,
+                            'transport_id' => null,
+                            'cost_type' => 'ticket',
+                            'amount' => (float) ($line['amount'] ?? 0),
+                            'currency' => strtoupper((string) ($line['currency'] ?? 'PLN')),
+                            'cost_date' => $departureDate->toDateString(),
+                            'description' => 'Bilet (odcinek '.($segIndex + 1).') - '.$employeeName,
+                            'file_path' => $line['attachment_path'] ?? null,
+                            'notes' => collect([
+                                ! empty($destinationStopLocationName) ? ('Przystanek docelowy: '.$destinationStopLocationName) : null,
+                                $airportText,
+                            ])->filter()->implode(' | ') ?: null,
+                            'created_by' => auth()->id() ?? 1,
+                        ]);
+                    }
+                } else {
+                    $airportLocationIds = collect($ticketCostsPerEmployee)
+                        ->flatMap(function ($row) {
+                            $start = $row['start_airport_location_id'] ?? null;
+                            $end = $row['end_airport_location_id'] ?? null;
+
+                            return array_filter([(int) $start, (int) $end]);
+                        })
+                        ->unique()
+                        ->values();
+                    $airportNames = Location::whereIn('id', $airportLocationIds)->pluck('name', 'id');
+
+                    foreach ($employeeIds as $employeeId) {
+                        $employeeName = $employeeNames[$employeeId] ?? ('ID: '.$employeeId);
+                        $costData = $ticketCostsPerEmployee[$employeeId] ?? [];
+                        $startAirportName = null;
+                        $endAirportName = null;
+                        if (! empty($costData['start_airport_location_id'])) {
+                            $startAirportName = $airportNames[(int) $costData['start_airport_location_id']] ?? null;
+                        }
+                        if (! empty($costData['end_airport_location_id'])) {
+                            $endAirportName = $airportNames[(int) $costData['end_airport_location_id']] ?? null;
+                        }
+                        $airportText = null;
+                        if ($startAirportName && $endAirportName) {
+                            $airportText = 'Lotnisko: '.$startAirportName.' → '.$endAirportName;
+                        }
+
+                        TransportCost::create([
+                            'logistics_event_id' => $departure->id,
+                            'vehicle_id' => null,
+                            'transport_id' => null,
+                            'cost_type' => 'ticket',
+                            'amount' => (float) ($costData['amount'] ?? 0),
+                            'currency' => strtoupper((string) ($costData['currency'] ?? 'PLN')),
+                            'cost_date' => $departureDate->toDateString(),
+                            'description' => 'Bilet - '.$employeeName,
+                            'file_path' => $costData['attachment_path'] ?? null,
+                            'notes' => collect([
+                                ! empty($destinationStopLocationName) ? ('Przystanek docelowy: '.$destinationStopLocationName) : null,
+                                $airportText,
+                            ])->filter()->implode(' | ') ?: null,
+                            'created_by' => auth()->id() ?? 1,
+                        ]);
+                    }
                 }
             }
 
@@ -910,73 +979,91 @@ class DepartureController extends Controller
                 }
             }
 
-            // Create transfer event (public transport only, if configured in step 4)
-            $transferConfig = $validated['transfer_config'] ?? [];
-            if (! empty($validated['vehicle_id']) === false && ! empty($transferConfig)) {
-                $transferVehicleId = ! empty($transferConfig['vehicle_id']) ? (int) $transferConfig['vehicle_id'] : null;
-                $transferDriverEmployeeId = ! empty($transferConfig['driver_employee_id']) ? (int) $transferConfig['driver_employee_id'] : null;
-                $transferBonusAmount = ! empty($transferConfig['bonus_amount']) ? (float) $transferConfig['bonus_amount'] : null;
-                $transferBonusCurrency = ! empty($transferConfig['bonus_currency']) ? strtoupper($transferConfig['bonus_currency']) : 'PLN';
-                $transferPickupLocationId = ! empty($transferConfig['pickup_location_id']) ? (int) $transferConfig['pickup_location_id'] : null;
-                $transferRouteDistance = $transferConfig['route_distance'] ?? null;
-                $transferRouteDuration = $transferConfig['route_duration'] ?? null;
-                $normalizedTransferWaypoints = LogisticsEvent::normalizeRouteWaypointsFromPayload(
-                    ! empty($transferConfig['route_waypoints']) && is_array($transferConfig['route_waypoints'])
-                        ? $transferConfig['route_waypoints']
-                        : null
-                );
-                $transferLocationStopNotes = LogisticsEvent::sanitizeLocationStopNotes(
-                    isset($transferConfig['location_stop_notes']) && is_array($transferConfig['location_stop_notes'])
-                        ? $transferConfig['location_stop_notes']
-                        : null,
-                    $normalizedTransferWaypoints
-                );
-                $endAirportLocationId = ! empty($transferConfig['end_airport_location_id']) ? (int) $transferConfig['end_airport_location_id'] : null;
-
-                // from_location = pickup location (or end airport if no pickup), to_location = destination (last accommodation)
-                $transferFromLocationId = $transferPickupLocationId ?? $endAirportLocationId ?? $destinationLocationId;
-
-                $transferAttributes = [
-                    'type' => \App\Enums\LogisticsEventType::TRANSFER,
-                    'event_date' => $departureDate,
-                    'end_date' => $departureDate,
-                    'from_location_id' => $transferFromLocationId,
-                    'to_location_id' => $destinationLocationId,
-                    'vehicle_id' => $transferVehicleId,
-                    'status' => LogisticsEventStatus::COMPLETED,
-                    'notes' => 'Transfer z lotniska – automatycznie z wyjazdu #'.$departure->id,
-                    'related_departure_id' => $departure->id,
-                    'has_reassignment' => false,
-                    'has_transport' => ! empty($transferVehicleId),
-                    'created_by' => auth()->id() ?? 1,
-                    'route_distance' => $transferRouteDistance,
-                    'route_duration' => $transferRouteDuration ? (int) $transferRouteDuration : null,
-                    'route_waypoints' => $normalizedTransferWaypoints !== [] ? $normalizedTransferWaypoints : null,
-                    'destination_stop_location' => null,
-                ];
-                if (Schema::hasColumn('logistics_events', 'location_stop_notes')) {
-                    $transferAttributes['location_stop_notes'] = $transferLocationStopNotes;
+            // Create transfer event(s) (public transport only, if configured in step 4)
+            $transferConfigsList = $validated['transfer_configs_list'] ?? [];
+            $transferConfigsToCreate = [];
+            if (is_array($transferConfigsList) && $transferConfigsList !== []) {
+                foreach ($transferConfigsList as $cfg) {
+                    if (is_array($cfg) && $cfg !== []) {
+                        $transferConfigsToCreate[] = $cfg;
+                    }
                 }
-
-                $transfer = LogisticsEvent::create($transferAttributes);
-
-                // Link participants to transfer
-                foreach ($employeeIds as $employeeId) {
-                    $transfer->participants()->create(['employee_id' => $employeeId]);
+            }
+            if ($transferConfigsToCreate === []) {
+                $single = $validated['transfer_config'] ?? [];
+                if (is_array($single) && $single !== []) {
+                    $transferConfigsToCreate[] = $single;
                 }
+            }
 
-                // Create driver adjustment if bonus is set
-                if ($transferDriverEmployeeId && $transferBonusAmount > 0) {
-                    \App\Models\Adjustment::create([
-                        'employee_id' => $transferDriverEmployeeId,
-                        'payroll_id' => null,
-                        'logistics_event_id' => $transfer->id,
-                        'type' => 'bonus',
-                        'amount' => $transferBonusAmount,
-                        'currency' => $transferBonusCurrency,
-                        'notes' => 'Uznanie za kierowanie transferem #'.$transfer->id,
-                        'date' => $departureDate->toDateString(),
-                    ]);
+            if (empty($validated['vehicle_id']) && $transferConfigsToCreate !== []) {
+                foreach ($transferConfigsToCreate as $transferIndex => $transferConfig) {
+                    $transferVehicleId = ! empty($transferConfig['vehicle_id']) ? (int) $transferConfig['vehicle_id'] : null;
+                    $transferDriverEmployeeId = ! empty($transferConfig['driver_employee_id']) ? (int) $transferConfig['driver_employee_id'] : null;
+                    $transferBonusAmount = ! empty($transferConfig['bonus_amount']) ? (float) $transferConfig['bonus_amount'] : null;
+                    $transferBonusCurrency = ! empty($transferConfig['bonus_currency']) ? strtoupper($transferConfig['bonus_currency']) : 'PLN';
+                    $transferPickupLocationId = ! empty($transferConfig['pickup_location_id']) ? (int) $transferConfig['pickup_location_id'] : null;
+                    $transferRouteDistance = $transferConfig['route_distance'] ?? null;
+                    $transferRouteDuration = $transferConfig['route_duration'] ?? null;
+                    $normalizedTransferWaypoints = LogisticsEvent::normalizeRouteWaypointsFromPayload(
+                        ! empty($transferConfig['route_waypoints']) && is_array($transferConfig['route_waypoints'])
+                            ? $transferConfig['route_waypoints']
+                            : null
+                    );
+                    $transferLocationStopNotes = LogisticsEvent::sanitizeLocationStopNotes(
+                        isset($transferConfig['location_stop_notes']) && is_array($transferConfig['location_stop_notes'])
+                            ? $transferConfig['location_stop_notes']
+                            : null,
+                        $normalizedTransferWaypoints
+                    );
+                    $endAirportLocationId = ! empty($transferConfig['end_airport_location_id']) ? (int) $transferConfig['end_airport_location_id'] : null;
+
+                    // from_location = pickup location (or end airport if no pickup), to_location = destination (last accommodation)
+                    $transferFromLocationId = $transferPickupLocationId ?? $endAirportLocationId ?? $destinationLocationId;
+
+                    $transferNoteSuffix = count($transferConfigsToCreate) > 1
+                        ? ' (odcinek '.($transferIndex + 1).')'
+                        : '';
+                    $transferAttributes = [
+                        'type' => LogisticsEventType::TRANSFER,
+                        'event_date' => $departureDate,
+                        'end_date' => $departureDate,
+                        'from_location_id' => $transferFromLocationId,
+                        'to_location_id' => $destinationLocationId,
+                        'vehicle_id' => $transferVehicleId,
+                        'status' => LogisticsEventStatus::COMPLETED,
+                        'notes' => 'Transfer z lotniska'.$transferNoteSuffix.' – automatycznie z wyjazdu #'.$departure->id,
+                        'related_departure_id' => $departure->id,
+                        'has_reassignment' => false,
+                        'has_transport' => ! empty($transferVehicleId),
+                        'created_by' => auth()->id() ?? 1,
+                        'route_distance' => $transferRouteDistance,
+                        'route_duration' => $transferRouteDuration ? (int) $transferRouteDuration : null,
+                        'route_waypoints' => $normalizedTransferWaypoints !== [] ? $normalizedTransferWaypoints : null,
+                        'destination_stop_location' => null,
+                    ];
+                    if (Schema::hasColumn('logistics_events', 'location_stop_notes')) {
+                        $transferAttributes['location_stop_notes'] = $transferLocationStopNotes;
+                    }
+
+                    $transfer = LogisticsEvent::create($transferAttributes);
+
+                    foreach ($employeeIds as $employeeId) {
+                        $transfer->participants()->create(['employee_id' => $employeeId]);
+                    }
+
+                    if ($transferDriverEmployeeId && $transferBonusAmount > 0) {
+                        \App\Models\Adjustment::create([
+                            'employee_id' => $transferDriverEmployeeId,
+                            'payroll_id' => null,
+                            'logistics_event_id' => $transfer->id,
+                            'type' => 'bonus',
+                            'amount' => $transferBonusAmount,
+                            'currency' => $transferBonusCurrency,
+                            'notes' => 'Uznanie za kierowanie transferem #'.$transfer->id,
+                            'date' => $departureDate->toDateString(),
+                        ]);
+                    }
                 }
             }
 

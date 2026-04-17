@@ -280,7 +280,34 @@
 
     @if($isPublicTransportDeparture)
         <x-ui.card label="Transfer" class="mb-0">
-            @if(!empty($transfer))
+            @if(isset($linkedTransfers) && $linkedTransfers->isNotEmpty())
+                @foreach($linkedTransfers as $transfer)
+                @php
+                    $transferDrivingStops = $transfer->getRouteStopsForDetailView();
+                    if ($transferDrivingStops->isEmpty()) {
+                        $transferDrivingStops = $departure->getRouteStopsForDetailView();
+                    }
+                    $segNum = $loop->iteration;
+                    $ticketForRow = $departure->transportCosts->where('cost_type', 'ticket')->first(function ($c) use ($segNum) {
+                        return (bool) preg_match('/\(odcinek\s*'.$segNum.'\)/u', (string) ($c->description ?? ''));
+                    }) ?? $departure->transportCosts->where('cost_type', 'ticket')->first();
+                    $transferTicketFlightLine = null;
+                    $transferEndAirportLocation = null;
+                    if ($ticketForRow && $ticketForRow->notes && preg_match('/Lotnisko:\s*(.+?)\s*→\s*(.+?)(?:\s*\||$)/u', $ticketForRow->notes, $m)) {
+                        $transferTicketFlightLine = trim($m[1]).' → '.trim($m[2]);
+                        $arrivalAirportName = trim($m[2]);
+                        $transferEndAirportLocation = \App\Models\Location::query()
+                            ->where(function ($q) use ($arrivalAirportName) {
+                                $q->where('name', $arrivalAirportName)
+                                    ->orWhere('name', 'like', '%'.addcslashes($arrivalAirportName, '%_\\').'%');
+                            })
+                            ->first();
+                    }
+                @endphp
+                <div class="transfer-block @if(!$loop->last) mb-4 pb-4 border-bottom @endif" style="border-color: rgba(255,255,255,0.08) !important;">
+                @if($linkedTransfers->count() > 1)
+                    <h6 class="text-muted small text-uppercase mb-3" style="font-size: 0.72rem; letter-spacing: .06em;">Odcinek {{ $segNum }} z {{ $linkedTransfers->count() }}</h6>
+                @endif
                 <div class="transfer-summary-grid mb-3">
                     <div class="row g-3 g-md-4">
                         <div class="col-12 col-md-4">
@@ -425,6 +452,8 @@
                         @endforelse
                     </div>
                 </div>
+                </div>
+                @endforeach
             @else
                 <p class="text-muted mb-0">Brak powiązanego transferu (dla wyjazdów transportem publicznym transfer tworzy się automatycznie w kroku 4).</p>
             @endif

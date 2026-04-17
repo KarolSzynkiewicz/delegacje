@@ -37,6 +37,7 @@ class LogisticsEvent extends Model
         'route_duration',
         'route_waypoints',
         'location_stop_notes',
+        'route_segments',
         'destination_stop_location',
         'has_reassignment',
         'related_departure_id',
@@ -53,6 +54,7 @@ class LogisticsEvent extends Model
         'route_duration' => 'integer',
         'route_waypoints' => 'array',
         'location_stop_notes' => 'array',
+        'route_segments' => 'array',
     ];
 
     /**
@@ -351,7 +353,13 @@ class LogisticsEvent extends Model
         if (is_int($waypoint) || (is_string($waypoint) && ctype_digit((string) $waypoint))) {
             return ['type' => 'acc', 'id' => (int) $waypoint];
         }
-        $s = strtolower((string) $waypoint);
+        $s = strtolower(trim((string) $waypoint));
+        if ($s === 'base') {
+            return ['type' => 'base', 'id' => 0];
+        }
+        if ($s === 'sap') {
+            return ['type' => 'sap', 'id' => 0];
+        }
         if (! str_contains($s, ':')) {
             return null;
         }
@@ -382,7 +390,14 @@ class LogisticsEvent extends Model
         $out = [];
         foreach ($waypoints as $w) {
             $p = self::parseRouteWaypointKey($w);
-            if ($p !== null) {
+            if ($p === null) {
+                continue;
+            }
+            if (($p['type'] ?? '') === 'base') {
+                $out[] = 'base';
+            } elseif (($p['type'] ?? '') === 'sap') {
+                $out[] = 'sap';
+            } else {
                 $out[] = $p['type'].':'.$p['id'];
             }
         }
@@ -461,6 +476,9 @@ class LogisticsEvent extends Model
         foreach ($this->route_waypoints ?? [] as $w) {
             $p = self::parseRouteWaypointKey($w);
             if ($p === null) {
+                continue;
+            }
+            if (($p['type'] ?? '') === 'base' || ($p['type'] ?? '') === 'sap') {
                 continue;
             }
             $pos++;

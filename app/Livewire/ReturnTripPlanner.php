@@ -11,8 +11,10 @@ use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
 use App\Services\ReturnTripService;
 use App\Services\VehicleValidationService;
+use App\Support\PublicTransportTicketCosts;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -43,7 +45,8 @@ class ReturnTripPlanner extends Component
 
     public string $employeeSearch = '';
 
-    public array $ticketCostsByEmployee = []; // [employee_id => ['amount' => ..., 'currency' => 'PLN', 'file' => ...]]
+    /** @var array<int, array{amount?: mixed, currency?: string, attachment?: mixed}> */
+    public array $ticketCostsByEmployee = [];
 
     public $sharedStartAirportLocationId = null;
 
@@ -234,6 +237,28 @@ class ReturnTripPlanner extends Component
     public function getIsPublicTransportProperty(): bool
     {
         return $this->transportMode === 'public';
+    }
+
+    /** Tytuł sekcji biletów: lotnisko vs dworzec. */
+    public function getPublicTransportTicketsSectionTitleProperty(): string
+    {
+        return $this->publicTransportHubKind === 'airport'
+            ? 'Bilety lotnicze'
+            : 'Bilety';
+    }
+
+    /** Kwota, waluta i załącznik dla każdej osoby (jak przy wyjeździe). */
+    public function getHeaderTicketsIncompleteProperty(): bool
+    {
+        if (! $this->isPublicTransport) {
+            return false;
+        }
+
+        return PublicTransportTicketCosts::areIncompleteForEmployees(
+            $this->selectedEmployeeIds,
+            $this->ticketCostsByEmployee,
+            true
+        );
     }
 
     public function getCurrencyCasesProperty(): array
@@ -652,22 +677,60 @@ class ReturnTripPlanner extends Component
             foreach ($this->selectedEmployeeIds as $empId) {
                 $cost = $this->ticketCostsByEmployee[$empId] ?? [];
                 $amount = $cost['amount'] ?? null;
-                if ($amount === null || $amount === '' || ! is_numeric($amount)) {
+                if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                     $this->addError('ticketCostsByEmployee.'.$empId.'.amount', 'Uzupełnij koszt biletu.');
+
+                    return;
+                }
+                $currency = strtoupper(trim((string) ($cost['currency'] ?? 'PLN')));
+                if (strlen($currency) !== 3) {
+                    $this->addError('ticketCostsByEmployee.'.$empId.'.currency', 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
+
+                    return;
+                }
+
+                $attachment = $cost['attachment'] ?? null;
+                if (empty($attachment)) {
+                    $this->addError('ticketCostsByEmployee.'.$empId.'.attachment', 'Dodaj załącznik biletu.');
+
+                    return;
+                }
+
+                $attachmentValidator = Validator::make(
+                    ['attachment' => $attachment],
+                    ['attachment' => 'file|max:10240'],
+                    [
+                        'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
+                        'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
+                    ]
+                );
+                if ($attachmentValidator->fails()) {
+                    foreach ($attachmentValidator->errors()->all() as $message) {
+                        $this->addError('ticketCostsByEmployee.'.$empId.'.attachment', $message);
+                    }
 
                     return;
                 }
             }
         }
 
-        // Save ticket file attachments temporarily
         $ticketCostsToSave = [];
-        foreach ($this->selectedEmployeeIds as $empId) {
-            $cost = $this->ticketCostsByEmployee[$empId] ?? [];
-            $ticketCostsToSave[$empId] = [
-                'amount' => $cost['amount'] ?? null,
-                'currency' => $cost['currency'] ?? 'PLN',
-            ];
+        if ($this->isPublicTransport) {
+            foreach ($this->selectedEmployeeIds as $empId) {
+                $cost = $this->ticketCostsByEmployee[$empId] ?? [];
+                $amount = $cost['amount'] ?? null;
+                $currency = strtoupper(trim((string) ($cost['currency'] ?? 'PLN')));
+                $attachment = $cost['attachment'] ?? null;
+                $attachmentPath = null;
+                if ($attachment) {
+                    $attachmentPath = $attachment->store('transport_costs', 'public');
+                }
+                $ticketCostsToSave[$empId] = [
+                    'amount' => $amount !== null && $amount !== '' ? (float) $amount : null,
+                    'currency' => $currency,
+                    'attachment_path' => $attachmentPath,
+                ];
+            }
         }
 
         // Store data in session for the controller to pick up

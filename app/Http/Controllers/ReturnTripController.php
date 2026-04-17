@@ -484,6 +484,9 @@ class ReturnTripController extends Controller
     {
         $startAirportId = $data['start_airport_location_id'] ?? null;
         $endAirportId = $data['end_airport_location_id'] ?? null;
+        $costDate = $returnTrip->event_date
+            ?? (isset($data['return_date']) ? Carbon::parse($data['return_date']) : now()->startOfDay());
+        $costDateString = Carbon::parse($costDate)->toDateString();
 
         foreach (($data['ticket_costs_per_employee'] ?? []) as $employeeId => $costData) {
             $amount = $costData['amount'] ?? null;
@@ -501,12 +504,15 @@ class ReturnTripController extends Controller
             \App\Models\TransportCost::create([
                 'logistics_event_id' => $returnTrip->id,
                 'cost_type' => 'ticket',
+                'cost_date' => $costDateString,
                 'amount' => $amount,
                 'currency' => $currency,
                 'employee_id' => $employeeId,
                 'from_location_id' => $startAirportId,
                 'to_location_id' => $endAirportId,
+                'file_path' => $costData['attachment_path'] ?? null,
                 'notes' => 'Bilet powrotny – '.$employee->full_name,
+                'created_by' => auth()->id() ?? 1,
             ]);
         }
     }
