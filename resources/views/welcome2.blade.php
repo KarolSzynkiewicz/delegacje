@@ -9,8 +9,35 @@
         <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
             <h3 class="mb-2">Komponenty logistyki <span class="text-muted small fw-normal">(<code>x-logistics.*</code>)</span></h3>
             <p class="text-muted small mb-3">
-                Używane w <code>/departures/create-v2</code>, zjeździe i transferze. Nagłówek sekcji: <code>x-logistics.section-header</code>; ramka kroku trasy: <code>x-logistics.route-planning-frame</code>; wiersz dat + transport: partial <code>trip-logistics-header</code> (tylko w kontekście Livewire).
+                Używane w <code>/departures/create-v2</code>, zjeździe i transferze. Nagłówek sekcji: <code>x-logistics.section-header</code>; ramka kroku trasy: <code>x-logistics.route-planning-frame</code>; wiersz dat + transport: partial <code>trip-logistics-header</code> (tylko w kontekście Livewire — podgląd pełnego wiersza tylko w planerze).
             </p>
+
+            {{-- Ściąga: klasy CSS nagłówka planera --}}
+            <div class="rounded-3 p-3 mb-4" style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.08);">
+                <h5 class="mb-2 small fw-semibold text-uppercase text-muted" style="letter-spacing: .04em;">Ściąga — klasy nagłówka planera</h5>
+                <p class="text-muted small mb-2 mb-md-3">Zdefiniowane w <code>resources/css/app.css</code> (prefiks <code>.logistics-trip-header-*</code>):</p>
+                <ul class="small text-muted mb-3 ps-3" style="line-height: 1.65;">
+                    <li><code>.logistics-trip-header-row</code> — wiersz Bootstrap (daty | Czym | szczegóły)</li>
+                    <li><code>.logistics-trip-header-card</code> — karta kolumny; <code>min-height: 106px</code></li>
+                    <li><code>.logistics-trip-header-card--invalid</code> — mocna obwódka błędu (daty / brak trybu / lotniska niekompletne)</li>
+                    <li><code>.logistics-trip-header-card--invalid-soft</code> — krok „Typ punktu” (lotnisko / dworzec)</li>
+                    <li><code>.logistics-trip-header-control</code> — input / select / przyciski w nagłówku</li>
+                    <li><code>.logistics-trip-header-control-row</code> — rząd przycisków (np. Czym, Lotnisko/Dworzec)</li>
+                    <li><code>.logistics-trip-header-hint</code> — podpowiedzi i komunikaty (<code>font-size: 0.72rem</code>)</li>
+                </ul>
+                <p class="text-muted small mb-2">Partial hubów (Start/Cel, bez Livewire nie renderuj): <code>resources/views/components/logistics/partials/trip-header-hub-select.blade.php</code></p>
+                <div class="row g-2 mb-0">
+                    <div class="col-md-4">
+                        <div class="rounded-2 p-2 small text-muted logistics-trip-header-card" style="border: 1px solid rgba(255,255,255,0.12);">Karta bazowa <code>.logistics-trip-header-card</code></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="rounded-2 p-2 small text-muted logistics-trip-header-card logistics-trip-header-card--invalid">Stan błędu <code>--invalid</code></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="rounded-2 p-2 small text-muted logistics-trip-header-card logistics-trip-header-card--invalid-soft">Krok typu punktu <code>--invalid-soft</code></div>
+                    </div>
+                </div>
+            </div>
 
             @php
                 $demoVehicle = (object) ['capacity' => 5, 'brand' => 'Volkswagen', 'model' => 'Transporter'];
@@ -35,10 +62,28 @@
             </div>
 
             <div class="rounded-3 p-3 mb-3" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
-                <div class="mb-3">
-                    <div class="text-muted small mb-1">Transport (wariant wymagany, bez wyboru na start):</div>
-                    <div style="max-width: 360px;">
+                <h5 class="mb-3 small fw-semibold text-muted">Ściąga — <code>x-logistics.transport-mode-toggle</code></h5>
+                <p class="text-muted small mb-3">Props: <code>mode</code> (<code>null</code>|<code>public</code>|<code>own</code>), <code>hub-kind</code> (<code>airport</code>|<code>station</code>|null), <code>interactive</code>, <code>required</code>. Etykiety przycisku publicznego w PHP: <code>TransportModeToggle</code>.</p>
+                <div class="row g-3 align-items-stretch mb-3">
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="text-muted small mb-1">Brak wyboru (wymagane)</div>
                         <x-logistics.transport-mode-toggle :mode="null" :interactive="false" />
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="text-muted small mb-1">Publiczny + własny (nieaktywne)</div>
+                        <x-logistics.transport-mode-toggle mode="public" :interactive="false" />
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="text-muted small mb-1">Własny</div>
+                        <x-logistics.transport-mode-toggle mode="own" :interactive="false" />
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="text-muted small mb-1">Publiczny — hub lotnisko → „Samolot”</div>
+                        <x-logistics.transport-mode-toggle mode="public" hub-kind="airport" :interactive="false" />
+                    </div>
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="text-muted small mb-1">Publiczny — hub dworzec → „Bus / pociąg”</div>
+                        <x-logistics.transport-mode-toggle mode="public" hub-kind="station" :interactive="false" />
                     </div>
                 </div>
                 <x-logistics.vehicle-seat-grid
@@ -49,12 +94,26 @@
                     :interactive="false"
                 />
             </div>
-            <pre class="small text-muted mb-0 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>&lt;x-logistics.vehicle-seat-grid
+            <pre class="small text-muted mb-2 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>&lt;x-logistics.vehicle-seat-grid
     :vehicle="$selectedVehicle"
     :vehicle-seats="$vehicleSeats"
     :selected-employees="$this->selectedEmployees"
     wire-key-prefix="vs"
 /&gt;</code></pre>
+            <pre class="small text-muted mb-2 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>&lt;x-logistics.transport-mode-toggle
+    :mode="$transportMode"
+    :hub-kind="$publicTransportHubKind"
+/&gt;</code></pre>
+            <pre class="small text-muted mb-0 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>@include('components.logistics.trip-logistics-header', [
+    'tripLogisticsHeader' => [
+        'title' => 'Szczegóły wyjazdu',     // albo zjazdu
+        'firstWire' => 'departureDate',    // albo returnDate
+        'firstLabel' => 'Data wyjazdu',
+        'datesHelp' => '…',
+        'vehiclePoolHint' => 'departure',  // albo 'return'
+    ],
+])
+// W widoku Livewire: $endDate, $transportMode, $publicTransportHubKind, …</code></pre>
         </div>
 
         {{-- Hero Card Example --}}

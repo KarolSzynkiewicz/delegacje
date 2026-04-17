@@ -1,6 +1,7 @@
-{{-- Modal: konfiguracja transferu na lotnisko (własny środek) — wzorowane na modalach kalendarza (step 2) --}}
-@if($showPreTransferConfigModal && $isPublicTransport && $transferToAirportLegKind === 'own')
+{{-- Modal: konfiguracja transferu na lotnisko — jeden dialog (transport publiczny / samochód / inny transport). --}}
+@if($showPreTransferConfigModal && $isPublicTransport && ($transferToAirportLegKind === null || $transferToAirportLegKind === 'public' || $transferToAirportLegKind === 'own'))
     @php
+        $modalSeg = $transferToAirportLegKind === null ? null : ($transferToAirportLegKind === 'public' ? 'public' : (($transferToAirportGroundMode ?? 'car') === 'car' ? 'car' : 'other'));
         $mGround = $preTransferConfigModalGroundMode ?? $transferToAirportGroundMode;
     @endphp
     <div class="modal-portal-to-body" wire:key="step4-pre-transfer-config-modal-root">
@@ -16,28 +17,52 @@
                         <button type="button" class="btn-close btn-close-white" wire:click="closePreTransferConfigModal" aria-label="Zamknij"></button>
                     </div>
                     <div class="modal-body">
-                        @if($mGround === 'other')
-                            <p class="small text-muted mb-3">Inny transport: <strong>dworzec startowy → dworzec docelowy</strong> (np. kolej), osobno od trasy samochodem.</p>
-                        @else
-                            <p class="small text-muted mb-3">Samochód: <strong>baza → przystanki → {{ $startAirportData['name'] ?? 'lotnisko' }}</strong> (ustalasz w „Konfiguruj trasę”).</p>
-                        @endif
-                        <label class="form-label small text-muted mb-1">Środek na odcinku</label>
-                        <div class="d-flex gap-2 align-items-stretch logistics-trip-header-control-row mb-3">
+                        <label class="form-label small text-muted mb-1">Typ odcinka</label>
+                        <div class="d-flex flex-wrap gap-2 align-items-stretch logistics-trip-header-control-row mb-3">
                             <button type="button"
-                                    class="btn btn-sm flex-fill d-inline-flex align-items-center justify-content-center logistics-trip-header-control {{ $mGround === 'car' ? 'btn-success' : 'btn-outline-secondary' }}"
+                                    class="btn btn-sm flex-fill d-inline-flex align-items-center justify-content-center logistics-trip-header-control {{ $modalSeg === 'public' ? 'btn-outline-light' : 'btn-outline-secondary' }}"
                                     style="min-height: 2.125rem;"
-                                    wire:click="requestPreTransferModalGroundMode('car')">
+                                    wire:click="selectPreTransferModalSegment('public')">
+                                <i class="bi bi-people me-1"></i> Transport publiczny
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm flex-fill d-inline-flex align-items-center justify-content-center logistics-trip-header-control {{ $modalSeg === 'car' ? 'btn-success' : 'btn-outline-secondary' }}"
+                                    style="min-height: 2.125rem;"
+                                    wire:click="selectPreTransferModalSegment('car')">
                                 <i class="bi bi-car-front me-1"></i> Samochód
                             </button>
                             <button type="button"
-                                    class="btn btn-sm flex-fill d-inline-flex align-items-center justify-content-center logistics-trip-header-control {{ $mGround === 'other' ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                    class="btn btn-sm flex-fill d-inline-flex align-items-center justify-content-center logistics-trip-header-control {{ $modalSeg === 'other' ? 'btn-primary' : 'btn-outline-secondary' }}"
                                     style="min-height: 2.125rem;"
-                                    wire:click="requestPreTransferModalGroundMode('other')">
+                                    wire:click="selectPreTransferModalSegment('other')">
                                 <i class="bi bi-bus-front me-1"></i> Inny transport
                             </button>
                         </div>
 
-                        @if($mGround === 'other')
+                        @if($transferToAirportLegKind === null)
+                            <p class="small text-muted mb-0">Wybierz typ odcinka przed zatwierdzeniem.</p>
+                        @elseif($modalSeg === 'public')
+                            <p class="small text-muted mb-3">Tylko bilety na ten odcinek — bez trasy samochodem w tym kroku.</p>
+                            @if($selectedEmployeesForTickets->isNotEmpty())
+                                <x-logistics.public-transport-tickets
+                                    variant="cards"
+                                    section-title="Bilety (ten odcinek)"
+                                    :employees="$selectedEmployeesForTickets"
+                                    :ticket-costs-by-employee="$toAirportPublicTicketCostsByEmployee"
+                                    :flat-attachment-uploads="$toAirportTicketFiles"
+                                    attachment-flat-binding-key="toAirportTicketFiles"
+                                    :tickets-incomplete="$this->toAirportGroundTicketsIncomplete"
+                                    :require-attachment="true"
+                                    ticket-costs-binding-key="toAirportPublicTicketCostsByEmployee"
+                                    wire:key-prefix="seg-pre-ticket-modal-public"
+                                    class="mt-0 pt-0 border-0 mb-0"
+                                    style="border-top: none !important;"
+                                />
+                            @else
+                                <p class="small text-muted mb-0">Brak osób w składzie wyjazdu — dodaj uczestników wcześniej.</p>
+                            @endif
+                        @elseif($modalSeg === 'other')
+                            <p class="small text-muted mb-3">Inny transport: <strong>dworzec startowy → dworzec docelowy</strong> (np. kolej), osobno od trasy samochodem.</p>
                             <div class="rounded-2 p-3 mb-3" style="background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.28);">
                                 <div class="small fw-semibold mb-2"><i class="bi bi-train-front me-1"></i> Dworce (widoczne w podglądzie karty)</div>
                                 <div class="row g-2">
@@ -59,6 +84,8 @@
                                     section-title="Bilety (ten odcinek)"
                                     :employees="$selectedEmployeesForTickets"
                                     :ticket-costs-by-employee="$toAirportPublicTicketCostsByEmployee"
+                                    :flat-attachment-uploads="$toAirportTicketFiles"
+                                    attachment-flat-binding-key="toAirportTicketFiles"
                                     :tickets-incomplete="$this->toAirportGroundTicketsIncomplete"
                                     :require-attachment="true"
                                     ticket-costs-binding-key="toAirportPublicTicketCostsByEmployee"
@@ -70,6 +97,7 @@
                                 <p class="small text-muted mb-0">Brak osób w składzie wyjazdu — dodaj uczestników wcześniej.</p>
                             @endif
                         @else
+                            <p class="small text-muted mb-3">Samochód: <strong>baza → przystanki → {{ $startAirportData['name'] ?? 'lotnisko' }}</strong> (ustalasz w „Konfiguruj trasę”).</p>
                             @php
                                 $preTransferIncomplete = $this->preTransferVehicleIncomplete || $this->preTransferDriverIncomplete || $this->preTransferBonusIncomplete;
                             @endphp
@@ -96,7 +124,6 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-semibold text-muted mb-1">Uznanie <span class="text-danger">*</span></label>
-                                        {{-- Bez disabled: Livewire nie synchronizuje wire:model po przełączeniu disabled — pola „martwe” mimo wybranego kierowcy. Walidacja przy Zatwierdź. --}}
                                         <input type="number" step="0.01" min="0" wire:model.live="preTransferDriverBonusAmount"
                                                class="form-control form-control-sm @if($this->preTransferBonusIncomplete) is-invalid @endif"
                                                placeholder="np. 200.00"
@@ -138,14 +165,19 @@
                     <div class="modal-footer border-secondary">
                         @php
                             $footerPreIncomplete = $this->preTransferVehicleIncomplete || $this->preTransferDriverIncomplete || $this->preTransferBonusIncomplete;
-                            $footerStationsIncomplete = $mGround === 'other' && (
+                            $footerStationsIncomplete = $modalSeg === 'other' && (
                                 trim((string)($preTransferPublicStationStart ?? '')) === '' || trim((string)($preTransferPublicStationEnd ?? '')) === ''
                             );
-                            $footerOtherBlocked = $mGround === 'other' && ($this->toAirportGroundTicketsIncomplete || $footerStationsIncomplete);
-                            $footerCarBlocked = $mGround === 'car' && $footerPreIncomplete;
-                            $footerDisabled = $mGround === 'other'
-                                ? ($selectedEmployeesForTickets->isEmpty() || $footerOtherBlocked)
-                                : $footerCarBlocked;
+                            $footerOtherBlocked = $modalSeg === 'other' && ($this->toAirportGroundTicketsIncomplete || $footerStationsIncomplete);
+                            $footerCarBlocked = $modalSeg === 'car' && $footerPreIncomplete;
+                            $footerPublicBlocked = $modalSeg === 'public' && $selectedEmployeesForTickets->isNotEmpty() && $this->toAirportGroundTicketsIncomplete;
+                            $footerUnset = $transferToAirportLegKind === null;
+                            $footerDisabled = $footerUnset
+                                || ($modalSeg === 'other'
+                                    ? ($selectedEmployeesForTickets->isEmpty() || $footerOtherBlocked)
+                                    : ($modalSeg === 'car'
+                                        ? $footerCarBlocked
+                                        : ($modalSeg === 'public' ? $footerPublicBlocked : false)));
                         @endphp
                         <button type="button" class="btn btn-outline-light" wire:click="closePreTransferConfigModal">Anuluj</button>
                         <button type="button" class="btn btn-primary" wire:click="confirmPreTransferModal" wire:loading.attr="disabled"
@@ -158,7 +190,7 @@
         </div>
     </div>
 
-    @if($showPreTransferGroundModeSwitchModal && $pendingPreTransferModalGroundMode)
+    @if($showPreTransferGroundModeSwitchModal && ($pendingPreTransferModalSegment || $pendingPreTransferModalGroundMode))
         @teleport('body')
             <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
                  aria-labelledby="preTransferGroundModeSwitchTitle"
@@ -167,12 +199,14 @@
                     <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0;">
                         <div class="modal-header border-secondary">
                             <h5 class="modal-title" id="preTransferGroundModeSwitchTitle">
-                                <i class="bi bi-arrow-left-right text-warning me-2"></i>Zmiana środka na odcinku
+                                <i class="bi bi-arrow-left-right text-warning me-2"></i>Zmiana typu odcinka
                             </h5>
                             <button type="button" class="btn-close btn-close-white" wire:click="cancelPreTransferGroundModeSwitch" aria-label="Zamknij"></button>
                         </div>
                         <div class="modal-body">
-                            @if($pendingPreTransferModalGroundMode === 'car')
+                            @if($pendingPreTransferModalSegment)
+                                <p class="mb-0">Zmiana typu odcinka może wyzerować wcześniej wpisane dane (bilety, pojazd, dworce lub trasę) w tym oknie.</p>
+                            @elseif($pendingPreTransferModalGroundMode === 'car')
                                 <p class="mb-0">Przejście na <strong>samochód</strong> wyzeruje bilety, dworce (opis) oraz dane <strong>innego transportu</strong> w tym oknie. Ustawioną trasę waypointów zaczniesz od domyślnej (baza → lotnisko).</p>
                             @else
                                 <p class="mb-0">Przejście na <strong>inny transport</strong> wyzeruje pojazd, kierowcę, uznanie oraz <strong>waypointy mapy</strong> (przystanki autem) dla tego odcinka.</p>

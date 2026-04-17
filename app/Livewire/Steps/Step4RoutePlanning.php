@@ -73,8 +73,6 @@ class Step4RoutePlanning extends Component
     /** null = nie skonfigurowano karty; public = powszechny; own = pojazd firmy (car/other poniżej) */
     public ?string $transferToAirportLegKind = null;
 
-    public bool $transferToAirportModePickerOpen = false;
-
     /** car = liczenie ORS; other = bez km (np. autobus prywatnie) — tylko przy transferToAirportLegKind === 'own' */
     public string $transferToAirportGroundMode = 'car';
 
@@ -94,14 +92,20 @@ class Step4RoutePlanning extends Component
      */
     public ?string $preTransferConfigModalGroundMode = null;
 
-    /** Potwierdzenie przełączenia Samochód ↔ Inny transport w modalu (zeruje dane drugiego typu w tym oknie). */
+    /** Potwierdzenie przełączenia typu odcinka (public / samochód / inny) w modalu. */
     public bool $showPreTransferGroundModeSwitchModal = false;
+
+    /** Docelowy segment po potwierdzeniu utraty danych (public|car|other). */
+    public ?string $pendingPreTransferModalSegment = null;
 
     /** @var 'car'|'other'|null */
     public ?string $pendingPreTransferModalGroundMode = null;
 
     /** Modal: trasa na lotnisko startowe (przystanki / przelicz / km). */
     public bool $showPreTransferRouteModal = false;
+
+    /** Modal: trasa i dystans lotnisko docelowe → domy (jak pre-transfer route modal). */
+    public bool $showPostTransferRouteModal = false;
 
     /** Modal: konfiguracja transferu z lotniska docelowego (własny środek). */
     public bool $showPostTransferConfigModal = false;
@@ -190,6 +194,16 @@ class Step4RoutePlanning extends Component
 
     /** @var array<int|string, array<string, mixed>> */
     public array $fromAirportPublicTicketCostsByEmployee = [];
+
+    /**
+     * Płaskie sloty plików dla biletów odcinka „z lotniska” — wire:model na upload wymaga płytkiego klucza.
+     *
+     * @var array<int|string, mixed>
+     */
+    public array $fromAirportTicketFiles = [];
+
+    /** @var array<int|string, mixed> */
+    public array $toAirportTicketFiles = [];
 
     /** Pojazd/kierowca tylko dla odcinka baza → lotnisko startowe (gdy „Autem”). */
     public $preTransferVehicleId = null;
@@ -763,12 +777,10 @@ class Step4RoutePlanning extends Component
         if (! $this->isPublicTransport || $this->transferToAirportLegKind !== null) {
             return;
         }
-        $this->transferToAirportModePickerOpen = true;
-    }
-
-    public function cancelTransferToAirportPicker(): void
-    {
-        $this->transferToAirportModePickerOpen = false;
+        $this->preTransferConfigModalGroundMode = null;
+        $this->showPreTransferGroundModeSwitchModal = false;
+        $this->pendingPreTransferModalSegment = null;
+        $this->showPreTransferConfigModal = true;
     }
 
     public function selectTransferToAirportLegKind(string $kind): void
@@ -779,10 +791,10 @@ class Step4RoutePlanning extends Component
         $this->preTransferCarSectionCollapsed = false;
         $this->preTransferOtherSectionCollapsed = false;
         $this->transferToAirportLegKind = $kind;
-        $this->transferToAirportModePickerOpen = false;
         if ($kind === 'own') {
             $this->transferToAirportGroundMode = 'car';
             $this->toAirportPublicTicketCostsByEmployee = [];
+            $this->toAirportTicketFiles = [];
             $this->preTransferConfigModalGroundMode = 'car';
             $this->transferToAirportStartsFromBase = true;
             $this->showPreTransferGroundModeSwitchModal = false;
@@ -826,11 +838,11 @@ class Step4RoutePlanning extends Component
         $this->pendingPreTransferModalGroundMode = null;
         $this->preTransferConfigModalGroundMode = null;
         $this->transferToAirportLegKind = null;
-        $this->transferToAirportModePickerOpen = false;
         $this->transferToAirportWaypoints = [];
         $this->transferToAirportStartsFromBase = true;
         $this->transferToAirportLocationStopNotes = [];
         $this->toAirportPublicTicketCostsByEmployee = [];
+        $this->toAirportTicketFiles = [];
         $this->preTransferVehicleId = null;
         $this->preTransferDriverEmployeeId = null;
         $this->preTransferDriverBonusAmount = null;
@@ -897,6 +909,7 @@ class Step4RoutePlanning extends Component
         if ($kind === 'own') {
             $this->transferFromAirportGroundMode = 'car';
             $this->fromAirportPublicTicketCostsByEmployee = [];
+            $this->fromAirportTicketFiles = [];
             $this->postTransferConfigModalGroundMode = 'car';
             $this->postTransferCarSectionCollapsed = false;
             $this->postTransferOtherSectionCollapsed = false;
@@ -915,6 +928,7 @@ class Step4RoutePlanning extends Component
         $this->transferDriverEmployeeId = null;
         $this->transferDriverBonusAmount = null;
         $this->fromAirportPublicTicketCostsByEmployee = [];
+        $this->fromAirportTicketFiles = [];
         $this->postTransferCarSectionCollapsed = false;
         $this->postTransferOtherSectionCollapsed = false;
         $this->showPostTransferConfigModal = false;
@@ -936,6 +950,8 @@ class Step4RoutePlanning extends Component
         $this->transferDriverBonusAmount = null;
         $this->transferPickupLocationId = null;
         $this->fromAirportPublicTicketCostsByEmployee = [];
+        $this->fromAirportTicketFiles = [];
+        $this->showPostTransferRouteModal = false;
         $this->showPostTransferConfigModal = false;
         $this->postTransferConfigModalGroundMode = null;
         $this->showPostTransferGroundModeSwitchModal = false;
@@ -1760,14 +1776,57 @@ class Step4RoutePlanning extends Component
         return strlen($cur) !== 3;
     }
 
+    /**
+     * Livewire niezawodnie obsługuje upload na płytkich kluczach; scala do zagnieżdżonej tablicy biletów.
+     */
+    protected function mergeFlatTicketFileUploadsIntoNested(string $n): void
+    {
+        if (str_starts_with($n, 'fromAirportTicketFiles.')) {
+            $eid = (int) substr($n, strlen('fromAirportTicketFiles.'));
+            if ($eid < 1) {
+                return;
+            }
+            $up = $this->fromAirportTicketFiles[$eid] ?? $this->fromAirportTicketFiles[(string) $eid] ?? null;
+            if ($up === null || $up === '') {
+                return;
+            }
+            $row = $this->fromAirportPublicTicketCostsByEmployee[$eid] ?? [];
+            if (! is_array($row)) {
+                $row = [];
+            }
+            $row['attachment'] = $up;
+            $this->fromAirportPublicTicketCostsByEmployee[$eid] = $row;
+        }
+        if (str_starts_with($n, 'toAirportTicketFiles.')) {
+            $eid = (int) substr($n, strlen('toAirportTicketFiles.'));
+            if ($eid < 1) {
+                return;
+            }
+            $up = $this->toAirportTicketFiles[$eid] ?? $this->toAirportTicketFiles[(string) $eid] ?? null;
+            if ($up === null || $up === '') {
+                return;
+            }
+            $row = $this->toAirportPublicTicketCostsByEmployee[$eid] ?? [];
+            if (! is_array($row)) {
+                $row = [];
+            }
+            $row['attachment'] = $up;
+            $this->toAirportPublicTicketCostsByEmployee[$eid] = $row;
+        }
+    }
+
     public function updated($name): void
     {
+        $n = (string) $name;
+        $this->mergeFlatTicketFileUploadsIntoNested($n);
+
         if (! $this->isPublicTransport) {
             return;
         }
-        $n = (string) $name;
         $syncSegments = str_starts_with($n, 'toAirportPublicTicketCostsByEmployee')
             || str_starts_with($n, 'fromAirportPublicTicketCostsByEmployee')
+            || str_starts_with($n, 'fromAirportTicketFiles')
+            || str_starts_with($n, 'toAirportTicketFiles')
             || str_starts_with($n, 'preTransfer')
             || $n === 'transferPickupLocationId';
         if ($syncSegments) {
@@ -2493,6 +2552,22 @@ class Step4RoutePlanning extends Component
 
     public function confirmPreTransferModal(): void
     {
+        if ($this->transferToAirportLegKind === null) {
+            return;
+        }
+        if ($this->transferToAirportLegKind === 'public') {
+            if ($this->selectedEmployeesForTickets->isNotEmpty() && $this->toAirportGroundTicketsIncomplete) {
+                return;
+            }
+            $this->preTransferConfigModalGroundMode = null;
+            $this->showPreTransferConfigModal = false;
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+
+            return;
+        }
+
         $draft = $this->preTransferConfigModalGroundMode;
         if ($draft !== null && in_array($draft, ['car', 'other'], true) && $draft !== $this->transferToAirportGroundMode) {
             $this->transferToAirportGroundMode = $draft;
@@ -2509,41 +2584,152 @@ class Step4RoutePlanning extends Component
 
     public function openPreTransferConfigModal(): void
     {
-        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own') {
+        if (! $this->isPublicTransport) {
+            return;
+        }
+        if (! in_array($this->transferToAirportLegKind, ['own', 'public'], true)) {
             return;
         }
         $this->showPreTransferGroundModeSwitchModal = false;
         $this->pendingPreTransferModalGroundMode = null;
-        $this->preTransferConfigModalGroundMode = $this->transferToAirportGroundMode;
+        $this->pendingPreTransferModalSegment = null;
+        $this->preTransferConfigModalGroundMode = $this->transferToAirportLegKind === 'own'
+            ? $this->transferToAirportGroundMode
+            : null;
         $this->showPreTransferConfigModal = true;
     }
 
-    /**
-     * Zmiana roboczego trybu w modalu — przy utracie dany drugiego typu: potwierdzenie (jak przełącznik transportu w planie wyjazdu).
-     */
-    public function requestPreTransferModalGroundMode(string $mode): void
+    /** Aktualny wybór w modalu: public | car | other | null (jeszcze nie wybrano). */
+    protected function getCurrentPreTransferModalSegment(): ?string
     {
-        if (! $this->isPublicTransport || $this->transferToAirportLegKind !== 'own' || ! $this->showPreTransferConfigModal) {
+        if ($this->transferToAirportLegKind === null) {
+            return null;
+        }
+        if ($this->transferToAirportLegKind === 'public') {
+            return 'public';
+        }
+
+        return $this->transferToAirportGroundMode === 'car' ? 'car' : 'other';
+    }
+
+    protected function preTransferSegmentSwitchWouldLoseData(?string $from, string $to): bool
+    {
+        if ($from === null || $from === $to) {
+            return false;
+        }
+        if ($from === 'public' && $to === 'car') {
+            return $this->preTransferModalHasOtherData();
+        }
+        if ($from === 'car' && $to === 'public') {
+            return $this->preTransferModalHasCarData();
+        }
+        if ($from === 'public' && $to === 'other') {
+            return false;
+        }
+        if ($from === 'other' && $to === 'public') {
+            return trim((string) ($this->preTransferPublicStationStart ?? '')) !== ''
+                || trim((string) ($this->preTransferPublicStationEnd ?? '')) !== '';
+        }
+        if (($from === 'car' && $to === 'other') || ($from === 'other' && $to === 'car')) {
+            return $this->preTransferModalSwitchWouldLoseData($from, $to);
+        }
+
+        return false;
+    }
+
+    public function selectPreTransferModalSegment(string $target): void
+    {
+        if (! $this->isPublicTransport || ! $this->showPreTransferConfigModal) {
             return;
         }
-        if (! in_array($mode, ['car', 'other'], true)) {
+        if (! in_array($target, ['public', 'car', 'other'], true)) {
             return;
         }
-        $current = $this->preTransferConfigModalGroundMode ?? $this->transferToAirportGroundMode;
-        if ($mode === $current) {
+        $from = $this->getCurrentPreTransferModalSegment();
+        if ($from === $target) {
             return;
         }
-        if ($this->preTransferModalSwitchWouldLoseData($current, $mode)) {
-            $this->pendingPreTransferModalGroundMode = $mode;
+        if ($this->preTransferSegmentSwitchWouldLoseData($from, $target)) {
+            $this->pendingPreTransferModalSegment = $target;
+            $this->pendingPreTransferModalGroundMode = null;
             $this->showPreTransferGroundModeSwitchModal = true;
 
             return;
         }
+        $this->applyPreTransferModalSegment($target);
+    }
+
+    protected function applyPreTransferModalSegment(string $target): void
+    {
+        if (! in_array($target, ['public', 'car', 'other'], true)) {
+            return;
+        }
+        $this->pendingPreTransferModalSegment = null;
+        $this->showPreTransferGroundModeSwitchModal = false;
+
+        if ($target === 'public') {
+            $this->transferToAirportLegKind = 'public';
+            $this->transferToAirportGroundMode = 'other';
+            $this->preTransferVehicleId = null;
+            $this->preTransferDriverEmployeeId = null;
+            $this->preTransferDriverBonusAmount = null;
+            $this->preTransferCarSectionCollapsed = false;
+            $this->preTransferOtherSectionCollapsed = false;
+            $this->transferToAirportWaypoints = [];
+            $this->transferToAirportLocationStopNotes = [];
+            $this->transferToAirportStartsFromBase = false;
+            $this->preRouteData = null;
+            $this->isManualPreRouteDistance = false;
+            $this->preRouteError = null;
+            $this->preTransferPublicStationStart = null;
+            $this->preTransferPublicStationEnd = null;
+            $this->preTransferConfigModalGroundMode = null;
+            $this->invalidatePreRouteMetricsAndSyncToParent();
+            $this->rebuildRouteSegmentsFromUiState();
+            $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+            $this->dispatchTransferConfig();
+
+            return;
+        }
+
+        $this->transferToAirportLegKind = 'own';
+        $mode = $target === 'car' ? 'car' : 'other';
+        $this->transferToAirportGroundMode = $mode;
+        $this->preTransferConfigModalGroundMode = $mode;
         $this->applyPreTransferModalDraftGroundMode($mode);
+        $this->preRouteData = null;
+        $this->isManualPreRouteDistance = false;
+        $this->preRouteError = null;
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    /**
+     * Zmiana roboczego trybu w modalu — przy utracie dany drugiego typu: potwierdzenie (jak przełącznik transportu w planie wyjazdu).
+     *
+     * @deprecated Używaj {@see selectPreTransferModalSegment}; zostawione dla kompatybilności.
+     */
+    public function requestPreTransferModalGroundMode(string $mode): void
+    {
+        if (! in_array($mode, ['car', 'other'], true)) {
+            return;
+        }
+        $this->selectPreTransferModalSegment($mode);
     }
 
     public function confirmPreTransferGroundModeSwitch(): void
     {
+        if ($this->pendingPreTransferModalSegment !== null
+            && in_array($this->pendingPreTransferModalSegment, ['public', 'car', 'other'], true)) {
+            $seg = $this->pendingPreTransferModalSegment;
+            $this->pendingPreTransferModalSegment = null;
+            $this->pendingPreTransferModalGroundMode = null;
+            $this->showPreTransferGroundModeSwitchModal = false;
+            $this->applyPreTransferModalSegment($seg);
+
+            return;
+        }
         if ($this->pendingPreTransferModalGroundMode === null
             || ! in_array($this->pendingPreTransferModalGroundMode, ['car', 'other'], true)) {
             $this->showPreTransferGroundModeSwitchModal = false;
@@ -2560,6 +2746,7 @@ class Step4RoutePlanning extends Component
     public function cancelPreTransferGroundModeSwitch(): void
     {
         $this->pendingPreTransferModalGroundMode = null;
+        $this->pendingPreTransferModalSegment = null;
         $this->showPreTransferGroundModeSwitchModal = false;
     }
 
@@ -2632,6 +2819,7 @@ class Step4RoutePlanning extends Component
         $this->preTransferConfigModalGroundMode = $mode;
         if ($mode === 'car') {
             $this->toAirportPublicTicketCostsByEmployee = [];
+            $this->toAirportTicketFiles = [];
             $this->preTransferPublicStationStart = null;
             $this->preTransferPublicStationEnd = null;
             $this->transferToAirportWaypoints = ['base', 'sap'];
@@ -2656,8 +2844,12 @@ class Step4RoutePlanning extends Component
         $this->showPreTransferConfigModal = false;
         $this->showPreTransferGroundModeSwitchModal = false;
         $this->pendingPreTransferModalGroundMode = null;
+        $this->pendingPreTransferModalSegment = null;
         $this->preTransferConfigModalGroundMode = null;
-        if ($this->transferToAirportLegKind === 'own') {
+        if ($this->transferToAirportLegKind === null) {
+            return;
+        }
+        if (in_array($this->transferToAirportLegKind, ['own', 'public'], true)) {
             $this->rebuildRouteSegmentsFromUiState();
             $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
             $this->dispatchTransferConfig();
@@ -2688,6 +2880,41 @@ class Step4RoutePlanning extends Component
         $this->closePreTransferRouteModal();
     }
 
+    public function openPostTransferRouteModal(): void
+    {
+        if (! $this->isPublicTransport || ! $this->postAirportTransferUserEnabled) {
+            return;
+        }
+        if ($this->effectiveTransferFromAirportLegKind === null) {
+            return;
+        }
+        $this->showPostTransferConfigModal = false;
+        $this->showPostTransferGroundModeSwitchModal = false;
+        $this->pendingPostTransferModalGroundMode = null;
+        $this->showPostTransferRouteModal = true;
+    }
+
+    public function closePostTransferRouteModal(): void
+    {
+        $this->showPostTransferRouteModal = false;
+    }
+
+    public function savePostTransferRouteModal(): void
+    {
+        if (! $this->isPublicTransport || ! $this->postAirportTransferUserEnabled) {
+            return;
+        }
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    public function confirmPostTransferRouteModal(): void
+    {
+        $this->savePostTransferRouteModal();
+        $this->closePostTransferRouteModal();
+    }
+
     public function expandPreTransferOwnCollapsedSection(): void
     {
         $this->openPreTransferConfigModal();
@@ -2707,6 +2934,7 @@ class Step4RoutePlanning extends Component
             $this->invalidatePreRouteMetricsAndSyncToParent();
         } else {
             $this->toAirportPublicTicketCostsByEmployee = [];
+            $this->toAirportTicketFiles = [];
             $this->preTransferPublicStationStart = null;
             $this->preTransferPublicStationEnd = null;
             $this->transferToAirportWaypoints = ['base', 'sap'];
@@ -2739,6 +2967,7 @@ class Step4RoutePlanning extends Component
             $this->invalidateRouteMetricsAndSyncToParent();
         } else {
             $this->fromAirportPublicTicketCostsByEmployee = [];
+            $this->fromAirportTicketFiles = [];
             $this->invalidateRouteMetricsAndSyncToParent();
         }
         $this->rebuildRouteSegmentsFromUiState();
@@ -2807,6 +3036,7 @@ class Step4RoutePlanning extends Component
         if (! $this->isPublicTransport || $this->effectiveTransferFromAirportLegKind !== 'own') {
             return;
         }
+        $this->showPostTransferRouteModal = false;
         $this->showPostTransferGroundModeSwitchModal = false;
         $this->pendingPostTransferModalGroundMode = null;
         $this->postTransferConfigModalGroundMode = $this->transferFromAirportGroundMode;
@@ -2925,6 +3155,7 @@ class Step4RoutePlanning extends Component
         $this->postTransferConfigModalGroundMode = $mode;
         if ($mode === 'car') {
             $this->fromAirportPublicTicketCostsByEmployee = [];
+            $this->fromAirportTicketFiles = [];
             $this->invalidateRouteMetricsAndSyncToParent();
         } else {
             $this->transferVehicleId = null;
@@ -3232,7 +3463,6 @@ class Step4RoutePlanning extends Component
             'airportHubLegKind' => $this->airportHubLegKind,
             'transferFromAirportLegKind' => $this->transferFromAirportLegKind,
             'transferFromAirportGroundMode' => $this->transferFromAirportGroundMode,
-            'transferToAirportModePickerOpen' => $this->transferToAirportModePickerOpen,
             'airportHubModePickerOpen' => $this->airportHubModePickerOpen,
             'transferFromAirportModePickerOpen' => $this->transferFromAirportModePickerOpen,
             'postAirportTransferUserEnabled' => $this->postAirportTransferUserEnabled,

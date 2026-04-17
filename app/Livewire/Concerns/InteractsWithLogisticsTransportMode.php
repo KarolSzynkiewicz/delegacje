@@ -45,6 +45,28 @@ trait InteractsWithLogisticsTransportMode
         $this->pendingTransportMode = null;
     }
 
+    /**
+     * Przycisk „Publiczny” / „Samolot” / „Bus / pociąg”: pierwszy raz wybiera transport publiczny;
+     * gdy typ huba jest już wybrany — reset (jak dawny link „Zmień typ”).
+     */
+    public function requestPublicTransportModeButtonAction(): void
+    {
+        if ($this->transportMode !== 'public') {
+            $this->requestSetTransportMode('public');
+
+            return;
+        }
+        if (! property_exists($this, 'publicTransportHubKind')) {
+            return;
+        }
+        if ($this->publicTransportHubKind === null) {
+            return;
+        }
+        $this->resetPublicTransportHubSelection();
+    }
+
+    abstract public function resetPublicTransportHubSelection(): void;
+
     public function setTransportMode(string $mode): void
     {
         $mode = $mode === 'own' ? 'own' : 'public';

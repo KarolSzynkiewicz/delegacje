@@ -34,17 +34,7 @@
         @endif
     </x-slot>
 
-    @if($transferToAirportModePickerOpen)
-        <x-logistics.transfer-segment-mode-picker intro="Wybierz środek transportu dla tego odcinka:">
-            <button type="button" class="btn btn-sm btn-outline-light" wire:click="selectTransferToAirportLegKind('public')">
-                <i class="bi bi-people me-1"></i> Transport publiczny
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-info" wire:click="selectTransferToAirportLegKind('own')">
-                <i class="bi bi-car-front me-1"></i> Autem
-            </button>
-            <button type="button" class="btn btn-link btn-sm text-muted py-0" wire:click="cancelTransferToAirportPicker">Anuluj</button>
-        </x-logistics.transfer-segment-mode-picker>
-    @elseif(!$transferToAirportLegKind)
+    @if(!$transferToAirportLegKind)
         <x-logistics.transfer-segment-empty-add>
             <x-slot name="hint">Opcjonalny odcinek przed lotem.</x-slot>
             <button type="button" wire:click="addTransferToAirportCard" wire:loading.attr="disabled"
@@ -65,6 +55,8 @@
                     section-title="Bilety (ten odcinek)"
                     :employees="$selectedEmployeesForTickets"
                     :ticket-costs-by-employee="$toAirportPublicTicketCostsByEmployee"
+                    :flat-attachment-uploads="$toAirportTicketFiles"
+                    attachment-flat-binding-key="toAirportTicketFiles"
                     :tickets-incomplete="$this->toAirportGroundTicketsIncomplete"
                     :require-attachment="true"
                     ticket-costs-binding-key="toAirportPublicTicketCostsByEmployee"
@@ -196,11 +188,12 @@
                     </button>
                 @endif
             </x-logistics.transfer-segment-action-row>
-
-            @include('livewire.steps.partials.step4-pre-transfer-config-modal')
-            @include('livewire.steps.partials.step4-pre-transfer-route-modal')
         @endif
     @endif
+
+    {{-- Zawsze w drzewie (warunek widoczności wewnątrz partiali) — inaczej po „Dodaj” (legKind=null) modal w ogóle się nie renderuje. --}}
+    @include('livewire.steps.partials.step4-pre-transfer-config-modal')
+    @include('livewire.steps.partials.step4-pre-transfer-route-modal')
 </x-logistics.transfer-segment-card>
 
 {{-- 2 — Odcinek lotu / przesiadki (tylko skąd → dokąd) --}}
@@ -291,97 +284,17 @@
         </div>
 
         @if($effFrom === 'public')
-            @if($selectedEmployeesForTickets->isNotEmpty())
-                <x-logistics.public-transport-tickets
-                    variant="cards"
-                    section-title="Bilety (ten odcinek)"
-                    :employees="$selectedEmployeesForTickets"
-                    :ticket-costs-by-employee="$fromAirportPublicTicketCostsByEmployee"
-                    :tickets-incomplete="$this->fromAirportGroundTicketsIncomplete"
-                    :require-attachment="true"
-                    ticket-costs-binding-key="fromAirportPublicTicketCostsByEmployee"
-                    wire:key-prefix="seg-post-ticket"
-                    class="mt-0 pt-0 border-0 mb-3"
-                    style="border-top: none !important;"
-                />
-            @else
-                <p class="small text-muted mb-3">Brak osób w składzie wyjazdu — dodaj uczestników wcześniej.</p>
-            @endif
-
             <p class="small text-muted mb-3" style="font-size: 0.78rem;">
                 <i class="bi bi-info-circle me-1"></i>
-                Komunikacja zbiorowa — nie dodajesz przystanków na mapie; uzupełnij bilety i szacunek odcinka poniżej.
+                Bilety i szacunek dystansu (lotnisko → domy) ustawiasz w oknie — spójnie z transferem przed lotem.
             </p>
-
-            @if($routeData)
-                <div class="p-3 border rounded bg-success bg-opacity-10 @if($this->routeBlockIncomplete) border-danger @endif mb-3">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                        <div class="small @if($this->routeBlockIncomplete) text-danger fw-semibold @else text-muted @endif mb-0">Dystans transferu (lotnisko → domy)</div>
-                        @if($isManualRouteDistance)
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(251,191,36,0.15); color: #fcd34d;">Wpisane ręcznie</span>
-                        @else
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(59,130,246,0.15); color: #93c5fd;">Szacunek systemu</span>
-                        @endif
-                    </div>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-sm-5">
-                            <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                            <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-sm-5">
-                            <label class="form-label small text-muted mb-0">Czas przejazdu (min)</label>
-                            <input type="number" step="1" min="1" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-sm-2">
-                            <button type="button" class="btn btn-sm btn-success w-100" wire:click="applyManualRouteDistance('post')" wire:loading.attr="disabled">OK</button>
-                        </div>
-                    </div>
-                    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                        <span class="small text-muted mb-0" style="font-size: 0.72rem;">Zapisane:</span>
-                        <x-logistics.route-metrics-saved-pill
-                            accent="success"
-                            :distance-km="isset($routeData['distance']) ? (float) $routeData['distance'] : null"
-                            :duration-seconds="isset($routeData['duration']) && $routeData['duration'] !== null ? (int) $routeData['duration'] : null"
-                        />
-                    </div>
-                </div>
-            @endif
-            @if(empty($routeData))
-                <div class="mt-0 mb-3 p-2 border rounded @if($this->routeBlockIncomplete) border-danger @endif" style="background: var(--bg-card); @if($this->routeBlockIncomplete) box-shadow: 0 0 0 1px rgba(239,68,68,0.35); @endif">
-                    <div class="small text-muted mb-2">
-                        <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                        Nie można obliczyć trasy automatycznie —
-                        @if(!empty($manualRouteHint))
-                            problem z lokalizacją <span class="fw-semibold">{{ $manualRouteHint }}</span>.
-                        @else
-                            wpisz dystans i czas (transport publiczny z lotniska).
-                        @endif
-                    </div>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-sm-4">
-                            <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                            <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm" placeholder="np. 18.5">
-                        </div>
-                        <div class="col-sm-4">
-                            <label class="form-label small text-muted mb-0">Czas (min)</label>
-                            <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm" placeholder="np. 35">
-                        </div>
-                        <div class="col-sm-4">
-                            <button type="button" class="btn btn-sm btn-outline-success w-100" wire:click="applyManualRouteDistance" wire:loading.attr="disabled">Ustaw ręcznie</button>
-                        </div>
-                    </div>
-                    @if(!empty($this->transferGoogleMapsUrl))
-                        <div class="small mt-2">
-                            <a href="{{ $this->transferGoogleMapsUrl }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
-                                <i class="bi bi-map me-1"></i> Google Maps
-                            </a>
-                        </div>
-                    @endif
-                    @if(!empty($routeError))
-                        <div class="alert alert-danger py-2 small mt-2 mb-0">{{ $routeError }}</div>
-                    @endif
-                </div>
-            @endif
+            <x-logistics.transfer-segment-action-row>
+                <button type="button"
+                        class="btn btn-sm d-inline-flex align-items-center btn-outline-success"
+                        wire:click="openPostTransferRouteModal" wire:loading.attr="disabled">
+                    <i class="bi bi-sliders me-1"></i> Konfiguruj odcinek (bilety i dystans)
+                </button>
+            </x-logistics.transfer-segment-action-row>
         @else
             @php
                 $postOwnCompact = ($postTransferCarSectionCollapsed && $transferFromAirportGroundMode === 'car')
@@ -468,152 +381,44 @@
                     </x-slot>
                 </x-logistics.transfer-segment-compact-summary>
 
-                @if($transferFromAirportGroundMode === 'other')
-                    <p class="small text-muted mb-3" style="font-size: 0.78rem;">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Poza samochodem nie dodajesz przystanków do trasy — uzupełnij bilety w oknie konfiguracji i szacunek odcinka poniżej.
-                    </p>
-
-                    @if($routeData)
-                        <div class="p-3 border rounded bg-success bg-opacity-10 @if($this->routeBlockIncomplete) border-danger @endif mb-3">
-                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                                <div class="small @if($this->routeBlockIncomplete) text-danger fw-semibold @else text-muted @endif mb-0">Dystans transferu (lotnisko → domy)</div>
-                                @if($isManualRouteDistance)
-                                    <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(251,191,36,0.15); color: #fcd34d;">Wpisane ręcznie</span>
-                                @else
-                                    <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(59,130,246,0.15); color: #93c5fd;">Szacunek</span>
-                                @endif
-                            </div>
-                            <div class="row g-2 align-items-end">
-                                <div class="col-sm-5">
-                                    <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                    <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm">
-                                </div>
-                                <div class="col-sm-5">
-                                    <label class="form-label small text-muted mb-0">Czas (min)</label>
-                                    <input type="number" step="1" min="1" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm">
-                                </div>
-                                <div class="col-sm-2">
-                                    <button type="button" class="btn btn-sm btn-success w-100" wire:click="applyManualRouteDistance('post')" wire:loading.attr="disabled">OK</button>
-                                </div>
-                            </div>
-                            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                                <span class="small text-muted mb-0" style="font-size: 0.72rem;">Zapisane:</span>
-                                <x-logistics.route-metrics-saved-pill
-                                    accent="success"
-                                    :distance-km="isset($routeData['distance']) ? (float) $routeData['distance'] : null"
-                                    :duration-seconds="isset($routeData['duration']) && $routeData['duration'] !== null ? (int) $routeData['duration'] : null"
-                                />
-                            </div>
-                        </div>
-                    @endif
-                    @if(empty($routeData))
-                        <div class="mt-0 mb-3 p-2 border rounded @if($this->routeBlockIncomplete) border-danger @endif" style="background: var(--bg-card); @if($this->routeBlockIncomplete) box-shadow: 0 0 0 1px rgba(239,68,68,0.35); @endif">
-                            <div class="small text-muted mb-2">
-                                <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                                Wpisz dystans i czas (inny transport z lotniska) —
-                                @if(!empty($manualRouteHint))
-                                    Uwaga: <span class="fw-semibold">{{ $manualRouteHint }}</span>.
-                                @endif
-                            </div>
-                            <div class="row g-2 align-items-end">
-                                <div class="col-sm-4">
-                                    <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                    <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm" placeholder="np. 18.5">
-                                </div>
-                                <div class="col-sm-4">
-                                    <label class="form-label small text-muted mb-0">Czas (min)</label>
-                                    <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm" placeholder="np. 35">
-                                </div>
-                                <div class="col-sm-4">
-                                    <button type="button" class="btn btn-sm btn-outline-success w-100" wire:click="applyManualRouteDistance" wire:loading.attr="disabled">Ustaw ręcznie</button>
-                                </div>
-                            </div>
-                            @if(!empty($this->transferGoogleMapsUrl))
-                                <div class="small mt-2">
-                                    <a href="{{ $this->transferGoogleMapsUrl }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
-                                        <i class="bi bi-map me-1"></i> Google Maps
-                                    </a>
-                                </div>
-                            @endif
-                            @if(!empty($routeError))
-                                <div class="alert alert-danger py-2 small mt-2 mb-0">{{ $routeError }}</div>
-                            @endif
-                        </div>
-                    @endif
-                @else
-                    @include('livewire.steps.partials.step4-card3-post-transfer-waypoints')
-
-                    <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-3" wire:click="planRoute" wire:loading.attr="disabled" wire:target="planRoute">
-                        <span wire:loading.remove wire:target="planRoute"><i class="bi bi-arrow-repeat me-1"></i> Przelicz trasę (lotnisko docelowe → domy)</span>
-                        <span wire:loading wire:target="planRoute"><span class="spinner-border spinner-border-sm"></span></span>
+                @php
+                    $postCompactCfgDanger = ($transferFromAirportGroundMode === 'car' && ($this->transferVehicleIncomplete || $this->transferDriverIncomplete || $this->transferBonusIncomplete))
+                        || ($transferFromAirportGroundMode === 'other' && $this->fromAirportGroundTicketsIncomplete);
+                    $postCompactRouteDanger = $this->routeBlockIncomplete;
+                @endphp
+                <p class="small text-muted mb-3" style="font-size: 0.78rem;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Szczegóły trasy, przystanków i dystansu ustalasz w oknie — tak jak przy transferze na lotnisko startowe.
+                </p>
+                <x-logistics.transfer-segment-action-row>
+                    <button type="button"
+                            class="btn btn-sm d-inline-flex align-items-center {{ $postCompactCfgDanger ? 'btn-danger' : 'btn-outline-success' }}"
+                            wire:click="openPostTransferConfigModal" wire:loading.attr="disabled">
+                        <i class="bi bi-sliders me-1"></i> Konfiguruj transfer
                     </button>
-                    @if($routeData)
-                        <div class="p-3 border rounded bg-success bg-opacity-10 @if($this->routeBlockIncomplete) border-danger @endif mb-3">
-                            <div class="small @if($this->routeBlockIncomplete) text-danger fw-semibold @else text-muted @endif mb-2">Dystans: lotnisko docelowe → przystanki</div>
-                            <div class="row g-2 align-items-end">
-                                <div class="col-sm-5">
-                                    <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                    <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm">
-                                </div>
-                                <div class="col-sm-5">
-                                    <label class="form-label small text-muted mb-0">Czas (min)</label>
-                                    <input type="number" step="1" min="1" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm">
-                                </div>
-                                <div class="col-sm-2">
-                                    <button type="button" class="btn btn-sm btn-success w-100" wire:click="applyManualRouteDistance('post')" wire:loading.attr="disabled">OK</button>
-                                </div>
-                            </div>
-                            {{-- Metryki zapisane są w pigułce „trail” nad kartą — tu tylko korekta km/czas + OK. --}}
-                        </div>
-                    @endif
-                    @if(empty($routeData))
-                        @if(!empty($routeError))
-                            <div class="alert alert-danger py-2 small mb-3">{{ $routeError }}</div>
-                        @endif
-                        @if(!empty($manualRouteHint))
-                            <p class="small text-muted mb-2">
-                                <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                                Problem z lokalizacją: <span class="fw-semibold">{{ $manualRouteHint }}</span>.
-                            </p>
-                        @endif
-                        @if(!empty($this->transferGoogleMapsUrl))
-                            <div class="small mb-3">
-                                <a href="{{ $this->transferGoogleMapsUrl }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
-                                    <i class="bi bi-map me-1"></i> Google Maps
-                                </a>
-                            </div>
-                        @endif
-                        {{-- Jeden zestaw pól (bez powtórzenia komunikatu z pigułki trail) — potrzebny do applyManualRouteDistance gdy ORS nie zwróci routeData. --}}
-                        <div class="p-3 border rounded bg-success bg-opacity-10 @if($this->routeBlockIncomplete) border-danger @endif mb-3">
-                            <div class="small text-muted mb-2">Dystans i czas (ręcznie)</div>
-                            <div class="row g-2 align-items-end">
-                                <div class="col-sm-4">
-                                    <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                    <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm" placeholder="np. 18,5">
-                                </div>
-                                <div class="col-sm-4">
-                                    <label class="form-label small text-muted mb-0">Czas (min)</label>
-                                    <input type="number" step="1" min="0" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm" placeholder="np. 35">
-                                </div>
-                                <div class="col-sm-4">
-                                    <button type="button" class="btn btn-sm btn-outline-success w-100" wire:click="applyManualRouteDistance" wire:loading.attr="disabled">Ustaw ręcznie</button>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-                @endif
+                    <button type="button"
+                            class="btn btn-sm d-inline-flex align-items-center {{ $postCompactRouteDanger ? 'btn-danger' : 'btn-outline-primary' }}"
+                            wire:click="openPostTransferRouteModal" wire:loading.attr="disabled">
+                        <i class="bi bi-signpost-split me-1"></i> Konfiguruj trasę
+                    </button>
+                </x-logistics.transfer-segment-action-row>
             @else
                 <p class="small text-muted mb-2 mb-md-3">Wybierz środek (samochód lub inny transport), uzupełnij dane i zatwierdź w oknie.</p>
                 @php
                     $postCfgBtnDanger = ($transferFromAirportGroundMode === 'car' && ($this->transferVehicleIncomplete || $this->transferDriverIncomplete || $this->transferBonusIncomplete))
                         || ($transferFromAirportGroundMode === 'other' && $this->fromAirportGroundTicketsIncomplete);
+                    $postRouteBtnDanger = $this->routeBlockIncomplete;
                 @endphp
                 <x-logistics.transfer-segment-action-row>
                     <button type="button"
                             class="btn btn-sm d-inline-flex align-items-center {{ $postCfgBtnDanger ? 'btn-danger' : 'btn-outline-success' }}"
                             wire:click="openPostTransferConfigModal" wire:loading.attr="disabled">
                         <i class="bi bi-sliders me-1"></i> Konfiguruj transfer
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm d-inline-flex align-items-center {{ $postRouteBtnDanger ? 'btn-danger' : 'btn-outline-primary' }}"
+                            wire:click="openPostTransferRouteModal" wire:loading.attr="disabled">
+                        <i class="bi bi-signpost-split me-1"></i> Konfiguruj trasę
                     </button>
                 </x-logistics.transfer-segment-action-row>
             @endif
@@ -622,3 +427,4 @@
 </x-logistics.transfer-segment-card>
 
 @include('livewire.steps.partials.step4-post-transfer-config-modal')
+@include('livewire.steps.partials.step4-post-transfer-route-modal')

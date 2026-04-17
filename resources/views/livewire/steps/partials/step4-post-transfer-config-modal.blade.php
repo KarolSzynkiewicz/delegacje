@@ -17,9 +17,9 @@
                     </div>
                     <div class="modal-body">
                         @if($mGround === 'other')
-                            <p class="small text-muted mb-3">Inny transport: <strong>bez mapy</strong> — bilety i szacunek odcinka poniżej w tym oknie; dystans ustalisz na karcie po zatwierdzeniu.</p>
+                            <p class="small text-muted mb-3">Inny transport: <strong>bez mapy</strong> — bilety w tym oknie; dystans ustalisz w <strong>Konfiguruj trasę</strong>.</p>
                         @else
-                            <p class="small text-muted mb-3">Samochód: <strong>{{ $endAirportData['name'] ?? 'Lotnisko' }} → przystanki → domy</strong> — przystanki i przeliczanie ustawiasz na karcie po zatwierdzeniu.</p>
+                            <p class="small text-muted mb-3">Samochód: <strong>{{ $endAirportData['name'] ?? 'Lotnisko' }} → przystanki → domy</strong> — przystanki i przeliczanie w <strong>Konfiguruj trasę</strong>.</p>
                         @endif
                         <label class="form-label small text-muted mb-1">Środek na odcinku</label>
                         <div class="d-flex gap-2 align-items-stretch logistics-trip-header-control-row mb-3">
@@ -44,6 +44,8 @@
                                     section-title="Bilety (ten odcinek)"
                                     :employees="$selectedEmployeesForTickets"
                                     :ticket-costs-by-employee="$fromAirportPublicTicketCostsByEmployee"
+                                    :flat-attachment-uploads="$fromAirportTicketFiles"
+                                    attachment-flat-binding-key="fromAirportTicketFiles"
                                     :tickets-incomplete="$this->fromAirportGroundTicketsIncomplete"
                                     :require-attachment="true"
                                     ticket-costs-binding-key="fromAirportPublicTicketCostsByEmployee"

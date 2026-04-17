@@ -236,4 +236,21 @@ class Vehicle extends Model
 
         return (bool) ($this->inspection_valid_to && $this->inspection_valid_to->lt($asOf));
     }
+
+    /**
+     * Krótki opis problemów z dokumentami (nagłówek planera); pusty string gdy brak uwag.
+     */
+    public function documentComplianceWarningMessage(?\Carbon\Carbon $asOf = null): string
+    {
+        $asOf ??= \Carbon\Carbon::today();
+        $parts = [];
+        if ($this->hasExpiredInsurance($asOf)) {
+            $parts[] = 'nieważne OC';
+        }
+        if ($this->hasExpiredInspection($asOf)) {
+            $parts[] = 'nieważny przegląd';
+        }
+
+        return implode(' oraz ', $parts);
+    }
 }

@@ -10,6 +10,12 @@
     'wireKeyPrefix' => 'pt-ticket',
     /** Nazwa właściwości Livewire (np. ticketCostsByEmployee, toAirportPublicTicketCostsByEmployee). */
     'ticketCostsBindingKey' => 'ticketCostsByEmployee',
+    /**
+     * Opcjonalnie: płaska tablica uploadów [employee_id => TemporaryUploadedFile] w komponencie nadrzędnym.
+     * Livewire niezawodnie wiąże pliki przy płytkim kluczu; głębokie „…amount.currency.attachment” bywają puste.
+     */
+    'attachmentFlatBindingKey' => null,
+    'flatAttachmentUploads' => [],
 ])
 
 @php
@@ -133,7 +139,12 @@
             @foreach($employees as $employee)
                 @php
                     $ticket = $ticketCostsByEmployee[$employee->id] ?? [];
-                    $hasAttachment = ! empty($ticket['attachment']) || ! empty($ticket['attachment_path'] ?? null);
+                    $flatUp = $attachmentFlatBindingKey
+                        ? ($flatAttachmentUploads[$employee->id] ?? $flatAttachmentUploads[(string) $employee->id] ?? null)
+                        : null;
+                    $hasAttachment = ! empty($flatUp)
+                        || ! empty($ticket['attachment'])
+                        || ! empty($ticket['attachment_path'] ?? null);
                     $fileInputId = 'ticket-attachment-'.$wireKeyPrefix.'-'.$employee->id;
                     $ticketRowIncomplete = PublicTransportTicketCosts::isRowIncomplete($ticket, $requireAttachment);
                     $bind = $ticketCostsBindingKey;
@@ -179,7 +190,11 @@
                             </span>
                             <input id="{{ $fileInputId }}"
                                    type="file"
-                                   wire:model="{{ $bind }}.{{ $employee->id }}.attachment"
+                                   @if(! empty($attachmentFlatBindingKey))
+                                       wire:model.live="{{ $attachmentFlatBindingKey }}.{{ $employee->id }}"
+                                   @else
+                                       wire:model="{{ $bind }}.{{ $employee->id }}.attachment"
+                                   @endif
                                    class="pt-ticket-file-input">
                         </div>
                     @endif
@@ -237,7 +252,12 @@
                         @php
                             $bind = $ticketCostsBindingKey;
                             $ticket = $ticketCostsByEmployee[$employee->id] ?? [];
-                            $hasAttachment = ! empty($ticket['attachment']) || ! empty($ticket['attachment_path'] ?? null);
+                            $flatUp = $attachmentFlatBindingKey
+                                ? ($flatAttachmentUploads[$employee->id] ?? $flatAttachmentUploads[(string) $employee->id] ?? null)
+                                : null;
+                            $hasAttachment = ! empty($flatUp)
+                                || ! empty($ticket['attachment'])
+                                || ! empty($ticket['attachment_path'] ?? null);
                             $fileInputId = 'rtp-ticket-attachment-'.$wireKeyPrefix.'-'.$employee->id;
                             $ticketRowIncomplete = PublicTransportTicketCosts::isRowIncomplete($ticket, $requireAttachment);
                         @endphp
@@ -281,7 +301,11 @@
                                         </label>
                                         <input id="{{ $fileInputId }}"
                                                type="file"
-                                               wire:model="{{ $bind }}.{{ $employee->id }}.attachment"
+                                               @if(! empty($attachmentFlatBindingKey))
+                                                   wire:model.live="{{ $attachmentFlatBindingKey }}.{{ $employee->id }}"
+                                               @else
+                                                   wire:model="{{ $bind }}.{{ $employee->id }}.attachment"
+                                               @endif
                                                class="pt-ticket-file-input">
                                     </div>
                                     @error($bind.'.'.$employee->id.'.attachment')

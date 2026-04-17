@@ -2836,3 +2836,41 @@ html .text-muted,
 .departure-show .departure-participants-table tbody tr:last-child td {
     border-bottom: none;
 }
+
+/* Nagłówek planera: kolumny nie wcinają się w siebie na wąskim widoku */
+.logistics-trip-header-row > [class*='col-'] {
+    min-width: 0;
+}
+
+.logistics-trip-header-card {
+    min-height: 106px;
+}
+
+.logistics-trip-header-card--invalid {
+    border: 1px solid rgba(239, 68, 68, 0.65) !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15);
+}
+
+.logistics-trip-header-card--invalid-soft {
+    border: 1px solid rgba(239, 68, 68, 0.45) !important;
+    background: rgba(239, 68, 68, 0.06) !important;
+}
+
+.logistics-trip-header-hint {
+    font-size: 0.72rem;
+}
+
+.logistics-trip-header-row .logistics-trip-header-control-row .btn.logistics-trip-header-control {
+    min-height: 2.375rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+}
+
+/* Select vs data w nagłówku planera — lekko zbijamy pion selecta, żeby był bliżej input[type=date]. */
+.logistics-trip-header-row select.form-select.logistics-trip-header-control {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    line-height: 1.45;
+    min-height: 0;
+}

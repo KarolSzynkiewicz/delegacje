@@ -767,9 +767,18 @@ class DeparturePlannerV2 extends Component
                 }
                 $this->sharedStartAirportLocationId = $seg['start_location_id'] ?? $this->sharedStartAirportLocationId;
                 $this->sharedEndAirportLocationId = $seg['end_location_id'] ?? $this->sharedEndAirportLocationId;
-                $this->ticketCostsByEmployee = is_array($seg['ticket_costs_by_employee'] ?? null)
+
+                $segmentTickets = is_array($seg['ticket_costs_by_employee'] ?? null)
                     ? $seg['ticket_costs_by_employee']
                     : [];
+                // Pierwszy route-planned z kroku 4 może mieć pusty segment zanim Livewire
+                // przekaże reactive bilety do Step4 — wtedy merge w child zwraca pustkę i nie
+                // wolno nadpisać nagłówka. Gdy użytkownik realnie czyści bilety, nagłówek jest już [].
+                if ($segmentTickets !== [] || empty($this->ticketCostsByEmployee)) {
+                    $this->ticketCostsByEmployee = $segmentTickets;
+                } else {
+                    $this->pushTicketsToFirstPublicSegment();
+                }
 
                 break;
             }
