@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Models\AccommodationAssignment;
+use App\Models\Employee;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\ProjectAssignment;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\TransferService;
+use App\Support\DepartureRoutePlan;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -91,7 +93,27 @@ class TransferController extends Controller
             },
             'driverAdjustments.employee',
             'driverAdjustments.payroll',
+            'transportCosts',
+            'relatedDeparture',
         ]);
+
+        $groundLegTicketRows = [];
+        if ($transfer->relatedDeparture && $transfer->relatedDeparture->type === LogisticsEventType::DEPARTURE) {
+            $groundLegTicketRows = DepartureRoutePlan::collectPublicLegTicketRowsFromSegments(
+                is_array($transfer->relatedDeparture->route_segments)
+                    ? $transfer->relatedDeparture->route_segments
+                    : []
+            );
+        }
+        if ($groundLegTicketRows !== []) {
+            $empIds = collect($groundLegTicketRows)->pluck('employee_id')->unique()->values()->all();
+            $empNames = Employee::whereIn('id', $empIds)->pluck('full_name', 'id');
+            $groundLegTicketRows = collect($groundLegTicketRows)->map(function (array $r) use ($empNames) {
+                $r['employee_name'] = $empNames[$r['employee_id']] ?? ('#'.$r['employee_id']);
+
+                return $r;
+            })->values()->all();
+        }
 
         $waypointIds = array_values(array_filter(array_map('intval', (array) ($transfer->route_waypoints ?? []))));
         $waypointsById = empty($waypointIds)
@@ -114,6 +136,7 @@ class TransferController extends Controller
             'transfer' => $transfer,
             'routeStops' => $routeStops,
             'waypoints' => $orderedWaypoints,
+            'groundLegTicketRows' => $groundLegTicketRows,
         ]);
     }
 

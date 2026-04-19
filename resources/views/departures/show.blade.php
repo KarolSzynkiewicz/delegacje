@@ -248,14 +248,15 @@
                         </thead>
                         <tbody>
                             @foreach($ticketCosts as $ticketCost)
+                                @php $ticketFileUrl = \App\Support\PublicDiskFileUrl::url($ticketCost->file_path); @endphp
                                 <tr>
                                     <td>{{ $ticketCost->description ?: 'Bilet' }}</td>
                                     <td>{{ number_format((float) $ticketCost->amount, 2) }} {{ $ticketCost->currency }}</td>
                                     <td>{{ $ticketCost->cost_date?->format('Y-m-d') ?? '-' }}</td>
                                     <td>{{ $ticketCost->notes ?: '—' }}</td>
                                     <td>
-                                        @if($ticketCost->file_path)
-                                            <a href="{{ asset('storage/' . $ticketCost->file_path) }}" target="_blank" class="text-decoration-none">
+                                        @if($ticketFileUrl)
+                                            <a href="{{ $ticketFileUrl }}" target="_blank" class="text-decoration-none">
                                                 <i class="bi bi-paperclip"></i> Podgląd
                                             </a>
                                         @else
@@ -280,6 +281,7 @@
 
     @if($isPublicTransportDeparture)
         <x-ui.card label="Transfer" class="mb-0">
+            <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
             @if(isset($linkedTransfers) && $linkedTransfers->isNotEmpty())
                 @foreach($linkedTransfers as $transfer)
                 @php
@@ -481,14 +483,15 @@
                     </thead>
                     <tbody>
                         @foreach($ticketCosts as $ticketCost)
+                            @php $ticketFileUrl = \App\Support\PublicDiskFileUrl::url($ticketCost->file_path); @endphp
                             <tr>
                                 <td>{{ $ticketCost->description ?: 'Bilet' }}</td>
                                 <td>{{ number_format((float) $ticketCost->amount, 2) }} {{ $ticketCost->currency }}</td>
                                 <td>{{ $ticketCost->cost_date?->format('Y-m-d') ?? '-' }}</td>
                                 <td>{{ $ticketCost->notes ?: '—' }}</td>
                                 <td>
-                                    @if($ticketCost->file_path)
-                                        <a href="{{ asset('storage/' . $ticketCost->file_path) }}" target="_blank" class="text-decoration-none">
+                                    @if($ticketFileUrl)
+                                        <a href="{{ $ticketFileUrl }}" target="_blank" class="text-decoration-none">
                                             <i class="bi bi-paperclip"></i> Podgląd
                                         </a>
                                     @else

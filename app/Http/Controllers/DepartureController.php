@@ -7,6 +7,7 @@ use App\Enums\LogisticsEventType;
 use App\Enums\VehiclePosition;
 use App\Models\Accommodation;
 use App\Models\Employee;
+use App\Support\DepartureRoutePlan;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
@@ -128,10 +129,24 @@ class DepartureController extends Controller
 
         $transfer = $linkedTransfers->last();
 
+        $groundLegTicketRows = DepartureRoutePlan::collectPublicLegTicketRowsFromSegments(
+            is_array($departure->route_segments) ? $departure->route_segments : []
+        );
+        if ($groundLegTicketRows !== []) {
+            $empIds = collect($groundLegTicketRows)->pluck('employee_id')->unique()->values()->all();
+            $empNames = Employee::whereIn('id', $empIds)->pluck('full_name', 'id');
+            $groundLegTicketRows = collect($groundLegTicketRows)->map(function (array $r) use ($empNames) {
+                $r['employee_name'] = $empNames[$r['employee_id']] ?? ('#'.$r['employee_id']);
+
+                return $r;
+            })->values()->all();
+        }
+
         return view('departures.show', [
             'departure' => $departure,
             'transfer' => $transfer,
             'linkedTransfers' => $linkedTransfers,
+            'groundLegTicketRows' => $groundLegTicketRows,
         ]);
     }
 

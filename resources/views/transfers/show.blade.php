@@ -136,6 +136,42 @@
         </div>
     </x-ui.card>
 
+    <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
+
+    @if($transfer->transportCosts->where('cost_type', 'ticket')->isNotEmpty())
+        <x-ui.card label="Bilety (zapisane przy transferze)" class="mb-4">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead>
+                        <tr class="text-muted small">
+                            <th>Opis</th>
+                            <th>Kwota</th>
+                            <th class="text-end">Załącznik</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($transfer->transportCosts->where('cost_type', 'ticket') as $tc)
+                            @php $u = \App\Support\PublicDiskFileUrl::url($tc->file_path); @endphp
+                            <tr>
+                                <td>{{ $tc->description ?: 'Bilet' }}</td>
+                                <td>{{ number_format((float) $tc->amount, 2) }} {{ $tc->currency }}</td>
+                                <td class="text-end">
+                                    @if($u)
+                                        <a href="{{ $u }}" target="_blank" rel="noopener" class="text-decoration-none">
+                                            <i class="bi bi-paperclip"></i> Podgląd
+                                        </a>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </x-ui.card>
+    @endif
+
     <!-- Uczestnicy -->
     <x-ui.card label="Uczestnicy" class="mb-4">
         @if($transfer->participants->count() > 0)

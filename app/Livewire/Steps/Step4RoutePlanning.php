@@ -1777,7 +1777,12 @@ class Step4RoutePlanning extends Component
     }
 
     /**
-     * Livewire niezawodnie obsługuje upload na płytkich kluczach; scala do zagnieżdżonej tablicy biletów.
+     * Natychmiast utrwala wgrany plik biletu ziemnego na dysku i w zagnieżdżonej tablicy biletów zostawia
+     * wyłącznie `attachment_path` (string). Dzięki temu event `route-planned` dispatchowany do rodzica
+     * niesie w `route_segments` wartości bezpiecznie serializowalne do JSON — inaczej obiekty
+     * `TemporaryUploadedFile` w params eventu ulegają korupcji (Synth pliku obsługuje tylko właściwości
+     * komponentu, a nie parametry eventów), co objawiało się znikaniem biletów po przejściu na krok 4
+     * i błędem „Załącznik musi być poprawnym plikiem” przy zapisie.
      */
     protected function mergeFlatTicketFileUploadsIntoNested(string $n): void
     {
@@ -1794,7 +1799,14 @@ class Step4RoutePlanning extends Component
             if (! is_array($row)) {
                 $row = [];
             }
-            $row['attachment'] = $up;
+            $path = $this->persistTicketUploadImmediately($up);
+            if ($path !== null) {
+                $row['attachment_path'] = $path;
+                unset($row['attachment']);
+                unset($this->fromAirportTicketFiles[$eid], $this->fromAirportTicketFiles[(string) $eid]);
+            } else {
+                $row['attachment'] = $up;
+            }
             $this->fromAirportPublicTicketCostsByEmployee[$eid] = $row;
         }
         if (str_starts_with($n, 'toAirportTicketFiles.')) {
@@ -1810,9 +1822,36 @@ class Step4RoutePlanning extends Component
             if (! is_array($row)) {
                 $row = [];
             }
-            $row['attachment'] = $up;
+            $path = $this->persistTicketUploadImmediately($up);
+            if ($path !== null) {
+                $row['attachment_path'] = $path;
+                unset($row['attachment']);
+                unset($this->toAirportTicketFiles[$eid], $this->toAirportTicketFiles[(string) $eid]);
+            } else {
+                $row['attachment'] = $up;
+            }
             $this->toAirportPublicTicketCostsByEmployee[$eid] = $row;
         }
+    }
+
+    /**
+     * Zapisuje TemporaryUploadedFile na dysku publicznym i zwraca ścieżkę, lub null przy nieudanym zapisie.
+     */
+    protected function persistTicketUploadImmediately(mixed $up): ?string
+    {
+        try {
+            if ($up instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+                $path = $up->store('transport_costs', 'public');
+
+                return is_string($path) && $path !== '' ? $path : null;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Step4RoutePlanning: nie udało się zapisać załącznika biletu ziemnego', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
     }
 
     public function updated($name): void

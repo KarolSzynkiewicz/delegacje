@@ -131,6 +131,62 @@ final class DepartureRoutePlan
     }
 
     /**
+     * Bilety transportu zbiorowego na odcinkach ziemnych (np. na/z lotniska), trzymane w `route_segments`
+     * jako `public_leg_ticket_costs_by_employee` — nie trafiają do `transport_costs`, więc widoki muszą
+     * czytać je stąd, żeby pokazać załączniki na stronie wyjazdu i transferu.
+     *
+     * @param  list<array<string, mixed>>  $segments
+     * @return list<array{
+     *   leg_label: string,
+     *   employee_id: int,
+     *   amount: ?float,
+     *   currency: string,
+     *   attachment_path: ?string,
+     * }>
+     */
+    public static function collectPublicLegTicketRowsFromSegments(array $segments): array
+    {
+        $out = [];
+        foreach ($segments as $seg) {
+            if (($seg['mode'] ?? '') !== 'own') {
+                continue;
+            }
+            $byEmp = $seg['public_leg_ticket_costs_by_employee'] ?? null;
+            if (! is_array($byEmp) || $byEmp === []) {
+                continue;
+            }
+            $leg = (string) ($seg['leg'] ?? '');
+            // Pusty `leg` występował w starszych zapisach dla odcinka „z lotniska”.
+            $legLabel = match ($leg) {
+                'to_airport' => 'Dojazd na lotnisko / dworzec',
+                'from_airport', '' => 'Dojazd z lotniska / dworca',
+                default => 'Odcinek ziemny (bilet)',
+            };
+            foreach ($byEmp as $eid => $cost) {
+                if (! is_array($cost)) {
+                    continue;
+                }
+                $attachmentPath = ! empty($cost['attachment_path']) ? (string) $cost['attachment_path'] : null;
+                $amount = $cost['amount'] ?? null;
+                $hasAmount = $amount !== null && $amount !== '' && is_numeric($amount) && (float) $amount > 0;
+                if (! $hasAmount && ($attachmentPath === null || $attachmentPath === '')) {
+                    continue;
+                }
+                $eidInt = is_numeric($eid) ? (int) $eid : (int) (string) $eid;
+                $out[] = [
+                    'leg_label' => $legLabel,
+                    'employee_id' => $eidInt,
+                    'amount' => $hasAmount ? (float) $amount : null,
+                    'currency' => strtoupper(trim((string) ($cost['currency'] ?? 'PLN'))),
+                    'attachment_path' => $attachmentPath,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $segments
      * @return list<array<string, mixed>>
      */

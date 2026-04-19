@@ -16,6 +16,7 @@ use Livewire\WithFileUploads;
 class DeparturePlannerV2 extends Component
 {
     use Concerns\InteractsWithLogisticsTransportMode;
+    use Concerns\ValidatesPublicTransportTicketUploads;
     use WithFileUploads;
 
     // Podstawowe dane formularza
@@ -753,6 +754,14 @@ class DeparturePlannerV2 extends Component
 
     /**
      * Utrzymuje zgodność z polami używanymi w nagłówku i walidacji (pierwszy segment publiczny, ostatni własny).
+     *
+     * UWAGA: nie czytamy z segmentów `ticket_costs_by_employee` do nagłówka. Bilety (kwota/waluta/załącznik)
+     * są własnością rodzica — plik (TemporaryUploadedFile) w nagłówku żyje tu, w rodzicu, przez `wire:model`.
+     * Eventy Livewire (`$this->dispatch(..., route_segments: ...)`) są kodowane do JSON po stronie JS; obiekty
+     * `TemporaryUploadedFile` nie przechodzą zdrową formą przez event payload (Synth dehydratuje tylko
+     * właściwości komponentu). Przyjęcie biletów z segmentów zwrotnych z Step4 niszczyło nagłówkowe uploady
+     * (UI: „bilety się odpinają”, walidacja: „Załącznik musi być poprawnym plikiem”). Zawsze wymuszamy
+     * kierunek nagłówek → segment.
      */
     protected function deriveLegacyFieldsFromRouteSegments(): void
     {
@@ -768,21 +777,13 @@ class DeparturePlannerV2 extends Component
                 $this->sharedStartAirportLocationId = $seg['start_location_id'] ?? $this->sharedStartAirportLocationId;
                 $this->sharedEndAirportLocationId = $seg['end_location_id'] ?? $this->sharedEndAirportLocationId;
 
-                $segmentTickets = is_array($seg['ticket_costs_by_employee'] ?? null)
-                    ? $seg['ticket_costs_by_employee']
-                    : [];
-                // Pierwszy route-planned z kroku 4 może mieć pusty segment zanim Livewire
-                // przekaże reactive bilety do Step4 — wtedy merge w child zwraca pustkę i nie
-                // wolno nadpisać nagłówka. Gdy użytkownik realnie czyści bilety, nagłówek jest już [].
-                if ($segmentTickets !== [] || empty($this->ticketCostsByEmployee)) {
-                    $this->ticketCostsByEmployee = $segmentTickets;
-                } else {
-                    $this->pushTicketsToFirstPublicSegment();
-                }
-
                 break;
             }
         }
+
+        // Zawsze nadpisz bilety w pierwszym segmencie publicznym autorytatywnym stanem nagłówka rodzica
+        // — niezależnie od tego, co przyszło zwrotnie z eventu (tam pliki są już uszkodzone).
+        $this->pushTicketsToFirstPublicSegment();
 
         $ground = DepartureRoutePlan::primaryPostAirportOwnSegment($this->routeSegments);
         if ($ground !== null) {
@@ -968,7 +969,7 @@ class DeparturePlannerV2 extends Component
                         continue;
                     }
                     $att = $cost['attachment'] ?? null;
-                    if ($att) {
+                    if ($this->isTicketFileUpload($att)) {
                         $path = $att->store('transport_costs', 'public');
                         $eidKey = is_numeric($eid) ? (int) $eid : $eid;
                         $this->routeSegments[$si]['ticket_costs_by_employee'][$eidKey]['attachment_path'] = $path;
@@ -990,7 +991,7 @@ class DeparturePlannerV2 extends Component
                         continue;
                     }
                     $att = $cost['attachment'] ?? null;
-                    if ($att) {
+                    if ($this->isTicketFileUpload($att)) {
                         $path = $att->store('transport_costs', 'public');
                         $eidKey = is_numeric($eid) ? (int) $eid : $eid;
                         $this->routeSegments[$si]['public_leg_ticket_costs_by_employee'][$eidKey]['attachment_path'] = $path;
@@ -1046,7 +1047,6 @@ class DeparturePlannerV2 extends Component
                 $employeeCost = $tickets[$employeeId] ?? $tickets[(string) $employeeId] ?? [];
                 $amount = $employeeCost['amount'] ?? null;
                 $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
-                $attachment = $employeeCost['attachment'] ?? null;
 
                 if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                     $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu (odcinek #'.($segIndex + 1).').');
@@ -1056,21 +1056,10 @@ class DeparturePlannerV2 extends Component
                     $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć 3 znaki (odcinek #'.($segIndex + 1).').');
                 }
 
-                if ($attachment) {
-                    $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
-                        ['attachment' => $attachment],
-                        ['attachment' => 'file|max:10240'],
-                        [
-                            'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
-                            'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
-                        ]
-                    );
-                    if ($attachmentValidator->fails()) {
-                        foreach ($attachmentValidator->errors()->all() as $message) {
-                            $this->addError("ticketCostsByEmployee.{$employeeId}.attachment", $message);
-                        }
-                    }
-                }
+                $this->validateTicketAttachmentUpload(
+                    $employeeCost,
+                    "ticketCostsByEmployee.{$employeeId}.attachment"
+                );
             }
         }
 
@@ -1163,7 +1152,6 @@ class DeparturePlannerV2 extends Component
                     $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
                     $amount = $employeeCost['amount'] ?? null;
                     $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
-                    $attachment = $employeeCost['attachment'] ?? null;
 
                     if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                         $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu dla tego pracownika.');
@@ -1173,21 +1161,10 @@ class DeparturePlannerV2 extends Component
                         $this->addError("ticketCostsByEmployee.{$employeeId}.currency", 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
                     }
 
-                    if ($attachment) {
-                        $attachmentValidator = \Illuminate\Support\Facades\Validator::make(
-                            ['attachment' => $attachment],
-                            ['attachment' => 'file|max:10240'],
-                            [
-                                'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
-                                'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
-                            ]
-                        );
-                        if ($attachmentValidator->fails()) {
-                            foreach ($attachmentValidator->errors()->all() as $message) {
-                                $this->addError("ticketCostsByEmployee.{$employeeId}.attachment", $message);
-                            }
-                        }
-                    }
+                    $this->validateTicketAttachmentUpload(
+                        $employeeCost,
+                        "ticketCostsByEmployee.{$employeeId}.attachment"
+                    );
                 }
 
                 if ($this->getErrorBag()->isNotEmpty()) {
@@ -1200,8 +1177,8 @@ class DeparturePlannerV2 extends Component
                     $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
                     $attachment = $employeeCost['attachment'] ?? null;
 
-                    $attachmentPath = null;
-                    if ($attachment) {
+                    $attachmentPath = $employeeCost['attachment_path'] ?? null;
+                    if ($this->isTicketFileUpload($attachment)) {
                         $attachmentPath = $attachment->store('transport_costs', 'public');
                     }
 
