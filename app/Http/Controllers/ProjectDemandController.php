@@ -41,8 +41,7 @@ class ProjectDemandController extends Controller
         }
 
         $demands = $query
-            ->orderBy('start_date', 'asc')
-            ->orderBy('id', 'asc')
+            ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 
@@ -135,7 +134,7 @@ class ProjectDemandController extends Controller
 
             return redirect()
                 ->route('projects.demands.index', $project)
-                ->with('success', 'Zapotrzebowania projektu zostały utworzone.');
+                ->with('success', 'Zapotrzebowania projektu zostały zapisane.');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
@@ -235,7 +234,7 @@ class ProjectDemandController extends Controller
 
             return redirect()
                 ->route('projects.demands.index', $project)
-                ->with('success', 'Zapotrzebowania projektu zostały utworzone.');
+                ->with('success', 'Zapotrzebowania projektu zostały zapisane.');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
