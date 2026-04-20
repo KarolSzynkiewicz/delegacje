@@ -219,6 +219,13 @@
             'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
             'vehiclePoolHint' => 'departure',
         ]"
+        :end-date="$endDate"
+        :departure-date="$departureDate"
+        :public-transport-hub-kind="$publicTransportHubKind"
+        :shared-start-airport-location-id="$sharedStartAirportLocationId"
+        :shared-end-airport-location-id="$sharedEndAirportLocationId"
+        :available-vehicles="$this->availableVehicles"
+        :available-public-transport-hubs="$this->availablePublicTransportHubs"
         :transport-mode="$transportMode"
         :vehicle-id="$vehicleId"
         :selected-vehicle="$tripPanelVehicle"

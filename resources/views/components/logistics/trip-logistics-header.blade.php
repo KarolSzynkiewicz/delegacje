@@ -2,9 +2,9 @@
   Wspólny nagłówek: daty + tryb transportu + szczegóły (lotniska / pojazd).
   Używany w widokach Livewire wyjazd/zjazd — wywołaj przez @include z tablicą $tripLogisticsHeader.
 
-  Wymaga w scope rodzica: $endDate, $transportMode, $publicTransportHubKind, $sharedStartAirportLocationId, $sharedEndAirportLocationId,
-  $vehicleId, $vehicleSeats (opcj.), oraz computed $this->availablePublicTransportHubs, $this->availableVehicles.
-  Dodatkowo nazwa pierwszej daty: departureDate albo returnDate (zgodnie z firstWire).
+  Wymaga w scope: $endDate, $transportMode, $publicTransportHubKind, $sharedStartAirportLocationId, $sharedEndAirportLocationId,
+  $vehicleId, $availableVehicles, $availablePublicTransportHubs (collections), $departureDate / $returnDate wg firstWire.
+  Przekazuj z widoku Livewire przez trip-details-panel lub inny @include — nie polegaj na $this w zagnieżdżonym komponencie Blade.
 --}}
 @php
     $cfg = $tripLogisticsHeader ?? [];
@@ -120,7 +120,7 @@
             @else
                 {{-- Krok 2: Start/Cel — ta sama wysokość pól co daty (bez -sm). Zmiana typu lotnisko/dworzec: przycisk „Samolot” / „Bus…”. --}}
                 <div class="d-flex flex-column w-100 h-100 rounded-3 p-2 transition-all logistics-trip-header-card{{ $airportsIncomplete ? ' logistics-trip-header-card--invalid' : '' }}">
-                    @if($this->availablePublicTransportHubs->isEmpty())
+                    @if($availablePublicTransportHubs->isEmpty())
                         <div class="small text-warning mb-2">
                             <i class="bi bi-info-circle me-1"></i>Brak lokalizacji tego typu — dodaj cel w kartotece lokalizacji.
                         </div>
@@ -160,7 +160,7 @@
                 <label class="form-label small text-muted mb-1">Pojazd <span class="text-danger">*</span></label>
                 <select wire:model.live="vehicleId" class="form-select logistics-trip-header-control @error('vehicleId') is-invalid @enderror">
                     <option value="" disabled {{ empty($vehicleId) ? 'selected' : '' }}>— wybierz pojazd —</option>
-                    @foreach($this->availableVehicles as $v)
+                    @foreach($availableVehicles as $v)
                         <option value="{{ $v->id }}">
                             {{ $v->registration_number }} – {{ $v->brand }} {{ $v->model }}
                             @if($v->capacity) ({{ $v->capacity }} m.) @endif
@@ -170,7 +170,7 @@
                 @error('vehicleId') <div class="invalid-feedback d-block logistics-trip-header-hint">{{ $message }}</div> @enderror
                 @if(!empty($vehicleId))
                     @php
-                        $headerTransportVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId);
+                        $headerTransportVehicle = $availableVehicles->firstWhere('id', (int) $vehicleId);
                         $headerDocWarning = $headerTransportVehicle?->documentComplianceWarningMessage() ?? '';
                     @endphp
                     @if($headerDocWarning !== '')
@@ -188,7 +188,7 @@
                             Wybierz datę wyjazdu i datę zakończenia — wtedy wczytamy listę pojazdów.
                         @endif
                     </div>
-                @elseif($this->availableVehicles->isEmpty())
+                @elseif($availableVehicles->isEmpty())
                     @if(($cfg['vehiclePoolHint'] ?? 'departure') === 'return')
                         @if(! empty($returnDate))
                             <div class="small text-warning mt-1">

@@ -63,6 +63,13 @@
             'datesHelp' => 'Wybierz datę zjazdu i datę zakończenia.',
             'vehiclePoolHint' => 'return',
         ]"
+        :end-date="$endDate"
+        :return-date="$returnDate"
+        :public-transport-hub-kind="$publicTransportHubKind"
+        :shared-start-airport-location-id="$sharedStartAirportLocationId"
+        :shared-end-airport-location-id="$sharedEndAirportLocationId"
+        :available-vehicles="$this->availableVehicles"
+        :available-public-transport-hubs="$this->availablePublicTransportHubs"
         :transport-mode="$transportMode"
         :vehicle-id="$vehicleId"
         :selected-vehicle="$tripPanelVehicle"

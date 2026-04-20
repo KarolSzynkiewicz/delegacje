@@ -2,10 +2,23 @@
   Cały blok „Szczegóły …”: karta + trip-logistics-header + siatka miejsc (własny) / bilety (publiczny).
   Stan Livewire pozostaje w rodzicu — komponent tylko komponuje widok (jedno miejsce na layout).
 
+  Ten komponent nie dziedziczy automatycznie zmiennych z widoku Livewire — nagłówek wymaga ich w scope,
+  więc przekazujemy je przez @include (patrz tablica poniżej).
+
   @see components.logistics.trip-logistics-header
 --}}
 @props([
     'tripLogisticsHeader' => [],
+    /** Zmienne wymagane przez trip-logistics-header (wire:model / $this w rodzicu Livewire) */
+    'endDate' => '',
+    'departureDate' => null,
+    'returnDate' => null,
+    'publicTransportHubKind' => null,
+    'sharedStartAirportLocationId' => null,
+    'sharedEndAirportLocationId' => null,
+    /** Kolekcje z rodzica Livewire (nie używaj $this w zagnieżdżonym include) */
+    'availableVehicles' => null,
+    'availablePublicTransportHubs' => null,
     'transportMode' => null,
     'vehicleId' => null,
     'selectedVehicle' => null,
@@ -33,11 +46,23 @@
     $ownEmptyFallback = 'Wybierz uczestników, aby zobaczyć siatkę miejsc.';
     $publicEmptyFallback = 'Wybierz uczestników, aby uzupełnić bilety.';
     $flatUploads = $flatAttachmentUploads ?? [];
+    $headerVehicles = $availableVehicles ?? collect();
+    $headerHubs = $availablePublicTransportHubs ?? collect();
 @endphp
 
 <x-ui.card {{ $attributes->class(['mb-4']) }}>
     @include('components.logistics.trip-logistics-header', [
         'tripLogisticsHeader' => $tripLogisticsHeader,
+        'endDate' => $endDate,
+        'departureDate' => $departureDate,
+        'returnDate' => $returnDate,
+        'transportMode' => $transportMode,
+        'publicTransportHubKind' => $publicTransportHubKind,
+        'sharedStartAirportLocationId' => $sharedStartAirportLocationId,
+        'sharedEndAirportLocationId' => $sharedEndAirportLocationId,
+        'vehicleId' => $vehicleId,
+        'availableVehicles' => $headerVehicles,
+        'availablePublicTransportHubs' => $headerHubs,
     ])
 
     @if($showOwnGrid)
