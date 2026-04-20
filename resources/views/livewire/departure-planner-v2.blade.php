@@ -103,50 +103,33 @@
         </x-ui.alert>
     @endif
 
-    {{-- ── Szczegóły wyjazdu (wspólny partial z zjazdem) ── --}}
-    <x-ui.card class="mb-4">
-        @include('components.logistics.trip-logistics-header', [
-            'tripLogisticsHeader' => [
-                'title' => 'Szczegóły wyjazdu',
-                'firstWire' => 'departureDate',
-                'firstLabel' => 'Data wyjazdu',
-                'datesHelp' => 'Wybierz datę wyjazdu i datę zakończenia.',
-                'vehiclePoolHint' => 'departure',
-            ],
-        ])
-
-        {{-- Miejsca w pojeździe (gdy wybrany pojazd) — komponent Blade: x-logistics.vehicle-seat-grid --}}
-        @if($transportMode === 'own' && ! empty($vehicleId))
-            @php $selectedVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId); @endphp
-            <x-logistics.vehicle-seat-grid
-                :vehicle="$selectedVehicle"
-                :vehicle-seats="$vehicleSeats"
-                :selected-employees="$this->selectedEmployees"
-                wire-key-prefix="vs"
-            />
-        @endif
-
-        {{-- Bilety (transport publiczny) — ta sama pozycja co siatka miejsc przy „Własny” --}}
-        @if($transportMode === 'public')
-            @if($this->selectedEmployees->isEmpty())
-                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
-                    <i class="bi bi-ticket-perforated me-1"></i>
-                    Przypisz pracowników w kroku 1 — wtedy uzupełnisz bilety tutaj (zamiast siatki miejsc).
-                </div>
-            @else
-                <x-logistics.public-transport-tickets
-                    variant="cards"
-                    :section-title="$this->publicTransportTicketsSectionTitle"
-                    :employees="$this->selectedEmployees"
-                    :ticket-costs-by-employee="$ticketCostsByEmployee"
-                    :tickets-incomplete="$this->headerTicketsIncomplete"
-                    :require-attachment="true"
-                    wire-key-prefix="header-ticket"
-                    ticket-costs-binding-key="ticketCostsByEmployee"
-                />
-            @endif
-        @endif
-    </x-ui.card>
+    @php
+        $tripPanelVehicle = $transportMode === 'own' && ! empty($vehicleId)
+            ? $this->availableVehicles->firstWhere('id', (int) $vehicleId)
+            : null;
+    @endphp
+    <x-logistics.trip-details-panel
+        class="mb-4"
+        :trip-logistics-header="[
+            'title' => 'Szczegóły wyjazdu',
+            'firstWire' => 'departureDate',
+            'firstLabel' => 'Data wyjazdu',
+            'datesHelp' => 'Wybierz datę wyjazdu i datę zakończenia.',
+            'vehiclePoolHint' => 'departure',
+        ]"
+        :transport-mode="$transportMode"
+        :vehicle-id="$vehicleId"
+        :selected-vehicle="$tripPanelVehicle"
+        :vehicle-seats="$vehicleSeats"
+        :employees="$this->selectedEmployees"
+        :defer-seat-grid-until-employees="false"
+        public-transport-empty-hint="Przypisz pracowników w kroku 1 — wtedy uzupełnisz bilety tutaj (zamiast siatki miejsc)."
+        seat-grid-wire-key-prefix="vs"
+        :public-tickets-section-title="$this->publicTransportTicketsSectionTitle"
+        :ticket-costs-by-employee="$ticketCostsByEmployee"
+        :tickets-incomplete="$this->headerTicketsIncomplete"
+        ticket-wire-key-prefix="header-ticket"
+    />
 
     <!-- Step Navigation -->
     @php

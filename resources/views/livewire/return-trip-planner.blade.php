@@ -49,51 +49,34 @@
         <div class="alert alert-danger mb-4">{{ session('error') }}</div>
     @endif
 
-    {{-- Szczegóły zjazdu — wspólny partial z planerem wyjazdu --}}
-    <x-ui.card class="mb-4">
-        @include('components.logistics.trip-logistics-header', [
-            'tripLogisticsHeader' => [
-                'title' => 'Szczegóły zjazdu',
-                'firstWire' => 'returnDate',
-                'firstLabel' => 'Data zjazdu',
-                'datesHelp' => 'Wybierz datę zjazdu i datę zakończenia.',
-                'vehiclePoolHint' => 'return',
-            ],
-        ])
-
-        {{-- Miejsca w pojeździe — ta sama karta co nagłówek (jak wyjazd / transfer) --}}
-        @if($transportMode === 'own' && $vehicleId)
-            @php $selectedVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId); @endphp
-            <x-logistics.vehicle-seat-grid
-                :vehicle="$selectedVehicle"
-                :vehicle-seats="$vehicleSeats"
-                :selected-employees="$this->selectedEmployees"
-                wire-key-prefix="rtp-vs"
-            />
-        @endif
-
-        {{-- Bilety zamiast foteli przy transporcie publicznym — jak departure-planner-v2 i transfer --}}
-        @if($transportMode === 'public')
-            @if($this->selectedEmployees->isEmpty())
-                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
-                    <i class="bi bi-ticket-perforated me-1"></i>
-                    Wybierz uczestników zjazdu poniżej, aby wpisać koszty biletów.
-                </div>
-            @else
-                <x-logistics.public-transport-tickets
-                    variant="cards"
-                    :section-title="$this->publicTransportTicketsSectionTitle"
-                    :employees="$this->selectedEmployees"
-                    :ticket-costs-by-employee="$ticketCostsByEmployee"
-                    :tickets-incomplete="$this->headerTicketsIncomplete"
-                    :require-attachment="true"
-                    :currencies="$this->currencyCases"
-                    wire-key-prefix="rtp-header-ticket"
-                    ticket-costs-binding-key="ticketCostsByEmployee"
-                />
-            @endif
-        @endif
-    </x-ui.card>
+    @php
+        $tripPanelVehicle = $transportMode === 'own' && ! empty($vehicleId)
+            ? $this->availableVehicles->firstWhere('id', (int) $vehicleId)
+            : null;
+    @endphp
+    <x-logistics.trip-details-panel
+        class="mb-4"
+        :trip-logistics-header="[
+            'title' => 'Szczegóły zjazdu',
+            'firstWire' => 'returnDate',
+            'firstLabel' => 'Data zjazdu',
+            'datesHelp' => 'Wybierz datę zjazdu i datę zakończenia.',
+            'vehiclePoolHint' => 'return',
+        ]"
+        :transport-mode="$transportMode"
+        :vehicle-id="$vehicleId"
+        :selected-vehicle="$tripPanelVehicle"
+        :vehicle-seats="$vehicleSeats"
+        :employees="$this->selectedEmployees"
+        :defer-seat-grid-until-employees="false"
+        public-transport-empty-hint="Wybierz uczestników zjazdu poniżej, aby wpisać koszty biletów."
+        seat-grid-wire-key-prefix="rtp-vs"
+        :public-tickets-section-title="$this->publicTransportTicketsSectionTitle"
+        :ticket-costs-by-employee="$ticketCostsByEmployee"
+        :tickets-incomplete="$this->headerTicketsIncomplete"
+        :currencies="$this->currencyCases"
+        ticket-wire-key-prefix="rtp-header-ticket"
+    />
 
     <div class="row g-4">
         {{-- ── SEKCJA 2: Pracownicy ── --}}

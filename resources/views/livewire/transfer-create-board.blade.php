@@ -199,66 +199,42 @@
     @endif
 
     @if($wizardPhase === 'board')
-    <x-ui.card class="mb-4">
-        @include('components.logistics.trip-logistics-header', [
-            'tripLogisticsHeader' => [
-                'title' => 'Szczegóły transferu',
-                'firstWire' => 'departureDate',
-                'firstLabel' => 'Data transferu',
-                'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
-                'vehiclePoolHint' => 'departure',
-            ],
-        ])
-
-        {{-- Miejsca w pojeździe (tryb własny) — widoczne zarówno w trybie Przypisania (szkic) jak i Transport --}}
-        @if($transportMode === 'own' && ! empty($vehicleId))
-            @php $selectedVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId); @endphp
-            @if($this->effectiveEmployees->isEmpty())
-                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
-                    <i class="bi bi-people me-1"></i>
-                    @if($mode === 'assignment')
-                        Dodaj kogoś do szkicu (przeciągnij), aby zobaczyć siatkę miejsc.
-                    @else
-                        Wybierz uczestników poniżej, aby zobaczyć siatkę miejsc.
-                    @endif
-                </div>
-            @else
-                <x-logistics.vehicle-seat-grid
-                    :vehicle="$selectedVehicle"
-                    :vehicle-seats="$vehicleSeats"
-                    :selected-employees="$this->effectiveEmployees"
-                    wire-key-prefix="transfer-vs"
-                />
-            @endif
-        @endif
-
-        {{-- Bilety (transport publiczny) — widoczne zarówno w trybie Przypisania (szkic) jak i Transport --}}
-        @if($transportMode === 'public')
-            @if($this->effectiveEmployees->isEmpty())
-                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
-                    <i class="bi bi-ticket-perforated me-1"></i>
-                    @if($mode === 'assignment')
-                        Dodaj kogoś do szkicu (przeciągnij), aby wpisać koszty biletów.
-                    @else
-                        Wybierz uczestników poniżej, aby wpisać koszty biletów.
-                    @endif
-                </div>
-            @else
-                <x-logistics.public-transport-tickets
-                    variant="cards"
-                    :section-title="$this->publicTransportTicketsSectionTitle"
-                    :employees="$this->effectiveEmployees"
-                    :ticket-costs-by-employee="$ticketCostsByEmployee"
-                    :tickets-incomplete="false"
-                    :require-attachment="true"
-                    wire-key-prefix="transfer-ticket"
-                    ticket-costs-binding-key="ticketCostsByEmployee"
-                    attachment-flat-binding-key="ticketAttachmentUploads"
-                    :flat-attachment-uploads="$ticketAttachmentUploads"
-                />
-            @endif
-        @endif
-    </x-ui.card>
+    @php
+        $tripPanelVehicle = $transportMode === 'own' && ! empty($vehicleId)
+            ? $this->availableVehicles->firstWhere('id', (int) $vehicleId)
+            : null;
+        $tripOwnEmptyHint = $mode === 'assignment'
+            ? 'Dodaj kogoś do szkicu (przeciągnij), aby zobaczyć siatkę miejsc.'
+            : 'Wybierz uczestników poniżej, aby zobaczyć siatkę miejsc.';
+        $tripPublicEmptyHint = $mode === 'assignment'
+            ? 'Dodaj kogoś do szkicu (przeciągnij), aby wpisać koszty biletów.'
+            : 'Wybierz uczestników poniżej, aby wpisać koszty biletów.';
+    @endphp
+    <x-logistics.trip-details-panel
+        class="mb-4"
+        :trip-logistics-header="[
+            'title' => 'Szczegóły transferu',
+            'firstWire' => 'departureDate',
+            'firstLabel' => 'Data transferu',
+            'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
+            'vehiclePoolHint' => 'departure',
+        ]"
+        :transport-mode="$transportMode"
+        :vehicle-id="$vehicleId"
+        :selected-vehicle="$tripPanelVehicle"
+        :vehicle-seats="$vehicleSeats"
+        :employees="$this->effectiveEmployees"
+        :defer-seat-grid-until-employees="true"
+        :own-transport-empty-hint="$tripOwnEmptyHint"
+        :public-transport-empty-hint="$tripPublicEmptyHint"
+        seat-grid-wire-key-prefix="transfer-vs"
+        :public-tickets-section-title="$this->publicTransportTicketsSectionTitle"
+        :ticket-costs-by-employee="$ticketCostsByEmployee"
+        :tickets-incomplete="false"
+        ticket-wire-key-prefix="transfer-ticket"
+        attachment-flat-binding-key="ticketAttachmentUploads"
+        :flat-attachment-uploads="$ticketAttachmentUploads"
+    />
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div class="btn-group" role="group" aria-label="Tryb kreatora">
