@@ -14,7 +14,6 @@ use App\Services\VehicleValidationService;
 use App\Support\PublicTransportTicketCosts;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -22,6 +21,7 @@ use Livewire\WithFileUploads;
 class ReturnTripPlanner extends Component
 {
     use Concerns\InteractsWithLogisticsTransportMode;
+    use Concerns\ValidatesPublicTransportTicketUploads;
     use WithFileUploads;
 
     public string $returnDate = '';
@@ -689,26 +689,18 @@ class ReturnTripPlanner extends Component
                     return;
                 }
 
+                $path = $cost['attachment_path'] ?? null;
+                $hasPath = is_string($path) && trim($path) !== '';
                 $attachment = $cost['attachment'] ?? null;
-                if (empty($attachment)) {
+
+                if (! $hasPath && ! $this->isTicketFileUpload($attachment) && empty($attachment)) {
                     $this->addError('ticketCostsByEmployee.'.$empId.'.attachment', 'Dodaj załącznik biletu.');
 
                     return;
                 }
 
-                $attachmentValidator = Validator::make(
-                    ['attachment' => $attachment],
-                    ['attachment' => 'file|max:10240'],
-                    [
-                        'attachment.file' => 'Załącznik musi być poprawnym plikiem.',
-                        'attachment.max' => 'Załącznik może mieć maksymalnie 10 MB.',
-                    ]
-                );
-                if ($attachmentValidator->fails()) {
-                    foreach ($attachmentValidator->errors()->all() as $message) {
-                        $this->addError('ticketCostsByEmployee.'.$empId.'.attachment', $message);
-                    }
-
+                $this->validateTicketAttachmentUpload($cost, 'ticketCostsByEmployee.'.$empId.'.attachment');
+                if ($this->getErrorBag()->isNotEmpty()) {
                     return;
                 }
             }
@@ -721,8 +713,8 @@ class ReturnTripPlanner extends Component
                 $amount = $cost['amount'] ?? null;
                 $currency = strtoupper(trim((string) ($cost['currency'] ?? 'PLN')));
                 $attachment = $cost['attachment'] ?? null;
-                $attachmentPath = null;
-                if ($attachment) {
+                $attachmentPath = $cost['attachment_path'] ?? null;
+                if ($this->isTicketFileUpload($attachment)) {
                     $attachmentPath = $attachment->store('transport_costs', 'public');
                 }
                 $ticketCostsToSave[$empId] = [

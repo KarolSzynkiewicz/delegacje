@@ -126,17 +126,25 @@
             />
         @endif
 
-        {{-- Bilety (transport publiczny + pracownicy przypisani) — wspólny komponent z planerem zjazdu --}}
-        @if($transportMode === 'public' && $this->selectedEmployees->isNotEmpty())
-            <x-logistics.public-transport-tickets
-                variant="cards"
-                :section-title="$this->publicTransportTicketsSectionTitle"
-                :employees="$this->selectedEmployees"
-                :ticket-costs-by-employee="$ticketCostsByEmployee"
-                :tickets-incomplete="$this->headerTicketsIncomplete"
-                :require-attachment="true"
-                wire-key-prefix="header-ticket"
-            />
+        {{-- Bilety (transport publiczny) — ta sama pozycja co siatka miejsc przy „Własny” --}}
+        @if($transportMode === 'public')
+            @if($this->selectedEmployees->isEmpty())
+                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                    <i class="bi bi-ticket-perforated me-1"></i>
+                    Przypisz pracowników w kroku 1 — wtedy uzupełnisz bilety tutaj (zamiast siatki miejsc).
+                </div>
+            @else
+                <x-logistics.public-transport-tickets
+                    variant="cards"
+                    :section-title="$this->publicTransportTicketsSectionTitle"
+                    :employees="$this->selectedEmployees"
+                    :ticket-costs-by-employee="$ticketCostsByEmployee"
+                    :tickets-incomplete="$this->headerTicketsIncomplete"
+                    :require-attachment="true"
+                    wire-key-prefix="header-ticket"
+                    ticket-costs-binding-key="ticketCostsByEmployee"
+                />
+            @endif
         @endif
     </x-ui.card>
 

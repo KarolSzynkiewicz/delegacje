@@ -517,7 +517,7 @@
                 @endif
 
                 @if($isPublicTransport)
-                    @include('livewire.steps.partials.step4-public-route-cards')
+                    @include('components.logistics.ground-transfer.public-route-cards')
                 @else
                     {{-- ── Car trip plan: ta sama kolejność co w panelu „Kolejność przystanków” (domy + przystanki ręczne loc:) --}}
                     @if(empty($waypointStops))

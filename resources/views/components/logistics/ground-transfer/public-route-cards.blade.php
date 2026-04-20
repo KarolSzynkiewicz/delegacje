@@ -192,8 +192,8 @@
     @endif
 
     {{-- Zawsze w drzewie (warunek widoczności wewnątrz partiali) — inaczej po „Dodaj” (legKind=null) modal w ogóle się nie renderuje. --}}
-    @include('livewire.steps.partials.step4-pre-transfer-config-modal')
-    @include('livewire.steps.partials.step4-pre-transfer-route-modal')
+    @include('components.logistics.ground-transfer.config-modal')
+    @include('components.logistics.ground-transfer.route-modal')
 </x-logistics.transfer-segment-card>
 
 {{-- 2 — Odcinek lotu / przesiadki (tylko skąd → dokąd) --}}
@@ -426,5 +426,5 @@
     @endif
 </x-logistics.transfer-segment-card>
 
-@include('livewire.steps.partials.step4-post-transfer-config-modal')
-@include('livewire.steps.partials.step4-post-transfer-route-modal')
+@include('components.logistics.ground-transfer.post-config-modal')
+@include('components.logistics.ground-transfer.post-route-modal')

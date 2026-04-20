@@ -61,7 +61,7 @@
             ],
         ])
 
-        {{-- Miejsca w pojeździe — komponent Blade: x-logistics.vehicle-seat-grid (jak /departures/create-v2) --}}
+        {{-- Miejsca w pojeździe — ta sama karta co nagłówek (jak wyjazd / transfer) --}}
         @if($transportMode === 'own' && $vehicleId)
             @php $selectedVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId); @endphp
             <x-logistics.vehicle-seat-grid
@@ -70,6 +70,28 @@
                 :selected-employees="$this->selectedEmployees"
                 wire-key-prefix="rtp-vs"
             />
+        @endif
+
+        {{-- Bilety zamiast foteli przy transporcie publicznym — jak departure-planner-v2 i transfer --}}
+        @if($transportMode === 'public')
+            @if($this->selectedEmployees->isEmpty())
+                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                    <i class="bi bi-ticket-perforated me-1"></i>
+                    Wybierz uczestników zjazdu poniżej, aby wpisać koszty biletów.
+                </div>
+            @else
+                <x-logistics.public-transport-tickets
+                    variant="cards"
+                    :section-title="$this->publicTransportTicketsSectionTitle"
+                    :employees="$this->selectedEmployees"
+                    :ticket-costs-by-employee="$ticketCostsByEmployee"
+                    :tickets-incomplete="$this->headerTicketsIncomplete"
+                    :require-attachment="true"
+                    :currencies="$this->currencyCases"
+                    wire-key-prefix="rtp-header-ticket"
+                    ticket-costs-binding-key="ticketCostsByEmployee"
+                />
+            @endif
         @endif
     </x-ui.card>
 
@@ -159,24 +181,8 @@
             </div>
         </div>
 
-        {{-- ── SEKCJA 3: Bilety / trasa ── --}}
+        {{-- ── SEKCJA 3: Podgląd + notatki (bilety są w karcie „Szczegóły zjazdu”) ── --}}
         <div class="col-md-7">
-            {{-- Koszty biletów (transport publiczny) --}}
-            @if($this->isPublicTransport && $this->selectedEmployees->isNotEmpty())
-                <div class="rtp-section mb-3">
-                    <x-logistics.public-transport-tickets
-                        variant="table"
-                        :section-title="$this->publicTransportTicketsSectionTitle"
-                        :employees="$this->selectedEmployees"
-                        :ticket-costs-by-employee="$ticketCostsByEmployee"
-                        :tickets-incomplete="$this->headerTicketsIncomplete"
-                        :require-attachment="true"
-                        :currencies="$this->currencyCases"
-                        wire-key-prefix="ticket"
-                    />
-                </div>
-            @endif
-
             {{-- Podgląd zjazdu (po prepareReturn): skrócenia + konsekwencje auta powrotnego --}}
             @if($showPreview && !empty($previewData))
                 <div class="rtp-section mb-3" style="border-color: {{ $previewData['is_valid'] ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)' }} !important;">

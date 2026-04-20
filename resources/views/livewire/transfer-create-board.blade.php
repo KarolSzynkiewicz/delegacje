@@ -145,11 +145,41 @@
         <div class="alert alert-warning py-2 small mb-3">{{ session('warning') }}</div>
     @endif
 
+    @if($showTransportSwitchModal && $pendingTransportMode)
+        @teleport('body')
+            <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="boardTransportSwitchModalTitle"
+                 style="background-color: rgba(0,0,0,0.55);">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0;">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title" id="boardTransportSwitchModalTitle">
+                                <i class="bi bi-arrow-left-right text-warning me-2"></i>Zmiana sposobu transportu
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" wire:click="cancelTransportModeSwitch" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            @if($pendingTransportMode === 'public')
+                                <p class="mb-0">Przejście na transport publiczny wyzeruje wybór pojazdu służbowego.</p>
+                            @else
+                                <p class="mb-0">Przejście na transport własny wyzeruje wybór lotniska / dworca (start i cel).</p>
+                            @endif
+                            <p class="fw-semibold mt-3 mb-0">Kontynuować?</p>
+                        </div>
+                        <div class="modal-footer border-secondary gap-2">
+                            <button type="button" class="btn btn-outline-light" wire:click="cancelTransportModeSwitch">Anuluj</button>
+                            <button type="button" class="btn btn-primary" wire:click="confirmTransportModeSwitch">Kontynuuj</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endteleport
+    @endif
+
     @if($wizardPhase !== 'board')
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 p-3 rounded-3 border" style="border-color: var(--glass-border) !important; background: rgba(0,0,0,0.12);">
             <div class="small">
                 <span class="text-muted">Transfer</span>
-                <strong class="ms-1">{{ \Carbon\Carbon::parse($transferDate)->format('d.m.Y') }}</strong>
+                <strong class="ms-1">{{ \Carbon\Carbon::parse($departureDate)->format('d.m.Y') }}</strong>
                 <span class="text-muted ms-2">
                     @if($wizardPhase === 'followup')
                         Kolejne kroki
@@ -169,6 +199,67 @@
     @endif
 
     @if($wizardPhase === 'board')
+    <x-ui.card class="mb-4">
+        @include('components.logistics.trip-logistics-header', [
+            'tripLogisticsHeader' => [
+                'title' => 'Szczegóły transferu',
+                'firstWire' => 'departureDate',
+                'firstLabel' => 'Data transferu',
+                'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
+                'vehiclePoolHint' => 'departure',
+            ],
+        ])
+
+        {{-- Miejsca w pojeździe (tryb własny) — widoczne zarówno w trybie Przypisania (szkic) jak i Transport --}}
+        @if($transportMode === 'own' && ! empty($vehicleId))
+            @php $selectedVehicle = $this->availableVehicles->firstWhere('id', (int) $vehicleId); @endphp
+            @if($this->effectiveEmployees->isEmpty())
+                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                    <i class="bi bi-people me-1"></i>
+                    @if($mode === 'assignment')
+                        Dodaj kogoś do szkicu (przeciągnij), aby zobaczyć siatkę miejsc.
+                    @else
+                        Wybierz uczestników poniżej, aby zobaczyć siatkę miejsc.
+                    @endif
+                </div>
+            @else
+                <x-logistics.vehicle-seat-grid
+                    :vehicle="$selectedVehicle"
+                    :vehicle-seats="$vehicleSeats"
+                    :selected-employees="$this->effectiveEmployees"
+                    wire-key-prefix="transfer-vs"
+                />
+            @endif
+        @endif
+
+        {{-- Bilety (transport publiczny) — widoczne zarówno w trybie Przypisania (szkic) jak i Transport --}}
+        @if($transportMode === 'public')
+            @if($this->effectiveEmployees->isEmpty())
+                <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                    <i class="bi bi-ticket-perforated me-1"></i>
+                    @if($mode === 'assignment')
+                        Dodaj kogoś do szkicu (przeciągnij), aby wpisać koszty biletów.
+                    @else
+                        Wybierz uczestników poniżej, aby wpisać koszty biletów.
+                    @endif
+                </div>
+            @else
+                <x-logistics.public-transport-tickets
+                    variant="cards"
+                    :section-title="$this->publicTransportTicketsSectionTitle"
+                    :employees="$this->effectiveEmployees"
+                    :ticket-costs-by-employee="$ticketCostsByEmployee"
+                    :tickets-incomplete="false"
+                    :require-attachment="true"
+                    wire-key-prefix="transfer-ticket"
+                    ticket-costs-binding-key="ticketCostsByEmployee"
+                    attachment-flat-binding-key="ticketAttachmentUploads"
+                    :flat-attachment-uploads="$ticketAttachmentUploads"
+                />
+            @endif
+        @endif
+    </x-ui.card>
+
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div class="btn-group" role="group" aria-label="Tryb kreatora">
             <button
@@ -202,32 +293,30 @@
     </div>
 
     @if($mode === 'transport')
-        <x-ui.card label="Transport (w przygotowaniu)">
-            <p class="text-muted small mb-0">
-                Tutaj trafi wybór trasy, pojazdu i uczestników. Poprzedni kreator (<code>transfer-planner</code>) można później podpiąć pod ten krok albo pod osobną ścieżkę.
-            </p>
-        </x-ui.card>
+    <livewire:employee-picker />
+
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <button type="button"
+                class="btn btn-primary"
+                wire:click="saveSimpleTransfer"
+                wire:loading.attr="disabled"
+                @disabled($selectedEmployeeIds === [])>
+            <span wire:loading.remove wire:target="saveSimpleTransfer">
+                <i class="bi bi-floppy me-1"></i> Zapisz transfer
+            </span>
+            <span wire:loading wire:target="saveSimpleTransfer">
+                <span class="spinner-border spinner-border-sm me-1"></span> Zapisuję…
+            </span>
+        </button>
+        @if($selectedEmployeeIds === [])
+            <span class="small text-muted">Wybierz uczestników.</span>
+        @endif
+    </div>
     @else
-        <x-ui.card label="Data transferu" class="mb-4">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4 col-lg-3">
-                    {{-- Bez statycznego value= z x-ui.input — inaczej wire:model bywa rozjechany z wyborem daty --}}
-                    <label class="form-label" for="transfer-create-board-date">Dzień</label>
-                    <input
-                        id="transfer-create-board-date"
-                        type="date"
-                        class="form-control"
-                        wire:model.live="transferDate"
-                    >
-                </div>
-                <div class="col-md-8 col-lg-9">
-                    <p class="small text-muted mb-0">
-                        Kolumny = projekty <strong>aktywne</strong> w systemie i <strong>trwające</strong> w wybranym dniu (zakres dat projektu).
-                        Puste projekty też są widoczne — możesz na nie przeciągnąć osoby. Na razie to tylko szkic (bez zapisu).
-                    </p>
-                </div>
-            </div>
-        </x-ui.card>
+        <p class="small text-muted mb-3">
+            Kolumny = projekty <strong>aktywne</strong> w systemie i <strong>trwające</strong> w pierwszym dniu zakresu (data transferu).
+            Puste projekty też są widoczne — możesz na nie przeciągnąć osoby. Szkic zapiszesz w kolejnych krokach.
+        </p>
 
         <div wire:loading.delay class="alert alert-info py-2 small mb-3">
             <i class="bi bi-arrow-repeat"></i> Ładowanie…
@@ -466,8 +555,8 @@
     @elseif($wizardPhase === 'done')
         <x-ui.card label="Podsumowanie szkicu transferu">
             <p class="small mb-4" style="color: #94a3b8;">
-                Data transferu:
-                <strong style="color: #f1f5f9;">{{ \Carbon\Carbon::parse($transferDate)->format('d.m.Y') }}</strong>
+                Data i godzina transferu:
+                <strong style="color: #f1f5f9;">{{ \Carbon\Carbon::parse($departureDate)->format('d.m.Y') }}</strong>
             </p>
 
             <h6 class="text-uppercase small fw-semibold mb-2" style="color: #94a3b8; letter-spacing: 0.04em;">Projekty (z tablicy)</h6>
