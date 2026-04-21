@@ -30,6 +30,33 @@
         <x-alert type="danger" dismissible icon="exclamation-triangle">{{ session('error') }}</x-alert>
     @endif
 
+    @once('transfer-show-route-note-styles')
+        <style>
+            .transfer-route-stop-note {
+                background: linear-gradient(90deg, rgba(99, 102, 241, 0.22) 0%, rgba(30, 41, 59, 0.85) 100%);
+                border: 1px solid rgba(165, 180, 252, 0.45);
+                border-left: 4px solid #a5b4fc;
+                color: #f1f5f9;
+                line-height: 1.45;
+                box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+            }
+            .transfer-route-stop-note__label {
+                display: block;
+                font-size: 0.65rem;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: #c7d2fe;
+                margin-bottom: 0.25rem;
+            }
+            .transfer-route-stop-note__text {
+                display: block;
+                color: #f8fafc;
+                font-weight: 500;
+            }
+        </style>
+    @endonce
+
     <!-- Podstawowe informacje -->
     <x-ui.card label="Informacje podstawowe" class="mb-4">
         <div class="row g-4">
@@ -52,16 +79,26 @@
                 <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($visualStatus) }}</x-ui.badge>
             </div>
             <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Pojazd</h6>
+                <h6 class="text-muted small mb-1">Środek transportu</h6>
                 @if($transfer->vehicle)
                     <p class="fw-semibold mb-0">
+                        Pojazd służbowy:
                         {{ $transfer->vehicle->registration_number }}
                         @if($transfer->vehicle->brand || $transfer->vehicle->model)
                             <small class="text-muted">— {{ trim($transfer->vehicle->brand . ' ' . $transfer->vehicle->model) }}</small>
                         @endif
                     </p>
+                @elseif($transfer->has_transport)
+                    <p class="fw-semibold mb-0">Transport publiczny</p>
+                    @if(($publicHubKind ?? null) === 'airport')
+                        <small class="text-muted d-block">Lotnisko — trasa lotnicza (samolot)</small>
+                    @elseif(($publicHubKind ?? null) === 'station')
+                        <small class="text-muted d-block">Dworzec — transport naziemny (autobus / pociąg)</small>
+                    @else
+                        <small class="text-muted d-block">Bez pojazdu służbowego</small>
+                    @endif
                 @else
-                    <span class="text-muted">Brak pojazdu / transport własny</span>
+                    <span class="text-muted">Bez pojazdu służbowego</span>
                 @endif
             </div>
             <div class="col-md-6">
@@ -99,29 +136,41 @@
                 <p class="fw-semibold mb-0">{{ $transfer->getFormattedDuration() ?? '—' }}</p>
             </div>
             <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Liczba przystanków</h6>
-                <p class="fw-semibold mb-0">{{ max(0, ($routeStops->count() ?? 0) - 2) }}</p>
+                <h6 class="text-muted small mb-1">Przystanki</h6>
+                <p class="fw-semibold mb-0">{{ $routeStopCount ?? ($routeStopRows->count() ?? 0) }}</p>
             </div>
         </div>
 
         <div class="mt-3">
-            @if(isset($routeStops) && $routeStops->count() > 0)
+            @if(isset($routeStopRows) && $routeStopRows->count() > 0)
                 <div class="d-flex flex-column gap-2">
-                    @foreach($routeStops as $i => $loc)
+                    @foreach($routeStopRows as $i => $row)
                         @php
                             $isStart = $i === 0;
-                            $isEnd = $i === ($routeStops->count() - 1);
+                            $isEnd = $i === ($routeStopRows->count() - 1);
                             $badge = $isStart ? 'Start' : ($isEnd ? 'Cel' : 'Przystanek');
                             $badgeVariant = $isStart ? 'primary' : ($isEnd ? 'success' : 'accent');
+                            $locModel = ($row['kind'] ?? '') === 'extra_location'
+                                ? ($routeStopLocationsById[$row['model_id']] ?? null)
+                                : null;
                         @endphp
                         <div class="p-3 border rounded-3 d-flex align-items-start gap-2 w-100">
                             <x-ui.badge variant="{{ $badgeVariant }}">{{ $badge }}</x-ui.badge>
                             <div class="min-w-0 flex-grow-1">
-                                <div class="fw-semibold">{{ $loc->name }}</div>
-                                @if($loc->city)
-                                    <div class="text-muted small">{{ $loc->city }}</div>
+                                <div class="fw-semibold">{{ $row['name'] ?? '—' }}</div>
+                                @if(!empty($row['address_line']))
+                                    <div class="text-muted small">{{ $row['address_line'] }}</div>
                                 @endif
-                                @if(!$loc->hasCoordinates())
+                                @if(!empty($row['employees_label']))
+                                    <div class="text-muted small mt-1">{{ $row['employees_label'] }}</div>
+                                @endif
+                                @if(!empty($row['purpose']))
+                                    <div class="small mt-2 px-3 py-2 rounded-3 transfer-route-stop-note">
+                                        <span class="transfer-route-stop-note__label">Notatka</span>
+                                        <span class="transfer-route-stop-note__text">{{ $row['purpose'] }}</span>
+                                    </div>
+                                @endif
+                                @if($locModel && !$locModel->hasCoordinates())
                                     <div class="text-warning small mt-1">
                                         <i class="bi bi-exclamation-triangle"></i> brak współrzędnych
                                     </div>
@@ -136,39 +185,49 @@
         </div>
     </x-ui.card>
 
-    <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
+    @if(! $transfer->vehicle_id)
+        <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
 
-    @if($transfer->transportCosts->where('cost_type', 'ticket')->isNotEmpty())
+        @php $savedTickets = $transfer->transportCosts->where('cost_type', 'ticket')->values(); @endphp
         <x-ui.card label="Bilety (zapisane przy transferze)" class="mb-4">
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0 align-middle">
-                    <thead>
-                        <tr class="text-muted small">
-                            <th>Opis</th>
-                            <th>Kwota</th>
-                            <th class="text-end">Załącznik</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($transfer->transportCosts->where('cost_type', 'ticket') as $tc)
-                            @php $u = \App\Support\PublicDiskFileUrl::url($tc->file_path); @endphp
-                            <tr>
-                                <td>{{ $tc->description ?: 'Bilet' }}</td>
-                                <td>{{ number_format((float) $tc->amount, 2) }} {{ $tc->currency }}</td>
-                                <td class="text-end">
-                                    @if($u)
-                                        <a href="{{ $u }}" target="_blank" rel="noopener" class="text-decoration-none">
-                                            <i class="bi bi-paperclip"></i> Podgląd
-                                        </a>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
+            @if($savedTickets->isNotEmpty())
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead>
+                            <tr class="text-muted small">
+                                <th>Opis</th>
+                                <th>Kwota</th>
+                                <th class="text-end">Załącznik</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            @foreach($savedTickets as $tc)
+                                @php $u = \App\Support\PublicDiskFileUrl::url($tc->file_path); @endphp
+                                <tr>
+                                    <td>
+                                        <div>{{ $tc->description ?: 'Bilet' }}</div>
+                                        @if($tc->notes)
+                                            <div class="text-muted small">{{ $tc->notes }}</div>
+                                        @endif
+                                    </td>
+                                    <td>{{ number_format((float) $tc->amount, 2) }} {{ $tc->currency }}</td>
+                                    <td class="text-end">
+                                        @if($u)
+                                            <a href="{{ $u }}" target="_blank" rel="noopener" class="text-decoration-none">
+                                                <i class="bi bi-paperclip"></i> Podgląd
+                                            </a>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="text-muted small mb-0">Brak zapisanych kosztów biletu przy tym transferze.</p>
+            @endif
         </x-ui.card>
     @endif
 

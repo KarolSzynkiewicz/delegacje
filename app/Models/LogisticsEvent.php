@@ -311,6 +311,9 @@ class LogisticsEvent extends Model
 
     /**
      * Get route distance formatted (km).
+     *
+     * Prosty transfer (TransferCreateBoard + GroundTransferSlot) zapisuje route_distance w metrach (jak ORS × 1000).
+     * Wyjazdy i transfery utworzone z planera wyjazdu trzymają dystans w kilometrach.
      */
     public function getFormattedDistance(): ?string
     {
@@ -318,7 +321,15 @@ class LogisticsEvent extends Model
             return null;
         }
 
-        return number_format($this->route_distance, 1).' km';
+        $raw = (float) $this->route_distance;
+        $isTransferInMeters = $this->type === LogisticsEventType::TRANSFER
+            && $this->related_departure_id === null;
+        $km = $isTransferInMeters ? $raw / 1000 : $raw;
+
+        $rounded = round($km, 1);
+        $decimals = abs($rounded - (int) $rounded) < 0.001 ? 0 : 1;
+
+        return number_format($rounded, $decimals, ',', ' ').' km';
     }
 
     /**

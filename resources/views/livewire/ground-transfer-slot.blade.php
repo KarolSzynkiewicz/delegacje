@@ -1,56 +1,99 @@
 {{-- GroundTransferSlot — 1 środek transportu, 1 slot. Niezależny od Step4. --}}
 <div wire:key="ground-transfer-slot-{{ $slotKey }}">
 
+    @once('ground-transfer-slot-summary-styles')
+        <style>
+            .transfer-gts-route-metric-badge {
+                background: rgba(14, 165, 233, 0.22) !important;
+                border: 1px solid rgba(125, 211, 252, 0.55) !important;
+                color: #e0f2fe !important;
+                font-weight: 600;
+            }
+            .transfer-gts-missing-route-badge {
+                background: rgba(248, 113, 113, 0.15) !important;
+                border: 1px solid rgba(252, 165, 165, 0.55) !important;
+                color: #fecaca !important;
+                font-weight: 600;
+            }
+        </style>
+    @endonce
+
     {{-- ── Summary / trigger row ─────────────────────────────────────────── --}}
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <span class="fw-semibold small text-muted">{{ $contextLabel }}</span>
+    <div class="d-flex flex-wrap align-items-start gap-2 mb-2">
+        <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1 min-w-0">
+            <span class="fw-semibold small text-muted">{{ $contextLabel }}</span>
 
-        @if($isConfigured)
-            <span class="badge rounded-pill bg-success bg-opacity-15 text-success border border-success border-opacity-25 small">
-                @if($legKind === 'public')
-                    <i class="bi bi-people me-1"></i>Transport publiczny
-                @elseif($groundMode === 'car')
-                    <i class="bi bi-car-front me-1"></i>Samochód
-                @else
-                    <i class="bi bi-bus-front me-1"></i>Inny transport
-                @endif
-            </span>
-
-            @if($legKind === 'own' && $vehicleId)
-                @php $veh = $availableVehicles->firstWhere('id', $vehicleId); @endphp
-                @if($veh)
-                    <span class="badge rounded-pill bg-secondary bg-opacity-15 text-secondary-emphasis small">
-                        <i class="bi bi-truck me-1"></i>{{ $veh->registration_number }}
-                    </span>
-                @endif
-            @endif
-
-            @if($routeDistance !== null)
-                <span class="badge rounded-pill bg-info bg-opacity-10 text-info-emphasis small">
-                    {{ number_format($routeDistance / 1000, 1) }} km
-                    @if($routeDuration !== null)
-                        · {{ intdiv($routeDuration, 3600) > 0 ? intdiv($routeDuration, 3600).'h ' : '' }}{{ intdiv($routeDuration % 3600, 60) }}min
-                    @endif
-                    @if($routeDistanceIsManual)
-                        <i class="bi bi-pencil ms-1" title="Wpisane ręcznie"></i>
+            @if($isConfigured)
+                <span class="badge rounded-pill bg-success bg-opacity-15 text-success border border-success border-opacity-25 small">
+                    @if($legKind === 'public')
+                        <i class="bi bi-people me-1"></i>Transport publiczny
+                    @elseif($groundMode === 'car')
+                        <i class="bi bi-car-front me-1"></i>Samochód
+                    @else
+                        <i class="bi bi-bus-front me-1"></i>Inny transport
                     @endif
                 </span>
+
+                @if($legKind === 'own' && $vehicleId)
+                    @php $veh = $availableVehicles->firstWhere('id', $vehicleId); @endphp
+                    @if($veh)
+                        <span class="badge rounded-pill bg-secondary bg-opacity-15 text-secondary-emphasis small">
+                            <i class="bi bi-truck me-1"></i>{{ $veh->registration_number }}
+                        </span>
+                    @endif
+                @endif
+
+                @if($routeDistance !== null)
+                    <span class="badge rounded-pill small transfer-gts-route-metric-badge">
+                        {{ number_format($routeDistance / 1000, 1) }} km
+                        @if($routeDuration !== null)
+                            · {{ intdiv($routeDuration, 3600) > 0 ? intdiv($routeDuration, 3600).'h ' : '' }}{{ intdiv($routeDuration % 3600, 60) }}min
+                        @endif
+                        @if($routeDistanceIsManual)
+                            <i class="bi bi-pencil ms-1" title="Wpisane ręcznie"></i>
+                        @endif
+                    </span>
+                @elseif(($legKind ?? null) === 'own' && ($groundMode ?? null) === 'car')
+                    <span class="badge rounded-pill small transfer-gts-missing-route-badge">
+                        <i class="bi bi-signpost-split me-1"></i>Brak trasy
+                    </span>
+                @endif
+            @else
+                <span class="badge rounded-pill bg-warning bg-opacity-15 text-warning-emphasis small">
+                    <i class="bi bi-exclamation-circle me-1"></i>Nie skonfigurowano
+                </span>
             @endif
-        @else
-            <span class="badge rounded-pill bg-warning bg-opacity-15 text-warning-emphasis small">
-                <i class="bi bi-exclamation-circle me-1"></i>Nie skonfigurowano
-            </span>
-        @endif
+        </div>
 
-        <button type="button" class="btn btn-sm btn-outline-info ms-auto" wire:click="openConfigModal">
-            <i class="bi bi-sliders me-1"></i>Konfiguruj transfer
-        </button>
+        <div class="d-flex flex-column align-items-end gap-2 ms-auto">
+            @if(($legKind ?? null) === 'own' && ($groundMode ?? null) === 'car')
+                <div class="text-end small" style="min-width: 11rem; max-width: 20rem;">
+                    <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem; letter-spacing: 0.04em;">Kierowca</div>
+                    <div class="text-white fw-semibold text-truncate" title="{{ $this->panelDriverLabel }}">
+                        <i class="bi bi-person-badge text-info me-1"></i>{{ $this->panelDriverLabel }}
+                    </div>
+                    <div class="mt-1" style="font-size: 0.78rem;">
+                        @if($driverPaymentAmount !== null && $driverPaymentAmount !== '' && (float) $driverPaymentAmount > 0)
+                            <span style="color: rgba(226, 232, 240, 0.75);">Uznanie:</span>
+                            <span class="text-success fw-semibold ms-1">{{ number_format((float) $driverPaymentAmount, 2, ',', ' ') }} {{ strtoupper($driverPaymentCurrency) }}</span>
+                        @else
+                            <span class="text-danger fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Brak wynagrodzenia</span>
+                        @endif
+                    </div>
+                </div>
+            @endif
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-info" wire:click="openConfigModal">
+                    <i class="bi bi-sliders me-1"></i>Konfiguruj transfer — wynagrodzenie za transport
+                </button>
 
-        @if($legKind === 'own')
-            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="openRouteModal">
-                <i class="bi bi-signpost-split me-1"></i>Konfiguruj trasę
-            </button>
-        @endif
+                @if($legKind === 'own')
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="openRouteModal">
+                        <i class="bi bi-signpost-split me-1"></i>Konfiguruj trasę
+                    </button>
+                @endif
+            </div>
+        </div>
     </div>
 
     {{-- Siatka miejsc i bilety są renderowane w rodzicu (TransferCreateBoard),
@@ -61,16 +104,18 @@
     {{-- CONFIG MODAL                                                        --}}
     {{-- ═══════════════════════════════════════════════════════════════════ --}}
     @if($showConfigModal)
-        <div class="modal-portal-to-body" wire:key="gts-config-modal-{{ $slotKey }}">
-            <div class="modal-backdrop fade show"></div>
-            <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog" aria-modal="true"
-                 aria-labelledby="gts-config-title-{{ $slotKey }}">
-                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
-                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0;">
+        {{-- Teleport do body: inaczej position:fixed jest przycinany przez przodka z backdrop-filter (.app-content-wrapper). --}}
+        @teleport('body')
+            <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
+                 aria-labelledby="gts-config-title-{{ $slotKey }}"
+                 style="background-color: rgba(0,0,0,0.55);"
+                 wire:key="gts-config-modal-{{ $slotKey }}">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable my-3" role="document">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0; max-height: min(90vh, 920px);">
 
                         <div class="modal-header border-secondary">
                             <h5 class="modal-title" id="gts-config-title-{{ $slotKey }}">
-                                <i class="bi bi-sliders text-info me-2"></i>{{ $contextLabel }} — konfiguracja
+                                <i class="bi bi-sliders text-info me-2"></i>{{ $contextLabel }} — wynagrodzenie za transport
                             </h5>
                             <button type="button" class="btn-close btn-close-white" wire:click="closeConfigModal" aria-label="Zamknij"></button>
                         </div>
@@ -120,8 +165,10 @@
                                         <div class="col-md-6">
                                             <label class="form-label small text-muted mb-1">Pojazd <span class="text-danger">*</span></label>
                                             <select wire:model.live="vehicleId" class="form-select form-select-sm">
-                                                <option value="">— wybierz pojazd —</option>
-                                                @foreach($availableVehicles as $v)
+                                                @if($configModalVehicleOptions->count() !== 1)
+                                                    <option value="">— wybierz pojazd —</option>
+                                                @endif
+                                                @foreach($configModalVehicleOptions as $v)
                                                     <option value="{{ $v->id }}">{{ $v->registration_number }} – {{ $v->brand }} {{ $v->model }}</option>
                                                 @endforeach
                                             </select>
@@ -129,8 +176,10 @@
                                         <div class="col-md-6">
                                             <label class="form-label small text-muted mb-1">Kierowca <span class="text-danger">*</span></label>
                                             <select wire:model.live="driverEmployeeId" class="form-select form-select-sm">
-                                                <option value="">— wybierz kierowcę —</option>
-                                                @foreach($availableEmployees as $emp)
+                                                @if($configModalDriverOptions->count() !== 1)
+                                                    <option value="">— wybierz kierowcę —</option>
+                                                @endif
+                                                @foreach($configModalDriverOptions as $emp)
                                                     <option value="{{ $emp->id }}">{{ $emp->full_name }}</option>
                                                 @endforeach
                                             </select>
@@ -138,7 +187,7 @@
                                         <div class="col-md-6">
                                             <label class="form-label small text-muted mb-1">Uznanie (opcjonalne)</label>
                                             <input type="number" step="0.01" min="0"
-                                                   wire:model.live="driverPaymentAmount"
+                                                   wire:model.live.debounce.600ms="driverPaymentAmount"
                                                    class="form-control form-control-sm"
                                                    placeholder="np. 200.00"
                                                    inputmode="decimal"
@@ -170,19 +219,20 @@
                     </div>
                 </div>
             </div>
-        </div>
+        @endteleport
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════════════ --}}
     {{-- ROUTE MODAL                                                         --}}
     {{-- ═══════════════════════════════════════════════════════════════════ --}}
     @if($showRouteModal)
-        <div class="modal-portal-to-body" wire:key="gts-route-modal-{{ $slotKey }}">
-            <div class="modal-backdrop fade show"></div>
-            <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog" aria-modal="true"
-                 aria-labelledby="gts-route-title-{{ $slotKey }}">
-                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
-                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0;">
+        @teleport('body')
+            <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
+                 aria-labelledby="gts-route-title-{{ $slotKey }}"
+                 style="background-color: rgba(0,0,0,0.55);"
+                 wire:key="gts-route-modal-{{ $slotKey }}">
+                <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable my-3" role="document">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0; max-height: min(90vh, 960px);">
 
                         <div class="modal-header border-secondary">
                             <h5 class="modal-title" id="gts-route-title-{{ $slotKey }}">
@@ -192,120 +242,73 @@
                         </div>
 
                         <div class="modal-body">
+                            <x-logistics.route-waypoints-plan
+                                class="rtp-card rounded-3 p-0"
+                                title="Plan trasy"
+                                :stops="$routeTiles"
+                                wire-key-prefix="gts-rwp-{{ $slotKey }}"
+                                :available-locations="$availableLocations"
+                                :add-disabled="! $pendingWaypointLocationId"
+                                remove-confirm="Usunąć ten przystanek z trasy?"
+                            >
+                                <x-slot name="distance">
+                                    <div class="rounded-3 border p-3"
+                                         style="background: rgba(15,23,42,0.55); border-color: rgba(148,163,184,0.28) !important;">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                            <div class="small fw-semibold text-secondary">Dystans i czas</div>
+                                            @if($groundMode === 'car')
+                                                <x-ui.button
+                                                    variant="warning"
+                                                    type="button"
+                                                    class="btn-sm px-2 py-1"
+                                                    title="Przelicz trasę (OpenRouteService)"
+                                                    wire:click="recalculateRouteWithOrs"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="recalculateRouteWithOrs"
+                                                >
+                                                    <span wire:loading.remove wire:target="recalculateRouteWithOrs"><i class="bi bi-arrow-clockwise"></i></span>
+                                                    <span wire:loading wire:target="recalculateRouteWithOrs"><span class="spinner-border spinner-border-sm" style="width: 0.9rem; height: 0.9rem;"></span></span>
+                                                </x-ui.button>
+                                            @endif
+                                        </div>
 
-                            {{-- ── Przystanki (tiles) ─────────────────────────────────── --}}
-                            <div class="small fw-semibold mb-2"><i class="bi bi-signpost-split me-1"></i> Kolejność przystanków</div>
-
-                            @if($routeTiles !== [])
-                                <div class="vstack gap-2 mb-3">
-                                    @foreach($routeTiles as $tile)
-                                        <div class="d-flex align-items-start gap-2 p-2 rounded border"
-                                             style="border-color: rgba(251,191,36,0.35) !important; background: rgba(15,23,42,0.35);"
-                                             wire:key="gts-tile-{{ $slotKey }}-{{ $tile['index'] }}">
-                                            <span class="badge bg-secondary rounded-pill align-self-start flex-shrink-0">{{ $loop->iteration }}</span>
-                                            <div class="flex-grow-1 small">
-                                                <div class="text-uppercase text-muted" style="font-size: 0.65rem; letter-spacing: .04em;">
-                                                    @if($loop->first) Skąd
-                                                    @elseif($loop->last) Dokąd
-                                                    @else Przystanek
-                                                    @endif
-                                                </div>
-                                                <div class="fw-semibold">{{ $tile['name'] }}@if($tile['city']) – {{ $tile['city'] }}@endif</div>
-                                                <textarea class="form-control form-control-sm mt-1" rows="1"
-                                                          placeholder="Notatka o przystanku…"
-                                                          wire:model.lazy="locationStopNotes.{{ $tile['id'] }}"></textarea>
+                                        @if($routeDistance !== null)
+                                            <div class="small mb-3" style="color: #94a3b8;">
+                                                <span class="text-white fw-semibold">{{ number_format($routeDistance / 1000, 1) }} km</span>
+                                                @if($routeDuration !== null)
+                                                    <span class="mx-1 opacity-50">·</span>
+                                                    <span class="text-white fw-semibold">{{ intdiv($routeDuration, 3600) > 0 ? intdiv($routeDuration, 3600).'h ' : '' }}{{ intdiv($routeDuration % 3600, 60) }} min</span>
+                                                @endif
                                             </div>
-                                            <div class="d-flex flex-column gap-0 align-self-center flex-shrink-0">
-                                                <button type="button" class="rtp-icon-btn"
-                                                        wire:click="moveWaypointUp({{ $tile['index'] }})"
-                                                        @disabled(! $tile['can_move_up']) title="Wyżej">
-                                                    <i class="bi bi-chevron-up"></i>
-                                                </button>
-                                                <button type="button" class="rtp-icon-btn"
-                                                        wire:click="moveWaypointDown({{ $tile['index'] }})"
-                                                        @disabled(! $tile['can_move_down']) title="Niżej">
-                                                    <i class="bi bi-chevron-down"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-link btn-sm text-danger p-0"
-                                                        wire:click="removeWaypoint({{ $tile['index'] }})"
-                                                        title="Usuń">
-                                                    <i class="bi bi-x-lg"></i>
-                                                </button>
+                                        @else
+                                            <p class="small text-muted mb-3 mb-lg-2">Brak wyznaczonej trasy — użyj ORS (wymaga przystanków) lub wpisz wartości ręcznie.</p>
+                                        @endif
+
+                                        @if($routeOrsError)
+                                            <div class="alert alert-warning py-2 px-3 small mb-2">{{ $routeOrsError }}</div>
+                                        @endif
+
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-sm-6">
+                                                <label class="form-label small text-muted mb-0">Dystans (km)</label>
+                                                <input type="number" step="0.1" min="0"
+                                                       wire:model.live.debounce.400ms="manualDistanceKm"
+                                                       class="form-control form-control-sm rounded-3"
+                                                       style="background: rgba(15,23,42,0.45); border-color: rgba(148,163,184,0.35);"
+                                                       placeholder="np. 42">
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <label class="form-label small text-muted mb-0">Czas (min)</label>
+                                                <input type="number" step="1" min="1"
+                                                       wire:model.live.debounce.400ms="manualDurationMin"
+                                                       class="form-control form-control-sm rounded-3"
+                                                       style="background: rgba(15,23,42,0.45); border-color: rgba(148,163,184,0.35);"
+                                                       placeholder="np. 55">
                                             </div>
                                         </div>
-                                    @endforeach
-                                </div>
-                            @else
-                                <div class="text-muted small mb-3 text-center p-3 rounded"
-                                     style="background: rgba(148,163,184,0.06); border: 1px dashed rgba(148,163,184,0.3);">
-                                    <i class="bi bi-map me-1"></i> Brak przystanków — dodaj poniżej (pierwszy = skąd, ostatni = dokąd)
-                                </div>
-                            @endif
-
-                            {{-- ── Dodaj przystanek ────────────────────────────────────── --}}
-                            <form wire:submit.prevent="addWaypoint" class="d-flex gap-2 align-items-center mb-3">
-                                <select wire:model.live="pendingWaypointLocationId"
-                                        class="form-select form-select-sm flex-grow-1">
-                                    <option value="">— Dodaj przystanek (wybierz lokalizację) —</option>
-                                    @foreach($availableLocations as $loc)
-                                        <option value="{{ $loc->id }}">{{ $loc->name }}@if($loc->city) – {{ $loc->city }}@endif</option>
-                                    @endforeach
-                                </select>
-                                <button type="submit" class="btn btn-sm btn-outline-info flex-shrink-0"
-                                        wire:loading.attr="disabled"
-                                        @disabled(! $pendingWaypointLocationId)>
-                                    Dodaj
-                                </button>
-                            </form>
-
-                            {{-- Manual distance / duration --}}
-                            <div class="rounded-2 border p-3"
-                                 style="background: rgba(15,23,42,0.5); border-color: rgba(148,163,184,0.35) !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <div class="small fw-semibold">Dystans i czas</div>
-                                    @if($routeDistance !== null)
-                                        @if($routeDistanceIsManual)
-                                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(251,191,36,0.15); color: #fcd34d;">Wpisane ręcznie</span>
-                                        @else
-                                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(59,130,246,0.15); color: #93c5fd;">Szacunek ORS</span>
-                                        @endif
-                                    @endif
-                                </div>
-
-                                @if($routeDistance !== null)
-                                    <div class="small text-muted mb-2">
-                                        Aktualnie: <strong class="text-white">{{ number_format($routeDistance / 1000, 1) }} km</strong>
-                                        @if($routeDuration !== null)
-                                            · <strong class="text-white">{{ intdiv($routeDuration, 3600) > 0 ? intdiv($routeDuration, 3600).'h ' : '' }}{{ intdiv($routeDuration % 3600, 60) }} min</strong>
-                                        @endif
                                     </div>
-                                @endif
-
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-sm-5">
-                                        <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                        <input type="number" step="0.1" min="0"
-                                               wire:model.lazy="manualDistanceKm"
-                                               class="form-control form-control-sm"
-                                               placeholder="np. 42">
-                                    </div>
-                                    <div class="col-sm-5">
-                                        <label class="form-label small text-muted mb-0">Czas (min)</label>
-                                        <input type="number" step="1" min="1"
-                                               wire:model.lazy="manualDurationMin"
-                                               class="form-control form-control-sm"
-                                               placeholder="np. 55">
-                                    </div>
-                                    <div class="col-sm-2">
-                                        <button type="button" class="btn btn-sm btn-outline-info w-100"
-                                                wire:click="applyManualRoute"
-                                                wire:loading.attr="disabled">
-                                            OK
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
+                                </x-slot>
+                            </x-logistics.route-waypoints-plan>
                         </div>
 
                         <div class="modal-footer border-secondary">
@@ -318,7 +321,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        @endteleport
     @endif
 
 </div>

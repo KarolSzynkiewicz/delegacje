@@ -1403,7 +1403,7 @@ class Step4RoutePlanning extends Component
             $locationIds = $this->getWaypointLocationIds();
             $locations = $locationIds ? Location::whereIn('id', $locationIds)->get()->keyBy('id') : collect();
             $result = [];
-            foreach ((array) $this->routeWaypoints as $key) {
+            foreach (array_values((array) $this->routeWaypoints) as $routeIndex => $key) {
                 $parsed = $this->parseWaypointKey($key);
                 if ($parsed['type'] === 'acc') {
                     $accId = (int) $parsed['id'];
@@ -1412,6 +1412,7 @@ class Step4RoutePlanning extends Component
                     }
                     $employees = $this->getEmployeesForAccommodation($accId);
                     $result[] = [
+                        'route_index' => $routeIndex,
                         'key' => 'acc:'.$accId,
                         'type' => 'acc',
                         'id' => $accId,
@@ -1429,6 +1430,7 @@ class Step4RoutePlanning extends Component
                         continue;
                     }
                     $result[] = [
+                        'route_index' => $routeIndex,
                         'key' => 'loc:'.$loc->id,
                         'type' => 'loc',
                         'id' => $loc->id,

@@ -243,6 +243,19 @@
         :flat-attachment-uploads="$ticketAttachmentUploads"
     />
 
+    @if($transportMode === 'own')
+        <x-logistics.route-card
+            :summary="$this->transferBoardRouteSummary"
+            :date-from="$departureDate"
+            :date-to="$endDate"
+            :selected-employee-ids="$selectedEmployeeIds"
+            :ground-transfer-config="$groundTransferConfig"
+            :vehicle-id="$vehicleId"
+            :vehicle-seats="$vehicleSeats"
+            :base-location-id="\App\Models\Location::getBase()->id"
+        />
+    @endif
+
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div class="btn-group" role="group" aria-label="Tryb kreatora">
             <button

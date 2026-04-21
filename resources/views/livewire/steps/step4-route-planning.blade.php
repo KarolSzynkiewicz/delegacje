@@ -171,14 +171,15 @@
                                             <div class="vstack gap-2">
                                                 @foreach($waypointStops as $index => $waypoint)
                                                     @php
+                                                        $routeIdx = (int) ($waypoint['route_index'] ?? $index);
                                                         $isAcc = ($waypoint['type'] ?? '') === 'acc';
                                                         $accommodation = $waypoint['accommodation'] ?? null;
                                                         $location = $waypoint['location'] ?? null;
                                                         $hasCoords = $isAcc
                                                             ? ($accommodation && !empty($accommodation['latitude']) && !empty($accommodation['longitude']))
                                                             : ($location && !empty($location['latitude']) && !empty($location['longitude']));
-                                                        $isFirst = $index === 0;
-                                                        $isLast = $index === count($waypointStops) - 1;
+                                                        $isFirst = $routeIdx === 0;
+                                                        $isLast = $routeIdx === count($routeWaypoints) - 1;
                                                         $borderColor = $hasCoords
                                                             ? ($isAcc ? 'rgba(34,197,94,0.3)' : 'rgba(251,191,36,0.4)')
                                                             : 'rgba(239,68,68,0.4)';
@@ -218,18 +219,18 @@
                                                             </div>
                                                             <div class="d-flex flex-column gap-1 align-items-center" style="flex-shrink: 0;">
                                                                 <button type="button" class="rtp-icon-btn"
-                                                                        wire:click="moveUp({{ $index }})" wire:loading.attr="disabled"
+                                                                        wire:click="moveUp({{ $routeIdx }})" wire:loading.attr="disabled"
                                                                         @disabled($isFirst) title="Wyżej">
                                                                     <i class="bi bi-chevron-up" style="font-size: 0.7rem;"></i>
                                                                 </button>
                                                                 <button type="button" class="rtp-icon-btn"
-                                                                        wire:click="moveDown({{ $index }})" wire:loading.attr="disabled"
+                                                                        wire:click="moveDown({{ $routeIdx }})" wire:loading.attr="disabled"
                                                                         @disabled($isLast) title="Niżej">
                                                                     <i class="bi bi-chevron-down" style="font-size: 0.7rem;"></i>
                                                                 </button>
                                                                 @if(!$isAcc)
                                                                     <button type="button" class="rtp-icon-btn rtp-icon-btn--danger"
-                                                                            wire:click="removeWaypoint({{ $index }})" title="Usuń przystanek">
+                                                                            wire:click="removeWaypoint({{ $routeIdx }})" title="Usuń przystanek">
                                                                         <i class="bi bi-x" style="font-size: 0.75rem;"></i>
                                                                     </button>
                                                                 @endif
@@ -292,14 +293,15 @@
 
                         @foreach($waypointStops as $index => $waypoint)
                             @php
+                                $routeIdx = (int) ($waypoint['route_index'] ?? $index);
                                 $isAcc = ($waypoint['type'] ?? '') === 'acc';
                                 $accommodation = $waypoint['accommodation'] ?? null;
                                 $location = $waypoint['location'] ?? null;
                                 $hasCoords = $isAcc
                                     ? (!empty($accommodation['latitude']) && !empty($accommodation['longitude']))
                                     : (!empty($location['latitude']) && !empty($location['longitude']));
-                                $isFirst = $index === 0;
-                                $isLast  = $index === count($waypointStops) - 1;
+                                $isFirst = $routeIdx === 0;
+                                $isLast  = $routeIdx === count($routeWaypoints) - 1;
                                 $borderColor = $hasCoords
                                     ? ($isAcc ? 'rgba(34,197,94,0.3)' : 'rgba(251,191,36,0.4)')
                                     : 'rgba(239,68,68,0.4)';
@@ -339,18 +341,18 @@
                                     </div>
                                     <div class="d-flex flex-column gap-1 align-items-center" style="flex-shrink: 0;">
                                         <button type="button" class="rtp-icon-btn"
-                                                wire:click="moveUp({{ $index }})" wire:loading.attr="disabled"
+                                                wire:click="moveUp({{ $routeIdx }})" wire:loading.attr="disabled"
                                                 @disabled($isFirst) title="Wyżej">
                                             <i class="bi bi-chevron-up" style="font-size: 0.7rem;"></i>
                                         </button>
                                         <button type="button" class="rtp-icon-btn"
-                                                wire:click="moveDown({{ $index }})" wire:loading.attr="disabled"
+                                                wire:click="moveDown({{ $routeIdx }})" wire:loading.attr="disabled"
                                                 @disabled($isLast) title="Niżej">
                                             <i class="bi bi-chevron-down" style="font-size: 0.7rem;"></i>
                                         </button>
                                         @if(!$isAcc)
                                             <button type="button" class="rtp-icon-btn rtp-icon-btn--danger"
-                                                    wire:click="removeWaypoint({{ $index }})" title="Usuń przystanek">
+                                                    wire:click="removeWaypoint({{ $routeIdx }})" title="Usuń przystanek">
                                                 <i class="bi bi-x" style="font-size: 0.75rem;"></i>
                                             </button>
                                         @endif
@@ -529,38 +531,25 @@
                         <div class="trip-plan-list">
                             @foreach($waypointStops as $wp)
                                 @if(($wp['type'] ?? '') === 'loc')
-                                    @php $locIdStr = (string) ($wp['id'] ?? ''); @endphp
-                                    <div class="trip-stop mb-4 p-3 border rounded" style="border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.04);" wire:key="plan-loc-{{ $locIdStr }}">
-                                        <div class="d-flex align-items-start gap-3 mb-0">
-                                            <div class="stop-number rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                                                 style="width: 40px; height: 40px; font-size: 1rem; flex-shrink: 0; background: rgba(251,191,36,0.18); color: #fde68a; border: 1px solid rgba(251,191,36,0.4);">
-                                                {{ $loop->iteration }}
-                                            </div>
-                                            <div class="flex-grow-1 min-w-0">
-                                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                                                    <span class="badge rounded-pill border fw-normal"
-                                                          style="font-size: 0.68rem; background: rgba(251,191,36,0.08); color: #fcd34d; border-color: rgba(251,191,36,0.35) !important;">Przystanek dodatkowy</span>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 px-2 py-0"
-                                                            wire:click="removeWaypoint({{ $loop->index }})"
-                                                            wire:confirm="Usunąć ten przystanek z trasy?"
-                                                            title="Usuń z trasy">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                </div>
-                                                <h6 class="mb-1 fw-semibold">{{ $wp['location']['name'] ?? '—' }}</h6>
-                                                <div class="small text-muted mb-2">
-                                                    {{ $wp['location']['address'] ?? '' }}@if(!empty($wp['location']['city'])), {{ $wp['location']['city'] }}@endif
-                                                </div>
-                                                <label class="form-label small text-muted mb-1">Po co tu jedziemy?</label>
-                                                <textarea
-                                                    class="form-control form-control-sm"
-                                                    rows="2"
-                                                    placeholder="Krótka notatka (np. odbiór dokumentów, spotkanie)…"
-                                                    wire:model.live.debounce.300ms="locationStopNotes.{{ $locIdStr }}"
-                                                ></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    @php
+                                        $ri = (int) ($wp['route_index'] ?? $loop->index);
+                                        $lr = $wp['location'] ?? [];
+                                    @endphp
+                                    <x-logistics.route-waypoint-loc-card
+                                        wire-key-prefix="step4-plan-loc"
+                                        :list-position="$loop->iteration"
+                                        :route-index="$ri"
+                                        :loc-id="$lr['id'] ?? ''"
+                                        :name="$lr['name'] ?? '—'"
+                                        :city="$lr['city'] ?? null"
+                                        :address="$lr['address'] ?? null"
+                                        :can-move-up="$ri > 0"
+                                        :can-move-down="$ri < count($routeWaypoints) - 1"
+                                        move-up-method="moveUp"
+                                        move-down-method="moveDown"
+                                        remove-method="removeWaypoint"
+                                        remove-confirm="Usunąć ten przystanek z trasy?"
+                                    />
                                 @else
                                     @php
                                         $accId = (int) ($wp['id'] ?? 0);
@@ -588,7 +577,7 @@
                                                             </div>
                                                         </div>
                                                         <button type="button" class="btn btn-sm btn-outline-secondary border-0 px-2 py-0 flex-shrink-0"
-                                                                wire:click="removeWaypoint({{ $loop->index }})"
+                                                                wire:click="removeWaypoint({{ (int) ($wp['route_index'] ?? $loop->index) }})"
                                                                 wire:confirm="Usunąć ten dom z kolejności trasy? (Nie usuwa przypisania mieszkania w kroku 2.)"
                                                                 title="Wyjmij z kolejności trasy">
                                                             <i class="bi bi-x-lg"></i>
@@ -644,7 +633,7 @@
                                                             </div>
                                                         </div>
                                                         <button type="button" class="btn btn-sm btn-outline-secondary border-0 px-2 py-0 flex-shrink-0"
-                                                                wire:click="removeWaypoint({{ $loop->index }})"
+                                                                wire:click="removeWaypoint({{ (int) ($wp['route_index'] ?? $loop->index) }})"
                                                                 wire:confirm="Usunąć ten dom z kolejności trasy?"
                                                                 title="Wyjmij z kolejności trasy">
                                                             <i class="bi bi-x-lg"></i>

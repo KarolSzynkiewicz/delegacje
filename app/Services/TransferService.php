@@ -11,11 +11,13 @@ use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\ProjectAssignment;
 use App\Models\Role;
+use App\Models\TransportCost;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class TransferService
@@ -45,6 +47,8 @@ class TransferService
      *     driver_payment_amount: float|null,
      *     driver_payment_currency: string|null,
      *     driver_payroll_id: int|null,
+     *     location_stop_notes?: array<string, string>|null,
+     *     public_ticket_lines?: list<array{employee_id: int, amount: float, currency: string, attachment_path?: string|null, description?: string, notes?: string|null}>,
      * }  $data
      */
     public function commitTransfer(array $data): LogisticsEvent
@@ -67,7 +71,7 @@ class TransferService
                 }
             }
 
-            $event = LogisticsEvent::create([
+            $eventAttributes = [
                 'type' => LogisticsEventType::TRANSFER,
                 'event_date' => $data['transfer_date'],
                 'end_date' => $data['transfer_date'],
@@ -81,8 +85,19 @@ class TransferService
                 'route_distance' => $data['route_distance'],
                 'route_duration' => $data['route_duration'],
                 'route_waypoints' => $data['route_waypoints'],
-                'created_by' => auth()->id(),
-            ]);
+                'created_by' => auth()->id() ?? 1,
+            ];
+
+            $locationStopNotes = $data['location_stop_notes'] ?? null;
+            if (
+                Schema::hasColumn('logistics_events', 'location_stop_notes')
+                && is_array($locationStopNotes)
+                && $locationStopNotes !== []
+            ) {
+                $eventAttributes['location_stop_notes'] = $locationStopNotes;
+            }
+
+            $event = LogisticsEvent::create($eventAttributes);
 
             foreach ($data['employee_ids'] as $employeeId) {
                 if ($data['has_reassignment']) {
@@ -115,6 +130,33 @@ class TransferService
                     'date' => $transferDate->toDateString(),
                     'notes' => 'Wynagrodzenie za transfer',
                 ]);
+            }
+
+            $ticketLines = $data['public_ticket_lines'] ?? [];
+            if (is_array($ticketLines) && $ticketLines !== []) {
+                foreach ($ticketLines as $line) {
+                    $employeeId = (int) ($line['employee_id'] ?? 0);
+                    if ($employeeId <= 0) {
+                        continue;
+                    }
+                    $amount = (float) ($line['amount'] ?? 0);
+                    if ($amount <= 0) {
+                        continue;
+                    }
+                    TransportCost::create([
+                        'logistics_event_id' => $event->id,
+                        'vehicle_id' => null,
+                        'transport_id' => null,
+                        'cost_type' => 'ticket',
+                        'amount' => $amount,
+                        'currency' => strtoupper((string) ($line['currency'] ?? 'PLN')),
+                        'cost_date' => $transferDate->toDateString(),
+                        'description' => (string) ($line['description'] ?? 'Bilet'),
+                        'file_path' => $line['attachment_path'] ?? null,
+                        'notes' => isset($line['notes']) && is_string($line['notes']) && $line['notes'] !== '' ? $line['notes'] : null,
+                        'created_by' => auth()->id() ?? 1,
+                    ]);
+                }
             }
 
             return $event;

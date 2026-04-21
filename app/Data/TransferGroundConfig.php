@@ -2,6 +2,8 @@
 
 namespace App\Data;
 
+use App\Models\Location;
+
 /**
  * Konfiguracja jednego odcinka ziemnego (1 slot = 1 środek transportu).
  *
@@ -84,5 +86,82 @@ class TransferGroundConfig
             && $this->vehicleId === null
             && $this->routeWaypoints === []
             && $this->publicTicketCostsByEmployee === [];
+    }
+
+    /**
+     * Podsumowanie trasy pod kartę UI (km, czas, liczba przystanków loc:, start/koniec jak przy zapisie transferu).
+     *
+     * @return array{
+     *     km: float|null,
+     *     duration_label: string|null,
+     *     stop_count: int,
+     *     start_label: string,
+     *     end_label: string
+     * }|null
+     */
+    public function toRouteSummary(): ?array
+    {
+        $locIds = [];
+        foreach ($this->routeWaypoints as $key) {
+            if (str_starts_with((string) $key, 'loc:')) {
+                $id = (int) substr((string) $key, 4);
+                if ($id > 0) {
+                    $locIds[] = $id;
+                }
+            }
+        }
+        $hasKm = $this->routeDistance !== null && (float) $this->routeDistance > 0;
+        $hasStops = $locIds !== [];
+        if (! $hasKm && ! $hasStops) {
+            return null;
+        }
+
+        $stopCount = count($locIds);
+        $km = $hasKm ? round((float) $this->routeDistance / 1000, 1) : null;
+
+        $durationLabel = null;
+        if ($this->routeDuration !== null && (int) $this->routeDuration > 0) {
+            $sec = (int) $this->routeDuration;
+            $durationLabel = (intdiv($sec, 3600) > 0 ? intdiv($sec, 3600).'h ' : '')
+                .intdiv($sec % 3600, 60).' min';
+        }
+
+        $base = Location::getBase();
+        $locs = $locIds !== []
+            ? Location::whereIn('id', array_values(array_unique($locIds)))->get()->keyBy('id')
+            : collect();
+
+        $formatLoc = function (?Location $loc) use ($base): string {
+            if (! $loc instanceof Location) {
+                return $base instanceof Location ? (string) ($base->name ?? '—') : '—';
+            }
+            $n = (string) ($loc->name ?? '—');
+            if (! empty($loc->city)) {
+                return $n.' ('.$loc->city.')';
+            }
+
+            return $n;
+        };
+
+        $startLabel = '—';
+        $endLabel = '—';
+        if ($stopCount >= 2) {
+            $startLabel = $formatLoc($locs->get($locIds[0]));
+            $endLabel = $formatLoc($locs->get($locIds[$stopCount - 1]));
+        } elseif ($stopCount === 1) {
+            $startLabel = $formatLoc($locs->get($locIds[0]));
+            $endLabel = $formatLoc($base);
+        } elseif ($base instanceof Location) {
+            $startLabel = $formatLoc($base);
+            $endLabel = $formatLoc($base);
+        }
+
+        return [
+            'km' => $km,
+            'duration_label' => $durationLabel,
+            'stop_count' => $stopCount,
+            'start_label' => $startLabel,
+            'end_label' => $endLabel,
+        ];
     }
 }

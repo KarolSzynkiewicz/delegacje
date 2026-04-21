@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LocationPurposeType;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Models\AccommodationAssignment;
@@ -16,6 +17,7 @@ use App\Support\DepartureRoutePlan;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class TransferController extends Controller
@@ -115,29 +117,79 @@ class TransferController extends Controller
             })->values()->all();
         }
 
-        $waypointIds = array_values(array_filter(array_map('intval', (array) ($transfer->route_waypoints ?? []))));
-        $waypointsById = empty($waypointIds)
-            ? collect()
-            : Location::whereIn('id', $waypointIds)->get()->keyBy('id');
-
-        $orderedWaypoints = collect();
-        foreach ($waypointIds as $id) {
-            if ($waypointsById->has($id)) {
-                $orderedWaypoints->push($waypointsById->get($id));
-            }
+        $routeStopRows = $transfer->getRouteStopsForDetailView()->values();
+        if ($routeStopRows->isEmpty()) {
+            $routeStopRows = $this->fallbackTransferRouteStopRows($transfer);
         }
 
-        $routeStops = collect()
-            ->when($transfer->fromLocation, fn ($c) => $c->push($transfer->fromLocation))
-            ->concat($orderedWaypoints)
-            ->when($transfer->toLocation, fn ($c) => $c->push($transfer->toLocation));
+        $locIds = $routeStopRows->where('kind', 'extra_location')->pluck('model_id')->unique()->filter()->all();
+        $routeStopLocationsById = $locIds === []
+            ? collect()
+            : Location::whereIn('id', $locIds)->get()->keyBy('id');
+
+        $hubKind = null;
+        if ($transfer->from_location_id && Location::matchesPurpose((int) $transfer->from_location_id, LocationPurposeType::AIRPORT)) {
+            $hubKind = 'airport';
+        } elseif ($transfer->from_location_id && Location::matchesPurpose((int) $transfer->from_location_id, LocationPurposeType::STATION)) {
+            $hubKind = 'station';
+        }
 
         return view('transfers.show', [
             'transfer' => $transfer,
-            'routeStops' => $routeStops,
-            'waypoints' => $orderedWaypoints,
+            'routeStopRows' => $routeStopRows,
+            'routeStopLocationsById' => $routeStopLocationsById,
+            'routeStopCount' => $routeStopRows->count(),
+            'publicHubKind' => $hubKind,
             'groundLegTicketRows' => $groundLegTicketRows,
         ]);
+    }
+
+    /**
+     * Gdy brak route_waypoints (np. transport publiczny: tylko skąd/dokąd w kolumnach).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function fallbackTransferRouteStopRows(LogisticsEvent $transfer): Collection
+    {
+        $from = $transfer->fromLocation;
+        $to = $transfer->toLocation;
+        $notes = is_array($transfer->location_stop_notes) ? $transfer->location_stop_notes : [];
+
+        if (! $from && ! $to) {
+            return collect();
+        }
+
+        $rowForLocation = static function (Location $loc, int $position, array $notes): array {
+            $noteKey = (string) $loc->id;
+            $note = isset($notes[$noteKey]) ? trim((string) $notes[$noteKey]) : null;
+
+            return [
+                'position' => $position,
+                'kind' => 'extra_location',
+                'model_id' => $loc->id,
+                'name' => $loc->name,
+                'address_line' => trim(implode(', ', array_filter([$loc->address, $loc->city ?? null]))),
+                'employees_label' => null,
+                'purpose' => ($note !== null && $note !== '') ? $note : null,
+            ];
+        };
+
+        if ($from && $to && (int) $from->id === (int) $to->id) {
+            return collect([$rowForLocation($from, 1, $notes)]);
+        }
+
+        $rows = collect();
+        $pos = 0;
+        if ($from) {
+            $pos++;
+            $rows->push($rowForLocation($from, $pos, $notes));
+        }
+        if ($to && (! $from || (int) $from->id !== (int) $to->id)) {
+            $pos++;
+            $rows->push($rowForLocation($to, $pos, $notes));
+        }
+
+        return $rows;
     }
 
     public function cancel(LogisticsEvent $transfer): RedirectResponse

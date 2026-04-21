@@ -2,14 +2,17 @@
 
 namespace App\Livewire;
 
+use App\Data\TransferGroundConfig;
 use App\Enums\LocationPurposeType;
 use App\Enums\ProjectStatus;
 use App\Enums\VehiclePosition;
 use App\Livewire\Concerns\InteractsWithLogisticsTransportMode;
+use App\Livewire\Concerns\ValidatesPublicTransportTicketUploads;
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
 use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\Role;
@@ -17,9 +20,11 @@ use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\AssignmentQueryService;
 use App\Services\DateRangeService;
+use App\Services\DefaultRouteWaypointsService;
 use App\Services\DeparturePlannerService;
 use App\Services\LocationTrackingService;
 use App\Services\TransferService;
+use App\Support\PublicTransportTicketCosts;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
@@ -29,6 +34,7 @@ use Livewire\WithFileUploads;
 class TransferCreateBoard extends Component
 {
     use InteractsWithLogisticsTransportMode;
+    use ValidatesPublicTransportTicketUploads;
     use WithFileUploads;
 
     public string $transferDate = '';
@@ -126,6 +132,8 @@ class TransferCreateBoard extends Component
 
     protected AssignmentQueryService $assignmentQueryService;
 
+    protected DefaultRouteWaypointsService $defaultRouteWaypointsService;
+
     protected $listeners = [
         'accommodation-assigned' => 'handleAccommodationAssigned',
         'accommodation-removed' => 'handleAccommodationRemoved',
@@ -139,11 +147,13 @@ class TransferCreateBoard extends Component
     public function boot(
         DeparturePlannerService $departurePlannerService,
         TransferService $transferService,
-        AssignmentQueryService $assignmentQueryService
+        AssignmentQueryService $assignmentQueryService,
+        DefaultRouteWaypointsService $defaultRouteWaypointsService
     ): void {
         $this->departurePlannerService = $departurePlannerService;
         $this->transferService = $transferService;
         $this->assignmentQueryService = $assignmentQueryService;
+        $this->defaultRouteWaypointsService = $defaultRouteWaypointsService;
     }
 
     // -------------------------------------------------------------------------
@@ -178,9 +188,49 @@ class TransferCreateBoard extends Component
     }
 
     #[On('ground-transfer-slot-updated')]
-    public function onGroundTransferSlotUpdated(array $config): void
+    public function onGroundTransferSlotUpdated(string $slotKey, array $config): void
     {
         $this->groundTransferConfig = $config;
+    }
+
+    #[On('ground-transfer-slot-request-default-waypoints')]
+    public function onGroundTransferSlotRequestDefaultWaypoints(string $slotKey): void
+    {
+        // Only seed for own transport: public mode is from/to hubs.
+        if ($this->transportMode !== 'own') {
+            return;
+        }
+
+        $day = $this->departureDate !== '' ? Carbon::parse($this->departureDate)->startOfDay() : now()->startOfDay();
+
+        $waypoints = [];
+        $locationStopNotes = [];
+        if ($this->mode === 'assignment' && ! empty($this->draftProjectByAssignment)) {
+            $data = $this->defaultRouteWaypointsService->buildReassignmentTransferWaypoints(
+                $this->draftProjectByAssignment,
+                $day
+            );
+            $waypoints = $data['waypoints'] ?? [];
+            $locationStopNotes = $data['location_stop_notes'] ?? [];
+        } else {
+            $data = $this->defaultRouteWaypointsService->buildSimpleTransferWaypoints(
+                $this->effectiveEmployeeIds,
+                $day
+            );
+            $waypoints = $data['waypoints'] ?? [];
+            $locationStopNotes = $data['location_stop_notes'] ?? [];
+        }
+
+        if ($waypoints === []) {
+            return;
+        }
+
+        $this->dispatch(
+            'ground-transfer-slot-apply-default-waypoints',
+            slotKey: $slotKey,
+            waypoints: $waypoints,
+            locationStopNotes: $locationStopNotes
+        );
     }
 
     #[On('error')]
@@ -224,6 +274,7 @@ class TransferCreateBoard extends Component
     {
         $this->vehicleId = null;
         $this->vehicleSeats = [];
+        $this->groundTransferConfig = [];
     }
 
     protected function onSwitchingToOwnTransportMode(): void
@@ -310,6 +361,14 @@ class TransferCreateBoard extends Component
             ->whereHas('purposes', fn ($q) => $q->where('purpose', $purpose))
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Podsumowanie trasy z konfiguracji slotu (km, liczba przystanków loc:, start/koniec jak przy zapisie transferu).
+     */
+    public function getTransferBoardRouteSummaryProperty(): ?array
+    {
+        return TransferGroundConfig::fromArray($this->groundTransferConfig)->toRouteSummary();
     }
 
     public function getSelectedEmployeesProperty()
@@ -899,24 +958,79 @@ class TransferCreateBoard extends Component
             return;
         }
 
-        $config = \App\Data\TransferGroundConfig::fromArray($this->groundTransferConfig);
+        $config = TransferGroundConfig::fromArray($this->groundTransferConfig);
         $base = Location::getBase();
 
-        $waypoints = $config->routeWaypoints;
-        $fromLocationId = $base->id;
-        $toLocationId = $base->id;
+        $publicTicketLines = [];
+        $locationStopNotes = null;
+        $routeWaypoints = $config->routeWaypoints ?: null;
+        $routeDistance = $config->routeDistance;
+        $routeDuration = $config->routeDuration;
 
-        if (count($waypoints) >= 1) {
-            $firstKey = (string) $waypoints[0];
-            if (str_starts_with($firstKey, 'loc:')) {
-                $fromLocationId = (int) substr($firstKey, 4) ?: $base->id;
+        if ($this->transportMode === 'public') {
+            if (PublicTransportTicketCosts::areIncompleteForEmployees($this->selectedEmployeeIds, $this->ticketCostsByEmployee, true)) {
+                session()->flash('warning', 'Uzupełnij kwoty, waluty i załączniki biletów dla wszystkich uczestników.');
+
+                return;
             }
-        }
-        if (count($waypoints) >= 2) {
-            $lastKey = (string) $waypoints[count($waypoints) - 1];
-            if (str_starts_with($lastKey, 'loc:')) {
-                $toLocationId = (int) substr($lastKey, 4) ?: $base->id;
+            foreach ($this->selectedEmployeeIds as $empId) {
+                $this->validateTicketAttachmentUpload(
+                    $this->ticketCostsByEmployee[$empId] ?? [],
+                    'ticketCostsByEmployee.'.$empId.'.attachment'
+                );
             }
+            if ($this->getErrorBag()->isNotEmpty()) {
+                session()->flash('warning', (string) $this->getErrorBag()->first());
+
+                return;
+            }
+
+            $fromLocationId = (int) $this->sharedStartAirportLocationId;
+            $toLocationId = (int) $this->sharedEndAirportLocationId;
+            $routeWaypoints = null;
+            $routeDistance = null;
+            $routeDuration = null;
+
+            $startLoc = Location::find($fromLocationId);
+            $endLoc = Location::find($toLocationId);
+            $hubLabel = $this->publicTransportHubKind === 'station' ? 'Dworzec' : 'Lotnisko';
+
+            foreach ($this->selectedEmployeeIds as $empId) {
+                $cost = $this->ticketCostsByEmployee[$empId] ?? [];
+                $attachmentPath = $cost['attachment_path'] ?? null;
+                if ($this->isTicketFileUpload($cost['attachment'] ?? null)) {
+                    $attachmentPath = $cost['attachment']->store('transport_costs', 'public');
+                }
+                $emp = Employee::find($empId);
+                $publicTicketLines[] = [
+                    'employee_id' => (int) $empId,
+                    'amount' => (float) ($cost['amount'] ?? 0),
+                    'currency' => strtoupper(trim((string) ($cost['currency'] ?? 'PLN'))),
+                    'attachment_path' => $attachmentPath,
+                    'description' => 'Bilet — '.($emp?->full_name ?? '#'.$empId),
+                    'notes' => trim($hubLabel.': '.($startLoc?->name ?? '').' → '.($endLoc?->name ?? '')),
+                ];
+            }
+        } else {
+            $waypoints = $config->routeWaypoints;
+            $fromLocationId = $base->id;
+            $toLocationId = $base->id;
+
+            if (count($waypoints) >= 1) {
+                $firstKey = (string) $waypoints[0];
+                if (str_starts_with($firstKey, 'loc:')) {
+                    $fromLocationId = (int) substr($firstKey, 4) ?: $base->id;
+                }
+            }
+            if (count($waypoints) >= 2) {
+                $lastKey = (string) $waypoints[count($waypoints) - 1];
+                if (str_starts_with($lastKey, 'loc:')) {
+                    $toLocationId = (int) substr($lastKey, 4) ?: $base->id;
+                }
+            }
+
+            $normalizedWpKeys = LogisticsEvent::normalizeRouteWaypointsFromPayload($config->routeWaypoints);
+            $locationStopNotes = LogisticsEvent::sanitizeLocationStopNotes($config->locationStopNotes, $normalizedWpKeys);
         }
 
         // Kierowca jest autorytatywnie zarządzany przez siatkę miejsc rodzica.
@@ -940,13 +1054,15 @@ class TransferCreateBoard extends Component
                 'reassignments' => [],
                 'notes' => null,
                 'vehicle_id' => $effectiveVehicleId,
-                'route_distance' => $config->routeDistance,
-                'route_duration' => $config->routeDuration,
-                'route_waypoints' => $config->routeWaypoints ?: null,
+                'route_distance' => $routeDistance,
+                'route_duration' => $routeDuration,
+                'route_waypoints' => $routeWaypoints,
                 'driver_employee_id' => $effectiveDriverId,
                 'driver_payment_amount' => $config->driverPaymentAmount,
                 'driver_payment_currency' => $config->driverPaymentCurrency,
                 'driver_payroll_id' => $config->driverPayrollId,
+                'location_stop_notes' => $locationStopNotes,
+                'public_ticket_lines' => $publicTicketLines,
             ]);
         } catch (ValidationException $e) {
             session()->flash('warning', collect($e->errors())->flatten()->first() ?: $e->getMessage());
