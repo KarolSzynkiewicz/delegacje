@@ -30,7 +30,7 @@
                 @if(!$cancellationHasSideEffects)
                     <x-ui.alert type="success" icon="check-circle">
                         <strong>Brak dodatkowych powiązań</strong><br>
-                        Ten wyjazd nie ma przypisań, kosztów transportu ani powiązanego transferu z lotniska. Możesz bezpiecznie anulować wyjazd.
+                        Ten wyjazd nie ma przypisań, kosztów transportu, powiązanych transferów ani korekt wynagrodzenia (uznań) przy tym wyjeździe. Możesz bezpiecznie anulować wyjazd.
                     </x-ui.alert>
 
                     <form method="POST" action="{{ route('departures.cancel', $departure) }}">
@@ -56,7 +56,9 @@
                         @csrf
 
                         <x-ui.alert type="warning" icon="exclamation-triangle">
-                            <strong>Uwaga!</strong> Anulowanie wyjazdu usuwa przypisania oraz — jeśli jest — anuluje powiązany transfer. Koszty w ewidencji usuwane są tylko wtedy, gdy zaznaczysz je poniżej.
+                            <strong>Uwaga!</strong> Anulowanie wyjazdu usuwa przypisania oraz — jeśli są — anuluje powiązane transfery.
+                            <strong>Uznania i inne korekty wynagrodzenia</strong> powiązane z tym wyjazdem lub transferem (o ile nie są jeszcze w rozliczeniu płac) zostaną <strong>usunięte automatycznie</strong>.
+                            Koszty transportu w ewidencji usuwane są tylko wtedy, gdy zaznaczysz je poniżej.
                         </x-ui.alert>
 
                         @if($hasAssignments)
@@ -147,43 +149,70 @@
                             </p>
                         @endif
 
-                        @if($linkedTransfer)
+                        @if($linkedTransfers->isNotEmpty())
                             <h5 class="fw-semibold mb-2 mt-4">
                                 <i class="bi bi-airplane text-primary me-1"></i>
-                                Powiązany transfer (lotnisko → domy)
+                                Powiązane transfery (lotnisko → domy)
                             </h5>
-                            <div class="table-responsive mb-4">
-                                <table class="table table-hover align-middle">
-                                    <tbody>
-                                        <tr>
-                                            <th class="text-muted small" scope="row" style="width: 11rem;">Trasa</th>
-                                            <td class="fw-semibold">
-                                                {{ $linkedTransfer->fromLocation?->name ?? '—' }}
-                                                <span class="text-muted px-1">→</span>
-                                                {{ $linkedTransfer->toLocation?->name ?? '—' }}
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th class="text-muted small" scope="row">Pojazd transferu</th>
-                                            <td>
-                                                @if($linkedTransfer->vehicle)
-                                                    {{ $linkedTransfer->vehicle->registration_number }}
-                                                    — {{ $linkedTransfer->vehicle->brand }} {{ $linkedTransfer->vehicle->model }}
-                                                @else
-                                                    <span class="text-muted">—</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th class="text-muted small" scope="row">Skutek anulowania</th>
-                                            <td class="small text-muted">
-                                                Zdarzenie zostanie oznaczone jako <strong class="text-body">anulowane</strong>,
-                                                a lista uczestników transferu usunięta.
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            @foreach($linkedTransfers as $transfer)
+                                <div class="table-responsive mb-4 @if(!$loop->last) pb-4 border-bottom @endif" style="border-color: rgba(255,255,255,0.08) !important;">
+                                    @if($linkedTransfers->count() > 1)
+                                        <h6 class="text-muted small text-uppercase mb-2" style="font-size: 0.72rem; letter-spacing: .06em;">Transfer #{{ $transfer->id }} ({{ $loop->iteration }} z {{ $linkedTransfers->count() }})</h6>
+                                    @endif
+                                    <table class="table table-hover align-middle mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <th class="text-muted small" scope="row" style="width: 11rem;">Trasa</th>
+                                                <td class="fw-semibold">
+                                                    {{ $transfer->fromLocation?->name ?? '—' }}
+                                                    <span class="text-muted px-1">→</span>
+                                                    {{ $transfer->toLocation?->name ?? '—' }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-muted small" scope="row">Pojazd transferu</th>
+                                                <td>
+                                                    @if($transfer->vehicle)
+                                                        {{ $transfer->vehicle->registration_number }}
+                                                        — {{ $transfer->vehicle->brand }} {{ $transfer->vehicle->model }}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-muted small" scope="row">Skutek anulowania</th>
+                                                <td class="small text-muted">
+                                                    Zdarzenie zostanie oznaczone jako <strong class="text-body">anulowane</strong>,
+                                                    a lista uczestników transferu usunięta.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endforeach
+                        @endif
+
+                        @if($departureRewardsRemovable->isNotEmpty() || $transferRewardsRemovable->isNotEmpty())
+                            <h5 class="fw-semibold mb-2 mt-4">
+                                <i class="bi bi-award text-success me-1"></i>
+                                Uznania / korekty — usunięcie automatyczne
+                            </h5>
+                            <p class="small text-muted mb-3">
+                                Poniższe wpisy <strong>nie są</strong> w rozliczeniu płac — zostaną <strong>trwale usunięte</strong> wraz z anulowaniem wyjazdu (bez dodatkowego zaznaczania).
+                            </p>
+                            <ul class="small mb-4 ps-3">
+                                @if($departureRewardSummary)
+                                    <li>
+                                        Przy wyjeździe (np. kierowanie pojazdem): <strong>{{ $departureRewardSummary }}</strong>
+                                    </li>
+                                @endif
+                                @if($transferRewardSummary)
+                                    <li>
+                                        Przy transferze{{ $linkedTransfers->count() > 1 ? 'ach' : '' }}: <strong>{{ $transferRewardSummary }}</strong>
+                                    </li>
+                                @endif
+                            </ul>
                         @endif
 
                         @if($showCostRemovalChoices)
@@ -228,19 +257,6 @@
                                             </tr>
                                         @endif
 
-                                        @if($transferRewardSummary)
-                                            <tr>
-                                                <td class="text-center">
-                                                    <input type="checkbox" class="form-check-input m-0" name="remove_transfer_reward" value="1" id="remove_transfer_reward">
-                                                </td>
-                                                <td>
-                                                    <label class="mb-0 fw-semibold" for="remove_transfer_reward">Wynagrodzenie za transfer</label>
-                                                    <div class="small text-muted">Korekty niepowiązane z rozliczeniem płac</div>
-                                                </td>
-                                                <td class="text-end text-nowrap">{{ $transferRewardSummary }}</td>
-                                            </tr>
-                                        @endif
-
                                         @foreach($ticketRemovalRows as $row)
                                             @php
                                                 $tc = $row['cost'];
@@ -265,12 +281,27 @@
                                             </tr>
                                         @endforeach
 
+                                        @foreach($departureRewardsLocked as $adj)
+                                            <tr class="text-muted">
+                                                <td class="text-center">—</td>
+                                                <td>
+                                                    <span class="fw-semibold text-body">Korekta przy wyjeździe</span>
+                                                    <span class="small">(w rozliczeniu płac — nie można usunąć automatycznie)</span>
+                                                    @if($adj->employee)
+                                                        <div class="small">{{ $adj->employee->full_name }}</div>
+                                                    @endif
+                                                </td>
+                                                <td class="text-end text-nowrap">
+                                                    {{ number_format((float) $adj->amount, 2) }} {{ $adj->currency }}
+                                                </td>
+                                            </tr>
+                                        @endforeach
                                         @foreach($transferRewardsLocked as $adj)
                                             <tr class="text-muted">
                                                 <td class="text-center">—</td>
                                                 <td>
-                                                    <span class="fw-semibold text-body">Wynagrodzenie za transfer</span>
-                                                    <span class="small">(w rozliczeniu płac — nie można usunąć)</span>
+                                                    <span class="fw-semibold text-body">Korekta przy transferze</span>
+                                                    <span class="small">(w rozliczeniu płac — nie można usunąć automatycznie)</span>
                                                     @if($adj->employee)
                                                         <div class="small">{{ $adj->employee->full_name }}</div>
                                                     @endif
@@ -294,11 +325,18 @@
                                 @if($hasAssignments)
                                     <li>Usunięcie {{ $totalAssignments }} {{ $totalAssignments === 1 ? 'przypisania' : 'przypisań' }} (projekt / pojazd / zakwaterowanie).</li>
                                 @endif
-                                @if($linkedTransfer)
-                                    <li>Anulowanie powiązanego transferu i usunięcie listy uczestników transferu.</li>
+                                @if($linkedTransfers->isNotEmpty())
+                                    <li>Anulowanie {{ $linkedTransfers->count() === 1 ? 'powiązanego transferu' : $linkedTransfers->count().' powiązanych transferów' }} i usunięcie list uczestników.</li>
+                                @endif
+                                @if($departureRewardsRemovable->isNotEmpty() || $transferRewardsRemovable->isNotEmpty())
+                                    <li>
+                                        Usunięcie {{ $departureRewardsRemovable->count() + $transferRewardsRemovable->count() }}
+                                        {{ ($departureRewardsRemovable->count() + $transferRewardsRemovable->count()) === 1 ? 'korekty' : 'korekt' }}
+                                        wynagrodzenia (uznań) niepowiązanych z rozliczeniem płac.
+                                    </li>
                                 @endif
                                 @if($showCostRemovalChoices)
-                                    <li>Koszty i korekty w ewidencji — usunięte zostaną wyłącznie pozycje zaznaczone w tabeli powyżej.</li>
+                                    <li>Koszty transportu w ewidencji — usunięte zostaną wyłącznie pozycje zaznaczone w tabeli powyżej (korekty z payrollu nigdy nie są usuwane automatycznie).</li>
                                 @endif
                             </ul>
                         </div>

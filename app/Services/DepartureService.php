@@ -11,6 +11,7 @@ use App\Models\LogisticsEventParticipant;
 use App\Models\TransportCost;
 use App\Models\Vehicle;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -173,18 +174,47 @@ class DepartureService
     }
 
     /**
-     * Usuwa z ewidencji tylko te koszty i korekty, które użytkownik zaznaczył.
-     * Zawsze anuluje powiązany transfer (jeśli jest) i czyści jego uczestników.
+     * Aktywne transfery powiązane z wyjazdem (FK), z jednym rekordem „legacy” gdy brak FK.
+     *
+     * @return EloquentCollection<int, LogisticsEvent>
+     */
+    public function activeTransfersLinkedToDeparture(LogisticsEvent $departure): EloquentCollection
+    {
+        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+            return new EloquentCollection;
+        }
+
+        $linked = LogisticsEvent::query()
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('related_departure_id', $departure->id)
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->orderBy('id')
+            ->get();
+
+        if ($linked->isNotEmpty()) {
+            return $linked;
+        }
+
+        $legacy = $this->findLinkedAirportTransfer($departure, true);
+
+        return $legacy ? new EloquentCollection([$legacy]) : new EloquentCollection;
+    }
+
+    /**
+     * Usuwa z ewidencji koszty zgodnie z zaznaczeniami użytkownika.
+     * Zawsze anuluje powiązane transfery, usuwa ich uczestników oraz
+     * usuwa korekty (uznania/obciążenia) powiązane z wyjazdem i transferami,
+     * o ile nie są już w rozliczeniu płac (payroll_id).
      *
      * @param  array{
      *     remove_fuel?: bool,
      *     remove_other_costs?: bool,
-     *     remove_transfer_reward?: bool,
      *     remove_ticket_ids?: array<int>,
      * }  $selection
      * @return array{
      *     transport_costs_deleted: int,
      *     transfer_cancelled: bool,
+     *     cancelled_transfers_count: int,
      *     adjustments_deleted: int,
      *     adjustments_skipped_payroll: int,
      * }
@@ -193,21 +223,18 @@ class DepartureService
     {
         $removeFuel = ! empty($selection['remove_fuel']);
         $removeOther = ! empty($selection['remove_other_costs']);
-        $removeReward = ! empty($selection['remove_transfer_reward']);
         $removeTicketIds = array_map('intval', $selection['remove_ticket_ids'] ?? []);
 
         $result = [
             'transport_costs_deleted' => 0,
             'transfer_cancelled' => false,
+            'cancelled_transfers_count' => 0,
             'adjustments_deleted' => 0,
             'adjustments_skipped_payroll' => 0,
         ];
 
-        $transfer = $this->findLinkedAirportTransfer($departure, true);
-        $eventIds = [$departure->id];
-        if ($transfer) {
-            $eventIds[] = $transfer->id;
-        }
+        $transfers = $this->activeTransfersLinkedToDeparture($departure);
+        $eventIds = collect([$departure->id])->merge($transfers->pluck('id'))->unique()->values()->all();
 
         $allowedTicketIds = TransportCost::query()
             ->whereIn('logistics_event_id', $eventIds)
@@ -233,22 +260,31 @@ class DepartureService
             }
         }
 
-        if ($transfer) {
+        foreach (Adjustment::query()->where('logistics_event_id', $departure->id)->get() as $adjustment) {
+            if ($adjustment->payroll_id !== null) {
+                $result['adjustments_skipped_payroll']++;
+
+                continue;
+            }
+            $adjustment->delete();
+            $result['adjustments_deleted']++;
+        }
+
+        foreach ($transfers as $transfer) {
             foreach (Adjustment::query()->where('logistics_event_id', $transfer->id)->get() as $adjustment) {
                 if ($adjustment->payroll_id !== null) {
                     $result['adjustments_skipped_payroll']++;
 
                     continue;
                 }
-                if ($removeReward) {
-                    $adjustment->delete();
-                    $result['adjustments_deleted']++;
-                }
+                $adjustment->delete();
+                $result['adjustments_deleted']++;
             }
 
             $transfer->update(['status' => LogisticsEventStatus::CANCELLED]);
             $transfer->load('participants');
             $transfer->participants->each->delete();
+            $result['cancelled_transfers_count']++;
             $result['transfer_cancelled'] = true;
         }
 

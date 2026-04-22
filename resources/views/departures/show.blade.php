@@ -633,6 +633,66 @@
         </x-ui.card>
     @endif
 
+    <x-ui.card label="Powiązane uznania" class="mb-0">
+        @if(($relatedUznania ?? collect())->isEmpty())
+            <p class="text-muted mb-0">Brak uznania powiązanego z tym wyjazdem lub transferami z lotniska.</p>
+        @else
+            <div class="table-responsive rounded-3 border" style="border-color: rgba(255,255,255,0.08) !important;">
+                <table class="table table-hover departure-participants-table mb-0 align-middle">
+                    <thead class="table-light" style="--bs-table-bg: rgba(255,255,255,0.04);">
+                        <tr>
+                            <th class="text-uppercase small text-muted fw-semibold py-3 ps-4">Pracownik</th>
+                            <th class="text-uppercase small text-muted fw-semibold py-3">Kwota</th>
+                            <th class="text-uppercase small text-muted fw-semibold py-3">Data</th>
+                            <th class="text-uppercase small text-muted fw-semibold py-3">Powiązanie</th>
+                            <th class="text-uppercase small text-muted fw-semibold py-3">Notatka</th>
+                            <th class="text-uppercase small text-muted fw-semibold py-3">Payroll</th>
+                            <th class="text-uppercase small text-muted fw-semibold py-3 pe-4">Szczegóły</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($relatedUznania as $adj)
+                            <tr>
+                                <td class="ps-4 py-3">
+                                    @if($adj->employee)
+                                        <x-employee-cell :employee="$adj->employee" />
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="py-3">
+                                    <span class="fw-semibold">{{ number_format((float) $adj->amount, 2) }}</span>
+                                    <span class="text-muted">{{ $adj->currency }}</span>
+                                </td>
+                                <td class="py-3">{{ $adj->date?->format('Y-m-d') ?? '—' }}</td>
+                                <td class="py-3">
+                                    @if((int) $adj->logistics_event_id === (int) $departure->id)
+                                        <span class="small">Kierowanie pojazdem wyjazdu</span>
+                                    @else
+                                        <a href="{{ route('transfers.show', $adj->logistics_event_id) }}" class="text-decoration-none small">
+                                            Transfer #{{ $adj->logistics_event_id }}
+                                        </a>
+                                    @endif
+                                </td>
+                                <td class="py-3 small text-muted" style="max-width: 14rem;">{{ $adj->notes ?: '—' }}</td>
+                                <td class="py-3">
+                                    @if($adj->payroll_id)
+                                        <a href="{{ route('payrolls.show', $adj->payroll_id) }}" class="text-decoration-none small">#{{ $adj->payroll_id }}</a>
+                                    @else
+                                        <span class="small text-muted">Bez payrollu</span>
+                                    @endif
+                                </td>
+                                <td class="py-3 pe-4">
+                                    <a href="{{ route('adjustments.show', $adj) }}" class="text-decoration-none small">Zobacz</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-ui.card>
+
     </div>
 
     <!-- Komentarze -->

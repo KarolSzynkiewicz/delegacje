@@ -6,6 +6,7 @@ use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Enums\VehiclePosition;
 use App\Models\Accommodation;
+use App\Models\Adjustment;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
@@ -129,6 +130,14 @@ class DepartureController extends Controller
             'driverAdjustments.payroll',
         ]);
 
+        $relatedUznaniaEventIds = $linkedTransfers->pluck('id')->push($departure->id)->unique()->values();
+        $relatedUznania = Adjustment::query()
+            ->whereIn('logistics_event_id', $relatedUznaniaEventIds)
+            ->where('type', 'bonus')
+            ->with(['employee', 'payroll'])
+            ->orderBy('id')
+            ->get();
+
         $transfer = $linkedTransfers->last();
 
         $groundLegTicketRows = DepartureRoutePlan::collectPublicLegTicketRowsFromSegments(
@@ -149,6 +158,7 @@ class DepartureController extends Controller
             'transfer' => $transfer,
             'linkedTransfers' => $linkedTransfers,
             'groundLegTicketRows' => $groundLegTicketRows,
+            'relatedUznania' => $relatedUznania,
         ]);
     }
 
@@ -183,25 +193,43 @@ class DepartureController extends Controller
 
         $departure->loadMissing(['fromLocation', 'toLocation', 'transportCosts']);
 
-        $linkedTransfer = $this->departureService->findLinkedAirportTransfer($departure, true);
-        if ($linkedTransfer) {
-            $linkedTransfer->loadMissing([
-                'fromLocation',
-                'toLocation',
-                'vehicle',
-                'transportCosts',
-                'driverAdjustments.employee',
-                'driverAdjustments.payroll',
-            ]);
-        }
+        $linkedTransfers = $this->departureService->activeTransfersLinkedToDeparture($departure);
+        $linkedTransfers->loadMissing([
+            'fromLocation',
+            'toLocation',
+            'vehicle',
+            'transportCosts',
+            'driverAdjustments.employee',
+            'driverAdjustments.payroll',
+        ]);
+
+        $departureAdjustments = Adjustment::query()
+            ->where('logistics_event_id', $departure->id)
+            ->with(['employee', 'payroll'])
+            ->orderBy('id')
+            ->get();
+
+        $departureRewardsRemovable = $departureAdjustments->whereNull('payroll_id')->values();
+        $departureRewardsLocked = $departureAdjustments->whereNotNull('payroll_id')->values();
+
+        $transferDriverAdjustments = $linkedTransfers->isEmpty()
+            ? collect()
+            : Adjustment::query()
+                ->whereIn('logistics_event_id', $linkedTransfers->pluck('id'))
+                ->with(['employee', 'payroll'])
+                ->orderBy('id')
+                ->get();
+
+        $transferRewardsRemovable = $transferDriverAdjustments->whereNull('payroll_id')->values();
+        $transferRewardsLocked = $transferDriverAdjustments->whereNotNull('payroll_id')->values();
 
         $hasAssignments = $affectedProjectAssignments->isNotEmpty()
             || $affectedVehicleAssignments->isNotEmpty()
             || $affectedAccommodationAssignments->isNotEmpty();
 
         $allTransportCosts = $departure->transportCosts;
-        if ($linkedTransfer) {
-            $allTransportCosts = $allTransportCosts->concat($linkedTransfer->transportCosts);
+        foreach ($linkedTransfers as $lt) {
+            $allTransportCosts = $allTransportCosts->concat($lt->transportCosts);
         }
 
         $fuelCosts = $allTransportCosts->where('cost_type', 'fuel')->values();
@@ -210,36 +238,39 @@ class DepartureController extends Controller
         foreach ($departure->transportCosts->where('cost_type', 'ticket') as $tc) {
             $ticketRemovalRows->push(['cost' => $tc, 'eventLabel' => 'Wyjazd']);
         }
-        if ($linkedTransfer) {
-            foreach ($linkedTransfer->transportCosts->where('cost_type', 'ticket') as $tc) {
-                $ticketRemovalRows->push(['cost' => $tc, 'eventLabel' => 'Transfer']);
+        foreach ($linkedTransfers as $lt) {
+            foreach ($lt->transportCosts->where('cost_type', 'ticket') as $tc) {
+                $label = $linkedTransfers->count() > 1
+                    ? 'Transfer #'.$lt->id
+                    : 'Transfer';
+                $ticketRemovalRows->push(['cost' => $tc, 'eventLabel' => $label]);
             }
         }
 
-        $transferRewardsRemovable = $linkedTransfer
-            ? $linkedTransfer->driverAdjustments->whereNull('payroll_id')->values()
-            : collect();
-        $transferRewardsLocked = $linkedTransfer
-            ? $linkedTransfer->driverAdjustments->whereNotNull('payroll_id')->values()
-            : collect();
-
         $fuelCostsSummary = $fuelCosts->isNotEmpty() ? $this->summarizeMoneyByCurrency($fuelCosts) : null;
         $otherCostsSummary = $otherCosts->isNotEmpty() ? $this->summarizeMoneyByCurrency($otherCosts) : null;
+        $departureRewardSummary = $departureRewardsRemovable->isNotEmpty()
+            ? $this->summarizeMoneyByCurrency($departureRewardsRemovable)
+            : null;
         $transferRewardSummary = $transferRewardsRemovable->isNotEmpty()
             ? $this->summarizeMoneyByCurrency($transferRewardsRemovable)
             : null;
 
+        $adjustmentsLockedForCostTable = $departureRewardsLocked->concat($transferRewardsLocked);
+
         $showCostRemovalChoices = $fuelCosts->isNotEmpty()
             || $otherCosts->isNotEmpty()
             || $ticketRemovalRows->isNotEmpty()
-            || $transferRewardsRemovable->isNotEmpty()
-            || $transferRewardsLocked->isNotEmpty();
+            || $adjustmentsLockedForCostTable->isNotEmpty();
+
+        $hasAnyTransportCostsOnDepartureOrTransfers = $departure->transportCosts->isNotEmpty()
+            || $linkedTransfers->contains(fn (LogisticsEvent $t) => $t->transportCosts->isNotEmpty());
 
         $cancellationHasSideEffects = $hasAssignments
-            || $linkedTransfer !== null
-            || $departure->transportCosts->isNotEmpty()
-            || ($linkedTransfer && $linkedTransfer->transportCosts->isNotEmpty())
-            || ($linkedTransfer && $linkedTransfer->driverAdjustments->isNotEmpty());
+            || $linkedTransfers->isNotEmpty()
+            || $hasAnyTransportCostsOnDepartureOrTransfers
+            || $departureAdjustments->isNotEmpty()
+            || $transferDriverAdjustments->isNotEmpty();
 
         $affectedEmployeeIds = $affectedProjectAssignments->pluck('employee_id')
             ->concat($affectedVehicleAssignments->pluck('employee_id'))
@@ -278,15 +309,19 @@ class DepartureController extends Controller
             'affectedVehicleAssignments' => $affectedVehicleAssignments,
             'affectedAccommodationAssignments' => $affectedAccommodationAssignments,
             'cancellationPreviewRows' => $cancellationPreviewRows,
-            'linkedTransfer' => $linkedTransfer,
+            'linkedTransfers' => $linkedTransfers,
             'hasAssignments' => $hasAssignments,
             'cancellationHasSideEffects' => $cancellationHasSideEffects,
             'showCostRemovalChoices' => $showCostRemovalChoices,
             'fuelCostsSummary' => $fuelCostsSummary,
             'otherCostsSummary' => $otherCostsSummary,
+            'departureRewardSummary' => $departureRewardSummary,
             'transferRewardSummary' => $transferRewardSummary,
-            'ticketRemovalRows' => $ticketRemovalRows,
+            'departureRewardsRemovable' => $departureRewardsRemovable,
+            'transferRewardsRemovable' => $transferRewardsRemovable,
+            'departureRewardsLocked' => $departureRewardsLocked,
             'transferRewardsLocked' => $transferRewardsLocked,
+            'ticketRemovalRows' => $ticketRemovalRows,
         ]);
     }
 
@@ -309,22 +344,22 @@ class DepartureController extends Controller
                 ->with('error', 'Można anulować tylko wyjazdy ze statusem "Oczekuje na przypisanie" lub "Przypisany".');
         }
 
+        $linkedForValidation = $this->departureService->activeTransfersLinkedToDeparture($departure);
+        $adjustmentEventIds = collect([$departure->id])->merge($linkedForValidation->pluck('id'))->unique()->values();
+
         $requiresConsequenceAccept = $departure->projectAssignments()->exists()
             || $departure->vehicleAssignments()->exists()
             || $departure->accommodationAssignments()->exists()
             || $departure->transportCosts()->exists()
-            || $this->departureService->findLinkedAirportTransfer($departure, true) !== null;
+            || $linkedForValidation->isNotEmpty()
+            || Adjustment::whereIn('logistics_event_id', $adjustmentEventIds)->exists();
 
-        $eventIdsForTickets = [$departure->id];
-        if ($transferForValidation = $this->departureService->findLinkedAirportTransfer($departure, true)) {
-            $eventIdsForTickets[] = $transferForValidation->id;
-        }
+        $eventIdsForTickets = $adjustmentEventIds->all();
 
         $request->validate([
             'accept_consequences' => ($requiresConsequenceAccept ? 'required' : 'sometimes').'|accepted',
             'remove_fuel' => 'sometimes|boolean',
             'remove_other_costs' => 'sometimes|boolean',
-            'remove_transfer_reward' => 'sometimes|boolean',
             'remove_ticket_ids' => 'sometimes|array',
             'remove_ticket_ids.*' => [
                 'integer',
@@ -342,7 +377,6 @@ class DepartureController extends Controller
             $costSelection = [
                 'remove_fuel' => $request->boolean('remove_fuel'),
                 'remove_other_costs' => $request->boolean('remove_other_costs'),
-                'remove_transfer_reward' => $request->boolean('remove_transfer_reward'),
                 'remove_ticket_ids' => array_map('intval', (array) $request->input('remove_ticket_ids', [])),
             ];
 
@@ -415,14 +449,17 @@ class DepartureController extends Controller
                 $message .= '.';
             }
 
-            if ($cascade['transfer_cancelled']) {
+            $cancelledTransfers = (int) ($cascade['cancelled_transfers_count'] ?? 0);
+            if ($cancelledTransfers === 1) {
                 $message .= ' Powiązany transfer został anulowany.';
+            } elseif ($cancelledTransfers > 1) {
+                $message .= ' Anulowano '.$cancelledTransfers.' powiązanych transferów.';
             }
             if ($cascade['transport_costs_deleted'] > 0) {
                 $message .= ' Usunięto '.$cascade['transport_costs_deleted'].' zapisów kosztów transportu.';
             }
             if ($cascade['adjustments_deleted'] > 0) {
-                $message .= ' Usunięto '.$cascade['adjustments_deleted'].' korekt wynagrodzenia powiązanych z transferem.';
+                $message .= ' Usunięto '.$cascade['adjustments_deleted'].' korekt (np. uznania za kierowanie) powiązanych z wyjazdem lub transferem.';
             }
             if ($cascade['adjustments_skipped_payroll'] > 0) {
                 $message .= ' Uwaga: '.$cascade['adjustments_skipped_payroll'].' korekt jest już w rozliczeniu płac — nie usunięto ich automatycznie.';
