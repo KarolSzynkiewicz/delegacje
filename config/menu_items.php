@@ -227,6 +227,13 @@ return [
         'permission' => 'audit-logs.view',
     ],
 
+    'prompt_engine' => [
+        'route' => 'prompts.index',
+        'icon' => 'bi bi-braces',
+        'label' => 'Prompt engine',
+        'permission' => 'tasks.view',
+    ],
+
     'mine_projects' => [
         'route' => 'mine.projects.index',
         'icon' => 'bi bi-folder',

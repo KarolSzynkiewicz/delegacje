@@ -96,6 +96,7 @@ return [
             'system_actions',
             'audit_logs',
             'system_changelog',
+            'prompt_engine',
         ],
     ],
 ];

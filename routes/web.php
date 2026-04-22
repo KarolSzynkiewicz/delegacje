@@ -11,6 +11,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectAssignmentController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectDemandController;
+use App\Http\Controllers\PromptEngineController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RotationController;
 use App\Http\Controllers\SystemActionsController;
@@ -434,6 +435,14 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             return view('changelog.index');
         })->name('changelog.index')
             ->defaults('resource', 'audit-logs');
+
+        Route::get('/prompts', [PromptEngineController::class, 'index'])
+            ->name('prompts.index')
+            ->defaults('resource', 'tasks');
+
+        Route::get('/prompts/export/tasks', [PromptEngineController::class, 'exportTasks'])
+            ->name('prompts.export.tasks')
+            ->defaults('resource', 'tasks');
 
         // Redirect old route to new one
         Route::get('/dashboard/profitability', function () {
