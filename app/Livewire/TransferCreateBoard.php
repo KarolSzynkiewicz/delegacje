@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Data\TransferGroundConfig;
 use App\Enums\LocationPurposeType;
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
 use App\Enums\ProjectStatus;
 use App\Enums\VehiclePosition;
 use App\Livewire\Concerns\InteractsWithLogisticsTransportMode;
@@ -206,9 +208,25 @@ class TransferCreateBoard extends Component
         $waypoints = [];
         $locationStopNotes = [];
         if ($this->mode === 'assignment' && ! empty($this->draftProjectByAssignment)) {
+            $targetAccByEmp = null;
+            if ($this->assignNewAccommodation && $this->accommodationAssignments !== []) {
+                $accByEmp = $this->accommodationAssignmentsByEmployeeId();
+                $targetAccByEmp = [];
+                foreach ($this->draftEmployeeIds as $eid) {
+                    $aid = (int) ($accByEmp[$eid]['accommodation_id'] ?? 0);
+                    if ($aid > 0) {
+                        $targetAccByEmp[$eid] = $aid;
+                    }
+                }
+                if ($targetAccByEmp === []) {
+                    $targetAccByEmp = null;
+                }
+            }
+
             $data = $this->defaultRouteWaypointsService->buildReassignmentTransferWaypoints(
                 $this->draftProjectByAssignment,
-                $day
+                $day,
+                $targetAccByEmp
             );
             $waypoints = $data['waypoints'] ?? [];
             $locationStopNotes = $data['location_stop_notes'] ?? [];
@@ -229,8 +247,19 @@ class TransferCreateBoard extends Component
             'ground-transfer-slot-apply-default-waypoints',
             slotKey: $slotKey,
             waypoints: $waypoints,
-            locationStopNotes: $locationStopNotes
+            locationStopNotes: $locationStopNotes,
+            force: $this->shouldForceRefreshDefaultRouteWaypointsFromSketch(),
         );
+    }
+
+    /**
+     * Przy każdym „Konfiguruj trasę” na tablicy przeniesień nadpisujemy prefill z aktualnego szkicu (bez gubienia punktów po edycji).
+     */
+    protected function shouldForceRefreshDefaultRouteWaypointsFromSketch(): bool
+    {
+        return $this->mode === 'assignment'
+            && $this->draftProjectByAssignment !== []
+            && $this->transportMode === 'own';
     }
 
     #[On('error')]
@@ -324,6 +353,24 @@ class TransferCreateBoard extends Component
         }
     }
 
+    public function updatedMode(string $value): void
+    {
+        if ($this->transportMode !== 'own') {
+            return;
+        }
+
+        $ids = $this->availableVehicles->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if ($this->vehicleId !== null && ($ids === [] || ! in_array((int) $this->vehicleId, $ids, true))) {
+            $this->vehicleId = null;
+            $this->vehicleSeats = [];
+        }
+
+        if (empty($this->vehicleId) && $this->availableVehicles->isNotEmpty()) {
+            $this->vehicleId = $this->availableVehicles->first()->id;
+            $this->initVehicleSeats();
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Computed properties
     // -------------------------------------------------------------------------
@@ -334,17 +381,22 @@ class TransferCreateBoard extends Component
             return collect();
         }
 
+        $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->orderBy('registration_number')
+            ->get();
+
+        if ($this->mode === 'transport') {
+            return $vehicles;
+        }
+
         $departureDate = Carbon::parse($this->departureDate);
         $locationTrackingService = app(LocationTrackingService::class);
 
-        return Vehicle::where('type', 'company_vehicle')
-            ->orderBy('registration_number')
-            ->get()
-            ->filter(function (Vehicle $vehicle) use ($departureDate, $locationTrackingService) {
-                $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $departureDate);
+        return $vehicles->filter(function (Vehicle $vehicle) use ($departureDate, $locationTrackingService) {
+            $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $departureDate);
 
-                return ! $status['in_transit'] && ! $status['outside_base'];
-            });
+            return ! $status['in_transit'] && $status['outside_base'];
+        });
     }
 
     public function getAvailablePublicTransportHubsProperty()
@@ -369,6 +421,60 @@ class TransferCreateBoard extends Component
     public function getTransferBoardRouteSummaryProperty(): ?array
     {
         return TransferGroundConfig::fromArray($this->groundTransferConfig)->toRouteSummary();
+    }
+
+    /**
+     * Informacje o zdarzeniu logistycznym aktualnie przypisanym do wybranego pojazdu na dzień transferu.
+     * Zwraca null gdy brak pojazdu lub brak aktywnego zdarzenia.
+     *
+     * @return array{event_id: int, type_label: string, from: ?string, to: ?string, status_label: string}|null
+     */
+    public function getSelectedVehicleActiveEventInfoProperty(): ?array
+    {
+        if (! $this->vehicleId || $this->departureDate === '') {
+            return null;
+        }
+        $vehicle = Vehicle::find((int) $this->vehicleId);
+        if (! $vehicle) {
+            return null;
+        }
+        $day = Carbon::parse($this->departureDate)->startOfDay();
+        $event = LogisticsEvent::where('vehicle_id', $vehicle->id)
+            ->whereIn('type', [
+                LogisticsEventType::DEPARTURE,
+                LogisticsEventType::RETURN,
+                LogisticsEventType::TRANSFER,
+            ])
+            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+            ->where('event_date', '<=', $day->copy()->endOfDay())
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $day))
+            ->with(['fromLocation', 'toLocation'])
+            ->orderByDesc('event_date')
+            ->orderByDesc('id')
+            ->first();
+        if (! $event) {
+            return null;
+        }
+        $typeLabel = match ($event->type) {
+            LogisticsEventType::DEPARTURE => 'Wyjazd',
+            LogisticsEventType::RETURN => 'Zjazd',
+            LogisticsEventType::TRANSFER => 'Transfer',
+            default => 'Zdarzenie',
+        };
+        $statusLabel = match ($event->status) {
+            LogisticsEventStatus::PLANNED => 'Planowany',
+            LogisticsEventStatus::IN_PROGRESS => 'W trakcie',
+            LogisticsEventStatus::COMPLETED => 'Zakończony',
+            default => (string) $event->status->value,
+        };
+
+        return [
+            'event_id' => $event->id,
+            'type_label' => $typeLabel,
+            'from' => $event->fromLocation?->name,
+            'to' => $event->toLocation?->name,
+            'status_label' => $statusLabel,
+        ];
     }
 
     public function getSelectedEmployeesProperty()
@@ -623,8 +729,6 @@ class TransferCreateBoard extends Component
         }
 
         $this->rebuildTransferAssignmentRanges();
-        $this->assignNewAccommodation = false;
-        $this->assignNewVehicle = false;
         $this->wizardPhase = 'followup';
     }
 
@@ -694,7 +798,12 @@ class TransferCreateBoard extends Component
 
     public function finishWizardBackToBoard(): void
     {
-        $this->resetTransferWizardState();
+        $fromSummary = $this->wizardPhase === 'done';
+        $this->rebuildTransferAssignmentRanges();
+        $this->wizardPhase = 'board';
+        if ($fromSummary) {
+            $this->successBanner = 'Podsumowanie zamknięte. Szkic i szczegóły transportu zostają w kreatorze — bez zapisu w systemie.';
+        }
     }
 
     protected function rebuildTransferAssignmentRanges(): void
@@ -741,6 +850,173 @@ class TransferCreateBoard extends Component
         }
 
         return array_map('intval', array_keys($ids));
+    }
+
+    /**
+     * Uzupełnienie karty kanban „Plan po zatwierdzeniu”: docelowy projekt oraz (gdy wybrano) nowe mieszkanie i pojazd.
+     *
+     * @return array<int, array{project_name: ?string, accommodation_name: ?string, vehicle_label: ?string}>
+     */
+    public function getDraftKanbanPlanExtrasProperty(): array
+    {
+        if ($this->draftProjectByAssignment === []) {
+            return [];
+        }
+
+        $assignmentIds = [];
+        foreach ($this->draftProjectByAssignment as $assignmentId => $_) {
+            if (! empty($this->draftAssignmentDetails[$assignmentId])) {
+                $assignmentIds[] = (int) $assignmentId;
+            }
+        }
+        if ($assignmentIds === []) {
+            return [];
+        }
+
+        $pas = ProjectAssignment::query()->whereIn('id', $assignmentIds)->get()->keyBy('id');
+        $projectIds = array_values(array_unique(array_map('intval', $this->draftProjectByAssignment)));
+        $projects = Project::query()->whereIn('id', $projectIds)->get()->keyBy('id');
+
+        $accById = collect();
+        if ($this->assignNewAccommodation && $this->accommodationAssignments !== []) {
+            $accIds = [];
+            foreach ($this->accommodationAssignmentsByEmployeeId() as $row) {
+                if (! empty($row['accommodation_id'])) {
+                    $accIds[] = (int) $row['accommodation_id'];
+                }
+            }
+            $accIds = array_values(array_unique(array_filter($accIds)));
+            if ($accIds !== []) {
+                $accById = Accommodation::query()->whereIn('id', $accIds)->get()->keyBy('id');
+            }
+        }
+
+        $vehById = collect();
+        if ($this->assignNewVehicle && $this->vehicleAssignments !== []) {
+            $vehIds = [];
+            foreach ($this->vehicleAssignmentsByEmployeeId() as $row) {
+                if (! empty($row['vehicle_id'])) {
+                    $vehIds[] = (int) $row['vehicle_id'];
+                }
+            }
+            $vehIds = array_values(array_unique(array_filter($vehIds)));
+            if ($vehIds !== []) {
+                $vehById = Vehicle::query()->whereIn('id', $vehIds)->get()->keyBy('id');
+            }
+        }
+
+        $accByEmp = $this->accommodationAssignmentsByEmployeeId();
+        $vehByEmp = $this->vehicleAssignmentsByEmployeeId();
+
+        $out = [];
+        foreach ($assignmentIds as $aid) {
+            $pid = (int) ($this->draftProjectByAssignment[$aid] ?? 0);
+            $pa = $pas->get($aid);
+            $employeeId = (int) ($pa?->employee_id ?? 0);
+
+            $projectName = $pid > 0 ? ($projects->get($pid)?->name) : null;
+
+            $accommodationName = null;
+            if ($this->assignNewAccommodation && $employeeId > 0) {
+                $accRow = $accByEmp[$employeeId] ?? null;
+                $accId = (int) ($accRow['accommodation_id'] ?? 0);
+                if ($accId > 0) {
+                    $accommodationName = $accById->get($accId)?->name;
+                }
+            }
+
+            $vehicleLabel = null;
+            if ($this->assignNewVehicle && $employeeId > 0) {
+                $vehRow = $vehByEmp[$employeeId] ?? null;
+                $vehId = (int) ($vehRow['vehicle_id'] ?? 0);
+                if ($vehId > 0) {
+                    $vehicleLabel = $vehById->get($vehId)?->registration_number;
+                }
+            }
+
+            $out[$aid] = [
+                'project_name' => $projectName,
+                'accommodation_name' => $accommodationName,
+                'vehicle_label' => $vehicleLabel,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Aktualne mieszkanie i pojazd z bazy na dzień transferu — pod karty kanban po zapisie (bez szkicu).
+     *
+     * @return array<int, array{accommodation_name: ?string, vehicle_label: ?string}>
+     */
+    public function getKanbanLiveLogisticsByAssignmentIdProperty(): array
+    {
+        if ($this->mode !== 'assignment' || $this->transferDate === '') {
+            return [];
+        }
+
+        $day = Carbon::parse($this->transferDate)->startOfDay();
+        $employeeIds = [];
+        $assignmentToEmployee = [];
+
+        foreach ($this->columns as $col) {
+            foreach ($col['assignments'] as $assignment) {
+                $eid = (int) $assignment->employee_id;
+                if ($eid <= 0) {
+                    continue;
+                }
+                $employeeIds[$eid] = true;
+                $assignmentToEmployee[(int) $assignment->id] = $eid;
+            }
+        }
+
+        $employeeIds = array_keys($employeeIds);
+        if ($employeeIds === []) {
+            return [];
+        }
+
+        $accByEmp = [];
+        $aaRows = AccommodationAssignment::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->where('start_date', '<=', $day)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $day))
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->with('accommodation')
+            ->get();
+        foreach ($aaRows as $aa) {
+            $eid = (int) $aa->employee_id;
+            if (! isset($accByEmp[$eid]) && $aa->accommodation) {
+                $accByEmp[$eid] = $aa->accommodation->name;
+            }
+        }
+
+        $vehByEmp = [];
+        $vaRows = VehicleAssignment::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->where('is_return_trip', false)
+            ->where('start_date', '<=', $day)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $day))
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->with('vehicle')
+            ->get();
+        foreach ($vaRows as $va) {
+            $eid = (int) $va->employee_id;
+            if (! isset($vehByEmp[$eid]) && $va->vehicle) {
+                $vehByEmp[$eid] = $va->vehicle->registration_number;
+            }
+        }
+
+        $out = [];
+        foreach ($assignmentToEmployee as $aid => $eid) {
+            $out[$aid] = [
+                'accommodation_name' => $accByEmp[$eid] ?? null,
+                'vehicle_label' => $vehByEmp[$eid] ?? null,
+            ];
+        }
+
+        return $out;
     }
 
     public function getWizardSummarySketchRowsProperty(): array
@@ -847,6 +1123,23 @@ class TransferCreateBoard extends Component
             ];
         }
 
+        $newAccNameByEmployee = [];
+        if ($this->assignNewAccommodation) {
+            foreach ($this->accommodationAssignments as $eid => $row) {
+                if (! empty($row['accommodation_id'])) {
+                    $newAccNameByEmployee[(int) $eid] = Accommodation::query()->find((int) $row['accommodation_id'])?->name ?? '?';
+                }
+            }
+        }
+        $newVehLabelByEmployee = [];
+        if ($this->assignNewVehicle) {
+            foreach ($this->vehicleAssignments as $eid => $row) {
+                if (! empty($row['vehicle_id'])) {
+                    $newVehLabelByEmployee[(int) $eid] = Vehicle::query()->find((int) $row['vehicle_id'])?->registration_number ?? '?';
+                }
+            }
+        }
+
         foreach ($this->draftEmployeeIds as $employeeId) {
             $employee = Employee::query()->find($employeeId);
             $name = $employee?->full_name ?? '?';
@@ -862,9 +1155,12 @@ class TransferCreateBoard extends Component
                 if ($aa) {
                     $endWas = $aa->end_date ? $aa->end_date->format('d.m.Y') : 'otwarte (brak końca)';
                     $aaStart = DateRangeService::normalizeDate($aa->start_date);
+                    $newAccLabel = $newAccNameByEmployee[$employeeId] ?? null;
+                    $newAccPhrase = $newAccLabel ? 'mieszkaniem „'.$newAccLabel.'"' : 'nowym mieszkaniem';
                     $detail = $aaStart->gte($transferDay)
-                        ? 'Przypisanie do „'.($aa->accommodation?->name ?? '?').'" zaczyna się w dniu transferu — zostanie usunięte i zastąpione nowym mieszkaniem od '.$dateLabel.'.'
-                        : 'Skrócenie końca przypisania do '.$dayBeforeLabel.' (wcześniej do: '.$endWas.').';
+                        ? 'Przypisanie do „'.($aa->accommodation?->name ?? '?').'" zaczyna się w dniu transferu — zostanie usunięte i zastąpione '.$newAccPhrase.' od '.$dateLabel.'.'
+                        : 'Skrócenie końca przypisania do '.$dayBeforeLabel.' (wcześniej do: '.$endWas.').'
+                            .($newAccLabel ? ' Nowe mieszkanie: „'.$newAccLabel.'” od '.$dateLabel.'.' : '');
                     $rows[] = [
                         'kind_label' => 'Mieszkanie',
                         'employee_name' => $name,
@@ -886,9 +1182,12 @@ class TransferCreateBoard extends Component
                 if ($va && $va->vehicle) {
                     $endWas = $va->end_date ? $va->end_date->format('d.m.Y') : 'otwarte (brak końca)';
                     $vaStart = DateRangeService::normalizeDate($va->start_date);
+                    $newVeh = $newVehLabelByEmployee[$employeeId] ?? null;
+                    $newVehPhrase = $newVeh ? 'pojazdem '.$newVeh : 'nowym pojazdem';
                     $detail = $vaStart->gte($transferDay)
-                        ? 'Przypisanie do pojazdu '.$va->vehicle->registration_number.' zaczyna się w dniu transferu — zostanie usunięte i zastąpione nowym od '.$dateLabel.'.'
-                        : 'Skrócenie końca przypisania do '.$dayBeforeLabel.' (wcześniej do: '.$endWas.').';
+                        ? 'Przypisanie do pojazdu '.$va->vehicle->registration_number.' zaczyna się w dniu transferu — zostanie usunięte i zastąpione '.$newVehPhrase.' od '.$dateLabel.'.'
+                        : 'Skrócenie końca przypisania do '.$dayBeforeLabel.' (wcześniej do: '.$endWas.').'
+                            .($newVeh ? ' Nowy pojazd: '.$newVeh.' od '.$dateLabel.'.' : '');
                     $rows[] = [
                         'kind_label' => 'Pojazd',
                         'employee_name' => $name,
@@ -906,9 +1205,12 @@ class TransferCreateBoard extends Component
     // Save — reassignment transfer
     // -------------------------------------------------------------------------
 
-    public function saveTransferFromSummary(): void
+    /**
+     * Zatwierdza transfer (reassignment) w bazie — tylko z głównej tablicy, gdy wypełniono szkic i transport.
+     */
+    public function saveReassignmentTransferToSystem(): void
     {
-        if ($this->wizardPhase !== 'done') {
+        if ($this->mode !== 'assignment' || $this->wizardPhase !== 'board') {
             return;
         }
 
@@ -936,8 +1238,7 @@ class TransferCreateBoard extends Component
         $this->successBanner = null;
         $this->resetTransferWizardState();
 
-        session()->flash('success', 'Transfer został zapisany.');
-        $this->redirect(route('transfers.show', $event), navigate: true);
+        session()->flash('success', 'Transfer został zapisany — wrócono do tablicy. Szczegóły zdarzenia: #'.$event->id.'.');
     }
 
     // -------------------------------------------------------------------------
@@ -960,6 +1261,24 @@ class TransferCreateBoard extends Component
 
         $config = TransferGroundConfig::fromArray($this->groundTransferConfig);
         $base = Location::getBase();
+
+        if ($this->transportMode === 'own') {
+            $simpleWaypoints = $config->routeWaypoints;
+            if (count($simpleWaypoints) < 2) {
+                session()->flash('warning', 'Skonfiguruj trasę — transport własny wymaga co najmniej 2 przystanków (start i cel).');
+
+                return;
+            }
+            $simpleFirst = str_starts_with((string) ($simpleWaypoints[0] ?? ''), 'loc:')
+                ? (int) substr($simpleWaypoints[0], 4) : 0;
+            $simpleLast = str_starts_with((string) ($simpleWaypoints[count($simpleWaypoints) - 1] ?? ''), 'loc:')
+                ? (int) substr($simpleWaypoints[count($simpleWaypoints) - 1], 4) : 0;
+            if ($simpleFirst > 0 && $simpleFirst === $simpleLast) {
+                session()->flash('warning', 'Start i cel trasy to ta sama lokalizacja — skonfiguruj trasę z różnym punktem startowym i docelowym.');
+
+                return;
+            }
+        }
 
         $publicTicketLines = [];
         $locationStopNotes = null;
@@ -1111,8 +1430,22 @@ class TransferCreateBoard extends Component
             if ((int) $this->sharedStartAirportLocationId === (int) $this->sharedEndAirportLocationId) {
                 return 'Punkt startowy i docelowy nie mogą być takie same.';
             }
-        } elseif ($this->transportMode === 'own' && empty($this->vehicleId)) {
-            return 'Wybierz pojazd służbowy (transport własny).';
+        } elseif ($this->transportMode === 'own') {
+            if (empty($this->vehicleId)) {
+                return 'Wybierz pojazd służbowy (transport własny).';
+            }
+            $ownConfig = TransferGroundConfig::fromArray($this->groundTransferConfig);
+            $ownWaypoints = $ownConfig->routeWaypoints;
+            if (count($ownWaypoints) < 2) {
+                return 'Skonfiguruj trasę — transport własny wymaga co najmniej 2 przystanków (start i cel).';
+            }
+            $firstLocId = str_starts_with((string) ($ownWaypoints[0] ?? ''), 'loc:')
+                ? (int) substr($ownWaypoints[0], 4) : 0;
+            $lastLocId = str_starts_with((string) ($ownWaypoints[count($ownWaypoints) - 1] ?? ''), 'loc:')
+                ? (int) substr($ownWaypoints[count($ownWaypoints) - 1], 4) : 0;
+            if ($firstLocId > 0 && $firstLocId === $lastLocId) {
+                return 'Start i cel trasy to ta sama lokalizacja — skonfiguruj trasę z różnym punktem startowym i docelowym.';
+            }
         }
 
         $seenEmployees = [];
@@ -1131,11 +1464,13 @@ class TransferCreateBoard extends Component
             $seenEmployees[$eid] = true;
         }
 
+        $accByEmp = $this->accommodationAssignmentsByEmployeeId();
+        $vehByEmp = $this->vehicleAssignmentsByEmployeeId();
         foreach ($this->draftEmployeeIds as $employeeId) {
-            if ($this->assignNewAccommodation && empty($this->accommodationAssignments[$employeeId]['accommodation_id'])) {
+            if ($this->assignNewAccommodation && empty($accByEmp[$employeeId]['accommodation_id'] ?? null)) {
                 return 'Brak przypisania mieszkania dla: '.(Employee::find($employeeId)?->full_name ?? 'ID '.$employeeId).'.';
             }
-            if ($this->assignNewVehicle && empty($this->vehicleAssignments[$employeeId]['vehicle_id'])) {
+            if ($this->assignNewVehicle && empty($vehByEmp[$employeeId]['vehicle_id'] ?? null)) {
                 return 'Brak przypisania pojazdu dla: '.(Employee::find($employeeId)?->full_name ?? 'ID '.$employeeId).'.';
             }
         }
@@ -1156,6 +1491,9 @@ class TransferCreateBoard extends Component
         $fromLocationId = (int) ($firstPa?->project?->location_id ?? $base->id) ?: $base->id;
         $toLocationId = (int) ($targetProject?->location_id ?? $fromLocationId) ?: $base->id;
 
+        $accByEmp = $this->accommodationAssignmentsByEmployeeId();
+        $vehByEmp = $this->vehicleAssignmentsByEmployeeId();
+
         $reassignments = [];
         foreach ($this->draftProjectByAssignment as $assignmentId => $targetProjectId) {
             $details = $this->draftAssignmentDetails[$assignmentId] ?? null;
@@ -1167,8 +1505,8 @@ class TransferCreateBoard extends Component
                 continue;
             }
             $employeeId = (int) $pa->employee_id;
-            $accRow = $this->accommodationAssignments[$employeeId] ?? null;
-            $vehRow = $this->vehicleAssignments[$employeeId] ?? null;
+            $accRow = $accByEmp[$employeeId] ?? null;
+            $vehRow = $vehByEmp[$employeeId] ?? null;
             $accId = $this->assignNewAccommodation ? ((int) ($accRow['accommodation_id'] ?? 0)) : 0;
             $vehId = $this->assignNewVehicle ? ((int) ($vehRow['vehicle_id'] ?? 0)) : 0;
 
@@ -1180,7 +1518,9 @@ class TransferCreateBoard extends Component
                 'end_date' => $details['end_date'],
                 'accommodation_id' => $accId > 0 ? $accId : null,
                 'vehicle_id' => $vehId > 0 ? $vehId : null,
-                'vehicle_position' => ($vehRow['position'] ?? null) ? (string) $vehRow['position'] : VehiclePosition::PASSENGER->value,
+                'vehicle_position' => is_array($vehRow) && ! empty($vehRow['position'])
+                    ? (string) $vehRow['position']
+                    : VehiclePosition::PASSENGER->value,
                 'skip_old_accommodation_shorten' => ! $this->assignNewAccommodation,
                 'skip_old_vehicle_shorten' => ! $this->assignNewVehicle,
             ];
@@ -1214,7 +1554,7 @@ class TransferCreateBoard extends Component
 
     public function handleAccommodationAssigned(array $data): void
     {
-        if ($this->wizardPhase !== 'accommodation' || empty($data['employee_id'])) {
+        if (! in_array($this->wizardPhase, ['accommodation', 'vehicle', 'done'], true) || empty($data['employee_id'])) {
             return;
         }
         $this->accommodationAssignments[(int) $data['employee_id']] = [
@@ -1234,7 +1574,7 @@ class TransferCreateBoard extends Component
 
     public function handleVehicleAssigned(array $data): void
     {
-        if ($this->wizardPhase !== 'vehicle' || empty($data['employee_id'])) {
+        if (! in_array($this->wizardPhase, ['vehicle', 'done'], true) || empty($data['employee_id'])) {
             return;
         }
         $this->vehicleAssignments[(int) $data['employee_id']] = [
@@ -1251,6 +1591,38 @@ class TransferCreateBoard extends Component
             return;
         }
         unset($this->vehicleAssignments[(int) $data['employee_id']]);
+    }
+
+    /**
+     * Livewire potrafi serializować klucze tablicy jako stringi — lookup po employee_id musi być stabilny.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function accommodationAssignmentsByEmployeeId(): array
+    {
+        $out = [];
+        foreach ($this->accommodationAssignments as $eid => $row) {
+            if (is_array($row)) {
+                $out[(int) $eid] = $row;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function vehicleAssignmentsByEmployeeId(): array
+    {
+        $out = [];
+        foreach ($this->vehicleAssignments as $eid => $row) {
+            if (is_array($row)) {
+                $out[(int) $eid] = $row;
+            }
+        }
+
+        return $out;
     }
 
     // -------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Steps;
 
+use App\Livewire\Concerns\ManagesVehicleSeats;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\Role;
@@ -13,6 +14,8 @@ use Livewire\Component;
 
 class Step1ProjectAssignments extends Component
 {
+    use ManagesVehicleSeats;
+
     // Dane otrzymane z rodzica (read-only)
     public $departureDate;
 
@@ -218,23 +221,16 @@ class Step1ProjectAssignments extends Component
                     $capacity = $this->vehicle->capacity;
                     $existingSeats = count($this->vehicleSeats);
 
-                    // Uzupełnij tylko brakujące miejsca, nie nadpisuj istniejących
                     if ($existingSeats < $capacity) {
                         for ($i = $existingSeats; $i < $capacity; $i++) {
                             if (! isset($this->vehicleSeats[$i])) {
-                                $this->vehicleSeats[$i] = [
-                                    'employee_id' => null,
-                                    'position' => 'passenger',
-                                ];
+                                $this->vehicleSeats[$i] = $this->buildSeatRow($i);
                             }
                         }
                     }
 
-                    // Upewnij się, że wszystkie miejsca mają poprawną strukturę
                     for ($i = 0; $i < min($existingSeats, $capacity); $i++) {
-                        if (! isset($this->vehicleSeats[$i]['position'])) {
-                            $this->vehicleSeats[$i]['position'] = 'passenger';
-                        }
+                        $this->vehicleSeats[$i] = $this->normalizeSeatRowFromPartial($i, $this->vehicleSeats[$i] ?? []);
                     }
                 }
             }
@@ -444,16 +440,8 @@ class Step1ProjectAssignments extends Component
                     // Jeśli capacity się zmieniło, uzupełnij tylko brakujące miejsca
                     $this->initializeVehicleSeats();
                 } else {
-                    // Upewnij się, że wszystkie miejsca mają poprawną strukturę
                     for ($i = 0; $i < $capacity; $i++) {
-                        if (! isset($this->vehicleSeats[$i])) {
-                            $this->vehicleSeats[$i] = [
-                                'employee_id' => null,
-                                'position' => 'passenger',
-                            ];
-                        } elseif (! isset($this->vehicleSeats[$i]['position'])) {
-                            $this->vehicleSeats[$i]['position'] = 'passenger';
-                        }
+                        $this->vehicleSeats[$i] = $this->normalizeSeatRowFromPartial($i, $this->vehicleSeats[$i] ?? []);
                     }
                 }
             }
@@ -473,32 +461,16 @@ class Step1ProjectAssignments extends Component
         $capacity = $this->vehicle->capacity;
         $existingSeats = count($this->vehicleSeats);
 
-        // Initialize seats array if needed - but preserve existing assignments from parent
         if ($existingSeats < $capacity) {
-            // Uzupełnij tylko brakujące miejsca, nie nadpisuj istniejących przypisań
             for ($i = $existingSeats; $i < $capacity; $i++) {
                 if (! isset($this->vehicleSeats[$i])) {
-                    $this->vehicleSeats[$i] = [
-                        'employee_id' => null,
-                        'position' => 'passenger',
-                    ];
+                    $this->vehicleSeats[$i] = $this->buildSeatRow($i);
                 }
             }
         }
-        // USUNIĘTE: elseif ($existingSeats > $capacity) - nie usuwaj nadmiarowych miejsc
-        // Jeśli capacity się zmniejszyło, zostaw istniejące przypisania
-        // (użytkownik może je później usunąć ręcznie lub zmienić pojazd)
 
-        // Ensure all seats have the correct structure
         for ($i = 0; $i < min($existingSeats, $capacity); $i++) {
-            if (! isset($this->vehicleSeats[$i])) {
-                $this->vehicleSeats[$i] = [
-                    'employee_id' => null,
-                    'position' => 'passenger',
-                ];
-            } elseif (! isset($this->vehicleSeats[$i]['position'])) {
-                $this->vehicleSeats[$i]['position'] = 'passenger';
-            }
+            $this->vehicleSeats[$i] = $this->normalizeSeatRowFromPartial($i, $this->vehicleSeats[$i] ?? []);
         }
     }
 
@@ -520,10 +492,7 @@ class Step1ProjectAssignments extends Component
         // Inicjalizuj miejsca jeśli są puste
         if (empty($this->vehicleSeats)) {
             for ($i = 0; $i < $vehicle->capacity; $i++) {
-                $this->vehicleSeats[$i] = [
-                    'employee_id' => null,
-                    'position' => 'passenger',
-                ];
+                $this->vehicleSeats[$i] = $this->buildSeatRow($i);
             }
         }
 
@@ -544,10 +513,7 @@ class Step1ProjectAssignments extends Component
             if (! $alreadyInVehicle) {
                 foreach ($this->vehicleSeats as $index => $seat) {
                     if (empty($seat['employee_id'])) {
-                        $this->vehicleSeats[$index] = [
-                            'employee_id' => $employeeId,
-                            'position' => 'passenger', // Domyślnie pasażer
-                        ];
+                        $this->vehicleSeats[$index] = $this->buildSeatRow($index, (int) $employeeId, 'passenger', false);
                         break;
                     }
                 }
@@ -1002,6 +968,195 @@ class Step1ProjectAssignments extends Component
 
     public function render()
     {
-        return view('livewire.steps.step1-project-assignments');
+        $employeesById = $this->buildEmployeesById();
+        $assignedMap = $this->buildAssignedMap();
+        $vehicleFlags = $this->computeVehicleFlags();
+
+        return view('livewire.steps.step1-project-assignments', [
+            'isVehicleFull' => $vehicleFlags['is_vehicle_full'],
+            'showFullBanner' => $vehicleFlags['show_full_banner'],
+            'employees' => $this->buildEmployeeRows(),
+            'pagination' => $this->buildPaginationData(),
+            'projects' => $this->buildProjectsWithChips($employeesById, $assignedMap),
+            'projectsEmpty' => empty($this->filteredProjectGapsTwoWeeks),
+            'projectsEmptyMsg' => filled($this->projectSearch)
+                                  ? 'Brak braków dla filtrów'
+                                  : 'Brak braków w rolach na najbliższe 2 tygodnie',
+            'calendar' => $this->buildCalendarData(),
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Render data assemblers — dostarczają gotowe dane do Blade
+    // ──────────────────────────────────────────────────────────────────────
+
+    private function buildEmployeesById(): array
+    {
+        return array_column($this->allAvailableEmployees, null, 'id');
+    }
+
+    private function buildAssignedMap(): array
+    {
+        $map = [];
+
+        foreach ($this->assignments as $dayAssignments) {
+            foreach ($dayAssignments as $projectId => $roles) {
+                foreach ($roles as $roleId => $empIds) {
+                    foreach ($empIds as $empId) {
+                        $map[$projectId][$roleId][$empId] = true;
+                    }
+                }
+            }
+        }
+
+        foreach ($this->assignmentRanges as $range) {
+            if (! empty($range['employee_id'])) {
+                $map[$range['project_id']][$range['role_id']][$range['employee_id']] = true;
+            }
+        }
+
+        return $map;
+    }
+
+    private function buildProjectsWithChips(array $employeesById, array $assignedMap): array
+    {
+        return collect($this->filteredProjectGapsTwoWeeks)
+            ->map(function ($project, $projectId) use ($employeesById, $assignedMap) {
+                $roles = collect($project['roles'])
+                    ->map(function ($role, $roleId) use ($employeesById, $assignedMap, $projectId) {
+                        $assignedIds = array_keys($assignedMap[$projectId][$roleId] ?? []);
+
+                        $chips = collect($assignedIds)
+                            ->map(fn ($id) => $this->buildChip((int) $id, $employeesById, $projectId, $roleId))
+                            ->filter()
+                            ->values()
+                            ->all();
+
+                        return array_merge($role, [
+                            'id' => $roleId,
+                            'gap_label' => $role['min_gaps'] === $role['max_gaps']
+                                                ? "{$role['min_gaps']} brak."
+                                                : "{$role['min_gaps']}–{$role['max_gaps']} brak.",
+                            'assigned_chips' => $chips,
+                        ]);
+                    })
+                    ->values()
+                    ->all();
+
+                return array_merge($project, ['id' => $projectId, 'roles' => $roles]);
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildChip(int $empId, array $employeesById, $projectId, $roleId): ?array
+    {
+        $emp = $employeesById[$empId] ?? null;
+        if (! $emp) {
+            return null;
+        }
+
+        return [
+            'employee_id' => $empId,
+            'project_id' => $projectId,
+            'role_id' => $roleId,
+            'name' => $emp['full_name'],
+            'initials' => mb_substr($emp['first_name'], 0, 1).mb_substr($emp['last_name'], 0, 1),
+            'image_url' => $emp['image_url'],
+        ];
+    }
+
+    private function buildEmployeeRows(): array
+    {
+        return collect($this->getFilteredEmployees())
+            ->map(fn ($e) => array_merge($e, [
+                'initials' => mb_substr($e['first_name'], 0, 1).mb_substr($e['last_name'], 0, 1),
+                'rotation_label' => $this->formatRotationLabel($e['rotation'] ?? null),
+                'docs_warning' => $this->buildDocsWarning($e['expiring_documents'] ?? []),
+            ]))
+            ->all();
+    }
+
+    private function formatRotationLabel(?array $rotation): ?string
+    {
+        if (! $rotation) {
+            return null;
+        }
+
+        $label = Carbon::parse($rotation['start_date'])->format('d.m.Y');
+        if ($rotation['end_date']) {
+            $label .= ' – '.Carbon::parse($rotation['end_date'])->format('d.m.Y');
+        }
+
+        return $label;
+    }
+
+    private function buildDocsWarning(array $docs): ?array
+    {
+        if (empty($docs)) {
+            return null;
+        }
+
+        $critical = count(array_filter($docs, fn ($d) => $d['is_required'] ?? false));
+
+        return ['total' => count($docs), 'critical' => $critical];
+    }
+
+    private function buildPaginationData(): ?array
+    {
+        $total = count($this->allAvailableEmployees);
+        $totalPages = $total > 0 ? (int) ceil($total / $this->employeesPerPage) : 1;
+
+        if ($totalPages <= 1) {
+            return null;
+        }
+
+        $from = ($this->employeesPage - 1) * $this->employeesPerPage + 1;
+        $to = min($this->employeesPage * $this->employeesPerPage, $total);
+
+        return [
+            'label' => "{$from}–{$to} / {$total}",
+            'can_prev' => $this->employeesPage > 1,
+            'can_next' => $this->employeesPage < $totalPages,
+        ];
+    }
+
+    private function computeVehicleFlags(): array
+    {
+        $capacity = is_array($this->vehicleSeats) ? count($this->vehicleSeats) : 0;
+        $isExternalDriver = (bool) ($this->vehicleSeats[0]['external_driver'] ?? true);
+        $isOwnTransport = ! empty($this->vehicleId) && $capacity > 0;
+        $totalPeople = count($this->getAllAssignedEmployeeIds()) + ($isExternalDriver ? 1 : 0);
+        $isFull = $isOwnTransport && $totalPeople >= $capacity;
+
+        return [
+            'is_vehicle_full' => $isFull,
+            'show_full_banner' => $isFull && ! $this->forTransfer,
+        ];
+    }
+
+    private function buildCalendarData(): array
+    {
+        $arrival = Carbon::parse($this->endDate);
+        $calStart = $this->calendarMonthStart
+            ? Carbon::parse($this->calendarMonthStart)
+            : $arrival->copy()->startOfMonth();
+
+        $selectedRange = null;
+        if ($this->selectedStartDate) {
+            $startFmt = Carbon::parse($this->selectedStartDate)->format('d.m.Y');
+            if ($this->selectedEndDate && $this->selectedStartDate !== $this->selectedEndDate) {
+                $endFmt = Carbon::parse($this->selectedEndDate)->format('d.m.Y');
+                $selectedRange = ['type' => 'range', 'label' => "{$startFmt} - {$endFmt}"];
+            } else {
+                $selectedRange = ['type' => 'start', 'label' => $startFmt];
+            }
+        }
+
+        return [
+            'arrival_date' => $arrival->format('Y-m-d'),
+            'start_date' => $calStart->format('Y-m-d'),
+            'selected_range' => $selectedRange,
+        ];
     }
 }

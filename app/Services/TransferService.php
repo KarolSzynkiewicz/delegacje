@@ -65,7 +65,7 @@ class TransferService
                     $employee = Employee::findOrFail($employeeId);
                     if (! $this->locationTracking->isEmployeeEligibleForTransfer($employee, $transferDate)) {
                         throw ValidationException::withMessages([
-                            'selectedEmployeeIds' => "Pracownik {$employee->full_name} jest w bazie w dniu transferu — użyj wyjazdu lub zjazdu, nie transferu.",
+                            'selectedEmployeeIds' => "Pracownik {$employee->full_name} jest aktualnie w lokalizacji bazy (siedziba) w dniu transferu — użyj wyjazdu lub zjazdu, nie transferu.",
                         ]);
                     }
                 }

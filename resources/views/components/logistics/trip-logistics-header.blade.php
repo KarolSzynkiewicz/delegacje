@@ -58,7 +58,7 @@
         </div>
     </div>
 
-    <div class="col-12 col-lg-3 d-flex min-w-0">
+    <div class="col-12 col-sm-5 col-lg-3 d-flex min-w-0">
         <x-logistics.transport-mode-toggle
             :mode="$transportMode"
             :hub-kind="$publicTransportHubKind"
@@ -66,7 +66,7 @@
         />
     </div>
 
-    <div class="col-12 col-lg-5 d-flex min-w-0">
+    <div class="col-12 col-sm-7 col-lg-5 d-flex min-w-0">
         @if($transportMode === null)
             <div class="rounded-3 p-2 transition-all logistics-trip-header-card logistics-trip-header-card--invalid d-flex flex-column w-100"
                  style="justify-content: space-between;">
@@ -163,7 +163,6 @@
                     @foreach($availableVehicles as $v)
                         <option value="{{ $v->id }}">
                             {{ $v->registration_number }} – {{ $v->brand }} {{ $v->model }}
-                            @if($v->capacity) ({{ $v->capacity }} m.) @endif
                         </option>
                     @endforeach
                 </select>
@@ -172,8 +171,24 @@
                     @php
                         $headerTransportVehicle = $availableVehicles->firstWhere('id', (int) $vehicleId);
                         $headerDocWarning = $headerTransportVehicle?->documentComplianceWarningMessage() ?? '';
+                        // Ostrzeżenie tylko gdy flaga warsztat aktywna I naprawa nakłada się na daty
+                        $headerRepair = null;
+                        if ($headerTransportVehicle?->technical_condition === 'workshop' && ! $datesIncomplete) {
+                            $hFrom = \Carbon\Carbon::parse($$fw)->startOfDay();
+                            $hTo   = \Carbon\Carbon::parse($endDate)->endOfDay();
+                            $headerRepair = $headerTransportVehicle->repairs()
+                                ->where('start_date', '<=', $hTo)
+                                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $hFrom))
+                                ->latest('start_date')
+                                ->first();
+                        }
                     @endphp
-                    @if($headerDocWarning !== '')
+                    @if($headerRepair)
+                        <small class="text-danger d-block mt-1 fw-semibold">
+                            <i class="bi bi-tools me-1"></i>Pojazd w warsztacie w tym okresie —
+                            <a href="{{ route('vehicle-repairs.show', $headerRepair) }}" class="text-danger" target="_blank">szczegóły naprawy #{{ $headerRepair->id }}</a>.
+                        </small>
+                    @elseif($headerDocWarning !== '')
                         <small class="text-warning d-block mt-1">
                             <i class="bi bi-exclamation-triangle me-1"></i>Uwaga: {{ $headerDocWarning }}
                         </small>
@@ -189,12 +204,21 @@
                         @endif
                     </div>
                 @elseif($availableVehicles->isEmpty())
-                    @if(($cfg['vehiclePoolHint'] ?? 'departure') === 'return')
+                    @php $vehiclePoolHint = $cfg['vehiclePoolHint'] ?? 'departure'; @endphp
+                    @if($vehiclePoolHint === 'return')
                         @if(! empty($returnDate))
                             <div class="small text-warning mt-1">
                                 <i class="bi bi-exclamation-triangle me-1"></i>Brak aut dostępnych dla tego okresu (poza bazą i wolnych w wyjeździe/zjeździe).
                             </div>
                         @endif
+                    @elseif($vehiclePoolHint === 'transfer_assignment')
+                        <div class="small text-warning mt-1">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Brak aut w terenie (poza bazą) na wybraną datę — żadne służbowe auto nie jest oznaczone jako poza bazą i wolne od przejazdu.
+                        </div>
+                    @elseif($vehiclePoolHint === 'transfer_transport')
+                        <div class="small text-warning mt-1">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Brak zdefiniowanych pojazdów służbowych w systemie.
+                        </div>
                     @else
                         <div class="small text-warning mt-1">
                             <i class="bi bi-exclamation-triangle me-1"></i>Brak aut dostępnych w bazie

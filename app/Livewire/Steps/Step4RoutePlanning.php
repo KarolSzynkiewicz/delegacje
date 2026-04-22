@@ -3,9 +3,12 @@
 namespace App\Livewire\Steps;
 
 use App\Enums\Currency;
+use App\Enums\LocationPurposeType;
+use App\Enums\ProjectStatus;
 use App\Models\Accommodation;
 use App\Models\Employee;
 use App\Models\Location;
+use App\Models\Project;
 use App\Models\Vehicle;
 use App\Services\GeocodingService;
 use App\Services\LocationTrackingService;
@@ -29,11 +32,21 @@ class Step4RoutePlanning extends Component
 
     public $vehicleId;
 
+    /** @var 'public'|'own'|null Tryb transportu z rodzica — używany do wykrywania własnego samochodu niezależnie od vehicleId. */
+    public ?string $transportMode = null;
+
     public $accommodationAssignments = [];
 
     public $assignmentRanges = [];
 
     public $vehicleAssignments = [];
+
+    /**
+     * Miejsca w aucie z planera (fotel 0 = kierowca, external_driver) — reactive z rodzica;
+     * lista kierowców w modalu wynagrodzenia musi być zgodna z fotelem, nie tylko z krokiem 3.
+     */
+    #[Reactive]
+    public array $vehicleSeats = [];
 
     /** Bilety lotnicze z nagłówka wyjazdu — reactive, żeby przebudowa kroku 4 nie rozjeżdżała załączników względem rodzica. */
     #[Reactive]
@@ -69,6 +82,9 @@ class Step4RoutePlanning extends Component
 
     // Optional manual extra stop (user-added) — tylko tryb własny samochód (nie transport publiczny)
     public $extraStopLocationId = null;
+
+    /** Oczekujący przystanek w modalu trasy (własny transport) — model dla x-logistics.route-waypoints-plan. */
+    public ?int $pendingWaypointLocationId = null;
 
     /** null = nie skonfigurowano karty; public = powszechny; own = pojazd firmy (car/other poniżej) */
     public ?string $transferToAirportLegKind = null;
@@ -122,6 +138,28 @@ class Step4RoutePlanning extends Component
 
     public bool $postTransferOtherSectionCollapsed = false;
 
+
+    // ――― Own transport modals (tryb własny samochód) ――――――――――――――――――――
+    /** Modal: konfiguracja kierowcy i wynagrodzenia za transport własny. */
+    public bool $showOwnTransferModal = false;
+
+    /** Modal: trasa i przystanki dla transportu własnego. */
+    public bool $showOwnRouteModal = false;
+
+    /**
+     * Po pierwszym otwarciu „Konfiguruj trasę” nie uruchamiamy już prefillu/merge (unika psucia kolejności i usunięć).
+     * Przy mount z niepustymi route_waypoints z rodzica od razu true (zapisany wyjazd).
+     */
+    public bool $ownRouteModalPrefillDone = false;
+
+    /** Roboczy kierowca w modalu wynagrodzenia (własny transport). */
+    public ?int $pendingOwnDriverEmployeeId = null;
+
+    /** Robocze wynagrodzenie kierowcy w modalu (własny transport). */
+    public ?float $pendingOwnBonusAmount = null;
+
+    /** Robocza waluta wynagrodzenia w modalu (własny transport). */
+    public string $pendingOwnBonusCurrency = 'PLN';
     /** Karta „Lotnisko” — opcjonalne podsumowanie (UI); null = pusty stan */
     public ?string $airportHubLegKind = null;
 
@@ -268,6 +306,7 @@ class Step4RoutePlanning extends Component
         $this->loadLocations();
 
         $initialRouteWaypoints = is_array($initialRouteWaypoints) ? $initialRouteWaypoints : [];
+        $hadPersistedRouteWaypointsFromParent = $initialRouteWaypoints !== [];
         $this->locationStopNotes = is_array($initialLocationStopNotes) ? $initialLocationStopNotes : [];
         $initialTransferConfig = is_array($initialTransferConfig) ? $initialTransferConfig : [];
         $initialRouteSegments = is_array($initialRouteSegments) ? $initialRouteSegments : [];
@@ -277,6 +316,7 @@ class Step4RoutePlanning extends Component
         }
 
         $this->hydrateTransferFieldsFromParent($initialTransferConfig);
+        $this->pruneInvalidOwnDriverSelection();
         $this->syncPostTransferCollapsedFromStoredState();
 
         if (! empty($initialRouteWaypoints)) {
@@ -284,6 +324,8 @@ class Step4RoutePlanning extends Component
         } else {
             $this->initializeWaypoints();
         }
+
+        $this->ownRouteModalPrefillDone = $hadPersistedRouteWaypointsFromParent;
 
         $restored = $this->hydrateRouteMetricsFromParent($initialRouteDistance, $initialRouteDuration, (bool) $initialRouteManual);
 
@@ -296,14 +338,80 @@ class Step4RoutePlanning extends Component
     }
 
     /**
+     * Normalizacja wpisu liczbowego z pola formularza (spacja, NBSP, przecinek dziesiętny).
+     */
+    protected function normalizeNumericScalarForRoute(mixed $value): mixed
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+        if (is_string($value)) {
+            $value = str_replace(["\u{00A0}", ' '], '', trim($value));
+            $value = str_replace(',', '.', $value);
+        }
+
+        return $value;
+    }
+
+    protected function manualDistancePairIsValid(mixed $km, mixed $minutes): bool
+    {
+        $km = $this->normalizeNumericScalarForRoute($km);
+        $minutes = $this->normalizeNumericScalarForRoute($minutes);
+        if ($km === null || $km === '' || $minutes === null || $minutes === '') {
+            return false;
+        }
+        if (! is_numeric($km) || ! is_numeric($minutes)) {
+            return false;
+        }
+
+        return (float) $km > 0 && (float) $minutes > 0;
+    }
+
+    /**
      * Po zmianie przystanków odcinka „z lotniska”: kasuj km/czas tego odcinka (bez API).
+     * Przy trasie ustalonej ręcznie zachowaj km/min — kolejność przystanków nie unieważnia wpisu.
      */
     protected function invalidateRouteMetricsAndSyncToParent(): void
     {
-        $this->routeData = null;
-        $this->isManualRouteDistance = false;
-        $this->manualRouteDistanceKm = null;
-        $this->manualRouteDurationMinutes = null;
+        $preserveManual = false;
+        $km = null;
+        $minutes = null;
+
+        if ($this->isManualRouteDistance) {
+            $km = $this->normalizeNumericScalarForRoute($this->manualRouteDistanceKm);
+            $minutes = $this->normalizeNumericScalarForRoute($this->manualRouteDurationMinutes);
+            if ($this->manualDistancePairIsValid($km, $minutes)) {
+                $preserveManual = true;
+            } else {
+                $rd = is_array($this->routeData) ? $this->routeData : [];
+                if (isset($rd['distance'], $rd['duration'])) {
+                    $km = round((float) $rd['distance'], 3);
+                    $minutes = max(1, (int) round(((int) $rd['duration']) / 60));
+                    if ($this->manualDistancePairIsValid($km, $minutes)) {
+                        $preserveManual = true;
+                    }
+                }
+            }
+        }
+
+        if ($preserveManual) {
+            $km = (float) $this->normalizeNumericScalarForRoute($km);
+            $minutes = (float) $this->normalizeNumericScalarForRoute($minutes);
+            $this->isManualRouteDistance = true;
+            $this->manualRouteDistanceKm = round($km, 3);
+            $this->manualRouteDurationMinutes = max(1, (int) round($minutes));
+            $durationSeconds = (int) round($this->manualRouteDurationMinutes * 60);
+            $this->routeData = [
+                'distance' => $km,
+                'duration' => $durationSeconds,
+            ];
+        } else {
+            $this->routeData = null;
+            $this->isManualRouteDistance = false;
+            $this->manualRouteDistanceKm = null;
+            $this->manualRouteDurationMinutes = null;
+        }
+
         $this->routeError = null;
         $this->manualRouteHint = null;
         $this->rebuildRouteSegmentsFromUiState();
@@ -349,13 +457,19 @@ class Step4RoutePlanning extends Component
 
     protected function hydrateTransferFieldsFromParent(array $tc): void
     {
-        if (! empty($this->vehicleId)) {
+        if ($tc === []) {
             return;
         }
 
-        if (array_key_exists('vehicle_id', $tc) && $tc['vehicle_id'] !== null && $tc['vehicle_id'] !== '') {
-            $this->transferVehicleId = (int) $tc['vehicle_id'];
+        // Pojazd „transferu” (np. odcinek po locie) — tylko gdy w nagłówku wyjazdu nie ma vehicleId
+        if (empty($this->vehicleId)) {
+            if (array_key_exists('vehicle_id', $tc) && $tc['vehicle_id'] !== null && $tc['vehicle_id'] !== '') {
+                $this->transferVehicleId = (int) $tc['vehicle_id'];
+            }
         }
+
+        // Kierowca i wynagrodzenie — zawsze wczytaj z rodzica (tryb własny ma vehicleId w nagłówku; wcześniejszy
+        // „return” przy vehicleId kasował te pola po powrocie z innego kroku).
         if (array_key_exists('driver_employee_id', $tc) && $tc['driver_employee_id'] !== null && $tc['driver_employee_id'] !== '') {
             $this->transferDriverEmployeeId = (int) $tc['driver_employee_id'];
         }
@@ -368,6 +482,24 @@ class Step4RoutePlanning extends Component
         if (array_key_exists('pickup_location_id', $tc) && $tc['pickup_location_id'] !== null && $tc['pickup_location_id'] !== '') {
             $this->transferPickupLocationId = (int) $tc['pickup_location_id'];
         }
+    }
+
+    /** Usuń wybór kierowcy, jeśli nie występuje na liście dozwolonych (fotel / zewnętrzny). */
+    protected function pruneInvalidOwnDriverSelection(): void
+    {
+        if (empty($this->transferDriverEmployeeId)) {
+            return;
+        }
+        $id = (int) $this->transferDriverEmployeeId;
+        $valid = $this->ownDriverCandidates->contains(fn (Employee $e) => (int) $e->id === $id);
+        if (! $valid) {
+            $this->transferDriverEmployeeId = null;
+        }
+    }
+
+    public function updatedVehicleSeats(): void
+    {
+        $this->pruneInvalidOwnDriverSelection();
     }
 
     protected function hydrateOptionalLegsFromRouteSegments(): void
@@ -992,9 +1124,11 @@ class Step4RoutePlanning extends Component
             $this->rebuildRouteSegmentsFromUiState();
         }
 
+        $rd = is_array($this->routeData) ? $this->routeData : [];
+
         return [
-            'route_distance' => $this->routeData['distance'] ?? null,
-            'route_duration' => $this->routeData['duration'] ?? null,
+            'route_distance' => $rd['distance'] ?? null,
+            'route_duration' => $rd['duration'] ?? null,
             'route_waypoints' => $this->routeWaypoints,
             'location_stop_notes' => $this->getLocationStopNotesPayload(),
             'route_distance_is_manual' => (bool) $this->isManualRouteDistance,
@@ -1147,6 +1281,12 @@ class Step4RoutePlanning extends Component
 
     public function getIsPublicTransportProperty(): bool
     {
+        if ($this->transportMode === 'own') {
+            return false;
+        }
+        if ($this->transportMode === 'public') {
+            return true;
+        }
         return empty($this->vehicleId);
     }
 
@@ -1650,9 +1790,318 @@ class Step4RoutePlanning extends Component
             });
     }
 
+    public function getOwnVehicleProperty(): ?\App\Models\Vehicle
+    {
+        if (empty($this->vehicleId)) {
+            return null;
+        }
+        return \App\Models\Vehicle::find($this->vehicleId);
+    }
+
+    public function getOwnTransferEmployeesProperty(): \Illuminate\Support\Collection
+    {
+        if (empty($this->selectedEmployeeIds)) {
+            return collect();
+        }
+        return Employee::whereIn('id', $this->selectedEmployeeIds)->orderBy('last_name')->get();
+    }
+
+    /**
+     * Kierowcy w modalu „Konfiguruj transfer”: przy konkretnej osobie na fotelu — tylko ona;
+     * przy „Zewnętrzny” lub braku przypisanego kierowcy — wszyscy uczestnicy wyjazdu.
+     * Fallback: wyłącznie osoby z rolą „kierowca” w kroku 3, gdy brak danych fotela.
+     */
+    public function getOwnDriverCandidatesProperty(): \Illuminate\Support\Collection
+    {
+        $seat0 = isset($this->vehicleSeats[0]) && is_array($this->vehicleSeats[0])
+            ? $this->vehicleSeats[0]
+            : null;
+
+        if ($seat0 !== null) {
+            $external = (bool) ($seat0['external_driver'] ?? true);
+            $eid = (int) ($seat0['employee_id'] ?? 0);
+
+            if (! $external && $eid > 0) {
+                if (! in_array($eid, $this->selectedEmployeeIds, true)) {
+                    return collect();
+                }
+
+                return Employee::where('id', $eid)->orderBy('last_name')->orderBy('first_name')->get();
+            }
+
+            if ($this->selectedEmployeeIds === []) {
+                return collect();
+            }
+
+            return Employee::whereIn('id', $this->selectedEmployeeIds)->orderBy('last_name')->orderBy('first_name')->get();
+        }
+
+        return $this->ownDriverCandidatesFromVehicleAssignmentDrivers();
+    }
+
+    /** Gdy brak wpisu fotela 0 w {@see $vehicleSeats} — fallback jak dawniej (rola „kierowca” w kroku 3). */
+    protected function ownDriverCandidatesFromVehicleAssignmentDrivers(): \Illuminate\Support\Collection
+    {
+        $driverIds = [];
+        foreach ($this->vehicleAssignments as $empId => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            if (($row['position'] ?? '') !== 'driver') {
+                continue;
+            }
+            $eid = (int) $empId;
+            if ($eid > 0 && in_array($eid, $this->selectedEmployeeIds, true)) {
+                $driverIds[$eid] = true;
+            }
+        }
+        if ($driverIds === []) {
+            return collect();
+        }
+
+        return Employee::whereIn('id', array_keys($driverIds))->orderBy('last_name')->orderBy('first_name')->get();
+    }
+
+    public function getOwnDriverPickerListsAllEmployeesProperty(): bool
+    {
+        $seat0 = $this->vehicleSeats[0] ?? null;
+        if (! is_array($seat0)) {
+            return true;
+        }
+        if (! empty($seat0['external_driver'])) {
+            return true;
+        }
+        $eid = (int) ($seat0['employee_id'] ?? 0);
+
+        return $eid <= 0;
+    }
+
+    public function getOwnDriverEmployeeProperty(): ?Employee
+    {
+        $id = $this->resolveDisplayedOwnDriverEmployeeId();
+
+        return $id ? Employee::find($id) : null;
+    }
+
+    protected function resolveDisplayedOwnDriverEmployeeId(): ?int
+    {
+        if (! empty($this->transferDriverEmployeeId)) {
+            return (int) $this->transferDriverEmployeeId;
+        }
+        $seat0 = $this->vehicleSeats[0] ?? null;
+        if (! is_array($seat0) || ! empty($seat0['external_driver'])) {
+            return null;
+        }
+        $eid = (int) ($seat0['employee_id'] ?? 0);
+
+        return $eid > 0 ? $eid : null;
+    }
+
+    /**
+     * Lista pracowników z przypisaniami do projektów i pojazdów (z kroków 1–3).
+     * Używana w widoku lewej kolumny kroku 4 dla trybu własnego samochodu.
+     */
+    public function getPersonAssignmentsProperty(): array
+    {
+        $employeeIds = $this->selectedEmployeeIds;
+        if (empty($employeeIds)) {
+            return [];
+        }
+
+        $employees = Employee::whereIn('id', $employeeIds)->get()->keyBy('id');
+
+        // Group assignment ranges by employee_id
+        $projectRangesByEmployee = [];
+        foreach ($this->assignmentRanges as $range) {
+            if (!is_array($range) || empty($range['employee_id'])) {
+                continue;
+            }
+            $empId = (int) $range['employee_id'];
+            $projectRangesByEmployee[$empId][] = $range;
+        }
+
+        // Load project names
+        $projectIds = collect($this->assignmentRanges)
+            ->filter(fn ($r) => is_array($r) && !empty($r['project_id']))
+            ->pluck('project_id')
+            ->unique()
+            ->toArray();
+        $projects = Project::whereIn('id', $projectIds)->get()->keyBy('id');
+
+        // Load vehicle names
+        $vehicleIds = collect($this->vehicleAssignments)
+            ->filter(fn ($a) => is_array($a) && !empty($a['vehicle_id']))
+            ->pluck('vehicle_id')
+            ->unique()
+            ->toArray();
+        $vehicles = Vehicle::whereIn('id', $vehicleIds)->get()->keyBy('id');
+
+        $result = [];
+        foreach ($employeeIds as $empId) {
+            $empId = (int) $empId;
+            $employee = $employees->get($empId);
+            if (!$employee) {
+                continue;
+            }
+
+            $empRanges = $projectRangesByEmployee[$empId] ?? [];
+            $empVehicle = $this->vehicleAssignments[$empId] ?? null;
+
+            $projectRows = [];
+            $seenProjects = [];
+            foreach ($empRanges as $range) {
+                $pid = (int) ($range['project_id'] ?? 0);
+                if (!$pid || in_array($pid, $seenProjects, true)) {
+                    continue;
+                }
+                $seenProjects[] = $pid;
+                $projectRows[] = [
+                    'project_name' => $projects->get($pid)?->name ?? ('Projekt #' . $pid),
+                    'start_date'   => $range['start_date'] ?? null,
+                    'end_date'     => $range['end_date'] ?? null,
+                ];
+            }
+
+            $vehicleRow = null;
+            if (is_array($empVehicle) && !empty($empVehicle['vehicle_id'])) {
+                $vid = (int) $empVehicle['vehicle_id'];
+                $vehicleRow = [
+                    'registration' => $vehicles->get($vid)?->registration_number ?? ('Pojazd #' . $vid),
+                    'position'     => $empVehicle['position'] ?? null,
+                    'start_date'   => $empVehicle['start_date'] ?? null,
+                    'end_date'     => $empVehicle['end_date'] ?? null,
+                ];
+            }
+
+            $housingRow = null;
+            $accRow = $this->accommodationAssignments[$empId] ?? null;
+            if (is_array($accRow) && !empty($accRow['accommodation_id'])) {
+                $aid = (int) $accRow['accommodation_id'];
+                $acc = Accommodation::find($aid);
+                if ($acc) {
+                    $housingRow = [
+                        'name'       => $acc->name,
+                        'address'    => $acc->address,
+                        'city'       => $acc->city,
+                        'start_date' => $accRow['start_date'] ?? null,
+                        'end_date'   => $accRow['end_date'] ?? null,
+                    ];
+                }
+            }
+
+            $result[] = [
+                'employee_id' => $empId,
+                'full_name'   => $employee->full_name,
+                'projects'    => $projectRows,
+                'housing'     => $housingRow,
+                'vehicle'     => $vehicleRow,
+            ];
+        }
+
+        return $result;
+    }
+
     public function getAvailableLocationsProperty()
     {
         return Location::orderBy('name')->get();
+    }
+
+    /**
+     * Kafelki przystanków dla komponentu <x-logistics.route-waypoints-plan> w trybie własnego samochodu.
+     * Obsługuje zarówno loc:ID (lokalizacje), jak i acc:ID (mieszkania) — konwertuje je do jednego formatu.
+     */
+    public function getOwnRouteTilesProperty(): array
+    {
+        $locIds = [];
+        $accIds = [];
+        foreach ($this->routeWaypoints as $key) {
+            $p = $this->parseWaypointKey((string) $key);
+            if ($p['type'] === 'loc' && $p['id'] > 0) {
+                $locIds[] = $p['id'];
+            } elseif ($p['type'] === 'acc' && $p['id'] > 0) {
+                $accIds[] = $p['id'];
+            }
+        }
+
+        $locations = $locIds
+            ? Location::whereIn('id', array_unique($locIds))->withCount('accommodations')->get()->keyBy('id')
+            : collect();
+        $accommodations = $accIds
+            ? Accommodation::whereIn('id', array_unique($accIds))->get()->keyBy('id')
+            : collect();
+
+        $n = count($this->routeWaypoints);
+        $tiles = [];
+
+        foreach ($this->routeWaypoints as $index => $key) {
+            $p = $this->parseWaypointKey((string) $key);
+
+            if ($p['type'] === 'loc') {
+                $loc = $locations->get($p['id']);
+                if (!$loc) {
+                    continue;
+                }
+                $typeLabel = null;
+                if ($loc->is_base || ($this->baseLocationId && (int) $loc->id === (int) $this->baseLocationId)) {
+                    $typeLabel = 'Baza';
+                } elseif (method_exists($loc, 'hasPurpose') && $loc->hasPurpose(LocationPurposeType::AIRPORT)) {
+                    $typeLabel = 'Lotnisko';
+                } elseif (method_exists($loc, 'hasPurpose') && $loc->hasPurpose(LocationPurposeType::STATION)) {
+                    $typeLabel = 'Dworzec';
+                } elseif ((int) ($loc->accommodations_count ?? 0) > 0) {
+                    $typeLabel = 'Dom';
+                } else {
+                    $projectNames = Project::where('location_id', $loc->id)
+                        ->where('status', ProjectStatus::ACTIVE)
+                        ->orderBy('name')
+                        ->pluck('name')
+                        ->unique()
+                        ->values();
+                    $typeLabel = $projectNames->isNotEmpty()
+                        ? ($projectNames->count() === 1 ? 'Projekt: ' . $projectNames->first() : 'Projekty: ' . $projectNames->join(', '))
+                        : 'Lokalizacja';
+                }
+                $tiles[] = [
+                    'index'        => $index,
+                    'key'          => $key,
+                    'id'           => (string) $p['id'],
+                    'type_label'   => $typeLabel,
+                    'name'         => $loc->name,
+                    'city'         => $loc->city ?? null,
+                    'address'      => $loc->address ?? null,
+                    'can_move_up'  => $index > 0,
+                    'can_move_down' => $index < $n - 1,
+                ];
+            } elseif ($p['type'] === 'acc') {
+                $acc = $accommodations->get($p['id']);
+                if (!$acc) {
+                    continue;
+                }
+                $employees = $this->getEmployeesForAccommodation($p['id']);
+                $empNames = $employees->pluck('full_name')->filter()->join(', ');
+                $typeLabel = 'Dom' . ($empNames ? ' — ' . $empNames : '');
+                // acc: waypoints use 'acc:ID' as the notes key to avoid collisions
+                $tiles[] = [
+                    'index'        => $index,
+                    'key'          => $key,
+                    'id'           => 'acc_' . $p['id'],
+                    'type_label'   => $typeLabel,
+                    'name'         => $acc->name,
+                    'city'         => $acc->city ?? null,
+                    'address'      => $acc->address ?? null,
+                    'can_move_up'  => $index > 0,
+                    'can_move_down' => $index < $n - 1,
+                ];
+            }
+        }
+
+        return $tiles;
+    }
+
+    /** Wszystkie lokalizacje do selekta "dodaj przystanek" w modalu trasy własnego samochodu. */
+    public function getAvailableOwnRouteLocationsProperty()
+    {
+        return Location::orderBy('name')->withCount('accommodations')->get();
     }
 
     public function getCurrencyCasesProperty(): array
@@ -2112,13 +2561,13 @@ class Step4RoutePlanning extends Component
         $leg = $leg ?? 'post';
 
         if ($leg === 'pre') {
-            $km = $this->preManualRouteDistanceKm;
+            $km = $this->normalizeNumericScalarForRoute($this->preManualRouteDistanceKm);
             if ($km === null || $km === '' || ! is_numeric($km) || (float) $km <= 0) {
                 $this->preRouteError = 'Podaj poprawną liczbę kilometrów dla odcinka na lotnisko.';
 
                 return;
             }
-            $minutes = $this->preManualRouteDurationMinutes;
+            $minutes = $this->normalizeNumericScalarForRoute($this->preManualRouteDurationMinutes);
             if ($minutes === null || $minutes === '' || ! is_numeric($minutes) || (float) $minutes <= 0) {
                 $this->preRouteError = 'Podaj czas przejazdu (min) dla odcinka na lotnisko.';
 
@@ -2139,14 +2588,14 @@ class Step4RoutePlanning extends Component
             return;
         }
 
-        $km = $this->manualRouteDistanceKm;
+        $km = $this->normalizeNumericScalarForRoute($this->manualRouteDistanceKm);
         if ($km === null || $km === '' || ! is_numeric($km) || (float) $km <= 0) {
             $this->routeError = 'Podaj poprawną liczbę kilometrów (większą od 0), aby ustawić dystans ręcznie.';
 
             return;
         }
 
-        $minutes = $this->manualRouteDurationMinutes;
+        $minutes = $this->normalizeNumericScalarForRoute($this->manualRouteDurationMinutes);
         if ($minutes === null || $minutes === '' || ! is_numeric($minutes) || (float) $minutes <= 0) {
             $this->routeError = 'Podaj szacowany czas przejazdu w minutach (większy od 0).';
 
@@ -2158,6 +2607,8 @@ class Step4RoutePlanning extends Component
 
         $this->isManualRouteDistance = true;
         $this->manualRouteHint = null;
+        $this->manualRouteDistanceKm = round((float) $km, 3);
+        $this->manualRouteDurationMinutes = max(1, (int) round((float) $minutes));
         $this->routeData = [
             'distance' => (float) $km,
             'duration' => $durationSeconds,
@@ -2173,19 +2624,345 @@ class Step4RoutePlanning extends Component
 
     protected function dispatchTransferConfig(): void
     {
+        $rd = is_array($this->routeData) ? $this->routeData : [];
         $this->dispatch('transfer-config-updated', [
             'vehicle_id' => $this->transferVehicleId,
             'driver_employee_id' => $this->transferDriverEmployeeId,
             'bonus_amount' => $this->transferDriverBonusAmount,
             'bonus_currency' => $this->transferDriverBonusCurrency,
             'pickup_location_id' => null,
-            'route_distance' => $this->routeData['distance'] ?? null,
-            'route_duration' => $this->routeData['duration'] ?? null,
+            'route_distance' => $rd['distance'] ?? null,
+            'route_duration' => $rd['duration'] ?? null,
             'route_waypoints' => $this->routeWaypoints,
             'location_stop_notes' => $this->getLocationStopNotesPayload(),
             'end_airport_location_id' => $this->sharedEndAirportLocationId,
             'route_distance_is_manual' => (bool) $this->isManualRouteDistance,
         ]);
+    }
+
+
+    // ─── Own transport modal methods ──────────────────────────────────────────
+
+    public function openOwnTransferModal(): void
+    {
+        if ($this->isPublicTransport) {
+            return;
+        }
+        $this->pendingOwnDriverEmployeeId = $this->transferDriverEmployeeId ? (int) $this->transferDriverEmployeeId : null;
+        $this->pendingOwnBonusAmount = $this->transferDriverBonusAmount !== null ? (float) $this->transferDriverBonusAmount : null;
+        $this->pendingOwnBonusCurrency = $this->transferDriverBonusCurrency ?: 'PLN';
+
+        $candidates = $this->ownDriverCandidates;
+        if ($this->pendingOwnDriverEmployeeId === null && $candidates->count() === 1) {
+            $this->pendingOwnDriverEmployeeId = (int) $candidates->first()->id;
+        }
+        if ($this->pendingOwnDriverEmployeeId === null) {
+            $seat0 = $this->vehicleSeats[0] ?? null;
+            if (is_array($seat0) && empty($seat0['external_driver'])) {
+                $sid = (int) ($seat0['employee_id'] ?? 0);
+                if ($sid > 0 && $candidates->contains(fn (Employee $e) => (int) $e->id === $sid)) {
+                    $this->pendingOwnDriverEmployeeId = $sid;
+                }
+            }
+        }
+
+        $this->showOwnTransferModal = true;
+    }
+
+    public function closeOwnTransferModal(): void
+    {
+        $this->showOwnTransferModal = false;
+    }
+
+    public function confirmOwnTransferModal(): void
+    {
+        $this->transferDriverEmployeeId = $this->pendingOwnDriverEmployeeId;
+        $this->transferDriverBonusAmount = $this->pendingOwnBonusAmount;
+        $this->transferDriverBonusCurrency = $this->pendingOwnBonusCurrency ?: 'PLN';
+        $this->showOwnTransferModal = false;
+        $this->dispatchTransferConfig();
+    }
+
+    public function openOwnRouteModal(): void
+    {
+        if ($this->isPublicTransport) {
+            return;
+        }
+        if (! $this->ownRouteModalPrefillDone) {
+            $this->prepareOwnRouteModalState();
+            $this->ownRouteModalPrefillDone = true;
+        }
+        $this->showOwnRouteModal = true;
+    }
+
+    public function closeOwnRouteModal(): void
+    {
+        $this->showOwnRouteModal = false;
+    }
+
+    /**
+     * Przed otwarciem modalu: acc:→loc:, dołączenie brakującej bazy / domów / projektów, wstępne notatki.
+     */
+    private function prepareOwnRouteModalState(): void
+    {
+        $this->normalizeOwnRouteWaypointsAccToLocations();
+        $notes = $this->locationStopNotes;
+
+        $baseKey = $this->baseLocationId ? 'loc:' . $this->baseLocationId : null;
+        $canonicalTail = $this->buildCanonicalOwnRouteTailWaypointKeys();
+
+        $merged = [];
+        $seen = [];
+
+        $push = function (string $key) use (&$merged, &$seen): void {
+            if ($key === '' || isset($seen[$key])) {
+                return;
+            }
+            $seen[$key] = true;
+            $merged[] = $key;
+        };
+
+        // 1. Baza zawsze na początku (jeśli jest)
+        if ($baseKey) {
+            $push($baseKey);
+            if (trim((string) ($notes[(string) $this->baseLocationId] ?? '')) === '') {
+                $notes[(string) $this->baseLocationId] = 'Wyjazd z bazy';
+            }
+        }
+
+        // 2. Zachowaj kolejność użytkownika (bez bazy — dodamy ją na górze)
+        foreach ($this->routeWaypoints as $key) {
+            $k = (string) $key;
+            if ($baseKey && $k === $baseKey) {
+                continue;
+            }
+            $push($k);
+        }
+
+        // 3. Dołącz brakujące domy i projekty z kontekstu wyjazdu
+        foreach ($canonicalTail as $key) {
+            if ($baseKey && $key === $baseKey) {
+                continue;
+            }
+            $push($key);
+        }
+
+        $this->routeWaypoints = $merged;
+        $this->prefillOwnRouteNotesForLocations($notes);
+        $this->locationStopNotes = $notes;
+        $this->pruneLocationStopNotes();
+        $this->rebuildRouteSegmentsFromUiState();
+        $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
+        $this->dispatchTransferConfig();
+    }
+
+    /** Kolejność „domy → projekty” (unikalne loc:), bez bazy — ta jest wstawiana osobno. */
+    private function buildCanonicalOwnRouteTailWaypointKeys(): array
+    {
+        $out = [];
+        $have = [];
+
+        $add = function (string $key) use (&$out, &$have): void {
+            if ($key === '' || isset($have[$key])) {
+                return;
+            }
+            $have[$key] = true;
+            $out[] = $key;
+        };
+
+        // Mieszkania: accommodationAssignments jest [employee_id => row z accommodation_id]
+        $accIds = [];
+        foreach ($this->accommodationAssignments as $row) {
+            if (is_array($row) && ! empty($row['accommodation_id'])) {
+                $accIds[] = (int) $row['accommodation_id'];
+            }
+        }
+        $accIds = array_values(array_unique($accIds));
+
+        if ($accIds !== []) {
+            $byAcc = Accommodation::whereIn('id', $accIds)
+                ->whereNotNull('location_id')
+                ->pluck('location_id', 'id');
+            foreach ($accIds as $accId) {
+                $locId = (int) ($byAcc->get($accId) ?? 0);
+                if ($locId > 0) {
+                    $add('loc:' . $locId);
+                }
+            }
+        }
+
+        $projectIds = collect($this->assignmentRanges)
+            ->filter(fn ($r) => is_array($r) && ! empty($r['project_id']))
+            ->pluck('project_id')
+            ->map('intval')
+            ->unique()
+            ->filter()
+            ->toArray();
+
+        if ($projectIds !== []) {
+            foreach (Project::whereIn('id', $projectIds)->whereNotNull('location_id')->get(['id', 'name', 'location_id']) as $project) {
+                $locId = (int) $project->location_id;
+                if ($locId > 0) {
+                    $add('loc:' . $locId);
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Zamienia przystanki acc:ID na loc:location_id (jedna notatka pod lokalizacją), żeby pola notatek działały jak w transferach.
+     */
+    private function normalizeOwnRouteWaypointsAccToLocations(): void
+    {
+        $notes = $this->locationStopNotes;
+        $accIds = [];
+        foreach ($this->routeWaypoints as $key) {
+            $p = $this->parseWaypointKey((string) $key);
+            if ($p['type'] === 'acc' && $p['id'] > 0) {
+                $accIds[] = $p['id'];
+            }
+        }
+        if ($accIds === []) {
+            return;
+        }
+        $accs = Accommodation::whereIn('id', array_unique($accIds))->get()->keyBy('id');
+        $newWp = [];
+        foreach ($this->routeWaypoints as $key) {
+            $p = $this->parseWaypointKey((string) $key);
+            if ($p['type'] !== 'acc' || $p['id'] <= 0) {
+                $newWp[] = (string) $key;
+
+                continue;
+            }
+            $acc = $accs->get($p['id']);
+            $locId = (int) ($acc?->location_id ?? 0);
+            if ($locId <= 0) {
+                $newWp[] = (string) $key;
+
+                continue;
+            }
+            $nk = 'loc:' . $locId;
+            $oldNoteKey = 'acc_' . $p['id'];
+            $oldNote = trim((string) ($notes[$oldNoteKey] ?? ''));
+            if ($oldNote !== '' && trim((string) ($notes[(string) $locId] ?? '')) === '') {
+                $notes[(string) $locId] = $oldNote;
+            }
+            unset($notes[$oldNoteKey]);
+            $newWp[] = $nk;
+        }
+        // Usuń kolejne duplikaty loc: zachowując kolejność
+        $dedup = [];
+        $seen = [];
+        foreach ($newWp as $k) {
+            if (isset($seen[$k])) {
+                continue;
+            }
+            $seen[$k] = true;
+            $dedup[] = $k;
+        }
+        $this->routeWaypoints = $dedup;
+        $this->locationStopNotes = $notes;
+    }
+
+    /** Wstępne notatki przy lokalizacjach (dom / projekt), bez nadpisywania ręcznych wpisów. */
+    private function prefillOwnRouteNotesForLocations(array &$notes): void
+    {
+        // Baza
+        if ($this->baseLocationId && trim((string) ($notes[(string) $this->baseLocationId] ?? '')) === '') {
+            $notes[(string) $this->baseLocationId] = 'Wyjazd z bazy';
+        }
+
+        // Domy — „Docelowy dom dla …”
+        foreach ($this->accommodationAssignments as $employeeId => $row) {
+            if (! is_array($row) || empty($row['accommodation_id'])) {
+                continue;
+            }
+            $accId = (int) $row['accommodation_id'];
+            $acc = Accommodation::find($accId);
+            $locId = (int) ($acc?->location_id ?? 0);
+            if ($locId <= 0) {
+                continue;
+            }
+            $emp = Employee::find((int) $employeeId);
+            $name = $emp?->full_name ?? ('#' . $employeeId);
+            $accName = $acc?->name ?? 'mieszkanie';
+            $line = 'Docelowy dom (' . $accName . ') dla: ' . $name;
+            $key = (string) $locId;
+            $cur = trim((string) ($notes[$key] ?? ''));
+            if ($cur === '') {
+                $notes[$key] = $line;
+            } elseif (stripos($cur, $name) === false) {
+                $notes[$key] = $cur . "\n" . $line;
+            }
+        }
+
+        // Projekty
+        foreach (Project::whereIn('id', collect($this->assignmentRanges)
+            ->filter(fn ($r) => is_array($r) && ! empty($r['project_id']))
+            ->pluck('project_id')->map('intval')->unique()->filter()->toArray())
+            ->whereNotNull('location_id')
+            ->get(['id', 'name', 'location_id']) as $project) {
+            $locId = (int) $project->location_id;
+            if ($locId <= 0) {
+                continue;
+            }
+            $empNames = collect($this->assignmentRanges)
+                ->filter(fn ($r) => is_array($r) && (int) ($r['project_id'] ?? 0) === (int) $project->id && ! empty($r['employee_id']))
+                ->pluck('employee_id')
+                ->map('intval')
+                ->unique()
+                ->map(fn ($eid) => Employee::find($eid)?->full_name)
+                ->filter()
+                ->join(', ');
+            $addition = $empNames !== ''
+                ? 'Projekt „' . $project->name . '": ' . $empNames
+                : 'Projekt „' . $project->name . '"';
+            $key = (string) $locId;
+            $cur = trim((string) ($notes[$key] ?? ''));
+            if ($cur === '') {
+                $notes[$key] = $addition;
+            } elseif (stripos($cur, $project->name) === false) {
+                $notes[$key] = $cur . "\n" . $addition;
+            }
+        }
+    }
+
+    // ─── Aliases for <x-logistics.route-waypoints-plan> ────────────────────────
+
+    /** Dodaje przystanek z modalu trasy własnego samochodu (używa pendingWaypointLocationId). */
+    public function addWaypoint(): void
+    {
+        $id = (int) $this->pendingWaypointLocationId;
+        if ($id <= 0) {
+            return;
+        }
+        $key = 'loc:' . $id;
+        if (in_array($key, $this->routeWaypoints, true)) {
+            $this->pendingWaypointLocationId = null;
+
+            return;
+        }
+        $loc = Location::find($id);
+        if ($loc && !$loc->hasCoordinates()) {
+            $this->geocodingService->geocodeLocation($loc);
+        }
+        $this->routeWaypoints[] = $key;
+        $this->routeWaypoints = array_values($this->routeWaypoints);
+        $this->pendingWaypointLocationId = null;
+        $this->locationStopNotes[(string) $id] ??= '';
+        $this->invalidateRouteMetricsAndSyncToParent();
+    }
+
+    public function moveWaypointUp(int $index): void
+    {
+        $this->moveUp($index);
+    }
+
+    public function moveWaypointDown(int $index): void
+    {
+        $this->moveDown($index);
     }
 
     public function planRoute(): void
@@ -3510,6 +4287,14 @@ class Step4RoutePlanning extends Component
             'effectiveTransferFromAirportLegKind' => $this->effectiveTransferFromAirportLegKind,
             'selectedEmployeesForTickets' => $this->selectedEmployeesForTickets,
             'publicTransportHubKind' => $this->publicTransportHubKind,
+            'ownVehicle' => $this->ownVehicle,
+            'ownDriverEmployee' => $this->ownDriverEmployee,
+            'ownTransferEmployees' => $this->ownTransferEmployees,
+            'ownDriverCandidates' => $this->ownDriverCandidates,
+            'ownDriverPickerListsAllEmployees' => $this->ownDriverPickerListsAllEmployees,
+            'personAssignments' => $this->personAssignments,
+            'ownRouteTiles' => $this->ownRouteTiles,
+            'availableOwnRouteLocations' => $this->availableOwnRouteLocations,
         ]);
     }
 }

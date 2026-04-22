@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\DeparturePlannerService;
+use App\Services\LocationTrackingService;
 use Carbon\Carbon;
 use Livewire\Attributes\Reactive;
 use Livewire\Component;
@@ -635,27 +636,8 @@ class Step3VehicleAssignments extends Component
 
     public function loadVehicles()
     {
-        // Show only vehicles that will be outside base on arrival date:
-        // 1. The departure vehicle itself (if set)
-        // 2. Vehicles with existing VehicleAssignments active on the arrival date
-        //    (i.e., already deployed to worksite from previous operations)
-        $outsideBaseIds = VehicleAssignment::where('start_date', '<=', $this->arrivalDate)
-            ->where(function ($q) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', $this->arrivalDate);
-            })
-            ->distinct()
-            ->pluck('vehicle_id')
-            ->toArray();
-
-        // Always include the departure vehicle
-        if ($this->vehicleId) {
-            $outsideBaseIds[] = (int) $this->vehicleId;
-        }
-
-        $outsideBaseIds = array_unique($outsideBaseIds);
-
-        if (empty($outsideBaseIds)) {
-            // Fallback: show all company vehicles if no filter matches
+        // Kreator transferu (tablica): pełna lista — inna logika floty.
+        if ($this->forTransferBoard || $this->forTransfer) {
             $this->vehicles = Vehicle::where('type', 'company_vehicle')
                 ->orderBy('registration_number')
                 ->get()
@@ -664,8 +646,37 @@ class Step3VehicleAssignments extends Component
             return;
         }
 
+        // Wyjazdy (create-v2): tylko pojazdy już poza bazą w dniu przyjazdu (projekt–dom)
+        // oraz pojazd z nagłówka wyjazdu (którym przyjeżdżają).
+        $arrivalDate = $this->arrivalDate;
+        $tracking = app(LocationTrackingService::class);
+
+        $eligibleIds = Vehicle::where('type', 'company_vehicle')
+            ->orderBy('registration_number')
+            ->get()
+            ->filter(function (Vehicle $vehicle) use ($arrivalDate, $tracking) {
+                $status = $tracking->getVehicleLocationStatus($vehicle, $arrivalDate);
+
+                return ! $status['in_transit'] && $status['outside_base'];
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (! empty($this->vehicleId)) {
+            $eligibleIds[] = (int) $this->vehicleId;
+        }
+
+        $eligibleIds = array_values(array_unique(array_filter($eligibleIds)));
+
+        if ($eligibleIds === []) {
+            $this->vehicles = [];
+
+            return;
+        }
+
         $this->vehicles = Vehicle::where('type', 'company_vehicle')
-            ->whereIn('id', $outsideBaseIds)
+            ->whereIn('id', $eligibleIds)
             ->orderBy('registration_number')
             ->get()
             ->toArray();

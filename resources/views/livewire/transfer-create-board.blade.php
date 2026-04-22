@@ -90,16 +90,16 @@
         .transfer-kanban-card__hint i {
             color: #94a3b8;
         }
-        /* „Obecna rola” — jasny tekst na stonowanym tle (bez ciemny na ciemnym) */
-        .transfer-kanban-badge-role {
-            display: inline-block;
+        /* Obecna rola — jeden wiersz z etykietą, bez badge (żeby nie mylić z „bazą danych”) */
+        .transfer-kanban-current-role {
+            font-size: 0.62rem;
+            color: #94a3b8;
+            line-height: 1.35;
+        }
+        .transfer-kanban-current-role strong {
             font-size: 0.68rem;
             font-weight: 600;
-            padding: 0.2rem 0.55rem;
-            border-radius: 6px;
-            color: #f1f5f9 !important;
-            background: rgba(71, 85, 105, 0.45) !important;
-            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: #e2e8f0;
         }
         /* Modal wyboru roli: badge „X brak” — bez ostrych żółci */
         .transfer-gap-pill {
@@ -192,7 +192,14 @@
                     @endif
                 </span>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary border-secondary" style="color: #e2e8f0;" wire:click="finishWizardBackToBoard">
+            <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary border-secondary"
+                style="color: #e2e8f0;"
+                wire:click="finishWizardBackToBoard"
+                wire:loading.attr="disabled"
+                wire:target="finishWizardBackToBoard"
+            >
                 <i class="bi bi-kanban me-1"></i> Wróć do tablicy
             </button>
         </div>
@@ -217,7 +224,7 @@
             'firstWire' => 'departureDate',
             'firstLabel' => 'Data transferu',
             'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
-            'vehiclePoolHint' => 'departure',
+            'vehiclePoolHint' => $mode === 'assignment' ? 'transfer_assignment' : 'transfer_transport',
         ]"
         :end-date="$endDate"
         :departure-date="$departureDate"
@@ -242,6 +249,22 @@
         attachment-flat-binding-key="ticketAttachmentUploads"
         :flat-attachment-uploads="$ticketAttachmentUploads"
     />
+
+    @if($transportMode === 'own' && $vehicleId && $this->selectedVehicleActiveEventInfo)
+        @php $vehEventInfo = $this->selectedVehicleActiveEventInfo; @endphp
+        <div class="alert py-2 px-3 small mb-4 d-flex align-items-start gap-2"
+             style="background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.35); color: #fcd34d; border-radius: 0.65rem;">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+            <div>
+                <strong>Pojazd zajęty w tym czasie:</strong>
+                {{ $vehEventInfo['type_label'] }} #{{ $vehEventInfo['event_id'] }}
+                ({{ $vehEventInfo['status_label'] }})
+                @if($vehEventInfo['from'] || $vehEventInfo['to'])
+                    — {{ $vehEventInfo['from'] ?? '?' }} → {{ $vehEventInfo['to'] ?? '?' }}
+                @endif
+            </div>
+        </div>
+    @endif
 
     @if($transportMode === 'own')
         <x-logistics.route-card
@@ -311,7 +334,7 @@
     @else
         <p class="small text-muted mb-3">
             Kolumny = projekty <strong>aktywne</strong> w systemie i <strong>trwające</strong> w pierwszym dniu zakresu (data transferu).
-            Puste projekty też są widoczne — możesz na nie przeciągnąć osoby. Szkic zapiszesz w kolejnych krokach.
+            Puste projekty też są widoczne — możesz na nie przeciągnąć osoby. Szkic doprecyzowujesz w kolejnych krokach; do bazy zapisujesz przyciskiem <strong>Zapisz transfer w systemie</strong> (na dole, gdy masz co najmniej jeden wiersz szkicu).
         </p>
 
         <div wire:loading.delay class="alert alert-info py-2 small mb-3">
@@ -411,17 +434,74 @@
                                                     </span>
                                                 </div>
                                             </div>
+                                            @php
+                                                $planExtras = $this->draftKanbanPlanExtras[$assignment->id] ?? null;
+                                            @endphp
+                                            @if($planExtras && ! empty($planExtras['project_name']))
+                                                <div class="transfer-kanban-card__row">
+                                                    <i class="bi bi-kanban" style="color: #a78bfa;"></i>
+                                                    <div>
+                                                        <span class="text-muted small d-block" style="font-size: 0.62rem;">Docelowy projekt</span>
+                                                        <span class="transfer-kanban-card__role">{{ $planExtras['project_name'] }}</span>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                            @if($planExtras && ! empty($planExtras['accommodation_name']))
+                                                <div class="transfer-kanban-card__row">
+                                                    <i class="bi bi-house" style="color: #34d399;"></i>
+                                                    <div>
+                                                        <span class="text-muted small d-block" style="font-size: 0.62rem;">Mieszkanie po transferze</span>
+                                                        <span class="transfer-kanban-card__role">{{ $planExtras['accommodation_name'] }}</span>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                            @if($planExtras && ! empty($planExtras['vehicle_label']))
+                                                <div class="transfer-kanban-card__row">
+                                                    <i class="bi bi-car-front" style="color: #38bdf8;"></i>
+                                                    <div>
+                                                        <span class="text-muted small d-block" style="font-size: 0.62rem;">Pojazd po transferze</span>
+                                                        <span class="transfer-kanban-card__role">{{ $planExtras['vehicle_label'] }}</span>
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </div>
                                         <div class="transfer-kanban-card__hint">
                                             <i class="bi bi-info-circle"></i>
-                                            <span>Nie zapisano w bazie — podgląd planowanego przypisania.</span>
+                                            <span>Jeszcze nie zapisano w systemie — podgląd planowanego przypisania.</span>
                                         </div>
                                     @else
                                         @if($assignment->role)
-                                            <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
-                                                <span style="font-size: 0.62rem; color: #94a3b8;">Obecna rola</span>
-                                                <span class="transfer-kanban-badge-role">{{ $assignment->role->name }}</span>
+                                            <div class="mt-1 transfer-kanban-current-role">
+                                                Obecna rola: <strong>{{ $assignment->role->name }}</strong>
                                             </div>
+                                        @endif
+                                        @if($mode === 'assignment')
+                                            @php
+                                                $liveLog = $this->kanbanLiveLogisticsByAssignmentId[$assignment->id] ?? null;
+                                            @endphp
+                                            @if($liveLog && (! empty($liveLog['accommodation_name']) || ! empty($liveLog['vehicle_label'])))
+                                                <div class="transfer-kanban-card__planned mt-2 pt-2" style="border-top: 1px dashed rgba(148, 163, 184, 0.28);">
+                                                    <div class="transfer-kanban-card__planned-title">Aktualnie w ({{ \Carbon\Carbon::parse($transferDate)->format('d.m.Y') }})</div>
+                                                    @if(! empty($liveLog['accommodation_name']))
+                                                        <div class="transfer-kanban-card__row">
+                                                            <i class="bi bi-house" style="color: #34d399;"></i>
+                                                            <div>
+                                                                <span class="text-muted small d-block" style="font-size: 0.62rem;">Mieszkanie</span>
+                                                                <span class="transfer-kanban-card__role">{{ $liveLog['accommodation_name'] }}</span>
+                                                            </div>
+                                                        </div>
+                                                    @endif
+                                                    @if(! empty($liveLog['vehicle_label']))
+                                                        <div class="transfer-kanban-card__row">
+                                                            <i class="bi bi-car-front" style="color: #38bdf8;"></i>
+                                                            <div>
+                                                                <span class="text-muted small d-block" style="font-size: 0.62rem;">Pojazd</span>
+                                                                <span class="transfer-kanban-card__role">{{ $liveLog['vehicle_label'] }}</span>
+                                                            </div>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endif
                                         @endif
                                         @if($isDraft)
                                             <div class="transfer-kanban-card__hint mb-0 mt-2" style="border-top: none; padding-top: 0;">
@@ -455,6 +535,25 @@
                     <x-ui.button variant="primary" type="button" wire:click="proceedFromBoard">Dalej</x-ui.button>
                 @endif
             </div>
+            @if(count($draftProjectByAssignment) > 0)
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                    <x-ui.button
+                        variant="primary"
+                        type="button"
+                        wire:click="saveReassignmentTransferToSystem"
+                        wire:loading.attr="disabled"
+                        wire:target="saveReassignmentTransferToSystem"
+                    >
+                        <span wire:loading.remove wire:target="saveReassignmentTransferToSystem">
+                            <i class="bi bi-floppy me-1"></i> Zapisz transfer w systemie
+                        </span>
+                        <span wire:loading wire:target="saveReassignmentTransferToSystem">Zapisywanie…</span>
+                    </x-ui.button>
+                    <span class="small" style="color: #94a3b8;">
+                        Zatwierdza zdarzenie i przypisania w bazie, gdy szkic i sekcja „Szczegóły transferu” są kompletne.
+                    </span>
+                </div>
+            @endif
         @endif
     @endif
     @endif
@@ -463,8 +562,8 @@
         <x-ui.card label="Zakwaterowanie i pojazd po transferze">
             <div class="rounded-3 border px-3 py-2 mb-4 small" style="border-color: rgba(148, 163, 184, 0.35) !important; background: rgba(59, 130, 246, 0.06); color: #cbd5e1;">
                 <i class="bi bi-info-circle me-1 text-info"></i>
-                <strong>Przypisz nowe:</strong> przy zapisie transferu dotychczasowe przypisania do domu lub auta zostaną <strong>zakończone w dniu transferu</strong>, a w bazie powstaną nowe wpisy z tego szkicu.
-                <span class="d-block mt-1"><strong>Nie zmienia się:</strong> przypisania do mieszkania lub pojazdu <strong>nie są przycinane</strong> — zostają tak jak w bazie (zmienia się wyłącznie projekt wg szkicu z tablicy).</span>
+                <strong>Przypisz nowe:</strong> przy zapisie transferu dotychczasowe przypisania do domu lub auta zostaną <strong>zakończone w dniu transferu</strong>, a w systemie powstaną nowe wpisy z tego szkicu.
+                <span class="d-block mt-1"><strong>Nie zmienia się:</strong> przypisania do mieszkania lub pojazdu <strong>nie są przycinane</strong> — zostają bez zmian w systemie (zmienia się wyłącznie projekt wg szkicu z tablicy).</span>
             </div>
 
             <div class="rounded-3 border p-3 mb-3" style="border-color: var(--glass-border) !important; background: rgba(0,0,0,0.12);">
@@ -612,7 +711,7 @@
             @else
                 <p class="small mb-4" style="color: #cbd5e1;">
                     <i class="bi bi-house me-1 text-success"></i>
-                    <strong>Nie zmienia się</strong> — przy zapisie transferu obecne przypisania mieszkaniowe w bazie <strong>nie będą skracane</strong>.
+                    <strong>Nie zmienia się</strong> — przy zapisie transferu obecne przypisania mieszkaniowe w systemie <strong>nie będą skracane</strong>.
                 </p>
             @endif
 
@@ -647,7 +746,7 @@
             @else
                 <p class="small mb-4" style="color: #cbd5e1;">
                     <i class="bi bi-car-front me-1 text-success"></i>
-                    <strong>Nie zmienia się</strong> — przy zapisie transferu obecne przypisania pojazdu w bazie <strong>nie będą skracane</strong>.
+                    <strong>Nie zmienia się</strong> — przy zapisie transferu obecne przypisania pojazdu w systemie <strong>nie będą skracane</strong>.
                 </p>
             @endif
 
@@ -685,28 +784,20 @@
             @endif
 
             <div class="rounded-3 border px-3 py-2 mb-4 small" style="border-color: rgba(148, 163, 184, 0.25) !important; color: #94a3b8;">
-                Przycisk <strong>Zapisz</strong> utworzy zdarzenie transferu w bazie i zaktualizuje przypisania zgodnie z tym podsumowaniem.
+                Poniższy przycisk tylko <strong>zamyka podsumowanie</strong> i wraca do tablicy — uaktualnia zakresy przypisań w kreatorze, <strong>nie zapisuje nic w systemie</strong>.
+                Zapis w bazie: na tablicy użyj <strong>Zapisz transfer w systemie</strong> (gdy szkic i transport są gotowe), albo wybierz tryb <strong>Transport</strong> i zapis tam.
             </div>
 
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <x-ui.button
                     variant="primary"
                     type="button"
-                    wire:click="saveTransferFromSummary"
-                    wire:loading.attr="disabled"
-                    wire:target="saveTransferFromSummary"
-                >
-                    <span wire:loading.remove wire:target="saveTransferFromSummary">Zapisz</span>
-                    <span wire:loading wire:target="saveTransferFromSummary">Zapisywanie…</span>
-                </x-ui.button>
-                <x-ui.button
-                    variant="ghost"
-                    type="button"
                     wire:click="finishWizardBackToBoard"
                     wire:loading.attr="disabled"
-                    wire:target="saveTransferFromSummary"
+                    wire:target="finishWizardBackToBoard"
                 >
-                    Wróć do tablicy bez zapisu
+                    <span wire:loading.remove wire:target="finishWizardBackToBoard">Zamknij podsumowanie i wróć do tablicy</span>
+                    <span wire:loading wire:target="finishWizardBackToBoard">Zamykanie…</span>
                 </x-ui.button>
             </div>
         </x-ui.card>

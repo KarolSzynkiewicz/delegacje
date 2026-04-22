@@ -140,8 +140,8 @@
                     @foreach($this->filteredAccommodations as $accommodation)
                         <div class="col-md-4">
                             <div class="accommodation-item p-3 border rounded h-100" style="background: rgba(255,255,255,0.03);">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <div>
+                                <div class="mb-2">
+                                    <div class="w-100 min-w-0 overflow-hidden">
                                         <span class="fw-semibold">{{ $accommodation['name'] }}</span>
                                         @php
                                             $projects = $this->getAccommodationProjects($accommodation['id']);
@@ -151,9 +151,10 @@
                                                 <div class="text-muted mb-1" style="font-size: 0.72rem;">
                                                     <i class="bi bi-briefcase me-1"></i>Projekty mieszkańców ({{ $this->arrivalDate->format('d.m.Y') }}):
                                                 </div>
-                                                <div class="d-flex flex-wrap gap-1">
+                                                <div class="d-flex flex-column gap-1 w-100">
                                                     @foreach($projects as $project)
-                                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">
+                                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 text-truncate d-block w-100 max-w-100"
+                                                              title="{{ $project['name'] }}">
                                                             {{ $project['name'] }}
                                                         </span>
                                                     @endforeach

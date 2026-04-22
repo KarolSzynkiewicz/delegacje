@@ -160,8 +160,9 @@
                                         @endif
                                     </div>
                                 @endif
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <div>
+                                {{-- Jak step 2: w-100 + min-w-0 + overflow-hidden, żeby badge z text-truncate nie wychodził poza kartę --}}
+                                <div class="mb-2">
+                                    <div class="w-100 min-w-0 overflow-hidden">
                                         <span class="fw-semibold">{{ $vehicle['registration_number'] }}</span>
                                         @if($vehicle['brand'] || $vehicle['model'])
                                             <div class="small text-muted">
@@ -170,7 +171,7 @@
                                         @endif
                                         @if($vehicle['capacity'])
                                             <div class="small text-muted">
-                                                Zajęte: {{ $occupancy['occupied'] }}/{{ $occupancy['capacity'] }} 
+                                                Zajęte: {{ $occupancy['occupied'] }}/{{ $occupancy['capacity'] }}
                                                 @if($occupancy['available'] > 0)
                                                     <span class="text-success">({{ $occupancy['available'] }} wolnych)</span>
                                                 @else
@@ -178,15 +179,16 @@
                                                 @endif
                                             </div>
                                         @endif
-                                        
+
                                         @if(!empty($projects))
-                                            <div class="small mt-2">
-                                                <div class="text-muted mb-1">
-                                                    <i class="bi bi-briefcase"></i> Projekty:
+                                            <div class="small mt-1 mb-2">
+                                                <div class="text-muted mb-1" style="font-size: 0.72rem;">
+                                                    <i class="bi bi-briefcase me-1"></i>Projekty:
                                                 </div>
-                                                <div class="d-flex flex-wrap gap-1">
+                                                <div class="d-flex flex-column gap-1 w-100">
                                                     @foreach($projects as $project)
-                                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">
+                                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 text-truncate d-block w-100 max-w-100"
+                                                              title="{{ $project['name'] }}">
                                                             {{ $project['name'] }}
                                                         </span>
                                                     @endforeach

@@ -22,10 +22,13 @@
     'showStopBadge' => false,
     'stopBadge' => '',
     'showReorder' => true,
+    /** Unikalny identyfikator wiersza (np. token trasy loc:5) — stabilny przy zmianie kolejności; inaczej morph Livewire psuje modale. */
+    'stableRowKey' => null,
 ])
 
 @php
     $locIdStr = (string) $locId;
+    $rowWireKey = $stableRowKey ?? ($wireKeyPrefix.'-'.$locIdStr.'-'.(int) $routeIndex);
 @endphp
 
 @once('logistics-rwp-card-styles')
@@ -150,7 +153,7 @@
 @endonce
 
 <div class="logistics-rwp-stop"
-     wire:key="{{ $wireKeyPrefix }}-{{ $locIdStr }}-{{ (int) $routeIndex }}">
+     wire:key="{{ $rowWireKey }}">
     <div class="logistics-rwp-stop-row">
         <div class="logistics-rwp-stop-main">
             <div class="d-flex align-items-start gap-2">

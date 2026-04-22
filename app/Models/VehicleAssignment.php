@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use App\Traits\HasDateRange;
 use App\Models\Employee;
+use App\Enums\LogisticsEventStatus;
 use App\Enums\VehiclePosition;
 use App\Enums\AssignmentStatus;
 use Carbon\Carbon;
@@ -66,6 +67,20 @@ class VehicleAssignment extends Model
     public function logisticsEvent(): BelongsTo
     {
         return $this->belongsTo(LogisticsEvent::class);
+    }
+
+    /**
+     * Pomija przypisania powiązane wyłącznie z anulowanym zdarzeniem logistycznym (np. wyjazd unieważniony w bazie).
+     * Bez {@see logistics_event_id} — traktujemy jak dotychczas (kompatybilność wsteczna).
+     */
+    public function scopeExcludingCancelledLogistics(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereNull($q->getModel()->getTable().'.logistics_event_id')
+                ->orWhereHas('logisticsEvent', function (Builder $le) {
+                    $le->where('status', '!=', LogisticsEventStatus::CANCELLED);
+                });
+        });
     }
 
     public function getStatusAttribute($value): AssignmentStatus

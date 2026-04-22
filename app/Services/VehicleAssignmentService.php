@@ -2,12 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\VehiclePosition;
+use App\Models\Employee;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
-use App\Models\Employee;
-use App\Enums\VehiclePosition;
-use App\Services\DateRangeService;
-use App\Services\LogisticsEventService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -16,6 +14,7 @@ class VehicleAssignmentService
     public function __construct(
         protected VehicleValidationService $vehicleValidationService
     ) {}
+
     /**
      * Create a vehicle assignment with availability validation.
      * Multiple people can be assigned to the same vehicle, but only one driver per period.
@@ -33,13 +32,17 @@ class VehicleAssignmentService
     ): VehicleAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
-        // Use centralized validation service
+        // Wyklucz ten sam event logistyczny z kolizji „pojazd w wyjeździe” — inaczej transfer
+        // z przypisanym autem (has_reassignment) blokuje tworzenie VehicleAssignment powiązanych z tym eventem.
         $this->vehicleValidationService->validateForProjectAssignmentOrFail(
             $vehicle,
             $employee,
             $position,
             $startDate,
-            $endDate
+            $endDate,
+            null,
+            null,
+            $logisticsEventId
         );
 
         return VehicleAssignment::create([
@@ -69,14 +72,16 @@ class VehicleAssignmentService
     ): VehicleAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
-        // Use centralized validation service (exclude current assignment)
+        // Wyklucz bieżący wpis oraz event logistyczny, który go utworzył (np. ten sam transfer).
         $this->vehicleValidationService->validateForProjectAssignmentOrFail(
             $vehicle,
             $assignment->employee,
             $position,
             $startDate,
             $endDate,
-            $assignment->id
+            $assignment->id,
+            null,
+            $assignment->logistics_event_id
         );
 
         $assignment->update([
@@ -90,5 +95,4 @@ class VehicleAssignmentService
 
         return $assignment;
     }
-
 }

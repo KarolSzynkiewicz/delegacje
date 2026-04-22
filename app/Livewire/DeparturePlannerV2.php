@@ -16,6 +16,7 @@ use Livewire\WithFileUploads;
 class DeparturePlannerV2 extends Component
 {
     use Concerns\InteractsWithLogisticsTransportMode;
+    use Concerns\ManagesVehicleSeats;
     use Concerns\ValidatesPublicTransportTicketUploads;
     use WithFileUploads;
 
@@ -324,18 +325,15 @@ class DeparturePlannerV2 extends Component
 
         // Restore driver if still part of the trip, otherwise default to external
         $driverIsEmployee = $previousDriverId && in_array($previousDriverId, $selectedIds);
-        $this->vehicleSeats[0] = [
-            'employee_id' => $driverIsEmployee ? $previousDriverId : null,
-            'position' => 'driver',
-            'external_driver' => ! $driverIsEmployee,
-        ];
+        $this->vehicleSeats[0] = $this->buildSeatRow(
+            0,
+            $driverIsEmployee ? $previousDriverId : null,
+            'driver',
+            ! $driverIsEmployee
+        );
 
         for ($i = 1; $i < $capacity; $i++) {
-            $this->vehicleSeats[$i] = [
-                'employee_id' => null,
-                'position' => 'passenger',
-                'external_driver' => false,
-            ];
+            $this->vehicleSeats[$i] = $this->buildSeatRow($i, null, 'passenger', false);
         }
 
         // Fill passenger seats from existing assignmentRanges (skip driver)
@@ -393,8 +391,8 @@ class DeparturePlannerV2 extends Component
         }
         $current = (bool) ($this->vehicleSeats[0]['external_driver'] ?? true);
         $this->vehicleSeats[0]['external_driver'] = ! $current;
-        if (! $current === false) {
-            // Turning off external driver — clear employee too
+        // Jak TransferCreateBoard: włączenie „Zewnętrzny” zdejmuje pracownika z fotela (nie mieszaj zewnętrznego z konkretną osobą).
+        if (! $current) {
             $this->vehicleSeats[0]['employee_id'] = null;
         }
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
@@ -421,40 +419,8 @@ class DeparturePlannerV2 extends Component
             $this->compactPassengerSeats();
         }
 
-        $this->vehicleSeats[0]['employee_id'] = $employeeId;
-        $this->vehicleSeats[0]['external_driver'] = $employeeId === null; // null → back to external
-        $this->vehicleSeats[0]['position'] = 'driver';
+        $this->vehicleSeats[0] = $this->buildSeatRow(0, $employeeId, 'driver', $employeeId === null);
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
-    }
-
-    /**
-     * Compact passenger seats (indices 1..n) so occupied slots come first,
-     * empty slots last — no gaps.
-     */
-    protected function compactPassengerSeats(): void
-    {
-        $capacity = count($this->vehicleSeats);
-        if ($capacity <= 1) {
-            return;
-        }
-        // Collect passenger employee IDs (non-null first)
-        $occupied = [];
-        for ($i = 1; $i < $capacity; $i++) {
-            $eid = $this->vehicleSeats[$i]['employee_id'] ?? null;
-            if ($eid) {
-                $occupied[] = $eid;
-            }
-        }
-        // Rewrite seats 1..n in order: occupied first, then nulls
-        $idx = 0;
-        for ($i = 1; $i < $capacity; $i++) {
-            $this->vehicleSeats[$i] = [
-                'employee_id' => $occupied[$idx] ?? null,
-                'position' => 'passenger',
-                'external_driver' => false,
-            ];
-            $idx++;
-        }
     }
 
     public function updatedTransportMode(): void
@@ -637,14 +603,12 @@ class DeparturePlannerV2 extends Component
 
     public function handleVehicleSeatUpdated($data)
     {
-        // $data: ['seat_index' => 0, 'employee_id' => 1, 'position' => 'driver']
-        $seatIndex = $data['seat_index'];
-        $this->vehicleSeats[$seatIndex] = [
-            'employee_id' => $data['employee_id'] ?? null,
-            'position' => $data['position'] ?? 'passenger',
-        ];
+        if (! is_array($data)) {
+            return;
+        }
 
-        // Dispatch event z aktualnymi vehicleSeats do komponentu Step1
+        $this->applyVehicleSeatUpdateFromChild($data);
+
         $this->dispatch('vehicle-seats-updated', vehicleSeats: $this->vehicleSeats);
     }
 
@@ -1217,7 +1181,9 @@ class DeparturePlannerV2 extends Component
                 'route_data' => $routeDataForSession,
                 'ticket_costs_per_employee' => $ticketCostsPerEmployee,
                 'ticket_costs_line_items' => $ticketCostsLineItems,
-                'transfer_config' => ! empty($this->vehicleId) ? [] : $this->transferConfig,
+                // Zawsze przekazuj transfer_config z kroku 4 (kierowca, uznanie, waypoints) — przy vehicle_id w nagłówku
+                // i tak tworzymy jeden LogisticsEvent wyjazdu; wcześniej zerowanie tu blokowało zapis Adjustment (bonus).
+                'transfer_config' => is_array($this->transferConfig) ? $this->transferConfig : [],
                 'transfer_configs_list' => $transferConfigsList,
             ],
         ]);

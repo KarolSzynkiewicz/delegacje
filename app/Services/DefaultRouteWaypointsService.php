@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
 use App\Models\Project;
@@ -68,7 +69,7 @@ class DefaultRouteWaypointsService
             }
             sort($names);
             if ($names !== []) {
-                $notes[(string) $locId] = 'Opuszcza: '.implode(', ', $names);
+                $notes[(string) $locId] = 'Opuszcza (dom): '.implode(', ', $names);
             }
         }
 
@@ -76,9 +77,53 @@ class DefaultRouteWaypointsService
     }
 
     /**
+     * @param  array<string, string>  $notes
+     */
+    private function appendLocationNote(array &$notes, int $locationId, string $segment): void
+    {
+        $segment = trim($segment);
+        if ($segment === '' || $locationId <= 0) {
+            return;
+        }
+        $k = (string) $locationId;
+        $prev = isset($notes[$k]) ? trim((string) $notes[$k]) : '';
+        $notes[$k] = $prev === '' ? $segment : $prev."\n".$segment;
+    }
+
+    /**
+     * @param  list<list<string>>  $groups  kolejność grup, wewnątrz grupy zachowujemy kolejność pierwszego wystąpienia loc:
+     * @return list<string>
+     */
+    private function mergeWaypointLocGroups(array $groups): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($groups as $keys) {
+            foreach ($keys as $key) {
+                if (! is_string($key) || ! str_starts_with($key, 'loc:')) {
+                    continue;
+                }
+                $id = (int) substr($key, 4);
+                if ($id <= 0 || isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $out[] = 'loc:'.$id;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Default waypoints for transfer with reassignment:
-     * - pick-ups: current accommodation locations
-     * - drop-offs: target project locations from draft map (assignment_id => project_id)
+     * - lokalizacje projektów **opuszczanych** (bieżące project_id przypisań ze szkicu)
+     * - odbiór z **obecnych** domów (mieszkań)
+     * - lokalizacje **nowych** domów ze szkicu (gdy przekazano mapę)
+     * - docelowe lokalizacje **projektów** z szkicu
+     *
+     * Notatki przy `loc:` są **doklejane** wierszami (nie nadpisują się), żeby widać było
+     * zarówno opuszczanie, meldunek w nowym domu, jak i dołączenie do projektu.
      *
      * @param  array<int,int>  $draftProjectByAssignment  [project_assignment_id => project_id]
      * @param  array<int,int>|null  $targetAccommodationByEmployeeId  [employee_id => accommodation_id]
@@ -93,7 +138,8 @@ class DefaultRouteWaypointsService
 
         $pas = ProjectAssignment::query()
             ->whereIn('id', $assignmentIds)
-            ->get(['id', 'employee_id']);
+            ->with(['project:id,name,location_id'])
+            ->get();
 
         if ($pas->isEmpty()) {
             return ['waypoints' => [], 'location_stop_notes' => []];
@@ -106,20 +152,86 @@ class DefaultRouteWaypointsService
             ->get(['id', 'first_name', 'last_name'])
             ->keyBy('id');
 
-        // current project per employee (for notes)
-        $currentProjects = ProjectAssignment::query()
-            ->whereIn('employee_id', $employeeIds)
-            ->activeAtDate($day)
-            ->with('project:id,name')
-            ->get()
-            ->keyBy('employee_id');
+        $notes = [];
 
-        // pick-ups: accommodation locations (+ notes)
+        // 1) Projekty opuszczane (bieżące miejsce pracy wg wiersza ProjectAssignment w bazie)
+        $sourceWaypoints = [];
+        $sourceSeenLoc = [];
+        $sourceNamesByLocProject = [];
+        foreach ($pas as $pa) {
+            $locId = (int) ($pa->project?->location_id ?? 0);
+            if ($locId <= 0) {
+                continue;
+            }
+            if (! isset($sourceSeenLoc[$locId])) {
+                $sourceSeenLoc[$locId] = true;
+                $sourceWaypoints[] = 'loc:'.$locId;
+            }
+            $eid = (int) $pa->employee_id;
+            $pid = (int) $pa->project_id;
+            $label = trim(($employees->get($eid)?->first_name ?? '').' '.($employees->get($eid)?->last_name ?? '')) ?: ('#'.$eid);
+            $sourceNamesByLocProject[$locId][$pid][] = $label;
+        }
+        foreach ($sourceNamesByLocProject as $locId => $byPid) {
+            foreach ($byPid as $pid => $labels) {
+                $paRef = $pas->first(fn ($p) => (int) $p->project_id === $pid);
+                $pname = $paRef?->project?->name ?? '?';
+                $uniq = array_values(array_unique(array_filter($labels)));
+                sort($uniq);
+                if ($uniq !== []) {
+                    $this->appendLocationNote($notes, (int) $locId, 'Opuszcza (projekt „'.$pname.'”): '.implode(', ', $uniq));
+                }
+            }
+        }
+
+        // 2) Obecne domy (odbiór)
         $pickupData = $this->buildSimpleTransferWaypoints($employeeIds, $day);
         $pickups = $pickupData['waypoints'];
-        $notes = $pickupData['location_stop_notes'];
+        foreach ($pickupData['location_stop_notes'] as $locKey => $text) {
+            $this->appendLocationNote($notes, (int) $locKey, (string) $text);
+        }
 
-        // drop-offs: target project locations
+        // 3) Nowe domy ze szkicu (lokalizacja mieszkania docelowego)
+        $newAccWaypoints = [];
+        $newAccSeenLoc = [];
+        if (is_array($targetAccommodationByEmployeeId) && $targetAccommodationByEmployeeId !== []) {
+            $accIds = array_values(array_unique(array_filter(array_map('intval', $targetAccommodationByEmployeeId), fn ($id) => $id > 0)));
+            $accs = $accIds === []
+                ? collect()
+                : Accommodation::query()->whereIn('id', $accIds)->get(['id', 'location_id', 'name'])->keyBy('id');
+
+            $newAccLabelsByLocAcc = [];
+            foreach ($employeeIds as $eid) {
+                $accId = (int) ($targetAccommodationByEmployeeId[$eid] ?? $targetAccommodationByEmployeeId[(string) $eid] ?? 0);
+                if ($accId <= 0) {
+                    continue;
+                }
+                $acc = $accs->get($accId);
+                $locId = (int) ($acc?->location_id ?? 0);
+                if ($locId <= 0) {
+                    continue;
+                }
+                if (! isset($newAccSeenLoc[$locId])) {
+                    $newAccSeenLoc[$locId] = true;
+                    $newAccWaypoints[] = 'loc:'.$locId;
+                }
+                $label = trim(($employees->get($eid)?->first_name ?? '').' '.($employees->get($eid)?->last_name ?? '')) ?: ('#'.$eid);
+                $newAccLabelsByLocAcc[$locId][$accId][] = $label;
+            }
+            foreach ($newAccLabelsByLocAcc as $locId => $byAccId) {
+                foreach ($byAccId as $accId => $labels) {
+                    $acc = $accs->get($accId);
+                    $aname = $acc?->name ?? ('#'.$accId);
+                    $uniq = array_values(array_unique(array_filter($labels)));
+                    sort($uniq);
+                    if ($uniq !== []) {
+                        $this->appendLocationNote($notes, (int) $locId, 'Melduje się (dom „'.$aname.'”): '.implode(', ', $uniq));
+                    }
+                }
+            }
+        }
+
+        // 4) Projekty docelowe ze szkicu
         $targetProjectIds = [];
         $targetProjectIdsByEmployee = [];
         foreach ($pas as $pa) {
@@ -131,7 +243,6 @@ class DefaultRouteWaypointsService
         }
         $targetProjectIds = array_values(array_unique($targetProjectIds));
 
-        $dropSeen = [];
         $drops = [];
         $dropLocByProject = [];
         if ($targetProjectIds !== []) {
@@ -140,6 +251,7 @@ class DefaultRouteWaypointsService
                 ->get(['id', 'location_id', 'name'])
                 ->keyBy('id');
 
+            $dropSeen = [];
             foreach ($targetProjectIds as $pid) {
                 $locId = (int) ($projects->get($pid)?->location_id ?? 0);
                 if ($locId <= 0 || isset($dropSeen[$locId])) {
@@ -150,47 +262,37 @@ class DefaultRouteWaypointsService
                 $dropLocByProject[$pid] = $locId;
             }
 
-            // drop notes: employees arriving to target projects (group by location)
-            $arrivalsByLoc = [];
+            $arrivalsByLocProject = [];
             foreach ($targetProjectIdsByEmployee as $eid => $pid) {
                 $locId = (int) ($dropLocByProject[$pid] ?? 0);
-                if ($locId > 0) {
-                    $arrivalsByLoc[$locId][] = (int) $eid;
+                if ($locId <= 0) {
+                    continue;
                 }
+                $arrivalsByLocProject[$locId][$pid][] = (int) $eid;
             }
 
-            foreach ($arrivalsByLoc as $locId => $eids) {
-                $names = [];
-                foreach (array_values(array_unique($eids)) as $eid) {
-                    $e = $employees->get($eid);
-                    if (! $e) {
-                        continue;
+            foreach ($arrivalsByLocProject as $locId => $byPid) {
+                foreach ($byPid as $pid => $eids) {
+                    $pname = $projects->get($pid)?->name ?? '?';
+                    $names = [];
+                    foreach (array_values(array_unique($eids)) as $empId) {
+                        $e = $employees->get($empId);
+                        if (! $e) {
+                            continue;
+                        }
+                        $names[] = trim(($e->first_name ?? '').' '.($e->last_name ?? '')) ?: ('#'.$empId);
                     }
-                    $names[] = trim(($e->first_name ?? '').' '.($e->last_name ?? '')) ?: ('#'.$eid);
-                }
-                sort($names);
-                if ($names !== []) {
-                    $notes[(string) $locId] = trim(($notes[(string) $locId] ?? '')."\n".'Dołącza: '.implode(', ', $names));
+                    sort($names);
+                    if ($names !== []) {
+                        $this->appendLocationNote($notes, (int) $locId, 'Dołącza (projekt „'.$pname.'”): '.implode(', ', $names));
+                    }
                 }
             }
         }
 
-        // merge unique preserving order: pickups then drops
-        $seen = [];
-        $out = [];
-        foreach (array_merge($pickups, $drops) as $key) {
-            $id = (int) (str_starts_with($key, 'loc:') ? substr($key, 4) : 0);
-            if ($id <= 0 || isset($seen[$id])) {
-                continue;
-            }
-            $seen[$id] = true;
-            $out[] = 'loc:'.$id;
-        }
+        $out = $this->mergeWaypointLocGroups([$sourceWaypoints, $pickups, $newAccWaypoints, $drops]);
 
-        // enrich pickup notes with current project info where available (optional)
         foreach ($notes as $locId => $text) {
-            // only for pickup entries (based on existing key in pickups)
-            // No expensive mapping here; keep notes concise.
             $notes[$locId] = trim((string) $text);
         }
 

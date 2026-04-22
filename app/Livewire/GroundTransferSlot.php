@@ -5,10 +5,13 @@ namespace App\Livewire;
 use App\Data\TransferGroundConfig;
 use App\Enums\Currency;
 use App\Enums\LocationPurposeType;
+use App\Enums\ProjectStatus;
 use App\Models\Employee;
 use App\Models\Location;
+use App\Models\Project;
 use App\Models\Vehicle;
 use App\Services\RoutePlanningService;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Reactive;
@@ -232,10 +235,8 @@ class GroundTransferSlot extends Component
 
     public function openRouteModal(): void
     {
-        // If the route is empty, parent may decide to seed default waypoints.
-        if ($this->routeWaypoints === []) {
-            $this->dispatch('ground-transfer-slot-request-default-waypoints', slotKey: $this->slotKey);
-        }
+        // Rodzic zwraca trasy: przy pustym slocie zawsze, przy szkicu przeniesień (tryb przypisań) — odświeża od aktualnych przypisań.
+        $this->dispatch('ground-transfer-slot-request-default-waypoints', slotKey: $this->slotKey);
 
         $this->routeOrsError = null;
         $this->manualDistanceKm = $this->routeDistance !== null
@@ -248,12 +249,12 @@ class GroundTransferSlot extends Component
     }
 
     #[\Livewire\Attributes\On('ground-transfer-slot-apply-default-waypoints')]
-    public function applyDefaultWaypoints(string $slotKey, array $waypoints, array $locationStopNotes = []): void
+    public function applyDefaultWaypoints(string $slotKey, array $waypoints, array $locationStopNotes = [], bool $force = false): void
     {
         if ($slotKey !== $this->slotKey) {
             return;
         }
-        if ($this->routeWaypoints !== []) {
+        if (! $force && $this->routeWaypoints !== []) {
             return;
         }
 
@@ -268,7 +269,10 @@ class GroundTransferSlot extends Component
         $this->routeWaypoints = $filtered;
         $this->routeWaypoints = array_values($this->routeWaypoints);
 
-        // Apply notes only for route locations and only if empty/not set.
+        if ($force) {
+            $this->locationStopNotes = [];
+        }
+
         if (is_array($locationStopNotes) && $locationStopNotes !== []) {
             foreach ($locationStopNotes as $locId => $note) {
                 $lid = (int) $locId;
@@ -276,9 +280,11 @@ class GroundTransferSlot extends Component
                     continue;
                 }
                 $key = (string) $lid;
-                $existing = $this->locationStopNotes[$key] ?? '';
-                if (trim((string) $existing) !== '') {
-                    continue;
+                if (! $force) {
+                    $existing = $this->locationStopNotes[$key] ?? '';
+                    if (trim((string) $existing) !== '') {
+                        continue;
+                    }
                 }
                 $n = is_string($note) ? trim($note) : '';
                 if ($n === '') {
@@ -288,6 +294,7 @@ class GroundTransferSlot extends Component
             }
         }
 
+        $this->pruneLocationStopNotes();
         $this->invalidateRouteMetrics();
     }
 
@@ -766,8 +773,28 @@ class GroundTransferSlot extends Component
                     $typeLabel = 'Dworzec';
                 } elseif (((int) ($loc->accommodations_count ?? 0)) > 0) {
                     $typeLabel = 'Dom';
+                    $accCaption = $this->domAccommodationNamesForLocationNote((int) $p['id']);
+                    if ($accCaption !== '') {
+                        $typeLabel = 'Dom — '.$accCaption;
+                    }
                 } else {
                     $typeLabel = 'Lokalizacja';
+                    if ($this->dateFrom !== '') {
+                        $ref = Carbon::parse($this->dateFrom)->startOfDay();
+                        $projectNames = Project::query()
+                            ->where('location_id', $loc->id)
+                            ->where('status', ProjectStatus::ACTIVE)
+                            ->activeAtDate($ref)
+                            ->orderBy('name')
+                            ->pluck('name')
+                            ->unique()
+                            ->values();
+                        if ($projectNames->isNotEmpty()) {
+                            $typeLabel = $projectNames->count() === 1
+                                ? 'Projekt: '.$projectNames->first()
+                                : 'Projekty: '.$projectNames->join(', ');
+                        }
+                    }
                 }
             }
             $tiles[] = [
@@ -863,6 +890,41 @@ class GroundTransferSlot extends Component
         }
 
         return ['type' => 'unknown', 'id' => 0];
+    }
+
+    /**
+     * Nazwy nowych domów (ze szkicu) w notatce: „Melduje się (dom „…”)” — do etykiety obok typu „Dom”.
+     */
+    private function domAccommodationNamesForLocationNote(int $locationId): string
+    {
+        $note = trim((string) ($this->locationStopNotes[(string) $locationId] ?? ''));
+        if ($note === '') {
+            return '';
+        }
+        $names = [];
+        if (preg_match_all('/Melduje się \(dom \x{201E}(.+?)\x{201D}\):/u', $note, $m)) {
+            foreach ($m[1] as $one) {
+                $t = trim((string) $one);
+                if ($t !== '') {
+                    $names[$t] = true;
+                }
+            }
+        }
+        if ($names === [] && preg_match_all('/Melduje się \(dom "([^"]+)"\):/u', $note, $m2)) {
+            foreach ($m2[1] as $one) {
+                $t = trim((string) $one);
+                if ($t !== '') {
+                    $names[$t] = true;
+                }
+            }
+        }
+        if ($names === []) {
+            return '';
+        }
+        $list = array_keys($names);
+        sort($list);
+
+        return implode(', ', $list);
     }
 
     private function pruneLocationStopNotes(): void

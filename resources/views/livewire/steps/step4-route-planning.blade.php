@@ -80,6 +80,8 @@
         </x-ui.alert>
     @endif
 
+    @if($isPublicTransport)
+    {{-- ═══════════════ TRANSPORT PUBLICZNY: istniejący układ dwukolumnowy ════════════ --}}
     <div class="row g-4">
         <!-- Left Column: Waypoints List -->
         <div class="col-md-4">
@@ -105,11 +107,7 @@
                             <i class="bi bi-signpost-split me-2 text-primary"></i>Kolejność przystanków
                         </h6>
                         <div class="text-muted mt-1" style="font-size: 0.78rem;">
-                            @if($isPublicTransport)
-                                Lotniska stałe · domy strzałkami · po zmianach użyj <strong class="text-white">Przelicz trasę</strong>
-                            @else
-                                Strzałki = kolejność · po zmianach użyj <strong class="text-white">Przelicz trasę</strong> (bez auto-API)
-                            @endif
+                            Lotniska stałe · domy strzałkami · po zmianach użyj <strong class="text-white">Przelicz trasę</strong>
                         </div>
                     </div>
                     <span class="badge rounded-pill" style="background: rgba(99,102,241,0.15); color: #a5b4fc; font-size: 0.75rem; padding: 4px 10px;">
@@ -117,543 +115,551 @@
                     </span>
                 </div>
 
-                @if($isPublicTransport)
-                    {{-- ── Public transport: show LOT + TRANSFER sections (display-only) ── --}}
-                    @if(empty($startAirportData) || empty($endAirportData))
-                        <div class="alert alert-warning mb-3">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            Wróć do poprzedniego kroku i wybierz lotnisko startowe oraz docelowe.
-                        </div>
-                    @else
-                        @php $segLotNum = $transferToAirportLegKind ? 2 : 1; $segT2Num = $transferToAirportLegKind ? 3 : 2; @endphp
+                @if(empty($startAirportData) || empty($endAirportData))
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Wróć do poprzedniego kroku i wybierz lotnisko startowe oraz docelowe.
+                    </div>
+                @else
+                    @php $segLotNum = $transferToAirportLegKind ? 2 : 1; $segT2Num = $transferToAirportLegKind ? 3 : 2; @endphp
 
-                        <div class="mb-3 p-3 border rounded bg-primary bg-opacity-10 border-primary">
-                            <div class="d-flex align-items-start gap-2">
-                                <div class="waypoint-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                                     style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;">
-                                    {{ $segLotNum }}
-                                </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-semibold mb-1"><i class="bi bi-airplane me-1"></i>Lot</div>
-                                    <div class="small text-muted">
-                                        <span class="fw-semibold text-dark">{{ $startAirportData['name'] }}</span>
-                                        <span class="text-muted">→</span>
-                                        <span class="fw-semibold text-dark">{{ $endAirportData['name'] }}</span>
-                                    </div>
-                                </div>
-                                <i class="bi bi-lock text-muted" title="Stałe dla całej grupy"></i>
+                    <div class="mb-3 p-3 border rounded bg-primary bg-opacity-10 border-primary">
+                        <div class="d-flex align-items-start gap-2">
+                            <div class="waypoint-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                                 style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;">
+                                {{ $segLotNum }}
                             </div>
-                        </div>
-
-                        <div class="p-3 border rounded bg-success bg-opacity-10 border-success">
-                            <div class="d-flex align-items-start gap-2">
-                                <div class="waypoint-number bg-success text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                                     style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;">
-                                    {{ $segT2Num }}
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold mb-1"><i class="bi bi-airplane me-1"></i>Lot</div>
+                                <div class="small text-muted">
+                                    <span class="fw-semibold text-dark">{{ $startAirportData['name'] }}</span>
+                                    <span class="text-muted">→</span>
+                                    <span class="fw-semibold text-dark">{{ $endAirportData['name'] }}</span>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-semibold mb-2"><i class="bi bi-car-front-fill me-1"></i>Transfer 2 <span class="text-muted fw-normal small">· lotnisko docelowe → domy</span></div>
-                                    <div class="small text-muted mb-2" style="font-size: 0.75rem;">
-                                        Opcjonalny start —
-                                        @if(!empty($pickupLocationData['name'] ?? null))
-                                            <span class="text-white">{{ $pickupLocationData['name'] }}</span>
-                                        @else
-                                            <span class="fst-italic">—</span>
-                                        @endif
-                                    </div>
-                                    <div class="small text-muted mb-2" style="font-size: 0.75rem;">
-                                        Lotnisko docelowe — <span class="text-white">{{ $endAirportData['name'] ?? '—' }}</span>
-                                    </div>
+                            </div>
+                            <i class="bi bi-lock text-muted" title="Stałe dla całej grupy"></i>
+                        </div>
+                    </div>
 
-                                    @if(!empty($waypointStops))
-                                        <div class="small text-muted mb-1">Przystanki (kolejność):</div>
-                                        @if(($effectiveTransferFromAirportLegKind ?? 'public') === 'own' && ($transferFromAirportGroundMode ?? 'car') === 'car')
-                                            <div class="vstack gap-2">
-                                                @foreach($waypointStops as $index => $waypoint)
-                                                    @php
-                                                        $routeIdx = (int) ($waypoint['route_index'] ?? $index);
-                                                        $isAcc = ($waypoint['type'] ?? '') === 'acc';
-                                                        $accommodation = $waypoint['accommodation'] ?? null;
-                                                        $location = $waypoint['location'] ?? null;
-                                                        $hasCoords = $isAcc
-                                                            ? ($accommodation && !empty($accommodation['latitude']) && !empty($accommodation['longitude']))
-                                                            : ($location && !empty($location['latitude']) && !empty($location['longitude']));
-                                                        $isFirst = $routeIdx === 0;
-                                                        $isLast = $routeIdx === count($routeWaypoints) - 1;
-                                                        $borderColor = $hasCoords
-                                                            ? ($isAcc ? 'rgba(34,197,94,0.3)' : 'rgba(251,191,36,0.4)')
-                                                            : 'rgba(239,68,68,0.4)';
-                                                        $bgColor = $isAcc ? 'rgba(34,197,94,0.05)' : 'rgba(251,191,36,0.06)';
-                                                    @endphp
-                                                    <div class="rtp-waypoint-item mb-2 p-2 rounded-3 border"
-                                                         style="border-color: {{ $borderColor }} !important; background: {{ $bgColor }};"
-                                                         wire:key="pt-sidebar-{{ $waypoint['key'] ?? $index }}">
-                                                        <div class="d-flex align-items-start gap-2">
-                                                            <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold text-white"
-                                                                 style="width: 28px; height: 28px; font-size: 0.78rem; flex-shrink: 0;
-                                                                        background: {{ $isAcc ? '#22c55e' : '#f59e0b' }};">
-                                                                @if($isAcc)
-                                                                    <i class="bi bi-house-fill" style="font-size: 0.7rem;"></i>
-                                                                @else
-                                                                    <i class="bi bi-geo-alt-fill" style="font-size: 0.7rem;"></i>
-                                                                @endif
-                                                            </div>
-                                                            <div class="flex-grow-1 min-w-0">
-                                                                <div class="d-flex align-items-center gap-1">
-                                                                    <div class="fw-semibold small text-truncate">
-                                                                        {{ $isAcc ? ($accommodation['name'] ?? '—') : ($location['name'] ?? 'Przystanek') }}
-                                                                    </div>
-                                                                    @if(!$hasCoords)
-                                                                        <i class="bi bi-exclamation-triangle-fill text-danger flex-shrink-0" style="font-size: 0.7rem;" title="Brak współrzędnych"></i>
-                                                                    @endif
-                                                                </div>
-                                                                @if($isAcc && !empty($waypoint['employees']))
-                                                                    <div style="font-size: 0.72rem; color: #86efac;">
-                                                                        {{ collect($waypoint['employees'])->pluck('full_name')->join(', ') }}
-                                                                    </div>
-                                                                @elseif(!$isAcc && $location)
-                                                                    <div class="text-muted" style="font-size: 0.72rem;">
-                                                                        {{ $location['address'] ?? '' }}@if(!empty($location['city'])), {{ $location['city'] }}@endif
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                            <div class="d-flex flex-column gap-1 align-items-center" style="flex-shrink: 0;">
-                                                                <button type="button" class="rtp-icon-btn"
-                                                                        wire:click="moveUp({{ $routeIdx }})" wire:loading.attr="disabled"
-                                                                        @disabled($isFirst) title="Wyżej">
-                                                                    <i class="bi bi-chevron-up" style="font-size: 0.7rem;"></i>
-                                                                </button>
-                                                                <button type="button" class="rtp-icon-btn"
-                                                                        wire:click="moveDown({{ $routeIdx }})" wire:loading.attr="disabled"
-                                                                        @disabled($isLast) title="Niżej">
-                                                                    <i class="bi bi-chevron-down" style="font-size: 0.7rem;"></i>
-                                                                </button>
-                                                                @if(!$isAcc)
-                                                                    <button type="button" class="rtp-icon-btn rtp-icon-btn--danger"
-                                                                            wire:click="removeWaypoint({{ $routeIdx }})" title="Usuń przystanek">
-                                                                        <i class="bi bi-x" style="font-size: 0.75rem;"></i>
-                                                                    </button>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <ol class="small ps-3 mb-0 text-muted" style="font-size: 0.78rem; line-height: 1.5;">
-                                                @foreach($waypointStops as $waypoint)
-                                                    @php $isAcc = ($waypoint['type'] ?? '') === 'acc'; @endphp
-                                                    @if($isAcc)
-                                                        @php
-                                                            $aid = (int) ($waypoint['id'] ?? 0);
-                                                            $stop = collect($tripPlan)->first(fn ($s) => (int) ($s['accommodation']['id'] ?? 0) === $aid);
-                                                            $accName = $stop
-                                                                ? ($stop['accommodation']['name'] ?? ($waypoint['accommodation']['name'] ?? 'Dom'))
-                                                                : ($waypoint['accommodation']['name'] ?? 'Dom');
-                                                        @endphp
-                                                        <li>Dom — {{ $accName }}</li>
-                                                    @else
-                                                        @php $lr = $waypoint['location'] ?? []; @endphp
-                                                        <li>Przystanek — {{ $lr['name'] ?? '—' }}</li>
-                                                    @endif
-                                                @endforeach
-                                            </ol>
-                                        @endif
+                    <div class="p-3 border rounded bg-success bg-opacity-10 border-success">
+                        <div class="d-flex align-items-start gap-2">
+                            <div class="waypoint-number bg-success text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                                 style="width: 32px; height: 32px; font-size: 0.85rem; flex-shrink: 0;">
+                                {{ $segT2Num }}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold mb-2"><i class="bi bi-car-front-fill me-1"></i>Transfer 2 <span class="text-muted fw-normal small">· lotnisko docelowe → domy</span></div>
+                                <div class="small text-muted mb-2" style="font-size: 0.75rem;">
+                                    Opcjonalny start —
+                                    @if(!empty($pickupLocationData['name'] ?? null))
+                                        <span class="text-white">{{ $pickupLocationData['name'] }}</span>
                                     @else
-                                        <div class="small text-muted fst-italic">Brak przystanków — wróć do kroku 2 lub dodaj lokalizację w planie wyjazdu.</div>
+                                        <span class="fst-italic">—</span>
                                     @endif
                                 </div>
-                            </div>
-                        </div>
-                    @endif
-                @endif
-
-                @if(!$isPublicTransport)
-                    {{-- ── Car trip: original waypoint list ── --}}
-                    @if(empty($routeWaypoints))
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i>
-                            Brak przypisanych mieszkań. Wróć do kroku 2.
-                        </div>
-                    @else
-                        @php $baseData = $baseLocationData; @endphp
-                        {{-- Base (fixed, always first) --}}
-                        <div class="rtp-waypoint-item mb-2 p-2 rounded-3 border"
-                             style="border-color: rgba(99,102,241,0.4) !important; background: rgba(99,102,241,0.08);">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold text-white"
-                                     style="width: 28px; height: 28px; font-size: 0.78rem; background: #6366f1; flex-shrink: 0;">B</div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-semibold small">{{ $baseData['name'] ?? 'Baza' }}</div>
-                                    <div class="text-muted" style="font-size: 0.74rem;">{{ $baseData['address'] ?? '' }}</div>
+                                <div class="small text-muted mb-2" style="font-size: 0.75rem;">
+                                    Lotnisko docelowe — <span class="text-white">{{ $endAirportData['name'] ?? '—' }}</span>
                                 </div>
-                                <i class="bi bi-lock text-muted" style="font-size: 0.75rem;" title="Stały punkt startowy"></i>
-                            </div>
-                        </div>
 
-                        @foreach($waypointStops as $index => $waypoint)
-                            @php
-                                $routeIdx = (int) ($waypoint['route_index'] ?? $index);
-                                $isAcc = ($waypoint['type'] ?? '') === 'acc';
-                                $accommodation = $waypoint['accommodation'] ?? null;
-                                $location = $waypoint['location'] ?? null;
-                                $hasCoords = $isAcc
-                                    ? (!empty($accommodation['latitude']) && !empty($accommodation['longitude']))
-                                    : (!empty($location['latitude']) && !empty($location['longitude']));
-                                $isFirst = $routeIdx === 0;
-                                $isLast  = $routeIdx === count($routeWaypoints) - 1;
-                                $borderColor = $hasCoords
-                                    ? ($isAcc ? 'rgba(34,197,94,0.3)' : 'rgba(251,191,36,0.4)')
-                                    : 'rgba(239,68,68,0.4)';
-                                $bgColor = $isAcc ? 'rgba(34,197,94,0.05)' : 'rgba(251,191,36,0.06)';
-                            @endphp
-                            <div class="rtp-waypoint-item mb-2 p-2 rounded-3 border"
-                                 style="border-color: {{ $borderColor }} !important; background: {{ $bgColor }};"
-                                 wire:key="waypoint-{{ $waypoint['key'] }}">
-                                <div class="d-flex align-items-start gap-2">
-                                    <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold text-white"
-                                         style="width: 28px; height: 28px; font-size: 0.78rem; flex-shrink: 0;
-                                                background: {{ $isAcc ? '#22c55e' : '#f59e0b' }};">
-                                        @if($isAcc)
-                                            <i class="bi bi-house-fill" style="font-size: 0.7rem;"></i>
-                                        @else
-                                            <i class="bi bi-geo-alt-fill" style="font-size: 0.7rem;"></i>
-                                        @endif
-                                    </div>
-                                    <div class="flex-grow-1 min-w-0">
-                                        <div class="d-flex align-items-center gap-1">
-                                            <div class="fw-semibold small text-truncate">
-                                                {{ $isAcc ? ($accommodation['name'] ?? '—') : ($location['name'] ?? 'Przystanek') }}
-                                            </div>
-                                            @if(!$hasCoords)
-                                                <i class="bi bi-exclamation-triangle-fill text-danger flex-shrink-0" style="font-size: 0.7rem;" title="Brak współrzędnych"></i>
-                                            @endif
+                                @if(!empty($waypointStops))
+                                    <div class="small text-muted mb-1">Przystanki (kolejność):</div>
+                                    @if(($effectiveTransferFromAirportLegKind ?? 'public') === 'own' && ($transferFromAirportGroundMode ?? 'car') === 'car')
+                                        <div class="vstack gap-2">
+                                            @foreach($waypointStops as $index => $waypoint)
+                                                @php
+                                                    $routeIdx = (int) ($waypoint['route_index'] ?? $index);
+                                                    $isAcc = ($waypoint['type'] ?? '') === 'acc';
+                                                    $accommodation = $waypoint['accommodation'] ?? null;
+                                                    $location = $waypoint['location'] ?? null;
+                                                    $hasCoords = $isAcc
+                                                        ? ($accommodation && !empty($accommodation['latitude']) && !empty($accommodation['longitude']))
+                                                        : ($location && !empty($location['latitude']) && !empty($location['longitude']));
+                                                    $isFirst = $routeIdx === 0;
+                                                    $isLast = $routeIdx === count($routeWaypoints) - 1;
+                                                    $borderColor = $hasCoords
+                                                        ? ($isAcc ? 'rgba(34,197,94,0.3)' : 'rgba(251,191,36,0.4)')
+                                                        : 'rgba(239,68,68,0.4)';
+                                                    $bgColor = $isAcc ? 'rgba(34,197,94,0.05)' : 'rgba(251,191,36,0.06)';
+                                                @endphp
+                                                <div class="rtp-waypoint-item mb-2 p-2 rounded-3 border"
+                                                     style="border-color: {{ $borderColor }} !important; background: {{ $bgColor }};"
+                                                     wire:key="pt-sidebar-{{ $waypoint['key'] ?? $index }}">
+                                                    <div class="d-flex align-items-start gap-2">
+                                                        <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold text-white"
+                                                             style="width: 28px; height: 28px; font-size: 0.78rem; flex-shrink: 0;
+                                                                    background: {{ $isAcc ? '#22c55e' : '#f59e0b' }};">
+                                                            @if($isAcc)
+                                                                <i class="bi bi-house-fill" style="font-size: 0.7rem;"></i>
+                                                            @else
+                                                                <i class="bi bi-geo-alt-fill" style="font-size: 0.7rem;"></i>
+                                                            @endif
+                                                        </div>
+                                                        <div class="flex-grow-1 min-w-0">
+                                                            <div class="d-flex align-items-center gap-1">
+                                                                <div class="fw-semibold small text-truncate">
+                                                                    {{ $isAcc ? ($accommodation['name'] ?? '—') : ($location['name'] ?? 'Przystanek') }}
+                                                                </div>
+                                                                @if(!$hasCoords)
+                                                                    <i class="bi bi-exclamation-triangle-fill text-danger flex-shrink-0" style="font-size: 0.7rem;" title="Brak współrzędnych"></i>
+                                                                @endif
+                                                            </div>
+                                                            @if($isAcc && !empty($waypoint['employees']))
+                                                                <div style="font-size: 0.72rem; color: #86efac;">
+                                                                    {{ collect($waypoint['employees'])->pluck('full_name')->join(', ') }}
+                                                                </div>
+                                                            @elseif(!$isAcc && $location)
+                                                                <div class="text-muted" style="font-size: 0.72rem;">
+                                                                    {{ $location['address'] ?? '' }}@if(!empty($location['city'])), {{ $location['city'] }}@endif
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                        <div class="d-flex flex-column gap-1 align-items-center" style="flex-shrink: 0;">
+                                                            <button type="button" class="rtp-icon-btn"
+                                                                    wire:click="moveUp({{ $routeIdx }})" wire:loading.attr="disabled"
+                                                                    @disabled($isFirst) title="Wyżej">
+                                                                <i class="bi bi-chevron-up" style="font-size: 0.7rem;"></i>
+                                                            </button>
+                                                            <button type="button" class="rtp-icon-btn"
+                                                                    wire:click="moveDown({{ $routeIdx }})" wire:loading.attr="disabled"
+                                                                    @disabled($isLast) title="Niżej">
+                                                                <i class="bi bi-chevron-down" style="font-size: 0.7rem;"></i>
+                                                            </button>
+                                                            @if(!$isAcc)
+                                                                <button type="button" class="rtp-icon-btn rtp-icon-btn--danger"
+                                                                        wire:click="removeWaypoint({{ $routeIdx }})" title="Usuń przystanek">
+                                                                    <i class="bi bi-x" style="font-size: 0.75rem;"></i>
+                                                                </button>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
                                         </div>
-                                        @if($isAcc && !empty($waypoint['employees']))
-                                            <div style="font-size: 0.72rem; color: #86efac;">
-                                                {{ collect($waypoint['employees'])->pluck('full_name')->join(', ') }}
-                                            </div>
-                                        @elseif(!$isAcc)
-                                            <div class="text-muted" style="font-size: 0.72rem;">
-                                                {{ $location['address'] ?? '' }}@if(!empty($location['city'])), {{ $location['city'] }}@endif
-                                            </div>
-                                        @endif
-                                    </div>
-                                    <div class="d-flex flex-column gap-1 align-items-center" style="flex-shrink: 0;">
-                                        <button type="button" class="rtp-icon-btn"
-                                                wire:click="moveUp({{ $routeIdx }})" wire:loading.attr="disabled"
-                                                @disabled($isFirst) title="Wyżej">
-                                            <i class="bi bi-chevron-up" style="font-size: 0.7rem;"></i>
-                                        </button>
-                                        <button type="button" class="rtp-icon-btn"
-                                                wire:click="moveDown({{ $routeIdx }})" wire:loading.attr="disabled"
-                                                @disabled($isLast) title="Niżej">
-                                            <i class="bi bi-chevron-down" style="font-size: 0.7rem;"></i>
-                                        </button>
-                                        @if(!$isAcc)
-                                            <button type="button" class="rtp-icon-btn rtp-icon-btn--danger"
-                                                    wire:click="removeWaypoint({{ $routeIdx }})" title="Usuń przystanek">
-                                                <i class="bi bi-x" style="font-size: 0.75rem;"></i>
-                                            </button>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    @endif
-                @endif
-
-                {{-- Dystans baza → lotnisko (transport publiczny): edycja w karcie 1 --}}
-
-                {{-- Route distance summary (edytowalne po API i ręcznie) --}}
-                @if($routeData && !$isPublicTransport)
-                    <div class="mt-3 p-3 border rounded bg-success bg-opacity-10 @if($this->routeBlockIncomplete) border-danger @endif">
-                        @php
-                            $durationSec = isset($routeData['duration']) && $routeData['duration'] !== null
-                                ? (int) $routeData['duration']
-                                : null;
-                            $hours       = $durationSec !== null ? (int) floor($durationSec / 3600) : null;
-                            $minutesPart = $durationSec !== null ? (int) floor(($durationSec % 3600) / 60) : null;
-                        @endphp
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                            <div class="small @if($this->routeBlockIncomplete) text-danger fw-semibold @else text-muted @endif mb-0">
-                                @if($isPublicTransport)
-                                    Dystans transferu (lotnisko → domy)
+                                    @else
+                                        <ol class="small ps-3 mb-0 text-muted" style="font-size: 0.78rem; line-height: 1.5;">
+                                            @foreach($waypointStops as $waypoint)
+                                                @php $isAcc = ($waypoint['type'] ?? '') === 'acc'; @endphp
+                                                @if($isAcc)
+                                                    @php
+                                                        $aid = (int) ($waypoint['id'] ?? 0);
+                                                        $stop = collect($tripPlan)->first(fn ($s) => (int) ($s['accommodation']['id'] ?? 0) === $aid);
+                                                        $accName = $stop
+                                                            ? ($stop['accommodation']['name'] ?? ($waypoint['accommodation']['name'] ?? 'Dom'))
+                                                            : ($waypoint['accommodation']['name'] ?? 'Dom');
+                                                    @endphp
+                                                    <li>Dom — {{ $accName }}</li>
+                                                @else
+                                                    @php $lr = $waypoint['location'] ?? []; @endphp
+                                                    <li>Przystanek — {{ $lr['name'] ?? '—' }}</li>
+                                                @endif
+                                            @endforeach
+                                        </ol>
+                                    @endif
                                 @else
-                                    Dystans trasy
+                                    <div class="small text-muted fst-italic">Brak przystanków — wróć do kroku 2 lub dodaj lokalizację w planie wyjazdu.</div>
                                 @endif
                             </div>
-                            @if($isManualRouteDistance)
-                                <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(251,191,36,0.15); color: #fcd34d;">Wpisane ręcznie</span>
-                            @else
-                                <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(59,130,246,0.15); color: #93c5fd;">Szacunek systemu</span>
-                            @endif
-                        </div>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-sm-5">
-                                <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm"
-                                       class="form-control form-control-sm">
-                            </div>
-                            <div class="col-sm-5">
-                                <label class="form-label small text-muted mb-0">Czas przejazdu (min)</label>
-                                <input type="number" step="1" min="1" wire:model.live.debounce.300ms="manualRouteDurationMinutes"
-                                       class="form-control form-control-sm">
-                            </div>
-                            <div class="col-sm-2">
-                                <button type="button" class="btn btn-sm btn-success w-100" wire:click="applyManualRouteDistance('post')"
-                                        wire:loading.attr="disabled" title="Zapisuje km i czas z pól powyżej do wyjazdu (po ewentualnej edycji)">
-                                    OK
-                                </button>
-                            </div>
-                        </div>
-                        <div class="small text-muted mt-2 mb-0" style="font-size: 0.72rem; line-height: 1.45;">
-                            <span class="text-muted">Zapisane w wyjeździe:</span>
-                            <span class="fw-semibold text-white">{{ number_format((float) ($routeData['distance'] ?? 0), 1) }} km</span>
-                            @if($durationSec !== null)
-                                <span class="text-muted"> · </span><span class="fw-semibold text-white">@if($hours > 0){{ $hours }}h @endif{{ $minutesPart }}min</span>
-                            @endif
-                            <span class="d-block mt-1" style="color: #94a3b8;">
-                                <strong class="text-white">Przelicz trasę</strong> — ponowny szacunek trasy z systemu (wg aktualnych przystanków).
-                                Możesz zmienić km i minuty w polach powyżej i zatwierdzić <strong class="text-white">OK</strong> — wtedy te wartości są zapisywane do wyjazdu.
-                            </span>
                         </div>
                     </div>
                 @endif
 
-                @if(!$isPublicTransport)
-                <div class="mt-3">
-                    {{-- Zewnętrzne spany bez klas display z !important — inaczej wire:loading nie ukrywa treści (konflikt z Bootstrap d-inline-flex). --}}
-                    <button type="button" class="btn btn-sm btn-outline-primary w-100 position-relative d-flex justify-content-center align-items-center" wire:click="planRoute"
-                            wire:loading.attr="disabled" wire:target="planRoute">
-                        <span wire:loading.remove wire:target="planRoute">
-                            <span class="d-inline-flex align-items-center justify-content-center gap-1">
-                                <i class="bi bi-arrow-repeat me-1"></i> Przelicz trasę
-                            </span>
-                        </span>
-                        <span wire:loading wire:target="planRoute">
-                            <span class="d-inline-flex align-items-center justify-content-center gap-2">
-                                <span class="spinner-border spinner-border-sm" role="status" style="width:0.9rem;height:0.9rem;"></span>
-                                Przeliczanie…
-                            </span>
-                        </span>
-                    </button>
-                    @if($this->routeBlockIncomplete)
-                        <div class="small text-danger mt-2 mb-0">
-                            <i class="bi bi-exclamation-circle me-1"></i>
-                            Ustal dystans i czas: <strong>Przelicz trasę</strong> (szacunek) albo wpisz km i minuty, potem <strong>OK</strong>.
-                        </div>
-                    @endif
-                </div>
-                @endif
-
-                {{-- Ręczny dystans lotnisko → domy (transport publiczny): karta 3 --}}
-
-                {{-- Ręczny dystans/czas gdy API trasy nie zadziała (tryb własny samochód) --}}
-                @if(!$isPublicTransport && !empty($routeWaypoints) && empty($routeData))
-                    <div class="mt-2 p-3 border rounded" style="background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.35);">
-                        <div class="small mb-3" style="color: #fca5a5;">
-                            <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                            @if(!empty($routeError))
-                                {{ $routeError }}
-                            @else
-                                Nie udało się wyznaczyć trasy automatycznie.
-                            @endif
-                            <span class="d-block mt-1 text-muted" style="font-size: 0.78rem;">
-                                Wpisz ręcznie dystans (km) oraz szacowany czas przejazdu (min) — zapis jak przy trasie z API (czas w bazie w sekundach).
-                            </span>
-                        </div>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-sm-4">
-                                <label class="form-label small text-muted mb-0">Dystans (km)</label>
-                                <input type="number" step="0.1" min="0" wire:model.live.debounce.300ms="manualRouteDistanceKm" class="form-control form-control-sm" placeholder="np. 343">
-                            </div>
-                            <div class="col-sm-4">
-                                <label class="form-label small text-muted mb-0">Czas (min)</label>
-                                <input type="number" step="1" min="0" wire:model.live.debounce.300ms="manualRouteDurationMinutes" class="form-control form-control-sm" placeholder="np. 225">
-                            </div>
-                            <div class="col-sm-4">
-                                <button type="button" class="btn btn-sm btn-outline-success w-100" wire:click="applyManualRouteDistance" wire:loading.attr="disabled">
-                                    Ustaw ręcznie
-                                </button>
-                            </div>
-                        </div>
-                        @if(!empty($isManualRouteDistance) && !empty($routeData))
-                            <div class="small text-success mt-2 mb-0">
-                                <i class="bi bi-check2-circle me-1"></i> Zapisano dystans i czas ręcznie.
-                            </div>
-                        @endif
-                    </div>
-                @endif
             </div>{{-- /left rtp-card --}}
         </div>
 
         <!-- Right Column: Plan wyjazdu + Transfer config -->
         <div class="col-md-8">
-
-            {{-- Trip plan --}}
             <div class="rtp-card rounded-3 p-3 mb-4" style="background: var(--bg-card); border: 1px solid rgba(255,255,255,0.08);">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <h6 class="mb-0 fw-semibold" style="font-size: 0.95rem;">
                         <i class="bi bi-calendar-check me-2 text-success"></i>Plan wyjazdu
                     </h6>
                 </div>
-
-                @if(!$isPublicTransport)
-                <form wire:submit.prevent="addExtraStop"
-                      class="d-flex gap-2 align-items-center mb-3 p-2 rounded-3"
-                      style="background: rgba(99,102,241,0.06); border: 1px dashed rgba(99,102,241,0.3);">
-                    <i class="bi bi-plus-circle text-primary" style="font-size: 1rem; flex-shrink: 0;"></i>
-                    <select wire:model.live="extraStopLocationId" class="form-select form-select-sm flex-grow-1" style="min-width: 0;">
-                        <option value="">— dodaj przystanek z ręki —</option>
-                        @foreach($availableLocations as $loc)
-                            <option value="{{ $loc->id }}">{{ $loc->name }}@if($loc->city) – {{ $loc->city }}@endif</option>
-                        @endforeach
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-primary px-3 flex-shrink-0"
-                            wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="addExtraStop"><i class="bi bi-plus-lg"></i> Dodaj</span>
-                        <span wire:loading wire:target="addExtraStop"><span class="spinner-border spinner-border-sm"></span></span>
-                    </button>
-                </form>
-                @endif
-
-                @if($isPublicTransport)
-                    @include('components.logistics.ground-transfer.public-route-cards')
-                @else
-                    {{-- ── Car trip plan: ta sama kolejność co w panelu „Kolejność przystanków” (domy + przystanki ręczne loc:) --}}
-                    @if(empty($waypointStops))
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i>
-                            Brak przystanków. Przypisz mieszkania w kroku 2 lub dodaj lokalizację powyżej.
-                        </div>
-                    @else
-                        <div class="trip-plan-list">
-                            @foreach($waypointStops as $wp)
-                                @if(($wp['type'] ?? '') === 'loc')
-                                    @php
-                                        $ri = (int) ($wp['route_index'] ?? $loop->index);
-                                        $lr = $wp['location'] ?? [];
-                                    @endphp
-                                    <x-logistics.route-waypoint-loc-card
-                                        wire-key-prefix="step4-plan-loc"
-                                        :list-position="$loop->iteration"
-                                        :route-index="$ri"
-                                        :loc-id="$lr['id'] ?? ''"
-                                        :name="$lr['name'] ?? '—'"
-                                        :city="$lr['city'] ?? null"
-                                        :address="$lr['address'] ?? null"
-                                        :can-move-up="$ri > 0"
-                                        :can-move-down="$ri < count($routeWaypoints) - 1"
-                                        move-up-method="moveUp"
-                                        move-down-method="moveDown"
-                                        remove-method="removeWaypoint"
-                                        remove-confirm="Usunąć ten przystanek z trasy?"
-                                    />
-                                @else
-                                    @php
-                                        $accId = (int) ($wp['id'] ?? 0);
-                                        $stop = collect($tripPlan)->first(function ($s) use ($accId) {
-                                            return (int) ($s['accommodation']['id'] ?? 0) === $accId;
-                                        });
-                                        $destNames = $stop
-                                            ? collect($stop['employees'])->pluck('full_name')->filter()->values()
-                                            : collect($wp['employees'] ?? [])->pluck('full_name')->filter()->values();
-                                    @endphp
-                                    @if($stop)
-                                        <div class="trip-stop mb-4 p-3 border rounded" wire:key="plan-acc-{{ $accId }}">
-                                            <div class="d-flex align-items-start gap-3 mb-3">
-                                                <div class="stop-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                                                     style="width: 40px; height: 40px; font-size: 1rem; flex-shrink: 0;">
-                                                    {{ $loop->iteration }}
-                                                </div>
-                                                <div class="flex-grow-1 min-w-0">
-                                                    <div class="d-flex justify-content-between align-items-start gap-2">
-                                                        <div class="min-w-0">
-                                                            <h6 class="mb-1 fw-semibold">{{ $stop['accommodation']['name'] }}</h6>
-                                                            <div class="small mb-2" style="color:#94a3b8;">
-                                                                <i class="bi bi-geo-alt me-1"></i>Miejsce docelowe dla:
-                                                                <span style="opacity: 0.9;">{{ $destNames->isNotEmpty() ? $destNames->join(', ') : '—' }}</span>
-                                                            </div>
-                                                        </div>
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 px-2 py-0 flex-shrink-0"
-                                                                wire:click="removeWaypoint({{ (int) ($wp['route_index'] ?? $loop->index) }})"
-                                                                wire:confirm="Usunąć ten dom z kolejności trasy? (Nie usuwa przypisania mieszkania w kroku 2.)"
-                                                                title="Wyjmij z kolejności trasy">
-                                                            <i class="bi bi-x-lg"></i>
-                                                        </button>
-                                                    </div>
-                                                    <div class="small text-muted mb-2">{{ $stop['accommodation']['address'] }}</div>
-
-                                                    @foreach($stop['employees'] as $employee)
-                                                        <x-ui.card variant="hover" class="mb-2 p-2">
-                                                            <div class="fw-semibold mb-1">{{ $employee['full_name'] }}</div>
-
-                                                            @if($employee['project_name'])
-                                                                <div class="small mb-1">
-                                                                    <i class="bi bi-briefcase"></i>
-                                                                    <span class="text-muted">Projekt:</span>
-                                                                    <span class="fw-semibold">{{ $employee['project_name'] }}</span>
-                                                                </div>
-                                                            @endif
-
-                                                            @if($employee['distance'] !== null)
-                                                                <div class="small mb-1">
-                                                                    <i class="bi bi-arrow-right-circle"></i>
-                                                                    <span class="text-muted">Dystans dom–projekt:</span>
-                                                                    <span class="fw-semibold">{{ number_format($employee['distance'], 1) }} km</span>
-                                                                </div>
-                                                            @endif
-                                                            @if($employee['vehicle_name'])
-                                                                <div class="small">
-                                                                    <i class="bi bi-car-front"></i>
-                                                                    <span class="text-muted">Pojazd:</span>
-                                                                    <span class="fw-semibold">{{ $employee['vehicle_name'] }}</span>
-                                                                </div>
-                                                            @endif
-                                                        </x-ui.card>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <div class="trip-stop mb-4 p-3 border rounded border-secondary">
-                                            <div class="d-flex align-items-start gap-3">
-                                                <div class="stop-number bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                                                     style="width: 40px; height: 40px; font-size: 1rem; flex-shrink: 0;">
-                                                    {{ $loop->iteration }}
-                                                </div>
-                                                <div class="flex-grow-1 min-w-0">
-                                                    <div class="d-flex justify-content-between align-items-start gap-2">
-                                                        <div>
-                                                            <h6 class="mb-1 fw-semibold">{{ $wp['accommodation']['name'] ?? 'Dom' }}</h6>
-                                                            <div class="small mb-1" style="color:#94a3b8;">
-                                                                <i class="bi bi-geo-alt me-1"></i>Miejsce docelowe dla:
-                                                                <span style="opacity:0.9;">{{ $destNames->isNotEmpty() ? $destNames->join(', ') : '—' }}</span>
-                                                            </div>
-                                                        </div>
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary border-0 px-2 py-0 flex-shrink-0"
-                                                                wire:click="removeWaypoint({{ (int) ($wp['route_index'] ?? $loop->index) }})"
-                                                                wire:confirm="Usunąć ten dom z kolejności trasy?"
-                                                                title="Wyjmij z kolejności trasy">
-                                                            <i class="bi bi-x-lg"></i>
-                                                        </button>
-                                                    </div>
-                                                    <div class="small text-muted">{{ $wp['accommodation']['address'] ?? '' }}@if(!empty($wp['accommodation']['city'])), {{ $wp['accommodation']['city'] }}@endif</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endif
-                                @endif
-                            @endforeach
-                        </div>
-                    @endif
-                @endif
+                @include('components.logistics.ground-transfer.public-route-cards')
             </div>{{-- /rtp-card Plan wyjazdu --}}
-
-
         </div>
     </div>
+
+    @else
+    {{-- ═══════════════ WŁASNY SAMOCHÓD: układ w stylu GroundTransferSlot ════════════ --}}
+
+    @once('step4-gts-styles')
+        <style>
+            .step4-gts-route-metric-badge {
+                background: rgba(14, 165, 233, 0.22) !important;
+                border: 1px solid rgba(125, 211, 252, 0.55) !important;
+                color: #e0f2fe !important;
+                font-weight: 600;
+            }
+            .step4-gts-missing-route-badge {
+                background: rgba(248, 113, 113, 0.15) !important;
+                border: 1px solid rgba(252, 165, 165, 0.55) !important;
+                color: #fecaca !important;
+                font-weight: 600;
+            }
+        </style>
+    @endonce
+
+    @php
+        // Step4 trzyma dystans w km w routeData['distance']; rodzic może mieć route_distance z tego samego źródła
+        $ownRouteDistKm = data_get($routeData, 'route_distance', data_get($routeData, 'distance'));
+        $ownRouteDurS   = data_get($routeData, 'route_duration', data_get($routeData, 'duration'));
+        $ownRouteOk     = $ownRouteDistKm !== null && $ownRouteDistKm !== '' && is_numeric($ownRouteDistKm) && (float) $ownRouteDistKm > 0;
+    @endphp
+
+    {{-- ─── Dwukolumnowy układ własnego transportu ─────────────────────────── --}}
+    <div class="row g-4">
+
+        {{-- LEWA KOLUMNA: Lista przypisań pracowników z kroków 1–3 --}}
+        <div class="col-md-5">
+            <div class="rtp-card h-100 rounded-3 p-3" style="background: var(--bg-card); border: 1px solid rgba(255,255,255,0.08);">
+                <div class="small fw-semibold text-muted text-uppercase mb-3" style="letter-spacing: 0.05em; font-size: 0.7rem;">
+                    <i class="bi bi-people me-1"></i>Przypisania z wyjazdu
+                </div>
+
+                @if(empty($personAssignments))
+                    <div class="text-muted small">
+                        <i class="bi bi-info-circle me-1"></i>Brak przypisanych pracowników. Wróć do kroków 1–3.
+                    </div>
+                @else
+                    <div class="d-flex flex-column gap-2">
+                        @foreach($personAssignments as $pa)
+                            <div class="rounded-2 p-2" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                                <div class="fw-semibold small mb-1">
+                                    <i class="bi bi-person me-1 text-info"></i>{{ $pa['full_name'] }}
+                                </div>
+                                @foreach($pa['projects'] as $proj)
+                                    <div class="small mb-1 ms-3" style="color: #94a3b8;">
+                                        <i class="bi bi-briefcase me-1" style="font-size: 0.7rem; color: #facc15;"></i>
+                                        <span style="color: #e2e8f0;">{{ $proj['project_name'] }}</span>
+                                        @if($proj['start_date'] || $proj['end_date'])
+                                            <span class="ms-1" style="opacity: 0.7;">{{ $proj['start_date'] }}–{{ $proj['end_date'] }}</span>
+                                        @endif
+                                    </div>
+                                @endforeach
+                                @if(!empty($pa['housing']))
+                                    <div class="small mb-1 ms-3" style="color: #94a3b8;">
+                                        <i class="bi bi-house me-1" style="font-size: 0.7rem; color: #86efac;"></i>
+                                        <span style="color: #e2e8f0;">{{ $pa['housing']['name'] }}</span>
+                                        @if(!empty($pa['housing']['city']) || !empty($pa['housing']['address']))
+                                            <span class="ms-1" style="opacity: 0.75;">@if(!empty($pa['housing']['address'])){{ $pa['housing']['address'] }}@endif @if(!empty($pa['housing']['city']))· {{ $pa['housing']['city'] }}@endif</span>
+                                        @endif
+                                        @if($pa['housing']['start_date'] || $pa['housing']['end_date'])
+                                            <span class="ms-1" style="opacity: 0.7;">{{ $pa['housing']['start_date'] }}–{{ $pa['housing']['end_date'] }}</span>
+                                        @endif
+                                    </div>
+                                @endif
+                                @if($pa['vehicle'])
+                                    <div class="small ms-3" style="color: #94a3b8;">
+                                        <i class="bi bi-car-front me-1" style="font-size: 0.7rem; color: #4ade80;"></i>
+                                        <span style="color: #e2e8f0;">{{ $pa['vehicle']['registration'] }}</span>
+                                        @if($pa['vehicle']['position'])
+                                            <span class="ms-1" style="opacity: 0.8;">({{ $pa['vehicle']['position'] }})</span>
+                                        @endif
+                                        @if($pa['vehicle']['start_date'])
+                                            <span class="ms-1" style="opacity: 0.7;">{{ $pa['vehicle']['start_date'] }}–{{ $pa['vehicle']['end_date'] }}</span>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- PRAWA KOLUMNA: Konfiguracja transferu i trasy (styl GroundTransferSlot) --}}
+        <div class="col-md-7">
+            <div class="rtp-card rounded-3 p-3" style="background: var(--bg-card); border: 1px solid rgba(255,255,255,0.08);">
+
+                <div class="small fw-semibold text-muted text-uppercase mb-3" style="letter-spacing: 0.05em; font-size: 0.7rem;">
+                    Trasa — przystanki i dystans
+                </div>
+
+                {{-- Status trasy (pełna szerokość) --}}
+                @if($ownRouteOk)
+                    <div class="rounded-2 px-3 py-2 mb-3 d-flex align-items-center gap-2 step4-gts-route-metric-badge">
+                        <i class="bi bi-signpost-split"></i>
+                        <span class="fw-semibold">
+                            {{ number_format((float) $ownRouteDistKm, 1, ',', ' ') }} km
+                            @if($ownRouteDurS !== null)
+                                · {{ intdiv((int) $ownRouteDurS, 3600) > 0 ? intdiv((int) $ownRouteDurS, 3600).'h ' : '' }}{{ intdiv((int) $ownRouteDurS % 3600, 60) }}min
+                            @endif
+                        </span>
+                        @if($isManualRouteDistance)
+                            <i class="bi bi-pencil ms-auto" title="Wpisane ręcznie" style="opacity: 0.7;"></i>
+                        @endif
+                    </div>
+                @else
+                    <div class="rounded-2 px-3 py-2 mb-3 d-flex align-items-center gap-2 step4-gts-missing-route-badge">
+                        <i class="bi bi-signpost-split"></i>
+                        <span class="fw-semibold">Brak trasy</span>
+                    </div>
+                @endif
+
+                <p class="small text-muted mb-3" style="font-size: 0.8rem;">
+                    Przystanki dodajesz w modalu <strong class="text-white">Konfiguruj trasę</strong> (kolejność = kolejność przejazdu, notatki przy każdym punkcie, opcjonalnie km i minuty ręcznie). Pojazd z karty powyżej jest synchronizowany z tą konfiguracją przy zapisie transferu.
+                </p>
+
+                {{-- Wiersz podsumowania transferu --}}
+                <div class="d-flex flex-wrap align-items-center gap-2 pb-3 mb-3" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <span class="fw-semibold small text-muted">Transfer</span>
+                    @if($ownVehicle)
+                        <span class="badge rounded-pill bg-secondary bg-opacity-15 text-secondary-emphasis small">
+                            <i class="bi bi-car-front me-1"></i>{{ $ownVehicle->registration_number }}
+                        </span>
+                    @else
+                        <span class="badge rounded-pill bg-success bg-opacity-15 text-success border border-success border-opacity-25 small">
+                            <i class="bi bi-car-front me-1"></i>Własny pojazd
+                        </span>
+                    @endif
+
+                    <div class="ms-auto text-end">
+                        <div class="small text-muted text-uppercase fw-semibold mb-1" style="font-size: 0.62rem; letter-spacing: 0.04em;">Kierowca</div>
+                        <div class="text-white fw-semibold small">
+                            <i class="bi bi-person-badge text-info me-1"></i>
+                            {{ $ownDriverEmployee?->full_name ?? 'Kierowca zewnętrzny' }}
+                        </div>
+                        <div style="font-size: 0.75rem;" class="mt-1">
+                            @if($transferDriverBonusAmount !== null && $transferDriverBonusAmount !== '' && (float) $transferDriverBonusAmount > 0)
+                                <span class="text-success fw-semibold">
+                                    {{ number_format((float) $transferDriverBonusAmount, 2, ',', ' ') }} {{ strtoupper($transferDriverBonusCurrency) }}
+                                </span>
+                            @else
+                                <span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Brak wynagrodzenia</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Przyciski akcji --}}
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <button type="button" class="btn btn-sm btn-outline-info" wire:click="openOwnTransferModal">
+                        <i class="bi bi-sliders me-1"></i>Konfiguruj transfer — wynagrodzenie za transport
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="openOwnRouteModal">
+                        <i class="bi bi-signpost-split me-1"></i>Konfiguruj trasę
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    {{-- Modal: Konfiguruj transfer — wynagrodzenie za transport --}}
+    @if($showOwnTransferModal)
+        @teleport('body')
+            <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
+                 style="background-color: rgba(0,0,0,0.55);"
+                 wire:key="step4-own-transfer-modal">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable my-3" role="document">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0; max-height: min(90vh, 920px);">
+
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">
+                                <i class="bi bi-sliders text-info me-2"></i>Transfer — wynagrodzenie za transport
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" wire:click="closeOwnTransferModal" aria-label="Zamknij"></button>
+                        </div>
+
+                        <div class="modal-body">
+
+                            @if($ownVehicle)
+                                <div class="rounded-2 p-3 mb-4" style="background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.25);">
+                                    <div class="small fw-semibold mb-2"><i class="bi bi-car-front text-success me-1"></i>Pojazd wyjazdu</div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="badge rounded-pill bg-success bg-opacity-15 text-success border border-success border-opacity-25">
+                                            {{ $ownVehicle->registration_number }}
+                                        </span>
+                                        <span class="small text-muted">{{ $ownVehicle->brand }} {{ $ownVehicle->model }}</span>
+                                    </div>
+                                    <div class="small text-muted mt-2" style="font-size: 0.75rem;">Pojazd jest ustawiony w nagłówku wyjazdu — zmień go w sekcji "Czym".</div>
+                                </div>
+                            @endif
+
+                            <div class="rounded-2 p-3" style="background: rgba(14,165,233,0.06); border: 1px solid rgba(14,165,233,0.25);">
+                                <div class="small fw-semibold mb-3"><i class="bi bi-person-badge text-info me-1"></i>Kierowca i wynagrodzenie</div>
+                                <div class="row g-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label small text-muted mb-1">Kierowca (opcjonalnie)</label>
+                                        <select wire:model.live="pendingOwnDriverEmployeeId" class="form-select form-select-sm">
+                                            <option value="">— wybierz kierowcę —</option>
+                                            @foreach($ownDriverCandidates as $emp)
+                                                <option value="{{ $emp->id }}">{{ $emp->full_name }}</option>
+                                            @endforeach
+                                        </select>
+                                        @if($ownDriverCandidates->isEmpty())
+                                            <div class="small text-warning mt-1" style="font-size: 0.72rem;">
+                                                Brak osób na liście — sprawdź uczestników wyjazdu lub fotel kierowcy w nagłówku.
+                                            </div>
+                                        @elseif($ownDriverPickerListsAllEmployees)
+                                            <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                                                <strong>Kierowca zewnętrzny</strong> (lub brak osoby na fotelu) — wybierz pracownika z uczestników wyjazdu.
+                                            </div>
+                                        @else
+                                            <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                                                Na fotelu jest <strong>konkretny kierowca</strong> — na liście tylko ta osoba. Zmiana: miejsce w aucie w nagłówku.
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label small text-muted mb-1">Uznanie za transport (opcjonalne)</label>
+                                        <input type="number" step="0.01" min="0"
+                                               wire:model.live.debounce.600ms="pendingOwnBonusAmount"
+                                               class="form-control form-control-sm"
+                                               placeholder="np. 200.00"
+                                               inputmode="decimal"
+                                               autocomplete="off">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small text-muted mb-1">Waluta</label>
+                                        <select wire:model.live="pendingOwnBonusCurrency" class="form-select form-select-sm">
+                                            @foreach($currencyCases as $cur)
+                                                <option value="{{ $cur->value }}">{{ $cur->value }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-light" wire:click="closeOwnTransferModal">Anuluj</button>
+                            <button type="button" class="btn btn-primary" wire:click="confirmOwnTransferModal">Zatwierdź</button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        @endteleport
+    @endif
+
+    {{-- Modal: Konfiguruj trasę — używa tych samych bloków UI co transfery (x-logistics.route-waypoints-plan) --}}
+    @if($showOwnRouteModal)
+        @teleport('body')
+            <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
+                 style="background-color: rgba(0,0,0,0.55);"
+                 wire:key="step4-own-route-modal">
+                <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable my-3" role="document">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0; max-height: min(90vh, 960px);">
+
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">
+                                <i class="bi bi-signpost-split text-info me-2"></i>
+                                @if($ownVehicle){{ $ownVehicle->registration_number }} — @endif trasa
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" wire:click="closeOwnRouteModal" aria-label="Zamknij"></button>
+                        </div>
+
+                        <div class="modal-body">
+                            <x-logistics.route-waypoints-plan
+                                class="rtp-card rounded-3 p-0"
+                                title="Plan trasy"
+                                :stops="$ownRouteTiles"
+                                wire-key-prefix="step4-own-rwp"
+                                :available-locations="$availableOwnRouteLocations"
+                                :add-disabled="! $pendingWaypointLocationId"
+                                add-submit-method="addWaypoint"
+                                pending-location-model="pendingWaypointLocationId"
+                                move-up-method="moveWaypointUp"
+                                move-down-method="moveWaypointDown"
+                                remove-method="removeWaypoint"
+                                remove-confirm="Usunąć ten przystanek z trasy?"
+                                notes-placeholder="np. kto wsiada / wysiada, co zabrać…"
+                            >
+                                <x-slot name="distance">
+                                    <div class="rounded-3 border p-3"
+                                         style="background: rgba(15,23,42,0.55); border-color: rgba(148,163,184,0.28) !important;">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                            <div class="small fw-semibold text-secondary">Dystans i czas</div>
+                                            <x-ui.button
+                                                variant="warning"
+                                                type="button"
+                                                class="btn-sm px-2 py-1"
+                                                title="Przelicz trasę (OpenRouteService)"
+                                                wire:click="planRoute"
+                                                wire:loading.attr="disabled"
+                                                wire:target="planRoute"
+                                            >
+                                                <span wire:loading.remove wire:target="planRoute"><i class="bi bi-arrow-clockwise"></i></span>
+                                                <span wire:loading wire:target="planRoute"><span class="spinner-border spinner-border-sm" style="width: 0.9rem; height: 0.9rem;"></span></span>
+                                            </x-ui.button>
+                                        </div>
+
+                                        @if($ownRouteOk)
+                                            <div class="small mb-3" style="color: #94a3b8;">
+                                                <span class="text-white fw-semibold">{{ number_format((float) $ownRouteDistKm, 1, ',', ' ') }} km</span>
+                                                @if($ownRouteDurS !== null)
+                                                    <span class="mx-1 opacity-50">·</span>
+                                                    <span class="text-white fw-semibold">
+                                                        {{ intdiv((int) $ownRouteDurS, 3600) > 0 ? intdiv((int) $ownRouteDurS, 3600).'h ' : '' }}{{ intdiv((int) $ownRouteDurS % 3600, 60) }} min
+                                                    </span>
+                                                @endif
+                                                @if($isManualRouteDistance)
+                                                    <span class="badge rounded-pill ms-1" style="font-size: 0.62rem; background: rgba(251,191,36,0.15); color: #fcd34d;">ręcznie</span>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <p class="small text-muted mb-3 mb-lg-2">Brak wyznaczonej trasy — użyj ORS (wymaga przystanków) lub wpisz wartości ręcznie.</p>
+                                        @endif
+
+                                        @if($routeError && !$isPublicTransport)
+                                            <div class="alert alert-warning py-2 px-3 small mb-2">{{ $routeError }}</div>
+                                        @endif
+
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-sm-6">
+                                                <label class="form-label small text-muted mb-0">Dystans (km)</label>
+                                                <input type="number" step="0.1" min="0"
+                                                       wire:model.live.debounce.400ms="manualRouteDistanceKm"
+                                                       class="form-control form-control-sm rounded-3"
+                                                       style="background: rgba(15,23,42,0.45); border-color: rgba(148,163,184,0.35);"
+                                                       placeholder="np. 343">
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <label class="form-label small text-muted mb-0">Czas (min)</label>
+                                                <input type="number" step="1" min="1"
+                                                       wire:model.live.debounce.400ms="manualRouteDurationMinutes"
+                                                       class="form-control form-control-sm rounded-3"
+                                                       style="background: rgba(15,23,42,0.45); border-color: rgba(148,163,184,0.35);"
+                                                       placeholder="np. 225">
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mt-0">
+                                            <div class="col-12">
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-info w-100 mt-2"
+                                                        wire:click="applyManualRouteDistance"
+                                                        wire:loading.attr="disabled">
+                                                    <i class="bi bi-check2 me-1"></i>Zatwierdź dystans i czas
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        @if($this->routeBlockIncomplete)
+                                            <div class="small text-danger mt-2">
+                                                <i class="bi bi-exclamation-circle me-1"></i>
+                                                Ustal dystans i czas: <strong>Przelicz trasę</strong> lub wpisz km i minuty, potem <strong>Zatwierdź</strong>.
+                                            </div>
+                                        @endif
+                                    </div>
+                                </x-slot>
+                            </x-logistics.route-waypoints-plan>
+                        </div>
+
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-light" wire:click="closeOwnRouteModal">Anuluj</button>
+                            <button type="button" class="btn btn-primary" wire:click="closeOwnRouteModal">Zapisz i zamknij</button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        @endteleport
+    @endif
+
+    @endif{{-- end @if($isPublicTransport) --}}
 
     <!-- Footer: Navigation -->
     <div class="row mt-4">

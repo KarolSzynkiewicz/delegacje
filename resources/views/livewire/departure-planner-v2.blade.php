@@ -243,28 +243,28 @@
             key="step3-{{ $departureDate }}-{{ $vehicleId }}-{{ md5(json_encode($assignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
         />
     @elseif($currentStep === 4)
-        <x-logistics.route-planning-frame title="Trasa, przystanki i transfer" icon="bi-signpost-split">
-            <livewire:steps.step4-route-planning
-                :departure-date="$departureDate"
-                :end-date="$endDate"
-                :vehicle-id="$vehicleId"
-                :accommodation-assignments="$accommodationAssignments"
-                :assignment-ranges="$assignmentRanges"
-                :vehicle-assignments="$vehicleAssignments"
-                :ticket-costs-by-employee="$ticketCostsByEmployee"
-                :shared-start-airport-location-id="$sharedStartAirportLocationId"
-                :shared-end-airport-location-id="$sharedEndAirportLocationId"
-                :initial-route-waypoints="data_get($routeData, 'route_waypoints', [])"
-                :initial-location-stop-notes="data_get($routeData, 'location_stop_notes', [])"
-                :initial-route-distance="data_get($routeData, 'route_distance')"
-                :initial-route-duration="data_get($routeData, 'route_duration')"
-                :initial-route-manual="(bool) data_get($routeData, 'route_distance_is_manual', false)"
-                :initial-transfer-config="$transferConfig"
-                :initial-route-segments="$routeSegments"
-                :selected-employee-ids="$this->selectedEmployeeIds"
-                {{-- Bez hashu segmentów / waypointów: aktualizacja trasy z kroku 4 zmieniałaby key i remountowała komponent — znikałyby m.in. otwarte modale. --}}
-                key="step4-{{ $departureDate }}-{{ $transportMode }}-{{ md5(json_encode($accommodationAssignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}-{{ $sharedStartAirportLocationId }}-{{ $sharedEndAirportLocationId }}"
-            />
-        </x-logistics.route-planning-frame>
+        <livewire:steps.step4-route-planning
+            :departure-date="$departureDate"
+            :end-date="$endDate"
+            :transport-mode="$transportMode"
+            :vehicle-id="$vehicleId"
+            :accommodation-assignments="$accommodationAssignments"
+            :assignment-ranges="$assignmentRanges"
+            :vehicle-assignments="$vehicleAssignments"
+            :vehicle-seats="$vehicleSeats"
+            :shared-start-airport-location-id="$sharedStartAirportLocationId"
+            :shared-end-airport-location-id="$sharedEndAirportLocationId"
+            :initial-route-waypoints="data_get($routeData, 'route_waypoints', [])"
+            :initial-location-stop-notes="data_get($routeData, 'location_stop_notes', [])"
+            :initial-route-distance="data_get($routeData, 'route_distance')"
+            :initial-route-duration="data_get($routeData, 'route_duration')"
+            :initial-route-manual="data_get($routeData, 'route_distance_is_manual', false)"
+            :initial-transfer-config="$transferConfig"
+            :initial-route-segments="$routeSegments"
+            :selected-employee-ids="$this->selectedEmployeeIds"
+            :ticket-costs-by-employee="$ticketCostsByEmployee"
+            {{-- Nie wpinaj transferConfig do key: sync trasy (waypoints) aktualizuje go w rodzicu i remount zamykałby modal kroku 4. --}}
+            key="step4-{{ $departureDate }}-{{ $endDate }}-{{ $vehicleId }}-{{ $transportMode }}-{{ md5(json_encode($accommodationAssignments)) }}"
+        />
     @endif
 </div>

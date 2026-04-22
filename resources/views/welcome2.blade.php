@@ -104,7 +104,7 @@
     :mode="$transportMode"
     :hub-kind="$publicTransportHubKind"
 /&gt;</code></pre>
-            <pre class="small text-muted mb-0 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>@include('components.logistics.trip-logistics-header', [
+            <pre class="small text-muted mb-0 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>@@include('components.logistics.trip-logistics-header', [
     'tripLogisticsHeader' => [
         'title' => 'Szczegóły wyjazdu',     // albo zjazdu
         'firstWire' => 'departureDate',    // albo returnDate
@@ -114,6 +114,96 @@
     ],
 ])
 // W widoku Livewire: $endDate, $transportMode, $publicTransportHubKind, …</code></pre>
+        </div>
+
+        {{-- Planer wyjazdu: krok 1 — przypisania (klasy .s1-*) --}}
+        <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
+            <h3 class="mb-2">Planer wyjazdu — krok 1 <span class="text-muted small fw-normal">(<code>x-departure.planner-step1-assignments-styles</code>)</span></h3>
+            <p class="text-muted small mb-3">
+                Arkusz CSS dla <code>resources/views/livewire/steps/step1-project-assignments.blade.php</code> (prefiks <code>.s1-*</code>: karty pracowników, bloki projektów, strefy drop, chipy). Podgląd statyczny — w planerze ten sam markup jest podpięty pod Livewire (drag &amp; drop).
+            </p>
+
+            <x-departure.planner-step1-assignments-styles />
+
+            <div class="rounded-3 p-3 mb-3" style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.08);">
+                <h5 class="mb-2 small fw-semibold text-uppercase text-muted" style="letter-spacing: .04em;">Ściąga — klasy <code>.s1-*</code></h5>
+                <ul class="small text-muted mb-0 ps-3" style="line-height: 1.65;">
+                    <li><code>.s1-panel</code>, <code>.s1-filters</code>, <code>.s1-hint</code> — layout lewej kolumny</li>
+                    <li><code>.s1-emp-card</code>, <code>.s1-emp-avatar</code>, <code>.s1-emp-role-pill</code> — karta pracownika (lista)</li>
+                    <li><code>.s1-project-block</code>, <code>.s1-roles-grid</code>, <code>.s1-role-card</code>, <code>.s1-gap-pill</code> — projekt i role</li>
+                    <li><code>.s1-drop-zone</code>, <code>.s1-assigned-chip</code> — przeciąganie i przypisania</li>
+                    <li><code>.s1-full-banner</code>, <code>.s1-pagination-*</code>, <code>.s1-empty-state</code> — komunikaty i paginacja</li>
+                </ul>
+            </div>
+
+            <div class="row g-3 align-items-stretch">
+                <div class="col-lg-5">
+                    <x-ui.card class="s1-panel">
+                        <div class="fw-semibold s1-panel-title mb-2">Dostępni pracownicy</div>
+                        <div class="s1-filters">
+                            <input type="text" class="form-control form-control-sm" placeholder="Szukaj pracownika…" readonly tabindex="-1" aria-hidden="true">
+                        </div>
+                        <div class="s1-hint">
+                            <i class="bi bi-grip-horizontal"></i>
+                            Przeciągnij pracownika na rolę po prawej
+                        </div>
+                        <div class="s1-emp-card s1-emp-card--static">
+                            <div class="s1-emp-avatar">AK</div>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="s1-emp-name text-truncate">Anna Kowalska</div>
+                                <div class="s1-emp-roles">
+                                    <span class="s1-emp-role-pill">Monter</span>
+                                    <span class="s1-emp-role-pill">BHP</span>
+                                </div>
+                            </div>
+                            <i class="bi bi-grip-vertical text-muted s1-grip-icon"></i>
+                        </div>
+                        <div class="s1-full-banner mb-0">
+                            <i class="bi bi-exclamation-circle-fill"></i>
+                            Przykład: brak miejsca w aucie (banner)
+                        </div>
+                    </x-ui.card>
+                </div>
+                <div class="col-lg-7">
+                    <x-ui.card class="s1-panel">
+                        <div class="fw-semibold s1-panel-title mb-1">Jakich ludzi brakuje po przyjeździe?</div>
+                        <div class="s1-section-subtitle mb-3">Braki w rolach — demo układu (bez danych z API).</div>
+                        <div class="s1-project-block mb-0">
+                            <div class="s1-project-header">
+                                <div class="s1-project-name">Projekt demonstracyjny</div>
+                                <div class="s1-project-loc">
+                                    <i class="bi bi-geo-alt-fill s1-project-loc-icon"></i>
+                                    Warszawa
+                                </div>
+                            </div>
+                            <div class="s1-roles-grid">
+                                <div class="s1-role-card">
+                                    <div class="s1-role-header">
+                                        <span class="s1-role-name">Elektryk</span>
+                                        <span class="s1-gap-pill">
+                                            <i class="bi bi-person-dash"></i>
+                                            1 brak.
+                                        </span>
+                                    </div>
+                                    <div class="s1-drop-zone s1-drop-zone--static">
+                                        <i class="bi bi-person-plus s1-drop-zone-icon"></i>
+                                        <span class="s1-drop-hint">Przeciągnij pracownika na tę rolę</span>
+                                    </div>
+                                    <div class="s1-assigned-list">
+                                        <div class="s1-assigned-chip">
+                                            <div class="s1-chip-avatar">JN</div>
+                                            <span class="s1-chip-name">Jan Nowak</span>
+                                            <span class="s1-chip-remove opacity-50" title="(demo)"><i class="bi bi-x-lg"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </x-ui.card>
+                </div>
+            </div>
+
+            <pre class="small text-muted mb-0 mt-3 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>&lt;x-departure.planner-step1-assignments-styles /&gt;</code></pre>
         </div>
 
         {{-- Hero Card Example --}}

@@ -125,20 +125,30 @@
     </x-ui.card>
 
     <!-- Trasa -->
+    @php $isPublicTransport = ! $transfer->vehicle_id && $transfer->has_transport; @endphp
     <x-ui.card label="Trasa" class="mb-4">
         <div class="row g-4">
-            <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Dystans</h6>
-                <p class="fw-semibold mb-0">{{ $transfer->getFormattedDistance() ?? '—' }}</p>
-            </div>
-            <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Czas</h6>
-                <p class="fw-semibold mb-0">{{ $transfer->getFormattedDuration() ?? '—' }}</p>
-            </div>
-            <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Przystanki</h6>
-                <p class="fw-semibold mb-0">{{ $routeStopCount ?? ($routeStopRows->count() ?? 0) }}</p>
-            </div>
+            @if(! $isPublicTransport)
+                <div class="col-md-4">
+                    <h6 class="text-muted small mb-1">Dystans</h6>
+                    <p class="fw-semibold mb-0">{{ $transfer->getFormattedDistance() ?? '—' }}</p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted small mb-1">Czas</h6>
+                    <p class="fw-semibold mb-0">{{ $transfer->getFormattedDuration() ?? '—' }}</p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted small mb-1">Przystanki</h6>
+                    <p class="fw-semibold mb-0">{{ $routeStopCount ?? ($routeStopRows->count() ?? 0) }}</p>
+                </div>
+            @else
+                <div class="col-12">
+                    <p class="small mb-0" style="color: #94a3b8;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Transport publiczny — dystans i czas nie są obliczane automatycznie.
+                    </p>
+                </div>
+            @endif
         </div>
 
         <div class="mt-3">

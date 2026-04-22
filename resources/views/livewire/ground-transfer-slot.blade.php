@@ -172,6 +172,27 @@
                                                     <option value="{{ $v->id }}">{{ $v->registration_number }} – {{ $v->brand }} {{ $v->model }}</option>
                                                 @endforeach
                                             </select>
+                                            @if($vehicleId)
+                                                @php
+                                                    $slotModalVehicle = $configModalVehicleOptions->firstWhere('id', (int) $vehicleId);
+                                                    $slotModalRepair = null;
+                                                    if ($slotModalVehicle?->technical_condition === 'workshop' && $dateFrom !== '' && $dateTo !== '') {
+                                                        $slotFrom = \Carbon\Carbon::parse($dateFrom)->startOfDay();
+                                                        $slotTo   = \Carbon\Carbon::parse($dateTo)->endOfDay();
+                                                        $slotModalRepair = $slotModalVehicle->repairs()
+                                                            ->where('start_date', '<=', $slotTo)
+                                                            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $slotFrom))
+                                                            ->latest('start_date')
+                                                            ->first();
+                                                    }
+                                                @endphp
+                                                @if($slotModalRepair)
+                                                    <small class="text-danger d-block mt-1 fw-semibold">
+                                                        <i class="bi bi-tools me-1"></i>Pojazd w warsztacie w tym okresie —
+                                                        <a href="{{ route('vehicle-repairs.show', $slotModalRepair) }}" class="text-danger" target="_blank">szczegóły naprawy #{{ $slotModalRepair->id }}</a>.
+                                                    </small>
+                                                @endif
+                                            @endif
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label small text-muted mb-1">Kierowca <span class="text-danger">*</span></label>

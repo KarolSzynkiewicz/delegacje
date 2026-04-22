@@ -168,6 +168,7 @@
                 name="is_base"
                 id="is_base"
                 value="1"
+                :checked="$is_base"
                 label="Baza (siedziba główna)"
             />
             <small class="text-muted d-block mt-1 ms-1">Tylko jedna lokalizacja w systemie może być główną siedzibą — zaznaczenie automatycznie odznaczy poprzednią.</small>

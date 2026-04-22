@@ -375,7 +375,7 @@ class ReturnTripPlanner extends Component
         }
         $current = (bool) ($this->vehicleSeats[0]['external_driver'] ?? true);
         $this->vehicleSeats[0]['external_driver'] = ! $current;
-        if (! $current === false) {
+        if (! $current) {
             $this->vehicleSeats[0]['employee_id'] = null;
         }
     }

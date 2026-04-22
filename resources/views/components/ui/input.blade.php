@@ -58,15 +58,16 @@
         }
         $checkboxId = $checkboxId ?: 'checkbox-'.uniqid('', true);
 
-        // Dla checkboxów, sprawdzamy czy value jest true/checked
-        // Jeśli value jest przekazane jako atrybut, używamy go
+        // Stan zaznaczenia — NIE wynika z propa `value`: przy checkboxie `value="1"`
+        // to wartość wysyłana w POST, a domyślna; mylono ją ze „zaznaczony” (miganie przy Livewire).
         $isChecked = false;
-        if (isset($value)) {
-            // Jeśli value jest boolean lub truthy, zaznaczamy
-            $isChecked = $value === true || $value === '1' || $value === 1 || $value === 'on';
-        } else {
-            // W przeciwnym razie sprawdzamy old() lub atrybut checked
-            $isChecked = old($name) || $attributes->has('checked');
+        if ($attributes->has('checked')) {
+            $c = $attributes->get('checked');
+            $isChecked = ! in_array($c, [false, 'false', '0', 0, 'off'], true);
+        } elseif (is_bool($value)) {
+            $isChecked = $value;
+        } elseif (old($name ?? '')) {
+            $isChecked = (bool) old($name);
         }
     @endphp
     <div class="form-check {{ $attributes->get('class') }}">

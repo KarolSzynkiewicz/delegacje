@@ -7,7 +7,6 @@ use App\Enums\LogisticsEventType;
 use App\Enums\VehiclePosition;
 use App\Models\Accommodation;
 use App\Models\Employee;
-use App\Support\DepartureRoutePlan;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
@@ -20,7 +19,9 @@ use App\Services\DepartureService;
 use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\VehicleValidationService;
+use App\Support\DepartureRoutePlan;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -114,7 +115,8 @@ class DepartureController extends Controller
 
         if ($linkedTransfers->isEmpty()) {
             $legacy = $this->departureService->findLinkedAirportTransfer($departure, false);
-            $linkedTransfers = $legacy ? collect([$legacy]) : collect();
+            // Eloquent Collection — potrzebne do load(); Support\Collection nie ma load()
+            $linkedTransfers = $legacy ? new EloquentCollection([$legacy]) : new EloquentCollection;
         }
 
         $linkedTransfers->load([
@@ -810,6 +812,34 @@ class DepartureController extends Controller
                 $departure->participants()->create([
                     'employee_id' => $employeeId,
                 ]);
+            }
+
+            // Uznanie za kierowanie — własny pojazd wyjazdu (vehicle_id w nagłówku). Transfer z lotniska używa osobnego
+            // LogisticsEvent + Adjustment w bloku niżej (tylko gdy brak vehicle_id).
+            if (! empty($validated['vehicle_id'])) {
+                $ownTransferCfg = $validated['transfer_config'] ?? [];
+                if (is_array($ownTransferCfg) && $ownTransferCfg !== []) {
+                    $ownDriverId = ! empty($ownTransferCfg['driver_employee_id']) ? (int) $ownTransferCfg['driver_employee_id'] : null;
+                    $ownBonus = $ownTransferCfg['bonus_amount'] ?? null;
+                    $ownCurrency = strtoupper(trim((string) ($ownTransferCfg['bonus_currency'] ?? 'PLN')));
+                    if (
+                        $ownDriverId
+                        && $ownBonus !== null && $ownBonus !== ''
+                        && is_numeric($ownBonus) && (float) $ownBonus > 0
+                        && strlen($ownCurrency) === 3
+                    ) {
+                        \App\Models\Adjustment::create([
+                            'employee_id' => $ownDriverId,
+                            'payroll_id' => null,
+                            'logistics_event_id' => $departure->id,
+                            'type' => 'bonus',
+                            'amount' => (float) $ownBonus,
+                            'currency' => $ownCurrency,
+                            'notes' => 'Uznanie za kierowanie pojazdem wyjazdu #'.$departure->id,
+                            'date' => $departureDate->toDateString(),
+                        ]);
+                    }
+                }
             }
 
             if (empty($validated['vehicle_id']) && $employeeIds->isNotEmpty()) {

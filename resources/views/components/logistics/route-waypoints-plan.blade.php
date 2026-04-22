@@ -110,6 +110,7 @@
             @foreach($stops as $stop)
                 <x-logistics.route-waypoint-loc-card
                     :wire-key-prefix="$wireKeyPrefix"
+                    :stable-row-key="isset($stop['key']) ? $wireKeyPrefix.'-'.str_replace(':', '-', (string) $stop['key']) : null"
                     :list-position="$loop->iteration"
                     :route-index="(int) ($stop['index'] ?? 0)"
                     :loc-id="$stop['id'] ?? ''"

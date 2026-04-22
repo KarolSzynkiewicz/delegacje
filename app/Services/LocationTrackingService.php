@@ -19,7 +19,7 @@ use Illuminate\Support\Collection;
 class LocationTrackingService
 {
     /**
-     * Czy pracownik może być uczestnikiem transferu (poza bazą lub w podróży — nie „w bazie”).
+     * Czy pracownik może być uczestnikiem transferu (poza lokalizacją bazy lub w podróży).
      */
     public function isEmployeeEligibleForTransfer(Employee $employee, Carbon $date): bool
     {
