@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Dodaj Szablon Kosztu Stałego">
+        <x-ui.page-header title="Dodaj Szablon Kosztu Ogólnofirmowego">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -15,7 +15,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Dodaj Nowy Szablon Kosztu Stałego">
+            <x-ui.card label="Dodaj Nowy Szablon Kosztu Ogólnofirmowego">
                 <form method="POST" action="{{ route('fixed-costs.store') }}">
                     @csrf
 

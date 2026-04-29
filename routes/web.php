@@ -361,6 +361,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('fixed-cost-entries/create', [\App\Http\Controllers\FixedCostController::class, 'createEntry'])
             ->name('fixed-cost-entries.create')
             ->defaults('resource', 'fixed-cost-entries');
+        Route::get('fixed-cost-entries/create-many', [\App\Http\Controllers\FixedCostController::class, 'createManyEntries'])
+            ->name('fixed-cost-entries.create-many')
+            ->defaults('resource', 'fixed-cost-entries');
+        Route::post('fixed-cost-entries/store-many', [\App\Http\Controllers\FixedCostController::class, 'storeManyEntries'])
+            ->name('fixed-cost-entries.store-many')
+            ->defaults('resource', 'fixed-cost-entries');
         Route::post('fixed-cost-entries', [\App\Http\Controllers\FixedCostController::class, 'storeEntry'])
             ->name('fixed-cost-entries.store')
             ->defaults('resource', 'fixed-cost-entries');

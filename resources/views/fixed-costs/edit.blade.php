@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Edytuj Szablon Kosztu Stałego">
+        <x-ui.page-header title="Edytuj Szablon Kosztu Ogólnofirmowego">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -15,7 +15,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Edytuj Szablon Kosztu Stałego">
+            <x-ui.card label="Edytuj Szablon Kosztu Ogólnofirmowego">
                 <form method="POST" action="{{ route('fixed-costs.update', $fixedCost) }}">
                     @csrf
                     @method('PUT')

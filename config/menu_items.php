@@ -108,7 +108,7 @@ return [
     'project_variable_costs' => [
         'route' => 'project-variable-costs.index',
         'icon' => 'bi bi-arrow-repeat',
-        'label' => 'Koszty zmienne',
+        'label' => 'Koszty projektowe',
     ],
 
     'transport_costs' => [
@@ -120,7 +120,7 @@ return [
     'fixed_costs' => [
         'route' => 'fixed-costs.index',
         'icon' => 'bi bi-lock',
-        'label' => 'Koszty stałe',
+        'label' => 'Koszty ogólnofirmowe',
     ],
 
     'fixed_cost_entries' => [

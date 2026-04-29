@@ -109,8 +109,8 @@
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
                             <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
-                                Koszty zmienne
-                                <x-tooltip title="Suma kosztów zmiennych przypisanych do projektów w wybranym miesiącu. Koszty zmienne to wydatki bezpośrednio związane z realizacją projektów, takie jak materiały, transport, zakwaterowanie itp.">
+                                Koszty projektowe
+                                <x-tooltip title="Suma kosztów projektowych przypisanych do projektów w wybranym miesiącu. Koszty projektowe to wydatki bezpośrednio związane z realizacją projektów, takie jak materiały, transport, zakwaterowanie itp.">
                                     <i class="bi bi-arrow-repeat text-warning fs-6"></i>
                                 </x-tooltip>
                             </div>
@@ -126,8 +126,8 @@
                     <div class="col-md-2">
                         <div class="text-center p-3 bg-light rounded">
                             <div class="text-muted small mb-1 d-flex align-items-center justify-content-center gap-1">
-                                Koszty stałe
-                                <x-tooltip title="Suma kosztów stałych w wybranym miesiącu. Koszty stałe to wydatki niezależne od poziomu działalności, takie jak czynsze, ubezpieczenia, opłaty administracyjne itp.">
+                                Koszty ogólnofirmowe
+                                <x-tooltip title="Suma kosztów ogólnofirmowych w wybranym miesiącu. Koszty ogólnofirmowe to wydatki niezależne od poziomu działalności, takie jak czynsze, ubezpieczenia, opłaty administracyjne itp.">
                                     <i class="bi bi-lock text-info fs-6"></i>
                                 </x-tooltip>
                             </div>
@@ -323,11 +323,11 @@
                             @endif
                         </div>
                         
-                        <!-- Koszty zmienne -->
+                        <!-- Koszty projektowe -->
                         <div>
                             <div class="text-muted small mb-1 d-flex align-items-center gap-1">
-                                Koszty zmienne
-                                <x-tooltip title="Suma kosztów zmiennych przypisanych do tego projektu w wybranym miesiącu. Obejmuje wydatki bezpośrednio związane z realizacją projektu, takie jak materiały, transport, zakwaterowanie itp.">
+                                Koszty projektowe
+                                <x-tooltip title="Suma kosztów projektowych przypisanych do tego projektu w wybranym miesiącu. Obejmuje wydatki bezpośrednio związane z realizacją projektu, takie jak materiały, transport, zakwaterowanie itp.">
                                     <i class="bi bi-arrow-repeat text-warning fs-6"></i>
                                 </x-tooltip>
                             </div>

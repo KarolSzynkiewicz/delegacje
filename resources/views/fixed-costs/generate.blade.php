@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Generuj Koszty Stałe">
+        <x-ui.page-header title="Generuj Koszty Ogólnofirmowe">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -15,7 +15,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Generuj Koszty Stałe">
+            <x-ui.card label="Generuj Koszty Ogólnofirmowe">
                 <form action="{{ route('fixed-costs.generate.store') }}" method="POST">
                     @csrf
 
@@ -63,7 +63,7 @@
                             type="submit"
                             action="save"
                         >
-                            Generuj Koszty Stałe
+                            Generuj Koszty Ogólnofirmowe
                         </x-ui.button>
                     </div>
                 </form>
@@ -71,7 +71,7 @@
 
             <x-ui.card label="Informacje" class="mt-4">
                 <p class="text-muted mb-0">
-                    System wygeneruje koszty stałe dla wszystkich aktywnych szablonów w wybranym okresie.
+                    System wygeneruje koszty ogólnofirmowe dla wszystkich aktywnych szablonów w wybranym okresie.
                     Koszty, które już istnieją dla danego okresu, zostaną pominięte.
                 </p>
             </x-ui.card>

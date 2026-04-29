@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Szablon Kosztu Stałego">
+        <x-ui.page-header title="Szablon Kosztu Ogólnofirmowego">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 

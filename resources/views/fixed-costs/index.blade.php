@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Koszty Stałe">
+        <x-ui.page-header title="Koszty Ogólnofirmowe">
             <x-slot name="right">
                 <div class="d-flex gap-2">
                     @if($activeTab === 'templates')
@@ -10,7 +10,7 @@
                             routeName="fixed-costs.generate"
                             action="filter"
                         >
-                            Generuj Koszty Stałe
+                            Generuj Koszty Ogólnofirmowe
                         </x-ui.button>
                         <x-ui.button 
                             variant="ghost" 
@@ -28,6 +28,14 @@
                             action="create"
                         >
                             Dodaj Koszt Niestandardowy
+                        </x-ui.button>
+                        <x-ui.button 
+                            variant="ghost" 
+                            href="{{ route('fixed-cost-entries.create-many') }}"
+                            routeName="fixed-cost-entries.create-many"
+                            action="create"
+                        >
+                            Dodaj wiele
                         </x-ui.button>
                     @endif
                 </div>
@@ -74,7 +82,7 @@
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
                         <div>
                             <h3 class="fs-5 fw-semibold mb-1 d-flex align-items-center gap-1">
-                                Szablony Kosztów Stałych
+                                Szablony Kosztów Ogólnofirmowych
                                 <x-tooltip title="Szablony kosztów stałych to wzorce definiujące powtarzające się wydatki firmy (np. czynsz, ubezpieczenia, abonamenty). Każdy szablon zawiera kwotę, interwał generowania (miesięczny, tygodniowy, roczny), dzień w miesiącu/tygodniu oraz okres obowiązywania. Na podstawie aktywnych szablonów możesz automatycznie generować wpisy księgowe dla wybranych okresów, co ułatwia zarządzanie regularnymi kosztami." direction="bottom">
                                     <i class="bi bi-info-circle text-primary fs-6"></i>
                                 </x-tooltip>
@@ -178,7 +186,7 @@
                         <div>
                             <h3 class="fs-5 fw-semibold mb-1 d-flex align-items-center gap-1">
                                 Koszty Księgowe
-                                <x-tooltip title="Koszty księgowe to faktyczne wpisy kosztów stałych w systemie. Mogą być generowane automatycznie z szablonów (przy użyciu funkcji 'Generuj Koszty Stałe') lub dodawane ręcznie jako koszty niestandardowe. Każdy wpis zawiera kwotę, okres obowiązywania, datę księgowania i opcjonalnie powiązanie z szablonem. Te wpisy są używane do obliczania rzeczywistych kosztów w raportach zysków i strat." direction="bottom">
+                                <x-tooltip title="Koszty księgowe to faktyczne wpisy kosztów ogólnofirmowych w systemie. Mogą być generowane automatycznie z szablonów (przy użyciu funkcji 'Generuj Koszty Ogólnofirmowe') lub dodawane ręcznie jako koszty niestandardowe. Każdy wpis zawiera kwotę, okres obowiązywania, datę księgowania i opcjonalnie powiązanie z szablonem. Te wpisy są używane do obliczania rzeczywistych kosztów w raportach zysków i strat." direction="bottom">
                                     <i class="bi bi-info-circle text-primary fs-6"></i>
                                 </x-tooltip>
                             </h3>
@@ -248,7 +256,7 @@
                             href="{{ route('fixed-costs.generate') }}"
                             routeName="fixed-costs.generate"
                         >
-                            Generuj Koszty Stałe
+                            Generuj Koszty Ogólnofirmowe
                         </x-ui.button>
                     </x-ui.empty-state>
                 @endif

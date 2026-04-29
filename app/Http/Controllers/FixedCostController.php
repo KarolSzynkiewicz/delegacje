@@ -195,6 +195,50 @@ class FixedCostController extends Controller
     }
 
     /**
+     * Show the grid form for creating multiple entries at once.
+     */
+    public function createManyEntries(): View
+    {
+        return view('fixed-costs.create-many-entries');
+    }
+
+    /**
+     * Store multiple entries submitted from the grid form.
+     */
+    public function storeManyEntries(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'period_start' => ['required', 'date'],
+            'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+            'entries' => ['required', 'array', 'min:1'],
+            'entries.*.accounting_date' => ['required', 'date'],
+            'entries.*.name' => ['required', 'string', 'max:255'],
+            'entries.*.amount' => ['required', 'numeric', 'min:0'],
+            'entries.*.currency' => ['required', 'string', 'size:3'],
+            'entries.*.notes' => ['nullable', 'string'],
+        ]);
+
+        $periodStart = $request->input('period_start');
+        $periodEnd = $request->input('period_end');
+
+        foreach ($request->input('entries') as $row) {
+            FixedCostEntry::create([
+                'name' => $row['name'],
+                'amount' => $row['amount'],
+                'currency' => $row['currency'],
+                'period_start' => $periodStart,
+                'period_end' => $periodEnd,
+                'accounting_date' => $row['accounting_date'],
+                'notes' => $row['notes'] ?? null,
+            ]);
+        }
+
+        return redirect()
+            ->route('fixed-costs.tab.entries')
+            ->with('success', 'Dodano ' . count($request->input('entries')) . ' wpisów kosztów.');
+    }
+
+    /**
      * Store a newly created entry (manual).
      */
     public function storeEntry(Request $request): RedirectResponse

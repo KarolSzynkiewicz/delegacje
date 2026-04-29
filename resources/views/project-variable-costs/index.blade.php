@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Koszty Zmienne Projektów">
+        <x-ui.page-header title="Koszty Projektowe">
             <x-slot name="right">
                 <x-ui.button 
                     variant="primary" 
@@ -60,7 +60,7 @@
         @else
             <x-ui.empty-state 
                 icon="folder-x"
-                message="Brak kosztów zmiennych w systemie"
+                message="Brak kosztów projektowych w systemie"
             >
                 <x-ui.button 
                     variant="primary" 
