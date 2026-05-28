@@ -23,6 +23,14 @@
                 {{ $entry->period_start->format('Y-m-d') }} - {{ $entry->period_end->format('Y-m-d') }}
             </x-ui.detail-item>
             <x-ui.detail-item label="Data księgowania:">{{ $entry->accounting_date->format('Y-m-d') }}</x-ui.detail-item>
+            <x-ui.detail-item label="Kategoria:">
+                @if($entry->category)
+                    @php $cats = \App\Models\FixedCostTemplate::categoryOptions(); @endphp
+                    {{ $cats[$entry->category] ?? $entry->category }}
+                @else
+                    <span class="text-muted">—</span>
+                @endif
+            </x-ui.detail-item>
             <x-ui.detail-item label="Szablon:">
                 @if($entry->template)
                     <a href="{{ route('fixed-costs.show', $entry->template) }}" class="text-decoration-none">

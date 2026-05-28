@@ -59,7 +59,8 @@
                             <th style="min-width:220px">Nazwa <span class="text-danger">*</span></th>
                             <th style="min-width:130px">Cena <span class="text-danger">*</span></th>
                             <th style="min-width:110px">Waluta <span class="text-danger">*</span></th>
-                            <th style="min-width:200px">Notatki</th>
+                            <th style="min-width:180px">Kategoria</th>
+                            <th style="min-width:180px">Notatki</th>
                             <th style="width:50px"></th>
                         </tr>
                     </thead>
@@ -108,6 +109,18 @@
                                         <option value="EUR">EUR</option>
                                         <option value="USD">USD</option>
                                         <option value="GBP">GBP</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select
+                                        :name="`entries[${index}][category]`"
+                                        x-model="row.category"
+                                        class="form-select form-select-sm"
+                                    >
+                                        <option value="">— brak —</option>
+                                        @foreach(\App\Models\FixedCostTemplate::categoryOptions() as $key => $label)
+                                            <option value="{{ $key }}">{{ $label }}</option>
+                                        @endforeach
                                     </select>
                                 </td>
                                 <td>
@@ -169,7 +182,7 @@
             let nextId = 1;
 
             function makeRow() {
-                return { id: nextId++, accounting_date: today, name: '', amount: '', currency: 'PLN', notes: '' };
+                return { id: nextId++, accounting_date: today, name: '', amount: '', currency: 'PLN', category: '', notes: '' };
             }
 
             return {

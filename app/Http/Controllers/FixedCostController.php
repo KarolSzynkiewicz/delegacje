@@ -217,6 +217,7 @@ class FixedCostController extends Controller
             'entries.*.name' => ['required', 'string', 'max:255'],
             'entries.*.amount' => ['required', 'numeric', 'min:0'],
             'entries.*.currency' => ['required', 'string', 'size:3'],
+            'entries.*.category' => ['nullable', 'string', 'max:64'],
             'entries.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -228,6 +229,7 @@ class FixedCostController extends Controller
                 'name' => $row['name'],
                 'amount' => $row['amount'],
                 'currency' => $row['currency'],
+                'category' => $row['category'] ?? null,
                 'period_start' => $periodStart,
                 'period_end' => $periodEnd,
                 'accounting_date' => $row['accounting_date'],

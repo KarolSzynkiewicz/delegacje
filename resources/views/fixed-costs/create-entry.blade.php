@@ -87,6 +87,20 @@
                     </div>
 
                     <div class="mb-3">
+                        <x-ui.input
+                            type="select"
+                            name="category"
+                            label="Kategoria (cost center)"
+                        >
+                            <option value="">— Brak / nie wybrano —</option>
+                            @foreach(\App\Models\FixedCostTemplate::categoryOptions() as $key => $label)
+                                <option value="{{ $key }}" {{ old('category') === $key ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </x-ui.input>
+                        <small class="text-muted">Używane do grupowania na wykresach struktury kosztów.</small>
+                    </div>
+
+                    <div class="mb-3">
                         <x-ui.input 
                             type="select" 
                             name="template_id" 
@@ -95,11 +109,11 @@
                             <option value="">Brak szablonu</option>
                             @foreach($templates as $template)
                                 <option value="{{ $template->id }}" {{ old('template_id') == $template->id ? 'selected' : '' }}>
-                                    {{ $template->name }}
+                                    {{ $template->name }}{{ $template->category ? ' · '.(\App\Models\FixedCostTemplate::categoryOptions()[$template->category] ?? $template->category) : '' }}
                                 </option>
                             @endforeach
                         </x-ui.input>
-                        <small class="text-muted">Możesz powiązać ten koszt z szablonem, jeśli został wygenerowany ręcznie z istniejącego szablonu.</small>
+                        <small class="text-muted">Powiązanie z szablonem automatycznie uzupełni kategorię, jeśli pole wyżej pozostanie puste.</small>
                     </div>
 
                     <div class="mb-4">
