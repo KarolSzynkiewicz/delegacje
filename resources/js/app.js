@@ -1,5 +1,6 @@
 import './bootstrap';
-import 'bootstrap'; // Bootstrap JS (dla modals, dropdowns, etc.)
+import * as bootstrap from 'bootstrap'; // Bootstrap JS (dla modals, dropdowns, etc.)
+window.bootstrap = bootstrap;
 
 /**
  * Livewire po morphowaniu DOM potrafi „zsunąć” stronę w dół (focus / przeliczenie layoutu).
