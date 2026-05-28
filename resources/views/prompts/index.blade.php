@@ -1,6 +1,12 @@
 @php
     $defaultStart = now()->startOfMonth()->toDateString();
     $defaultEnd = now()->toDateString();
+
+    $assignmentEmployees = \App\Models\Employee::orderBy('last_name')->orderBy('first_name')
+        ->get(['id', 'first_name', 'last_name'])
+        ->map(fn ($e) => ['id' => $e->id, 'full_name' => $e->full_name])
+        ->values()
+        ->all();
 @endphp
 
 <x-app-layout>
@@ -16,6 +22,7 @@
         id="prompt-engine-page"
         class="prompt-engine-page"
         data-export-tasks-url="{{ route('prompts.export.tasks') }}"
+        data-export-assignments-url="{{ route('prompts.export.assignments') }}"
         data-default-start="{{ $defaultStart }}"
         data-default-end="{{ $defaultEnd }}"
     >
@@ -44,16 +51,24 @@
             </div>
 
             <div class="col d-flex">
-                <x-ui.card class="w-100 d-flex flex-column opacity-50">
+                <x-ui.card variant="hover" class="w-100 d-flex flex-column">
                     <div class="d-flex align-items-start gap-2 mb-2">
-                        <span class="rounded-2 p-2 bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-hourglass-split fs-5"></i></span>
+                        <span class="rounded-2 p-2 bg-success bg-opacity-10 text-success"><i class="bi bi-people fs-5"></i></span>
                         <div class="min-w-0">
-                            <div class="fw-semibold">Więcej eksportów</div>
-                            <div class="text-muted small">Kolejne kafelki prompt engine — w przygotowaniu.</div>
+                            <div class="fw-semibold">Przypisania pracowników</div>
+                            <div class="text-muted small">Projekty, auta, domy, rotacje, wyjazdy i zjazdy — dla wybranych osób i okresu.</div>
                         </div>
                     </div>
                     <div class="mt-auto pt-2">
-                        <x-ui.badge variant="info">Wkrótce</x-ui.badge>
+                        <x-ui.button
+                            variant="success"
+                            class="w-100"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#promptEngineAssignmentsModal"
+                        >
+                            Wybierz osoby i pobierz
+                        </x-ui.button>
                     </div>
                 </x-ui.card>
             </div>
@@ -89,7 +104,106 @@
             </div>
         </div>
 
-        {{-- Modal musi być podpięty pod body: .app-content-wrapper ma backdrop-filter i psuje fixed + klikalność. --}}
+        {{-- Assignments modal --}}
+        <div
+            class="modal fade departure-planner-teleport-modal"
+            id="promptEngineAssignmentsModal"
+            tabindex="-1"
+            aria-labelledby="promptEngineAssignmentsModalLabel"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: var(--bs-body-color, #e2e8f0);">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title" id="promptEngineAssignmentsModalLabel">
+                            <i class="bi bi-people me-2 text-success"></i>Eksport przypisań (JSON)
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="prompt-engine-assignments-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
+
+                        {{-- Date range --}}
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <x-ui.input type="date" name="pea_start_date" id="pea_start_date" label="Data od" :value="$defaultStart" required />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.input type="date" name="pea_end_date" id="pea_end_date" label="Data do" :value="$defaultEnd" required />
+                            </div>
+                        </div>
+
+                        {{-- Employee picker --}}
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Pracownicy</label>
+                            <div class="d-flex gap-2 mb-2">
+                                <input
+                                    id="pea-emp-search"
+                                    type="search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Szukaj pracownika…"
+                                    autocomplete="off"
+                                >
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" id="pea-select-all">Zaznacz wszystkich</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" id="pea-deselect-all">Odznacz</button>
+                            </div>
+                            <div
+                                id="pea-emp-list"
+                                class="border rounded-2 p-2"
+                                style="max-height:200px;overflow-y:auto;background:rgba(255,255,255,0.04);"
+                            >
+                                @foreach($assignmentEmployees as $emp)
+                                    <div
+                                        class="pea-emp-row d-flex align-items-center gap-2 px-2 py-1 rounded-2"
+                                        data-name="{{ mb_strtolower($emp['full_name']) }}"
+                                        style="cursor:pointer;"
+                                        onclick="this.querySelector('input').click()"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input pea-emp-cb flex-shrink-0"
+                                            value="{{ $emp['id'] }}"
+                                            style="pointer-events:none;"
+                                        >
+                                        <span class="small">{{ $emp['full_name'] }}</span>
+                                    </div>
+                                @endforeach
+                                @if(empty($assignmentEmployees))
+                                    <p class="small text-muted mb-0 px-2">Brak pracowników w systemie.</p>
+                                @endif
+                            </div>
+                            <div class="mt-1">
+                                <span id="pea-selected-count" class="small text-muted">Wszyscy pracownicy (brak filtra)</span>
+                            </div>
+                        </div>
+
+                        {{-- Actions --}}
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <x-ui.button variant="success" type="button" id="pea-fetch">Generuj JSON</x-ui.button>
+                            <x-ui.button variant="ghost" type="button" id="pea-copy" disabled>Skopiuj do schowka</x-ui.button>
+                        </div>
+                        <div id="pea-loading" class="text-muted small d-none mb-2">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Ładowanie…
+                        </div>
+                        <label class="form-label small text-muted" for="pea-json">Wynik</label>
+                        <textarea
+                            id="pea-json"
+                            class="form-control font-monospace small"
+                            rows="12"
+                            readonly
+                            placeholder="Kliknij „Generuj JSON"…"
+                            style="min-height:240px;"
+                        ></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <x-ui.button variant="ghost" type="button" data-bs-dismiss="modal">Zamknij</x-ui.button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Tasks modal musi być podpięty pod body: .app-content-wrapper ma backdrop-filter i psuje fixed + klikalność. --}}
         <div
             class="modal fade departure-planner-teleport-modal"
             id="promptEngineTasksModal"
@@ -141,6 +255,165 @@
 
     @push('scripts')
         <script>
+            // ── Assignments modal ────────────────────────────────────────────────────
+            (function () {
+                const root = document.getElementById('prompt-engine-page');
+                if (!root) return;
+
+                const modalEl = document.getElementById('promptEngineAssignmentsModal');
+                if (modalEl && modalEl.parentElement !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+
+                const exportUrl = root.dataset.exportAssignmentsUrl;
+                const defaultStart = root.dataset.defaultStart;
+                const defaultEnd = root.dataset.defaultEnd;
+
+                const startInput = document.getElementById('pea_start_date');
+                const endInput = document.getElementById('pea_end_date');
+                const searchInput = document.getElementById('pea-emp-search');
+                const empList = document.getElementById('pea-emp-list');
+                const selectAllBtn = document.getElementById('pea-select-all');
+                const deselectAllBtn = document.getElementById('pea-deselect-all');
+                const selectedCountEl = document.getElementById('pea-selected-count');
+                const fetchBtn = document.getElementById('pea-fetch');
+                const copyBtn = document.getElementById('pea-copy');
+                const textarea = document.getElementById('pea-json');
+                const loadingEl = document.getElementById('pea-loading');
+                const errorEl = document.getElementById('prompt-engine-assignments-error');
+
+                function allRows() {
+                    return Array.from(empList?.querySelectorAll('.pea-emp-row') ?? []);
+                }
+
+                function updateSelectedCount() {
+                    const checked = empList?.querySelectorAll('.pea-emp-cb:checked').length ?? 0;
+                    const total = empList?.querySelectorAll('.pea-emp-cb').length ?? 0;
+                    if (!selectedCountEl) return;
+                    if (checked === 0) {
+                        selectedCountEl.textContent = 'Wszyscy pracownicy (brak filtra)';
+                    } else {
+                        selectedCountEl.textContent = `Wybrano: ${checked} z ${total}`;
+                    }
+                }
+
+                function filterEmployees() {
+                    const q = (searchInput?.value ?? '').toLowerCase().trim();
+                    allRows().forEach((row) => {
+                        const name = row.dataset.name ?? '';
+                        row.style.display = (!q || name.includes(q)) ? '' : 'none';
+                    });
+                }
+
+                searchInput?.addEventListener('input', filterEmployees);
+
+                selectAllBtn?.addEventListener('click', () => {
+                    allRows().forEach((row) => {
+                        if (row.style.display !== 'none') {
+                            const cb = row.querySelector('.pea-emp-cb');
+                            if (cb) cb.checked = true;
+                        }
+                    });
+                    updateSelectedCount();
+                });
+
+                deselectAllBtn?.addEventListener('click', () => {
+                    empList?.querySelectorAll('.pea-emp-cb').forEach((cb) => { cb.checked = false; });
+                    updateSelectedCount();
+                });
+
+                empList?.addEventListener('change', updateSelectedCount);
+
+                modalEl?.addEventListener('show.bs.modal', () => {
+                    if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('d-none'); }
+                    if (startInput && !startInput.value) startInput.value = defaultStart;
+                    if (endInput && !endInput.value) endInput.value = defaultEnd;
+                    updateSelectedCount();
+                });
+
+                modalEl?.addEventListener('hidden.bs.modal', () => {
+                    loadingEl?.classList.add('d-none');
+                });
+
+                function showError(msg) {
+                    if (!errorEl) return;
+                    errorEl.textContent = msg || 'Wystąpił błąd.';
+                    errorEl.classList.remove('d-none');
+                }
+
+                function clearError() {
+                    if (!errorEl) return;
+                    errorEl.textContent = '';
+                    errorEl.classList.add('d-none');
+                }
+
+                fetchBtn?.addEventListener('click', async () => {
+                    clearError();
+                    const start = startInput?.value;
+                    const end = endInput?.value;
+                    if (!start || !end) { showError('Uzupełnij daty od i do.'); return; }
+
+                    loadingEl?.classList.remove('d-none');
+                    fetchBtn.disabled = true;
+                    copyBtn.disabled = true;
+                    textarea.value = '';
+
+                    const url = new URL(exportUrl, window.location.origin);
+                    url.searchParams.set('start_date', start);
+                    url.searchParams.set('end_date', end);
+
+                    const checkedIds = Array.from(empList?.querySelectorAll('.pea-emp-cb:checked') ?? [])
+                        .map((cb) => cb.value);
+                    checkedIds.forEach((id) => url.searchParams.append('employee_ids[]', id));
+
+                    try {
+                        const res = await fetch(url.toString(), {
+                            headers: { Accept: 'application/json' },
+                            credentials: 'same-origin',
+                        });
+                        const text = await res.text();
+                        if (!res.ok) {
+                            let detail = text;
+                            try {
+                                const j = JSON.parse(text);
+                                if (j.errors && typeof j.errors === 'object') {
+                                    detail = Object.values(j.errors).flat()[0] || j.message || text;
+                                } else {
+                                    detail = j.message || j.error || text;
+                                }
+                            } catch (_) {}
+                            showError('Serwer zwrócił błąd (' + res.status + '): ' + detail);
+                            return;
+                        }
+                        let parsed;
+                        try { parsed = JSON.parse(text); } catch (e) {
+                            showError('Odpowiedź nie jest poprawnym JSON.');
+                            textarea.value = text;
+                            return;
+                        }
+                        textarea.value = JSON.stringify(parsed, null, 2);
+                        copyBtn.disabled = false;
+                    } catch (e) {
+                        showError(e?.message || 'Nie udało się pobrać danych.');
+                    } finally {
+                        loadingEl?.classList.add('d-none');
+                        fetchBtn.disabled = false;
+                    }
+                });
+
+                copyBtn?.addEventListener('click', async () => {
+                    const t = textarea.value;
+                    if (!t) return;
+                    try {
+                        await navigator.clipboard.writeText(t);
+                    } catch (_) {
+                        textarea.focus(); textarea.select();
+                        try { document.execCommand('copy'); } catch (__) {}
+                    }
+                });
+            })();
+
+            // ── Tasks modal ──────────────────────────────────────────────────────────
             (function () {
                 const root = document.getElementById('prompt-engine-page');
                 if (!root) return;

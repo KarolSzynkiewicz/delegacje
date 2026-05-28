@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PromptEngine\AssignmentPromptBundleService;
 use App\Services\PromptEngine\TaskPromptBundleService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -26,5 +27,21 @@ class PromptEngineController extends Controller
         $end = Carbon::parse($validated['end_date']);
 
         return response()->json($bundleService->build($start, $end));
+    }
+
+    public function exportAssignments(Request $request, AssignmentPromptBundleService $bundleService): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'employee_ids' => ['nullable', 'array'],
+            'employee_ids.*' => ['integer', 'exists:employees,id'],
+        ]);
+
+        $start = Carbon::parse($validated['start_date']);
+        $end = Carbon::parse($validated['end_date']);
+        $employeeIds = array_map('intval', $validated['employee_ids'] ?? []);
+
+        return response()->json($bundleService->build($start, $end, $employeeIds));
     }
 }
