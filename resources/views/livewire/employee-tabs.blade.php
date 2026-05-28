@@ -855,6 +855,11 @@
                 </div>
             </div>
         </div>
+    @elseif($activeTab === 'comments')
+        <!-- Zakładka Komentarze -->
+        <div id="comments" role="tabpanel">
+            <x-comments :commentable="$employee" />
+        </div>
     @endif
 </div>
 </div>

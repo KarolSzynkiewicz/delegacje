@@ -3,6 +3,7 @@
 namespace App\Enums;
 
 use App\Models\Accommodation;
+use App\Models\Employee;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
@@ -18,6 +19,7 @@ enum CommentableType: string
     case ACCOMMODATION = 'accommodation';
     case LOGISTICS_EVENT = 'logistics_event';
     case LOCATION = 'location';
+    case EMPLOYEE = 'employee';
 
     public function modelClass(): string
     {
@@ -28,6 +30,7 @@ enum CommentableType: string
             self::ACCOMMODATION => Accommodation::class,
             self::LOGISTICS_EVENT => LogisticsEvent::class,
             self::LOCATION => Location::class,
+            self::EMPLOYEE => Employee::class,
         };
     }
 
@@ -40,6 +43,7 @@ enum CommentableType: string
             Accommodation::class => self::ACCOMMODATION,
             LogisticsEvent::class => self::LOGISTICS_EVENT,
             Location::class => self::LOCATION,
+            Employee::class => self::EMPLOYEE,
             default => throw new \InvalidArgumentException('Model '.$model::class.' is not commentable'),
         };
     }

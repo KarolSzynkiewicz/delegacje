@@ -20,7 +20,7 @@ class StoreCommentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'commentable_type' => ['required', 'string', 'in:project,project_task,vehicle,accommodation,logistics_event,location'],
+            'commentable_type' => ['required', 'string', 'in:'.implode(',', CommentableType::values())],
             'commentable_id' => ['required', 'integer'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
             'body' => ['nullable', 'string', 'max:5000'],

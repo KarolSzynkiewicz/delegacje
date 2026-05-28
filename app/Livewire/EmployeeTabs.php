@@ -36,6 +36,7 @@ class EmployeeTabs extends Component
             'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
             'evaluations' => ['label' => 'Oceny', 'permission' => 'employee-evaluations.view', 'icon' => 'bi bi-star-fill'],
             'adjustments' => ['label' => 'Obciążenia i uznania', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
+            'comments' => ['label' => 'Komentarze', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp
@@ -81,6 +82,7 @@ class EmployeeTabs extends Component
                 ->get(),
             'evaluations' => $this->employee->evaluations()->with('createdBy')->orderBy('created_at', 'desc')->get(),
             'adjustments' => $this->employee->adjustments()->orderBy('date', 'desc')->get(),
+            'comments' => null, // komentarze ładowane przez komponent x-comments
             default => null,
         };
     }
@@ -99,7 +101,8 @@ class EmployeeTabs extends Component
             'payrolls',
             'advances',
             'evaluations',
-            'adjustments'
+            'adjustments',
+            'comments'
         ]);
         
         // Load roles for info tab
@@ -128,6 +131,7 @@ class EmployeeTabs extends Component
                 'time-logs' => $timeLogsCount,
                 'evaluations' => $this->employee->evaluations_count ?? 0,
                 'adjustments' => $this->employee->adjustments_count ?? 0,
+                'comments' => $this->employee->comments_count ?? 0,
                 default => null,
             };
             
