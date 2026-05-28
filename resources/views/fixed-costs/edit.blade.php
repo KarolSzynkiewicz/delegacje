@@ -57,6 +57,20 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <x-ui.input 
+                            type="select" 
+                            name="category" 
+                            label="Kategoria kosztu (cost center)"
+                        >
+                            <option value="">— Brak / nie wybrano —</option>
+                            @foreach(\App\Models\FixedCostTemplate::categoryOptions() as $key => $label)
+                                <option value="{{ $key }}" {{ old('category', $fixedCost->category) === $key ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </x-ui.input>
+                        <small class="text-muted">Używane do grupowania na wykresach struktury kosztów stałych.</small>
+                    </div>
+
                     <div class="row mb-3">
                         <div class="col-md-6 mb-3 mb-md-0">
                             <x-ui.input 

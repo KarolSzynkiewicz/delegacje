@@ -15,6 +15,7 @@ class FixedCostTemplate extends Model
         'name',
         'amount',
         'currency',
+        'category',
         'interval_type',
         'interval_day',
         'start_date',
@@ -22,6 +23,28 @@ class FixedCostTemplate extends Model
         'notes',
         'is_active',
     ];
+
+    /**
+     * Predefiniowane kategorie kosztów stałych firmowych
+     * (cost-centers / overhead grouping).
+     *
+     * @return array<string, string>
+     */
+    public static function categoryOptions(): array
+    {
+        return [
+            'office'      => 'Biuro (czynsze biurowe, media)',
+            'accounting'  => 'Księgowość / prawnicy',
+            'software'    => 'Oprogramowanie / licencje',
+            'leasing'     => 'Leasing aut firmowych',
+            'insurance'   => 'Ubezpieczenia',
+            'marketing'   => 'Marketing',
+            'hr'          => 'HR / rekrutacje',
+            'bank'        => 'Bank / prowizje',
+            'taxes'       => 'Podatki / opłaty publiczne',
+            'other'       => 'Inne',
+        ];
+    }
 
     protected $casts = [
         'amount' => 'decimal:2',

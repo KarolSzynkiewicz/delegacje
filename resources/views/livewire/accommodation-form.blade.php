@@ -289,6 +289,38 @@
                 <x-input-error :messages="$errors->get('lease_end_date')" class="mt-2" />
             </div>
         </div>
+        <div class="row">
+            <div class="col-md-8 mb-3">
+                <x-input-label for="lease_monthly_rent" value="Miesięczny czynsz (opcjonalny)" />
+                <input
+                    type="number"
+                    id="lease_monthly_rent"
+                    wire:model="lease_monthly_rent"
+                    name="lease_monthly_rent"
+                    class="form-control mt-1 @error('lease_monthly_rent') is-invalid @enderror"
+                    step="0.01"
+                    min="0"
+                    placeholder="np. 1500.00"
+                />
+                <small class="text-muted">Używane w raportach kosztów (proporcjonalnie do dni najmu w okresie).</small>
+                <x-input-error :messages="$errors->get('lease_monthly_rent')" class="mt-2" />
+            </div>
+            <div class="col-md-4 mb-3">
+                <x-input-label for="lease_currency" value="Waluta czynszu" />
+                <select
+                    id="lease_currency"
+                    wire:model="lease_currency"
+                    name="lease_currency"
+                    class="form-select mt-1 @error('lease_currency') is-invalid @enderror"
+                >
+                    <option value="EUR">EUR</option>
+                    <option value="PLN">PLN</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                </select>
+                <x-input-error :messages="$errors->get('lease_currency')" class="mt-2" />
+            </div>
+        </div>
     @endif
 
     <div class="mb-3">

@@ -40,6 +40,8 @@ class AccommodationController extends Controller
                 'type' => 'wynajmowany',
                 'start_date' => $validated['lease_start_date'] ?? null,
                 'end_date' => $validated['lease_end_date'] ?? null,
+                'monthly_rent' => $validated['lease_monthly_rent'] ?? null,
+                'currency' => !empty($validated['lease_monthly_rent']) ? ($validated['lease_currency'] ?? 'EUR') : null,
             ]);
         }
 
@@ -85,6 +87,8 @@ class AccommodationController extends Controller
                 'type' => 'wynajmowany',
                 'start_date' => $validated['lease_start_date'] ?? null,
                 'end_date' => $validated['lease_end_date'] ?? null,
+                'monthly_rent' => $validated['lease_monthly_rent'] ?? null,
+                'currency' => !empty($validated['lease_monthly_rent']) ? ($validated['lease_currency'] ?? 'EUR') : null,
             ];
 
             if ($activeLease) {
@@ -121,6 +125,8 @@ class AccommodationController extends Controller
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'monthly_rent' => ['nullable', 'numeric', 'min:0'],
+            'currency' => ['nullable', 'string', 'size:3'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -134,6 +140,8 @@ class AccommodationController extends Controller
             'type' => 'wynajmowany',
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'] ?? null,
+            'monthly_rent' => $validated['monthly_rent'] ?? null,
+            'currency' => !empty($validated['monthly_rent']) ? ($validated['currency'] ?? 'EUR') : null,
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -148,12 +156,16 @@ class AccommodationController extends Controller
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'monthly_rent' => ['nullable', 'numeric', 'min:0'],
+            'currency' => ['nullable', 'string', 'size:3'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
         $lease->update([
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'] ?? null,
+            'monthly_rent' => $validated['monthly_rent'] ?? null,
+            'currency' => !empty($validated['monthly_rent']) ? ($validated['currency'] ?? $lease->currency ?? 'EUR') : null,
             'notes' => $validated['notes'] ?? null,
         ]);
 

@@ -20,6 +20,8 @@ class ProjectVariableCost extends Model
         'name',
         'amount',
         'currency',
+        'incurred_date',
+        'category',
         'notes',
     ];
 
@@ -30,7 +32,27 @@ class ProjectVariableCost extends Model
      */
     protected $casts = [
         'amount' => 'decimal:2',
+        'incurred_date' => 'date',
     ];
+
+    /**
+     * Predefiniowane kategorie kosztów zmiennych (sugerowane w UI,
+     * pole pozostaje dowolnym stringiem dla elastyczności).
+     *
+     * @return array<string, string>
+     */
+    public static function categoryOptions(): array
+    {
+        return [
+            'material'      => 'Materiały',
+            'equipment'     => 'Sprzęt jednorazowy',
+            'subcontractor' => 'Podwykonawcy',
+            'food'          => 'Wyżywienie / catering',
+            'tools'         => 'Narzędzia',
+            'permits'       => 'Pozwolenia / opłaty urzędowe',
+            'other'         => 'Inne',
+        ];
+    }
 
     /**
      * Get the project that owns this variable cost.

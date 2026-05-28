@@ -78,6 +78,7 @@ class FixedCostController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
+            'category' => ['nullable', 'string', 'max:64'],
             'interval_type' => ['required', 'in:monthly,weekly,yearly'],
             'interval_day' => ['required', 'integer', 'min:1', 'max:31'],
             'start_date' => ['nullable', 'date'],
@@ -124,6 +125,7 @@ class FixedCostController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
+            'category' => ['nullable', 'string', 'max:64'],
             'interval_type' => ['required', 'in:monthly,weekly,yearly'],
             'interval_day' => ['required', 'integer', 'min:1', 'max:31'],
             'start_date' => ['nullable', 'date'],
@@ -247,12 +249,21 @@ class FixedCostController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
+            'category' => ['nullable', 'string', 'max:64'],
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after_or_equal:period_start'],
             'accounting_date' => ['required', 'date'],
             'template_id' => ['nullable', 'exists:fixed_cost_templates,id'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        // Jeśli wpis pochodzi z szablonu i nie wybrano własnej kategorii — odziedzicz z szablonu.
+        if (empty($validated['category']) && !empty($validated['template_id'])) {
+            $template = FixedCostTemplate::find($validated['template_id']);
+            if ($template && $template->category) {
+                $validated['category'] = $template->category;
+            }
+        }
 
         FixedCostEntry::create($validated);
 

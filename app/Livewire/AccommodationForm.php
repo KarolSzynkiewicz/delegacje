@@ -51,6 +51,10 @@ class AccommodationForm extends Component
 
     public ?string $lease_end_date = null;
 
+    public ?string $lease_monthly_rent = null;
+
+    public string $lease_currency = 'EUR';
+
     public string $description = '';
 
     protected GeocodingService $geocodingService;
@@ -74,6 +78,8 @@ class AccommodationForm extends Component
             $this->type = $lease?->type ?? 'własny';
             $this->lease_start_date = $lease?->start_date?->format('Y-m-d');
             $this->lease_end_date = $lease?->end_date?->format('Y-m-d');
+            $this->lease_monthly_rent = $lease?->monthly_rent !== null ? (string) $lease->monthly_rent : null;
+            $this->lease_currency = $lease?->currency ?? 'EUR';
 
             if ($accommodation->location_id) {
                 $this->location_mode = 'existing';

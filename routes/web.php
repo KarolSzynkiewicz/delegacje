@@ -454,6 +454,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('prompts.export.assignments')
             ->defaults('resource', 'tasks');
 
+        Route::get('/prompts/export/costs', [PromptEngineController::class, 'exportCosts'])
+            ->name('prompts.export.costs')
+            ->defaults('resource', 'tasks');
+
         // Redirect old route to new one
         Route::get('/dashboard/profitability', function () {
             return redirect()->route('profitability.index');

@@ -101,6 +101,7 @@
                                     <th>Typ</th>
                                     <th>Od</th>
                                     <th>Do</th>
+                                    <th>Czynsz</th>
                                     <th>Status</th>
                                     <th>Uwagi</th>
                                     <th class="text-end">Akcje</th>
@@ -118,6 +119,14 @@
                                         </td>
                                         <td>{{ $lease->start_date?->format('d.m.Y') ?? '—' }}</td>
                                         <td>{{ $lease->end_date?->format('d.m.Y') ?? 'bezterminowo' }}</td>
+                                        <td class="text-nowrap">
+                                            @if($lease->monthly_rent !== null)
+                                                <strong>{{ number_format((float) $lease->monthly_rent, 2, ',', ' ') }}</strong>
+                                                <small class="text-muted">{{ $lease->currency ?? '' }} / mc</small>
+                                            @else
+                                                <small class="text-muted">—</small>
+                                            @endif
+                                        </td>
                                         <td>
                                             @if($lease->isActive())
                                                 <x-ui.badge variant="success">Aktywny</x-ui.badge>
@@ -148,7 +157,7 @@
                                         </td>
                                     </tr>
                                     <tr x-show="leaseEditId === {{ $lease->id }}" x-cloak>
-                                        <td colspan="6" class="bg-body-secondary bg-opacity-10 border-bottom">
+                                        <td colspan="7" class="bg-body-secondary bg-opacity-10 border-bottom">
                                             <form
                                                 method="POST"
                                                 action="{{ route('accommodations.leases.update', [$accommodation, $lease]) }}"
@@ -158,7 +167,7 @@
                                                 @method('PUT')
                                                 <input type="hidden" name="lease_edit" value="{{ $lease->id }}">
                                                 <div class="row g-2 align-items-end">
-                                                    <div class="col-md-4">
+                                                    <div class="col-md-3">
                                                         <label class="form-label small mb-1">Od <span class="text-danger">*</span></label>
                                                         <input
                                                             type="date"
@@ -169,7 +178,7 @@
                                                         >
                                                         <x-input-error :messages="$errors->get('start_date')" class="mt-1" />
                                                     </div>
-                                                    <div class="col-md-4">
+                                                    <div class="col-md-3">
                                                         <label class="form-label small mb-1">Do</label>
                                                         <input
                                                             type="date"
@@ -179,7 +188,28 @@
                                                         >
                                                         <x-input-error :messages="$errors->get('end_date')" class="mt-1" />
                                                     </div>
-                                                    <div class="col-md-4">
+                                                    <div class="col-md-2">
+                                                        <label class="form-label small mb-1">Czynsz / mc</label>
+                                                        <input
+                                                            type="number"
+                                                            name="monthly_rent"
+                                                            step="0.01"
+                                                            min="0"
+                                                            class="form-control form-control-sm @error('monthly_rent') is-invalid @enderror"
+                                                            value="{{ old('lease_edit') == $lease->id ? old('monthly_rent', $lease->monthly_rent) : $lease->monthly_rent }}"
+                                                            placeholder="np. 1500"
+                                                        >
+                                                        <x-input-error :messages="$errors->get('monthly_rent')" class="mt-1" />
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label small mb-1">Waluta</label>
+                                                        <select name="currency" class="form-select form-select-sm">
+                                                            @foreach(['EUR','PLN','USD','GBP'] as $cur)
+                                                                <option value="{{ $cur }}" {{ ($lease->currency ?? 'EUR') === $cur ? 'selected' : '' }}>{{ $cur }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-2">
                                                         <label class="form-label small mb-1">Uwagi</label>
                                                         <input
                                                             type="text"
@@ -212,19 +242,32 @@
                     <form action="{{ route('accommodations.leases.store', $accommodation) }}" method="POST">
                         @csrf
                         <div class="row g-2 align-items-end">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small mb-1">Od <span class="text-danger">*</span></label>
                                 <input type="date" name="start_date" class="form-control form-control-sm @error('start_date') is-invalid @enderror" value="{{ old('start_date') }}" required>
                                 <x-input-error :messages="$errors->get('start_date')" class="mt-1" />
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small mb-1">Do</label>
                                 <input type="date" name="end_date" class="form-control form-control-sm @error('end_date') is-invalid @enderror" value="{{ old('end_date') }}">
                                 <x-input-error :messages="$errors->get('end_date')" class="mt-1" />
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Czynsz / mc</label>
+                                <input type="number" step="0.01" min="0" name="monthly_rent" class="form-control form-control-sm @error('monthly_rent') is-invalid @enderror" value="{{ old('monthly_rent') }}" placeholder="np. 1500">
+                                <x-input-error :messages="$errors->get('monthly_rent')" class="mt-1" />
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label small mb-1">Waluta</label>
+                                <select name="currency" class="form-select form-select-sm">
+                                    @foreach(['EUR','PLN','USD','GBP'] as $cur)
+                                        <option value="{{ $cur }}" {{ old('currency', 'EUR') === $cur ? 'selected' : '' }}>{{ $cur }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label small mb-1">Uwagi</label>
-                                <input type="text" name="notes" class="form-control form-control-sm" value="{{ old('notes') }}" placeholder="np. przedłużenie umowy">
+                                <input type="text" name="notes" class="form-control form-control-sm" value="{{ old('notes') }}" placeholder="np. przedłużenie">
                             </div>
                             <div class="col-md-1">
                                 <x-ui.button type="submit" variant="primary" class="btn-sm w-100">

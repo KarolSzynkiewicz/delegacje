@@ -17,6 +17,7 @@ class FixedCostEntry extends Model
         'name',
         'amount',
         'currency',
+        'category',
         'period_start',
         'period_end',
         'accounting_date',

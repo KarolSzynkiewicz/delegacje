@@ -7,6 +7,12 @@
         ->map(fn ($e) => ['id' => $e->id, 'full_name' => $e->full_name])
         ->values()
         ->all();
+
+    $costProjects = \App\Models\Project::orderBy('name')
+        ->get(['id', 'name', 'status'])
+        ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name])
+        ->values()
+        ->all();
 @endphp
 
 <x-app-layout>
@@ -23,6 +29,7 @@
         class="prompt-engine-page"
         data-export-tasks-url="{{ route('prompts.export.tasks') }}"
         data-export-assignments-url="{{ route('prompts.export.assignments') }}"
+        data-export-costs-url="{{ route('prompts.export.costs') }}"
         data-default-start="{{ $defaultStart }}"
         data-default-end="{{ $defaultEnd }}"
     >
@@ -74,16 +81,24 @@
             </div>
 
             <div class="col d-flex">
-                <x-ui.card class="w-100 d-flex flex-column opacity-50">
+                <x-ui.card variant="hover" class="w-100 d-flex flex-column">
                     <div class="d-flex align-items-start gap-2 mb-2">
-                        <span class="rounded-2 p-2 bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-hourglass-split fs-5"></i></span>
+                        <span class="rounded-2 p-2 bg-warning bg-opacity-10 text-warning"><i class="bi bi-cash-stack fs-5"></i></span>
                         <div class="min-w-0">
-                            <div class="fw-semibold">Więcej eksportów</div>
-                            <div class="text-muted small">Kolejne kafelki prompt engine — w przygotowaniu.</div>
+                            <div class="fw-semibold">Koszty (raw JSON)</div>
+                            <div class="text-muted small">Stałe, zmienne, transport, najem, praca, korekty — per waluta (PLN i EUR osobno).</div>
                         </div>
                     </div>
                     <div class="mt-auto pt-2">
-                        <x-ui.badge variant="info">Wkrótce</x-ui.badge>
+                        <x-ui.button
+                            variant="warning"
+                            class="w-100"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#promptEngineCostsModal"
+                        >
+                            Wybierz zakres i pobierz
+                        </x-ui.button>
                     </div>
                 </x-ui.card>
             </div>
@@ -251,6 +266,163 @@
                     <div class="modal-footer border-secondary">
                         <x-ui.button variant="ghost" type="button" data-bs-dismiss="modal">Zamknij</x-ui.button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Costs modal --}}
+        <div
+            class="modal fade departure-planner-teleport-modal"
+            id="promptEngineCostsModal"
+            tabindex="-1"
+            aria-labelledby="promptEngineCostsModalLabel"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: var(--bs-body-color, #e2e8f0);">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title" id="promptEngineCostsModalLabel">
+                            <i class="bi bi-cash-stack me-2 text-warning"></i>Eksport kosztów (JSON)
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="prompt-engine-costs-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <x-ui.input type="date" name="pc_start_date" id="pc_start_date" label="Data od" :value="$defaultStart" required />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.input type="date" name="pc_end_date" id="pc_end_date" label="Data do" :value="$defaultEnd" required />
+                            </div>
+                        </div>
+
+                        {{-- Cost types include --}}
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Kategorie kosztów do uwzględnienia</label>
+                            <div class="d-flex flex-wrap gap-2" id="pc-include-list">
+                                @php
+                                    $costTypes = [
+                                        'fixed'           => 'Stałe (overhead)',
+                                        'variable'        => 'Zmienne (projektowe)',
+                                        'transport'       => 'Transport (logistyka)',
+                                        'accommodation'   => 'Najem mieszkań',
+                                        'labor'           => 'Praca (godziny)',
+                                        'adjustments'     => 'Korekty (kary/nagrody)',
+                                        'advances'        => 'Zaliczki',
+                                        'vehicle_repairs' => 'Naprawy aut',
+                                    ];
+                                @endphp
+                                @foreach($costTypes as $key => $label)
+                                    <label class="d-flex align-items-center gap-1 px-2 py-1 rounded-2"
+                                           style="cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)">
+                                        <input type="checkbox" class="form-check-input pc-include-cb" value="{{ $key }}" checked>
+                                        <span class="small">{{ $label }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <small class="text-muted">Domyślnie zaznaczone wszystko. Odznacz, by ograniczyć JSON.</small>
+                        </div>
+
+                        {{-- Project picker --}}
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Projekty (opcjonalnie — pusto = wszystkie)</label>
+                            <div class="d-flex gap-2 mb-2">
+                                <input
+                                    id="pc-proj-search"
+                                    type="search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Szukaj projektu…"
+                                    autocomplete="off"
+                                >
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" id="pc-select-all">Zaznacz wszystkie</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" id="pc-deselect-all">Odznacz</button>
+                            </div>
+                            <div
+                                id="pc-proj-list"
+                                class="border rounded-2 p-2"
+                                style="max-height:180px;overflow-y:auto;background:rgba(255,255,255,0.04);"
+                            >
+                                @foreach($costProjects as $proj)
+                                    <div
+                                        class="pc-proj-row d-flex align-items-center gap-2 px-2 py-1 rounded-2"
+                                        data-name="{{ mb_strtolower($proj['name']) }}"
+                                        style="cursor:pointer;"
+                                        onclick="this.querySelector('input').click()"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input pc-proj-cb flex-shrink-0"
+                                            value="{{ $proj['id'] }}"
+                                            style="pointer-events:none;"
+                                        >
+                                        <span class="small">{{ $proj['name'] }}</span>
+                                    </div>
+                                @endforeach
+                                @if(empty($costProjects))
+                                    <p class="small text-muted mb-0 px-2">Brak projektów w systemie.</p>
+                                @endif
+                            </div>
+                            <div class="mt-1">
+                                <span id="pc-selected-count" class="small text-muted">Wszystkie projekty (brak filtra)</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <x-ui.button variant="warning" type="button" id="pc-fetch">Generuj JSON</x-ui.button>
+                            <x-ui.button variant="ghost" type="button" id="pc-copy" disabled>Skopiuj do schowka</x-ui.button>
+                            <button type="button" class="btn btn-outline-info" id="pc-analyze" disabled>
+                                <i class="bi bi-bar-chart-line me-1"></i>Zobacz wykresy
+                            </button>
+                        </div>
+
+                        <div id="pc-loading" class="text-muted small d-none mb-2">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Ładowanie…
+                        </div>
+                        <label class="form-label small text-muted" for="pc-json">Wynik</label>
+                        <textarea
+                            id="pc-json"
+                            class="form-control font-monospace small"
+                            rows="12"
+                            readonly
+                            placeholder="Kliknij „Generuj JSON"…"
+                            style="min-height: 240px;"
+                        ></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <x-ui.button variant="ghost" type="button" data-bs-dismiss="modal">Zamknij</x-ui.button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Costs analytics modal --}}
+    <div
+        class="modal fade departure-planner-teleport-modal"
+        id="promptEngineCostsAnalyticsModal"
+        tabindex="-1"
+        aria-labelledby="pc-analytics-title"
+        aria-hidden="true"
+    >
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: var(--bs-body-color, #e2e8f0);">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="pc-analytics-title">
+                        <i class="bi bi-bar-chart-line me-2 text-warning"></i>Analytics — Eksport kosztów
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body" id="pc-analytics-body" style="padding: 1.25rem;">
+                    <div class="text-center text-muted py-5">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Ładowanie…
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Zamknij</button>
                 </div>
             </div>
         </div>
@@ -562,6 +734,170 @@
                     }
                 });
             })();
+
+            // ── Costs modal ──────────────────────────────────────────────────────────
+            (function () {
+                const root = document.getElementById('prompt-engine-page');
+                if (!root) return;
+
+                const modalEl = document.getElementById('promptEngineCostsModal');
+                if (modalEl && modalEl.parentElement !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+
+                const analyticsModalEl = document.getElementById('promptEngineCostsAnalyticsModal');
+                if (analyticsModalEl && analyticsModalEl.parentElement !== document.body) {
+                    document.body.appendChild(analyticsModalEl);
+                }
+
+                const exportUrl = root.dataset.exportCostsUrl;
+                const defaultStart = root.dataset.defaultStart;
+                const defaultEnd = root.dataset.defaultEnd;
+
+                const startInput = document.getElementById('pc_start_date');
+                const endInput = document.getElementById('pc_end_date');
+                const searchInput = document.getElementById('pc-proj-search');
+                const projList = document.getElementById('pc-proj-list');
+                const selectAllBtn = document.getElementById('pc-select-all');
+                const deselectAllBtn = document.getElementById('pc-deselect-all');
+                const selectedCountEl = document.getElementById('pc-selected-count');
+                const fetchBtn = document.getElementById('pc-fetch');
+                const copyBtn = document.getElementById('pc-copy');
+                const analyzeBtn = document.getElementById('pc-analyze');
+                const textarea = document.getElementById('pc-json');
+                const loadingEl = document.getElementById('pc-loading');
+                const errorEl = document.getElementById('prompt-engine-costs-error');
+
+                let lastBundle = null;
+
+                function allRows() { return Array.from(projList?.querySelectorAll('.pc-proj-row') ?? []); }
+                function updateSelectedCount() {
+                    const checked = projList?.querySelectorAll('.pc-proj-cb:checked').length ?? 0;
+                    const total = projList?.querySelectorAll('.pc-proj-cb').length ?? 0;
+                    if (!selectedCountEl) return;
+                    if (checked === 0) selectedCountEl.textContent = 'Wszystkie projekty (brak filtra)';
+                    else selectedCountEl.textContent = 'Wybrano: ' + checked + ' z ' + total;
+                }
+                function filterProjects() {
+                    const q = (searchInput?.value ?? '').toLowerCase().trim();
+                    allRows().forEach((row) => {
+                        const name = row.dataset.name ?? '';
+                        row.style.display = (!q || name.includes(q)) ? '' : 'none';
+                    });
+                }
+                searchInput?.addEventListener('input', filterProjects);
+                selectAllBtn?.addEventListener('click', () => {
+                    allRows().forEach((row) => {
+                        if (row.style.display !== 'none') {
+                            const cb = row.querySelector('.pc-proj-cb');
+                            if (cb) cb.checked = true;
+                        }
+                    });
+                    updateSelectedCount();
+                });
+                deselectAllBtn?.addEventListener('click', () => {
+                    projList?.querySelectorAll('.pc-proj-cb').forEach((cb) => { cb.checked = false; });
+                    updateSelectedCount();
+                });
+                projList?.addEventListener('change', updateSelectedCount);
+
+                modalEl?.addEventListener('show.bs.modal', () => {
+                    if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('d-none'); }
+                    if (startInput && !startInput.value) startInput.value = defaultStart;
+                    if (endInput && !endInput.value) endInput.value = defaultEnd;
+                    updateSelectedCount();
+                });
+
+                modalEl?.addEventListener('hidden.bs.modal', () => {
+                    loadingEl?.classList.add('d-none');
+                });
+
+                function showError(msg) {
+                    if (!errorEl) return;
+                    errorEl.textContent = msg || 'Wystąpił błąd.';
+                    errorEl.classList.remove('d-none');
+                }
+                function clearError() {
+                    if (!errorEl) return;
+                    errorEl.textContent = '';
+                    errorEl.classList.add('d-none');
+                }
+
+                fetchBtn?.addEventListener('click', async () => {
+                    clearError();
+                    const start = startInput?.value;
+                    const end = endInput?.value;
+                    if (!start || !end) { showError('Uzupełnij daty od i do.'); return; }
+
+                    loadingEl?.classList.remove('d-none');
+                    fetchBtn.disabled = true;
+                    copyBtn.disabled = true;
+                    if (analyzeBtn) analyzeBtn.disabled = true;
+                    textarea.value = '';
+
+                    const url = new URL(exportUrl, window.location.origin);
+                    url.searchParams.set('start_date', start);
+                    url.searchParams.set('end_date', end);
+
+                    document.querySelectorAll('.pc-proj-cb:checked').forEach((cb) => {
+                        url.searchParams.append('project_ids[]', cb.value);
+                    });
+                    document.querySelectorAll('.pc-include-cb:checked').forEach((cb) => {
+                        url.searchParams.append('include[]', cb.value);
+                    });
+
+                    try {
+                        const res = await fetch(url.toString(), {
+                            headers: { Accept: 'application/json' },
+                            credentials: 'same-origin',
+                        });
+                        const text = await res.text();
+                        if (!res.ok) {
+                            let detail = text;
+                            try {
+                                const j = JSON.parse(text);
+                                if (j.errors && typeof j.errors === 'object') {
+                                    detail = Object.values(j.errors).flat()[0] || j.message || text;
+                                } else {
+                                    detail = j.message || j.error || text;
+                                }
+                            } catch (_) {}
+                            showError('Serwer zwrócił błąd (' + res.status + '): ' + detail);
+                            return;
+                        }
+                        let parsed;
+                        try { parsed = JSON.parse(text); }
+                        catch (e) {
+                            showError('Odpowiedź nie jest poprawnym JSON.');
+                            textarea.value = text;
+                            return;
+                        }
+                        lastBundle = parsed;
+                        textarea.value = JSON.stringify(parsed, null, 2);
+                        copyBtn.disabled = false;
+                        if (analyzeBtn) analyzeBtn.disabled = false;
+                    } catch (e) {
+                        showError(e?.message || 'Nie udało się pobrać danych.');
+                    } finally {
+                        loadingEl?.classList.add('d-none');
+                        fetchBtn.disabled = false;
+                    }
+                });
+
+                copyBtn?.addEventListener('click', async () => {
+                    const t = textarea.value;
+                    if (!t) return;
+                    try { await navigator.clipboard.writeText(t); }
+                    catch (_) {
+                        textarea.focus(); textarea.select();
+                        try { document.execCommand('copy'); } catch (__) {}
+                    }
+                });
+
+                // Eksponujemy ostatni bundle dla modułu analityki kosztów
+                window.__lastCostsBundle = () => lastBundle;
+            })();
+
             // ── Analytics modal ──────────────────────────────────────────────────────
             (function () {
                 const analyzeBtn = document.getElementById('pe-tasks-analyze');
@@ -1231,6 +1567,456 @@
                         setTimeout(() => {
                             if (!analyticsModalEl.classList.contains('show')) {
                                 tasksModalEl.removeEventListener('hidden.bs.modal', onHidden);
+                                openAnalyticsModal(parsed);
+                            }
+                        }, 600);
+                    } else {
+                        openAnalyticsModal(parsed);
+                    }
+                });
+
+                analyticsModalEl.addEventListener('hidden.bs.modal', destroyCharts);
+            })();
+
+            // ── Costs analytics modal ────────────────────────────────────────────────
+            (function () {
+                const analyzeBtn = document.getElementById('pc-analyze');
+                const costsModalEl = document.getElementById('promptEngineCostsModal');
+                const analyticsModalEl = document.getElementById('promptEngineCostsAnalyticsModal');
+                if (!analyzeBtn || !analyticsModalEl) return;
+
+                let activeCharts = [];
+
+                function destroyCharts() {
+                    activeCharts.forEach(c => { try { c.destroy(); } catch (_) {} });
+                    activeCharts = [];
+                }
+
+                function loadChartJs() {
+                    return new Promise(resolve => {
+                        if (window.Chart) { resolve(); return; }
+                        const s = document.createElement('script');
+                        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+                        s.onload = resolve;
+                        s.onerror = resolve;
+                        document.head.appendChild(s);
+                    });
+                }
+
+                const COST_TYPE_COLORS = {
+                    fixed:           '#3b82f6',
+                    variable:        '#10b981',
+                    transport:       '#f59e0b',
+                    accommodation:   '#8b5cf6',
+                    labor:           '#ef4444',
+                    vehicle_repairs: '#06b6d4',
+                    adjustments_net: '#a3a3a3',
+                    advances_net:    '#737373',
+                };
+                const COST_TYPE_LABELS = {
+                    fixed:           'Stałe',
+                    variable:        'Zmienne',
+                    transport:       'Transport',
+                    accommodation:   'Najem',
+                    labor:           'Praca',
+                    vehicle_repairs: 'Naprawy aut',
+                    adjustments_net: 'Korekty netto',
+                    advances_net:    'Zaliczki netto',
+                };
+                const CURRENCY_ACCENT = {
+                    EUR: '#60a5fa',
+                    PLN: '#fbbf24',
+                    USD: '#34d399',
+                    GBP: '#f472b6',
+                };
+
+                function escHtml(s) {
+                    if (!s) return '';
+                    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                }
+                function fmtMoney(v, cur) {
+                    const n = Number(v || 0);
+                    return n.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (cur ? ' ' + cur : '');
+                }
+                function mkChart(id, config) {
+                    const el = document.getElementById(id);
+                    if (!el || !window.Chart) return null;
+                    const ch = new Chart(el.getContext('2d'), config);
+                    activeCharts.push(ch);
+                    return ch;
+                }
+
+                function renderAnalytics(json) {
+                    destroyCharts();
+                    const body = document.getElementById('pc-analytics-body');
+                    if (!body) return;
+
+                    const summary = json.summary || {};
+                    const byCurType = summary.by_currency_and_type || {};
+                    const period = json.meta?.period || {};
+                    const currencies = Object.keys(byCurType).sort();
+
+                    const titleEl = document.getElementById('pc-analytics-title');
+                    if (titleEl) {
+                        const curStr = currencies.length ? currencies.join(' + ') : 'brak';
+                        titleEl.innerHTML = `<i class="bi bi-bar-chart-line me-2 text-warning"></i>Analytics · ${escHtml(period.start_date || '')} — ${escHtml(period.end_date || '')} · ${escHtml(curStr)}`;
+                    }
+
+                    body.innerHTML = '';
+
+                    if (window.Chart) {
+                        Chart.defaults.color = 'rgba(255,255,255,0.45)';
+                        Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+                        Chart.defaults.font.family = "'Inter', sans-serif";
+                        Chart.defaults.font.size = 11;
+                    }
+
+                    const card = (inner, cls = '') =>
+                        `<div class="rounded-2 p-3 ${cls}" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)">${inner}</div>`;
+                    const sectionHead = (label, sub = '') =>
+                        `<div class="small fw-semibold text-uppercase mb-1" style="letter-spacing:.06em;font-size:10px;color:rgba(255,255,255,0.5)">${escHtml(label)}</div>` +
+                        (sub ? `<div style="font-size:9px;color:rgba(255,255,255,0.3);margin-bottom:10px">${escHtml(sub)}</div>` : '<div style="margin-bottom:10px"></div>');
+                    const chartBox = (id, h = 200) =>
+                        `<div style="height:${h}px;position:relative"><canvas id="${id}"></canvas></div>`;
+
+                    // ── KPI rows (per currency) ──────────────────────────────────────
+                    if (currencies.length === 0) {
+                        body.innerHTML = '<div class="text-center text-muted py-5">Brak kosztów w wybranym okresie.</div>';
+                        return;
+                    }
+
+                    const kpiContainer = document.createElement('div');
+                    kpiContainer.className = 'mb-3';
+                    currencies.forEach((cur) => {
+                        const totals = byCurType[cur] || {};
+                        const accent = CURRENCY_ACCENT[cur] || '#94a3b8';
+                        const row = document.createElement('div');
+                        row.className = 'd-flex flex-wrap gap-2 mb-2';
+                        const kpis = [
+                            { label: 'Razem koszty', v: totals.total, big: true },
+                            { label: 'Stałe', v: totals.fixed },
+                            { label: 'Zmienne', v: totals.variable },
+                            { label: 'Transport', v: totals.transport },
+                            { label: 'Najem', v: totals.accommodation },
+                            { label: 'Praca', v: totals.labor },
+                            { label: 'Naprawy aut', v: totals.vehicle_repairs },
+                        ];
+                        const cards = kpis.map((k) => `
+                            <div class="flex-grow-1 rounded-2 p-3" style="background:rgba(255,255,255,0.05);border:1px solid ${k.big ? accent + '60' : 'rgba(255,255,255,0.1)'};min-width:90px;max-width:170px">
+                                <div style="font-size:${k.big ? 22 : 16}px;font-weight:700;color:${accent};line-height:1.1;white-space:nowrap">${fmtMoney(k.v, '')}</div>
+                                <div style="font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px;text-transform:uppercase;letter-spacing:.04em">${escHtml(k.label)}</div>
+                            </div>
+                        `).join('');
+                        row.innerHTML = `
+                            <div class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-2 p-3"
+                                 style="background:${accent}15;border:1px solid ${accent};min-width:70px;font-size:18px;font-weight:800;color:${accent}">
+                                ${escHtml(cur)}
+                            </div>
+                            ${cards}
+                        `;
+                        kpiContainer.appendChild(row);
+                    });
+                    body.appendChild(kpiContainer);
+
+                    // ── Donuts — struktura kosztów per waluta ────────────────────────
+                    const donutRow = document.createElement('div');
+                    donutRow.className = 'row g-3 mb-3';
+                    currencies.forEach((cur, idx) => {
+                        const totals = byCurType[cur] || {};
+                        const keys = ['fixed','variable','transport','accommodation','labor','vehicle_repairs'];
+                        const sum = keys.reduce((s, k) => s + (Number(totals[k]) || 0), 0);
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6';
+                        col.innerHTML = card(`
+                            ${sectionHead('Struktura kosztów · ' + cur, sum > 0 ? 'razem ' + fmtMoney(sum, cur) : 'brak danych')}
+                            ${chartBox('pc-donut-' + idx, 220)}
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                ${keys.map(k => `<div class="d-flex align-items-center gap-1" style="font-size:10px;color:rgba(255,255,255,0.55)">
+                                    <span style="width:8px;height:8px;background:${COST_TYPE_COLORS[k]};border-radius:2px;display:inline-block"></span>
+                                    ${escHtml(COST_TYPE_LABELS[k])} ${fmtMoney(totals[k] || 0, '')}
+                                </div>`).join('')}
+                            </div>
+                        `, 'h-100');
+                        donutRow.appendChild(col);
+                    });
+                    body.appendChild(donutRow);
+
+                    currencies.forEach((cur, idx) => {
+                        const totals = byCurType[cur] || {};
+                        const keys = ['fixed','variable','transport','accommodation','labor','vehicle_repairs'];
+                        const data = keys.map(k => Number(totals[k]) || 0);
+                        if (data.reduce((s, v) => s + v, 0) === 0) return;
+                        mkChart('pc-donut-' + idx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: keys.map(k => COST_TYPE_LABELS[k]),
+                                datasets: [{
+                                    data,
+                                    backgroundColor: keys.map(k => COST_TYPE_COLORS[k] + '30'),
+                                    borderColor: keys.map(k => COST_TYPE_COLORS[k]),
+                                    borderWidth: 2,
+                                }],
+                            },
+                            options: {
+                                responsive: true, maintainAspectRatio: false, cutout: '62%',
+                                plugins: { legend: { display: false } },
+                            },
+                        });
+                    });
+
+                    // ── Top categories per currency (bar) ────────────────────────────
+                    const topCats = summary.top_categories_by_currency || {};
+                    const topCatsCurrencies = Object.keys(topCats);
+                    if (topCatsCurrencies.length > 0) {
+                        const topRow = document.createElement('div');
+                        topRow.className = 'row g-3 mb-3';
+                        topCatsCurrencies.forEach((cur, idx) => {
+                            const list = topCats[cur] || [];
+                            const max = list[0]?.amount || 1;
+                            const items = list.slice(0, 12).map((item, i) => `
+                                <div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                                    <span style="font-size:10px;color:rgba(255,255,255,0.3);min-width:18px">#${i+1}</span>
+                                    <span class="flex-grow-1 small text-truncate" style="font-size:11px" title="${escHtml(item.category)}">${escHtml(item.category)}</span>
+                                    <div style="width:60px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;flex-shrink:0">
+                                        <div style="width:${Math.round((item.amount / max) * 100)}%;height:100%;background:${CURRENCY_ACCENT[cur] || '#94a3b8'};border-radius:2px"></div>
+                                    </div>
+                                    <span style="font-size:11px;font-weight:600;color:${CURRENCY_ACCENT[cur] || '#94a3b8'};min-width:80px;text-align:right;white-space:nowrap">${fmtMoney(item.amount, '')}</span>
+                                </div>
+                            `).join('') || '<div class="small text-muted">Brak danych.</div>';
+                            const col = document.createElement('div');
+                            col.className = 'col-md-6';
+                            col.innerHTML = card(sectionHead('Top kategorie · ' + cur, 'fixed + variable + transport') + items, 'h-100');
+                            topRow.appendChild(col);
+                        });
+                        body.appendChild(topRow);
+                    }
+
+                    // ── Projects: revenue × costs × margin ───────────────────────────
+                    const projects = summary.by_project_and_currency || [];
+                    if (projects.length > 0) {
+                        const sortedProjects = [...projects]
+                            .map(p => {
+                                const totalCost = Object.values(p.costs_total_by_currency || {}).reduce((s, v) => s + Number(v || 0), 0);
+                                return { ...p, _totalCost: totalCost };
+                            })
+                            .sort((a, b) => b._totalCost - a._totalCost)
+                            .slice(0, 15);
+
+                        const projectsCard = document.createElement('div');
+                        projectsCard.className = 'rounded-2 p-3 mb-3';
+                        projectsCard.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)';
+
+                        const rowsHtml = sortedProjects.map(p => {
+                            const costsHtml = Object.entries(p.costs_total_by_currency || {})
+                                .map(([cur, v]) => `<span class="small me-2" style="color:${CURRENCY_ACCENT[cur] || '#94a3b8'}"><strong>${fmtMoney(v, '')}</strong> ${escHtml(cur)}</span>`)
+                                .join('') || '<span class="small text-muted">—</span>';
+                            const revenueHtml = p.revenue_in_period
+                                ? `<span class="small" style="color:#10b981"><strong>${fmtMoney(p.revenue_in_period.amount, '')}</strong> ${escHtml(p.revenue_in_period.currency || '')}</span>`
+                                : '<span class="small text-muted">—</span>';
+                            const marginHtml = Object.entries(p.margin_by_currency || {})
+                                .map(([cur, v]) => {
+                                    const col = (Number(v) >= 0) ? '#10b981' : '#ef4444';
+                                    return `<span class="small me-2" style="color:${col}"><strong>${fmtMoney(v, '')}</strong> ${escHtml(cur)}</span>`;
+                                })
+                                .join('') || '<span class="small text-muted">—</span>';
+                            return `
+                                <tr>
+                                    <td class="text-truncate" style="max-width:240px" title="${escHtml(p.project_name)}">${escHtml(p.project_name)}</td>
+                                    <td class="text-end">${revenueHtml}</td>
+                                    <td class="text-end">${costsHtml}</td>
+                                    <td class="text-end">${marginHtml}</td>
+                                    <td class="text-end small text-muted">${Number(p.hours_in_period || 0).toFixed(1)}h</td>
+                                </tr>`;
+                        }).join('');
+
+                        projectsCard.innerHTML = sectionHead('Projekty · top 15 wg kosztów', 'koszty: variable + labor · margin = revenue − koszty (per waluta)') + `
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.04em">
+                                            <th>Projekt</th>
+                                            <th class="text-end">Przychód</th>
+                                            <th class="text-end">Koszty</th>
+                                            <th class="text-end">Marża</th>
+                                            <th class="text-end">Godziny</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rowsHtml}</tbody>
+                                </table>
+                            </div>
+                        `;
+                        body.appendChild(projectsCard);
+                    }
+
+                    // ── Top transport by vehicle (bar) ──────────────────────────────
+                    const transportRows = json.transport_costs || [];
+                    if (transportRows.length > 0) {
+                        const byVehicle = {};
+                        transportRows.forEach(t => {
+                            const label = t.vehicle?.label || (t.cost_type ? '— ' + t.cost_type : '—');
+                            const cur = t.currency || 'PLN';
+                            const key = label + '|' + cur;
+                            byVehicle[key] = byVehicle[key] || { label, cur, amount: 0 };
+                            byVehicle[key].amount = Math.round((byVehicle[key].amount + Number(t.amount || 0)) * 100) / 100;
+                        });
+                        const sorted = Object.values(byVehicle).sort((a, b) => b.amount - a.amount).slice(0, 10);
+                        const max = sorted[0]?.amount || 1;
+                        const items = sorted.map((item, i) => `
+                            <div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                                <span style="font-size:10px;color:rgba(255,255,255,0.3);min-width:18px">#${i+1}</span>
+                                <span class="flex-grow-1 small text-truncate" style="font-size:11px" title="${escHtml(item.label)}">${escHtml(item.label)}</span>
+                                <div style="width:80px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;flex-shrink:0">
+                                    <div style="width:${Math.round((item.amount / max) * 100)}%;height:100%;background:${CURRENCY_ACCENT[item.cur] || '#f59e0b'};border-radius:2px"></div>
+                                </div>
+                                <span style="font-size:11px;font-weight:600;color:${CURRENCY_ACCENT[item.cur] || '#f59e0b'};min-width:90px;text-align:right;white-space:nowrap">${fmtMoney(item.amount, item.cur)}</span>
+                            </div>
+                        `).join('');
+                        const wrap = document.createElement('div');
+                        wrap.className = 'rounded-2 p-3 mb-3';
+                        wrap.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)';
+                        wrap.innerHTML = sectionHead('Top 10 auta · koszty transportu', 'paliwo, parking, opłaty drogowe, bilety') + items;
+                        body.appendChild(wrap);
+                    }
+
+                    // ── Accommodations: cost per person-night ───────────────────────
+                    const acc = json.accommodation_costs || [];
+                    if (acc.length > 0) {
+                        const sorted = [...acc].sort((a, b) => (b.amount_in_period || 0) - (a.amount_in_period || 0)).slice(0, 10);
+                        const max = sorted[0]?.amount_in_period || 1;
+                        const items = sorted.map((item, i) => {
+                            const name = item.accommodation?.name || ('Lease #' + item.lease_id);
+                            const city = item.accommodation?.city || '';
+                            const cpn = item.cost_per_person_night;
+                            return `
+                                <div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                                    <span style="font-size:10px;color:rgba(255,255,255,0.3);min-width:18px">#${i+1}</span>
+                                    <span class="flex-grow-1 small text-truncate" style="font-size:11px" title="${escHtml(name)}">${escHtml(name)}${city ? ', ' + escHtml(city) : ''}</span>
+                                    <span class="small me-2" style="color:rgba(255,255,255,0.5);font-size:10px">${item.person_nights_in_period} os-nocy</span>
+                                    <span class="small me-2" style="color:${CURRENCY_ACCENT[item.currency] || '#8b5cf6'};font-size:10px">
+                                        ${cpn !== null ? fmtMoney(cpn, item.currency) + ' / os-noc' : '—'}
+                                    </span>
+                                    <div style="width:80px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;flex-shrink:0">
+                                        <div style="width:${Math.round((item.amount_in_period / max) * 100)}%;height:100%;background:${CURRENCY_ACCENT[item.currency] || '#8b5cf6'};border-radius:2px"></div>
+                                    </div>
+                                    <span style="font-size:11px;font-weight:600;color:${CURRENCY_ACCENT[item.currency] || '#8b5cf6'};min-width:90px;text-align:right;white-space:nowrap">${fmtMoney(item.amount_in_period, item.currency)}</span>
+                                </div>
+                            `;
+                        }).join('');
+                        const wrap = document.createElement('div');
+                        wrap.className = 'rounded-2 p-3 mb-3';
+                        wrap.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)';
+                        wrap.innerHTML = sectionHead('Top 10 mieszkania · czynsze proporcjonalne w okresie', 'sortowane po koszcie · w nawiasie koszt/osobonoc') + items;
+                        body.appendChild(wrap);
+                    }
+
+                    // ── Top labor (employees) ───────────────────────────────────────
+                    const labor = json.labor_costs || [];
+                    if (labor.length > 0) {
+                        const byEmp = {};
+                        labor.forEach(l => {
+                            const name = l.employee?.name || '—';
+                            const cur = l.currency || 'PLN';
+                            const key = name + '|' + cur;
+                            byEmp[key] = byEmp[key] || { name, cur, cost: 0, hours: 0 };
+                            byEmp[key].cost = Math.round((byEmp[key].cost + Number(l.cost || 0)) * 100) / 100;
+                            byEmp[key].hours = Math.round((byEmp[key].hours + Number(l.hours || 0)) * 100) / 100;
+                        });
+                        const sorted = Object.values(byEmp).sort((a, b) => b.cost - a.cost).slice(0, 10);
+                        const max = sorted[0]?.cost || 1;
+                        const items = sorted.map((item, i) => `
+                            <div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                                <span style="font-size:10px;color:rgba(255,255,255,0.3);min-width:18px">#${i+1}</span>
+                                <span class="flex-grow-1 small text-truncate" style="font-size:11px" title="${escHtml(item.name)}">${escHtml(item.name)}</span>
+                                <span class="small me-2" style="color:rgba(255,255,255,0.5);font-size:10px">${item.hours}h</span>
+                                <div style="width:80px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;flex-shrink:0">
+                                    <div style="width:${Math.round((item.cost / max) * 100)}%;height:100%;background:${CURRENCY_ACCENT[item.cur] || '#ef4444'};border-radius:2px"></div>
+                                </div>
+                                <span style="font-size:11px;font-weight:600;color:${CURRENCY_ACCENT[item.cur] || '#ef4444'};min-width:90px;text-align:right;white-space:nowrap">${fmtMoney(item.cost, item.cur)}</span>
+                            </div>
+                        `).join('');
+                        const wrap = document.createElement('div');
+                        wrap.className = 'rounded-2 p-3 mb-3';
+                        wrap.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)';
+                        wrap.innerHTML = sectionHead('Top 10 pracownicy · koszty pracy', 'godziny × stawka (per waluta stawki)') + items;
+                        body.appendChild(wrap);
+                    }
+                }
+
+                function getBs() {
+                    return window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
+                }
+
+                function openAnalyticsModal(parsed) {
+                    const bs = getBs();
+                    if (!bs || !bs.Modal) {
+                        console.error('[costs-analytics] bootstrap.Modal niedostępne na window');
+                        alert('Błąd: Bootstrap JS nie jest załadowany. Odśwież stronę (Ctrl+F5).');
+                        return;
+                    }
+
+                    const analyticsBody = document.getElementById('pc-analytics-body');
+                    if (analyticsBody) {
+                        analyticsBody.innerHTML = '<div class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Ładowanie wykresów…</div>';
+                    }
+
+                    let modal;
+                    try {
+                        modal = bs.Modal.getOrCreateInstance(analyticsModalEl);
+                    } catch (e) {
+                        console.error('[costs-analytics] Modal.getOrCreateInstance failed', e);
+                        return;
+                    }
+
+                    const onShown = () => {
+                        loadChartJs().then(() => {
+                            try { renderAnalytics(parsed); }
+                            catch (e) {
+                                console.error('[costs-analytics] renderAnalytics failed', e);
+                                if (analyticsBody) {
+                                    analyticsBody.innerHTML = '<div class="alert alert-danger">Błąd renderowania wykresów: ' + (e?.message || e) + '</div>';
+                                }
+                            }
+                        });
+                    };
+                    analyticsModalEl.addEventListener('shown.bs.modal', onShown, { once: true });
+
+                    try {
+                        modal.show();
+                    } catch (e) {
+                        console.error('[costs-analytics] modal.show() failed', e);
+                    }
+                }
+
+                analyzeBtn.addEventListener('click', () => {
+                    const textarea = document.getElementById('pc-json');
+                    const jsonText = textarea?.value;
+                    if (!jsonText) {
+                        console.warn('[costs-analytics] brak JSON w textarea');
+                        return;
+                    }
+                    let parsed;
+                    try { parsed = JSON.parse(jsonText); }
+                    catch (e) {
+                        console.error('[costs-analytics] JSON.parse failed', e);
+                        alert('Niepoprawny JSON w polu wyniku.');
+                        return;
+                    }
+
+                    const bs = getBs();
+                    const costsModalInst = bs && costsModalEl ? bs.Modal.getInstance(costsModalEl) : null;
+
+                    // Costs modal otwarty → zamknij go najpierw, a po `hidden` otwórz analitykę.
+                    if (costsModalInst && costsModalEl.classList.contains('show')) {
+                        const onHidden = () => {
+                            costsModalEl.removeEventListener('hidden.bs.modal', onHidden);
+                            setTimeout(() => openAnalyticsModal(parsed), 50);
+                        };
+                        costsModalEl.addEventListener('hidden.bs.modal', onHidden);
+                        costsModalInst.hide();
+                        // Failsafe: jeśli `hidden` nie zostanie wystrzelone w 600ms, otwórz mimo to.
+                        setTimeout(() => {
+                            if (!analyticsModalEl.classList.contains('show')) {
+                                costsModalEl.removeEventListener('hidden.bs.modal', onHidden);
                                 openAnalyticsModal(parsed);
                             }
                         }, 600);

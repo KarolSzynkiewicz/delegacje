@@ -33,6 +33,8 @@ class UpdateAccommodationRequest extends FormRequest
             'type' => ['required', 'in:wynajmowany,własny'],
             'lease_start_date' => ['nullable', 'date', 'required_if:type,wynajmowany'],
             'lease_end_date' => ['nullable', 'date', 'required_if:type,wynajmowany', 'after_or_equal:lease_start_date'],
+            'lease_monthly_rent' => ['nullable', 'numeric', 'min:0'],
+            'lease_currency' => ['nullable', 'string', 'size:3'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];
     }

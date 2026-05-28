@@ -42,6 +42,7 @@ class GenerateFixedCostsService
                     'name' => $template->name,
                     'amount' => $template->amount,
                     'currency' => $template->currency,
+                    'category' => $template->category,
                     'period_start' => $periodStart->toDateString(),
                     'period_end' => $periodEnd->toDateString(),
                     'accounting_date' => $accountingDate->toDateString(),

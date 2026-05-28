@@ -73,6 +73,31 @@
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input 
+                                type="date" 
+                                name="incurred_date" 
+                                label="Data poniesienia kosztu"
+                                value="{{ old('incurred_date', $projectVariableCost->incurred_date?->format('Y-m-d')) }}"
+                                required="true"
+                            />
+                            <small class="text-muted">Decyduje, do którego miesiąca trafi koszt w raportach.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input 
+                                type="select" 
+                                name="category" 
+                                label="Kategoria"
+                            >
+                                <option value="">— Brak / nie wybrano —</option>
+                                @foreach(\App\Models\ProjectVariableCost::categoryOptions() as $key => $label)
+                                    <option value="{{ $key }}" {{ old('category', $projectVariableCost->category) === $key ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </x-ui.input>
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <x-ui.input 
                             type="textarea" 

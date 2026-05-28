@@ -12,12 +12,15 @@ class AccommodationLease extends Model
         'type',
         'start_date',
         'end_date',
+        'monthly_rent',
+        'currency',
         'notes',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'monthly_rent' => 'decimal:2',
     ];
 
     public function accommodation(): BelongsTo

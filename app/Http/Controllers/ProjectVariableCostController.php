@@ -41,6 +41,8 @@ class ProjectVariableCostController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
+            'incurred_date' => ['required', 'date'],
+            'category' => ['nullable', 'string', 'max:64'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -79,6 +81,8 @@ class ProjectVariableCostController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
+            'incurred_date' => ['required', 'date'],
+            'category' => ['nullable', 'string', 'max:64'],
             'notes' => ['nullable', 'string'],
         ]);
 
