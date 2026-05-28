@@ -46,6 +46,11 @@ class UserMentionService
             self::MENTION_REGEX,
             static function (array $m) use ($knownUsers): string {
                 $handle = $m[1]; // część po @ (już po e() źródła)
+
+                if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
+                    return '<strong class="text-warning">@wszyscy</strong>';
+                }
+
                 foreach ($knownUsers as $u) {
                     if (! isset($u['name'])) {
                         continue;
@@ -110,10 +115,16 @@ class UserMentionService
     public function notifyCommentMentions(Comment $comment, User $author): array
     {
         $notifiedIds = [];
+        $notifyEveryone = false;
 
         $comment->loadMissing('commentable');
 
         foreach (self::extractHandles((string) ($comment->body ?? '')) as $name) {
+            if (mb_strtolower($name, 'UTF-8') === 'wszyscy') {
+                $notifyEveryone = true;
+                continue;
+            }
+
             $user = self::resolveUserByMentionHandle($name);
 
             if (! $user) {
@@ -122,6 +133,16 @@ class UserMentionService
 
             $user->notify(new CommentMentioned($comment, $author));
             $notifiedIds[] = $user->id;
+        }
+
+        if ($notifyEveryone) {
+            User::where('id', '!=', $author->id)
+                ->whereNotIn('id', $notifiedIds)
+                ->get()
+                ->each(function (User $user) use ($comment, $author, &$notifiedIds): void {
+                    $user->notify(new CommentMentioned($comment, $author));
+                    $notifiedIds[] = $user->id;
+                });
         }
 
         return $notifiedIds;

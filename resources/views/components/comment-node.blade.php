@@ -143,11 +143,12 @@
                                 >
                                     <span x-show="item.kind === 'user'" class="d-flex align-items-center gap-2 w-100 min-w-0">
                                         <span
-                                            class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary fw-semibold flex-shrink-0"
+                                            class="d-inline-flex align-items-center justify-content-center rounded-circle fw-semibold flex-shrink-0"
+                                            :class="item.isEveryone ? 'bg-warning bg-opacity-25 text-warning' : 'bg-primary bg-opacity-25 text-primary'"
                                             style="width:1.5rem;height:1.5rem;font-size:.6rem;"
                                             x-text="item.initials"
                                         ></span>
-                                        <span class="small fw-medium text-truncate" x-text="item.name"></span>
+                                        <span class="small fw-medium text-truncate" x-text="item.isEveryone ? '@wszyscy — powiadomienie do wszystkich' : item.name"></span>
                                     </span>
                                     <span x-show="item.kind === 'subtask'" class="d-flex align-items-center gap-2 w-100 min-w-0">
                                         <span class="badge bg-secondary bg-opacity-50 text-body flex-shrink-0" x-text="'#' + item.num"></span>
