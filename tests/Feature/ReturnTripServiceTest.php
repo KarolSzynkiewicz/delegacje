@@ -103,4 +103,79 @@ class ReturnTripServiceTest extends TestCase
             $event->participants()->where('employee_id', $employee->id)->exists()
         );
     }
+
+    /** @test */
+    public function it_shortens_active_rotation_to_return_date()
+    {
+        $employee = Employee::factory()->create();
+
+        $returnDate = now()->startOfDay();
+        $originalRotationEnd = $returnDate->copy()->addDays(10);
+
+        $rotation = Rotation::factory()->create([
+            'employee_id' => $employee->id,
+            'start_date' => $returnDate->copy()->subDays(10),
+            'end_date' => $originalRotationEnd,
+        ]);
+
+        $event = $this->service->createReturn(
+            [$employee->id],
+            $returnDate,
+            null,
+            'Zjazd – test skrócenia rotacji'
+        );
+
+        // Rotacja powinna być skrócona do dnia zjazdu
+        $rotation->refresh();
+        $this->assertEquals(
+            $returnDate->format('Y-m-d'),
+            $rotation->end_date->format('Y-m-d')
+        );
+
+        // Powinien istnieć uczestnik powiązany z rotacją (typ 'rotation') z zapisaną oryginalną datą końca
+        $participant = $event->participants()
+            ->where('employee_id', $employee->id)
+            ->where('assignment_type', 'rotation')
+            ->where('assignment_id', $rotation->id)
+            ->first();
+
+        $this->assertNotNull($participant, 'Brak uczestnika z assignment_type=rotation.');
+        $this->assertEquals(
+            $originalRotationEnd->format('Y-m-d'),
+            $participant->original_end_date->format('Y-m-d')
+        );
+    }
+
+    /** @test */
+    public function it_restores_rotation_end_date_when_zjazd_is_reversed()
+    {
+        $employee = Employee::factory()->create();
+
+        $returnDate = now()->startOfDay();
+        $originalRotationEnd = $returnDate->copy()->addDays(12);
+
+        $rotation = Rotation::factory()->create([
+            'employee_id' => $employee->id,
+            'start_date' => $returnDate->copy()->subDays(5),
+            'end_date' => $originalRotationEnd,
+        ]);
+
+        $event = $this->service->createReturn(
+            [$employee->id],
+            $returnDate,
+            null,
+            'Zjazd – test cofnięcia'
+        );
+
+        $rotation->refresh();
+        $this->assertEquals($returnDate->format('Y-m-d'), $rotation->end_date->format('Y-m-d'));
+
+        $this->service->reverseZjazd($event);
+
+        $rotation->refresh();
+        $this->assertEquals(
+            $originalRotationEnd->format('Y-m-d'),
+            $rotation->end_date->format('Y-m-d')
+        );
+    }
 }

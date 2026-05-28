@@ -236,7 +236,7 @@
                             1. Odpięcie przypisań uczestników (koniec {{ $previewData['return_date'] }})
                         </div>
                         <p class="small text-muted mb-2" style="font-size: 0.78rem;">
-                            Dla wybranych osób data końcowa przypisań zostanie ustawiona na dzień zjazdu — skrócone zostaną powiązania z projektem, mieszkaniem i pojazdem (jeśli dotyczą).
+                            Dla wybranych osób data końcowa przypisań zostanie ustawiona na dzień zjazdu — skrócone zostaną powiązania z projektem, mieszkaniem, pojazdem oraz rotacją (jeśli dotyczą).
                         </p>
                         @if(!empty($previewData['participant_rows']))
                             <div class="table-responsive rounded border" style="border-color: rgba(255,255,255,0.1) !important;">
@@ -246,7 +246,8 @@
                                             <th class="ps-3 py-2"><i class="bi bi-person me-1"></i>Osoba</th>
                                             <th class="py-2"><i class="bi bi-briefcase me-1"></i>Projekt</th>
                                             <th class="py-2"><i class="bi bi-car-front me-1"></i>Auto</th>
-                                            <th class="pe-3 py-2"><i class="bi bi-house me-1"></i>Dom</th>
+                                            <th class="py-2"><i class="bi bi-house me-1"></i>Dom</th>
+                                            <th class="pe-3 py-2"><i class="bi bi-arrow-repeat me-1"></i>Rotacja</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -255,7 +256,8 @@
                                                 <td class="ps-3 py-2 fw-semibold text-white">{{ $row['full_name'] }}</td>
                                                 <td class="py-2">{{ $row['projects_label'] }}</td>
                                                 <td class="py-2">{{ $row['vehicle_label'] }}</td>
-                                                <td class="pe-3 py-2">{{ $row['house_label'] }}</td>
+                                                <td class="py-2">{{ $row['house_label'] }}</td>
+                                                <td class="pe-3 py-2">{{ $row['rotation_label'] ?? '—' }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>

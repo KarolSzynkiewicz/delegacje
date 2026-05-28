@@ -43,6 +43,7 @@
                                     $item->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
                                     $item->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
                                     $item->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
+                                    $item->assignment instanceof \App\Models\Rotation => 'Rotacja',
                                     default => class_basename($item->assignment),
                                 };
                                 return "{$employeeId}_{$type}";
@@ -78,6 +79,7 @@
                                                     $assignmentToShorten->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
                                                     $assignmentToShorten->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
                                                     $assignmentToShorten->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
+                                                    $assignmentToShorten->assignment instanceof \App\Models\Rotation => 'Rotacja',
                                                     default => class_basename($assignmentToShorten->assignment),
                                                 };
                                                 
@@ -87,6 +89,7 @@
                                                         $item->assignment instanceof \App\Models\ProjectAssignment => 'Projekt',
                                                         $item->assignment instanceof \App\Models\AccommodationAssignment => 'Dom',
                                                         $item->assignment instanceof \App\Models\VehicleAssignment => 'Auto',
+                                                        $item->assignment instanceof \App\Models\Rotation => 'Rotacja',
                                                         default => class_basename($item->assignment),
                                                     };
                                                     return $item->assignment->employee->id === $employee->id && $itemType === $type;

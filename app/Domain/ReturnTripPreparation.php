@@ -2,10 +2,11 @@
 
 namespace App\Domain;
 
-use App\Models\ProjectAssignment;
-use App\Models\VehicleAssignment;
 use App\Models\AccommodationAssignment;
+use App\Models\ProjectAssignment;
+use App\Models\Rotation;
 use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -78,7 +79,7 @@ class ReturnTripPreparation
      * 
      * Does NOT modify the database.
      * 
-     * @param Collection<ProjectAssignment|VehicleAssignment|AccommodationAssignment> $activeAssignments All active assignments for employees
+     * @param Collection<ProjectAssignment|VehicleAssignment|AccommodationAssignment|Rotation> $activeAssignments All active assignments (and rotations) for employees
      * @param Collection<VehicleAssignment> $returnVehicleAssignments Assignments for return vehicle
      * @return self
      */
@@ -176,7 +177,7 @@ class ReturnTripPreparation
 class AssignmentToShorten
 {
     public function __construct(
-        public ProjectAssignment|VehicleAssignment|AccommodationAssignment $assignment,
+        public ProjectAssignment|VehicleAssignment|AccommodationAssignment|Rotation $assignment,
         public ?Carbon $currentEndDate,
         public Carbon $newEndDate
     ) {}

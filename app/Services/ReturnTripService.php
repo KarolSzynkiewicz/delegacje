@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\ProjectAssignment;
+use App\Models\Rotation;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use Carbon\Carbon;
@@ -126,6 +127,12 @@ class ReturnTripService
         // Get all active assignments for returning employees
         $activeAssignments = $this->assignmentQueryService->getActiveAssignmentsForEmployees($employeeIds, $returnDate);
 
+        // Włącz aktywne rotacje do listy rzeczy skracanych — zjazd kończy rotację w dniu powrotu.
+        $activeRotations = Rotation::whereIn('employee_id', $employeeIds)
+            ->activeAtDate($returnDate)
+            ->get();
+        $activeAssignments = $activeAssignments->merge($activeRotations);
+
         // Get active vehicle assignments for return vehicle (if specified)
         $returnVehicleAssignments = collect();
         if ($returnVehicle) {
@@ -146,7 +153,7 @@ class ReturnTripService
      * Dane do podglądu zjazdu: przypisania uczestników (skrócenie) oraz osoby tracące auto powrotne.
      *
      * @return array{
-     *     participant_rows: list<array{employee_id: int, full_name: string, projects_label: string, vehicle_label: string, house_label: string}>,
+     *     participant_rows: list<array{employee_id: int, full_name: string, projects_label: string, vehicle_label: string, house_label: string, rotation_label: string}>,
      *     displaced_without_vehicle: list<array{employee_id: int, full_name: string}>,
      *     requires_consequences_confirm: bool,
      * }
@@ -178,6 +185,7 @@ class ReturnTripService
                     'projects' => [],
                     'vehicle' => null,
                     'house' => null,
+                    'rotation' => null,
                 ];
             }
 
@@ -193,6 +201,11 @@ class ReturnTripService
                     : '—';
             } elseif ($assignment instanceof AccommodationAssignment) {
                 $byEmployee[$eid]['house'] = $assignment->accommodation?->name ?? '—';
+            } elseif ($assignment instanceof Rotation) {
+                $original = $item->currentEndDate;
+                $byEmployee[$eid]['rotation'] = $original
+                    ? 'do '.$original->format('d.m.Y').' → '.$item->newEndDate->format('d.m.Y')
+                    : '→ '.$item->newEndDate->format('d.m.Y');
             }
         }
 
@@ -208,6 +221,7 @@ class ReturnTripService
                 'projects_label' => ! empty($projects) ? implode(', ', $projects) : '—',
                 'vehicle_label' => $row['vehicle'] ?? '—',
                 'house_label' => $row['house'] ?? '—',
+                'rotation_label' => $row['rotation'] ?? '—',
             ];
         }
 
@@ -377,6 +391,7 @@ class ReturnTripService
                     ProjectAssignment::class => 'project_assignment',
                     AccommodationAssignment::class => 'accommodation_assignment',
                     VehicleAssignment::class => 'vehicle_assignment',
+                    Rotation::class => 'rotation',
                     default => strtolower(class_basename($assignment)),
                 };
 

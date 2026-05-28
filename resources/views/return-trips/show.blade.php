@@ -123,6 +123,7 @@
                                                                     'project_assignment' => 'Projekt',
                                                                     'accommodation_assignment' => 'Mieszkanie',
                                                                     'vehicle_assignment' => 'Auto',
+                                                                    'rotation' => 'Rotacja',
                                                                     default => $assignmentData['type'],
                                                                 };
                                                             @endphp

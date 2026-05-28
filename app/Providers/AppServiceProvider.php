@@ -60,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
             'project_assignment' => \App\Models\ProjectAssignment::class,
             'vehicle_assignment' => \App\Models\VehicleAssignment::class,
             'accommodation_assignment' => \App\Models\AccommodationAssignment::class,
+            'rotation' => \App\Models\Rotation::class,
             'user' => \App\Models\User::class, // Required for Spatie Permission morphedByMany
             // Commentable models
             'project' => \App\Models\Project::class,
