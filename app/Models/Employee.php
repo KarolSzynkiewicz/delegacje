@@ -333,6 +333,15 @@ class Employee extends Model
      */
     public function getActiveRotationForDate($date): ?Rotation
     {
+        $date = \Carbon\Carbon::parse($date);
+
+        if ($this->relationLoaded('rotations')) {
+            return $this->rotations->first(function ($rotation) use ($date) {
+                return $rotation->start_date->lte($date)
+                    && ($rotation->end_date === null || $rotation->end_date->gte($date));
+            });
+        }
+
         return $this->rotations()
             ->activeAtDate($date)
             ->first();
@@ -435,15 +444,21 @@ class Employee extends Model
             $this->load('employeeDocuments.document');
         }
 
-        // Sprawdź czy kolumna is_required istnieje
-        $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
+        // Cache statycznych danych na czas trwania requestu (bez N×Schema/Document queries w pętlach)
+        static $hasIsRequiredColumnCache = null;
+        static $requiredDocumentsCache = null;
 
-        // Sprawdź tylko wymagane dokumenty lub wszystkie jeśli kolumna nie istnieje
-        if ($hasIsRequiredColumn) {
-            $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
-        } else {
-            $requiredDocuments = \App\Models\Document::all();
+        if ($hasIsRequiredColumnCache === null) {
+            $hasIsRequiredColumnCache = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
         }
+        $hasIsRequiredColumn = $hasIsRequiredColumnCache;
+
+        if ($requiredDocumentsCache === null) {
+            $requiredDocumentsCache = $hasIsRequiredColumn
+                ? \App\Models\Document::where('is_required', true)->get()
+                : \App\Models\Document::all();
+        }
+        $requiredDocuments = $requiredDocumentsCache;
 
         // Jeśli nie ma żadnych wymaganych dokumentów, nie sprawdzaj nic
         if ($hasIsRequiredColumn && $requiredDocuments->isEmpty()) {

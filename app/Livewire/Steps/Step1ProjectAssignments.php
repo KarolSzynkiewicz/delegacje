@@ -245,36 +245,32 @@ class Step1ProjectAssignments extends Component
 
         // Get all employees (not just available ones) so we can show them in vehicle seats
         // We'll filter out assigned ones in getFilteredEmployees()
-        $allEmployees = Employee::with(['roles', 'employeeDocuments.document'])
+        $now = Carbon::now();
+
+        $allEmployees = Employee::with(['roles', 'employeeDocuments.document', 'rotations'])
             ->when($this->forTransfer && ! empty($this->allowedEmployeeIds), function ($q) {
                 $q->whereIn('id', $this->allowedEmployeeIds);
             })
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get()
-            ->map(function ($employee) use ($departureDate) {
-                // Get rotation for this date
+            ->map(function ($employee) use ($departureDate, $now) {
+                // Get rotation for this date — uses eagerly-loaded collection, no extra query
                 $rotation = $employee->getActiveRotationForDate($departureDate);
 
-                // Get expiring documents (within a month)
+                // Get expiring documents — uses eagerly-loaded relation, no extra queries
                 $expiringDocuments = $this->expiringDocumentsService->getExpiringDocumentsForEmployee($employee, 30);
 
-                // POPRAWKA: Sprawdź również wszystkie wygasłe wymagane dokumenty (niezależnie od daty wygaśnięcia)
-                // aby wyświetlić je w liście pracowników, nawet jeśli wygasły dawno
-                $now = Carbon::now();
-                $allExpiredRequired = \App\Models\EmployeeDocument::where('employee_id', $employee->id)
-                    ->where('kind', 'okresowy')
-                    ->whereNotNull('valid_to')
-                    ->where('valid_to', '<', $now->format('Y-m-d'))
-                    ->with('document')
-                    ->get()
-                    ->filter(function ($doc) {
-                        // Tylko wymagane dokumenty
-                        return $doc->document && $doc->document->is_required;
-                    })
+                // Wygasłe wymagane dokumenty — filtruj z już załadowanej relacji (bez dodatkowego DB query)
+                $allExpiredRequired = $employee->employeeDocuments
+                    ->filter(fn ($doc) => $doc->kind === 'okresowy'
+                        && $doc->valid_to !== null
+                        && $doc->valid_to->lt($now)
+                        && $doc->document
+                        && $doc->document->is_required
+                    )
                     ->map(function ($doc) use ($now) {
-                        $validTo = Carbon::parse($doc->valid_to);
-                        $daysDiff = $validTo->diffInDays($now);
+                        $daysDiff = $doc->valid_to->diffInDays($now);
 
                         return [
                             'id' => $doc->id,

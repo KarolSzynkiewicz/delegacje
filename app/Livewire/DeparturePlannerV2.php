@@ -3,8 +3,11 @@
 namespace App\Livewire;
 
 use App\Enums\LocationPurposeType;
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
 use App\Models\Employee;
 use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Vehicle;
 use App\Services\LocationTrackingService;
 use App\Support\DepartureRoutePlan;
@@ -1193,7 +1196,10 @@ class DeparturePlannerV2 extends Component
     }
 
     /**
-     * Get vehicles that are in base on departure date
+     * Get vehicles that are in base on departure date.
+     *
+     * Uses a single batch query to find in-transit vehicle IDs instead of
+     * calling getVehicleLocationStatus() per vehicle (N+1).
      */
     public function getAvailableVehiclesProperty()
     {
@@ -1202,22 +1208,27 @@ class DeparturePlannerV2 extends Component
         }
 
         $departureDate = Carbon::parse($this->departureDate);
-        $locationTrackingService = app(LocationTrackingService::class);
 
-        // Pobierz wszystkie pojazdy firmowe
         $vehicles = Vehicle::where('type', 'company_vehicle')
             ->orderBy('registration_number')
             ->get();
 
-        // Filtruj tylko te, które są w bazie na dzień wyjazdu
-        $availableVehicles = $vehicles->filter(function ($vehicle) use ($departureDate, $locationTrackingService) {
-            $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $departureDate);
+        // Jeden batch query zamiast N×getVehicleLocationStatus()
+        $inTransitVehicleIds = LogisticsEvent::forLocationTracking()
+            ->whereIn('vehicle_id', $vehicles->pluck('id'))
+            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
+            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+            ->where('event_date', '<=', $departureDate)
+            ->where(function ($q) use ($departureDate) {
+                $q->whereNull('end_date')->orWhere('end_date', '>', $departureDate);
+            })
+            ->pluck('vehicle_id')
+            ->flip()
+            ->toArray();
 
-            // Pojazd jest dostępny jeśli nie jest w podróży i nie jest poza bazą
-            return ! $status['in_transit'] && ! $status['outside_base'];
-        });
-
-        return $availableVehicles;
+        return $vehicles->filter(
+            fn ($v) => ! isset($inTransitVehicleIds[$v->id]) && ! $v->outside_base
+        );
     }
 
     public function getSelectedEmployeesProperty()
