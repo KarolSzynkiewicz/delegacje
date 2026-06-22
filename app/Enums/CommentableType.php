@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\RecruitmentApplication;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Model;
 
@@ -20,6 +21,7 @@ enum CommentableType: string
     case LOGISTICS_EVENT = 'logistics_event';
     case LOCATION = 'location';
     case EMPLOYEE = 'employee';
+    case RECRUITMENT_APPLICATION = 'recruitment_application';
 
     public function modelClass(): string
     {
@@ -31,6 +33,7 @@ enum CommentableType: string
             self::LOGISTICS_EVENT => LogisticsEvent::class,
             self::LOCATION => Location::class,
             self::EMPLOYEE => Employee::class,
+            self::RECRUITMENT_APPLICATION => RecruitmentApplication::class,
         };
     }
 
@@ -44,6 +47,7 @@ enum CommentableType: string
             LogisticsEvent::class => self::LOGISTICS_EVENT,
             Location::class => self::LOCATION,
             Employee::class => self::EMPLOYEE,
+            RecruitmentApplication::class => self::RECRUITMENT_APPLICATION,
             default => throw new \InvalidArgumentException('Model '.$model::class.' is not commentable'),
         };
     }

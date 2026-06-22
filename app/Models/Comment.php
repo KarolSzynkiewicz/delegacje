@@ -98,6 +98,7 @@ class Comment extends Model
             $morph instanceof Accommodation => route('accommodations.show', $morph).$hash,
             $morph instanceof Location => route('locations.show', $morph).$hash,
             $morph instanceof Employee => route('employees.show', $morph).$hash,
+            $morph instanceof RecruitmentApplication => route('recruitment-applications.show', $morph).$hash,
             default => url('/'),
         };
     }

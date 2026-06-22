@@ -15,6 +15,7 @@ class RecruitmentForm extends Component
     public string $email = '';
     public string $phone = '';
     public string $desired_role = '';
+    public string $referral_source = '';
     public string $cover_letter = '';
     public $photo = null;
 
@@ -30,6 +31,7 @@ class RecruitmentForm extends Component
         'email'        => 'required|email|max:255|unique:recruitment_applications,email',
         'phone'        => 'nullable|string|max:20',
         'desired_role' => 'nullable|string|max:255',
+        'referral_source' => 'nullable|string|in:social_media,employee_referral,recommendation,job_portal',
         'cover_letter' => 'nullable|string|max:5000',
         'photo'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         'consent_rodo' => 'accepted',
@@ -70,6 +72,7 @@ class RecruitmentForm extends Component
             'email'        => $this->email,
             'phone'        => $this->phone ?: null,
             'desired_role' => $this->desired_role ?: null,
+            'referral_source' => $this->referral_source ?: null,
             'cover_letter' => $this->cover_letter ?: null,
             'photo_path'   => $photoPath,
             'consent_rodo' => $this->consent_rodo,

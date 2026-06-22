@@ -109,6 +109,25 @@
             </div>
 
             <div class="mb-3">
+                <label class="form-label" for="referral_source">
+                    Skąd o nas wiesz?
+                </label>
+                <select
+                    id="referral_source"
+                    wire:model.blur="referral_source"
+                    class="form-select @error('referral_source') is-invalid @enderror"
+                >
+                    <option value="">— Wybierz opcję —</option>
+                    @foreach(\App\Enums\RecruitmentReferralSource::options() as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                @error('referral_source')
+                    <span class="invalid-feedback">{{ $message }}</span>
+                @enderror
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label" for="cover_letter">
                     List motywacyjny / wiadomość
                 </label>

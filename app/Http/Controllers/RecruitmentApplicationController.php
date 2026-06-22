@@ -14,27 +14,15 @@ class RecruitmentApplicationController extends Controller
 {
     use HandlesImageUpload;
 
-    public function index(Request $request): View
+    public function index(): View
     {
-        $status = $request->get('status');
-
-        $applications = RecruitmentApplication::query()
-            ->when($status, fn ($q) => $q->where('status', $status))
-            ->orderByRaw("FIELD(status, 'pending', 'reviewing', 'accepted', 'rejected', 'converted')")
-            ->orderByDesc('created_at')
-            ->paginate(20)
-            ->withQueryString();
-
-        $counts = RecruitmentApplication::query()
-            ->selectRaw('status, COUNT(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
-        return view('recruitment.index', compact('applications', 'status', 'counts'));
+        return view('recruitment.index');
     }
 
     public function show(RecruitmentApplication $recruitmentApplication): View
     {
+        $recruitmentApplication->load('employee');
+
         $roles = Role::orderBy('name')->get();
 
         return view('recruitment.show', [
@@ -61,7 +49,7 @@ class RecruitmentApplicationController extends Controller
     public function convert(Request $request, RecruitmentApplication $recruitmentApplication): RedirectResponse
     {
         if ($recruitmentApplication->status === 'converted') {
-            return back()->with('error', 'Ta kandydatura została już przeniesiona do pracowników.');
+            return back()->with('error', 'Ta kandydatura została już zatrudniona.');
         }
 
         $request->validate([
@@ -105,6 +93,6 @@ class RecruitmentApplicationController extends Controller
 
         return redirect()
             ->route('employees.show', $employee)
-            ->with('success', "Kandydat {$employee->full_name} został przeniesiony do bazy pracowników.");
+            ->with('success', "Kandydat {$employee->full_name} został zatrudniony i dodany do bazy pracowników.");
     }
 }

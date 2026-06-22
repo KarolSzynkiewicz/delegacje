@@ -2,17 +2,22 @@
 
 namespace App\Models;
 
+use App\Enums\RecruitmentReferralSource;
+use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RecruitmentApplication extends Model
 {
+    use HasComments;
+
     protected $fillable = [
         'first_name',
         'last_name',
         'email',
         'phone',
         'desired_role',
+        'referral_source',
         'cover_letter',
         'photo_path',
         'consent_rodo',
@@ -26,6 +31,7 @@ class RecruitmentApplication extends Model
 
     protected $casts = [
         'status' => 'string',
+        'referral_source' => RecruitmentReferralSource::class,
         'consent_rodo' => 'boolean',
         'consent_recruitment_processing' => 'boolean',
         'consent_marketing' => 'boolean',
@@ -51,6 +57,11 @@ class RecruitmentApplication extends Model
         return asset('storage/'.$this->photo_path);
     }
 
+    public function getReferralSourceLabelAttribute(): ?string
+    {
+        return $this->referral_source?->label();
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
@@ -58,7 +69,7 @@ class RecruitmentApplication extends Model
             'reviewing'  => 'W trakcie weryfikacji',
             'accepted'   => 'Zaakceptowany',
             'rejected'   => 'Odrzucony',
-            'converted'  => 'Przeniesiony do pracowników',
+            'converted'  => 'Zatrudniony',
             default      => $this->status,
         };
     }

@@ -54,12 +54,30 @@
                             <x-ui.detail-item label="Stanowisko">
                                 {{ $application->desired_role ?? '—' }}
                             </x-ui.detail-item>
-                            <x-ui.detail-item label="Data zgłoszenia">
-                                {{ $application->created_at->format('d.m.Y H:i') }}
+                            <x-ui.detail-item label="Skąd o nas wie">
+                                {{ $application->referral_source_label ?? '—' }}
                             </x-ui.detail-item>
                         </x-ui.detail-list>
                     </div>
                 </div>
+            </x-ui.card>
+
+            <x-ui.card label="Daty zgłoszenia" class="mb-4">
+                <x-ui.detail-list>
+                    <x-ui.detail-item label="Data zgłoszenia">
+                        {{ $application->created_at->format('d.m.Y H:i') }}
+                        <small class="text-muted">({{ $application->created_at->diffForHumans() }})</small>
+                    </x-ui.detail-item>
+                    <x-ui.detail-item label="Ostatnia aktualizacja">
+                        {{ $application->updated_at->format('d.m.Y H:i') }}
+                        <small class="text-muted">({{ $application->updated_at->diffForHumans() }})</small>
+                    </x-ui.detail-item>
+                    @if($application->consent_given_at)
+                        <x-ui.detail-item label="Data wyrażenia zgód" fullWidth="true">
+                            {{ $application->consent_given_at->format('d.m.Y H:i') }}
+                        </x-ui.detail-item>
+                    @endif
+                </x-ui.detail-list>
             </x-ui.card>
 
             @if($application->cover_letter)
@@ -98,14 +116,16 @@
             </x-ui.card>
 
             @if($application->status === 'converted' && $application->employee)
-                <x-ui.alert variant="success">
+                <x-ui.alert variant="success" class="mb-4">
                     <i class="bi bi-person-check-fill me-2"></i>
-                    Kandydat został przeniesiony do bazy pracowników.
+                    Kandydat został zatrudniony.
                     <a href="{{ route('employees.show', $application->employee) }}" class="fw-semibold">
                         Przejdź do profilu pracownika →
                     </a>
                 </x-ui.alert>
             @endif
+
+            <x-comments :commentable="$application" class="mb-4" />
 
         </div>
 
@@ -126,7 +146,7 @@
                                 'reviewing' => 'W trakcie weryfikacji',
                                 'accepted'  => 'Zaakceptowany',
                                 'rejected'  => 'Odrzucony',
-                                'converted' => 'Przeniesiony do pracowników',
+                                'converted' => 'Zatrudniony',
                             ] as $val => $label)
                                 <option value="{{ $val }}" {{ $application->status === $val ? 'selected' : '' }}>
                                     {{ $label }}
@@ -149,9 +169,9 @@
 
             {{-- Konwersja do pracownika --}}
             @if($application->status !== 'converted')
-                <x-ui.card label="Przenieś do pracowników">
+                <x-ui.card label="Zatrudnij kandydata">
                     <p class="text-muted small mb-3">
-                        Konwersja utworzy nowego pracownika na podstawie danych kandydata.
+                        Utworzy nowego pracownika na podstawie danych kandydata.
                         Wybierz przypisywane role.
                     </p>
 
@@ -196,9 +216,9 @@
                         <button
                             type="submit"
                             class="btn btn-success w-100"
-                            onclick="return confirm('Czy na pewno chcesz przenieść kandydata do bazy pracowników?')"
+                            onclick="return confirm('Czy na pewno chcesz zatrudnić tego kandydata?')"
                         >
-                            <i class="bi bi-person-plus me-1"></i> Przenieś do pracowników
+                            <i class="bi bi-person-plus me-1"></i> Zatrudnij kandydata
                         </button>
                     </form>
                 </x-ui.card>

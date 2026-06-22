@@ -70,6 +70,7 @@ class AppServiceProvider extends ServiceProvider
             'logistics_event' => \App\Models\LogisticsEvent::class,
             'location' => \App\Models\Location::class,
             'employee' => \App\Models\Employee::class,
+            'recruitment_application' => \App\Models\RecruitmentApplication::class,
             'comment' => \App\Models\Comment::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
