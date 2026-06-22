@@ -141,6 +141,14 @@ return [
         'label' => 'Pracownicy',
     ],
 
+    'recruitment_applications' => [
+        'route' => 'recruitment-applications.index',
+        'icon' => 'bi bi-person-lines-fill',
+        'label' => 'Rekrutacja',
+        'permission' => 'employees.view',
+        'routePattern' => 'recruitment-applications.*',
+    ],
+
     'roles' => [
         'route' => 'roles.index',
         'icon' => 'bi bi-person-badge',

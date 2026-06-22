@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AccommodationAssignmentController;
+use App\Http\Controllers\RecruitmentApplicationController;
+use App\Http\Controllers\RecruitmentConsentController;
 use App\Http\Controllers\AccommodationController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
@@ -33,6 +35,17 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+
+// Publiczny formularz rekrutacyjny (bez autoryzacji)
+Route::get('/rekrutacja', function () {
+    return view('recruitment.apply');
+})->name('recruitment.apply');
+
+Route::prefix('rekrutacja')->name('recruitment.')->group(function () {
+    Route::get('/rodo', [RecruitmentConsentController::class, 'rodo'])->name('rodo');
+    Route::get('/zgoda-rekrutacja', [RecruitmentConsentController::class, 'recruitmentProcessing'])->name('consent.recruitment');
+    Route::get('/zgoda-marketingowa', [RecruitmentConsentController::class, 'marketing'])->name('consent.marketing');
+});
 
 // ui build helper
 Route::get('/2', function () {
@@ -220,6 +233,20 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('bulk-assignments.store')
             ->defaults('permission_type', 'resource')
             ->defaults('resource', 'project-assignments');
+
+        // Recruitment applications (admin panel)
+        Route::get('recruitment-applications', [RecruitmentApplicationController::class, 'index'])
+            ->name('recruitment-applications.index')
+            ->defaults('resource', 'employees');
+        Route::get('recruitment-applications/{recruitmentApplication}', [RecruitmentApplicationController::class, 'show'])
+            ->name('recruitment-applications.show')
+            ->defaults('resource', 'employees');
+        Route::patch('recruitment-applications/{recruitmentApplication}/status', [RecruitmentApplicationController::class, 'updateStatus'])
+            ->name('recruitment-applications.update-status')
+            ->defaults('resource', 'employees');
+        Route::post('recruitment-applications/{recruitmentApplication}/convert', [RecruitmentApplicationController::class, 'convert'])
+            ->name('recruitment-applications.convert')
+            ->defaults('resource', 'employees');
 
         // Employees + assignments + documents
         Route::resource('employees', EmployeeController::class);

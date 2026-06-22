@@ -20,9 +20,10 @@ class MenuService
     {
         $user = Auth::user();
         $userId = $user?->id ?? 0;
-        
+        $menuVersion = md5(json_encode(config('menu')).json_encode(config('menu_items')));
+
         return Cache::remember(
-            "menu_user_{$userId}",
+            "menu_user_{$userId}_{$menuVersion}",
             now()->addHour(),
             function () use ($user) {
                 $menuConfig = config('menu', []);
@@ -58,6 +59,9 @@ class MenuService
      */
     public function clearMenuCacheForUser(int $userId): void
     {
+        $menuVersion = md5(json_encode(config('menu')).json_encode(config('menu_items')));
+        Cache::forget("menu_user_{$userId}_{$menuVersion}");
+        // Stary klucz cache (przed wersjonowaniem)
         Cache::forget("menu_user_{$userId}");
     }
 
@@ -168,9 +172,11 @@ class MenuService
 
         // Jawne uprawnienie z menu_items (np. to samo co inny zasób) — nie nadpisuj z trasy
         if (array_key_exists('permission', $itemData) && is_string($itemData['permission']) && $itemData['permission'] !== '') {
-            $routePattern = $this->generateRoutePattern($route);
-            if ($routePattern) {
-                $itemData['routePattern'] = $routePattern;
+            if (empty($itemData['routePattern'])) {
+                $routePattern = $this->generateRoutePattern($route);
+                if ($routePattern) {
+                    $itemData['routePattern'] = $routePattern;
+                }
             }
 
             return $itemData;

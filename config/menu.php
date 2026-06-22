@@ -69,6 +69,7 @@ return [
         'icon' => 'bi bi-briefcase',
         'items' => [
             'employees',
+            'recruitment_applications',
             'roles',
             'documents',
             'employee_documents',
