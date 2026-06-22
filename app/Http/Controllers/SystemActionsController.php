@@ -13,7 +13,9 @@ use App\Services\RoutePermissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SystemActionsController extends Controller
 {
@@ -306,6 +308,37 @@ class SystemActionsController extends Controller
             return redirect()->route('system-actions.index')
                 ->with('error', 'Błąd: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Export a full JSON backup of all database tables (data only, no binary files).
+     */
+    public function backupDatabase(): StreamedResponse
+    {
+        $dbName = DB::getDatabaseName();
+        $tablesRaw = DB::select('SHOW TABLES');
+        $key = 'Tables_in_'.$dbName;
+
+        $backup = [
+            'generated_at' => now()->toIso8601String(),
+            'app_env' => config('app.env'),
+            'database' => $dbName,
+            'tables' => [],
+        ];
+
+        foreach ($tablesRaw as $tableRow) {
+            $tableName = $tableRow->$key;
+            $backup['tables'][$tableName] = DB::table($tableName)->get()->toArray();
+        }
+
+        $filename = 'backup_'.$dbName.'_'.now()->format('Y-m-d_His').'.json';
+        $json = json_encode($backup, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return response()->streamDownload(function () use ($json) {
+            echo $json;
+        }, $filename, [
+            'Content-Type' => 'application/json; charset=utf-8',
+        ]);
     }
 
     /**

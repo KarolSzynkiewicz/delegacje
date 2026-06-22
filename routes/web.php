@@ -93,6 +93,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('/system-actions/fix-location-names', [SystemActionsController::class, 'fixLocationNames'])
             ->name('system-actions.fix-location-names')
             ->defaults('resource', 'system-actions');
+
+        Route::get('/system-actions/backup-database', [SystemActionsController::class, 'backupDatabase'])
+            ->name('system-actions.backup-database')
+            ->defaults('resource', 'system-actions');
         // Return Trips Actions - MUST BE BEFORE resource routes to avoid route conflict
         Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
             ->name('return-trips.prepare-form')

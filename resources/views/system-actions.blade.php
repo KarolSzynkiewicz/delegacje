@@ -198,6 +198,35 @@
                 </x-ui.card>
             </div>
 
+            <div class="col-lg-8 mt-4">
+                <x-ui.card label="Backup danych">
+                    <p class="text-muted mb-4">
+                        Pobierz pełny backup wszystkich danych z bazy danych jako plik JSON. Backup zawiera wszystkie rekordy ze wszystkich tabel — bez plików graficznych przechowywanych na dysku.
+                    </p>
+
+                    <div class="border rounded p-3 bg-success bg-opacity-10">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-download text-success"></i>
+                                    Pobierz backup bazy danych
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    Eksportuje wszystkie tabele do pliku <code>.json</code>.
+                                    Może chwilę potrwać przy dużej bazie.
+                                    <strong>Przechowuj w bezpiecznym miejscu!</strong>
+                                </p>
+                            </div>
+                            <a href="{{ route('system-actions.backup-database') }}"
+                               class="btn btn-success ms-3"
+                               onclick="return confirm('Wygenerować backup bazy danych? Może to chwilę potrwać.')">
+                                <i class="bi bi-download"></i> Pobierz backup
+                            </a>
+                        </div>
+                    </div>
+                </x-ui.card>
+            </div>
+
             <div class="col-lg-4">
                 <x-ui.card label="Dane i spójność" class="mb-4">
                     <p class="text-muted mb-4 small">
