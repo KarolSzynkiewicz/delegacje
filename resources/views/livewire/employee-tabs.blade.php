@@ -589,6 +589,82 @@
                 </div>
             </div>
         </div>
+    @elseif($activeTab === 'company-assignments')
+        <div id="company-assignments" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Przypisania do spółek">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('company-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">
+                                    <i class="bi bi-plus-circle"></i> Dodaj przypisanie
+                                </x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($tabData && $tabData->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Spółka</th>
+                                            <th>Okres</th>
+                                            <th>Status</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($tabData as $assignment)
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ route('companies.show', $assignment->company) }}" class="text-primary">
+                                                        {{ $assignment->company->name }}
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    {{ $assignment->start_date->format('Y-m-d') }}
+                                                    @if($assignment->end_date)
+                                                        - {{ $assignment->end_date->format('Y-m-d') }}
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @php
+                                                        if ($assignment->isCurrentlyActive()) {
+                                                            $statusLabel = 'Aktywne';
+                                                            $badgeVariant = 'success';
+                                                        } elseif ($assignment->isPast()) {
+                                                            $statusLabel = 'Zakończone';
+                                                            $badgeVariant = 'accent';
+                                                        } elseif ($assignment->isScheduled()) {
+                                                            $statusLabel = 'Zaplanowane';
+                                                            $badgeVariant = 'info';
+                                                        } else {
+                                                            $statusLabel = 'Nieznany';
+                                                            $badgeVariant = 'accent';
+                                                        }
+                                                    @endphp
+                                                    <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
+                                                </td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('company-assignments.show', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('company-assignments.edit', $assignment) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak przypisań do spółek dla tego pracownika.</p>
+                            <x-ui.button variant="primary" href="{{ route('company-assignments.create', ['employee_id' => $employee->id]) }}">Dodaj pierwsze przypisanie</x-ui.button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
     @elseif($activeTab === 'advances')
         <!-- Zakładka Zaliczki -->
         <div id="advances" role="tabpanel">

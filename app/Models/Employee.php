@@ -97,6 +97,22 @@ class Employee extends Model
     }
 
     /**
+     * Get all company assignments for this employee.
+     */
+    public function companyAssignments(): HasMany
+    {
+        return $this->hasMany(CompanyAssignment::class);
+    }
+
+    /**
+     * Get the currently active company assignment (today's date).
+     */
+    public function currentCompanyAssignment(): ?CompanyAssignment
+    {
+        return $this->companyAssignments()->active()->orderByDesc('start_date')->first();
+    }
+
+    /**
      * Get all vehicle assignments for this employee.
      */
     public function vehicleAssignments(): HasMany

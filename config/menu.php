@@ -24,6 +24,7 @@ return [
             'projects',
             'vehicles',
             'accommodations',
+            'companies',
         ],
     ],
 
@@ -34,6 +35,7 @@ return [
             'assignments',
             'vehicle_assignments',
             'accommodation_assignments',
+            'company_assignments',
             'demands',
             'vehicle_repairs',
         ],

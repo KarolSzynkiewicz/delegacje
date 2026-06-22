@@ -45,6 +45,12 @@ return [
         'label' => 'Mieszkania',
     ],
 
+    'companies' => [
+        'route' => 'companies.index',
+        'icon' => 'bi bi-building',
+        'label' => 'Spółki',
+    ],
+
     'locations' => [
         'route' => 'locations.index',
         'icon' => 'bi bi-geo-alt',
@@ -67,6 +73,12 @@ return [
         'route' => 'accommodation-assignments.index',
         'icon' => 'bi bi-house-fill',
         'label' => 'Przypisania mieszkań',
+    ],
+
+    'company_assignments' => [
+        'route' => 'company-assignments.index',
+        'icon' => 'bi bi-building-fill',
+        'label' => 'Przypisania do spółek',
     ],
 
     'demands' => [

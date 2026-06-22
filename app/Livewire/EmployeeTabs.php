@@ -32,6 +32,7 @@ class EmployeeTabs extends Component
             'accommodation-assignments' => ['label' => 'Przypisania do domów', 'permission' => 'accommodation-assignments.view', 'icon' => 'bi bi-house-fill'],
             'payrolls' => ['label' => 'Płace', 'permission' => 'payrolls.view', 'icon' => 'bi bi-cash-stack'],
             'employee-rates' => ['label' => 'Stawki', 'permission' => 'employee-rates.view', 'icon' => 'bi bi-currency-dollar'],
+            'company-assignments' => ['label' => 'Przypisania do spółek', 'permission' => 'company-assignments.view', 'icon' => 'bi bi-building'],
             'advances' => ['label' => 'Zaliczki', 'permission' => 'advances.view', 'icon' => 'bi bi-wallet2'],
             'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
             'evaluations' => ['label' => 'Oceny', 'permission' => 'employee-evaluations.view', 'icon' => 'bi bi-star-fill'],
@@ -73,6 +74,7 @@ class EmployeeTabs extends Component
             'accommodation-assignments' => $this->employee->accommodationAssignments()->with('accommodation')->orderBy('start_date', 'desc')->get(),
             'payrolls' => $this->employee->payrolls()->orderBy('period_start', 'desc')->get(),
             'employee-rates' => \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->orderBy('start_date', 'desc')->get(),
+            'company-assignments' => $this->employee->companyAssignments()->with('company')->orderBy('start_date', 'desc')->get(),
             'advances' => $this->employee->advances()->orderBy('date', 'desc')->get(),
             'time-logs' => \App\Models\TimeLog::whereHas('projectAssignment', function($query) {
                     $query->where('employee_id', $this->employee->id);
@@ -98,6 +100,7 @@ class EmployeeTabs extends Component
             'assignments',
             'vehicleAssignments',
             'accommodationAssignments',
+            'companyAssignments',
             'payrolls',
             'advances',
             'evaluations',
@@ -125,6 +128,7 @@ class EmployeeTabs extends Component
                 'assignments' => $this->employee->assignments_count ?? 0,
                 'vehicle-assignments' => $this->employee->vehicle_assignments_count ?? 0,
                 'accommodation-assignments' => $this->employee->accommodation_assignments_count ?? 0,
+                'company-assignments' => $this->employee->company_assignments_count ?? 0,
                 'payrolls' => $this->employee->payrolls_count ?? 0,
                 'employee-rates' => $employeeRatesCount,
                 'advances' => $this->employee->advances_count ?? 0,

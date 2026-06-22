@@ -19,6 +19,8 @@ use App\Http\Controllers\RotationController;
 use App\Http\Controllers\SystemActionsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserRoleController;
+use App\Http\Controllers\CompanyAssignmentController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\VehicleAssignmentController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WeeklyOverviewController;
@@ -326,9 +328,11 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('accommodation-assignments', [AccommodationAssignmentController::class, 'all'])
             ->name('accommodation-assignments.index');
 
-        // Vehicles, Accommodations (CRUD)
+        // Vehicles, Accommodations, Companies (CRUD)
         Route::resource('vehicles', VehicleController::class);
         Route::resource('accommodations', AccommodationController::class);
+        Route::resource('companies', CompanyController::class);
+        Route::resource('company-assignments', CompanyAssignmentController::class);
         Route::post('accommodations/{accommodation}/leases', [AccommodationController::class, 'storeLease'])
             ->name('accommodations.leases.store');
         Route::put('accommodations/{accommodation}/leases/{lease}', [AccommodationController::class, 'updateLease'])
