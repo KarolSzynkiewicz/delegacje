@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Role;
 use Livewire\Component;
@@ -19,6 +20,8 @@ class EmployeesTable extends Component
 
     public $rotationFilter = '';
 
+    public $companyFilter = '';
+
     public $statusDate = ''; // Nowy filtr daty
 
     public $sortField = 'last_name';
@@ -35,6 +38,7 @@ class EmployeesTable extends Component
         'roleFilter' => ['except' => ''],
         'locationFilter' => ['except' => ''],
         'rotationFilter' => ['except' => ''],
+        'companyFilter' => ['except' => ''],
         'statusDate' => ['except' => ''],
         'sortField' => ['except' => 'last_name'],
         'sortDirection' => ['except' => 'asc'],
@@ -60,6 +64,11 @@ class EmployeesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingCompanyFilter()
+    {
+        $this->resetPage();
+    }
+
     public function updatingStatusDate()
     {
         $this->resetPage();
@@ -71,6 +80,7 @@ class EmployeesTable extends Component
         $this->roleFilter = '';
         $this->locationFilter = '';
         $this->rotationFilter = '';
+        $this->companyFilter = '';
         $this->statusDate = '';
         $this->sortField = 'last_name';
         $this->sortDirection = 'asc';
@@ -105,7 +115,7 @@ class EmployeesTable extends Component
             'vehicleAssignments' => fn ($q) => $q->where('is_return_trip', false),
             'vehicleAssignments.vehicle',
             'rotations',
-            'rates' => fn ($q) => $q->active()->orderByDesc('start_date'),
+            'companyAssignments' => fn ($q) => $q->active()->orderByDesc('start_date')->with('company'),
         ]);
 
         // Filtrowanie po pracownikach (dla /mine/*)
@@ -126,6 +136,13 @@ class EmployeesTable extends Component
         if ($this->roleFilter) {
             $query->whereHas('roles', function ($q) {
                 $q->where('roles.id', $this->roleFilter);
+            });
+        }
+
+        // Filtrowanie po spółce (aktywne przypisanie)
+        if ($this->companyFilter) {
+            $query->whereHas('companyAssignments', function ($q) {
+                $q->where('company_id', $this->companyFilter)->active();
             });
         }
 
@@ -211,12 +228,14 @@ class EmployeesTable extends Component
         }
 
         $roles = Role::orderBy('name')->get();
+        $companies = Company::orderBy('name')->get();
 
         return view('livewire.employees-table', [
             'employees' => $employees,
             'roles' => $roles,
+            'companies' => $companies,
             'filterProjectIds' => $this->filterProjectIds,
-            'checkDate' => $checkDate, // Przekaż datę do widoku
+            'checkDate' => $checkDate,
         ]);
     }
 }

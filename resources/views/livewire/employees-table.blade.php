@@ -7,7 +7,7 @@
                 <div>
                     <h3 class="fs-5 fw-semibold mb-1">Pracownicy</h3>
                 <p class="small text-muted mb-0">
-                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate)
+                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter)
                         Znaleziono: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
                         @if($statusDate)
                             <span class="text-primary">(stan na {{ \Carbon\Carbon::parse($statusDate)->format('d.m.Y') }})</span>
@@ -17,7 +17,7 @@
                     @endif
                 </p>
                 </div>
-                @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate)
+                @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter)
                     <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
                         <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                     </x-ui.button>
@@ -84,6 +84,19 @@
                     <option value="inactive">Nieaktywna</option>
                 </select>
             </div>
+
+            <!-- Spółka -->
+            <div class="col-md-2">
+                <label class="form-label small">
+                    <i class="bi bi-building me-1"></i> Spółka
+                </label>
+                <select wire:model.live="companyFilter" class="form-control">
+                    <option value="">Wszystkie spółki</option>
+                    @foreach($companies as $company)
+                        <option value="{{ $company->id }}">{{ $company->name }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
     </x-ui.card>
 
@@ -101,7 +114,7 @@
                         <th class="text-center" style="min-width: 120px;">Auto</th>
                         <th class="text-center" style="min-width: 140px;">Projekt</th>
                         <th class="text-center" style="min-width: 100px;">Rotacja</th>
-                        <th class="text-end" style="min-width: 110px;">Stawka</th>
+                        <th class="text-center" style="min-width: 110px;">Spółka</th>
                         <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
@@ -146,8 +159,8 @@
                                 @elseif(!empty($locationStatus['accommodation_names']))
                                     <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
                                         @foreach($locationStatus['accommodation_names'] as $accName)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">
-                                                🏡 {{ $accName }}
+                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'" title="{{ $accName }}">
+                                                🏡 {{ \Illuminate\Support\Str::limit($accName, 5, '…') }}
                                             </x-ui.badge>
                                         @endforeach
                                     </div>
@@ -165,8 +178,8 @@
                                 @elseif(!empty($locationStatus['vehicle_labels']))
                                     <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
                                         @foreach($locationStatus['vehicle_labels'] as $reg)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">
-                                                🚗 {{ $reg }}
+                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'" title="{{ $reg }}">
+                                                🚗 {{ \Illuminate\Support\Str::limit($reg, 5, '…') }}
                                             </x-ui.badge>
                                         @endforeach
                                     </div>
@@ -184,8 +197,8 @@
                                 @elseif(!empty($locationStatus['project_names']))
                                     <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
                                         @foreach($locationStatus['project_names'] as $pname)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">
-                                                🏢 {{ $pname }}
+                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'" title="{{ $pname }}">
+                                                🏢 {{ \Illuminate\Support\Str::limit($pname, 5, '…') }}
                                             </x-ui.badge>
                                         @endforeach
                                     </div>
@@ -205,12 +218,14 @@
                                 @endif
                             </td>
 
-                            <!-- Stawka (aktywna dziś) -->
-                            <td class="text-end text-nowrap">
-                                @php $rate = $employee->rates->first(); @endphp
-                                @if($rate)
-                                    <span class="fw-semibold">{{ number_format((float) $rate->amount, 2, ',', ' ') }}</span>
-                                    <span class="text-muted small">{{ $rate->currency }}</span>
+                            <!-- Spółka (aktywne przypisanie) -->
+                            <td class="text-center text-nowrap">
+                                @php $companyAssignment = $employee->companyAssignments->first(); @endphp
+                                @if($companyAssignment && $companyAssignment->company)
+                                    @php $companyName = $companyAssignment->company->name; @endphp
+                                    <x-ui.badge variant="secondary" title="{{ $companyName }}">
+                                        🏢 {{ \Illuminate\Support\Str::limit($companyName, 5, '…') }}
+                                    </x-ui.badge>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
