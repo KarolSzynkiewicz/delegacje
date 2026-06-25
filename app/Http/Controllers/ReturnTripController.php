@@ -303,6 +303,7 @@ class ReturnTripController extends Controller
                     \App\Models\AccommodationAssignment::class => ['accommodation'],
                 ]);
             },
+            'transportCosts' => fn ($query) => $query->orderBy('cost_date', 'desc'),
         ]);
 
         return view('return-trips.show', compact('returnTrip'));

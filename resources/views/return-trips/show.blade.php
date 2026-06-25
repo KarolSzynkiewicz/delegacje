@@ -147,6 +147,106 @@
                     </div>
     </x-ui.card>
 
+    @php
+        $costTypeLabels = [
+            'ticket' => 'Bilet',
+            'fuel' => 'Paliwo',
+            'parking' => 'Parking',
+            'toll' => 'Opłata drogowa',
+            'other' => 'Inne',
+        ];
+        $costTypeIcons = [
+            'ticket' => 'ticket-perforated',
+            'fuel' => 'fuel-pump',
+            'parking' => 'p-square',
+            'toll' => 'sign-turn-right',
+            'other' => 'three-dots',
+        ];
+        $transportCosts = $returnTrip->transportCosts;
+        $costsTotalByCurrency = $transportCosts
+            ->groupBy('currency')
+            ->map(fn ($items, $currency) => number_format($items->sum('amount'), 2).' '.$currency)
+            ->values();
+    @endphp
+
+    <x-ui.card label="Koszty transportu i bilety">
+        <div class="d-flex justify-content-end gap-2 mb-3">
+            <x-ui.button
+                variant="primary"
+                href="{{ route('transport-costs.create', [
+                    'logistics_event_id' => $returnTrip->id,
+                    'cost_type' => 'ticket',
+                    'cost_date' => $returnTrip->event_date?->format('Y-m-d'),
+                    'description' => 'Bilet - zjazd #'.$returnTrip->id,
+                ]) }}"
+                action="create"
+            >
+                + Bilet
+            </x-ui.button>
+            <x-ui.button
+                variant="ghost"
+                href="{{ route('transport-costs.create', [
+                    'logistics_event_id' => $returnTrip->id,
+                    'cost_type' => 'fuel',
+                    'cost_date' => $returnTrip->event_date?->format('Y-m-d'),
+                    'description' => 'Paliwo - zjazd #'.$returnTrip->id,
+                ]) }}"
+                action="create"
+            >
+                + Paliwo
+            </x-ui.button>
+        </div>
+
+        @if($transportCosts->isNotEmpty())
+            @if($costsTotalByCurrency->isNotEmpty())
+                <div class="mb-3">
+                    <span class="fw-semibold">Pozycji: {{ $transportCosts->count() }}</span>
+                    <span class="text-muted ms-2">Suma: {{ $costsTotalByCurrency->join(', ') }}</span>
+                </div>
+            @endif
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-start">Typ</th>
+                            <th class="text-start">Kwota</th>
+                            <th class="text-start">Data</th>
+                            <th class="text-start">Opis</th>
+                            <th class="text-end">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($transportCosts as $cost)
+                            <tr>
+                                <td>
+                                    <x-ui.badge variant="info">
+                                        <i class="bi bi-{{ $costTypeIcons[$cost->cost_type] ?? 'three-dots' }} me-1"></i>
+                                        {{ $costTypeLabels[$cost->cost_type] ?? ucfirst($cost->cost_type) }}
+                                    </x-ui.badge>
+                                </td>
+                                <td class="fw-semibold text-nowrap">
+                                    {{ number_format((float) $cost->amount, 2) }} {{ $cost->currency }}
+                                </td>
+                                <td class="text-nowrap">{{ $cost->cost_date?->format('Y-m-d') ?? '-' }}</td>
+                                <td>{{ $cost->description ?: '-' }}</td>
+                                <td class="text-end">
+                                    <x-action-buttons
+                                        viewRoute="{{ route('transport-costs.show', $cost) }}"
+                                        editRoute="{{ route('transport-costs.edit', $cost) }}"
+                                        deleteRoute="{{ route('transport-costs.destroy', $cost) }}"
+                                        deleteMessage="Czy na pewno chcesz usunąć ten koszt?"
+                                    />
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="text-muted mb-0">Brak powiązanych kosztów transportu.</p>
+        @endif
+    </x-ui.card>
+
     <x-comments
         :commentable="$returnTrip"
         commentable-type="logistics_event"
