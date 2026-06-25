@@ -61,15 +61,61 @@
                             <dt class="col-sm-4 text-muted small">Plik</dt>
                             <dd class="col-sm-8">
                                 @if($employeeDocument->file_path)
-                                    <x-ui.button variant="ghost" href="{{ $employeeDocument->file_url }}" target="_blank" class="btn-sm">
-                                        <i class="bi bi-download"></i>
-                                        Pobierz załącznik
-                                    </x-ui.button>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <x-ui.button variant="ghost" href="{{ $employeeDocument->preview_url }}" target="_blank" class="btn-sm">
+                                            <i class="bi bi-eye"></i>
+                                            Otwórz w nowej karcie
+                                        </x-ui.button>
+                                        <x-ui.button variant="ghost" href="{{ $employeeDocument->file_url }}" class="btn-sm">
+                                            <i class="bi bi-download"></i>
+                                            Pobierz załącznik
+                                        </x-ui.button>
+                                    </div>
                                 @else
                                     <span class="text-muted">Brak pliku</span>
                                 @endif
                             </dd>
                         </dl>
+
+                        @if($employeeDocument->file_path)
+                            <div class="mt-4 pt-3 border-top">
+                                <h3 class="h6 fw-semibold mb-3">Podgląd dokumentu</h3>
+                                @if($employeeDocument->isPreviewable())
+                                    @if($employeeDocument->file_extension === 'pdf')
+                                        <div class="ratio ratio-16x9" style="min-height: 70vh;">
+                                            <iframe
+                                                src="{{ $employeeDocument->preview_url }}"
+                                                title="Podgląd dokumentu"
+                                                class="w-100 h-100 border rounded"
+                                                loading="lazy"></iframe>
+                                        </div>
+                                    @elseif($employeeDocument->file_extension === 'txt')
+                                        <div class="border rounded" style="height: 60vh;">
+                                            <iframe
+                                                src="{{ $employeeDocument->preview_url }}"
+                                                title="Podgląd dokumentu"
+                                                class="w-100 h-100"
+                                                loading="lazy"></iframe>
+                                        </div>
+                                    @else
+                                        <a href="{{ $employeeDocument->preview_url }}" target="_blank">
+                                            <img
+                                                src="{{ $employeeDocument->preview_url }}"
+                                                alt="Podgląd dokumentu"
+                                                class="img-fluid border rounded"
+                                                loading="lazy">
+                                        </a>
+                                    @endif
+                                @else
+                                    <div class="alert alert-info mb-0">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Podgląd w przeglądarce nie jest dostępny dla plików
+                                        <span class="font-monospace">.{{ $employeeDocument->file_extension ?: '?' }}</span>.
+                                        Skorzystaj z przycisku „Pobierz załącznik”.
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
 
                         <div class="d-flex flex-wrap gap-2 mt-4 pt-3 border-top">
                             <x-ui.button variant="warning" href="{{ route('employee-documents.edit', $employeeDocument) }}">

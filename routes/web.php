@@ -298,6 +298,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->defaults('permission_type', 'view')
             ->defaults('resource', 'employee-documents');
 
+        // Inline preview route for employee documents (without forcing a download)
+        Route::get('employee-documents/{employeeDocument}/preview', [EmployeeDocumentController::class, 'preview'])
+            ->name('employee-documents.preview')
+            ->defaults('permission_type', 'view')
+            ->defaults('resource', 'employee-documents');
+
         // Rotations (global routes)
         Route::get('rotations', [RotationController::class, 'all'])->name('rotations.index');
         Route::get('rotations/create', [RotationController::class, 'createGlobal'])->name('rotations.create');

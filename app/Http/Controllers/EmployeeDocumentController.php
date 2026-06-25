@@ -217,6 +217,33 @@ class EmployeeDocumentController extends Controller
     }
 
     /**
+     * Stream the specified employee document file inline (preview without forcing a download).
+     */
+    public function preview(EmployeeDocument $employeeDocument): StreamedResponse
+    {
+        if (! auth()->user()->hasPermission('employee-documents.view')) {
+            abort(403, 'Nie masz uprawnień do podglądu tego dokumentu.');
+        }
+
+        if (! $employeeDocument->file_path) {
+            abort(404, 'Plik nie został znaleziony.');
+        }
+
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($employeeDocument->file_path)) {
+            abort(404, 'Plik nie istnieje na serwerze.');
+        }
+
+        $fileName = ($employeeDocument->document->name ?? 'document').'_'.basename($employeeDocument->file_path);
+
+        return $disk->response($employeeDocument->file_path, $fileName, [
+            'Content-Type' => $disk->mimeType($employeeDocument->file_path),
+            'Content-Disposition' => 'inline; filename="'.$fileName.'"',
+        ]);
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(EmployeeDocument $employeeDocument): RedirectResponse

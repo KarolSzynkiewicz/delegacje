@@ -109,10 +109,36 @@ class EmployeeDocument extends Model
     }
 
     /**
+     * Get the inline preview URL (streams the file without forcing a download).
+     */
+    public function getPreviewUrlAttribute(): ?string
+    {
+        return $this->file_path ? route('employee-documents.preview', $this) : null;
+    }
+
+    /**
      * Check if document has a file attached.
      */
     public function hasFile(): bool
     {
         return ! empty($this->file_path);
+    }
+
+    /**
+     * Lowercase file extension of the attached file (empty string when no file).
+     */
+    public function getFileExtensionAttribute(): string
+    {
+        return $this->file_path
+            ? strtolower(pathinfo($this->file_path, PATHINFO_EXTENSION))
+            : '';
+    }
+
+    /**
+     * Whether the attached file can be previewed inline in the browser.
+     */
+    public function isPreviewable(): bool
+    {
+        return in_array($this->file_extension, ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'txt'], true);
     }
 }
