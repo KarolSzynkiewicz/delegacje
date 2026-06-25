@@ -106,6 +106,9 @@
             <table class="table">
                 <thead>
                     <tr>
+                        <x-livewire.sortable-header field="id" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start" style="width: 70px;">
+                            ID
+                        </x-livewire.sortable-header>
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
                             Pracownik
                         </x-livewire.sortable-header>
@@ -137,6 +140,9 @@
                             })->isNotEmpty();
                         @endphp
                         <tr>
+                            <td class="text-muted small">
+                                {{ $employee->id }}
+                            </td>
                             <td>
                                 <x-employee-cell :employee="$employee"  />
                             </td>
@@ -244,7 +250,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-4">
+                            <td colspan="9" class="text-center py-4">
                                 <x-ui.empty-state 
                                     icon="people"
                                     message="Brak pracowników do wyświetlenia"

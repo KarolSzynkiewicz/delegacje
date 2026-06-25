@@ -5,6 +5,7 @@ return [
     | Etykiety typów zapisywanych w audycie (klasa modelu => krótki opis PL).
     */
     'model_labels' => [
+        \App\Models\Employee::class => 'Pracownik',
         \App\Models\LogisticsEvent::class => 'Zdarzenie logistyczne',
         \App\Models\VehicleAssignment::class => 'Przypisanie pojazdu',
         \App\Models\ProjectAssignment::class => 'Przypisanie do projektu',

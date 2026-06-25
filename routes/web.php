@@ -255,7 +255,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->defaults('resource', 'employees');
 
         // Employees + assignments + documents
-        Route::resource('employees', EmployeeController::class);
+        // Trasa 'destroy' celowo wyłączona — usuwanie pracowników jest zablokowane.
+        // Employee model używa SoftDeletes; fizyczne usunięcie możliwe wyłącznie przez Tinker/DB.
+        Route::resource('employees', EmployeeController::class)->except(['destroy']);
 
         // Employee tabs - usunięte, teraz przez Livewire EmployeeTabs z query string
 

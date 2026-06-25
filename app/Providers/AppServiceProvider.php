@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\AccommodationAssignment;
 use App\Models\Adjustment;
+use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\ProjectAssignment;
@@ -48,6 +49,7 @@ class AppServiceProvider extends ServiceProvider
         // Custom morph map for assignment models and User (for Spatie Permission)
         // This ensures polymorphic assignments only point to valid assignment models
         // User is included because Spatie Permission uses morphedByMany for User model
+        Employee::observe(AuditableModelObserver::class);
         LogisticsEvent::observe(AuditableModelObserver::class);
         VehicleAssignment::observe(AuditableModelObserver::class);
         ProjectAssignment::observe(AuditableModelObserver::class);
