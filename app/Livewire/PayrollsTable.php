@@ -6,6 +6,7 @@ use App\Models\Payroll;
 use App\Models\Employee;
 use App\Models\EmployeeRate;
 use App\Models\Adjustment;
+use App\Models\Company;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +18,7 @@ class PayrollsTable extends Component
 
     public $search = '';
     public $statusFilter = '';
+    public $companyFilter = '';
     public $dateFrom = '';
     public $dateTo = '';
     public $sortField = 'period_start';
@@ -35,6 +37,7 @@ class PayrollsTable extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'statusFilter' => ['except' => ''],
+        'companyFilter' => ['except' => ''],
         'dateFrom' => ['except' => ''],
         'dateTo' => ['except' => ''],
         'sortField' => ['except' => 'period_start'],
@@ -48,6 +51,11 @@ class PayrollsTable extends Component
     }
 
     public function updatingStatusFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingCompanyFilter()
     {
         $this->resetPage();
     }
@@ -71,6 +79,7 @@ class PayrollsTable extends Component
     {
         $this->search = '';
         $this->statusFilter = '';
+        $this->companyFilter = '';
         $this->dateFrom = '';
         $this->dateTo = '';
         $this->sortField = 'period_start';
@@ -239,6 +248,18 @@ class PayrollsTable extends Component
             $query->where('status', $this->statusFilter);
         }
 
+        // Filtrowanie po spółce (przypisanie pracownika nakładające się na okres payrolla)
+        if (!empty($this->companyFilter)) {
+            $query->whereHas('employee.companyAssignments', function (Builder $q) {
+                $q->where('company_id', $this->companyFilter)
+                  ->whereColumn('company_assignments.start_date', '<=', 'payrolls.period_end')
+                  ->where(function (Builder $q2) {
+                      $q2->whereNull('company_assignments.end_date')
+                         ->orWhereColumn('company_assignments.end_date', '>=', 'payrolls.period_start');
+                  });
+            });
+        }
+
         // Filtrowanie po datach (payroll okres nachodzi na zakres)
         if (!empty($this->dateFrom)) {
             $query->whereDate('period_end', '>=', $this->dateFrom);
@@ -311,6 +332,7 @@ class PayrollsTable extends Component
 
         return view('livewire.payrolls-table', [
             'payrolls' => $payrolls,
+            'companies' => Company::orderBy('name')->get(),
         ]);
     }
 }

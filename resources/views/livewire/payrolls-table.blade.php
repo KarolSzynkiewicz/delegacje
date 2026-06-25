@@ -12,7 +12,7 @@
                 <div class="text-center text-md-start min-w-0">
                     <h3 class="fs-5 fw-semibold mb-1">Payroll</h3>
                     <p class="small text-muted mb-0">
-                        @if(!empty($search) || !empty($statusFilter) || !empty($dateFrom) || !empty($dateTo))
+                        @if(!empty($search) || !empty($statusFilter) || !empty($companyFilter) || !empty($dateFrom) || !empty($dateTo))
                             Znaleziono: <span class="fw-semibold">{{ $payrolls->total() }}</span> payrolli
                         @else
                             Łącznie: <span class="fw-semibold">{{ $payrolls->total() }}</span> payrolli
@@ -32,7 +32,7 @@
                         variant="ghost"
                         wire:click="clearFilters"
                         class="btn-sm w-100 w-md-auto"
-                        :disabled="empty($search) && empty($statusFilter) && empty($dateFrom) && empty($dateTo)"
+                        :disabled="empty($search) && empty($statusFilter) && empty($companyFilter) && empty($dateFrom) && empty($dateTo)"
                     >
                         <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                     </x-ui.button>
@@ -42,7 +42,7 @@
             <!-- Filtry -->
             <div class="row g-2 align-items-end">
                 <!-- Wyszukiwanie po pracowniku -->
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="search" class="form-label small fw-semibold mb-1">
                         <i class="bi bi-search me-1"></i> Szukaj pracownika
                     </label>
@@ -53,8 +53,23 @@
                            placeholder="Imię lub nazwisko...">
                 </div>
 
-                <!-- Filtrowanie po statusie -->
+                <!-- Filtrowanie po spółce -->
                 <div class="col-md-3">
+                    <label for="companyFilter" class="form-label small fw-semibold mb-1">
+                        <i class="bi bi-building me-1"></i> Spółka
+                    </label>
+                    <select id="companyFilter"
+                            wire:model.live="companyFilter"
+                            class="form-select form-select-sm">
+                        <option value="">Wszystkie spółki</option>
+                        @foreach($companies as $company)
+                            <option value="{{ $company->id }}">{{ $company->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Filtrowanie po statusie -->
+                <div class="col-md-2">
                     <label for="statusFilter" class="form-label small fw-semibold mb-1">
                         Status
                     </label>
@@ -70,7 +85,7 @@
                 </div>
 
                 <!-- Data od -->
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="dateFrom" class="form-label small fw-semibold mb-1">
                         <i class="bi bi-calendar-event me-1"></i> Data od
                     </label>
