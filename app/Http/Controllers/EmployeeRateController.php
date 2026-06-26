@@ -7,6 +7,7 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeRateController extends Controller
 {
@@ -42,6 +43,13 @@ class EmployeeRateController extends Controller
             'status' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
+
+        $this->checkOverlap(
+            $validated['employee_id'],
+            $validated['currency'],
+            $validated['start_date'],
+            $validated['end_date'] ?? null
+        );
 
         EmployeeRate::create($validated);
 
@@ -81,10 +89,52 @@ class EmployeeRateController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        $this->checkOverlap(
+            $validated['employee_id'],
+            $validated['currency'],
+            $validated['start_date'],
+            $validated['end_date'] ?? null,
+            $employeeRate->id
+        );
+
         $employeeRate->update($validated);
 
         return redirect()->route('employee-rates.index')
             ->with('success', 'Stawka została zaktualizowana.');
+    }
+
+    /**
+     * Check if a rate with the given date range overlaps with existing rates for the same employee+currency.
+     * Throws ValidationException if an overlap is detected.
+     *
+     * @param int $excludeId Rate ID to exclude from the check (used during update)
+     */
+    private function checkOverlap(
+        int $employeeId,
+        string $currency,
+        string $startDate,
+        ?string $endDate,
+        ?int $excludeId = null
+    ): void {
+        $query = EmployeeRate::where('employee_id', $employeeId)
+            ->where('currency', $currency)
+            ->where('status', 'active')
+            // overlap: existing.start <= new.end AND (existing.end >= new.start OR existing.end IS NULL)
+            ->where('start_date', '<=', $endDate ?? '9999-12-31')
+            ->where(function ($q) use ($startDate) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $startDate);
+            });
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'start_date' => 'Stawka nakłada się z istniejącą stawką dla tego pracownika i waluty w podanym przedziale dat. Zamknij poprzednią stawkę (ustaw datę zakończenia) przed dodaniem nowej.',
+            ]);
+        }
     }
 
     /**

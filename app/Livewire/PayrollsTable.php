@@ -292,7 +292,7 @@ class PayrollsTable extends Component
                 $rates = EmployeeRate::query()
                     ->where('employee_id', $payroll->employee_id)
                     ->where('currency', $payroll->currency)
-                    ->active()
+                    ->where('status', 'active')
                     ->where('start_date', '<=', $periodEnd)
                     ->where(function (Builder $q) use ($periodStart) {
                         $q->whereNull('end_date')
