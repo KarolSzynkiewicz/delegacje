@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\PromptEngine\AssignmentPromptBundleService;
 use App\Services\PromptEngine\CostPromptBundleService;
 use App\Services\PromptEngine\TaskPromptBundleService;
+use App\Services\PromptEngine\TimeLogPromptBundleService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,5 +64,18 @@ class PromptEngineController extends Controller
         $include = $validated['include'] ?? null;
 
         return response()->json($bundleService->build($start, $end, $projectIds, $include));
+    }
+
+    public function exportTimeLogs(Request $request, TimeLogPromptBundleService $bundleService): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $start = Carbon::parse($validated['start_date']);
+        $end = Carbon::parse($validated['end_date']);
+
+        return response()->json($bundleService->build($start, $end));
     }
 }
