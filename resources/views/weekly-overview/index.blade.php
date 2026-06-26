@@ -439,21 +439,14 @@
                                 </div>
                             @endif
 
-                            {{-- Pojazdy w serwisie w tym miesiącu --}}
+                            {{-- Pojazdy w serwisie w tym tygodniu --}}
                             @php
                                 $serviceRepairs = collect($weekData['service_repairs'] ?? []);
-                                $monthNames = [
-                                    1 => 'styczeń', 2 => 'luty', 3 => 'marzec', 4 => 'kwiecień',
-                                    5 => 'maj', 6 => 'czerwiec', 7 => 'lipiec', 8 => 'sierpień',
-                                    9 => 'wrzesień', 10 => 'październik', 11 => 'listopad', 12 => 'grudzień',
-                                ];
-                                $monthLabel = $monthNames[(int) $weeks[0]['start']->format('n')] ?? $weeks[0]['start']->format('F');
                             @endphp
                             <div class="mt-3 pt-3 border-top">
                                 <div class="d-flex align-items-center gap-1 mb-2">
                                     <i class="bi bi-tools text-warning"></i>
                                     <span class="card-label">Pojazdy w serwisie</span>
-                                    <span class="small text-muted">({{ $monthLabel }})</span>
                                 </div>
                                 @if($serviceRepairs->isNotEmpty())
                                     <ul class="list-unstyled mb-0 small">
@@ -483,7 +476,7 @@
                                         @endforeach
                                     </ul>
                                 @else
-                                    <p class="text-muted small mb-0">Brak pojazdów w serwisie w tym miesiącu</p>
+                                    <p class="text-muted small mb-0">Brak pojazdów w serwisie w tym tygodniu</p>
                                 @endif
                             </div>
                         </x-ui.card>

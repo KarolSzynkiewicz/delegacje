@@ -108,8 +108,8 @@ class WeeklyOverviewService
         // Get project tasks (already eager loaded in getProjectsWithWeeklyData)
         $tasks = $project->tasks;
 
-        // Get vehicles in service (akcje serwisowe) for this project in the week's month
-        $serviceRepairs = $this->getServiceRepairsForMonth($project, $weekStart);
+        // Get vehicles in service (akcje serwisowe) for this project in this week
+        $serviceRepairs = $this->getServiceRepairsForWeek($project, $weekStart, $weekEnd);
 
         return [
             'week' => $week,
@@ -153,16 +153,12 @@ class WeeklyOverviewService
     }
 
     /**
-     * Get vehicles in service (akcje serwisowe) linked to this project, overlapping the month
-     * that contains the given reference date (week start).
+     * Get vehicles in service (akcje serwisowe) linked to this project, overlapping the given week.
      */
-    protected function getServiceRepairsForMonth(Project $project, Carbon $referenceDate): Collection
+    protected function getServiceRepairsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
     {
-        $monthStart = $referenceDate->copy()->startOfMonth();
-        $monthEnd = $referenceDate->copy()->endOfMonth();
-
         return VehicleRepair::forProject($project->id)
-            ->overlappingWith($monthStart, $monthEnd)
+            ->overlappingWith($weekStart, $weekEnd)
             ->with(['vehicle', 'location'])
             ->orderBy('start_date')
             ->get()
