@@ -68,6 +68,19 @@
 
                 <div class="row mb-3">
                     <div class="col-md-6">
+                        <h6>Projekt</h6>
+                        @if($vehicleRepair->project)
+                            <a href="{{ route('projects.show', $vehicleRepair->project) }}" class="text-decoration-none">
+                                {{ $vehicleRepair->project->name }}
+                            </a>
+                        @else
+                            <span class="text-muted">Brak powiązania</span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
                         <h6>Data oddania</h6>
                         <p>{{ $vehicleRepair->start_date->format('Y-m-d') }}</p>
                     </div>

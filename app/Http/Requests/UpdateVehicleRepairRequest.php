@@ -16,6 +16,7 @@ class UpdateVehicleRepairRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'project_id'          => ['nullable', 'exists:projects,id'],
             'action_type'         => ['required', Rule::enum(ServiceActionType::class)],
             'start_date'          => ['required', 'date'],
             'end_date'            => ['nullable', 'date', 'after_or_equal:start_date'],
@@ -38,6 +39,7 @@ class UpdateVehicleRepairRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'project_id.exists'       => 'Wybrany projekt nie istnieje.',
             'action_type.required'    => 'Typ akcji serwisowej jest wymagany.',
             'start_date.required'     => 'Data oddania do warsztatu jest wymagana.',
             'end_date.after_or_equal' => 'Data odbioru nie może być wcześniejsza niż data oddania.',

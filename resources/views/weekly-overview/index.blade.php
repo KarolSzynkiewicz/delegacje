@@ -438,6 +438,54 @@
                                     @endif
                                 </div>
                             @endif
+
+                            {{-- Pojazdy w serwisie w tym miesiącu --}}
+                            @php
+                                $serviceRepairs = collect($weekData['service_repairs'] ?? []);
+                                $monthNames = [
+                                    1 => 'styczeń', 2 => 'luty', 3 => 'marzec', 4 => 'kwiecień',
+                                    5 => 'maj', 6 => 'czerwiec', 7 => 'lipiec', 8 => 'sierpień',
+                                    9 => 'wrzesień', 10 => 'październik', 11 => 'listopad', 12 => 'grudzień',
+                                ];
+                                $monthLabel = $monthNames[(int) $weeks[0]['start']->format('n')] ?? $weeks[0]['start']->format('F');
+                            @endphp
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="d-flex align-items-center gap-1 mb-2">
+                                    <i class="bi bi-tools text-warning"></i>
+                                    <span class="card-label">Pojazdy w serwisie</span>
+                                    <span class="small text-muted">({{ $monthLabel }})</span>
+                                </div>
+                                @if($serviceRepairs->isNotEmpty())
+                                    <ul class="list-unstyled mb-0 small">
+                                        @foreach($serviceRepairs as $repairData)
+                                            @php
+                                                $repair = $repairData['repair'];
+                                            @endphp
+                                            <li class="mb-2">
+                                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                    @if($repairData['vehicle'])
+                                                        <a href="{{ route('vehicles.show', $repairData['vehicle']) }}" class="text-decoration-none fw-semibold">
+                                                            <i class="bi bi-car-front"></i> {{ $repairData['vehicle']->registration_number }}
+                                                        </a>
+                                                    @else
+                                                        <span class="fw-semibold">{{ $repairData['vehicle_name'] }}</span>
+                                                    @endif
+                                                    <a href="{{ route('vehicle-repairs.show', $repair) }}" class="text-decoration-none">
+                                                        <x-ui.badge variant="{{ $repair->status_badge_variant }}">{{ $repair->status_label }}</x-ui.badge>
+                                                    </a>
+                                                </div>
+                                                <div class="text-muted">
+                                                    {{ $repair->action_type->label() }}
+                                                    &middot;
+                                                    {{ $repair->start_date->format('d.m') }}@if($repair->end_date) – {{ $repair->end_date->format('d.m') }}@endif
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="text-muted small mb-0">Brak pojazdów w serwisie w tym miesiącu</p>
+                                @endif
+                            </div>
                         </x-ui.card>
                     </div>
 

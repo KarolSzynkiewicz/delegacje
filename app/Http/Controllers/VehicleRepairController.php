@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Project;
 use App\Models\Vehicle;
 use App\Models\VehicleRepair;
 use App\Models\Location;
@@ -25,7 +26,7 @@ class VehicleRepairController extends Controller
 
     public function index(Request $request): View
     {
-        $query = VehicleRepair::with(['vehicle', 'location'])
+        $query = VehicleRepair::with(['vehicle', 'location', 'project'])
             ->orderBy('start_date', 'desc');
 
         if ($request->filled('vehicle_id')) {
@@ -54,10 +55,12 @@ class VehicleRepairController extends Controller
     {
         $vehicles   = Vehicle::orderBy('registration_number')->get();
         $locations  = Location::orderBy('name')->get();
+        $projects   = Project::orderBy('name')->get();
         $actionTypes = ServiceActionType::cases();
         $selectedVehicleId = $request->vehicle_id;
+        $selectedProjectId = $request->project_id;
 
-        return view('vehicle-repairs.create', compact('vehicles', 'locations', 'actionTypes', 'selectedVehicleId'));
+        return view('vehicle-repairs.create', compact('vehicles', 'locations', 'projects', 'actionTypes', 'selectedVehicleId', 'selectedProjectId'));
     }
 
     /**
@@ -141,7 +144,7 @@ class VehicleRepairController extends Controller
 
     public function show(VehicleRepair $vehicleRepair): View
     {
-        $vehicleRepair->load(['vehicle', 'location', 'fixedCostEntry']);
+        $vehicleRepair->load(['vehicle', 'location', 'project', 'fixedCostEntry']);
         $conditionOptions = VehicleCondition::cases();
 
         return view('vehicle-repairs.show', compact('vehicleRepair', 'conditionOptions'));
@@ -149,11 +152,12 @@ class VehicleRepairController extends Controller
 
     public function edit(VehicleRepair $vehicleRepair): View
     {
-        $vehicleRepair->load(['vehicle', 'location']);
+        $vehicleRepair->load(['vehicle', 'location', 'project']);
         $locations   = Location::orderBy('name')->get();
+        $projects    = Project::orderBy('name')->get();
         $actionTypes = ServiceActionType::cases();
 
-        return view('vehicle-repairs.edit', compact('vehicleRepair', 'locations', 'actionTypes'));
+        return view('vehicle-repairs.edit', compact('vehicleRepair', 'locations', 'projects', 'actionTypes'));
     }
 
     public function update(UpdateVehicleRepairRequest $request, VehicleRepair $vehicleRepair): RedirectResponse

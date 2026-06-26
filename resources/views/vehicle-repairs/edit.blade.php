@@ -38,6 +38,20 @@
                         </p>
                     </div>
 
+                    {{-- Project --}}
+                    <div class="mb-4">
+                        <x-input-label for="project_id" value="Projekt (opcjonalnie)" />
+                        <select id="project_id" name="project_id" class="form-select mt-1 @error('project_id') is-invalid @enderror">
+                            <option value="">-- Brak powiązania z projektem --</option>
+                            @foreach($projects as $project)
+                                <option value="{{ $project->id }}" {{ old('project_id', $vehicleRepair->project_id) == $project->id ? 'selected' : '' }}>
+                                    {{ $project->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <x-input-error :messages="$errors->get('project_id')" class="mt-2" />
+                    </div>
+
                     {{-- Action type --}}
                     <div class="mb-4">
                         <x-input-label for="action_type" value="Typ akcji serwisowej" />

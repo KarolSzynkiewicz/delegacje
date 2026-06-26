@@ -24,6 +24,7 @@ class VehicleRepairService
 
             $repair = VehicleRepair::create([
                 'vehicle_id'                   => $vehicle->id,
+                'project_id'                   => $data['project_id'] ?? null,
                 'location_id'                  => $workshopLocationId,
                 'action_type'                  => $data['action_type'],
                 'start_date'                   => $data['start_date'],
@@ -77,6 +78,7 @@ class VehicleRepairService
             $workshopLocationId = $this->resolveWorkshopLocation($data);
 
             $repair->update([
+                'project_id'  => $data['project_id'] ?? null,
                 'location_id' => $workshopLocationId,
                 'action_type' => $data['action_type'],
                 'start_date'  => $data['start_date'],

@@ -14,6 +14,7 @@ class VehicleRepair extends Model
 
     protected $fillable = [
         'vehicle_id',
+        'project_id',
         'location_id',
         'action_type',
         'start_date',
@@ -35,6 +36,11 @@ class VehicleRepair extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function location(): BelongsTo
@@ -96,6 +102,25 @@ class VehicleRepair extends Model
     public function scopeForVehicle($query, int $vehicleId)
     {
         return $query->where('vehicle_id', $vehicleId);
+    }
+
+    public function scopeForProject($query, int $projectId)
+    {
+        return $query->where('project_id', $projectId);
+    }
+
+    /**
+     * Akcje serwisowe, które nakładają się na podany zakres dat.
+     * Serwis trwa od start_date do end_date (lub nadal trwa, gdy end_date jest null).
+     */
+    public function scopeOverlappingWith($query, Carbon $startDate, Carbon $endDate)
+    {
+        return $query
+            ->whereDate('start_date', '<=', $endDate->toDateString())
+            ->where(function ($q) use ($startDate) {
+                $q->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $startDate->toDateString());
+            });
     }
 
     public function scopeCompleted($query)

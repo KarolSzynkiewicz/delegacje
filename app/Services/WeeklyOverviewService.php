@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectDemand;
 use App\Models\VehicleAssignment;
+use App\Models\VehicleRepair;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -107,6 +108,9 @@ class WeeklyOverviewService
         // Get project tasks (already eager loaded in getProjectsWithWeeklyData)
         $tasks = $project->tasks;
 
+        // Get vehicles in service (akcje serwisowe) for this project in the week's month
+        $serviceRepairs = $this->getServiceRepairsForMonth($project, $weekStart);
+
         return [
             'week' => $week,
             'demands' => $demands,
@@ -116,6 +120,7 @@ class WeeklyOverviewService
             'vehicles' => $vehicles,
             'assigned_employees' => $assignedEmployees,
             'tasks' => $tasks,
+            'service_repairs' => $serviceRepairs,
             'has_data' => $demands->isNotEmpty() || $assignments->isNotEmpty(),
         ];
     }
@@ -145,6 +150,32 @@ class WeeklyOverviewService
             ->overlappingWith($startDate, $endDate)
             ->with('role')
             ->get();
+    }
+
+    /**
+     * Get vehicles in service (akcje serwisowe) linked to this project, overlapping the month
+     * that contains the given reference date (week start).
+     */
+    protected function getServiceRepairsForMonth(Project $project, Carbon $referenceDate): Collection
+    {
+        $monthStart = $referenceDate->copy()->startOfMonth();
+        $monthEnd = $referenceDate->copy()->endOfMonth();
+
+        return VehicleRepair::forProject($project->id)
+            ->overlappingWith($monthStart, $monthEnd)
+            ->with(['vehicle', 'location'])
+            ->orderBy('start_date')
+            ->get()
+            ->map(function (VehicleRepair $repair) {
+                return [
+                    'repair' => $repair,
+                    'vehicle' => $repair->vehicle,
+                    'vehicle_name' => $repair->vehicle
+                        ? trim("{$repair->vehicle->brand} {$repair->vehicle->model} {$repair->vehicle->registration_number}")
+                        : '—',
+                ];
+            })
+            ->values();
     }
 
     /**
