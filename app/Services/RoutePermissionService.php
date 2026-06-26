@@ -341,6 +341,7 @@ class RoutePermissionService
             'dashboard', // Dashboard dostępny dla każdego zalogowanego użytkownika
             'mine.*', // Wykluczone na testy - routes dla /mine/*
             'health', // Healthcheck endpoint - no auth/permission required
+            'attachments.*', // Autoryzacja kontekstowa przez AttachmentPolicy
         ];
         
         foreach ($excludedRoutes as $pattern) {

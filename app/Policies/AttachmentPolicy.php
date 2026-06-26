@@ -2,11 +2,18 @@
 
 namespace App\Policies;
 
+use App\Enums\LogisticsEventType;
+use App\Models\Accommodation;
 use App\Models\Attachment;
 use App\Models\Comment;
+use App\Models\Employee;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\RecruitmentApplication;
 use App\Models\User;
+use App\Models\Vehicle;
 
 class AttachmentPolicy
 {
@@ -67,7 +74,30 @@ class AttachmentPolicy
         if ($ctx instanceof Project) {
             return $user->hasPermission('projects.view');
         }
+        if ($ctx instanceof Vehicle) {
+            return $user->hasPermission('vehicles.view');
+        }
+        if ($ctx instanceof Accommodation) {
+            return $user->hasPermission('accommodations.view');
+        }
+        if ($ctx instanceof Location) {
+            return $user->hasPermission('locations.view');
+        }
+        if ($ctx instanceof Employee) {
+            return $user->hasPermission('employees.view');
+        }
+        if ($ctx instanceof RecruitmentApplication) {
+            return $user->hasPermission('recruitment-applications.view');
+        }
+        if ($ctx instanceof LogisticsEvent) {
+            return match ($ctx->type) {
+                LogisticsEventType::DEPARTURE => $user->hasPermission('departures.view'),
+                LogisticsEventType::RETURN => $user->hasPermission('return-trips.view'),
+                LogisticsEventType::TRANSFER => $user->hasPermission('transfers.view'),
+                default => false,
+            };
+        }
 
-        return $user->hasPermission('tasks.view') || $user->hasPermission('projects.view');
+        return false;
     }
 }
