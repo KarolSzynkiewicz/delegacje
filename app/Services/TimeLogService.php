@@ -242,23 +242,27 @@ class TimeLogService
         $prevMonth = $currentDate->copy()->subMonth()->format('Y-m');
         $nextMonth = $currentDate->copy()->addMonth()->format('Y-m');
 
-        // Get all projects with their assignments
+        // Constraint: tylko przypisania, które nakładają się na bieżący miesiąc.
+        $assignmentInMonth = function ($query) use ($monthStart, $monthEnd) {
+            $query->where('start_date', '<=', $monthEnd)
+                ->where(function ($q2) use ($monthStart) {
+                    $q2->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $monthStart);
+                });
+        };
+
+        // Get all projects with their assignments.
+        // Eager-loaded `assignments` ograniczamy do tych nakładających się na miesiąc,
+        // żeby listować tylko osoby z przypisaniem na jakikolwiek dzień w tym miesiącu.
         $projectsQuery = Project::with([
+            'assignments' => $assignmentInMonth,
             'assignments.employee',
             'assignments.role',
             'assignments.timeLogs' => function ($query) use ($monthStart, $monthEnd) {
                 $query->whereBetween('start_time', [$monthStart, $monthEnd->endOfDay()]);
             },
         ])
-            ->whereHas('assignments', function ($query) use ($monthStart, $monthEnd) {
-                $query->where(function ($q) use ($monthStart, $monthEnd) {
-                    $q->where('start_date', '<=', $monthEnd)
-                        ->where(function ($q2) use ($monthStart) {
-                            $q2->whereNull('end_date')
-                                ->orWhere('end_date', '>=', $monthStart);
-                        });
-                });
-            });
+            ->whereHas('assignments', $assignmentInMonth);
 
         // Filter by project IDs if provided (for /mine/* routes)
         if ($projectIds !== null && ! empty($projectIds)) {
