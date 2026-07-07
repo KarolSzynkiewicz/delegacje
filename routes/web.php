@@ -141,6 +141,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('time-logs/monthly-grid', [\App\Http\Controllers\TimeLogController::class, 'monthlyGrid'])
             ->name('time-logs.monthly-grid')
             ->defaults('resource', 'time-logs');
+        Route::get('time-logs/analytics', [\App\Http\Controllers\TimeLogController::class, 'analytics'])
+            ->name('time-logs.analytics')
+            ->defaults('resource', 'time-logs');
         Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])
             ->name('time-logs.bulk-update')
             ->defaults('resource', 'time-logs');

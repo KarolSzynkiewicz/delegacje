@@ -191,6 +191,296 @@ class TimeLogController extends Controller
     }
 
     /**
+     * Display analytics / read-only monthly grid for time logs.
+     */
+    public function analytics(Request $request): \Illuminate\View\View|\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $month = $request->query('month', Carbon::now()->format('Y-m'));
+        $projectIdsParam = $request->query('project_ids');
+        $format = $request->query('format');
+
+        $currentDate = Carbon::parse($month . '-01');
+        $monthStart = $currentDate->copy()->startOfMonth();
+        $monthEnd = $currentDate->copy()->endOfMonth();
+        $daysInMonth = $monthStart->daysInMonth;
+
+        $prevMonth = $currentDate->copy()->subMonth()->format('Y-m');
+        $nextMonth = $currentDate->copy()->addMonth()->format('Y-m');
+
+        // Projects with assignments active in this month
+        $availableProjects = \App\Models\Project::query()
+            ->whereHas('assignments', function ($q) use ($monthStart, $monthEnd) {
+                $q->where('start_date', '<=', $monthEnd)
+                    ->where(function ($q2) use ($monthStart) {
+                        $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $monthStart);
+                    });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $allProjectIds = $availableProjects->pluck('id')->all();
+
+        // Resolve selected project IDs from query string
+        if ($projectIdsParam !== null) {
+            $selectedProjectIds = array_values(array_intersect(
+                array_map('intval', (array) $projectIdsParam),
+                $allProjectIds
+            ));
+        } else {
+            $selectedProjectIds = $allProjectIds;
+        }
+
+        // Generate days array
+        $days = [];
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $date = $monthStart->copy()->addDays($d - 1)->startOfDay();
+            $days[] = [
+                'number' => $d,
+                'date' => $date,
+                'isWeekend' => $date->isWeekend(),
+            ];
+        }
+
+        // Group days into ISO calendar weeks (weeks that overlap the month)
+        $weeks = [];
+        $weekGroupsMap = [];
+        foreach ($days as $dayData) {
+            $isoWeek = $dayData['date']->isoWeek();
+            $isoYear = $dayData['date']->isoWeekYear();
+            $wKey = $isoYear . 'W' . sprintf('%02d', $isoWeek);
+            $weekGroupsMap[$wKey][] = $dayData['number'];
+        }
+        $wi = 1;
+        foreach ($weekGroupsMap as $wKey => $dayNums) {
+            $firstDate = $monthStart->copy()->addDays($dayNums[0] - 1);
+            $lastDate = $monthStart->copy()->addDays($dayNums[count($dayNums) - 1] - 1);
+            $weeks[] = [
+                'key' => $wKey,
+                'index' => $wi++,
+                'days' => $dayNums,
+                'label' => 'Tydz. ' . ($wi - 1),
+                'dateRange' => $firstDate->format('d') . '–' . $lastDate->format('d'),
+            ];
+        }
+
+        // Fetch all time logs for the month (only employees with actual entries)
+        $queryProjectIds = !empty($selectedProjectIds) ? $selectedProjectIds : [0];
+
+        $rawLogs = TimeLog::whereBetween('start_time', [$monthStart, $monthEnd->copy()->endOfDay()])
+            ->join('project_assignments as pa', 'time_logs.project_assignment_id', '=', 'pa.id')
+            ->join('projects as pr', 'pa.project_id', '=', 'pr.id')
+            ->join('employees as em', 'pa.employee_id', '=', 'em.id')
+            ->whereIn('pa.project_id', $queryProjectIds)
+            ->select(
+                'time_logs.hours_worked',
+                'time_logs.start_time',
+                'pa.project_id',
+                'pa.employee_id',
+                'pr.name as project_name',
+                'em.first_name',
+                'em.last_name'
+            )
+            ->get();
+
+        // Aggregate by project → employee → day
+        $byProject = [];
+
+        foreach ($rawLogs as $log) {
+            $pid = $log->project_id;
+            $eid = $log->employee_id;
+            $day = Carbon::parse($log->start_time)->day;
+            $h = (float) $log->hours_worked;
+
+            if (!isset($byProject[$pid])) {
+                $byProject[$pid] = [
+                    'name' => $log->project_name,
+                    'employees' => [],
+                    'dailyTotals' => [],
+                    'weeklyTotals' => [],
+                    'monthTotal' => 0.0,
+                ];
+            }
+            if (!isset($byProject[$pid]['employees'][$eid])) {
+                $byProject[$pid]['employees'][$eid] = [
+                    'first_name' => $log->first_name,
+                    'last_name' => $log->last_name,
+                    'dailyHours' => [],
+                    'weeklyTotals' => [],
+                    'monthTotal' => 0.0,
+                ];
+            }
+
+            $byProject[$pid]['employees'][$eid]['dailyHours'][$day] =
+                ($byProject[$pid]['employees'][$eid]['dailyHours'][$day] ?? 0.0) + $h;
+            $byProject[$pid]['employees'][$eid]['monthTotal'] += $h;
+            $byProject[$pid]['dailyTotals'][$day] =
+                ($byProject[$pid]['dailyTotals'][$day] ?? 0.0) + $h;
+            $byProject[$pid]['monthTotal'] += $h;
+        }
+
+        // Compute weekly totals and sort employees
+        foreach ($byProject as $pid => &$projData) {
+            foreach ($weeks as $week) {
+                $wt = 0.0;
+                foreach ($week['days'] as $dn) {
+                    $wt += $projData['dailyTotals'][$dn] ?? 0.0;
+                }
+                $projData['weeklyTotals'][$week['key']] = $wt;
+
+                foreach ($projData['employees'] as $eid => &$empData) {
+                    $ewt = 0.0;
+                    foreach ($week['days'] as $dn) {
+                        $ewt += $empData['dailyHours'][$dn] ?? 0.0;
+                    }
+                    $empData['weeklyTotals'][$week['key']] = $ewt;
+                }
+                unset($empData);
+            }
+            uasort($projData['employees'], fn ($a, $b) => strcmp(
+                mb_strtolower($a['last_name'] . $a['first_name']),
+                mb_strtolower($b['last_name'] . $b['first_name'])
+            ));
+        }
+        unset($projData);
+
+        // Sort projects by name
+        uasort($byProject, fn ($a, $b) => strcmp(mb_strtolower($a['name']), mb_strtolower($b['name'])));
+
+        // Grand totals across all projects
+        $grandDailyTotals = [];
+        $grandWeeklyTotals = [];
+        $grandMonthTotal = 0.0;
+
+        foreach ($byProject as $projData) {
+            foreach ($projData['dailyTotals'] as $dn => $h) {
+                $grandDailyTotals[$dn] = ($grandDailyTotals[$dn] ?? 0.0) + $h;
+            }
+            $grandMonthTotal += $projData['monthTotal'];
+        }
+        foreach ($weeks as $week) {
+            $wt = 0.0;
+            foreach ($week['days'] as $dn) {
+                $wt += $grandDailyTotals[$dn] ?? 0.0;
+            }
+            $grandWeeklyTotals[$week['key']] = $wt;
+        }
+
+        // Build chart data for JavaScript
+        $chartProjectLabels = [];
+        $chartProjectTotals = [];
+        $chartWeekLabels = array_map(
+            fn ($w) => $w['label'] . ' (' . $w['dateRange'] . ')',
+            $weeks
+        );
+        $chartWeekDatasets = [];
+        $chartDayLabels = array_map(
+            fn ($d) => $d['date']->format('d') . ' ' . $d['date']->locale('pl')->translatedFormat('D'),
+            $days
+        );
+        $chartDayDatasets = [];
+
+        foreach ($byProject as $projData) {
+            $chartProjectLabels[] = $projData['name'];
+            $chartProjectTotals[] = round($projData['monthTotal'], 2);
+
+            $wData = [];
+            foreach ($weeks as $week) {
+                $wData[] = round($projData['weeklyTotals'][$week['key']] ?? 0.0, 2);
+            }
+            $chartWeekDatasets[] = ['label' => $projData['name'], 'data' => $wData];
+
+            $dData = [];
+            foreach ($days as $d) {
+                $dData[] = round($projData['dailyTotals'][$d['number']] ?? 0.0, 2);
+            }
+            $chartDayDatasets[] = ['label' => $projData['name'], 'data' => $dData];
+        }
+
+        $chartData = [
+            'projectLabels' => $chartProjectLabels,
+            'projectTotals' => $chartProjectTotals,
+            'weekLabels' => $chartWeekLabels,
+            'weekDatasets' => $chartWeekDatasets,
+            'dayLabels' => $chartDayLabels,
+            'dayDatasets' => $chartDayDatasets,
+        ];
+
+        // CSV export
+        if ($format === 'csv') {
+            $filename = 'time-logs-analytics-' . $month . '.csv';
+
+            return response()->streamDownload(
+                function () use ($byProject, $days, $weeks, $grandDailyTotals, $grandWeeklyTotals, $grandMonthTotal) {
+                    $out = fopen('php://output', 'w');
+                    fputs($out, "\xEF\xBB\xBF");
+
+                    $hdr = ['Projekt', 'Pracownik'];
+                    foreach ($days as $d) {
+                        $hdr[] = $d['date']->format('d.m') . ' ' . $d['date']->format('D');
+                    }
+                    foreach ($weeks as $w) {
+                        $hdr[] = 'Σ ' . $w['label'];
+                    }
+                    $hdr[] = 'Σ Miesiąc';
+                    fputcsv($out, $hdr, ';');
+
+                    foreach ($byProject as $projData) {
+                        foreach ($projData['employees'] as $empData) {
+                            $row = [$projData['name'], $empData['last_name'] . ' ' . $empData['first_name']];
+                            foreach ($days as $d) {
+                                $h = $empData['dailyHours'][$d['number']] ?? 0.0;
+                                $row[] = $h > 0 ? number_format($h, 2, ',', '') : '';
+                            }
+                            foreach ($weeks as $w) {
+                                $wh = $empData['weeklyTotals'][$w['key']] ?? 0.0;
+                                $row[] = $wh > 0 ? number_format($wh, 2, ',', '') : '';
+                            }
+                            $row[] = number_format($empData['monthTotal'], 2, ',', '');
+                            fputcsv($out, $row, ';');
+                        }
+
+                        $row = [$projData['name'] . ' [SUMA]', '—'];
+                        foreach ($days as $d) {
+                            $h = $projData['dailyTotals'][$d['number']] ?? 0.0;
+                            $row[] = $h > 0 ? number_format($h, 2, ',', '') : '';
+                        }
+                        foreach ($weeks as $w) {
+                            $wh = $projData['weeklyTotals'][$w['key']] ?? 0.0;
+                            $row[] = $wh > 0 ? number_format($wh, 2, ',', '') : '';
+                        }
+                        $row[] = number_format($projData['monthTotal'], 2, ',', '');
+                        fputcsv($out, $row, ';');
+                    }
+
+                    $row = ['ŁĄCZNIE', '—'];
+                    foreach ($days as $d) {
+                        $h = $grandDailyTotals[$d['number']] ?? 0.0;
+                        $row[] = $h > 0 ? number_format($h, 2, ',', '') : '';
+                    }
+                    foreach ($weeks as $w) {
+                        $wh = $grandWeeklyTotals[$w['key']] ?? 0.0;
+                        $row[] = $wh > 0 ? number_format($wh, 2, ',', '') : '';
+                    }
+                    $row[] = number_format($grandMonthTotal, 2, ',', '');
+                    fputcsv($out, $row, ';');
+
+                    fclose($out);
+                },
+                $filename,
+                ['Content-Type' => 'text/csv; charset=UTF-8']
+            );
+        }
+
+        return view('time-logs.analytics', compact(
+            'byProject', 'days', 'weeks', 'currentDate', 'prevMonth', 'nextMonth',
+            'monthStart', 'monthEnd', 'availableProjects', 'selectedProjectIds',
+            'grandDailyTotals', 'grandWeeklyTotals', 'grandMonthTotal',
+            'chartData', 'month'
+        ));
+    }
+
+    /**
      * Bulk update time logs.
      */
     public function bulkUpdate(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
