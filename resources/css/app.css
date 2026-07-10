@@ -88,6 +88,31 @@ body {
     transform: rotate(-90deg);
 }
 
+/* Weekly overview: assigned employees table — limit long badge text */
+.weekly-overview-assigned-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.weekly-overview-assigned-table .wo-cell-truncate {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.weekly-overview-assigned-table th:nth-child(2),
+.weekly-overview-assigned-table td:nth-child(2) {
+    max-width: 9rem;
+}
+
+.weekly-overview-assigned-table th:nth-child(5),
+.weekly-overview-assigned-table td:nth-child(5) {
+    max-width: 10rem;
+}
+
 /* Dashboard styles */
 .dashboard-card {
     padding: 1.5rem !important;

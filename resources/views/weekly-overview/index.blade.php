@@ -316,10 +316,10 @@
             </div>
 
             @if($weekData && $weekData['has_data'])
-                <!-- Row3: Zapotrzebowanie, Auta w projekcie, Domy w projekcie -->
+                <!-- Zapotrzebowanie, Auta w projekcie, Domy w projekcie (jedna pod drugą) -->
                 <div class="row g-3 mb-4">
-                    <!-- Zapotrzebowanie (1/3) -->
-                    <div class="col-md-4">
+                    <!-- Zapotrzebowanie -->
+                    <div class="col-12">
                         <x-ui.card>
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <span class="card-label">Zapotrzebowanie</span>
@@ -338,8 +338,23 @@
                                 $totalAssigned = $reqSummary['total_assigned_max'] ?? $reqSummary['total_assigned'] ?? 0;
                                 $roleDetails = $reqSummary['role_details'] ?? [];
                                 $summary = new \App\ViewModels\WeeklyProjectSummary($weekData);
+                                $demandChartItems = collect($roleDetails)
+                                    ->filter(fn ($roleDetail) => ($roleDetail['needed'] ?? 0) > 0)
+                                    ->map(function ($roleDetail) {
+                                        $role = $roleDetail['role'] ?? null;
+
+                                        return [
+                                            'label' => $role?->name ?? '—',
+                                            'value' => (int) ($roleDetail['needed'] ?? 0),
+                                        ];
+                                    })
+                                    ->values();
+                                $demandChartLabels = $demandChartItems->pluck('label')->all();
+                                $demandChartValues = $demandChartItems->pluck('value')->all();
                             @endphp
-                            
+
+                            <div class="row g-3 align-items-start">
+                                <div class="col-md-6">
                             <!-- Tabelka zapotrzebowania -->
                             @if(!empty($roleDetails))
                                 <div class="table-responsive mb-0">
@@ -438,52 +453,30 @@
                                     @endif
                                 </div>
                             @endif
-
-                            {{-- Pojazdy w serwisie w tym tygodniu --}}
-                            @php
-                                $serviceRepairs = collect($weekData['service_repairs'] ?? []);
-                            @endphp
-                            <div class="mt-3 pt-3 border-top">
-                                <div class="d-flex align-items-center gap-1 mb-2">
-                                    <i class="bi bi-tools text-warning"></i>
-                                    <span class="card-label">Pojazdy w serwisie</span>
                                 </div>
-                                @if($serviceRepairs->isNotEmpty())
-                                    <ul class="list-unstyled mb-0 small">
-                                        @foreach($serviceRepairs as $repairData)
-                                            @php
-                                                $repair = $repairData['repair'];
-                                            @endphp
-                                            <li class="mb-2">
-                                                <div class="d-flex align-items-center gap-1 flex-wrap">
-                                                    @if($repairData['vehicle'])
-                                                        <a href="{{ route('vehicles.show', $repairData['vehicle']) }}" class="text-decoration-none fw-semibold">
-                                                            <i class="bi bi-car-front"></i> {{ $repairData['vehicle']->registration_number }}
-                                                        </a>
-                                                    @else
-                                                        <span class="fw-semibold">{{ $repairData['vehicle_name'] }}</span>
-                                                    @endif
-                                                    <a href="{{ route('vehicle-repairs.show', $repair) }}" class="text-decoration-none">
-                                                        <x-ui.badge variant="{{ $repair->status_badge_variant }}">{{ $repair->status_label }}</x-ui.badge>
-                                                    </a>
-                                                </div>
-                                                <div class="text-muted">
-                                                    {{ $repair->action_type->label() }}
-                                                    &middot;
-                                                    {{ $repair->start_date->format('d.m') }}@if($repair->end_date) – {{ $repair->end_date->format('d.m') }}@endif
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                @else
-                                    <p class="text-muted small mb-0">Brak pojazdów w serwisie w tym tygodniu</p>
-                                @endif
+
+                                <div class="col-md-6">
+                                    <div class="text-center h-100 d-flex flex-column justify-content-center">
+                                        <p class="small text-muted mb-2">Potrzebni wg roli</p>
+                                        @if(!empty($demandChartLabels))
+                                            <div style="position: relative; min-height: 220px; max-width: 360px; margin: 0 auto; width: 100%;">
+                                                <canvas
+                                                    class="wo-demand-chart"
+                                                    data-labels='@json($demandChartLabels)'
+                                                    data-values='@json($demandChartValues)'
+                                                ></canvas>
+                                            </div>
+                                        @else
+                                            <p class="text-muted small mb-0">Brak zapotrzebowania na role</p>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
                         </x-ui.card>
                     </div>
 
-                    <!-- Auta w projekcie (1/3) -->
-                    <div class="col-md-4">
+                    <!-- Auta w projekcie -->
+                    <div class="col-12">
                         <x-ui.card label="Auta w projekcie">
                             @php
                                 $projectVehicles = collect($weekData['vehicles'] ?? []);
@@ -670,11 +663,51 @@
                             @else
                                 <p class="text-muted small mb-0">Brak aut w projekcie</p>
                             @endif
+
+                            @php
+                                $serviceRepairs = collect($weekData['service_repairs'] ?? []);
+                            @endphp
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="d-flex align-items-center gap-1 mb-2">
+                                    <i class="bi bi-tools text-warning"></i>
+                                    <span class="card-label">Pojazdy w serwisie</span>
+                                </div>
+                                @if($serviceRepairs->isNotEmpty())
+                                    <ul class="list-unstyled mb-0 small">
+                                        @foreach($serviceRepairs as $repairData)
+                                            @php
+                                                $repair = $repairData['repair'];
+                                            @endphp
+                                            <li class="mb-2">
+                                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                    @if($repairData['vehicle'])
+                                                        <a href="{{ route('vehicles.show', $repairData['vehicle']) }}" class="text-decoration-none fw-semibold">
+                                                            <i class="bi bi-car-front"></i> {{ $repairData['vehicle']->registration_number }}
+                                                        </a>
+                                                    @else
+                                                        <span class="fw-semibold">{{ $repairData['vehicle_name'] }}</span>
+                                                    @endif
+                                                    <a href="{{ route('vehicle-repairs.show', $repair) }}" class="text-decoration-none">
+                                                        <x-ui.badge variant="{{ $repair->status_badge_variant }}">{{ $repair->status_label }}</x-ui.badge>
+                                                    </a>
+                                                </div>
+                                                <div class="text-muted">
+                                                    {{ $repair->action_type->label() }}
+                                                    &middot;
+                                                    {{ $repair->start_date->format('d.m') }}@if($repair->end_date) – {{ $repair->end_date->format('d.m') }}@endif
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="text-muted small mb-0">Brak pojazdów w serwisie w tym tygodniu</p>
+                                @endif
+                            </div>
                         </x-ui.card>
                     </div>
 
-                    <!-- Domy w projekcie (1/3) -->
-                    <div class="col-md-4">
+                    <!-- Domy w projekcie -->
+                    <div class="col-12">
                         <x-ui.card label="Domy w projekcie">
                             @php
                                 $projectAccommodations = collect($weekData['accommodations'] ?? []);
@@ -929,7 +962,7 @@
                     <div class="collapse show" id="{{ $assignedCollapseId }}">
                         @if($assignedList->isNotEmpty())
                         <div class="table-responsive">
-                            <table class="table align-middle">
+                            <table class="table align-middle weekly-overview-assigned-table">
                                 <thead>
                                     <tr>
                                         <th>Pracownik</th>
@@ -958,15 +991,20 @@
                                                 @elseif(isset($employeeData['assignment']) && $employeeData['assignment'])
                                                     @php
                                                         $assignment = $employeeData['assignment'];
-                                                        // Upewnij się, że używamy ID jeśli assignment jest obiektem
                                                         $assignmentId = is_object($assignment) ? $assignment->id : $assignment;
                                                         $editUrl = route('project-assignments.edit', $assignmentId);
+                                                        $roleName = $employeeData['role']->name ?? '-';
+                                                        $roleDisplay = Str::limit($roleName, 24);
                                                     @endphp
-                                                    <x-ui.clickable-badge variant="accent" :href="$editUrl">
-                                                        {{ $employeeData['role']->name ?? '-' }}
+                                                    <x-ui.clickable-badge variant="accent" :href="$editUrl" title="{{ $roleName }}" class="wo-cell-truncate">
+                                                        {{ $roleDisplay }}
                                                     </x-ui.clickable-badge>
                                                 @else
-                                                    <x-ui.badge variant="info">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
+                                                    @php
+                                                        $roleName = $employeeData['role']->name ?? '-';
+                                                        $roleDisplay = Str::limit($roleName, 24);
+                                                    @endphp
+                                                    <x-ui.badge variant="info" title="{{ $roleName }}" class="wo-cell-truncate">{{ $roleDisplay }}</x-ui.badge>
                                                 @endif
                                             </td>
                                             <td class="text-center {{ !$isFullWeek ? 'bg-danger bg-opacity-25' : '' }}">
@@ -989,8 +1027,12 @@
                                             </td>
                                             <td>
                                                 @if(isset($employeeData['accommodation']) && $employeeData['accommodation'])
-                                                    <x-ui.clickable-badge variant="info" route="accommodation-assignments.show" :routeParams="['accommodation_assignment' => $employeeData['accommodation_assignment']]">
-                                                        <i class="bi bi-house"></i> {{ $employeeData['accommodation']->name }}
+                                                    @php
+                                                        $accommodationName = $employeeData['accommodation']->name;
+                                                        $accommodationDisplay = Str::limit($accommodationName, 32);
+                                                    @endphp
+                                                    <x-ui.clickable-badge variant="info" route="accommodation-assignments.show" :routeParams="['accommodation_assignment' => $employeeData['accommodation_assignment']]" title="{{ $accommodationName }}" class="wo-cell-truncate">
+                                                        <i class="bi bi-house"></i> {{ $accommodationDisplay }}
                                                     </x-ui.clickable-badge>
                                                 @else
                                                     <x-ui.clickable-badge variant="danger" route="accommodation-assignments.create" :routeParams="['employee_id' => $employeeData['employee']->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]">
@@ -1095,13 +1137,101 @@
 
     @push('scripts')
     <script>
-        // Initialize Bootstrap tooltips
-        document.addEventListener('DOMContentLoaded', function () {
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
+        (function () {
+            const PALETTE = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#14b8a6',
+                '#a855f7', '#64748b', '#0ea5e9', '#d97706', '#16a34a',
+            ];
+
+            function mkColor(i) { return PALETTE[i % PALETTE.length]; }
+            function mkAlpha(hex, a) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r},${g},${b},${a})`;
+            }
+
+            function loadChartJs() {
+                return new Promise(resolve => {
+                    if (window.Chart) { resolve(); return; }
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+                    s.onload = resolve;
+                    s.onerror = resolve;
+                    document.head.appendChild(s);
+                });
+            }
+
+            function initDemandCharts() {
+                if (!window.Chart) return;
+
+                Chart.defaults.color = 'rgba(255,255,255,0.45)';
+                Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+                Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+                Chart.defaults.font.size = 11;
+
+                document.querySelectorAll('.wo-demand-chart').forEach(canvas => {
+                    const labels = JSON.parse(canvas.dataset.labels || '[]');
+                    const values = JSON.parse(canvas.dataset.values || '[]');
+                    if (!labels.length) return;
+
+                    const colors = labels.map((_, i) => mkColor(i));
+
+                    new Chart(canvas.getContext('2d'), {
+                        type: 'pie',
+                        data: {
+                            labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: colors.map(c => mkAlpha(c, 0.25)),
+                                borderColor: colors,
+                                borderWidth: 2,
+                            }],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: {
+                                        boxWidth: 10,
+                                        padding: 8,
+                                        font: { size: 10 },
+                                        generateLabels(chart) {
+                                            const ds = chart.data.datasets[0];
+                                            return chart.data.labels.map((lbl, i) => ({
+                                                text: `${lbl} (${ds.data[i]})`,
+                                                fillStyle: ds.backgroundColor[i],
+                                                strokeStyle: ds.borderColor[i],
+                                                lineWidth: 1,
+                                                index: i,
+                                            }));
+                                        },
+                                    },
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: ctx => ` ${ctx.label}: ${ctx.raw} os.`,
+                                    },
+                                },
+                            },
+                        },
+                    });
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+
+                loadChartJs().then(initDemandCharts);
             });
-        });
+        })();
     </script>
     @endpush
 
