@@ -378,21 +378,28 @@
                                     ->map(function ($rd, $index) use ($demandPalette) {
                                         $needed = (int) ($rd['needed'] ?? 0);
                                         $assigned = $rd['assigned'] ?? null;
+                                        $assignedMin = (int) ($rd['assigned_min'] ?? ($assigned ?? 0));
+                                        $assignedMax = (int) ($rd['assigned_max'] ?? ($assigned ?? 0));
+                                        $isStable = $rd['is_stable'] ?? ($assignedMin === $assignedMax);
                                         $assignedVal = $assigned !== null
                                             ? (float) $assigned
-                                            : (float)(($rd['assigned_min'] ?? 0) + ($rd['assigned_max'] ?? 0)) / 2;
+                                            : (float) ($assignedMin + $assignedMax) / 2;
                                         $pct = $needed > 0 ? min(round(($assignedVal / $needed) * 100), 200) : 0;
                                         $color = $pct >= 100 ? '#10b981' : ($pct >= 70 ? '#f59e0b' : '#ef4444');
                                         $role = $rd['role'] ?? null;
+                                        $countLabel = $isStable
+                                            ? $assignedMax . '/' . $needed
+                                            : $assignedMin . '-' . $assignedMax . '/' . $needed;
 
                                         return [
-                                            'label'     => $role?->name ?? '—',
-                                            'role_id'   => $role?->id,
-                                            'assigned'  => $assignedVal,
-                                            'needed'    => $needed,
-                                            'pct'       => $pct,
-                                            'color'     => $color,
-                                            'bg_color'  => $demandPalette[$index % count($demandPalette)],
+                                            'label'       => $role?->name ?? '—',
+                                            'role_id'     => $role?->id,
+                                            'assigned'    => $assignedVal,
+                                            'needed'      => $needed,
+                                            'count_label' => $countLabel,
+                                            'pct'         => $pct,
+                                            'color'       => $color,
+                                            'bg_color'    => $demandPalette[$index % count($demandPalette)],
                                         ];
                                     });
                             @endphp
@@ -477,6 +484,7 @@
                                                     @else
                                                         <div class="small text-muted text-truncate mt-1" style="font-size:0.72rem;" title="{{ $gauge['label'] }}">{{ $gaugeLabel }}</div>
                                                     @endif
+                                                    <div class="small fw-semibold mt-1" style="font-size:0.75rem;color:{{ $gauge['color'] }};">{{ $gauge['count_label'] }}</div>
                                                 </div>
                                             @endforeach
                                         </div>
