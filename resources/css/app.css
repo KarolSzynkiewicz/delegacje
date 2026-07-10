@@ -113,6 +113,8 @@ body {
     max-width: 10rem;
 }
 
+/* Weekly overview: demand donut — no extra classes needed, inline styles used */
+
 /* Dashboard styles */
 .dashboard-card {
     padding: 1.5rem !important;

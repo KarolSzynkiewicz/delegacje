@@ -335,143 +335,163 @@
                             @php
                                 $reqSummary = $weekData['requirements_summary'] ?? [];
                                 $totalNeeded = $reqSummary['total_needed'] ?? 0;
-                                $totalAssigned = $reqSummary['total_assigned_max'] ?? $reqSummary['total_assigned'] ?? 0;
+                                $totalAssignedMin = $reqSummary['total_assigned_min'] ?? ($reqSummary['total_assigned'] ?? 0);
+                                $totalAssignedMax = $reqSummary['total_assigned_max'] ?? ($reqSummary['total_assigned'] ?? 0);
+                                $isAssignedStable = $reqSummary['is_stable'] ?? ($totalAssignedMin === $totalAssignedMax);
                                 $roleDetails = $reqSummary['role_details'] ?? [];
                                 $summary = new \App\ViewModels\WeeklyProjectSummary($weekData);
+
+                                if ($isAssignedStable) {
+                                    $centerAssignedLabel = (string) (int) $totalAssignedMax;
+                                } else {
+                                    $centerAvg = ($totalAssignedMin + $totalAssignedMax) / 2;
+                                    $centerAssignedLabel = fmod($centerAvg, 1) === 0.0
+                                        ? (string) (int) $centerAvg
+                                        : rtrim(rtrim(number_format($centerAvg, 1, '.', ''), '0'), '.');
+                                }
+
+                                $demandPalette = [
+                                    '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#64748b',
+                                    '#3b82f6', '#06b6d4', '#f97316', '#84cc16', '#14b8a6',
+                                ];
                                 $demandChartItems = collect($roleDetails)
                                     ->filter(fn ($roleDetail) => ($roleDetail['needed'] ?? 0) > 0)
-                                    ->map(function ($roleDetail) {
+                                    ->values()
+                                    ->map(function ($roleDetail, $index) use ($demandPalette) {
                                         $role = $roleDetail['role'] ?? null;
 
                                         return [
                                             'label' => $role?->name ?? '—',
                                             'value' => (int) ($roleDetail['needed'] ?? 0),
+                                            'role_id' => $role?->id,
+                                            'color' => $demandPalette[$index % count($demandPalette)],
                                         ];
-                                    })
-                                    ->values();
+                                    });
                                 $demandChartLabels = $demandChartItems->pluck('label')->all();
                                 $demandChartValues = $demandChartItems->pluck('value')->all();
+                                $demandChartColors = $demandChartItems->pluck('color')->all();
+
+                                // Gauge data per role (assigned vs needed)
+                                $gaugeItems = collect($roleDetails)
+                                    ->filter(fn ($rd) => ($rd['needed'] ?? 0) > 0)
+                                    ->values()
+                                    ->map(function ($rd, $index) use ($demandPalette) {
+                                        $needed = (int) ($rd['needed'] ?? 0);
+                                        $assigned = $rd['assigned'] ?? null;
+                                        $assignedVal = $assigned !== null
+                                            ? (float) $assigned
+                                            : (float)(($rd['assigned_min'] ?? 0) + ($rd['assigned_max'] ?? 0)) / 2;
+                                        $pct = $needed > 0 ? min(round(($assignedVal / $needed) * 100), 200) : 0;
+                                        $color = $pct >= 100 ? '#10b981' : ($pct >= 70 ? '#f59e0b' : '#ef4444');
+                                        $role = $rd['role'] ?? null;
+
+                                        return [
+                                            'label'     => $role?->name ?? '—',
+                                            'role_id'   => $role?->id,
+                                            'assigned'  => $assignedVal,
+                                            'needed'    => $needed,
+                                            'pct'       => $pct,
+                                            'color'     => $color,
+                                            'bg_color'  => $demandPalette[$index % count($demandPalette)],
+                                        ];
+                                    });
                             @endphp
 
-                            <div class="row g-3 align-items-start">
-                                <div class="col-md-6">
-                            <!-- Tabelka zapotrzebowania -->
-                            @if(!empty($roleDetails))
-                                <div class="table-responsive mb-0">
-                                    <table class="table table-sm mb-0" style="margin-bottom: 0 !important;">
-                                        <thead>
-                                            <tr>
-                                                <th class="text-start small fw-bold" style="padding: 0.5rem;">Rola</th>
-                                                <th class="text-center small fw-bold" style="padding: 0.5rem;">jest</th>
-                                                <th class="text-center small fw-bold" style="padding: 0.5rem;">ma być</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($roleDetails as $roleDetail)
-                                                @php
-                                                    $needed = $roleDetail['needed'] ?? 0;
-                                                    $assigned = $roleDetail['assigned'] ?? null;
-                                                    $assignedMin = $roleDetail['assigned_min'] ?? $assigned;
-                                                    $assignedMax = $roleDetail['assigned_max'] ?? $assigned;
-                                                    $isStable = $roleDetail['is_stable'] ?? true;
-                                                    $missing = $roleDetail['missing'] ?? 0;
-                                                    $isComplete = $isStable && $assigned !== null && $assigned >= $needed;
-                                                    $isPartial = $isStable && $assigned !== null && $assigned > 0 && $assigned < $needed;
-                                                    $role = $roleDetail['role'] ?? null;
-                                                @endphp
-                                                <tr>
-                                                    <td class="small" style="padding: 0.25rem;">
-                                                        @if($role)
-                                                            @php
-                                                                $createUrl = route('project-assignments.create', [
-                                                                    'project_id' => $project->id,
-                                                                    'start_date' => $weeks[0]['start']->format('Y-m-d'),
-                                                                    'end_date' => $weeks[0]['end']->format('Y-m-d'),
-                                                                    'role_id' => $role->id
-                                                                ]);
-                                                            @endphp
-                                                            <x-ui.clickable-badge 
-                                                                variant="accent" 
-                                                                :href="$createUrl"
-                                                            >
-                                                                {{ $role->name }}
-                                                            </x-ui.clickable-badge>
-                                                        @else
-                                                            {{ Str::lower($roleDetail['role']->name ?? '-') }}
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-center small fw-semibold text-primary" style="padding: 0.25rem;">
-                                                        @if($isStable && $assigned !== null)
-                                                            {{ $assigned }}
-                                                        @else
-                                                            {{ $assignedMin }}-{{ $assignedMax }}
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-center small fw-semibold {{ $isComplete ? 'text-success' : ($isPartial ? 'text-warning' : 'text-danger') }}" style="padding: 0.25rem;">
-                                                        {{ $needed }}
-                                                    </td>
-                                                </tr>
-                                                @if($needed > 0)
-                                                    @php
-                                                        $roleProgress = $isStable && $assigned !== null 
-                                                            ? round(($assigned / $needed) * 100) 
-                                                            : ($assignedMax > 0 ? round(($assignedMax / $needed) * 100) : 0);
-                                                        $roleProgressVariant = $roleProgress == 100 ? 'success' : ($roleProgress >= 70 ? 'warning' : 'danger');
-                                                    @endphp
-                                                    <tr>
-                                                        <td colspan="3" style="padding: 0.25rem 0.5rem;">
-                                                            <div style="width: 100%;">
-                                                                <x-ui.progress 
-                                                                    value="{{ min($roleProgress, 100) }}" 
-                                                                    max="100" 
-                                                                    variant="{{ $roleProgressVariant }}"
-                                                                    style="height: 4px;"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                @endif
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            @else
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="small text-muted">Potrzebnych:</span>
-                                        <x-ui.badge variant="info">{{ $totalNeeded }}</x-ui.badge>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="small text-muted">Przypisanych:</span>
-                                        <x-ui.badge variant="accent">{{ $totalAssigned }}</x-ui.badge>
-                                    </div>
-                                    @if($totalMissing > 0)
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span class="small text-danger fw-bold">Brak:</span>
-                                            <x-ui.badge variant="danger">{{ $totalMissing }}</x-ui.badge>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="text-center h-100 d-flex flex-column justify-content-center">
-                                        <p class="small text-muted mb-2">Potrzebni wg roli</p>
-                                        @if(!empty($demandChartLabels))
-                                            <div style="position: relative; min-height: 220px; max-width: 360px; margin: 0 auto; width: 100%;">
+                            @if(!empty($demandChartLabels))
+                                <div class="row g-4 align-items-start">
+                                    {{-- Lewa: donut + legenda --}}
+                                    <div class="col-12 col-md-6">
+                                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                                            {{-- Donut --}}
+                                            <div style="position:relative;width:180px;height:180px;flex-shrink:0;">
                                                 <canvas
                                                     class="wo-demand-chart"
+                                                    style="width:100%;height:100%;"
                                                     data-labels='@json($demandChartLabels)'
                                                     data-values='@json($demandChartValues)'
+                                                    data-colors='@json($demandChartColors)'
                                                 ></canvas>
+                                                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:2;line-height:1.2;">
+                                                    <div class="fw-bold" style="font-size:1.6rem;">{{ $centerAssignedLabel }}</div>
+                                                    <div class="text-muted" style="font-size:0.75rem;">z {{ $totalNeeded }} potrzeb</div>
+                                                </div>
                                             </div>
-                                        @else
-                                            <p class="text-muted small mb-0">Brak zapotrzebowania na role</p>
-                                        @endif
+                                            {{-- Legenda --}}
+                                            <ul class="list-unstyled mb-0" style="flex:1;min-width:130px;">
+                                                @foreach($demandChartItems as $item)
+                                                    @php
+                                                        $legendUrl = $item['role_id']
+                                                            ? route('project-assignments.create', [
+                                                                'project_id' => $project->id,
+                                                                'start_date' => $weeks[0]['start']->format('Y-m-d'),
+                                                                'end_date'   => $weeks[0]['end']->format('Y-m-d'),
+                                                                'role_id'    => $item['role_id'],
+                                                            ])
+                                                            : null;
+                                                    @endphp
+                                                    <li class="d-flex align-items-center gap-2" style="padding:0.3rem 0;">
+                                                        <span style="width:12px;height:12px;border-radius:3px;background:{{ $item['color'] }};flex-shrink:0;display:inline-block;border:1px solid rgba(255,255,255,0.3);"></span>
+                                                        @if($legendUrl)
+                                                            <a href="{{ $legendUrl }}" class="text-decoration-none small" style="color:var(--text-main);">
+                                                                {{ $item['label'] }} <span style="color:var(--text-muted);">{{ $item['value'] }}</span>
+                                                            </a>
+                                                        @else
+                                                            <span class="small">{{ $item['label'] }} <span style="color:var(--text-muted);">{{ $item['value'] }}</span></span>
+                                                        @endif
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    {{-- Prawa: Wykonanie (gauge'e na rolę) --}}
+                                    <div class="col-12 col-md-6">
+                                        <div class="small text-muted fw-semibold mb-3" style="text-transform:uppercase;letter-spacing:.05em;font-size:0.7rem;">Wykonanie</div>
+                                        <div class="d-flex flex-wrap gap-3">
+                                            @foreach($gaugeItems as $gauge)
+                                                @php
+                                                    $gaugeUrl = $gauge['role_id']
+                                                        ? route('project-assignments.create', [
+                                                            'project_id' => $project->id,
+                                                            'start_date' => $weeks[0]['start']->format('Y-m-d'),
+                                                            'end_date'   => $weeks[0]['end']->format('Y-m-d'),
+                                                            'role_id'    => $gauge['role_id'],
+                                                        ])
+                                                        : null;
+                                                    $gaugeLabel = Str::limit($gauge['label'], 12);
+                                                @endphp
+                                                <div class="text-center" style="width:80px;">
+                                                    <div style="position:relative;width:80px;height:80px;margin:0 auto;">
+                                                        <canvas
+                                                            class="wo-gauge-chart"
+                                                            style="width:100%;height:100%;"
+                                                            data-pct="{{ $gauge['pct'] }}"
+                                                            data-color="{{ $gauge['color'] }}"
+                                                        ></canvas>
+                                                        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:2;line-height:1.1;">
+                                                            <span class="fw-bold" style="font-size:0.82rem;color:{{ $gauge['color'] }};">{{ $gauge['pct'] }}%</span>
+                                                        </div>
+                                                    </div>
+                                                    @if($gaugeUrl)
+                                                        <a href="{{ $gaugeUrl }}" class="text-decoration-none d-block mt-1 small text-truncate" style="max-width:80px;color:var(--text-muted);font-size:0.72rem;" title="{{ $gauge['label'] }}">{{ $gaugeLabel }}</a>
+                                                    @else
+                                                        <div class="small text-muted text-truncate mt-1" style="font-size:0.72rem;" title="{{ $gauge['label'] }}">{{ $gaugeLabel }}</div>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            @else
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div>
+                                        <span class="small text-muted">Przypisanych: </span>
+                                        <span class="fw-semibold">{{ $centerAssignedLabel }}</span>
+                                        <span class="small text-muted"> z {{ $totalNeeded }} potrzeb</span>
+                                    </div>
+                                    <p class="text-muted small mb-0">Brak zapotrzebowania na role</p>
+                                </div>
+                            @endif
                         </x-ui.card>
                     </div>
 
@@ -482,13 +502,14 @@
                                 $projectVehicles = collect($weekData['vehicles'] ?? []);
                             @endphp
                             @if($projectVehicles->isNotEmpty())
-                                <div class="d-flex flex-column gap-2">
-                                    @foreach($projectVehicles->take(6) as $vehicleData)
+                                <div class="row g-3">
+                                    @foreach($projectVehicles->take(9) as $vehicleData)
                                         @php
                                             $usagePercentage = $vehicleData['usage_percentage'] ?? 0;
                                             $progressVariant = $usagePercentage == 100 ? 'success' : ($usagePercentage >= 70 ? 'warning' : 'danger');
                                         @endphp
-                                        <x-ui.card>
+                                        <div class="col-12 col-md-4">
+                                        <x-ui.card class="h-100">
                                             <!-- Wiersz 1: Nazwa auta i progress bar -->
                                             <div class="mb-3">
                                                 <div class="small fw-semibold mb-2">
@@ -653,11 +674,12 @@
                                                 </div>
                                             @endif
                                         </x-ui.card>
+                                        </div>
                                     @endforeach
                                 </div>
-                                @if($projectVehicles->count() > 6)
+                                @if($projectVehicles->count() > 9)
                                     <div class="text-center mt-2">
-                                        <x-ui.badge variant="info">+{{ $projectVehicles->count() - 6 }} więcej</x-ui.badge>
+                                        <x-ui.badge variant="info">+{{ $projectVehicles->count() - 9 }} więcej</x-ui.badge>
                                     </div>
                                 @endif
                             @else
@@ -713,8 +735,8 @@
                                 $projectAccommodations = collect($weekData['accommodations'] ?? []);
                             @endphp
                             @if($projectAccommodations->isNotEmpty())
-                                <div class="d-flex flex-column gap-2">
-                                    @foreach($projectAccommodations->take(6) as $accommodationData)
+                                <div class="row g-3">
+                                    @foreach($projectAccommodations->take(9) as $accommodationData)
                                         @php
                                             $accommodation = $accommodationData['accommodation'];
                                             $usagePercentage = $accommodationData['usage_percentage'] ?? 0;
@@ -738,7 +760,8 @@
                                                 $accommodationLeaseCaption = null;
                                             }
                                         @endphp
-                                        <x-ui.card>
+                                        <div class="col-12 col-md-4">
+                                        <x-ui.card class="h-100">
                                             <!-- Wiersz 1: Nazwa domu i progress bar -->
                                             <div class="mb-3">
                                                 <div class="small fw-semibold mb-2">
@@ -845,11 +868,12 @@
                                                 </div>
                                             @endif
                                         </x-ui.card>
+                                        </div>
                                     @endforeach
                                 </div>
-                                @if($projectAccommodations->count() > 6)
+                                @if($projectAccommodations->count() > 9)
                                     <div class="text-center mt-2">
-                                        <x-ui.badge variant="info">+{{ $projectAccommodations->count() - 6 }} więcej</x-ui.badge>
+                                        <x-ui.badge variant="info">+{{ $projectAccommodations->count() - 9 }} więcej</x-ui.badge>
                                     </div>
                                 @endif
                             @else
@@ -1171,53 +1195,63 @@
                 Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
                 Chart.defaults.font.size = 11;
 
+                // Main demand donut
                 document.querySelectorAll('.wo-demand-chart').forEach(canvas => {
                     const labels = JSON.parse(canvas.dataset.labels || '[]');
                     const values = JSON.parse(canvas.dataset.values || '[]');
+                    const colors = JSON.parse(canvas.dataset.colors || '[]');
                     if (!labels.length) return;
-
-                    const colors = labels.map((_, i) => mkColor(i));
-
+                    const chartColors = colors.length ? colors : labels.map((_, i) => mkColor(i));
                     new Chart(canvas.getContext('2d'), {
-                        type: 'pie',
+                        type: 'doughnut',
                         data: {
                             labels,
                             datasets: [{
                                 data: values,
-                                backgroundColor: colors.map(c => mkAlpha(c, 0.25)),
-                                borderColor: colors,
+                                backgroundColor: chartColors.map(c => mkAlpha(c, 0.55)),
+                                borderColor: chartColors,
                                 borderWidth: 2,
+                                hoverOffset: 4,
                             }],
                         },
                         options: {
-                            responsive: true,
+                            responsive: false,
                             maintainAspectRatio: false,
+                            cutout: '70%',
                             plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'bottom',
-                                    labels: {
-                                        boxWidth: 10,
-                                        padding: 8,
-                                        font: { size: 10 },
-                                        generateLabels(chart) {
-                                            const ds = chart.data.datasets[0];
-                                            return chart.data.labels.map((lbl, i) => ({
-                                                text: `${lbl} (${ds.data[i]})`,
-                                                fillStyle: ds.backgroundColor[i],
-                                                strokeStyle: ds.borderColor[i],
-                                                lineWidth: 1,
-                                                index: i,
-                                            }));
-                                        },
-                                    },
-                                },
+                                legend: { display: false },
                                 tooltip: {
                                     callbacks: {
-                                        label: ctx => ` ${ctx.label}: ${ctx.raw} os.`,
+                                        label: ctx => ` ${ctx.label}: ${ctx.raw} potrzebnych`,
                                     },
                                 },
                             },
+                        },
+                    });
+                });
+
+                // Per-role gauge donuts
+                document.querySelectorAll('.wo-gauge-chart').forEach(canvas => {
+                    const pct   = parseFloat(canvas.dataset.pct) || 0;
+                    const color = canvas.dataset.color || '#10b981';
+                    const filled  = Math.min(pct, 100);
+                    const rest    = Math.max(0, 100 - filled);
+                    new Chart(canvas.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            datasets: [{
+                                data: [filled, rest],
+                                backgroundColor: [mkAlpha(color, 0.75), 'rgba(255,255,255,0.07)'],
+                                borderColor:     [color,                 'transparent'],
+                                borderWidth: [2, 0],
+                            }],
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            cutout: '72%',
+                            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                            events: [],
                         },
                     });
                 });
