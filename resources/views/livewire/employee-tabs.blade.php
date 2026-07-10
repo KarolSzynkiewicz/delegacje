@@ -153,9 +153,14 @@
                                         </td>
                                         <td>
                                             @if($employeeDocument->file_path)
-                                                <x-ui.button variant="ghost" href="{{ $employeeDocument->file_url }}" target="_blank" class="btn-sm" title="Pobierz plik">
-                                                    <i class="bi bi-download"></i>
-                                                </x-ui.button>
+                                                <div class="d-flex gap-1">
+                                                    <x-ui.button variant="ghost" href="{{ $employeeDocument->preview_url }}" target="_blank" class="btn-sm" title="Podgląd pliku">
+                                                        <i class="bi bi-eye"></i>
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ $employeeDocument->file_url }}" target="_blank" class="btn-sm" title="Pobierz plik">
+                                                        <i class="bi bi-download"></i>
+                                                    </x-ui.button>
+                                                </div>
                                             @else
                                                 <span class="text-muted">-</span>
                                             @endif
