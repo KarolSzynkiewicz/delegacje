@@ -147,6 +147,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('time-logs/bulk-update', [\App\Http\Controllers\TimeLogController::class, 'bulkUpdate'])
             ->name('time-logs.bulk-update')
             ->defaults('resource', 'time-logs');
+        Route::get('time-logs/export-csv', [\App\Http\Controllers\TimeLogController::class, 'exportCsv'])
+            ->name('time-logs.export-csv')
+            ->defaults('resource', 'time-logs');
 
         // Payrolls Actions
         Route::get('payrolls/generate-batch', [\App\Http\Controllers\PayrollController::class, 'generateBatchForm'])

@@ -139,6 +139,65 @@ class TimeLogController extends Controller
     }
 
     /**
+     * Export time logs to CSV based on filters (employee, project, date range).
+     */
+    public function exportCsv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $employeeId = $request->query('employee_id');
+        $projectId  = $request->query('project_id');
+        $dateFrom   = $request->query('date_from');
+        $dateTo     = $request->query('date_to');
+
+        $query = TimeLog::with(
+            'projectAssignment.employee',
+            'projectAssignment.project',
+            'projectAssignment.role'
+        );
+
+        if ($employeeId) {
+            $query->whereHas('projectAssignment', fn ($q) => $q->where('employee_id', $employeeId));
+        }
+        if ($projectId) {
+            $query->whereHas('projectAssignment', fn ($q) => $q->where('project_id', $projectId));
+        }
+        if ($dateFrom) {
+            $query->whereDate('start_time', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('start_time', '<=', $dateTo);
+        }
+
+        $logs = $query->orderBy('start_time', 'desc')->get();
+
+        $parts = array_filter([
+            $dateFrom ? 'od-' . $dateFrom : null,
+            $dateTo   ? 'do-' . $dateTo   : null,
+        ]);
+        $filename = 'ewidencja-godzin' . ($parts ? '-' . implode('-', $parts) : '') . '.csv';
+
+        return response()->streamDownload(function () use ($logs) {
+            $out = fopen('php://output', 'w');
+            fputs($out, "\xEF\xBB\xBF"); // UTF-8 BOM for Excel
+
+            fputcsv($out, ['Data', 'Pracownik', 'Projekt', 'Rola', 'Godziny', 'Notatki'], ';');
+
+            foreach ($logs as $log) {
+                $assignment = $log->projectAssignment;
+                fputcsv($out, [
+                    Carbon::parse($log->start_time)->format('Y-m-d'),
+                    $assignment->employee->full_name ?? '—',
+                    $assignment->project->name ?? '—',
+                    $assignment->role->name ?? '—',
+                    number_format((float) $log->hours_worked, 2, ',', ''),
+                    $log->notes ?? '',
+                ], ';');
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
      * Display monthly grid for time logs editing.
      */
     public function monthlyGrid(Request $request): View

@@ -6,11 +6,9 @@
                 <x-ui.button variant="ghost" href="{{ route('time-logs.monthly-grid') }}" class="w-100 w-sm-auto">
                     <i class="bi bi-calendar-month"></i> Widok Miesięczny
                 </x-ui.button>
-                @if(auth()->user()->isAdmin())
-                    <x-ui.button variant="primary" href="{{ route('time-logs.create') }}" class="w-100 w-sm-auto">
-                        <i class="bi bi-plus-circle"></i> Dodaj Wpis
-                    </x-ui.button>
-                @endif
+                <x-ui.button variant="ghost" href="{{ route('time-logs.analytics') }}" class="w-100 w-sm-auto">
+                    <i class="bi bi-bar-chart-line"></i> Analityka
+                </x-ui.button>
             </div>
         </div>
     </x-slot>

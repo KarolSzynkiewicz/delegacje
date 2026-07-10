@@ -18,14 +18,28 @@
                         @endif
                     </p>
                 </div>
-                <x-ui.button 
-                    variant="ghost" 
-                    wire:click="clearFilters" 
-                    class="btn-sm align-self-center align-self-sm-end w-100 w-sm-auto"
-                    :disabled="!($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)"
-                >
-                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                </x-ui.button>
+                <div class="d-flex gap-2 align-self-center align-self-sm-end flex-wrap w-100 w-sm-auto justify-content-center justify-content-sm-end">
+                    @php
+                        $csvParams = array_filter([
+                            'employee_id' => $employeeFilter ?: null,
+                            'project_id'  => (!$isMineView && $projectFilter) ? $projectFilter : null,
+                            'date_from'   => $dateFrom ?: null,
+                            'date_to'     => $dateTo   ?: null,
+                        ]);
+                        $csvUrl = route('time-logs.export-csv', $csvParams);
+                    @endphp
+                    <a href="{{ $csvUrl }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-download me-1"></i> Eksport CSV
+                    </a>
+                    <x-ui.button 
+                        variant="ghost" 
+                        wire:click="clearFilters" 
+                        class="btn-sm"
+                        :disabled="!($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)"
+                    >
+                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                    </x-ui.button>
+                </div>
             </div>
         </div>
 
