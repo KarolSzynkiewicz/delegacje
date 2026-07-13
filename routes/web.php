@@ -406,6 +406,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
         Route::resource('fixed-costs', \App\Http\Controllers\FixedCostController::class);
 
+        // Exchange Rates (kursy walut — do przeliczeń orientacyjnych w kontrolingu)
+        Route::resource('exchange-rates', \App\Http\Controllers\ExchangeRateController::class)
+            ->except(['show']);
+
         // Fixed Cost Entries (koszty księgowe)
         Route::get('fixed-cost-entries/create', [\App\Http\Controllers\FixedCostController::class, 'createEntry'])
             ->name('fixed-cost-entries.create')

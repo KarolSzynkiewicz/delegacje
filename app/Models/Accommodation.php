@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Traits\HasComments;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -162,6 +164,40 @@ class Accommodation extends Model
     public function hasCoordinates(): bool
     {
         return ! is_null($this->latitude) && ! is_null($this->longitude);
+    }
+
+    /**
+     * Liczba "osobonocy" (person-nights) w danym okresie — suma dni nakładania się
+     * przypisań pracowników (AccommodationAssignment) na ten okres. Używana do liczenia
+     * kosztu najmu przypadającego na jedną osobę/noc (kontroling + eksport JSON dla LLM).
+     * Wspólna metoda dla ProfitabilityService i CostPromptBundleService.
+     */
+    public function occupancyNightsBetween(CarbonInterface $start, CarbonInterface $end): int
+    {
+        $assignments = $this->assignments()
+            ->where('start_date', '<=', $end->toDateString())
+            ->where(function ($q) use ($start) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $start->toDateString());
+            })
+            ->get();
+
+        $totalNights = 0;
+        foreach ($assignments as $assignment) {
+            $aStart = $assignment->start_date ? Carbon::parse($assignment->start_date) : $start;
+            $aEnd = $assignment->end_date ? Carbon::parse($assignment->end_date) : $end;
+
+            $overlapStart = $aStart->gt($start) ? $aStart : $start;
+            $overlapEnd = $aEnd->lt($end) ? $aEnd : $end;
+
+            if ($overlapStart->gt($overlapEnd)) {
+                continue;
+            }
+
+            $totalNights += (int) $overlapStart->copy()->startOfDay()->diffInDays($overlapEnd->copy()->endOfDay()) + 1;
+        }
+
+        return $totalNights;
     }
 
     /**

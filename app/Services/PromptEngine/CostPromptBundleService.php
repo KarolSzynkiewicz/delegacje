@@ -3,7 +3,6 @@
 namespace App\Services\PromptEngine;
 
 use App\Enums\PayrollStatus;
-use App\Models\AccommodationAssignment;
 use App\Models\AccommodationLease;
 use App\Models\Adjustment;
 use App\Models\Advance;
@@ -26,8 +25,10 @@ use Illuminate\Support\Collection;
  * Design principles:
  * - Currencies NEVER mixed in aggregates (separate buckets per currency code).
  * - Transport costs are NOT allocated to projects (cost-center: "logistics").
- * - Accommodation rent is sourced from `accommodation_leases.monthly_rent`,
- *   pro-rated by number of lease-days overlapping the report period.
+ * - Accommodation rent is sourced from `accommodation_leases.monthly_rent`, pro-rated via
+ *   {@see \App\Models\AccommodationLease::amountForPeriod()} (metodologia współdzielona
+ *   z kontrolingiem rentowności): umowa na czas określony = kwota całkowita za cały okres
+ *   podzielona proporcjonalnie do dni; umowa bezterminowa = stawka miesięczna /30 dni.
  * - Fixed costs are pro-rated proportionally to overlap between entry's
  *   `period_start..period_end` and the report range.
  * - Variable costs use `incurred_date` (with fallback to `created_at`).
@@ -272,13 +273,12 @@ class CostPromptBundleService
                 continue;
             }
 
-            $monthlyRent = (float) $lease->monthly_rent;
-            // Rent for `$overlap` days = monthly_rent / 30 * overlap_days
-            // (uproszczenie księgowe — w raportach miesięcznych daje 1 pełen czynsz)
-            $costInPeriod = round($monthlyRent * $overlap / 30, 2);
+            // Metodologia (patrz AccommodationLease::amountForPeriod — wspólna z kontrolingiem
+            // rentowności): umowa na czas określony = monthly_rent to kwota za CAŁY okres,
+            // dzielona proporcjonalnie; umowa bezterminowa = stawka miesięczna /30 dni.
+            $costInPeriod = $lease->amountForPeriod($start, $end);
 
-            // Person-nights w okresie (capacity × overlap × occupancy estimate based on AccommodationAssignments)
-            $personNights = $this->countOccupancyNights($lease->accommodation_id, $start, $end);
+            $personNights = $lease->accommodation?->occupancyNightsBetween($start, $end) ?? 0;
 
             $result[] = [
                 'lease_id' => $lease->id,
@@ -293,7 +293,7 @@ class CostPromptBundleService
                 ] : null,
                 'lease_start' => $lease->start_date?->toDateString(),
                 'lease_end' => $lease->end_date?->toDateString(),
-                'monthly_rent' => $monthlyRent,
+                'monthly_rent' => (float) $lease->monthly_rent,
                 'currency' => $lease->currency,
                 'days_in_period' => $overlap,
                 'amount_in_period' => $costInPeriod,
@@ -306,27 +306,6 @@ class CostPromptBundleService
         }
 
         return $result;
-    }
-
-    private function countOccupancyNights(int $accommodationId, Carbon $start, Carbon $end): int
-    {
-        $assignments = AccommodationAssignment::query()
-            ->where('accommodation_id', $accommodationId)
-            ->where('start_date', '<=', $end->toDateString())
-            ->where(function ($q) use ($start) {
-                $q->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $start->toDateString());
-            })
-            ->get();
-
-        $totalNights = 0;
-        foreach ($assignments as $a) {
-            $aStart = $a->start_date ? Carbon::parse($a->start_date) : $start;
-            $aEnd = $a->end_date ? Carbon::parse($a->end_date) : $end;
-            $totalNights += $this->overlapDays($aStart, $aEnd, $start, $end);
-        }
-
-        return $totalNights;
     }
 
     // ── Labor costs (TimeLog × EmployeeRate) ─────────────────────────────────

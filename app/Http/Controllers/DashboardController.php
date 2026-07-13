@@ -69,6 +69,9 @@ class DashboardController extends Controller
         // Trend 12 miesięcy do wykresu (kontroling / statystyki)
         $trend = $this->profitabilityService->getMonthlyTrend($monthStart, 12, $filters['statuses'], $filters['type']);
 
+        // Ranking mieszkań wg kosztu najmu w miesiącu + koszt na osobonoc (kontroling zakwaterowania)
+        $topAccommodations = $this->profitabilityService->getTopAccommodationCostsForMonth($monthStart, $monthEnd, 10);
+
         $navigation = $this->buildNavigation($month, $filters);
 
         $rankings = $this->buildRankings($projectsProfitability);
@@ -87,7 +90,8 @@ class DashboardController extends Controller
             'month',
             'filters',
             'rankings',
-            'breakdown'
+            'breakdown',
+            'topAccommodations'
         ));
     }
 

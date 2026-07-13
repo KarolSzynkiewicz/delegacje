@@ -9,6 +9,9 @@ use App\Models\EmployeeRate;
 use App\Models\Rotation;
 use App\Models\ProjectVariableCost;
 use App\Models\FixedCostEntry;
+use App\Models\TransportCost;
+use App\Models\AccommodationLease;
+use App\Models\ExchangeRate;
 use App\Enums\ProjectType;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -979,6 +982,11 @@ class ProfitabilityService
         })->get();
         
         $fixedCostsByCurrency = $this->calculateFixedCostsForMonthByCurrency($fixedCosts, $monthStart, $monthEnd);
+
+        // Koszty transportu i najmu — ogólnofirmowe (nie alokowane per projekt, patrz
+        // calculateTransportCostsForMonthByCurrency() / calculateAccommodationCostsForMonthByCurrency()).
+        $transportCostsByCurrency = $this->calculateTransportCostsForMonthByCurrency($monthStart, $monthEnd);
+        $accommodationCostsByCurrency = $this->calculateAccommodationCostsForMonthByCurrency($monthStart, $monthEnd);
         
         // Round all values
         foreach ($revenueByCurrency as $currency => $value) {
@@ -1000,6 +1008,8 @@ class ProfitabilityService
             'labor_costs_by_currency' => $laborCostsByCurrency,
             'variable_costs_by_currency' => $variableCostsByCurrency,
             'fixed_costs_by_currency' => $fixedCostsByCurrency,
+            'transport_costs_by_currency' => $transportCostsByCurrency,
+            'accommodation_costs_by_currency' => $accommodationCostsByCurrency,
         ];
     }
 
@@ -1038,6 +1048,10 @@ class ProfitabilityService
         })->get();
         $fixedCostsByCurrency = $this->calculateFixedCostsForMonthByCurrency($fixedCosts, $monthStart, $monthEnd);
 
+        // Koszty transportu i najmu — ogólnofirmowe, patrz komentarz w getRevenueVsCostsSummaryForMonth().
+        $transportCostsByCurrency = $this->calculateTransportCostsForMonthByCurrency($monthStart, $monthEnd);
+        $accommodationCostsByCurrency = $this->calculateAccommodationCostsForMonthByCurrency($monthStart, $monthEnd);
+
         $round = function (array $arr): array {
             foreach ($arr as $currency => $value) {
                 $arr[$currency] = round($value, 2);
@@ -1051,6 +1065,8 @@ class ProfitabilityService
             'labor_costs_by_currency' => $round($laborCostsByCurrency),
             'variable_costs_by_currency' => $round($variableCostsByCurrency),
             'fixed_costs_by_currency' => $round($fixedCostsByCurrency),
+            'transport_costs_by_currency' => $round($transportCostsByCurrency),
+            'accommodation_costs_by_currency' => $round($accommodationCostsByCurrency),
         ];
     }
 
@@ -1083,6 +1099,12 @@ class ProfitabilityService
                 $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
             }
             foreach ($summary['fixed_costs_by_currency'] as $currency => $amount) {
+                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+            }
+            foreach ($summary['transport_costs_by_currency'] as $currency => $amount) {
+                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+            }
+            foreach ($summary['accommodation_costs_by_currency'] as $currency => $amount) {
                 $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
             }
 
@@ -1173,7 +1195,10 @@ class ProfitabilityService
 
         foreach ($fixedCosts as $fixedCost) {
             $costStart = Carbon::parse($fixedCost->period_start);
-            $costEnd = $fixedCost->end_date ? Carbon::parse($fixedCost->end_date) : $monthEnd;
+            // Fix: `FixedCostEntry` nie ma pola `end_date` (jest `period_end`) — odwołanie do
+            // nieistniejącego pola zawsze dawało null, więc `$costEnd` zawsze "spadał" na
+            // `$monthEnd`, co przeszacowywało koszty wielomiesięczne przy pro-ratowaniu.
+            $costEnd = $fixedCost->period_end ? Carbon::parse($fixedCost->period_end) : $monthEnd;
             $currency = $fixedCost->currency ?? 'EUR';
             
             // Calculate overlap period
@@ -1207,5 +1232,152 @@ class ProfitabilityService
         }
 
         return $costsByCurrency;
+    }
+
+    /**
+     * Koszty transportu (logistyka) za dany miesiąc, grupowane po walucie.
+     *
+     * WAŻNE: transport nie jest przypisywany do konkretnego projektu — jeden wyjazd/transfer
+     * często obsługuje pracowników z różnych projektów naraz, więc alokacja per-projekt
+     * byłaby myląca. Koszt trafia do puli kosztów OGÓLNOFIRMOWYCH (jak koszty stałe),
+     * a nie do marży pojedynczego projektu. Liczony wg `cost_date` (data poniesienia =
+     * data księgowania — TransportCost nie ma osobnej daty księgowej).
+     */
+    protected function calculateTransportCostsForMonthByCurrency(Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $costsByCurrency = TransportCost::query()
+            ->whereBetween('cost_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+            ->get()
+            ->groupBy(fn (TransportCost $cost) => $cost->currency ?? 'PLN')
+            ->map(fn ($group) => round((float) $group->sum('amount'), 2))
+            ->all();
+
+        return $costsByCurrency;
+    }
+
+    /**
+     * Koszty najmu mieszkań (czynsze) za dany miesiąc, grupowane po walucie.
+     *
+     * Analogicznie do transportu: najem NIE jest przypisywany do projektu (te same
+     * mieszkania mieszczą pracowników z różnych projektów naraz) — trafia do kosztów
+     * ogólnofirmowych. Kwota za okres liczona przez {@see AccommodationLease::amountForPeriod()}
+     * (metodologia współdzielona z eksportem JSON w CostPromptBundleService).
+     */
+    protected function calculateAccommodationCostsForMonthByCurrency(Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $leases = AccommodationLease::query()
+            ->whereNotNull('monthly_rent')
+            ->where('start_date', '<=', $monthEnd->toDateString())
+            ->where(function ($q) use ($monthStart) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $monthStart->toDateString());
+            })
+            ->get();
+
+        $costsByCurrency = [];
+        foreach ($leases as $lease) {
+            $amount = $lease->amountForPeriod($monthStart, $monthEnd);
+            if ($amount <= 0.0) {
+                continue;
+            }
+
+            $currency = $lease->currency ?? 'EUR';
+            $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+        }
+
+        foreach ($costsByCurrency as $currency => $amount) {
+            $costsByCurrency[$currency] = round($amount, 2);
+        }
+
+        return $costsByCurrency;
+    }
+
+    /**
+     * Ranking mieszkań wg kosztu najmu w danym miesiącu, z kosztem przypadającym na
+     * jedną "osobonoc" (person-night) — wzorem sekcji "Top mieszkania" z /prompts,
+     * przeniesiony na dashboard kontrolingowy.
+     *
+     * @return array<int, array{lease: AccommodationLease, amount: float, currency: string, person_nights: int, cost_per_person_night: ?float}>
+     */
+    public function getTopAccommodationCostsForMonth(Carbon $monthStart, Carbon $monthEnd, int $limit = 10): array
+    {
+        $leases = AccommodationLease::query()
+            ->with('accommodation')
+            ->whereNotNull('monthly_rent')
+            ->where('start_date', '<=', $monthEnd->toDateString())
+            ->where(function ($q) use ($monthStart) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $monthStart->toDateString());
+            })
+            ->get();
+
+        $rows = [];
+        foreach ($leases as $lease) {
+            $amount = $lease->amountForPeriod($monthStart, $monthEnd);
+            if ($amount <= 0.0) {
+                continue;
+            }
+
+            $personNights = $lease->accommodation?->occupancyNightsBetween($monthStart, $monthEnd) ?? 0;
+
+            $rows[] = [
+                'lease' => $lease,
+                'amount' => round($amount, 2),
+                'currency' => $lease->currency ?? 'EUR',
+                'person_nights' => $personNights,
+                'cost_per_person_night' => $personNights > 0 ? round($amount / $personNights, 2) : null,
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => $b['amount'] <=> $a['amount']);
+
+        return array_slice($rows, 0, $limit);
+    }
+
+    /**
+     * Przelicza sumy kwot w różnych walutach na jedną referencyjną walutę, tam gdzie
+     * znany jest kurs ({@see ExchangeRate}). Nie zastępuje kwot źródłowych — ma dać
+     * DODATKOWY, orientacyjny pełny obraz kosztów/przychodów, gdy w grę wchodzi
+     * więcej niż jedna waluta. Waluty bez znanego kursu są zwracane osobno jako
+     * `unconverted`, żeby UI mógł to jasno zakomunikować (a nie zaniżać total bez ostrzeżenia).
+     *
+     * @param  array<string, float>  $amountsByCurrency
+     * @return array{total: float, target_currency: string, converted_currencies: array<int, string>, unconverted: array<string, float>}
+     */
+    public function convertedTotal(array $amountsByCurrency, string $targetCurrency, ?Carbon $onDate = null): array
+    {
+        $targetCurrency = strtoupper($targetCurrency);
+        $total = 0.0;
+        $convertedCurrencies = [];
+        $unconverted = [];
+
+        foreach ($amountsByCurrency as $currency => $amount) {
+            $amount = (float) $amount;
+            if (abs($amount) < 0.00001) {
+                continue;
+            }
+
+            if (strtoupper($currency) === $targetCurrency) {
+                $total += $amount;
+                $convertedCurrencies[] = $currency;
+                continue;
+            }
+
+            $converted = ExchangeRate::convert($amount, $currency, $targetCurrency, $onDate);
+            if ($converted === null) {
+                $unconverted[$currency] = ($unconverted[$currency] ?? 0) + $amount;
+                continue;
+            }
+
+            $total += $converted;
+            $convertedCurrencies[] = $currency;
+        }
+
+        return [
+            'total' => round($total, 2),
+            'target_currency' => $targetCurrency,
+            'converted_currencies' => $convertedCurrencies,
+            'unconverted' => $unconverted,
+        ];
     }
 }

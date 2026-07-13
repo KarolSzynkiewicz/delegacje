@@ -141,6 +141,12 @@ return [
         'label' => 'Koszty księgowe',
     ],
 
+    'exchange_rates' => [
+        'route' => 'exchange-rates.index',
+        'icon' => 'bi bi-currency-exchange',
+        'label' => 'Kursy walut',
+    ],
+
     'employee_evaluations' => [
         'route' => 'employee-evaluations.index',
         'icon' => 'bi bi-star',

@@ -2196,6 +2196,11 @@ header.bg-white.border-bottom {
 html {
     --bs-body-bg: var(--bg-body);
     --bs-body-color: var(--text-main);
+    /* Bootstrap .text-body / .text-body-secondary / .text-body-tertiary itd. liczą kolor jako
+       rgba(var(--bs-body-color-rgb), opacity) — sam --bs-body-color na to NIE wpływa.
+       Bez tego .text-body renderował się domyślnym (ciemnym) RGB Bootstrapa, czyli ciemnym
+       tekstem na ciemnym tle karty (niewidoczne nagłówki tabel, "Uwagi metodologiczne" itp.). */
+    --bs-body-color-rgb: 241, 245, 249;
     --bs-body-tertiary-bg: var(--bg-card);
     --bs-border-color: var(--glass-border);
 }
