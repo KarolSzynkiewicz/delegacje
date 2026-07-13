@@ -9,14 +9,101 @@ use App\Models\EmployeeRate;
 use App\Models\Rotation;
 use App\Models\ProjectVariableCost;
 use App\Models\FixedCostEntry;
-use App\Models\Payroll;
 use App\Enums\ProjectType;
-use App\Enums\PayrollStatus;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
 class ProfitabilityService
 {
+    /**
+     * Cache stawek pracowników w ramach jednego requestu (grupowane po employee_id,
+     * sortowane malejąco po start_date). Eliminuje N+1 zapytań do employee_rates —
+     * wcześniej każdy wpis godzin (time_log) odpytywał bazę osobno, co przy większej
+     * liczbie wpisów i 12-miesięcznym wykresie trendu dawało tysiące zapytań na jedno
+     * wejście na dashboard rentowności.
+     *
+     * @var \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, EmployeeRate>>|null
+     */
+    protected ?\Illuminate\Support\Collection $employeeRatesByEmployee = null;
+
+    protected function employeeRates(): \Illuminate\Support\Collection
+    {
+        if ($this->employeeRatesByEmployee === null) {
+            $this->employeeRatesByEmployee = EmployeeRate::where('status', 'active')
+                ->orderByDesc('start_date')
+                ->get()
+                ->groupBy('employee_id');
+        }
+
+        return $this->employeeRatesByEmployee;
+    }
+
+    /**
+     * Znajduje obowiązującą stawkę pracownika na dany dzień, z pamięci (patrz {@see employeeRates()}).
+     * Odpowiednik poprzedniego zapytania `EmployeeRate::where(...)->orderBy('start_date','desc')->first()`,
+     * ale bez trafiania do bazy przy każdym wywołaniu.
+     */
+    protected function findEmployeeRate(int $employeeId, string $workDate, ?string $preferredCurrency = null): ?EmployeeRate
+    {
+        $workDateCarbon = Carbon::parse($workDate)->startOfDay();
+
+        $candidates = $this->employeeRates()
+            ->get($employeeId, collect())
+            ->filter(function (EmployeeRate $rate) use ($workDateCarbon) {
+                return $rate->start_date->lte($workDateCarbon)
+                    && ($rate->end_date === null || $rate->end_date->gte($workDateCarbon));
+            });
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        if ($preferredCurrency) {
+            $preferred = $candidates->firstWhere('currency', $preferredCurrency);
+            if ($preferred) {
+                return $preferred;
+            }
+        }
+
+        // Kolekcja jest już posortowana malejąco po start_date (grupowanie zachowuje porządek).
+        return $candidates->first();
+    }
+
+    /**
+     * Przypisania projektu nakładające się na dany miesiąc. Jeśli relacja `assignments` jest już
+     * eager-loadowana (patrz {@see monthRelevantProjectsQuery}), filtruje w pamięci — bez dodatkowego
+     * zapytania SQL per projekt. W przeciwnym razie odpytuje bazę (tryb zapasowy dla wywołań spoza
+     * tego kontekstu).
+     */
+    protected function assignmentsOverlappingMonth(Project $project, Carbon $monthStart, Carbon $monthEnd)
+    {
+        if ($project->relationLoaded('assignments')) {
+            return $project->assignments->filter(function ($assignment) use ($monthStart, $monthEnd) {
+                if ($assignment->start_date && $assignment->start_date->gt($monthEnd)) {
+                    return false;
+                }
+                if ($assignment->end_date && $assignment->end_date->lt($monthStart)) {
+                    return false;
+                }
+
+                return true;
+            })->values();
+        }
+
+        return $project->assignments()
+            ->with(['employee', 'timeLogs' => function ($query) use ($monthStart, $monthEnd) {
+                $query->whereBetween('start_time', [
+                    $monthStart->copy()->startOfDay(),
+                    $monthEnd->copy()->endOfDay(),
+                ]);
+            }])
+            ->where('start_date', '<=', $monthEnd)
+            ->where(function ($q) use ($monthStart) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $monthStart);
+            })
+            ->get();
+    }
+
     /**
      * Baza zapytania o projekty "istotne" dla danego miesiąca.
      *
@@ -43,7 +130,20 @@ class ProfitabilityService
         $monthStartDate = $monthStart->copy()->startOfDay();
         $monthEndDate = $monthEnd->copy()->endOfDay();
 
-        $query = Project::with(['assignments.employee', 'assignments.timeLogs', 'variableCosts'])
+        // WAŻNE (perf): eager-loadowane relacje są od razu przycięte do danego miesiąca
+        // (whereBetween na start_time / incurred_date). Dzięki temu dalsze obliczenia mogą
+        // korzystać z już wczytanych kolekcji zamiast odpytywać bazę ponownie per-projekt
+        // (to był główny powód, dla którego widok ładował się bardzo długo — N+1 zapytań
+        // pomnożone przez liczbę projektów i wpisów godzin, i to jeszcze x12 dla wykresu trendu).
+        $query = Project::with([
+                'assignments.employee',
+                'assignments.timeLogs' => function ($q) use ($monthStartDate, $monthEndDate) {
+                    $q->whereBetween('start_time', [$monthStartDate, $monthEndDate]);
+                },
+                'variableCosts' => function ($q) use ($monthStartDate, $monthEndDate) {
+                    $q->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()]);
+                },
+            ])
             ->where(function (Builder $q) use ($monthStartDate, $monthEndDate) {
                 // 1) Projekt ma przypisanie (pracownika) nakładające się na miesiąc
                 $q->whereHas('assignments', function (Builder $aq) use ($monthStartDate, $monthEndDate) {
@@ -195,33 +295,14 @@ class ProfitabilityService
      */
     public function getProjectProfitabilityForMonth(Project $project, Carbon $monthStart, Carbon $monthEnd): array
     {
-        // Get assignments that overlap with the month
-        $assignments = $project->assignments()
-            ->with(['employee', 'timeLogs' => function ($query) use ($monthStart, $monthEnd) {
-                $query->whereBetween('start_time', [
-                    $monthStart->copy()->startOfDay(),
-                    $monthEnd->copy()->endOfDay()
-                ]);
-            }])
-            ->where(function ($query) use ($monthStart, $monthEnd) {
-                $query->where(function ($q) use ($monthStart, $monthEnd) {
-                    $q->where('start_date', '<=', $monthEnd)
-                      ->where(function ($q2) use ($monthStart) {
-                          $q2->whereNull('end_date')
-                             ->orWhere('end_date', '>=', $monthStart);
-                      });
-                });
-            })
-            ->get();
-        
+        // Get assignments that overlap with the month (z pamięci, jeśli eager-loadowane — patrz assignmentsOverlappingMonth)
+        $assignments = $this->assignmentsOverlappingMonth($project, $monthStart, $monthEnd);
+
         // Get variable costs for the month (wg daty poniesienia kosztu, nie daty wprowadzenia do systemu)
         $variableCosts = $this->variableCostsForMonth($project, $monthStart, $monthEnd);
         
         // Calculate labor costs (from payroll/time logs) for the month - grouped by currency
         $laborCostsByCurrency = $this->calculateLaborCostsForMonthByCurrency($project, $assignments, $monthStart, $monthEnd);
-        
-        // Calculate paid and unpaid labor costs by currency
-        $paidLaborCostsByCurrency = $this->calculatePaidLaborCostsForMonthByCurrency($project, $assignments, $monthStart, $monthEnd);
         
         // Calculate variable costs for the month - grouped by currency
         $variableCostsByCurrency = $this->calculateVariableCostsByCurrency($variableCosts);
@@ -271,7 +352,6 @@ class ProfitabilityService
             'revenue' => round($revenue, 2),
             'revenue_currency' => $revenueCurrency,
             'labor_costs_by_currency' => $laborCostsByCurrency,
-            'paid_labor_costs_by_currency' => $paidLaborCostsByCurrency,
             'variable_costs_by_currency' => $variableCostsByCurrency,
             'total_costs_by_currency' => $totalCostsByCurrency,
             'margin' => round($margin, 2),
@@ -362,16 +442,8 @@ class ProfitabilityService
                     continue;
                 }
                 
-                // Find employee rate for this date (any currency)
-                $rate = EmployeeRate::where('employee_id', $assignment->employee_id)
-                    ->where('status', 'active')
-                    ->where('start_date', '<=', $workDate)
-                    ->where(function ($query) use ($workDate) {
-                        $query->whereNull('end_date')
-                            ->orWhere('end_date', '>=', $workDate);
-                    })
-                    ->orderBy('start_date', 'desc')
-                    ->first();
+                // Find employee rate for this date (any currency) — z pamięci, patrz findEmployeeRate()
+                $rate = $this->findEmployeeRate($assignment->employee_id, $workDate);
                 
                 if ($rate) {
                     $currency = $rate->currency;
@@ -394,85 +466,6 @@ class ProfitabilityService
     }
 
     /**
-     * Calculate paid labor costs for a project for a specific month, grouped by currency.
-     * Only includes costs from payrolls with status "paid".
-     */
-    protected function calculatePaidLaborCostsForMonthByCurrency(Project $project, $assignments, Carbon $monthStart, Carbon $monthEnd): array
-    {
-        $paidCostsByCurrency = [];
-
-        // Get all employees assigned to this project
-        $employeeIds = $assignments->pluck('employee_id')->unique();
-
-        // Get all paid payrolls for these employees that overlap with the month
-        $paidPayrolls = Payroll::whereIn('employee_id', $employeeIds)
-            ->where('status', PayrollStatus::PAID)
-            ->where(function ($query) use ($monthStart, $monthEnd) {
-                $query->where(function ($q) use ($monthStart, $monthEnd) {
-                    $q->where('period_start', '<=', $monthEnd)
-                      ->where('period_end', '>=', $monthStart);
-                });
-            })
-            ->get();
-
-        // For each paid payroll, calculate the proportion of costs that belong to this project
-        foreach ($paidPayrolls as $payroll) {
-            $payrollStart = Carbon::parse($payroll->period_start);
-            $payrollEnd = Carbon::parse($payroll->period_end);
-            $payrollCurrency = $payroll->currency;
-            
-            // Get time logs for this employee in the payroll period that belong to this project
-            $timeLogs = TimeLog::whereHas('projectAssignment', function ($query) use ($project, $payroll) {
-                $query->where('project_id', $project->id)
-                      ->where('employee_id', $payroll->employee_id);
-            })
-            ->whereBetween('start_time', [
-                $payrollStart->copy()->startOfDay(),
-                $payrollEnd->copy()->endOfDay()
-            ])
-            ->whereBetween('start_time', [
-                $monthStart->copy()->startOfDay(),
-                $monthEnd->copy()->endOfDay()
-            ])
-            ->get();
-
-            // Calculate total hours for this project in the payroll period
-            $projectHours = $timeLogs->sum('hours_worked');
-            
-            // Get all time logs for this employee in the payroll period (all projects)
-            $allTimeLogs = TimeLog::whereHas('projectAssignment', function ($query) use ($payroll) {
-                $query->where('employee_id', $payroll->employee_id);
-            })
-            ->whereBetween('start_time', [
-                $payrollStart->copy()->startOfDay(),
-                $payrollEnd->copy()->endOfDay()
-            ])
-            ->get();
-
-            $allHours = $allTimeLogs->sum('hours_worked');
-            
-            // Calculate proportion of payroll that belongs to this project
-            if ($allHours > 0 && $projectHours > 0) {
-                $proportion = $projectHours / $allHours;
-                // Use hours_amount from payroll (which is the cost for hours)
-                $projectCost = (float) $payroll->hours_amount * $proportion;
-                
-                if (!isset($paidCostsByCurrency[$payrollCurrency])) {
-                    $paidCostsByCurrency[$payrollCurrency] = 0;
-                }
-                $paidCostsByCurrency[$payrollCurrency] += $projectCost;
-            }
-        }
-
-        // Round all values
-        foreach ($paidCostsByCurrency as $currency => $cost) {
-            $paidCostsByCurrency[$currency] = round($cost, 2);
-        }
-
-        return $paidCostsByCurrency;
-    }
-
-    /**
      * Koszty zmienne projektu za dany miesiąc — liczone wg daty PONIESIENIA kosztu
      * (`incurred_date`), z fallbackiem na `created_at` dla starszych wpisów bez tej daty.
      * To ważne dla poprawności historii: koszt wprowadzony do systemu z opóźnieniem
@@ -480,6 +473,12 @@ class ProfitabilityService
      */
     protected function variableCostsForMonth(Project $project, Carbon $monthStart, Carbon $monthEnd)
     {
+        // Jeśli relacja jest już eager-loadowana i przycięta do miesiąca (patrz monthRelevantProjectsQuery),
+        // użyj jej z pamięci — bez dodatkowego zapytania SQL per projekt.
+        if ($project->relationLoaded('variableCosts')) {
+            return $project->variableCosts;
+        }
+
         $monthStartDate = $monthStart->copy()->startOfDay();
         $monthEndDate = $monthEnd->copy()->endOfDay();
 
@@ -800,16 +799,8 @@ class ProfitabilityService
             
             $workDate = Carbon::parse($timeLog->start_time)->toDateString();
             
-            // Get employee rate
-            $rate = EmployeeRate::where('employee_id', $employee->id)
-                ->where('status', 'active')
-                ->where('start_date', '<=', $workDate)
-                ->where(function ($query) use ($workDate) {
-                    $query->whereNull('end_date')
-                        ->orWhere('end_date', '>=', $workDate);
-                })
-                ->orderBy('start_date', 'desc')
-                ->first();
+            // Get employee rate — z pamięci, patrz findEmployeeRate()
+            $rate = $this->findEmployeeRate($employee->id, $workDate);
             
             if (!$rate) {
                 continue;
@@ -946,24 +937,8 @@ class ProfitabilityService
         $projectCount = $projects->count();
         
         foreach ($projects as $project) {
-            // Get assignments that overlap with the month
-            $assignments = $project->assignments()
-                ->with(['timeLogs' => function ($query) use ($monthStart, $monthEnd) {
-                    $query->whereBetween('start_time', [
-                        $monthStart->copy()->startOfDay(),
-                        $monthEnd->copy()->endOfDay()
-                    ]);
-                }])
-                ->where(function ($query) use ($monthStart, $monthEnd) {
-                    $query->where(function ($q) use ($monthStart, $monthEnd) {
-                        $q->where('start_date', '<=', $monthEnd)
-                          ->where(function ($q2) use ($monthStart) {
-                              $q2->whereNull('end_date')
-                                 ->orWhere('end_date', '>=', $monthStart);
-                          });
-                    });
-                })
-                ->get();
+            // Get assignments that overlap with the month (z pamięci, jeśli eager-loadowane)
+            $assignments = $this->assignmentsOverlappingMonth($project, $monthStart, $monthEnd);
             
             // Get variable costs for the month (wg daty poniesienia kosztu, nie daty wprowadzenia do systemu)
             $variableCosts = $this->variableCostsForMonth($project, $monthStart, $monthEnd);
@@ -1025,6 +1000,57 @@ class ProfitabilityService
             'labor_costs_by_currency' => $laborCostsByCurrency,
             'variable_costs_by_currency' => $variableCostsByCurrency,
             'fixed_costs_by_currency' => $fixedCostsByCurrency,
+        ];
+    }
+
+    /**
+     * Agreguje podsumowanie przychodów/kosztów wg walut na podstawie wyniku
+     * {@see getProjectsProfitabilityForMonth()} dla TEGO SAMEGO miesiąca i tych samych filtrów.
+     *
+     * Perf: pozwala uniknąć drugiego, kosztownego przejścia po tych samych projektach —
+     * wcześniej widok liczył dane rentowności dla miesiąca RAZ dla tabeli projektów, a potem
+     * jeszcze RAZ (od zera, z tymi samymi filtrami) tylko po to, by policzyć sumę do kart KPI.
+     *
+     * @param  array<int, array<string, mixed>>  $projectsProfitability  wynik getProjectsProfitabilityForMonth()
+     */
+    public function summarizeProjectsProfitability(array $projectsProfitability, Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $revenueByCurrency = [];
+        $laborCostsByCurrency = [];
+        $variableCostsByCurrency = [];
+
+        foreach ($projectsProfitability as $row) {
+            $revenueByCurrency[$row['revenue_currency']] = ($revenueByCurrency[$row['revenue_currency']] ?? 0) + $row['revenue'];
+
+            foreach ($row['labor_costs_by_currency'] as $currency => $amount) {
+                $laborCostsByCurrency[$currency] = ($laborCostsByCurrency[$currency] ?? 0) + $amount;
+            }
+            foreach ($row['variable_costs_by_currency'] as $currency => $amount) {
+                $variableCostsByCurrency[$currency] = ($variableCostsByCurrency[$currency] ?? 0) + $amount;
+            }
+        }
+
+        // Koszty ogólnofirmowe wciąż liczone bezpośrednio — to tylko jedno (lekkie) zapytanie,
+        // niezależne od liczby projektów.
+        $fixedCosts = FixedCostEntry::where(function (Builder $query) use ($monthStart, $monthEnd) {
+            $query->where('period_start', '<=', $monthEnd)
+                ->where('period_end', '>=', $monthStart);
+        })->get();
+        $fixedCostsByCurrency = $this->calculateFixedCostsForMonthByCurrency($fixedCosts, $monthStart, $monthEnd);
+
+        $round = function (array $arr): array {
+            foreach ($arr as $currency => $value) {
+                $arr[$currency] = round($value, 2);
+            }
+            return $arr;
+        };
+
+        return [
+            'project_count' => count($projectsProfitability),
+            'revenue_by_currency' => $round($revenueByCurrency),
+            'labor_costs_by_currency' => $round($laborCostsByCurrency),
+            'variable_costs_by_currency' => $round($variableCostsByCurrency),
+            'fixed_costs_by_currency' => $round($fixedCostsByCurrency),
         ];
     }
 

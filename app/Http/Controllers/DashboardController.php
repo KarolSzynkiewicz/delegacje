@@ -48,12 +48,12 @@ class DashboardController extends Controller
             $filters['statuses']
         );
         $longestRotations = $this->profitabilityService->getEmployeesWithLongestRotations(10);
-        $summary = $this->profitabilityService->getRevenueVsCostsSummaryForMonth(
+        // Podsumowanie dla bieżącego miesiąca liczone z już wyliczonych danych projektów
+        // (te same filtry/miesiąc co $projectsProfitability) — patrz summarizeProjectsProfitability().
+        $summary = $this->profitabilityService->summarizeProjectsProfitability(
+            $projectsProfitability,
             $monthStart,
-            $monthEnd,
-            $filters['statuses'],
-            $filters['type'],
-            $filters['search']
+            $monthEnd
         );
 
         // Poprzedni miesiąc — do wyliczenia trendu miesiąc-do-miesiąca (kontroling)
