@@ -13,9 +13,84 @@ use App\Models\Payroll;
 use App\Enums\ProjectType;
 use App\Enums\PayrollStatus;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProfitabilityService
 {
+    /**
+     * Baza zapytania o projekty "istotne" dla danego miesiąca.
+     *
+     * WAŻNE (fix historii): projekt liczy się do danego miesiąca na podstawie tego,
+     * czy w tym miesiącu faktycznie miał aktywność (przypisania, koszty zmienne, zakres dat),
+     * a NIE na podstawie jego BIEŻĄCEGO statusu. Dzięki temu zakończony/wstrzymany/anulowany
+     * projekt wciąż poprawnie liczy się w danych za miesiące, w których się odbywał —
+     * zmiana statusu po fakcie nie "wymazuje" historii.
+     *
+     * Opcjonalny filtr $statuses pozwala zawężyć widok (np. tylko aktywne) na potrzeby UI,
+     * ale nie jest wymagany do poprawności danych historycznych.
+     *
+     * @param  array<int, string>|null  $statuses  lista wartości ProjectStatus do filtrowania (null = wszystkie)
+     * @param  string|null  $type  wartość ProjectType do filtrowania
+     * @param  string|null  $search  szukana fraza (nazwa projektu / klient)
+     */
+    protected function monthRelevantProjectsQuery(
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        ?array $statuses = null,
+        ?string $type = null,
+        ?string $search = null
+    ): Builder {
+        $monthStartDate = $monthStart->copy()->startOfDay();
+        $monthEndDate = $monthEnd->copy()->endOfDay();
+
+        $query = Project::with(['assignments.employee', 'assignments.timeLogs', 'variableCosts'])
+            ->where(function (Builder $q) use ($monthStartDate, $monthEndDate) {
+                // 1) Projekt ma przypisanie (pracownika) nakładające się na miesiąc
+                $q->whereHas('assignments', function (Builder $aq) use ($monthStartDate, $monthEndDate) {
+                    $aq->where('start_date', '<=', $monthEndDate)
+                        ->where(function (Builder $aq2) use ($monthStartDate) {
+                            $aq2->whereNull('end_date')
+                                ->orWhere('end_date', '>=', $monthStartDate);
+                        });
+                })
+                // 2) Projekt miał koszt zmienny poniesiony w tym miesiącu
+                ->orWhereHas('variableCosts', function (Builder $vq) use ($monthStartDate, $monthEndDate) {
+                    $vq->where(function (Builder $vq2) use ($monthStartDate, $monthEndDate) {
+                        $vq2->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()])
+                            ->orWhereBetween('created_at', [$monthStartDate, $monthEndDate]);
+                    });
+                })
+                // 3) Projekt ma zdefiniowany zakres dat (start_date) nakładający się na miesiąc
+                //    (dot. przede wszystkim projektów kontraktowych) — start_date musi być ustawiony,
+                //    inaczej warunek dopasowałby wszystkie projekty bez dat.
+                ->orWhere(function (Builder $pq) use ($monthStartDate, $monthEndDate) {
+                    $pq->whereNotNull('start_date')
+                        ->where('start_date', '<=', $monthEndDate)
+                        ->where(function (Builder $pq2) use ($monthStartDate) {
+                            $pq2->whereNull('end_date')
+                                ->orWhere('end_date', '>=', $monthStartDate);
+                        });
+                });
+            });
+
+        if ($statuses !== null && $statuses !== []) {
+            $query->whereIn('status', $statuses);
+        }
+
+        if ($type) {
+            $query->where('type', $type);
+        }
+
+        if ($search) {
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('client_name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
     /**
      * Get profitability data for all active projects.
      */
@@ -31,17 +106,38 @@ class ProfitabilityService
     }
 
     /**
-     * Get profitability data for all active projects for a specific month.
+     * Get profitability data for all projects relevant to a specific month.
+     *
+     * Zwraca projekty, które miały aktywność w danym miesiącu, niezależnie od ich
+     * BIEŻĄCEGO statusu (patrz {@see monthRelevantProjectsQuery}). Można opcjonalnie
+     * zawężyć wynik do wybranych statusów/typu/frazy szukanej — przydatne dla filtrów w UI.
+     *
+     * @param  array<int, string>|null  $statuses
      */
-    public function getActiveProjectsProfitabilityForMonth(Carbon $monthStart, Carbon $monthEnd): array
-    {
-        $projects = Project::with(['assignments.employee', 'assignments.timeLogs', 'variableCosts'])
-            ->where('status', 'active')
+    public function getProjectsProfitabilityForMonth(
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        ?array $statuses = null,
+        ?string $type = null,
+        ?string $search = null
+    ): array {
+        $projects = $this->monthRelevantProjectsQuery($monthStart, $monthEnd, $statuses, $type, $search)
+            ->orderBy('name')
             ->get();
 
         return $projects->map(function ($project) use ($monthStart, $monthEnd) {
             return $this->getProjectProfitabilityForMonth($project, $monthStart, $monthEnd);
         })->toArray();
+    }
+
+    /**
+     * @deprecated Use getProjectsProfitabilityForMonth() — nazwa historyczna zachowana
+     * dla kompatybilności, ale metoda już NIE ogranicza się tylko do statusu "active"
+     * (to właśnie był błąd psujący dane historyczne).
+     */
+    public function getActiveProjectsProfitabilityForMonth(Carbon $monthStart, Carbon $monthEnd): array
+    {
+        return $this->getProjectsProfitabilityForMonth($monthStart, $monthEnd);
     }
 
     /**
@@ -118,11 +214,8 @@ class ProfitabilityService
             })
             ->get();
         
-        // Get variable costs for the month
-        $variableCosts = $project->variableCosts()
-            ->where('created_at', '>=', $monthStart->startOfDay())
-            ->where('created_at', '<=', $monthEnd->endOfDay())
-            ->get();
+        // Get variable costs for the month (wg daty poniesienia kosztu, nie daty wprowadzenia do systemu)
+        $variableCosts = $this->variableCostsForMonth($project, $monthStart, $monthEnd);
         
         // Calculate labor costs (from payroll/time logs) for the month - grouped by currency
         $laborCostsByCurrency = $this->calculateLaborCostsForMonthByCurrency($project, $assignments, $monthStart, $monthEnd);
@@ -148,7 +241,31 @@ class ProfitabilityService
         
         // Calculate plan execution (actual vs estimated)
         $planExecution = $estimatedHours > 0 ? ($actualHours / $estimatedHours) * 100 : 0;
-        
+
+        // Total costs by currency = labor + variable, merged
+        $totalCostsByCurrency = [];
+        foreach ($laborCostsByCurrency as $currency => $amount) {
+            $totalCostsByCurrency[$currency] = ($totalCostsByCurrency[$currency] ?? 0) + $amount;
+        }
+        foreach ($variableCostsByCurrency as $currency => $amount) {
+            $totalCostsByCurrency[$currency] = ($totalCostsByCurrency[$currency] ?? 0) + $amount;
+        }
+        foreach ($totalCostsByCurrency as $currency => $amount) {
+            $totalCostsByCurrency[$currency] = round($amount, 2);
+        }
+
+        // Margin (brutto, bez kosztów ogólnofirmowych) — liczona tylko dla walucy przychodu,
+        // bo koszty w innych walutach nie mają wspólnego mianownika bez kursu wymiany.
+        $costsInRevenueCurrency = $totalCostsByCurrency[$revenueCurrency] ?? 0;
+        $margin = $revenue - $costsInRevenueCurrency;
+        $marginPercentage = $revenue > 0 ? ($margin / $revenue) * 100 : null;
+
+        // Czy istnieją koszty w walutach innych niż waluta przychodu (informacja dla UI/tooltipa)
+        $hasCostsInOtherCurrencies = collect($totalCostsByCurrency)
+            ->except([$revenueCurrency])
+            ->filter(fn ($v) => abs((float) $v) > 0.00001)
+            ->isNotEmpty();
+
         return [
             'project' => $project,
             'revenue' => round($revenue, 2),
@@ -156,10 +273,15 @@ class ProfitabilityService
             'labor_costs_by_currency' => $laborCostsByCurrency,
             'paid_labor_costs_by_currency' => $paidLaborCostsByCurrency,
             'variable_costs_by_currency' => $variableCostsByCurrency,
+            'total_costs_by_currency' => $totalCostsByCurrency,
+            'margin' => round($margin, 2),
+            'margin_percentage' => $marginPercentage !== null ? round($marginPercentage, 2) : null,
+            'has_costs_in_other_currencies' => $hasCostsInOtherCurrencies,
             'employee_count' => $employeeCount,
             'estimated_hours' => round($estimatedHours, 2),
             'actual_hours' => round($actualHours, 2),
             'plan_execution' => round($planExecution, 2),
+            'cost_per_hour' => $actualHours > 0 ? round($costsInRevenueCurrency / $actualHours, 2) : null,
         ];
     }
 
@@ -348,6 +470,28 @@ class ProfitabilityService
         }
 
         return $paidCostsByCurrency;
+    }
+
+    /**
+     * Koszty zmienne projektu za dany miesiąc — liczone wg daty PONIESIENIA kosztu
+     * (`incurred_date`), z fallbackiem na `created_at` dla starszych wpisów bez tej daty.
+     * To ważne dla poprawności historii: koszt wprowadzony do systemu z opóźnieniem
+     * (np. w lipcu za maj) musi trafić do maja, a nie do lipca.
+     */
+    protected function variableCostsForMonth(Project $project, Carbon $monthStart, Carbon $monthEnd)
+    {
+        $monthStartDate = $monthStart->copy()->startOfDay();
+        $monthEndDate = $monthEnd->copy()->endOfDay();
+
+        return $project->variableCosts()
+            ->where(function ($query) use ($monthStartDate, $monthEndDate) {
+                $query->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()])
+                    ->orWhere(function ($q) use ($monthStartDate, $monthEndDate) {
+                        $q->whereNull('incurred_date')
+                            ->whereBetween('created_at', [$monthStartDate, $monthEndDate]);
+                    });
+            })
+            ->get();
     }
 
     /**
@@ -616,22 +760,37 @@ class ProfitabilityService
 
     /**
      * Get top employees by revenue for a specific month.
+     *
+     * WAŻNE (fix historii): liczy przychód ze WSZYSTKICH wpisów godzin w miesiącu,
+     * niezależnie od bieżącego statusu projektu, do którego przypisany jest pracownik
+     * (dawniej filtrowało tylko projekty o statusie "active", co ucinało historię
+     * zakończonych projektów). Opcjonalny filtr $statuses pozwala zawężić to w UI.
+     *
+     * @param  array<int, string>|null  $statuses
      */
-    public function getTopEmployeesByRevenueForMonth(Carbon $monthStart, Carbon $monthEnd, int $limit = 10): array
+    public function getTopEmployeesByRevenueForMonth(Carbon $monthStart, Carbon $monthEnd, int $limit = 10, ?array $statuses = null): array
     {
         $employees = [];
         
-        $timeLogs = TimeLog::with(['projectAssignment.employee', 'projectAssignment.project'])
-            ->whereHas('projectAssignment.project', function ($query) {
-                $query->where('status', 'active');
-            })
+        $timeLogsQuery = TimeLog::with(['projectAssignment.employee', 'projectAssignment.project'])
             ->whereBetween('start_time', [
                 $monthStart->copy()->startOfDay(),
                 $monthEnd->copy()->endOfDay()
-            ])
-            ->get();
+            ]);
+
+        if ($statuses !== null && $statuses !== []) {
+            $timeLogsQuery->whereHas('projectAssignment.project', function ($query) use ($statuses) {
+                $query->whereIn('status', $statuses);
+            });
+        }
+
+        $timeLogs = $timeLogsQuery->get();
         
         foreach ($timeLogs as $timeLog) {
+            if (! $timeLog->projectAssignment || ! $timeLog->projectAssignment->employee) {
+                continue;
+            }
+
             $employee = $timeLog->projectAssignment->employee;
             $hoursWorked = (float) $timeLog->hours_worked;
             
@@ -769,17 +928,22 @@ class ProfitabilityService
     }
 
     /**
-     * Get summary: revenue vs costs for all active projects for a specific month.
+     * Get summary: revenue vs costs for all projects relevant to a specific month.
+     *
+     * WAŻNE (fix historii): jak w {@see monthRelevantProjectsQuery} — bierze projekty
+     * z aktywnością w danym miesiącu niezależnie od bieżącego statusu, więc zakończone
+     * projekty poprawnie wliczają się do podsumowania za miesiące, w których się odbywały.
+     *
+     * @param  array<int, string>|null  $statuses
      */
-    public function getRevenueVsCostsSummaryForMonth(Carbon $monthStart, Carbon $monthEnd): array
+    public function getRevenueVsCostsSummaryForMonth(Carbon $monthStart, Carbon $monthEnd, ?array $statuses = null, ?string $type = null, ?string $search = null): array
     {
-        $projects = Project::with(['assignments.timeLogs', 'variableCosts'])
-            ->where('status', 'active')
-            ->get();
+        $projects = $this->monthRelevantProjectsQuery($monthStart, $monthEnd, $statuses, $type, $search)->get();
         
         $revenueByCurrency = [];
         $laborCostsByCurrency = [];
         $variableCostsByCurrency = [];
+        $projectCount = $projects->count();
         
         foreach ($projects as $project) {
             // Get assignments that overlap with the month
@@ -801,11 +965,8 @@ class ProfitabilityService
                 })
                 ->get();
             
-            // Get variable costs for the month
-            $variableCosts = $project->variableCosts()
-                ->where('created_at', '>=', $monthStart->startOfDay())
-                ->where('created_at', '<=', $monthEnd->endOfDay())
-                ->get();
+            // Get variable costs for the month (wg daty poniesienia kosztu, nie daty wprowadzenia do systemu)
+            $variableCosts = $this->variableCostsForMonth($project, $monthStart, $monthEnd);
             
             // Calculate revenue by currency
             $revenue = $this->calculateRevenueForMonth($project, $assignments, $monthStart, $monthEnd);
@@ -859,10 +1020,85 @@ class ProfitabilityService
         }
         
         return [
+            'project_count' => $projectCount,
             'revenue_by_currency' => $revenueByCurrency,
             'labor_costs_by_currency' => $laborCostsByCurrency,
             'variable_costs_by_currency' => $variableCostsByCurrency,
             'fixed_costs_by_currency' => $fixedCostsByCurrency,
+        ];
+    }
+
+    /**
+     * Trend przychodów/kosztów/marży w ostatnich $monthsBack miesiącach (kontroling).
+     * Zwraca dane pogrupowane po walucie, gotowe do wykresu liniowego.
+     *
+     * @param  array<int, string>|null  $statuses
+     * @return array{labels: array<int, string>, currencies: array<string, array{revenue: array<int, float>, costs: array<int, float>, margin: array<int, float>}>}
+     */
+    public function getMonthlyTrend(Carbon $currentMonthStart, int $monthsBack = 12, ?array $statuses = null, ?string $type = null): array
+    {
+        $labels = [];
+        $monthlyCostsByCurrency = [];
+        $monthlySummaries = [];
+
+        for ($i = $monthsBack - 1; $i >= 0; $i--) {
+            $monthStart = $currentMonthStart->copy()->subMonths($i)->startOfMonth();
+            $monthEnd = $monthStart->copy()->endOfMonth();
+
+            $labels[] = mb_convert_case($monthStart->locale('pl')->translatedFormat('M Y'), MB_CASE_TITLE, 'UTF-8');
+
+            $summary = $this->getRevenueVsCostsSummaryForMonth($monthStart, $monthEnd, $statuses, $type);
+
+            $costsByCurrency = [];
+            foreach ($summary['labor_costs_by_currency'] as $currency => $amount) {
+                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+            }
+            foreach ($summary['variable_costs_by_currency'] as $currency => $amount) {
+                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+            }
+            foreach ($summary['fixed_costs_by_currency'] as $currency => $amount) {
+                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+            }
+
+            $monthlySummaries[] = $summary;
+            $monthlyCostsByCurrency[] = $costsByCurrency;
+        }
+
+        // Zbierz pełny zestaw walut występujących w JAKIMKOLWIEK z miesięcy, żeby
+        // każda seria miała tyle samo punktów co $labels i były one poprawnie wyrównane
+        // (bez tego waluta, która pojawiła się np. tylko w 3 z 12 miesięcy, "przesuwałaby się"
+        // względem etykiet miesięcy).
+        $allCurrencies = [];
+        foreach ($monthlySummaries as $idx => $summary) {
+            $allCurrencies = array_merge(
+                $allCurrencies,
+                array_keys($summary['revenue_by_currency']),
+                array_keys($monthlyCostsByCurrency[$idx])
+            );
+        }
+        $allCurrencies = array_unique($allCurrencies);
+
+        $rows = [];
+        foreach ($allCurrencies as $currency) {
+            $rows[$currency] = ['revenue' => [], 'costs' => [], 'margin' => []];
+        }
+
+        foreach ($monthlySummaries as $idx => $summary) {
+            $costsByCurrency = $monthlyCostsByCurrency[$idx];
+
+            foreach ($allCurrencies as $currency) {
+                $revenue = $summary['revenue_by_currency'][$currency] ?? 0.0;
+                $costs = $costsByCurrency[$currency] ?? 0.0;
+
+                $rows[$currency]['revenue'][] = round($revenue, 2);
+                $rows[$currency]['costs'][] = round($costs, 2);
+                $rows[$currency]['margin'][] = round($revenue - $costs, 2);
+            }
+        }
+
+        return [
+            'labels' => $labels,
+            'currencies' => $rows,
         ];
     }
 

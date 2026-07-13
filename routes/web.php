@@ -519,6 +519,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/profitability', [DashboardController::class, 'index'])
             ->name('profitability.index');
 
+        Route::get('/profitability/export-csv', [DashboardController::class, 'exportCsv'])
+            ->name('profitability.export-csv')
+            ->defaults('resource', 'profitability');
+
         Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])
             ->name('weekly-overview.index');
 
