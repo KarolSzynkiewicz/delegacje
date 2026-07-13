@@ -100,19 +100,15 @@ class GeneratePayrollForEmployee
      */
     public function getEmployeeIdsWithTimeLogsInPeriod(Carbon $periodStart, Carbon $periodEnd)
     {
-        // Używamy whereBetween z startOfDay/endOfDay zamiast DATE() w SQL (problemy z granicami dni)
-        // endOfDay() zapewnia, że ostatni dzień jest uwzględniony
-        return TimeLog::whereHas('projectAssignment')
-            ->whereBetween('start_time', [
+        // Lean query: JOIN + DISTINCT zamiast ładowania pełnych modeli do PHP
+        return TimeLog::join('project_assignments', 'time_logs.project_assignment_id', '=', 'project_assignments.id')
+            ->whereBetween('time_logs.start_time', [
                 $periodStart->copy()->startOfDay(),
-                $periodEnd->copy()->endOfDay()
+                $periodEnd->copy()->endOfDay(),
             ])
-            ->with('projectAssignment.employee')
-            ->get()
-            ->pluck('projectAssignment.employee_id')
-            ->unique()
-            ->filter()
-            ->values();
+            ->whereNotNull('project_assignments.employee_id')
+            ->distinct()
+            ->pluck('project_assignments.employee_id');
     }
 
     /**
@@ -154,38 +150,37 @@ class GeneratePayrollForEmployee
     public function calculateHoursAmount($timeLogs, string $currency): float
     {
         $totalAmount = 0;
+        // Klucz: "{employeeId}-{date}-{currency}" lub "{employeeId}-{date}-any" → EmployeeRate|null
+        $rateCache = [];
 
         foreach ($timeLogs as $timeLog) {
+            $employeeId = $timeLog->projectAssignment->employee_id;
             $workDate = Carbon::parse($timeLog->start_time)->toDateString();
             $hoursWorked = (float) $timeLog->hours_worked;
 
             if ($hoursWorked <= 0) {
-                continue; // Skip logs with no hours
-            }
-
-            // Find active EmployeeRate for this date - first try requested currency
-            $rate = $this->findEmployeeRateForDate(
-                $timeLog->projectAssignment->employee_id,
-                $workDate,
-                $currency
-            );
-
-            // If no rate found in requested currency, try to find any active rate for this date
-            if (!$rate) {
-                $rate = $this->findAnyEmployeeRateForDate(
-                    $timeLog->projectAssignment->employee_id,
-                    $workDate
-                );
-            }
-
-            if (!$rate) {
-                // If no rate found at all, skip this log
                 continue;
             }
 
-            // Calculate amount for this log: hours * rate
-            $logAmount = $hoursWorked * (float) $rate->amount;
-            $totalAmount += $logAmount;
+            $cacheKey = "{$employeeId}-{$workDate}-{$currency}";
+            if (!array_key_exists($cacheKey, $rateCache)) {
+                $rateCache[$cacheKey] = $this->findEmployeeRateForDate($employeeId, $workDate, $currency);
+            }
+            $rate = $rateCache[$cacheKey];
+
+            if (!$rate) {
+                $fallbackKey = "{$employeeId}-{$workDate}-any";
+                if (!array_key_exists($fallbackKey, $rateCache)) {
+                    $rateCache[$fallbackKey] = $this->findAnyEmployeeRateForDate($employeeId, $workDate);
+                }
+                $rate = $rateCache[$fallbackKey];
+            }
+
+            if (!$rate) {
+                continue;
+            }
+
+            $totalAmount += $hoursWorked * (float) $rate->amount;
         }
 
         return round($totalAmount, 2);

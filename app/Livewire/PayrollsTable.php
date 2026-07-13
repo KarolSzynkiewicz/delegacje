@@ -10,6 +10,7 @@ use App\Models\Company;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class PayrollsTable extends Component
@@ -174,7 +175,7 @@ class PayrollsTable extends Component
         ]);
 
         $payrolls = Payroll::query()
-            ->with('employee')
+            ->with(['employee', 'adjustments', 'advances'])
             ->whereIn('id', $this->selectedPayrollIds)
             ->get();
 
@@ -188,24 +189,32 @@ class PayrollsTable extends Component
         $currency = strtoupper((string) $this->bulkCurrency);
         $description = trim((string) $this->bulkDescription);
 
-        foreach ($payrolls as $payroll) {
-            Adjustment::create([
-                'employee_id' => $payroll->employee_id,
-                'payroll_id' => $payroll->id,
-                'amount' => abs($amount),
-                'currency' => $currency,
-                'type' => 'penalty',
-                'date' => $date,
-                'notes' => $description !== '' ? $description : 'Rozliczenie zbiorowe',
-            ]);
+        DB::transaction(function () use ($payrolls, $amount, $date, $currency, $description) {
+            foreach ($payrolls as $payroll) {
+                $adjustment = Adjustment::create([
+                    'employee_id' => $payroll->employee_id,
+                    'payroll_id' => $payroll->id,
+                    'amount' => abs($amount),
+                    'currency' => $currency,
+                    'type' => 'penalty',
+                    'date' => $date,
+                    'notes' => $description !== '' ? $description : 'Rozliczenie zbiorowe',
+                ]);
 
-            if ($payroll->canBeRecalculated()) {
-                $service = app(\App\Services\GeneratePayrollForEmployee::class);
-                $payroll->adjustments_amount = $service->calculateAdjustmentsAmountForPayroll($payroll);
-                $payroll->recalculateTotal();
-                $payroll->save();
+                if ($payroll->canBeRecalculated()) {
+                    // Oblicz z już załadowanych relacji + nowy adjustment (bez dodatkowych zapytań SQL)
+                    $adjustmentsTotal = $payroll->adjustments->sum(fn ($a) => $a->getEffectiveAmount())
+                        + $adjustment->getEffectiveAmount();
+                    $advancesTotal = $payroll->advances->sum(
+                        fn ($adv) => (float) $adv->amount + $adv->getInterestAmount()
+                    );
+
+                    $payroll->adjustments_amount = round($adjustmentsTotal - $advancesTotal, 2);
+                    $payroll->recalculateTotal();
+                    $payroll->save();
+                }
             }
-        }
+        });
 
         session()->flash('success', 'Dodano koszt do wybranych payrolli.');
         $this->resetSelection();
