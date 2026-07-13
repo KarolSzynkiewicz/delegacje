@@ -2,7 +2,6 @@
     $usagePercentage = $accommodationData['usage_percentage'] ?? 0;
     $progressVariant = $usagePercentage == 100 ? 'success' : ($usagePercentage >= 70 ? 'warning' : 'danger');
     $progressColor   = $usagePercentage == 100 ? '#10b981' : ($usagePercentage >= 70 ? '#f59e0b' : '#ef4444');
-    $borderColor     = $usagePercentage == 100 ? 'rgba(16,185,129,0.5)' : ($usagePercentage >= 70 ? 'rgba(245,158,11,0.5)' : 'rgba(239,68,68,0.4)');
 
     $accType = $accommodation->type ?? '';
     if ($accType === 'własny') {
@@ -37,23 +36,21 @@
 @endphp
 
 <div class="col-12 col-md-6 col-lg-4">
-    <div class="h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden; border: 1px solid {{ $borderColor }}; background: var(--bg-card, #1e293b);">
+    <div class="h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden; border: 1px solid var(--glass-border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b);">
 
         {{-- Baner ze zdjęciem --}}
         <a href="{{ route('accommodations.show', $accommodation) }}" class="d-block text-decoration-none" style="flex-shrink:0;">
-            <div style="height:148px; position:relative; overflow:hidden; background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.06) 100%);">
+            <div style="height:148px; position:relative; background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%); display:flex; align-items:center; justify-content:center;">
                 @if($accommodation->image_path)
                     <img src="{{ $accommodation->image_url }}"
                          alt="{{ $accommodation->name }}"
-                         style="width:100%; height:100%; object-fit:cover; display:block;"
+                         style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; display:block;"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center; position:absolute; top:0; left:0;">
                         <i class="bi bi-house" style="font-size:4rem; color:rgba(16,185,129,0.3);"></i>
                     </div>
                 @else
-                    <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
-                        <i class="bi bi-house" style="font-size:4.5rem; color:rgba(16,185,129,0.3);"></i>
-                    </div>
+                    <i class="bi bi-house" style="font-size:4.5rem; color:rgba(16,185,129,0.3);"></i>
                 @endif
 
                 {{-- Nakładka: zapełnienie --}}
