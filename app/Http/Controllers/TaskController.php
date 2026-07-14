@@ -23,6 +23,11 @@ class TaskController extends Controller
         return view('tasks.index');
     }
 
+    public function grid(): View
+    {
+        return view('tasks.grid');
+    }
+
     /**
      * Store a newly created task.
      */

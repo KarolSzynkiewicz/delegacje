@@ -68,7 +68,7 @@ class UserMentionService
     }
 
     /** Odwołania #1, #2 … do podzadań zadania (tekst już po e(); może zawierać np. &lt;br /&gt;). */
-    private const SUBTASK_REF_REGEX = '/(?<!\w)#(\d+)\b/u';
+    public const SUBTASK_REF_REGEX = '/(?<!\w)#(\d+)\b/u';
 
     /**
      * Zamienia #n na kartę z odznaką #n i nazwą podzadania (jak na liście / widoku podzadań).

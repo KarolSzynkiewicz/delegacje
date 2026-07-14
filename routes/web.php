@@ -198,7 +198,14 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('projects/{project}/files/{file}/download', [\App\Http\Controllers\ProjectFileController::class, 'download'])
             ->name('projects.files.download');
 
-        // Tasks
+        // Tasks — tasks2 przed resource, żeby uniknąć konfliktów z tasks/{task}
+        Route::group(['defaults' => ['resource' => 'tasks']], function () {
+            Route::get('tasks2', [\App\Http\Controllers\TaskController::class, 'grid'])
+                ->name('tasks.grid');
+            Route::get('tasks/grid', [\App\Http\Controllers\TaskController::class, 'grid'])
+                ->name('tasks.grid.alias');
+        });
+
         Route::group(['defaults' => ['resource' => 'tasks']], function () {
             Route::resource('tasks', \App\Http\Controllers\TaskController::class)
                 ->except(['create']);

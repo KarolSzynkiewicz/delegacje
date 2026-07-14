@@ -14,6 +14,7 @@ class TaskSubtask extends Model
 
     protected $fillable = [
         'task_id',
+        'sort_order',
         'name',
         'is_completed',
         'completed_at',
