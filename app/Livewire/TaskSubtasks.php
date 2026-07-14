@@ -22,8 +22,7 @@ class TaskSubtasks extends Component
 
     public function mount(ProjectTask $task): void
     {
-        $this->task = $task;
-        $this->task->load('subtasks');
+        $this->task = ProjectTask::with('subtasks')->findOrFail($task->id);
     }
 
     public function addSubtask(): void
@@ -54,8 +53,7 @@ class TaskSubtasks extends Component
         );
 
         $this->newSubtaskName = '';
-        $this->task->refresh();
-        $this->task->load('subtasks');
+        $this->refreshTask();
     }
 
     public function toggleSubtask($subtaskId): void
@@ -74,8 +72,7 @@ class TaskSubtasks extends Component
             TaskSubtaskEvent::log($subtask, 'completed', auth()->id());
         }
 
-        $this->task->refresh();
-        $this->task->load('subtasks');
+        $this->refreshTask();
     }
 
     public function startEditSubtask(int $subtaskId): void
@@ -127,8 +124,7 @@ class TaskSubtasks extends Component
         );
 
         $this->cancelEditSubtask();
-        $this->task->refresh();
-        $this->task->load('subtasks');
+        $this->refreshTask();
     }
 
     public function deleteSubtask(int $subtaskId): void
@@ -147,59 +143,20 @@ class TaskSubtasks extends Component
             $this->cancelEditSubtask();
         }
 
-        $this->task->refresh();
-        $this->task->load('subtasks');
+        $this->refreshTask();
     }
 
-    public function getCompletedSubtasksProperty(): Collection
+    private function refreshTask(): void
     {
-        if (! $this->task->relationLoaded('subtasks')) {
-            $this->task->load('subtasks');
-        }
-
-        return $this->task->subtasks->where('is_completed', true)->sortByDesc('completed_at')->values();
-    }
-
-    public function getPendingSubtasksProperty(): Collection
-    {
-        if (! $this->task->relationLoaded('subtasks')) {
-            $this->task->load('subtasks');
-        }
-
-        return $this->task->subtasks->where('is_completed', false)->sortBy('created_at')->values();
-    }
-
-    public function getProgressPercentageProperty(): float
-    {
-        if (! $this->task->relationLoaded('subtasks')) {
-            $this->task->load('subtasks');
-        }
-        $progress = $this->task->subtasks_progress;
-
-        return is_numeric($progress) ? (float) $progress : 0.0;
+        $this->task = ProjectTask::with('subtasks')->findOrFail($this->task->id);
     }
 
     /**
-     * @return array<int, int>
-     */
-    public function getSubtaskDisplayNumbersProperty(): array
-    {
-        return $this->task->subtaskDisplayNumbers();
-    }
-
-    /**
-     * Metadane historii dla każdego podzadania: kto i kiedy je utworzył/zamknął.
-     * Zwraca array indexed subtask_id => ['created_by' => ..., 'completed_by' => ...].
-     *
      * @return array<int, array{created_by: string|null, created_at: string|null, completed_by: string|null, completed_at: string|null}>
      */
-    public function getSubtaskMetaProperty(): array
+    private function buildSubtaskMeta(Collection $subtasks): array
     {
-        if (! $this->task->relationLoaded('subtasks')) {
-            $this->task->load('subtasks');
-        }
-
-        $subtaskIds = $this->task->subtasks->pluck('id');
+        $subtaskIds = $subtasks->pluck('id');
 
         if ($subtaskIds->isEmpty()) {
             return [];
@@ -220,7 +177,6 @@ class TaskSubtasks extends Component
 
             $createdEvent = $subtaskEvents->firstWhere('event', 'created');
 
-            // Ostatnie zdarzenie `completed` lub `reopened` — jeśli ostatnie to `completed`, subtask jest zamknięty
             $lastCompletedEvent = $subtaskEvents
                 ->filter(fn ($e) => in_array($e->event, ['completed', 'reopened']))
                 ->last();
@@ -230,8 +186,8 @@ class TaskSubtasks extends Component
                 : null;
 
             $meta[$subtaskId] = [
-                'created_by' => $createdEvent?->user?->name,
-                'created_at' => $createdEvent?->created_at?->format('d.m.Y H:i'),
+                'created_by'   => $createdEvent?->user?->name,
+                'created_at'   => $createdEvent?->created_at?->format('d.m.Y H:i'),
                 'completed_by' => $completedByEvent?->user?->name,
                 'completed_at' => $completedByEvent?->created_at?->format('d.m.Y H:i'),
             ];
@@ -242,7 +198,28 @@ class TaskSubtasks extends Component
 
     public function render()
     {
+        $task = ProjectTask::with('subtasks')->findOrFail($this->task->id);
+        $this->task = $task;
+
+        $subtasks = $task->subtasks;
+        $pendingSubtasks = $subtasks->where('is_completed', false)->sortBy('created_at')->values();
+        $completedSubtasks = $subtasks->where('is_completed', true)->sortByDesc('completed_at')->values();
+        $totalSubtasks = $subtasks->count();
+        $completedCount = $completedSubtasks->count();
+        $progressPercentage = $totalSubtasks > 0
+            ? round(($completedCount / $totalSubtasks) * 100, 2)
+            : 0.0;
+
         return view('livewire.task-subtasks', [
+            'pendingSubtasks'             => $pendingSubtasks,
+            'completedSubtasks'           => $completedSubtasks,
+            'totalSubtasks'               => $totalSubtasks,
+            'completedCount'              => $completedCount,
+            'pendingCount'                => $pendingSubtasks->count(),
+            'progressPercentage'          => $progressPercentage,
+            'progressVariant'             => $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default'),
+            'subtaskNumbers'              => $task->subtaskDisplayNumbers(),
+            'subtaskMeta'                 => $this->buildSubtaskMeta($subtasks),
             'mentionUsersForAutocomplete' => User::orderBy('name')
                 ->get()
                 ->map(fn (User $u) => [

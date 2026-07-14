@@ -1,20 +1,4 @@
 <div>
-    @php
-        if (!$this->task->relationLoaded('subtasks')) {
-            $this->task->load('subtasks');
-        }
-
-        $completedSubtasks   = $this->completedSubtasks ?? collect([]);
-        $pendingSubtasks     = $this->pendingSubtasks ?? collect([]);
-        $totalSubtasks       = $completedSubtasks->count() + $pendingSubtasks->count();
-        $completedCount      = $completedSubtasks->count();
-        $pendingCount        = $pendingSubtasks->count();
-        $progressPercentage  = is_numeric($this->progressPercentage) ? (float)$this->progressPercentage : 0;
-        $progressVariant     = $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default');
-        $subtaskNumbers      = $this->subtaskDisplayNumbers;
-        $subtaskMeta         = $this->subtaskMeta;
-    @endphp
-
     <x-ui.card label="Podzadania">
         <!-- Progress bar -->
         @if($totalSubtasks > 0)
@@ -91,7 +75,7 @@
 
         <!-- Lista podzadań do zrobienia -->
         @if($pendingCount > 0)
-            <div class="mb-4">
+            <div class="mb-4" wire:key="pending-section-{{ $pendingCount }}">
                 <h6 class="small fw-semibold text-muted mb-2">
                     <i class="bi bi-circle me-1"></i>Do zrobienia ({{ $pendingCount }})
                 </h6>
@@ -157,7 +141,7 @@
                                             type="checkbox"
                                             class="form-check-input flex-shrink-0"
                                             id="subtask-{{ $subtask->id }}"
-                                            wire:click="toggleSubtask({{ $subtask->id }})"
+                                            wire:click.prevent="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label" for="subtask-{{ $subtask->id }}">
                                             <span
@@ -209,7 +193,7 @@
 
         <!-- Lista wykonanych podzadań -->
         @if($completedCount > 0)
-            <div>
+            <div wire:key="completed-section-{{ $completedCount }}">
                 <h6 class="small fw-semibold text-muted mb-2">
                     <i class="bi bi-check-circle me-1"></i>Wykonane ({{ $completedCount }})
                 </h6>
@@ -276,7 +260,7 @@
                                             class="form-check-input flex-shrink-0"
                                             id="subtask-{{ $subtask->id }}"
                                             checked
-                                            wire:click="toggleSubtask({{ $subtask->id }})"
+                                            wire:click.prevent="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label text-muted" for="subtask-{{ $subtask->id }}">
                                             <span
@@ -343,7 +327,7 @@
     @script
     <script>
         function initSubtaskTooltips() {
-            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            $wire.$el.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
                 var existing = bootstrap.Tooltip.getInstance(el);
                 if (existing) existing.dispose();
                 new bootstrap.Tooltip(el, { trigger: 'hover focus' });
