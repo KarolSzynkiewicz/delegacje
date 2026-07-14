@@ -400,6 +400,14 @@
                 </template>
             </div>
 
+            {{-- Domyślny widok menu --}}
+            <button type="button"
+                    wire:click="setAsMenuDefaultView"
+                    class="btn btn-sm {{ $isMenuDefaultView ? 'btn-primary' : 'btn-outline-secondary' }}"
+                    title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
+                <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }} me-1"></i>Domyślny
+            </button>
+
             {{-- Task count --}}
             <div class="ms-auto" style="font-size:0.78rem;color:var(--text-muted,#94a3b8)">
                 @if($tasks)

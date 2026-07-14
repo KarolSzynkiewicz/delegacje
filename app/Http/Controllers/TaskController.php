@@ -7,9 +7,12 @@ use App\Http\Requests\StoreProjectTaskRequest;
 use App\Http\Requests\UpdateProjectTaskRequest;
 use App\Models\Attachment;
 use App\Models\ProjectTask;
+use App\Models\TaskGridView;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
+use App\Support\TasksGridUrlParams;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class TaskController extends Controller
@@ -21,6 +24,55 @@ class TaskController extends Controller
     {
         // Dane są pobierane przez komponent Livewire TasksTable
         return view('tasks.index');
+    }
+
+    /**
+     * Wejście z menu — przekierowanie do domyślnego widoku użytkownika.
+     */
+    public function home(): RedirectResponse
+    {
+        return redirect()->to(auth()->user()->tasksHomeUrl());
+    }
+
+    public function setDefaultView(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'view'       => ['required', 'in:cards,grid'],
+            'grid_query' => ['nullable', 'array'],
+        ]);
+
+        $user = auth()->user();
+
+        if ($validated['view'] === 'cards') {
+            $user->update([
+                'default_tasks_view'           => 'cards',
+                'default_tasks_grid_view_slug' => null,
+                'default_tasks_grid_query'     => null,
+            ]);
+
+            return back()->with('success', 'Domyślny widok zadań został zapisany.');
+        }
+
+        $query = TasksGridUrlParams::fromRequestQuery($validated['grid_query'] ?? $request->query());
+
+        $slug = isset($query['view'])
+            ? TaskGridView::query()
+                ->where('user_id', $user->id)
+                ->where('slug', $query['view'])
+                ->value('slug')
+            : null;
+
+        if ($slug === null && isset($query['view'])) {
+            unset($query['view']);
+        }
+
+        $user->update([
+            'default_tasks_view'           => 'grid',
+            'default_tasks_grid_view_slug' => $slug,
+            'default_tasks_grid_query'     => $query !== [] ? $query : null,
+        ]);
+
+        return back()->with('success', 'Domyślny widok zadań został zapisany.');
     }
 
     public function grid(): View

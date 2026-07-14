@@ -2,6 +2,7 @@
     <x-slot name="header">
         <x-ui.page-header title="Zadania">
             <x-slot name="right">
+                <x-tasks-default-view-button view="cards" />
                 <a href="{{ route('tasks.grid') }}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-grid-3x3-gap me-1"></i>Widok siatki
                 </a>

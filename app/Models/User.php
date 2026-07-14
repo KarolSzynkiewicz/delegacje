@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TasksGridUrlParams;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +29,9 @@ class User extends Authenticatable
         'password',
         'image_path',
         'employee_id',
+        'default_tasks_view',
+        'default_tasks_grid_view_slug',
+        'default_tasks_grid_query',
     ];
 
     /**
@@ -48,6 +52,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'default_tasks_grid_query' => 'array',
     ];
 
     /**
@@ -273,5 +278,70 @@ class User extends Authenticatable
         }
 
         return $initials;
+    }
+
+    /**
+     * Adres URL otwierany z pozycji menu „Zadania”.
+     */
+    public function tasksHomeUrl(): string
+    {
+        if (($this->default_tasks_view ?? 'cards') === 'grid') {
+            $query = is_array($this->default_tasks_grid_query)
+                ? TasksGridUrlParams::normalize($this->default_tasks_grid_query)
+                : [];
+
+            if ($query !== []) {
+                return route('tasks.grid', $query);
+            }
+
+            if ($this->default_tasks_grid_view_slug) {
+                $record = TaskGridView::query()
+                    ->where('user_id', $this->id)
+                    ->where('slug', $this->default_tasks_grid_view_slug)
+                    ->first();
+
+                if ($record) {
+                    return route('tasks.grid', $record->queryStringParams());
+                }
+            }
+
+            return route('tasks.grid');
+        }
+
+        return route('tasks.index');
+    }
+
+    public function usesCardsAsDefaultTasksView(): bool
+    {
+        return ($this->default_tasks_view ?? 'cards') === 'cards';
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $currentQuery
+     */
+    public function usesGridAsDefaultTasksView(?array $currentQuery = null): bool
+    {
+        if (($this->default_tasks_view ?? 'cards') !== 'grid') {
+            return false;
+        }
+
+        if ($currentQuery !== null) {
+            $stored = is_array($this->default_tasks_grid_query)
+                ? $this->default_tasks_grid_query
+                : [];
+
+            if ($stored !== []) {
+                return TasksGridUrlParams::matches($stored, $currentQuery);
+            }
+
+            $defaultSlug = $this->default_tasks_grid_view_slug ?: null;
+            $currentSlug = ($currentQuery['view'] ?? null) ?: null;
+
+            return $defaultSlug === $currentSlug;
+        }
+
+        $defaultSlug = $this->default_tasks_grid_view_slug ?: null;
+
+        return $defaultSlug === null && empty($this->default_tasks_grid_query);
     }
 }

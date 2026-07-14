@@ -200,6 +200,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
         // Tasks — tasks2 przed resource, żeby uniknąć konfliktów z tasks/{task}
         Route::group(['defaults' => ['resource' => 'tasks']], function () {
+            Route::get('tasks/home', [\App\Http\Controllers\TaskController::class, 'home'])
+                ->name('tasks.home');
+            Route::post('tasks/default-view', [\App\Http\Controllers\TaskController::class, 'setDefaultView'])
+                ->name('tasks.default-view');
             Route::get('tasks2', [\App\Http\Controllers\TaskController::class, 'grid'])
                 ->name('tasks.grid');
             Route::get('tasks/grid', [\App\Http\Controllers\TaskController::class, 'grid'])

@@ -9,5 +9,11 @@
         </x-ui.page-header>
     </x-slot>
 
+    @if(session('success'))
+        <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
+
     <livewire:tasks-grid />
 </x-app-layout>

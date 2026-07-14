@@ -14,7 +14,7 @@ return [
     ],
 
     'tasks' => [
-        'route' => 'tasks.index',
+        'route' => 'tasks.home',
         'icon' => 'bi bi-list-check',
         'label' => 'Zadania',
     ],

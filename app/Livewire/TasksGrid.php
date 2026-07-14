@@ -11,6 +11,7 @@ use App\Models\TaskSubtask;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
+use App\Support\TasksGridUrlParams;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -84,17 +85,34 @@ class TasksGrid extends Component
     // Flash messages
     public ?string $flash = null;
 
+    private bool $batchingViewPersist = false;
+
     protected $queryString = [
-        'searchTask'      => ['except' => ''],
-        'searchProject'   => ['except' => ''],
-        'searchCategory'  => ['except' => ''],
-        'searchAssignedTo' => ['except' => ''],
-        'status'          => ['except' => ''],
-        'myTasksOnly'     => ['except' => false],
-        'sortField'       => ['except' => 'created_at'],
-        'sortDirection'   => ['except' => 'desc'],
-        'groupBy'         => ['except' => ''],
-        'view'            => ['except' => ''],
+        'searchTask'       => ['except' => '', 'history' => true],
+        'searchProject'    => ['except' => '', 'history' => true],
+        'searchCategory'   => ['except' => '', 'history' => true],
+        'searchAssignedTo' => ['except' => '', 'history' => true],
+        'status'           => ['except' => '', 'history' => true],
+        'myTasksOnly'      => ['except' => false, 'history' => true],
+        'sortField'        => ['except' => 'created_at', 'history' => true],
+        'sortDirection'    => ['except' => 'desc', 'history' => true],
+        'groupBy'          => ['except' => '', 'history' => true],
+        'view'             => ['except' => '', 'history' => true],
+    ];
+
+    /** @var list<string> */
+    protected array $persistableViewProperties = [
+        'searchTask',
+        'searchProject',
+        'searchCategory',
+        'searchAssignedTo',
+        'status',
+        'myTasksOnly',
+        'groupBy',
+        'sortField',
+        'sortDirection',
+        'visibleColumns',
+        'columnWidths',
     ];
 
     public function mount(): void
@@ -123,13 +141,23 @@ class TasksGrid extends Component
 
     public function updating(string $name, mixed $value): void
     {
-        if (in_array($name, ['searchTask', 'searchProject', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly'])) {
+        if (in_array($name, ['searchTask', 'searchProject', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly'], true)) {
             $this->resetPage();
         }
     }
 
+    public function updated(string $property): void
+    {
+        if ($this->batchingViewPersist || ! in_array($property, $this->persistableViewProperties, true)) {
+            return;
+        }
+
+        $this->persistActiveView();
+    }
+
     public function clearFilters(): void
     {
+        $this->batchingViewPersist = true;
         $this->searchTask = '';
         $this->searchProject = '';
         $this->searchCategory = '';
@@ -139,7 +167,9 @@ class TasksGrid extends Component
         $this->sortField = 'created_at';
         $this->sortDirection = 'desc';
         $this->groupBy = '';
+        $this->batchingViewPersist = false;
         $this->resetPage();
+        $this->persistActiveView();
     }
 
     public function sortBy(string $field): void
@@ -151,14 +181,12 @@ class TasksGrid extends Component
             $this->sortDirection = 'asc';
         }
         $this->resetPage();
-        $this->persistActiveView();
     }
 
     public function setGroupBy(string $field): void
     {
         $this->groupBy = $this->groupBy === $field ? '' : $field;
         $this->resetPage();
-        $this->persistActiveView();
     }
 
     public function toggleColumn(string $key): void
@@ -173,8 +201,6 @@ class TasksGrid extends Component
         } else {
             $this->visibleColumns[] = $key;
         }
-
-        $this->persistActiveView();
     }
 
     public function toggleExpand(int $taskId): void
@@ -412,6 +438,54 @@ class TasksGrid extends Component
         $this->flash = 'Widok domyślny.';
     }
 
+    public function setAsMenuDefaultView(): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        $query = $this->currentQueryParams();
+
+        if (isset($query['view'])) {
+            $validSlug = TaskGridView::query()
+                ->where('user_id', $user->id)
+                ->where('slug', $query['view'])
+                ->exists();
+
+            if (! $validSlug) {
+                unset($query['view']);
+            }
+        }
+
+        $user->update([
+            'default_tasks_view'           => 'grid',
+            'default_tasks_grid_view_slug' => $query['view'] ?? null,
+            'default_tasks_grid_query'     => $query !== [] ? $query : null,
+        ]);
+
+        $this->flash = 'Domyślny widok z menu zapisany (wraz z filtrami).';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function currentQueryParams(): array
+    {
+        return TasksGridUrlParams::normalize([
+            'view'             => $this->view,
+            'searchTask'       => $this->searchTask,
+            'searchProject'    => $this->searchProject,
+            'searchCategory'   => $this->searchCategory,
+            'searchAssignedTo' => $this->searchAssignedTo,
+            'status'           => $this->status,
+            'myTasksOnly'      => $this->myTasksOnly,
+            'groupBy'          => $this->groupBy,
+            'sortField'        => $this->sortField,
+            'sortDirection'    => $this->sortDirection,
+        ]);
+    }
+
     protected function gridViewsTableExists(): bool
     {
         return Schema::hasTable('task_grid_views');
@@ -443,22 +517,36 @@ class TasksGrid extends Component
 
     protected function applyViewRecord(TaskGridView $record): void
     {
-        $this->visibleColumns = $record->visible_columns ?: $this->visibleColumns;
-        $this->columnWidths   = $record->column_widths ?? [];
-        $this->groupBy        = $record->group_by ?? '';
-        $this->sortField      = $record->sort_field ?: 'created_at';
-        $this->sortDirection  = $record->sort_direction ?: 'desc';
+        $this->batchingViewPersist = true;
+        $this->visibleColumns   = $record->visible_columns ?: $this->visibleColumns;
+        $this->columnWidths     = $record->column_widths ?? [];
+        $this->groupBy          = $record->group_by ?? '';
+        $this->sortField        = $record->sort_field ?: 'created_at';
+        $this->sortDirection    = $record->sort_direction ?: 'desc';
+        $this->searchTask       = $record->search_task ?? '';
+        $this->searchProject    = $record->search_project ?? '';
+        $this->searchCategory   = $record->search_category ?? '';
+        $this->searchAssignedTo = $record->search_assigned_to ?? '';
+        $this->status           = $record->status ?? '';
+        $this->myTasksOnly      = (bool) ($record->my_tasks_only ?? false);
+        $this->batchingViewPersist = false;
         $this->resetPage();
     }
 
     protected function viewPayload(): array
     {
         return [
-            'visible_columns' => $this->visibleColumns,
-            'column_widths'   => $this->columnWidths,
-            'group_by'        => $this->groupBy,
-            'sort_field'      => $this->sortField,
-            'sort_direction'  => $this->sortDirection,
+            'visible_columns'    => $this->visibleColumns,
+            'column_widths'      => $this->columnWidths,
+            'group_by'           => $this->groupBy,
+            'sort_field'         => $this->sortField,
+            'sort_direction'     => $this->sortDirection,
+            'search_task'        => $this->searchTask,
+            'search_project'     => $this->searchProject,
+            'search_category'    => $this->searchCategory,
+            'search_assigned_to' => $this->searchAssignedTo,
+            'status'             => $this->status,
+            'my_tasks_only'      => $this->myTasksOnly,
         ];
     }
 
@@ -671,13 +759,11 @@ class TasksGrid extends Component
         array_splice($order, $fromIdx, 1);
         array_splice($order, $toIdx,   0, [$from]);
         $this->visibleColumns = array_values($order);
-        $this->persistActiveView();
     }
 
     public function setColumnWidth(string $col, int $width): void
     {
         $this->columnWidths[$col] = max(50, min(1200, $width));
-        $this->persistActiveView();
     }
 
     public function paginationView(): string
@@ -778,6 +864,7 @@ class TasksGrid extends Component
             'activeViewName'   => $this->view !== ''
                 ? (collect($savedViews)->firstWhere('slug', $this->view)?->name ?? $this->view)
                 : null,
+            'isMenuDefaultView' => auth()->user()?->usesGridAsDefaultTasksView($this->currentQueryParams()) ?? false,
         ]);
     }
 }
