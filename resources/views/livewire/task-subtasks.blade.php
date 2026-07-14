@@ -141,7 +141,7 @@
                                             type="checkbox"
                                             class="form-check-input flex-shrink-0"
                                             id="subtask-{{ $subtask->id }}"
-                                            wire:click.prevent="toggleSubtask({{ $subtask->id }})"
+                                            wire:click="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label" for="subtask-{{ $subtask->id }}">
                                             <span
@@ -260,7 +260,7 @@
                                             class="form-check-input flex-shrink-0"
                                             id="subtask-{{ $subtask->id }}"
                                             checked
-                                            wire:click.prevent="toggleSubtask({{ $subtask->id }})"
+                                            wire:click="toggleSubtask({{ $subtask->id }})"
                                         >
                                         <label class="form-check-label text-muted" for="subtask-{{ $subtask->id }}">
                                             <span

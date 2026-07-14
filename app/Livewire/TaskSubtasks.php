@@ -148,7 +148,8 @@ class TaskSubtasks extends Component
 
     private function refreshTask(): void
     {
-        $this->task = ProjectTask::with('subtasks')->findOrFail($this->task->id);
+        // Resetuj tylko id — Livewire bezpiecznie dehydratuje prosty model bez relacji
+        $this->task = ProjectTask::findOrFail($this->task->id);
     }
 
     /**
@@ -198,17 +199,25 @@ class TaskSubtasks extends Component
 
     public function render()
     {
-        $task = ProjectTask::with('subtasks')->findOrFail($this->task->id);
-        $this->task = $task;
+        // Pobieramy świeże podzadania z bazy bez mutowania $this->task
+        // (mutacja publicznej właściwości Eloquent w render() miesza Livewire)
+        $subtasks = TaskSubtask::where('task_id', $this->task->id)
+            ->orderBy('created_at')
+            ->get();
 
-        $subtasks = $task->subtasks;
-        $pendingSubtasks = $subtasks->where('is_completed', false)->sortBy('created_at')->values();
+        $pendingSubtasks   = $subtasks->where('is_completed', false)->sortBy('created_at')->values();
         $completedSubtasks = $subtasks->where('is_completed', true)->sortByDesc('completed_at')->values();
-        $totalSubtasks = $subtasks->count();
-        $completedCount = $completedSubtasks->count();
+        $totalSubtasks     = $subtasks->count();
+        $completedCount    = $completedSubtasks->count();
         $progressPercentage = $totalSubtasks > 0
             ? round(($completedCount / $totalSubtasks) * 100, 2)
             : 0.0;
+
+        // Numeracja podzadań według daty dodania
+        $subtaskNumbers = [];
+        foreach ($subtasks->sortBy(['created_at', 'id'])->values() as $i => $st) {
+            $subtaskNumbers[$st->id] = $i + 1;
+        }
 
         return view('livewire.task-subtasks', [
             'pendingSubtasks'             => $pendingSubtasks,
@@ -218,7 +227,7 @@ class TaskSubtasks extends Component
             'pendingCount'                => $pendingSubtasks->count(),
             'progressPercentage'          => $progressPercentage,
             'progressVariant'             => $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default'),
-            'subtaskNumbers'              => $task->subtaskDisplayNumbers(),
+            'subtaskNumbers'              => $subtaskNumbers,
             'subtaskMeta'                 => $this->buildSubtaskMeta($subtasks),
             'mentionUsersForAutocomplete' => User::orderBy('name')
                 ->get()
