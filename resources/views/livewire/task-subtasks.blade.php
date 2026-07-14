@@ -158,8 +158,6 @@
                                             <span
                                                 class="text-muted ms-1 flex-shrink-0"
                                                 style="cursor:help;font-size:.75rem;line-height:1;"
-                                                data-bs-toggle="tooltip"
-                                                data-bs-placement="top"
                                                 title="{{ implode('&#10;', $tipLines) }}"
                                             ><i class="bi bi-info-circle"></i></span>
                                         @endif
@@ -282,8 +280,6 @@
                                             <span
                                                 class="text-muted ms-1 flex-shrink-0"
                                                 style="cursor:help;font-size:.75rem;line-height:1;"
-                                                data-bs-toggle="tooltip"
-                                                data-bs-placement="top"
                                                 title="{{ implode('&#10;', $tipLines) }}"
                                             ><i class="bi bi-info-circle"></i></span>
                                         @endif
@@ -324,18 +320,4 @@
         @endif
     </x-ui.card>
 
-    @script
-    <script>
-        function initSubtaskTooltips() {
-            $wire.$el.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-                var existing = bootstrap.Tooltip.getInstance(el);
-                if (existing) existing.dispose();
-                new bootstrap.Tooltip(el, { trigger: 'hover focus' });
-            });
-        }
-
-        $wire.hook('morph.updated', () => initSubtaskTooltips());
-        initSubtaskTooltips();
-    </script>
-    @endscript
 </div>
