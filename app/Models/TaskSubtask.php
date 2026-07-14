@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 
 class TaskSubtask extends Model
@@ -16,6 +17,7 @@ class TaskSubtask extends Model
         'name',
         'is_completed',
         'completed_at',
+        'created_by',
     ];
 
     protected $casts = [
@@ -23,33 +25,31 @@ class TaskSubtask extends Model
         'completed_at' => 'datetime',
     ];
 
-    /**
-     * Get the task that owns this subtask.
-     */
     public function task(): BelongsTo
     {
         return $this->belongsTo(ProjectTask::class, 'task_id');
     }
 
-    /**
-     * Scope a query to only include completed subtasks.
-     */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(TaskSubtaskEvent::class, 'subtask_id')->orderBy('created_at');
+    }
+
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('is_completed', true);
     }
 
-    /**
-     * Scope a query to only include pending subtasks.
-     */
     public function scopePending(Builder $query): Builder
     {
         return $query->where('is_completed', false);
     }
 
-    /**
-     * Mark subtask as completed.
-     */
     public function markCompleted(): void
     {
         $this->update([
@@ -58,9 +58,6 @@ class TaskSubtask extends Model
         ]);
     }
 
-    /**
-     * Mark subtask as incomplete.
-     */
     public function markIncomplete(): void
     {
         $this->update([
