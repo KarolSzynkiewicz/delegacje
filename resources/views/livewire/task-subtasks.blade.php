@@ -166,20 +166,17 @@
                                             >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                             {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
                                         </label>
-                                        @if(!empty($meta['created_by']) || !empty($meta['completed_by']))
+                                        @if(!empty($meta['created_by']))
                                             @php
                                                 $tipLines = [];
-                                                if (!empty($meta['created_by'])) {
-                                                    $tipLines[] = '<i class=\'bi bi-plus-circle me-1\'></i><strong>Dodał:</strong> ' . e($meta['created_by']) . ($meta['created_at'] ? ' · ' . $meta['created_at'] : '');
-                                                }
+                                                $tipLines[] = 'Dodał: ' . ($meta['created_by'] ?? '') . ($meta['created_at'] ? ' · ' . $meta['created_at'] : '');
                                             @endphp
                                             <span
                                                 class="text-muted ms-1 flex-shrink-0"
                                                 style="cursor:help;font-size:.75rem;line-height:1;"
                                                 data-bs-toggle="tooltip"
-                                                data-bs-html="true"
                                                 data-bs-placement="top"
-                                                title="{{ implode('<br>', $tipLines) }}"
+                                                title="{{ implode('&#10;', $tipLines) }}"
                                             ><i class="bi bi-info-circle"></i></span>
                                         @endif
                                     </div>
@@ -292,19 +289,18 @@
                                             @php
                                                 $tipLines = [];
                                                 if (!empty($meta['created_by'])) {
-                                                    $tipLines[] = '<i class=\'bi bi-plus-circle me-1\'></i><strong>Dodał:</strong> ' . e($meta['created_by']) . ($meta['created_at'] ? ' · ' . $meta['created_at'] : '');
+                                                    $tipLines[] = 'Dodał: ' . ($meta['created_by'] ?? '') . ($meta['created_at'] ? ' · ' . $meta['created_at'] : '');
                                                 }
                                                 if (!empty($meta['completed_by'])) {
-                                                    $tipLines[] = '<i class=\'bi bi-check-circle me-1\'></i><strong>Zamknął:</strong> ' . e($meta['completed_by']) . ($meta['completed_at'] ? ' · ' . $meta['completed_at'] : '');
+                                                    $tipLines[] = 'Zamknął: ' . ($meta['completed_by'] ?? '') . ($meta['completed_at'] ? ' · ' . $meta['completed_at'] : '');
                                                 }
                                             @endphp
                                             <span
                                                 class="text-muted ms-1 flex-shrink-0"
                                                 style="cursor:help;font-size:.75rem;line-height:1;"
                                                 data-bs-toggle="tooltip"
-                                                data-bs-html="true"
                                                 data-bs-placement="top"
-                                                title="{{ implode('<br>', $tipLines) }}"
+                                                title="{{ implode('&#10;', $tipLines) }}"
                                             ><i class="bi bi-info-circle"></i></span>
                                         @endif
                                     </div>
@@ -344,22 +340,18 @@
         @endif
     </x-ui.card>
 
-    @push('scripts')
+    @script
     <script>
-        (function initSubtaskTooltips() {
-            function init() {
-                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-                    if (el._bsTooltip) return;
-                    el._bsTooltip = new bootstrap.Tooltip(el, { trigger: 'hover focus' });
-                });
-            }
+        function initSubtaskTooltips() {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                var existing = bootstrap.Tooltip.getInstance(el);
+                if (existing) existing.dispose();
+                new bootstrap.Tooltip(el, { trigger: 'hover focus' });
+            });
+        }
 
-            // Pierwsza inicjalizacja
-            document.addEventListener('DOMContentLoaded', init);
-
-            // Po każdej aktualizacji Livewire (morph) reinicjalizuj tooltips
-            document.addEventListener('livewire:update', init);
-        })();
+        $wire.hook('morph.updated', () => initSubtaskTooltips());
+        initSubtaskTooltips();
     </script>
-    @endpush
+    @endscript
 </div>
