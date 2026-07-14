@@ -113,6 +113,34 @@ body {
     max-width: 10rem;
 }
 
+/* Weekly overview: sortable column headers */
+.weekly-overview-assigned-table th.wo-sortable {
+    padding: 0;
+}
+
+.weekly-overview-assigned-table .wo-sort-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.weekly-overview-assigned-table .wo-sort-btn:hover {
+    color: var(--text-main, #f1f5f9);
+}
+
+.weekly-overview-assigned-table .wo-sort-icon {
+    font-size: 0.85rem;
+}
+
 /* Weekly overview: demand donut — no extra classes needed, inline styles used */
 
 /* Dashboard styles */

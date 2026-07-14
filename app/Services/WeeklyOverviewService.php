@@ -719,7 +719,9 @@ class WeeklyOverviewService
                 'date_range' => $dateRangeText,
                 'rotation' => $rotationInfo,
             ];
-        })->filter(); // Remove nulls
+        })->filter() // Remove nulls
+            ->sortBy(fn ($item) => mb_strtolower($item['employee']->last_name.' '.$item['employee']->first_name))
+            ->values();
     }
 
     /**

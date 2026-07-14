@@ -706,12 +706,42 @@
                             <table class="table align-middle weekly-overview-assigned-table">
                                 <thead>
                                     <tr>
-                                        <th>Pracownik</th>
-                                        <th>Rola w projekcie</th>
-                                        <th>Pokrycie</th>
-                                        <th>Auto</th>
-                                        <th>Dom</th>
-                                        <th>Do rotacji</th>
+                                        <th class="wo-sortable" data-sort-dir="asc">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Pracownik</span>
+                                                <i class="bi bi-chevron-up wo-sort-icon"></i>
+                                            </button>
+                                        </th>
+                                        <th class="wo-sortable">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Rola w projekcie</span>
+                                                <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
+                                            </button>
+                                        </th>
+                                        <th class="wo-sortable">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Pokrycie</span>
+                                                <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
+                                            </button>
+                                        </th>
+                                        <th class="wo-sortable">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Auto</span>
+                                                <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
+                                            </button>
+                                        </th>
+                                        <th class="wo-sortable">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Dom</span>
+                                                <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
+                                            </button>
+                                        </th>
+                                        <th class="wo-sortable">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Do rotacji</span>
+                                                <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
+                                            </button>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -721,10 +751,10 @@
                                             $isFullWeek = ($dateRange === 'cały tydzień' || $dateRange === 'pon-nie');
                                         @endphp
                                         <tr>
-                                            <td>
+                                            <td data-sort-value="{{ mb_strtolower($employeeData['employee']->last_name.' '.$employeeData['employee']->first_name) }}">
                                                 <x-employee-cell :employee="$employeeData['employee']"  />
                                             </td>
-                                            <td>
+                                            <td data-sort-value="{{ mb_strtolower($employeeData['role']->name ?? '') }}">
                                                 @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
                                                     <x-ui.badge variant="warning" title="Rola zmienia się w trakcie tygodnia">
                                                         <i class="bi bi-arrow-left-right"></i> Zmienna
@@ -748,10 +778,10 @@
                                                     <x-ui.badge variant="info" title="{{ $roleName }}" class="wo-cell-truncate">{{ $roleDisplay }}</x-ui.badge>
                                                 @endif
                                             </td>
-                                            <td class="text-center {{ !$isFullWeek ? 'bg-danger bg-opacity-25' : '' }}">
+                                            <td class="text-center {{ !$isFullWeek ? 'bg-danger bg-opacity-25' : '' }}" data-sort-value="{{ $isFullWeek ? 1 : 0 }}">
                                                 <span class="fw-semibold small">{{ $dateRange }}</span>
                                             </td>
-                                            <td>
+                                            <td data-sort-value="{{ mb_strtolower($employeeData['vehicle']->registration_number ?? '') }}">
                                                 @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
                                                     <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
                                                         <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
@@ -766,7 +796,7 @@
                                                     </x-ui.clickable-badge>
                                                 @endif
                                             </td>
-                                            <td>
+                                            <td data-sort-value="{{ mb_strtolower($employeeData['accommodation']->name ?? '') }}">
                                                 @if(isset($employeeData['accommodation']) && $employeeData['accommodation'])
                                                     @php
                                                         $accommodationName = $employeeData['accommodation']->name;
@@ -781,7 +811,7 @@
                                                     </x-ui.clickable-badge>
                                                 @endif
                                             </td>
-                                            <td>
+                                            <td data-sort-value="{{ $employeeData['rotation']['days_left'] ?? 999999 }}">
                                                 @if(isset($employeeData['rotation']) && $employeeData['rotation'])
                                                     @php
                                                         $rotation = $employeeData['rotation']['rotation'] ?? null;
@@ -981,6 +1011,77 @@
                 });
 
                 loadChartJs().then(initDemandCharts);
+            });
+        })();
+    </script>
+
+    <script>
+        (function () {
+            function getSortValue(cell) {
+                if (cell.dataset && 'sortValue' in cell.dataset) {
+                    return cell.dataset.sortValue;
+                }
+                return (cell.textContent || '').trim();
+            }
+
+            function compareValues(a, b) {
+                var na = parseFloat(String(a).replace(',', '.'));
+                var nb = parseFloat(String(b).replace(',', '.'));
+                var numericPattern = /^-?\d+([.,]\d+)?$/;
+                var bothNumeric = a !== '' && b !== '' && numericPattern.test(a) && numericPattern.test(b) && !isNaN(na) && !isNaN(nb);
+                if (bothNumeric) {
+                    return na - nb;
+                }
+                return String(a).localeCompare(String(b), 'pl', { sensitivity: 'base' });
+            }
+
+            function updateIcons(table, activeTh, direction) {
+                table.querySelectorAll('th.wo-sortable').forEach(function (th) {
+                    th.removeAttribute('data-sort-dir');
+                    var icon = th.querySelector('.wo-sort-icon');
+                    if (icon) {
+                        icon.className = 'bi bi-chevron-expand wo-sort-icon text-muted';
+                    }
+                });
+
+                activeTh.setAttribute('data-sort-dir', direction);
+                var activeIcon = activeTh.querySelector('.wo-sort-icon');
+                if (activeIcon) {
+                    activeIcon.className = direction === 'asc'
+                        ? 'bi bi-chevron-up wo-sort-icon'
+                        : 'bi bi-chevron-down wo-sort-icon';
+                }
+            }
+
+            function sortTable(table, colIndex, direction) {
+                var tbody = table.tBodies[0];
+                if (!tbody) return;
+
+                var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'))
+                    .filter(function (tr) { return tr.cells.length > colIndex; });
+
+                rows.sort(function (r1, r2) {
+                    var v1 = getSortValue(r1.cells[colIndex]);
+                    var v2 = getSortValue(r2.cells[colIndex]);
+                    var cmp = compareValues(v1, v2);
+                    return direction === 'asc' ? cmp : -cmp;
+                });
+
+                rows.forEach(function (row) { tbody.appendChild(row); });
+            }
+
+            document.addEventListener('click', function (e) {
+                var th = e.target.closest('th.wo-sortable');
+                if (!th) return;
+
+                var table = th.closest('table');
+                if (!table) return;
+
+                var colIndex = Array.prototype.indexOf.call(th.parentElement.children, th);
+                var nextDir = th.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+
+                sortTable(table, colIndex, nextDir);
+                updateIcons(table, th, nextDir);
             });
         })();
     </script>

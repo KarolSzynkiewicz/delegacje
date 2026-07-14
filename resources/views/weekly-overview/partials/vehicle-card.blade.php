@@ -17,7 +17,7 @@
     }
 @endphp
 
-<div class="col-12 col-md-6 col-lg-4">
+<div class="col-12 col-md-6 col-lg-3">
     <div class="h-100 d-flex flex-column" style="border-radius: 12px; overflow: hidden; border: 1px solid var(--glass-border, rgba(255,255,255,0.1)); background: var(--bg-card, #1e293b);">
 
         {{-- Baner ze zdjęciem --}}
