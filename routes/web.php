@@ -198,6 +198,32 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('projects/{project}/files/{file}/download', [\App\Http\Controllers\ProjectFileController::class, 'download'])
             ->name('projects.files.download');
 
+        // Procedures (SOP)
+        Route::group(['defaults' => ['resource' => 'procedure-templates']], function () {
+            Route::resource('procedure-templates', \App\Http\Controllers\ProcedureTemplateController::class)
+                ->except(['create', 'show']);
+            Route::get('procedure-templates/{procedureTemplate}/editor',
+                [\App\Http\Controllers\ProcedureTemplateController::class, 'editor'])
+                ->name('procedure-templates.editor');
+        });
+        Route::group(['defaults' => ['resource' => 'procedure-runs']], function () {
+            Route::post('procedure-templates/{procedureTemplate}/runs',
+                [\App\Http\Controllers\ProcedureRunController::class, 'store'])
+                ->name('procedure-runs.store');
+            Route::post('procedure-runs/{procedureRun}/advance',
+                [\App\Http\Controllers\ProcedureRunController::class, 'advance'])
+                ->name('procedure-runs.advance');
+            Route::post('procedure-runs/{procedureRun}/back',
+                [\App\Http\Controllers\ProcedureRunController::class, 'back'])
+                ->name('procedure-runs.back');
+            Route::post('procedure-runs/{procedureRun}/abandon',
+                [\App\Http\Controllers\ProcedureRunController::class, 'abandon'])
+                ->name('procedure-runs.abandon');
+            Route::post('procedure-runs/{procedureRun}/comments',
+                [\App\Http\Controllers\ProcedureRunController::class, 'storeComment'])
+                ->name('procedure-runs.comments.store');
+        });
+
         // Tasks — tasks2 przed resource, żeby uniknąć konfliktów z tasks/{task}
         Route::group(['defaults' => ['resource' => 'tasks']], function () {
             Route::get('tasks/home', [\App\Http\Controllers\TaskController::class, 'home'])

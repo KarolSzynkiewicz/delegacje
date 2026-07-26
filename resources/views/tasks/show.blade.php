@@ -135,6 +135,12 @@
                 </x-ui.detail-list>
             </x-ui.card>
 
+            @if($task->procedureRun)
+                <div class="mt-4">
+                    <livewire:procedure-run-stepper :run="$task->procedureRun" wire:key="stepper-{{ $task->procedureRun->id }}" />
+                </div>
+            @endif
+
             <div class="mt-4">
                 <livewire:task-subtasks :task="$task" />
             </div>

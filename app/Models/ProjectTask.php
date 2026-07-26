@@ -33,6 +33,7 @@ class ProjectTask extends Model
         'due_date',
         'completed_at',
         'created_by',
+        'procedure_run_id',
     ];
 
     protected $casts = [
@@ -47,6 +48,14 @@ class ProjectTask extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Get the procedure run linked to this task (if any).
+     */
+    public function procedureRun(): BelongsTo
+    {
+        return $this->belongsTo(ProcedureRun::class, 'procedure_run_id');
     }
 
     /**

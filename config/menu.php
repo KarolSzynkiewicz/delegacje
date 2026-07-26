@@ -3,6 +3,7 @@
 return [
     'weekly_overview',
     'tasks',
+    'procedures',
 
     [
         'label' => 'Mój zespół',

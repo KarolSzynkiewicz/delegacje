@@ -19,6 +19,12 @@ return [
         'label' => 'Zadania',
     ],
 
+    'procedures' => [
+        'route' => 'procedure-templates.index',
+        'icon'  => 'bi bi-diagram-3',
+        'label' => 'Procedury',
+    ],
+
     'projects' => [
         'route' => 'projects.index',
         'icon' => 'bi bi-folder',

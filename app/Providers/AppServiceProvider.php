@@ -7,10 +7,12 @@ use App\Models\Adjustment;
 use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
+use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
 use App\Models\TransportCost;
 use App\Models\VehicleAssignment;
 use App\Observers\AuditableModelObserver;
+use App\Observers\ProcedureTemplateObserver;
 use App\Services\SystemBootstrapService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
@@ -57,6 +59,8 @@ class AppServiceProvider extends ServiceProvider
         TransportCost::observe(AuditableModelObserver::class);
         Adjustment::observe(AuditableModelObserver::class);
         LogisticsEventParticipant::observe(AuditableModelObserver::class);
+
+        ProcedureTemplate::observe(ProcedureTemplateObserver::class);
 
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,
