@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RecruitmentRejectionReason;
+use App\Enums\RecruitmentStatus;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Models\Employee;
-use App\Models\RecruitmentApplication;
+use App\Models\RecruitmentProcess;
 use App\Models\Role;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class RecruitmentApplicationController extends Controller
+class RecruitmentProcessController extends Controller
 {
     use HandlesImageUpload;
 
@@ -19,36 +21,40 @@ class RecruitmentApplicationController extends Controller
         return view('recruitment.index');
     }
 
-    public function show(RecruitmentApplication $recruitmentApplication): View
+    public function show(RecruitmentProcess $recruitmentProcess): View
     {
-        $recruitmentApplication->load('employee');
+        $recruitmentProcess->load(['candidate.consents', 'candidate.roles', 'lead', 'employee', 'contactAttempts.user', 'statusHistory.changedBy']);
 
         $roles = Role::orderBy('name')->get();
 
         return view('recruitment.show', [
-            'application' => $recruitmentApplication,
+            'application' => $recruitmentProcess,
             'roles'       => $roles,
         ]);
     }
 
-    public function updateStatus(Request $request, RecruitmentApplication $recruitmentApplication): RedirectResponse
+    public function updateStatus(Request $request, RecruitmentProcess $recruitmentProcess): RedirectResponse
     {
         $request->validate([
-            'status'      => 'required|in:pending,reviewing,accepted,rejected,converted',
+            'status'      => 'required|in:'.implode(',', array_column(RecruitmentStatus::cases(), 'value')),
             'admin_notes' => 'nullable|string|max:2000',
+            'rejection_reason' => ['nullable', 'in:'.implode(',', array_column(RecruitmentRejectionReason::cases(), 'value'))],
         ]);
 
-        $recruitmentApplication->update([
-            'status'      => $request->status,
-            'admin_notes' => $request->admin_notes,
-        ]);
+        $recruitmentProcess->update(['admin_notes' => $request->admin_notes]);
+
+        $recruitmentProcess->transitionTo(
+            RecruitmentStatus::from($request->string('status')->value()),
+            auth()->id(),
+            $request->filled('rejection_reason') ? RecruitmentRejectionReason::from($request->string('rejection_reason')->value()) : null
+        );
 
         return back()->with('success', 'Status kandydatury został zaktualizowany.');
     }
 
-    public function convert(Request $request, RecruitmentApplication $recruitmentApplication): RedirectResponse
+    public function convert(Request $request, RecruitmentProcess $recruitmentProcess): RedirectResponse
     {
-        if ($recruitmentApplication->status === 'converted') {
+        if ($recruitmentProcess->employee_id) {
             return back()->with('error', 'Ta kandydatura została już zatrudniona.');
         }
 
@@ -61,10 +67,12 @@ class RecruitmentApplicationController extends Controller
             'roles.*.exists' => 'Wybrana rola nie istnieje.',
         ]);
 
+        $candidate = $recruitmentProcess->candidate;
+
         $imagePath = null;
-        if ($recruitmentApplication->photo_path) {
+        if ($candidate->photo_path) {
             // Przenieś zdjęcie z folderu rekrutacji do folderu pracowników
-            $oldPath = $recruitmentApplication->photo_path;
+            $oldPath = $candidate->photo_path;
             $filename = basename($oldPath);
             $newPath = 'employees/'.$filename;
 
@@ -76,20 +84,18 @@ class RecruitmentApplicationController extends Controller
         }
 
         $employee = Employee::create([
-            'first_name' => $recruitmentApplication->first_name,
-            'last_name'  => $recruitmentApplication->last_name,
-            'email'      => $recruitmentApplication->email,
-            'phone'      => $recruitmentApplication->phone,
-            'notes'      => $recruitmentApplication->cover_letter,
+            'first_name' => $candidate->first_name,
+            'last_name'  => $candidate->last_name,
+            'email'      => $candidate->email,
+            'phone'      => $candidate->phone,
+            'notes'      => null,
             'image_path' => $imagePath,
         ]);
 
         $employee->roles()->attach($request->roles);
 
-        $recruitmentApplication->update([
-            'status'      => 'converted',
-            'employee_id' => $employee->id,
-        ]);
+        $recruitmentProcess->transitionTo(RecruitmentStatus::Zatrudniony, auth()->id());
+        $recruitmentProcess->update(['employee_id' => $employee->id]);
 
         return redirect()
             ->route('employees.show', $employee)

@@ -1,7 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 mb-0">Kandydatury rekrutacyjne</h2>
+        <x-ui.page-header title="Kandydatury rekrutacyjne">
+            <x-slot name="right">
+                <x-ui.button
+                    variant="primary"
+                    href="{{ route('recruitment.apply') }}"
+                    routeName="recruitment-processes.index"
+                    action="create"
+                >
+                    Dodaj kandydata
+                </x-ui.button>
+            </x-slot>
+        </x-ui.page-header>
     </x-slot>
 
-    <livewire:recruitment-applications-table />
+    <livewire:recruitment-processes-table />
 </x-app-layout>

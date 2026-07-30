@@ -2543,6 +2543,355 @@ html .text-muted,
 }
 
 /* ============================================
+   Offcanvas - Dark Theme Override
+   Bootstrap bakes --bs-offcanvas-bg: #fff at component level,
+   so we have to override it here.
+   ============================================ */
+.offcanvas {
+    --bs-offcanvas-bg: var(--bg-card) !important;
+    --bs-offcanvas-color: var(--text-main) !important;
+    background-color: var(--bg-card) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--glass-border) !important;
+    color: var(--text-main) !important;
+}
+.offcanvas-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    color: var(--text-main) !important;
+}
+.offcanvas-title {
+    color: var(--text-main) !important;
+    font-weight: 600;
+}
+.offcanvas-body {
+    background: transparent !important;
+    color: var(--text-main) !important;
+}
+.offcanvas-backdrop {
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* Recruitment pipeline — drawer section separators */
+.rp-section {
+    padding: 1rem 0;
+    border-top: 1px solid var(--glass-border);
+}
+.rp-section:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+.rp-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+/* Compact form-check for inline role lists */
+.form-check-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    background: transparent !important;
+    border: none !important;
+    margin-bottom: 0 !important;
+}
+.form-check-compact input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--bg-input);
+    border: 1.5px solid var(--glass-border);
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.2s;
+}
+.form-check-compact input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    border-color: var(--primary);
+}
+.form-check-compact input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.form-check-compact label {
+    color: var(--text-main);
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin: 0;
+    font-weight: 400;
+}
+/* Table row active state for dark theme */
+.table tbody tr.rp-row-selected td {
+    background: rgba(59, 130, 246, 0.1) !important;
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+/* Sortable column header buttons */
+.rp-sort-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text-muted);
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.rp-sort-btn:hover {
+    color: var(--text-main);
+}
+/* ──────────────────────────────────────────────────────
+   RECRUITMENT PIPELINE MODAL
+────────────────────────────────────────────────────── */
+.rp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.rp-modal-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 1045;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: .75rem;
+    pointer-events: none;
+}
+.rp-modal {
+    width: 100%;
+    max-width: 1440px;
+    height: calc(100vh - 1.5rem);
+    max-height: 920px;
+    background: rgba(15, 23, 42, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+    pointer-events: auto;
+}
+/* Top bar */
+.rp-modal-topbar {
+    display: flex;
+    align-items: center;
+    padding: .6rem 1rem;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.02);
+    flex-shrink: 0;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+/* Three-column body */
+.rp-modal-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+/* Left: candidate list */
+.rp-modal-left {
+    width: 270px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--glass-border);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--glass-border) transparent;
+}
+.rp-modal-left::-webkit-scrollbar { width: 4px; }
+.rp-modal-left::-webkit-scrollbar-track { background: transparent; }
+.rp-modal-left::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 9999px; }
+/* Center: details */
+.rp-modal-center {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    border-right: 1px solid var(--glass-border);
+    scrollbar-width: thin;
+    scrollbar-color: var(--glass-border) transparent;
+}
+.rp-modal-center::-webkit-scrollbar { width: 4px; }
+.rp-modal-center::-webkit-scrollbar-track { background: transparent; }
+.rp-modal-center::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 9999px; }
+/* Right: history */
+.rp-modal-right {
+    width: 320px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 1.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--glass-border) transparent;
+}
+.rp-modal-right::-webkit-scrollbar { width: 4px; }
+.rp-modal-right::-webkit-scrollbar-track { background: transparent; }
+.rp-modal-right::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 9999px; }
+/* ── Experience picker ──────────────────────────────── */
+.rp-exp-picker {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+.rp-exp-btn {
+    flex: 1 1 60px;
+    padding: .35rem .6rem;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.45);
+    font-size: .78rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: all .15s;
+    white-space: nowrap;
+}
+.rp-exp-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(59,130,246,.08);
+}
+.rp-exp-btn.rp-exp-active {
+    border-color: var(--primary);
+    background: rgba(59,130,246,.2);
+    color: #93c5fd;
+    font-weight: 700;
+}
+
+/* ── Pipeline status component ──────────────────────── */
+.rp-pipeline {
+    display: flex;
+    align-items: flex-start;
+    margin: .25rem 0 1rem;
+    position: relative;
+}
+.rp-pipeline-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+}
+.rp-pipeline-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.05);
+    transition: all .2s;
+    flex-shrink: 0;
+    position: relative;
+}
+.rp-pipeline-step:hover .rp-pipeline-dot {
+    border-color: var(--primary);
+    background: rgba(59,130,246,.15);
+    transform: scale(1.15);
+}
+.rp-pipeline-step.rp-done .rp-pipeline-dot {
+    background: var(--success);
+    border-color: var(--success);
+}
+.rp-pipeline-step.rp-active .rp-pipeline-dot {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 5px rgba(59,130,246,.25);
+    transform: scale(1.35);
+}
+.rp-pipeline-step.rp-active:hover .rp-pipeline-dot {
+    transform: scale(1.4);
+}
+.rp-pipeline-label {
+    font-size: .62rem;
+    margin-top: .4rem;
+    color: rgba(255,255,255,.3);
+    text-align: center;
+    line-height: 1.3;
+    max-width: 60px;
+    transition: color .15s;
+}
+.rp-pipeline-step:hover .rp-pipeline-label {
+    color: var(--text-muted);
+}
+.rp-pipeline-step.rp-done .rp-pipeline-label {
+    color: var(--success);
+}
+.rp-pipeline-step.rp-active .rp-pipeline-label {
+    color: var(--primary);
+    font-weight: 700;
+}
+/* Connecting line between steps */
+.rp-pipeline-connector {
+    flex: 1;
+    height: 2px;
+    background: rgba(255,255,255,.1);
+    margin-top: 7px; /* align to center of 16px dot */
+    transition: background .2s;
+}
+.rp-pipeline-connector.rp-done {
+    background: var(--success);
+}
+/* Side-exit statuses (Odrzucony, Były pracownik) */
+.rp-pipeline-side {
+    display: flex;
+    gap: .5rem;
+    margin-top: .5rem;
+}
+/* List items */
+.rp-list-item {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    padding: .65rem .9rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--glass-border);
+    text-align: left;
+    cursor: pointer;
+    transition: background .12s;
+    color: var(--text-main);
+    min-width: 0;
+}
+.rp-list-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.rp-list-item--active {
+    background: rgba(59, 130, 246, 0.12) !important;
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+/* ============================================
    Modal Styles - Dark Theme
    ============================================ */
 .modal {

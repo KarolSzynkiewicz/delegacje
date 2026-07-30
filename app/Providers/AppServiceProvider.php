@@ -9,6 +9,7 @@ use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
+use App\Models\RecruitmentCandidate;
 use App\Models\TransportCost;
 use App\Models\VehicleAssignment;
 use App\Observers\AuditableModelObserver;
@@ -59,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
         TransportCost::observe(AuditableModelObserver::class);
         Adjustment::observe(AuditableModelObserver::class);
         LogisticsEventParticipant::observe(AuditableModelObserver::class);
+        RecruitmentCandidate::observe(AuditableModelObserver::class);
 
         ProcedureTemplate::observe(ProcedureTemplateObserver::class);
 
@@ -76,7 +78,8 @@ class AppServiceProvider extends ServiceProvider
             'logistics_event' => \App\Models\LogisticsEvent::class,
             'location' => \App\Models\Location::class,
             'employee' => \App\Models\Employee::class,
-            'recruitment_application' => \App\Models\RecruitmentApplication::class,
+            'recruitment_process' => \App\Models\RecruitmentProcess::class,
+            'recruitment_candidate' => \App\Models\RecruitmentCandidate::class,
             'comment' => \App\Models\Comment::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);

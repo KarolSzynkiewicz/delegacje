@@ -166,11 +166,11 @@ return [
     ],
 
     'recruitment_applications' => [
-        'route' => 'recruitment-applications.index',
+        'route' => 'recruitment-processes.index',
         'icon' => 'bi bi-person-lines-fill',
         'label' => 'Rekrutacja',
         'permission' => 'employees.view',
-        'routePattern' => 'recruitment-applications.*',
+        'routePattern' => 'recruitment-processes.*',
     ],
 
     'roles' => [

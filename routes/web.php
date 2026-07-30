@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccommodationAssignmentController;
-use App\Http\Controllers\RecruitmentApplicationController;
+use App\Http\Controllers\RecruitmentProcessController;
 use App\Http\Controllers\RecruitmentConsentController;
 use App\Http\Controllers\AccommodationController;
 use App\Http\Controllers\AuditLogController;
@@ -283,18 +283,18 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->defaults('permission_type', 'resource')
             ->defaults('resource', 'project-assignments');
 
-        // Recruitment applications (admin panel)
-        Route::get('recruitment-applications', [RecruitmentApplicationController::class, 'index'])
-            ->name('recruitment-applications.index')
+        // Recruitment processes (admin panel)
+        Route::get('recruitment-processes', [RecruitmentProcessController::class, 'index'])
+            ->name('recruitment-processes.index')
             ->defaults('resource', 'employees');
-        Route::get('recruitment-applications/{recruitmentApplication}', [RecruitmentApplicationController::class, 'show'])
-            ->name('recruitment-applications.show')
+        Route::get('recruitment-processes/{recruitmentProcess}', [RecruitmentProcessController::class, 'show'])
+            ->name('recruitment-processes.show')
             ->defaults('resource', 'employees');
-        Route::patch('recruitment-applications/{recruitmentApplication}/status', [RecruitmentApplicationController::class, 'updateStatus'])
-            ->name('recruitment-applications.update-status')
+        Route::patch('recruitment-processes/{recruitmentProcess}/status', [RecruitmentProcessController::class, 'updateStatus'])
+            ->name('recruitment-processes.update-status')
             ->defaults('resource', 'employees');
-        Route::post('recruitment-applications/{recruitmentApplication}/convert', [RecruitmentApplicationController::class, 'convert'])
-            ->name('recruitment-applications.convert')
+        Route::post('recruitment-processes/{recruitmentProcess}/convert', [RecruitmentProcessController::class, 'convert'])
+            ->name('recruitment-processes.convert')
             ->defaults('resource', 'employees');
 
         // Employees + assignments + documents

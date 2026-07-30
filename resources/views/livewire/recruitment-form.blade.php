@@ -58,6 +58,16 @@
 
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
+                    <label class="form-label" for="city">Miasto zamieszkania</label>
+                    <input type="text" id="city" wire:model.blur="city"
+                           class="form-control @error('city') is-invalid @enderror"
+                           placeholder="np. Warszawa, Kraków…" autocomplete="address-level2">
+                    @error('city')<span class="invalid-feedback">{{ $message }}</span>@enderror
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
                     <label class="form-label" for="email">
                         Adres e-mail <span class="text-danger">*</span>
                     </label>
@@ -76,7 +86,7 @@
 
                 <div class="col-md-6">
                     <label class="form-label" for="phone">
-                        Numer telefonu
+                        Numer telefonu <span class="text-danger">*</span>
                     </label>
                     <input
                         type="tel"
@@ -93,19 +103,76 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label" for="desired_role">
+                <label class="form-label">
                     Stanowisko, o które się ubiegasz
                 </label>
-                <input
-                    type="text"
-                    id="desired_role"
-                    wire:model.blur="desired_role"
-                    class="form-control @error('desired_role') is-invalid @enderror"
-                    placeholder="np. Kierowca, Mechanik, Operator maszyn…"
-                >
-                @error('desired_role')
-                    <span class="invalid-feedback">{{ $message }}</span>
+                <div class="border rounded p-3 @error('desired_roles') border-danger @enderror">
+                    @forelse($roles as $role)
+                        <div class="form-check">
+                            <input
+                                type="checkbox"
+                                id="desired_role_{{ $role->id }}"
+                                wire:model="desired_roles"
+                                value="{{ $role->id }}"
+                                class="form-check-input"
+                            >
+                            <label class="form-check-label" for="desired_role_{{ $role->id }}">
+                                {{ $role->name }}
+                            </label>
+                        </div>
+                    @empty
+                        <p class="text-muted mb-0 small">Brak zdefiniowanych stanowisk.</p>
+                    @endforelse
+                </div>
+                @error('desired_roles')
+                    <span class="text-danger small d-block mt-1">{{ $message }}</span>
                 @enderror
+                <small class="text-muted">Możesz wybrać więcej niż jedno stanowisko.</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="expected_rate_eur">
+                    Oczekiwana stawka (EUR/h)
+                </label>
+                <div class="input-group" style="max-width:220px;">
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        id="expected_rate_eur"
+                        wire:model.blur="expected_rate_eur"
+                        class="form-control @error('expected_rate_eur') is-invalid @enderror"
+                        placeholder="np. 15.00"
+                    >
+                    <span class="input-group-text">EUR/h</span>
+                    @error('expected_rate_eur')
+                        <span class="invalid-feedback">{{ $message }}</span>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Uprawnienia i języki</label>
+                <div class="d-flex flex-wrap gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="has_driving_license_b" wire:model="has_driving_license_b">
+                        <label class="form-check-label" for="has_driving_license_b">
+                            <i class="bi bi-car-front me-1"></i>Prawo jazdy kat.&nbsp;B
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="speaks_english" wire:model="speaks_english">
+                        <label class="form-check-label" for="speaks_english">🇬🇧 Angielski</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="speaks_french" wire:model="speaks_french">
+                        <label class="form-check-label" for="speaks_french">🇫🇷 Francuski</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="speaks_german" wire:model="speaks_german">
+                        <label class="form-check-label" for="speaks_german">🇩🇪 Niemiecki</label>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-3">
@@ -125,27 +192,6 @@
                 @error('referral_source')
                     <span class="invalid-feedback">{{ $message }}</span>
                 @enderror
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label" for="cover_letter">
-                    List motywacyjny / wiadomość
-                </label>
-                <textarea
-                    id="cover_letter"
-                    wire:model.blur="cover_letter"
-                    class="form-control @error('cover_letter') is-invalid @enderror"
-                    rows="5"
-                    placeholder="Kilka słów o sobie, doświadczeniu i motywacji do pracy…"
-                ></textarea>
-                <div class="d-flex justify-content-between mt-1">
-                    @error('cover_letter')
-                        <span class="invalid-feedback d-block">{{ $message }}</span>
-                    @else
-                        <span></span>
-                    @enderror
-                    <small class="text-muted ms-auto">{{ mb_strlen($cover_letter) }} / 5000</small>
-                </div>
             </div>
 
             <div class="mb-4">

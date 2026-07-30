@@ -34,6 +34,7 @@ class ProjectTask extends Model
         'completed_at',
         'created_by',
         'procedure_run_id',
+        'recruitment_process_id',
     ];
 
     protected $casts = [
@@ -56,6 +57,14 @@ class ProjectTask extends Model
     public function procedureRun(): BelongsTo
     {
         return $this->belongsTo(ProcedureRun::class, 'procedure_run_id');
+    }
+
+    /**
+     * Get the recruitment process this follow-up task belongs to (if any).
+     */
+    public function recruitmentProcess(): BelongsTo
+    {
+        return $this->belongsTo(RecruitmentProcess::class, 'recruitment_process_id');
     }
 
     /**

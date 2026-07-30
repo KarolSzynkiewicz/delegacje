@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex align-items-center gap-3">
-            <a href="{{ route('recruitment-applications.index') }}" class="btn btn-sm btn-outline-secondary">
+            <a href="{{ route('recruitment-processes.index') }}" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i>
             </a>
             <h2 class="fw-semibold fs-4 mb-0">
@@ -52,10 +52,24 @@
                                 {{ $application->phone ?? '—' }}
                             </x-ui.detail-item>
                             <x-ui.detail-item label="Stanowisko">
-                                {{ $application->desired_role ?? '—' }}
+                                @forelse($application->roles as $role)
+                                    <span class="badge bg-light text-dark border me-1">{{ $role->name }}</span>
+                                @empty
+                                    —
+                                @endforelse
+                            </x-ui.detail-item>
+                            <x-ui.detail-item label="Oczekiwana stawka">
+                                {{ $application->expected_rate_eur !== null ? number_format((float) $application->expected_rate_eur, 2).' €/h' : '—' }}
                             </x-ui.detail-item>
                             <x-ui.detail-item label="Skąd o nas wie">
                                 {{ $application->referral_source_label ?? '—' }}
+                            </x-ui.detail-item>
+                            <x-ui.detail-item label="Ocena kandydata">
+                                @if($application->candidate?->rating)
+                                    <span class="badge bg-{{ $application->candidate->rating->variant() }}">{{ $application->candidate->rating->label() }}</span>
+                                @else
+                                    —
+                                @endif
                             </x-ui.detail-item>
                         </x-ui.detail-list>
                     </div>
@@ -72,50 +86,43 @@
                         {{ $application->updated_at->format('d.m.Y H:i') }}
                         <small class="text-muted">({{ $application->updated_at->diffForHumans() }})</small>
                     </x-ui.detail-item>
-                    @if($application->consent_given_at)
-                        <x-ui.detail-item label="Data wyrażenia zgód" fullWidth="true">
-                            {{ $application->consent_given_at->format('d.m.Y H:i') }}
-                        </x-ui.detail-item>
-                    @endif
                 </x-ui.detail-list>
             </x-ui.card>
 
-            @if($application->cover_letter)
-                <x-ui.card label="List motywacyjny" class="mb-4">
-                    <div style="white-space:pre-wrap;line-height:1.7;">{{ $application->cover_letter }}</div>
-                </x-ui.card>
-            @endif
+            <x-ui.card label="Historia kontaktu" class="mb-4">
+                @forelse($application->contactAttempts as $attempt)
+                    <div class="border-start border-3 border-{{ $attempt->outcome->variant() }} ps-3 mb-3">
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span><strong class="text-body">{{ $attempt->user?->name ?? 'Nieznany' }}</strong></span>
+                            <span>{{ $attempt->created_at->format('d.m.Y H:i') }}</span>
+                        </div>
+                        <div class="badge bg-{{ $attempt->outcome->variant() }} mb-1">{{ $attempt->outcome->label() }}</div>
+                        @if($attempt->comment)
+                            <div class="small">{{ $attempt->comment }}</div>
+                        @endif
+                    </div>
+                @empty
+                    <p class="text-muted small mb-0">Brak jeszcze żadnych prób kontaktu. Aby je zarejestrować, użyj panelu kandydatury na liście kandydatur.</p>
+                @endforelse
+            </x-ui.card>
 
             <x-ui.card label="Zgody i oświadczenia" class="mb-4">
-                <x-ui.detail-list>
-                    <x-ui.detail-item label="Zgoda RODO">
-                        @if($application->consent_rodo)
-                            <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Wyrażona</span>
-                        @else
-                            <span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i> Brak</span>
-                        @endif
-                    </x-ui.detail-item>
-                    <x-ui.detail-item label="Zgoda na rekrutację (bieżącą i przyszłe)">
-                        @if($application->consent_recruitment_processing)
-                            <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Wyrażona</span>
-                        @else
-                            <span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i> Brak</span>
-                        @endif
-                    </x-ui.detail-item>
-                    <x-ui.detail-item label="Zgoda marketingowa">
-                        @if($application->consent_marketing)
-                            <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Wyrażona</span>
-                        @else
-                            <span class="text-muted"><i class="bi bi-dash-circle me-1"></i> Nie wyrażona</span>
-                        @endif
-                    </x-ui.detail-item>
-                    <x-ui.detail-item label="Data wyrażenia zgód" fullWidth="true">
-                        {{ $application->consent_given_at?->format('d.m.Y H:i') ?? '—' }}
-                    </x-ui.detail-item>
-                </x-ui.detail-list>
+                @forelse($application->candidate?->consents ?? [] as $consent)
+                    <x-ui.detail-list>
+                        <x-ui.detail-item label="{{ $consent->type->label() }}">
+                            @if($consent->isActive())
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Wyrażona {{ $consent->given_at->format('d.m.Y H:i') }}</span>
+                            @else
+                                <span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i> Wycofana {{ $consent->withdrawn_at->format('d.m.Y H:i') }}</span>
+                            @endif
+                        </x-ui.detail-item>
+                    </x-ui.detail-list>
+                @empty
+                    <p class="text-muted small mb-0">Brak zarejestrowanych zgód.</p>
+                @endforelse
             </x-ui.card>
 
-            @if($application->status === 'converted' && $application->employee)
+            @if($application->employee_id && $application->employee)
                 <x-ui.alert variant="success" class="mb-4">
                     <i class="bi bi-person-check-fill me-2"></i>
                     Kandydat został zatrudniony.
@@ -134,23 +141,27 @@
 
             {{-- Zmiana statusu --}}
             <x-ui.card label="Zmień status">
-                <form action="{{ route('recruitment-applications.update-status', $application) }}" method="POST">
+                <form action="{{ route('recruitment-processes.update-status', $application) }}" method="POST">
                     @csrf
                     @method('PATCH')
 
                     <div class="mb-3">
                         <label class="form-label" for="status">Status kandydatury</label>
                         <select name="status" id="status" class="form-select">
-                            @foreach([
-                                'pending'   => 'Oczekuje',
-                                'reviewing' => 'W trakcie weryfikacji',
-                                'accepted'  => 'Zaakceptowany',
-                                'rejected'  => 'Odrzucony',
-                                'converted' => 'Zatrudniony',
-                            ] as $val => $label)
-                                <option value="{{ $val }}" {{ $application->status === $val ? 'selected' : '' }}>
-                                    {{ $label }}
+                            @foreach(\App\Enums\RecruitmentStatus::cases() as $case)
+                                <option value="{{ $case->value }}" {{ $application->status === $case ? 'selected' : '' }}>
+                                    {{ $case->label() }}
                                 </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="rejection_reason">Powód odrzucenia (jeśli dotyczy)</label>
+                        <select name="rejection_reason" id="rejection_reason" class="form-select">
+                            <option value="">— Nie dotyczy —</option>
+                            @foreach(\App\Enums\RecruitmentRejectionReason::options() as $value => $label)
+                                <option value="{{ $value }}" {{ $application->rejection_reason?->value === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -168,14 +179,14 @@
             </x-ui.card>
 
             {{-- Konwersja do pracownika --}}
-            @if($application->status !== 'converted')
+            @if(! $application->employee_id)
                 <x-ui.card label="Zatrudnij kandydata">
                     <p class="text-muted small mb-3">
                         Utworzy nowego pracownika na podstawie danych kandydata.
                         Wybierz przypisywane role.
                     </p>
 
-                    <form action="{{ route('recruitment-applications.convert', $application) }}" method="POST">
+                    <form action="{{ route('recruitment-processes.convert', $application) }}" method="POST">
                         @csrf
 
                         <div class="mb-3">

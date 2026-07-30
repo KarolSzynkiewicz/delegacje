@@ -11,7 +11,7 @@ use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectTask;
-use App\Models\RecruitmentApplication;
+use App\Models\RecruitmentProcess;
 use App\Models\User;
 use App\Models\Vehicle;
 
@@ -86,8 +86,8 @@ class AttachmentPolicy
         if ($ctx instanceof Employee) {
             return $user->hasPermission('employees.view');
         }
-        if ($ctx instanceof RecruitmentApplication) {
-            return $user->hasPermission('recruitment-applications.view');
+        if ($ctx instanceof RecruitmentProcess) {
+            return $user->hasPermission('recruitment-processes.view');
         }
         if ($ctx instanceof LogisticsEvent) {
             return match ($ctx->type) {

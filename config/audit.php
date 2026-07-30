@@ -13,6 +13,7 @@ return [
         \App\Models\TransportCost::class => 'Koszt transportu',
         \App\Models\Adjustment::class => 'Korekta wynagrodzenia',
         \App\Models\LogisticsEventParticipant::class => 'Uczestnik zdarzenia logistycznego',
+        \App\Models\RecruitmentCandidate::class => 'Kandydat rekrutacyjny',
     ],
 
     'event_labels' => [
