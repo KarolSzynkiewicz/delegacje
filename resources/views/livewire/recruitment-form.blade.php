@@ -181,46 +181,30 @@
                 </label>
                 <select
                     id="referral_source"
-                    wire:model.blur="referral_source"
+                    wire:model.live="referral_source"
                     class="form-select @error('referral_source') is-invalid @enderror"
                 >
                     <option value="">— Wybierz opcję —</option>
-                    @foreach(\App\Enums\RecruitmentReferralSource::options() as $value => $label)
+                    @foreach(\App\Enums\RecruitmentReferralSource::publicFormOptions() as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
                 </select>
                 @error('referral_source')
                     <span class="invalid-feedback">{{ $message }}</span>
                 @enderror
-            </div>
 
-            <div class="mb-4">
-                <label class="form-label" for="photo">
-                    Zdjęcie (opcjonalne)
-                </label>
-
-                <div>
-                    <input
-                        type="file"
-                        id="photo"
-                        wire:model="photo"
-                        class="form-control @error('photo') is-invalid @enderror"
-                        accept="image/jpeg,image/png,image/webp"
-                    >
-                    <small class="text-muted">Dozwolone formaty: JPG, PNG, WebP. Maksymalny rozmiar: 2 MB.</small>
-                    @error('photo')
-                        <span class="invalid-feedback d-block">{{ $message }}</span>
-                    @enderror
-                </div>
-
-                @if($photo)
+                @if($referral_source !== '' && ($refSrc = \App\Enums\RecruitmentReferralSource::tryFrom($referral_source)) && $refSrc->requiresDetail())
                     <div class="mt-2">
-                        <img
-                            src="{{ $photo->temporaryUrl() }}"
-                            alt="Podgląd zdjęcia"
-                            class="rounded"
-                            style="max-height:120px;max-width:120px;object-fit:cover;"
+                        <input
+                            type="text"
+                            wire:model.blur="referral_source_detail"
+                            class="form-control @error('referral_source_detail') is-invalid @enderror"
+                            placeholder="{{ $refSrc->detailPlaceholder() }}"
+                            autocomplete="off"
                         >
+                        @error('referral_source_detail')
+                            <span class="invalid-feedback">{{ $message }}</span>
+                        @enderror
                     </div>
                 @endif
             </div>
@@ -354,7 +338,7 @@
                     type="submit"
                     class="btn btn-primary px-4"
                     wire:loading.attr="disabled"
-                    wire:target="submit,photo"
+                    wire:target="submit"
                 >
                     <span wire:loading.remove wire:target="submit">
                         <i class="bi bi-send me-1"></i> Wyślij zgłoszenie
@@ -367,14 +351,6 @@
 
                 <small class="text-muted">
                     Pola oznaczone <span class="text-danger">*</span> są wymagane.
-                </small>
-            </div>
-
-            {{-- Upload progress indicator --}}
-            <div wire:loading wire:target="photo" class="mt-2">
-                <small class="text-muted">
-                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                    Ładowanie zdjęcia…
                 </small>
             </div>
 

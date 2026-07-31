@@ -67,6 +67,17 @@ class RecruitmentProcess extends Model
         return $this->hasMany(ProjectTask::class, 'recruitment_process_id');
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (self $process) {
+            $process->statusHistory()->create([
+                'from_status' => null,
+                'to_status' => $process->status?->value ?? RecruitmentStatus::Nowy->value,
+                'changed_by' => null,
+            ]);
+        });
+    }
+
     /**
      * Change status and record the transition in recruitment_status_history.
      * The single entry point both the Livewire pipeline table and the plain admin

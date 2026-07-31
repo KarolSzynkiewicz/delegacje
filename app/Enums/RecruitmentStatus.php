@@ -17,7 +17,7 @@ enum RecruitmentStatus: string
         return match ($this) {
             self::Nowy => 'Nowy',
             self::WTrakcieKontaktu => 'W trakcie kontaktu',
-            self::Zaakceptowany => 'Zaakceptowany',
+            self::Zaakceptowany => 'Weryfikacja',
             self::Odrzucony => 'Odrzucony',
             self::Onboarding => 'Onboarding',
             self::Zatrudniony => 'Zatrudniony',

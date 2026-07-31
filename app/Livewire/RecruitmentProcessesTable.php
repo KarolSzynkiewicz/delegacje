@@ -103,6 +103,8 @@ class RecruitmentProcessesTable extends Component
 
     public ?int $taskAssignedTo = null;
 
+    public string $taskDescription = '';
+
     // Comment modal (process-level or candidate-level)
     public bool $showCommentModal = false;
 
@@ -476,6 +478,11 @@ class RecruitmentProcessesTable extends Component
             'comment' => $this->newComment ?: null,
         ]);
 
+        // First contact attempt advances a fresh lead into active outreach.
+        if ($process->status === RecruitmentStatus::Nowy) {
+            $process->transitionTo(RecruitmentStatus::WTrakcieKontaktu, auth()->id());
+        }
+
         $shouldOpenTaskModal = $this->newOutcome === RecruitmentContactOutcome::ProsiOOddzwonienie->value;
 
         $this->resetDraft();
@@ -489,9 +496,24 @@ class RecruitmentProcessesTable extends Component
     protected function openTaskModal(RecruitmentProcess $process): void
     {
         $this->showTaskModal = true;
-        $this->taskTitle = 'Oddzwonić do '.$process->full_name;
+        $this->taskTitle = 'Oddzwonić do '.$process->full_name.' #'.$process->id;
         $this->taskDueDate = now()->addDay()->format('Y-m-d');
         $this->taskAssignedTo = $process->assigned_recruiter_id ?: auth()->id();
+        $this->taskDescription = '';
+    }
+
+    public function openTaskModalManual(): void
+    {
+        $process = $this->getSelectedProcess();
+        if (! $process) {
+            return;
+        }
+
+        $this->showTaskModal = true;
+        $this->taskTitle = $process->full_name.' #'.$process->id;
+        $this->taskDueDate = now()->addDay()->format('Y-m-d');
+        $this->taskAssignedTo = $process->assigned_recruiter_id ?: auth()->id();
+        $this->taskDescription = '';
     }
 
     public function saveFollowUpTask(): void
@@ -514,6 +536,7 @@ class RecruitmentProcessesTable extends Component
 
         ProjectTask::create([
             'name' => $this->taskTitle,
+            'description' => $this->taskDescription ?: null,
             'category' => 'Rekrutacja',
             'status' => TaskStatus::PENDING->value,
             'due_date' => $this->taskDueDate,
@@ -533,6 +556,7 @@ class RecruitmentProcessesTable extends Component
         $this->taskTitle = '';
         $this->taskDueDate = '';
         $this->taskAssignedTo = null;
+        $this->taskDescription = '';
     }
 
     public function openCommentModal(string $target): void
@@ -648,12 +672,6 @@ class RecruitmentProcessesTable extends Component
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        $lastOutcomeSubquery = DB::raw(
-            '(SELECT outcome FROM recruitment_contact_attempts rca'
-            .' WHERE rca.recruitment_process_id = recruitment_processes.id'
-            .' ORDER BY rca.created_at DESC LIMIT 1) as last_contact_outcome'
-        );
-
         $lastCandidateContactSubquery = DB::raw(
             '(SELECT MAX(rca.created_at)'
             .' FROM recruitment_contact_attempts rca'
@@ -667,6 +685,8 @@ class RecruitmentProcessesTable extends Component
         };
 
         // Each row in the main table = one candidate. Their processes are sub-rows.
+        // Status filter only decides which candidates appear; all of their processes
+        // are loaded so sibling pipelines stay visible informatively.
         $status = $this->status;
         $search = $this->search;
         $applications = RecruitmentCandidate::query()
@@ -676,14 +696,13 @@ class RecruitmentProcessesTable extends Component
             })
             ->with([
                 'roles',
-                'processes' => function ($q) use ($status, $lastOutcomeSubquery) {
+                'processes' => function ($q) {
                     $q->select(['recruitment_processes.*',
                         DB::raw('(SELECT outcome FROM recruitment_contact_attempts rca WHERE rca.recruitment_process_id = recruitment_processes.id ORDER BY rca.created_at DESC LIMIT 1) as last_contact_outcome'),
                     ])
                         ->withMax('contactAttempts as last_contact_at', 'created_at')
                         ->withCount('contactAttempts')
                         ->with(['lead', 'assignedRecruiter'])
-                        ->when($status, fn ($q) => $q->where('status', $status))
                         ->orderBy('created_at', 'desc');
                 },
             ])
@@ -701,21 +720,20 @@ class RecruitmentProcessesTable extends Component
             ->orderBy('recruitment_candidates.last_name')
             ->paginate(20);
 
-        $siblingCountSubquery = DB::raw(
-            '(SELECT COUNT(*) FROM recruitment_processes rp2'
-            .' WHERE rp2.candidate_id = recruitment_processes.candidate_id) as candidate_process_count'
-        );
-
-        // Compact list for the modal left panel (up to 60, no pagination)
-        $listQuery = RecruitmentProcess::query()
-            ->join('recruitment_candidates', 'recruitment_candidates.id', '=', 'recruitment_processes.candidate_id')
-            ->withCount('contactAttempts')
-            ->withMax('contactAttempts as last_contact_at', 'created_at')
-            ->addSelect(['recruitment_processes.*', $lastOutcomeSubquery, $siblingCountSubquery])
-            ->with(['candidate'])
-            ->when($this->status, fn ($q) => $q->where('recruitment_processes.status', $this->status))
-            ->when($this->search, function ($q) use ($phoneSearch) {
-                $search = $this->search;
+        // Compact candidate-grouped list for the drawer left panel
+        $listCandidates = RecruitmentCandidate::query()
+            ->select(['recruitment_candidates.*', $lastCandidateContactSubquery])
+            ->whereHas('processes', function ($q) use ($status) {
+                $q->when($status, fn ($q) => $q->where('status', $status));
+            })
+            ->with([
+                'processes' => function ($q) {
+                    $q->with(['lead'])
+                        ->withMax('contactAttempts as last_contact_at', 'created_at')
+                        ->orderBy('created_at', 'desc');
+                },
+            ])
+            ->when($search, function ($q) use ($search, $phoneSearch) {
                 $q->where(function ($q) use ($search, $phoneSearch) {
                     $q->where('recruitment_candidates.first_name', 'like', "%{$search}%")
                         ->orWhere('recruitment_candidates.last_name', 'like', "%{$search}%")
@@ -724,14 +742,14 @@ class RecruitmentProcessesTable extends Component
                         ->when($phoneSearch, fn ($q) => $q->orWhere('recruitment_candidates.phone', 'like', "%{$phoneSearch}%"));
                 });
             })
-            ->orderByRaw('ISNULL(last_contact_at) DESC')
-            ->orderBy('last_contact_at', 'asc')
-            ->limit(60)
+            ->orderByRaw('ISNULL(last_candidate_contact_at) DESC')
+            ->orderBy('last_candidate_contact_at', 'asc')
+            ->limit(40)
             ->get();
 
         return view('livewire.recruitment-processes-table', [
             'applications' => $applications,
-            'listApplications' => $listQuery,
+            'listCandidates' => $listCandidates,
             'counts' => $counts,
             'total' => RecruitmentCandidate::whereHas('processes')->count(),
             'roles' => Role::orderBy('name')->get(),

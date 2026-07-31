@@ -23,6 +23,8 @@ class ProcedureRunService
      *     due_date: string|null,
      *     subject_type: string|null,
      *     subject_id: int|null,
+     *     slot_key: string|null,
+     *     variables: array|null,
      * } $params
      */
     public function startRun(ProcedureTemplate $template, array $params): ProcedureRun
@@ -42,10 +44,11 @@ class ProcedureRunService
                 'definition_snapshot'   => $definition,
                 'subject_type'          => $params['subject_type'] ?? null,
                 'subject_id'            => $params['subject_id'] ?? null,
+                'slot_key'              => $params['slot_key'] ?? null,
                 'current_node_id'       => $startNode['id'],
                 'path'                  => [$startNode['id']],
                 'status'                => ProcedureRunStatus::IN_PROGRESS,
-                'variables'             => null,
+                'variables'             => $params['variables'] ?? null,
                 'started_by'            => Auth::id(),
                 'started_at'            => $now,
             ]);

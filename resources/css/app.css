@@ -2784,84 +2784,90 @@ html .text-muted,
     font-weight: 700;
 }
 
-/* ── Pipeline status component ──────────────────────── */
-.rp-pipeline {
+/* ── Pipeline status component: horizontal boxes ──────────────────────── */
+.rp-flow2 {
     display: flex;
-    align-items: flex-start;
-    margin: .25rem 0 1rem;
-    position: relative;
-}
-.rp-pipeline-step {
-    display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     align-items: center;
-    flex: 1;
-    background: none;
-    border: none;
-    padding: 0;
+    gap: 0;
+    margin: .35rem 0 1rem;
+}
+.rp-flow2-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .5rem .85rem;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.03);
+    color: rgba(255,255,255,.45);
+    font-size: .74rem;
+    font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
-    position: relative;
-    z-index: 1;
+    transition: all .25s ease;
+    line-height: 1.25;
 }
-.rp-pipeline-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,.15);
-    background: rgba(255,255,255,.05);
-    transition: all .2s;
-    flex-shrink: 0;
-    position: relative;
-}
-.rp-pipeline-step:hover .rp-pipeline-dot {
+.rp-flow2-box:hover {
     border-color: var(--primary);
-    background: rgba(59,130,246,.15);
-    transform: scale(1.15);
+    color: var(--text-main);
+    background: rgba(59,130,246,.08);
 }
-.rp-pipeline-step.rp-done .rp-pipeline-dot {
-    background: var(--success);
-    border-color: var(--success);
-}
-.rp-pipeline-step.rp-active .rp-pipeline-dot {
-    background: var(--primary);
-    border-color: var(--primary);
-    box-shadow: 0 0 0 5px rgba(59,130,246,.25);
-    transform: scale(1.35);
-}
-.rp-pipeline-step.rp-active:hover .rp-pipeline-dot {
-    transform: scale(1.4);
-}
-.rp-pipeline-label {
-    font-size: .62rem;
-    margin-top: .4rem;
-    color: rgba(255,255,255,.3);
-    text-align: center;
-    line-height: 1.3;
-    max-width: 60px;
-    transition: color .15s;
-}
-.rp-pipeline-step:hover .rp-pipeline-label {
-    color: var(--text-muted);
-}
-.rp-pipeline-step.rp-done .rp-pipeline-label {
+.rp-flow2-box.rp-done {
+    border-color: rgba(34,197,94,.5);
+    background: rgba(34,197,94,.08);
     color: var(--success);
 }
-.rp-pipeline-step.rp-active .rp-pipeline-label {
-    color: var(--primary);
-    font-weight: 700;
+.rp-flow2-box.rp-active {
+    border-color: var(--primary);
+    background: rgba(59,130,246,.2);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.22);
+    animation: rp-box-pulse .8s cubic-bezier(.22,.8,.36,1);
 }
-/* Connecting line between steps */
-.rp-pipeline-connector {
-    flex: 1;
+.rp-flow2-box.rp-active--danger {
+    border-color: var(--danger);
+    background: rgba(239,68,68,.2);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(239,68,68,.22);
+    animation: rp-box-pulse-danger .8s cubic-bezier(.22,.8,.36,1);
+}
+.rp-flow2-box--sm {
+    padding: .32rem .65rem;
+    font-size: .68rem;
+}
+.rp-flow2-box--dim {
+    opacity: .35;
+}
+.rp-flow2-fork {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+}
+.rp-flow2-connector {
+    flex: 0 0 22px;
+    width: 22px;
     height: 2px;
-    background: rgba(255,255,255,.1);
-    margin-top: 7px; /* align to center of 16px dot */
-    transition: background .2s;
+    background: rgba(255,255,255,.12);
+    transition: background .3s ease;
 }
-.rp-pipeline-connector.rp-done {
+.rp-flow2-connector.rp-done {
     background: var(--success);
 }
-/* Side-exit statuses (Odrzucony, Były pracownik) */
+.rp-flow2-connector.rp-done--danger {
+    background: var(--danger);
+}
+@keyframes rp-box-pulse {
+    0% { transform: scale(.88); filter: brightness(1.5); box-shadow: 0 0 0 0 rgba(59,130,246,.6); }
+    60% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+    100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0 3px rgba(59,130,246,.22); }
+}
+@keyframes rp-box-pulse-danger {
+    0% { transform: scale(.88); filter: brightness(1.5); box-shadow: 0 0 0 0 rgba(239,68,68,.6); }
+    60% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+    100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0 3px rgba(239,68,68,.22); }
+}
+/* Side-exit statuses (Były pracownik) */
 .rp-pipeline-side {
     display: flex;
     gap: .5rem;
@@ -2889,6 +2895,59 @@ html .text-muted,
 .rp-list-item--active {
     background: rgba(59, 130, 246, 0.12) !important;
     box-shadow: inset 3px 0 0 var(--primary);
+}
+
+/* Compact candidate groups in drawer left panel */
+.rp-cand-group {
+    border-bottom: 1px solid var(--glass-border);
+    padding: .45rem 0 .35rem;
+}
+.rp-cand-group--active {
+    background: rgba(59, 130, 246, 0.06);
+}
+.rp-cand-group__head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .2rem .75rem .35rem;
+    min-width: 0;
+}
+.rp-cand-proc {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .4rem;
+    width: 100%;
+    padding: .28rem .75rem .28rem 1.15rem;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-main);
+    transition: background .12s;
+}
+.rp-cand-proc:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.rp-cand-proc--active {
+    background: rgba(59, 130, 246, 0.14) !important;
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+.rp-cand-proc--muted {
+    opacity: .42;
+}
+.rp-cand-proc__id {
+    font-size: .7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.rp-cand-proc__id .bi {
+    font-size: .58rem;
+}
+.rp-cand-proc__status {
+    font-size: .58rem !important;
+    padding: 2px 6px !important;
+    flex-shrink: 0;
 }
 
 /* ============================================

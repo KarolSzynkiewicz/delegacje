@@ -12,6 +12,7 @@ class RecruitmentLead extends Model
     protected $fillable = [
         'candidate_id',
         'referral_source',
+        'referral_source_detail',
         'cover_letter',
     ];
 
@@ -31,6 +32,11 @@ class RecruitmentLead extends Model
 
     public function getReferralSourceLabelAttribute(): ?string
     {
-        return $this->referral_source?->label();
+        $label = $this->referral_source?->label();
+        if ($label && $this->referral_source_detail) {
+            $label .= ' — ' . $this->referral_source_detail;
+        }
+
+        return $label;
     }
 }

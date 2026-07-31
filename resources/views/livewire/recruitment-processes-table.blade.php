@@ -101,11 +101,12 @@
                                 @php
                                     $lo = RecruitmentContactOutcome::tryFrom($proc->last_contact_outcome ?? '');
                                     $loBadge = match($lo?->variant()) { 'success'=>'badge-success','danger'=>'badge-danger','warning'=>'badge-warning',default=>'badge-info' };
+                                    $matchesFilter = ! $status || $proc->status?->value === $status;
                                 @endphp
                                 <tr wire:key="proc-{{ $proc->id }}"
                                     wire:click="selectProcess({{ $proc->id }})"
                                     role="button"
-                                    style="font-size:.82rem;cursor:pointer;"
+                                    style="font-size:.82rem;cursor:pointer;{{ $matchesFilter ? '' : 'opacity:.45;' }}"
                                     class="{{ $selectedId===$proc->id ? 'table-active' : '' }}">
                                     <td style="width:36px;"></td>
                                     <td style="padding-left:.75rem;color:var(--text-muted);font-size:.75rem;white-space:nowrap;">
@@ -194,41 +195,42 @@
 
                     {{-- ── LEFT: candidate list ────────────────── --}}
                     <div class="rp-modal-left">
-                        @forelse($listApplications as $app)
-                            @php $lo2 = RecruitmentContactOutcome::tryFrom($app->last_contact_outcome ?? ''); $lo2Badge = match($lo2?->variant()) { 'success'=>'badge-success','danger'=>'badge-danger','warning'=>'badge-warning',default=>'badge-info' }; @endphp
-                            <button type="button"
-                                    wire:click="selectProcess({{ $app->id }})"
-                                    wire:key="li-{{ $app->id }}"
-                                    class="rp-list-item {{ $selectedId===$app->id ? 'rp-list-item--active' : '' }}">
-                                <div class="position-relative flex-shrink-0">
-                                    <x-ui.avatar :image-url="$app->photo_url" :initials="mb_strtoupper(mb_substr($app->first_name,0,1).mb_substr($app->last_name,0,1))" size="34px" shape="rounded" :border="false" />
-                                    @if($app->candidate?->rating === RecruitmentCandidateFlag::Wartosciowy)
-                                        <i class="bi bi-star-fill position-absolute" style="font-size:.6rem;color:#f59e0b;bottom:-2px;right:-2px;"></i>
-                                    @elseif($app->candidate?->rating === RecruitmentCandidateFlag::CzarnaLista)
-                                        <i class="bi bi-flag-fill position-absolute" style="font-size:.6rem;color:var(--danger);bottom:-2px;right:-2px;"></i>
+                        @forelse($listCandidates as $cand)
+                            @php
+                                $candHasActive = $cand->processes->contains(fn ($p) => $selectedId === $p->id);
+                            @endphp
+                            <div class="rp-cand-group {{ $candHasActive ? 'rp-cand-group--active' : '' }}" wire:key="lc-{{ $cand->id }}">
+                                <div class="rp-cand-group__head">
+                                    <div class="position-relative flex-shrink-0">
+                                        <x-ui.avatar :image-url="$cand->photo_url" :initials="mb_strtoupper(mb_substr($cand->first_name,0,1).mb_substr($cand->last_name,0,1))" size="28px" shape="rounded" :border="false" />
+                                        @if($cand->rating === RecruitmentCandidateFlag::Wartosciowy)
+                                            <i class="bi bi-star-fill position-absolute" style="font-size:.55rem;color:#f59e0b;bottom:-2px;right:-2px;"></i>
+                                        @elseif($cand->rating === RecruitmentCandidateFlag::CzarnaLista)
+                                            <i class="bi bi-flag-fill position-absolute" style="font-size:.55rem;color:var(--danger);bottom:-2px;right:-2px;"></i>
+                                        @endif
+                                    </div>
+                                    <div class="flex-grow-1 min-width-0">
+                                        <div class="fw-semibold" style="font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $cand->full_name }}</div>
+                                        <div style="font-size:.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $cand->phone ?? $cand->email }}</div>
+                                    </div>
+                                    @if($cand->processes->count() > 1)
+                                        <span class="badge badge-secondary flex-shrink-0" style="font-size:.55rem;">{{ $cand->processes->count() }}</span>
                                     @endif
                                 </div>
-                                <div class="flex-grow-1 min-width-0">
-                                    <div class="fw-semibold" style="font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $app->full_name }}</div>
-                                    <div style="font-size:.71rem;color:var(--text-muted);">{{ $app->phone ?? $app->email }}</div>
-                                    @if($lo2)
-                                        <span class="badge {{ $lo2Badge }}" style="font-size:.58rem;padding:2px 5px;margin-top:2px;">{{ $lo2->label() }}</span>
-                                    @elseif(!$app->last_contact_at)
-                                        <span style="font-size:.68rem;color:var(--text-muted);">Brak kontaktu</span>
-                                    @endif
-                                    @if(($app->candidate_process_count ?? 1) > 1)
-                                        <span class="badge badge-warning ms-1" style="font-size:.56rem;padding:2px 5px;margin-top:2px;"><i class="bi bi-diagram-2 me-1"></i>{{ $app->candidate_process_count }} proc.</span>
-                                    @endif
-                                </div>
-                                <div class="flex-shrink-0 text-end" style="font-size:.68rem;color:var(--text-muted);">
-                                    @if($app->last_contact_at)
-                                        {{ \Carbon\Carbon::parse($app->last_contact_at)->format('d.m') }}
-                                    @endif
-                                    @if($app->contact_attempts_count > 0)
-                                        <div>{{ $app->contact_attempts_count }}×</div>
-                                    @endif
-                                </div>
-                            </button>
+                                @foreach($cand->processes as $proc)
+                                    @php
+                                        $matchesFilter = ! $status || $proc->status?->value === $status;
+                                        $sBadge = match($proc->status?->variant()) { 'success'=>'badge-success','danger'=>'badge-danger','warning'=>'badge-warning',default=>'badge-info' };
+                                    @endphp
+                                    <button type="button"
+                                            wire:click="selectProcess({{ $proc->id }})"
+                                            wire:key="li-{{ $proc->id }}"
+                                            class="rp-cand-proc {{ $selectedId===$proc->id ? 'rp-cand-proc--active' : '' }} {{ $matchesFilter ? '' : 'rp-cand-proc--muted' }}">
+                                        <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right me-1"></i>#{{ $proc->id }}</span>
+                                        <span class="badge {{ $sBadge }} rp-cand-proc__status">{{ $proc->status?->label() ?? '—' }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
                         @empty
                             <div class="p-3 text-center" style="color:var(--text-muted);font-size:.85rem;">Brak wyników</div>
                         @endforelse
@@ -237,12 +239,20 @@
                     {{-- ── CENTER: details + editing ───────────── --}}
                     <div class="rp-modal-center">
                         @php
-                            $pipelineSteps = RecruitmentStatus::pipelineSteps();
-                            $currentIdx    = $selected->status?->pipelineIndex();
-                            $sideStatuses  = [RecruitmentStatus::Odrzucony, RecruitmentStatus::BylyPracownik];
+                            $sideStatuses  = [RecruitmentStatus::BylyPracownik];
                             $candidate     = $selected->candidate;
                             $isStarred     = $candidate?->rating === RecruitmentCandidateFlag::Wartosciowy;
                             $isBlacklisted = $candidate?->rating === RecruitmentCandidateFlag::CzarnaLista;
+                            $statusVal     = $selected->status?->value;
+                            $onRejectPath  = $selected->status === RecruitmentStatus::Odrzucony;
+                            $onAcceptPath  = in_array($selected->status, [
+                                RecruitmentStatus::Zaakceptowany,
+                                RecruitmentStatus::Onboarding,
+                                RecruitmentStatus::Zatrudniony,
+                            ], true);
+                            $pastContact   = $onRejectPath || $onAcceptPath
+                                || $selected->status === RecruitmentStatus::WTrakcieKontaktu
+                                || $selected->status === RecruitmentStatus::BylyPracownik;
                         @endphp
 
                         {{-- ══════════════════════════════════════════
@@ -427,13 +437,13 @@
                                     @error('editAvailableFrom') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                                 </div>
 
-                                {{-- Komentarze do kandydata --}}
+                                {{-- Komentarze o kandydacie --}}
                                 @if($candidate)
                                 <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
                                     @php $candidateComments = $candidate->comments->sortByDesc('created_at'); @endphp
                                     <div class="d-flex align-items-center justify-content-between mb-1">
                                         <span style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-                                            <i class="bi bi-chat-dots me-1"></i>Komentarze kandydata
+                                            <i class="bi bi-chat-dots me-1"></i>Komentarze o kandydacie
                                             @if($candidateComments->count()) <span class="badge badge-secondary ms-1" style="font-size:.6rem;">{{ $candidateComments->count() }}</span> @endif
                                         </span>
                                         <button type="button" wire:click="openCommentModal('candidate')" class="btn btn-sm btn-outline-secondary" style="padding:1px 7px;font-size:.7rem;line-height:1.6;">
@@ -458,87 +468,138 @@
                                     @endif
                                 </div>
                                 @endif
+                            </div>{{-- /karta kandydata --}}
+                        </div>
 
-                                {{-- Proces rekrutacyjny --}}
-                                <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
-                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                        <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-                                            <i class="bi bi-kanban me-1"></i>Proces rekrutacyjny
-                                            <span class="badge badge-secondary ms-1" style="font-size:.65rem;font-weight:600;">#{{ $selected->id }}</span>
+                        {{-- ══════════════════════════════════════════
+                             PROCES — osobna karta
+                        ══════════════════════════════════════════ --}}
+                        <div style="margin-bottom:1.5rem;">
+                            <div style="border:1px solid var(--glass-border);border-radius:12px;padding:1rem;background:rgba(255,255,255,.02);">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                    <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
+                                        <i class="bi bi-kanban me-1"></i>Proces rekrutacyjny
+                                        <span class="badge badge-secondary ms-1" style="font-size:.65rem;font-weight:600;">#{{ $selected->id }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">Prowadzi</span>
+                                        <select wire:model.live="editAssignedRecruiterId" class="form-select form-select-sm" style="min-width:160px;max-width:220px;">
+                                            <option value="">— Nieprzypisany —</option>
+                                            @foreach($recruiters as $recruiter)
+                                                <option value="{{ $recruiter->id }}">{{ $recruiter->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">Status</div>
+
+                                    @php
+                                        $acceptDoneOnly = in_array($selected->status, [
+                                            RecruitmentStatus::Onboarding,
+                                            RecruitmentStatus::Zatrudniony,
+                                        ], true);
+                                        $boxCls = fn ($isDone, $isActive, $danger = false) => $isDone
+                                            ? 'rp-done'
+                                            : ($isActive ? ($danger ? 'rp-active rp-active--danger' : 'rp-active') : '');
+                                    @endphp
+                                    <div class="rp-flow2" wire:key="rp-flow2-{{ $selected->id }}-{{ $statusVal }}">
+                                        <button type="button" wire:click="updateStatus({{ $selected->id }}, 'nowy')"
+                                                class="rp-flow2-box {{ $boxCls($pastContact, $selected->status === RecruitmentStatus::Nowy) }}">Nowy</button>
+
+                                        <div class="rp-flow2-connector {{ $pastContact ? 'rp-done' : '' }}"></div>
+
+                                        <button type="button" wire:click="updateStatus({{ $selected->id }}, 'w_trakcie_kontaktu')"
+                                                class="rp-flow2-box {{ $boxCls($onAcceptPath || $onRejectPath, $selected->status === RecruitmentStatus::WTrakcieKontaktu) }}">W trakcie kontaktu</button>
+
+                                        <div class="rp-flow2-connector {{ $onAcceptPath ? 'rp-done' : ($onRejectPath ? 'rp-done--danger' : '') }}"></div>
+
+                                        <div class="rp-flow2-fork">
+                                            <button type="button" wire:click="updateStatus({{ $selected->id }}, 'zaakceptowany')"
+                                                    class="rp-flow2-box rp-flow2-box--sm {{ $boxCls($acceptDoneOnly, $selected->status === RecruitmentStatus::Zaakceptowany) }} {{ $onRejectPath ? 'rp-flow2-box--dim' : '' }}">{{ RecruitmentStatus::Zaakceptowany->label() }}</button>
+                                            <button type="button" wire:click="updateStatus({{ $selected->id }}, 'odrzucony')"
+                                                    class="rp-flow2-box rp-flow2-box--sm {{ $boxCls(false, $onRejectPath, true) }} {{ $onAcceptPath ? 'rp-flow2-box--dim' : '' }}">Odrzucony</button>
                                         </div>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">Prowadzi</span>
-                                            <select wire:model.live="editAssignedRecruiterId" class="form-select form-select-sm" style="min-width:160px;max-width:220px;">
-                                                <option value="">— Nieprzypisany —</option>
-                                                @foreach($recruiters as $recruiter)
-                                                    <option value="{{ $recruiter->id }}">{{ $recruiter->name }}</option>
+
+                                        <div class="rp-flow2-connector {{ $onAcceptPath ? 'rp-done' : '' }} {{ $onRejectPath ? 'rp-flow2-box--dim' : '' }}"></div>
+
+                                        <button type="button" wire:click="updateStatus({{ $selected->id }}, 'onboarding')"
+                                                class="rp-flow2-box {{ $boxCls($selected->status === RecruitmentStatus::Zatrudniony, $selected->status === RecruitmentStatus::Onboarding) }} {{ $onRejectPath ? 'rp-flow2-box--dim' : '' }}">Onboarding</button>
+
+                                        <div class="rp-flow2-connector {{ $selected->status === RecruitmentStatus::Zatrudniony ? 'rp-done' : '' }} {{ $onRejectPath ? 'rp-flow2-box--dim' : '' }}"></div>
+
+                                        <button type="button" wire:click="updateStatus({{ $selected->id }}, 'zatrudniony')"
+                                                class="rp-flow2-box {{ $boxCls(false, $selected->status === RecruitmentStatus::Zatrudniony) }} {{ $onRejectPath ? 'rp-flow2-box--dim' : '' }}">Zatrudniony</button>
+                                    </div>
+
+                                    <div class="rp-pipeline-side">
+                                        @foreach($sideStatuses as $side)
+                                            <button type="button" wire:click="updateStatus({{ $selected->id }}, '{{ $side->value }}')"
+                                                    class="btn btn-sm {{ $selected->status === $side ? 'btn-'.$side->variant() : 'btn-outline-secondary' }}">
+                                                {{ $side->label() }}
+                                            </button>
+                                        @endforeach
+                                    </div>
+
+                                    @if($selected->status === RecruitmentStatus::Odrzucony && $selected->rejection_reason)
+                                        <div class="mt-2" style="font-size:.8rem;color:var(--text-muted);">
+                                            <i class="bi bi-info-circle me-1"></i>Powód: <strong style="color:var(--text-0,inherit);">{{ $selected->rejection_reason->label() }}</strong>
+                                            @if($selected->rejection_reason_note) — {{ $selected->rejection_reason_note }} @endif
+                                        </div>
+                                    @endif
+
+                                    @php
+                                        // Jeden slot procedury per status — karta widoczna tylko w tym jednym widoku,
+                                        // dostosowana do tego, co aktualnie dzieje się z kandydatem na danym etapie.
+                                        $statusSlots = [
+                                            RecruitmentStatus::Zaakceptowany->value => ['key' => 'recruitment_process.zaakceptowany', 'label' => 'Procedura: Weryfikacja'],
+                                            RecruitmentStatus::Onboarding->value    => ['key' => 'recruitment_process.onboarding', 'label' => 'Procedura: Onboarding'],
+                                            RecruitmentStatus::Zatrudniony->value   => ['key' => 'recruitment_process.zatrudniony', 'label' => 'Procedura: Zatrudniony'],
+                                        ];
+                                        $activeSlot = $statusSlots[$selected->status->value] ?? null;
+                                    @endphp
+                                    @if($activeSlot)
+                                        <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
+                                            <div class="rp-section-title">{{ $activeSlot['label'] }}</div>
+                                            <livewire:procedure-slot
+                                                :slot-key="$activeSlot['key']"
+                                                :subject="$selected"
+                                                :variables="['candidate_name' => $selected->candidate?->full_name, 'recruitment_process_id' => $selected->id]"
+                                                :subject-label="($selected->candidate?->full_name ?? 'Kandydat').' #'.$selected->id"
+                                                wire:key="proc-slot-{{ $activeSlot['key'] }}-{{ $selected->id }}"
+                                            />
+                                        </div>
+                                    @endif
+
+                                    @if($showRejectionPrompt)
+                                        <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
+                                            <div class="rp-section-title" style="color:var(--danger);">Powód odrzucenia</div>
+                                            <select wire:model="rejectionReason" class="form-select form-select-sm mb-2">
+                                                <option value="">— Wybierz powód —</option>
+                                                @foreach(RecruitmentRejectionReason::options() as $value => $label)
+                                                    <option value="{{ $value }}">{{ $label }}</option>
                                                 @endforeach
                                             </select>
+                                            @error('rejectionReason') <div class="small mb-2" style="color:var(--danger);">{{ $message }}</div> @enderror
+                                            <textarea wire:model="rejectionNote" class="form-control mb-2" rows="2" style="font-size:.82rem;" placeholder="Komentarz (opcjonalnie)…"></textarea>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" wire:click="confirmRejection" class="btn btn-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Potwierdź odrzucenie</button>
+                                                <button type="button" wire:click="cancelRejection" class="btn btn-outline-secondary btn-sm">Anuluj</button>
+                                            </div>
                                         </div>
+                                    @endif
+                                </div>
+
+                                {{-- Historia statusów tego procesu --}}
+                                <div class="mb-3" style="border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);padding:.75rem .85rem;">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
+                                            Historia statusów
+                                        </div>
+                                        <span style="font-size:.65rem;color:var(--text-muted);">proces #{{ $selected->id }}</span>
                                     </div>
-
-                                    <div class="mb-3">
-                                        <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">Status</div>
-                                        <div class="rp-pipeline">
-                                            @foreach($pipelineSteps as $i => $step)
-                                                @php
-                                                    $isDone   = $currentIdx !== null && $i < $currentIdx;
-                                                    $isActive = $selected->status === $step;
-                                                    $cls      = $isDone ? 'rp-done' : ($isActive ? 'rp-active' : '');
-                                                @endphp
-                                                <button type="button" wire:click="updateStatus({{ $selected->id }}, '{{ $step->value }}')"
-                                                        class="rp-pipeline-step {{ $cls }}" title="{{ $step->label() }}">
-                                                    <div class="rp-pipeline-dot"></div>
-                                                    <div class="rp-pipeline-label">{{ $step->label() }}</div>
-                                                </button>
-                                                @if(! $loop->last)
-                                                    <div class="rp-pipeline-connector {{ $isDone ? 'rp-done' : '' }}"></div>
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                        <div class="rp-pipeline-side">
-                                            @foreach($sideStatuses as $side)
-                                                <button type="button" wire:click="updateStatus({{ $selected->id }}, '{{ $side->value }}')"
-                                                        class="btn btn-sm {{ $selected->status === $side ? 'btn-'.$side->variant() : 'btn-outline-secondary' }}">
-                                                    {{ $side->label() }}
-                                                </button>
-                                            @endforeach
-                                        </div>
-
-                                        @if($selected->status === RecruitmentStatus::Odrzucony && $selected->rejection_reason)
-                                            <div class="mt-2" style="font-size:.8rem;color:var(--text-muted);">
-                                                <i class="bi bi-info-circle me-1"></i>Powód: <strong style="color:var(--text-0,inherit);">{{ $selected->rejection_reason->label() }}</strong>
-                                                @if($selected->rejection_reason_note) — {{ $selected->rejection_reason_note }} @endif
-                                            </div>
-                                        @endif
-
-                                        @if($showRejectionPrompt)
-                                            <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
-                                                <div class="rp-section-title" style="color:var(--danger);">Powód odrzucenia</div>
-                                                <select wire:model="rejectionReason" class="form-select form-select-sm mb-2">
-                                                    <option value="">— Wybierz powód —</option>
-                                                    @foreach(RecruitmentRejectionReason::options() as $value => $label)
-                                                        <option value="{{ $value }}">{{ $label }}</option>
-                                                    @endforeach
-                                                </select>
-                                                @error('rejectionReason') <div class="small mb-2" style="color:var(--danger);">{{ $message }}</div> @enderror
-                                                <textarea wire:model="rejectionNote" class="form-control mb-2" rows="2" style="font-size:.82rem;" placeholder="Komentarz (opcjonalnie)…"></textarea>
-                                                <div class="d-flex gap-2">
-                                                    <button type="button" wire:click="confirmRejection" class="btn btn-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Potwierdź odrzucenie</button>
-                                                    <button type="button" wire:click="cancelRejection" class="btn btn-outline-secondary btn-sm">Anuluj</button>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    {{-- Historia statusów tego procesu --}}
-                                    <div class="mb-3" style="border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);padding:.75rem .85rem;">
-                                        <div class="d-flex align-items-center justify-content-between mb-2">
-                                            <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-                                                Historia statusów
-                                            </div>
-                                            <span style="font-size:.65rem;color:var(--text-muted);">proces #{{ $selected->id }}</span>
-                                        </div>
+                                    <div style="max-height:120px;overflow-y:auto;">
                                         @forelse($selected->statusHistory as $entry)
                                             <div class="d-flex gap-2 mb-2" wire:key="hist-{{ $entry->id }}" style="font-size:.78rem;">
                                                 <div style="padding-top:5px;flex-shrink:0;">
@@ -548,6 +609,9 @@
                                                     <div>
                                                         @if($entry->from_status)
                                                             <span style="color:var(--text-muted);">{{ $entry->from_status->label() }}</span>
+                                                            <i class="bi bi-arrow-right mx-1" style="color:var(--text-muted);font-size:.7rem;"></i>
+                                                        @else
+                                                            <span style="color:var(--text-muted);">Utworzono</span>
                                                             <i class="bi bi-arrow-right mx-1" style="color:var(--text-muted);font-size:.7rem;"></i>
                                                         @endif
                                                         <strong>{{ $entry->to_status->label() }}</strong>
@@ -560,60 +624,60 @@
                                             <p style="color:var(--text-muted);font-size:.78rem;margin:0;">Brak zmian statusu — historia pojawi się po pierwszej zmianie.</p>
                                         @endforelse
                                     </div>
+                                </div>
 
-                                    <div class="mb-3">
-                                        @php $processComments = $selected->comments->sortByDesc('created_at'); @endphp
-                                        <div class="d-flex align-items-center justify-content-between mb-1">
-                                            <span style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-                                                <i class="bi bi-chat-dots me-1"></i>Komentarze procesu
-                                                @if($processComments->count()) <span class="badge badge-secondary ms-1" style="font-size:.6rem;">{{ $processComments->count() }}</span> @endif
-                                            </span>
-                                            <button type="button" wire:click="openCommentModal('process')" class="btn btn-sm btn-outline-secondary" style="padding:1px 7px;font-size:.7rem;line-height:1.6;">
-                                                <i class="bi bi-plus me-1"></i>Dodaj
-                                            </button>
-                                        </div>
-                                        @if($processComments->count())
-                                            <div style="max-height:120px;overflow-y:auto;">
-                                                @foreach($processComments->take(20) as $cm)
-                                                    <div class="d-flex align-items-start gap-2 py-1" style="border-bottom:1px solid rgba(255,255,255,.05);">
-                                                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary flex-shrink-0" style="width:1.4rem;height:1.4rem;font-size:.55rem;font-weight:700;">{{ mb_strtoupper(mb_substr($cm->user->name ?? '?',0,2)) }}</span>
-                                                        <div class="flex-grow-1 min-width-0" style="font-size:.73rem;">
-                                                            <span class="fw-semibold" style="color:var(--text-body);">{{ $cm->user->name ?? '—' }}</span>
-                                                            <span style="color:var(--text-muted);"> · {{ $cm->created_at->diffForHumans() }}</span>
-                                                            <div style="color:var(--text-muted);white-space:pre-line;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">{{ $cm->body }}</div>
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <p style="color:var(--text-muted);font-size:.72rem;margin:.2rem 0 0;">Brak komentarzy.</p>
-                                        @endif
+                                <div class="mb-3">
+                                    @php $processComments = $selected->comments->sortByDesc('created_at'); @endphp
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
+                                            <i class="bi bi-chat-dots me-1"></i>Komentarze procesu
+                                            @if($processComments->count()) <span class="badge badge-secondary ms-1" style="font-size:.6rem;">{{ $processComments->count() }}</span> @endif
+                                        </span>
+                                        <button type="button" wire:click="openCommentModal('process')" class="btn btn-sm btn-outline-secondary" style="padding:1px 7px;font-size:.7rem;line-height:1.6;">
+                                            <i class="bi bi-plus me-1"></i>Dodaj
+                                        </button>
                                     </div>
-
-                                    @if(! $selected->employee_id && $selected->status === RecruitmentStatus::Onboarding)
-                                        <div class="mt-3" style="border:1px solid rgba(34,197,94,.25);border-radius:10px;padding:.85rem;background:rgba(34,197,94,.04);">
-                                            <div class="rp-section-title" style="color:var(--success);"><i class="bi bi-person-plus me-1"></i>Zatrudnij kandydata</div>
-                                            <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:.6rem;">
-                                                Tworzy profil pracownika i ustawia status na „Zatrudniony". Wybierz role:
-                                            </p>
-                                            <div class="d-flex flex-wrap gap-1 mb-3">
-                                                @foreach($roles as $role)
-                                                    <label class="form-check-compact" wire:key="hr-{{ $role->id }}">
-                                                        <input type="checkbox" wire:model="hireRoles" value="{{ $role->id }}">
-                                                        <span>{{ $role->name }}</span>
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                            @error('hireRoles') <div class="small mb-2" style="color:var(--danger);">{{ $message }}</div> @enderror
-                                            <button type="button" class="btn btn-success btn-sm"
-                                                    wire:click="convertToEmployee"
-                                                    onclick="return confirm('Zatrudnić kandydata?')">
-                                                <i class="bi bi-person-plus me-1"></i>Zatrudnij
-                                            </button>
+                                    @if($processComments->count())
+                                        <div style="max-height:120px;overflow-y:auto;">
+                                            @foreach($processComments->take(20) as $cm)
+                                                <div class="d-flex align-items-start gap-2 py-1" style="border-bottom:1px solid rgba(255,255,255,.05);">
+                                                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary flex-shrink-0" style="width:1.4rem;height:1.4rem;font-size:.55rem;font-weight:700;">{{ mb_strtoupper(mb_substr($cm->user->name ?? '?',0,2)) }}</span>
+                                                    <div class="flex-grow-1 min-width-0" style="font-size:.73rem;">
+                                                        <span class="fw-semibold" style="color:var(--text-body);">{{ $cm->user->name ?? '—' }}</span>
+                                                        <span style="color:var(--text-muted);"> · {{ $cm->created_at->diffForHumans() }}</span>
+                                                        <div style="color:var(--text-muted);white-space:pre-line;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">{{ $cm->body }}</div>
+                                                    </div>
+                                                </div>
+                                            @endforeach
                                         </div>
+                                    @else
+                                        <p style="color:var(--text-muted);font-size:.72rem;margin:.2rem 0 0;">Brak komentarzy.</p>
                                     @endif
                                 </div>
-                            </div>
+
+                                @if(! $selected->employee_id && $selected->status === RecruitmentStatus::Onboarding)
+                                    <div class="mt-3" style="border:1px solid rgba(34,197,94,.25);border-radius:10px;padding:.85rem;background:rgba(34,197,94,.04);">
+                                        <div class="rp-section-title" style="color:var(--success);"><i class="bi bi-person-plus me-1"></i>Zatrudnij kandydata</div>
+                                        <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:.6rem;">
+                                            Tworzy profil pracownika i ustawia status na „Zatrudniony". Wybierz role:
+                                        </p>
+                                        <div class="d-flex flex-wrap gap-1 mb-3">
+                                            @foreach($roles as $role)
+                                                <label class="form-check-compact" wire:key="hr-{{ $role->id }}">
+                                                    <input type="checkbox" wire:model="hireRoles" value="{{ $role->id }}">
+                                                    <span>{{ $role->name }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                        @error('hireRoles') <div class="small mb-2" style="color:var(--danger);">{{ $message }}</div> @enderror
+                                        <button type="button" class="btn btn-success btn-sm"
+                                                wire:click="convertToEmployee"
+                                                onclick="return confirm('Zatrudnić kandydata?')">
+                                            <i class="bi bi-person-plus me-1"></i>Zatrudnij
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>{{-- /karta procesu --}}
                         </div>
 
                         {{-- Inne procesy tego kandydata --}}
@@ -752,6 +816,9 @@
                                 Zadania
                                 <span class="badge badge-info ms-1">{{ $selected->tasks->count() }}</span>
                                 <span style="font-size:.65rem;color:var(--text-muted);font-weight:400;margin-left:.35rem;">proces #{{ $selected->id }}</span>
+                                <button type="button" wire:click="openTaskModalManual" class="btn btn-sm btn-outline-secondary ms-auto" style="padding:1px 7px;font-size:.7rem;line-height:1.6;">
+                                    <i class="bi bi-plus me-1"></i>Dodaj
+                                </button>
                             </div>
                             @forelse($selected->tasks as $task)
                                 <div class="d-flex justify-content-between align-items-start mb-2" wire:key="task-{{ $task->id }}" style="font-size:.8rem;">
@@ -790,14 +857,17 @@
                     <button type="button" wire:click="closeTaskModal" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <div class="p-3">
-                    <p style="color:var(--text-muted);font-size:.82rem;">Kandydat prosi o oddzwonienie — dodaj przypomnienie z terminem, żeby nie zgubić follow-upu.</p>
                     <div class="mb-2">
-                        <label class="form-label" style="font-size:.75rem;">Tytuł zadania</label>
+                        <label class="form-label" style="font-size:.75rem;">Tytuł zadania <span class="text-danger">*</span></label>
                         <input type="text" wire:model="taskTitle" class="form-control form-control-sm">
                         @error('taskTitle') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                     </div>
                     <div class="mb-2">
-                        <label class="form-label" style="font-size:.75rem;">Termin (due date)</label>
+                        <label class="form-label" style="font-size:.75rem;">Opis (opcjonalnie)</label>
+                        <textarea wire:model="taskDescription" class="form-control form-control-sm" rows="2" style="resize:vertical;" placeholder="Dodatkowe informacje…"></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:.75rem;">Termin <span class="text-danger">*</span></label>
                         <input type="date" wire:model="taskDueDate" class="form-control form-control-sm">
                         @error('taskDueDate') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                     </div>
@@ -811,7 +881,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <button type="button" wire:click="saveFollowUpTask" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Dodaj zadanie</button>
-                        <button type="button" wire:click="closeTaskModal" class="btn btn-outline-secondary btn-sm">Pomiń</button>
+                        <button type="button" wire:click="closeTaskModal" class="btn btn-outline-secondary btn-sm">Anuluj</button>
                     </div>
                 </div>
             </div>
@@ -826,7 +896,7 @@
                     <strong style="font-size:.9rem;">
                         <i class="bi bi-chat-dots me-1"></i>
                         @if($commentModalTarget === 'candidate')
-                            Komentarz do kandydata
+                            Komentarz o kandydacie
                         @else
                             Komentarz do procesu #{{ $selected?->id }}
                         @endif

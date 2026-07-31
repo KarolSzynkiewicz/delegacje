@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ProcedureRun extends Model
 {
@@ -15,6 +16,7 @@ class ProcedureRun extends Model
         'definition_snapshot',
         'subject_type',
         'subject_id',
+        'slot_key',
         'current_node_id',
         'path',
         'status',
@@ -36,6 +38,12 @@ class ProcedureRun extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(ProcedureTemplate::class, 'procedure_template_id');
+    }
+
+    /** The arbitrary model this run was started for (e.g. a RecruitmentProcess). */
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
     }
 
     public function startedBy(): BelongsTo

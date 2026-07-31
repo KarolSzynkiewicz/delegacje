@@ -4,23 +4,19 @@ namespace App\Enums;
 
 enum RecruitmentRejectionReason: string
 {
-    case ZaDrogi = 'za_drogi';
-    case StawkaZaNiska = 'stawka_za_niska';
-    case OczekiwaniaFinansowe = 'oczekiwania_finansowe';
+    case Stawka = 'stawka';
+    case PracujeGdzieIndziej = 'pracuje_gdzie_indziej';
+    case Duplikat = 'duplikat';
     case BrakDoswiadczenia = 'brak_doswiadczenia';
-    case NieOdpowiadaNaTelefon = 'nie_odpowiada_na_telefon';
-    case ZatrudnionyGdzieIndziej = 'zatrudniony_gdzie_indziej';
     case Inne = 'inne';
 
     public function label(): string
     {
         return match ($this) {
-            self::ZaDrogi => 'Za drogi',
-            self::StawkaZaNiska => 'Stawka za niska',
-            self::OczekiwaniaFinansowe => 'Oczekiwania finansowe',
+            self::Stawka => 'Stawka (zbyt niska/wysoka)',
+            self::PracujeGdzieIndziej => 'Pracuje gdzie indziej',
+            self::Duplikat => 'Duplikat',
             self::BrakDoswiadczenia => 'Brak doświadczenia',
-            self::NieOdpowiadaNaTelefon => 'Nie odpowiada na telefon',
-            self::ZatrudnionyGdzieIndziej => 'Zatrudniony gdzie indziej',
             self::Inne => 'Inne',
         };
     }
