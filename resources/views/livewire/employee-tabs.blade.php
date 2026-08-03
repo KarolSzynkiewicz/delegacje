@@ -12,6 +12,41 @@
         <div id="info" role="tabpanel">
             <div class="card">
                 <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4 p-3 rounded" style="background:{{ $employee->isTerminated() ? 'rgba(239,68,68,.08)' : 'rgba(52,211,153,.08)' }};border:1px solid {{ $employee->isTerminated() ? 'rgba(239,68,68,.25)' : 'rgba(52,211,153,.25)' }};">
+                        <div>
+                            @if($employee->isTerminated())
+                                <x-ui.badge variant="danger">
+                                    <i class="bi bi-person-x me-1"></i>Zwolniony
+                                </x-ui.badge>
+                                <div class="small text-muted mt-1">
+                                    {{ $employee->terminated_at->format('Y-m-d') }}
+                                    &nbsp;·&nbsp;
+                                    {{ $employee->termination_reason?->label() ?? '-' }}
+                                    @if($employee->termination_note)
+                                        <br>{{ $employee->termination_note }}
+                                    @endif
+                                </div>
+                            @else
+                                <x-ui.badge variant="success">
+                                    <i class="bi bi-person-check me-1"></i>Zatrudniony
+                                </x-ui.badge>
+                            @endif
+                        </div>
+                        @if(auth()->user()->hasPermission('employees.update'))
+                            <div>
+                                @if($employee->isTerminated())
+                                    <x-ui.button variant="outline-secondary" class="btn-sm" wire:click="reinstate" wire:confirm="Czy na pewno chcesz cofnąć zwolnienie tego pracownika?">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i>Cofnij zwolnienie
+                                    </x-ui.button>
+                                @else
+                                    <x-ui.button variant="danger" class="btn-sm" wire:click="openTerminateModal">
+                                        <i class="bi bi-person-x me-1"></i>Zwolnij pracownika
+                                    </x-ui.button>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+
                     @if($employee->image_path)
                         <div class="mb-4 text-center">
                             <img src="{{ $employee->image_url }}" alt="{{ $employee->full_name }}" class="img-fluid rounded" style="max-width: 500px; max-height: 400px; object-fit: cover;">
@@ -943,4 +978,68 @@
         </div>
     @endif
 </div>
+
+@if($showTerminateModal)
+    @teleport('body')
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
+         style="background:rgba(0,0,0,.75);z-index:2000;"
+         wire:click.self="closeTerminateModal"
+         wire:key="employee-terminate-modal">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background:var(--bg-card,#1e2535);border:1px solid var(--glass-border,rgba(255,255,255,.1));color:var(--text-main,#f1f5f9);">
+                <div class="modal-header" style="border-color:var(--glass-border);">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-x me-2 text-danger"></i>
+                        Zwolnij pracownika — {{ $employee->full_name }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" wire:click="closeTerminateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning d-flex gap-2 align-items-start mb-3" style="font-size:.85rem;">
+                        <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+                        <div>
+                            Ta akcja nie usuwa pracownika ani nie zmienia historii rekrutacji.
+                            Zapisuje tylko datę i powód zwolnienia oraz dodaje wpis audytowy do bazy kandydatów (status: <em>Były pracownik</em>).
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted mb-1">Powód zwolnienia *</label>
+                        <select wire:model="terminationReason" class="form-select @error('terminationReason') is-invalid @enderror">
+                            <option value="">— wybierz —</option>
+                            @foreach(\App\Enums\EmployeeTerminationReason::options() as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('terminationReason')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label small text-muted mb-1">Notatka (opcjonalnie)</label>
+                        <textarea wire:model="terminationNote" class="form-control @error('terminationNote') is-invalid @enderror" rows="3"></textarea>
+                        @error('terminationNote')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-color:var(--glass-border);">
+                    <button type="button" wire:click="terminate" wire:loading.attr="disabled" class="btn btn-danger">
+                        <span wire:loading.remove wire:target="terminate">
+                            <i class="bi bi-person-x me-1"></i>Zwolnij
+                        </span>
+                        <span wire:loading wire:target="terminate">
+                            <i class="bi bi-hourglass-split me-1"></i>Zapisuję…
+                        </span>
+                    </button>
+                    <button type="button" wire:click="closeTerminateModal" class="btn btn-outline-secondary">
+                        Anuluj
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endteleport
+@endif
 </div>

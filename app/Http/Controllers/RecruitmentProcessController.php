@@ -29,14 +29,14 @@ class RecruitmentProcessController extends Controller
 
         return view('recruitment.show', [
             'application' => $recruitmentProcess,
-            'roles'       => $roles,
+            'roles' => $roles,
         ]);
     }
 
     public function updateStatus(Request $request, RecruitmentProcess $recruitmentProcess): RedirectResponse
     {
         $request->validate([
-            'status'      => 'required|in:'.implode(',', array_column(RecruitmentStatus::cases(), 'value')),
+            'status' => 'required|in:'.implode(',', array_column(RecruitmentStatus::cases(), 'value')),
             'admin_notes' => 'nullable|string|max:2000',
             'rejection_reason' => ['nullable', 'in:'.implode(',', array_column(RecruitmentRejectionReason::cases(), 'value'))],
         ]);
@@ -59,11 +59,11 @@ class RecruitmentProcessController extends Controller
         }
 
         $request->validate([
-            'roles'   => 'required|array|min:1',
+            'roles' => 'required|array|min:1',
             'roles.*' => 'exists:roles,id',
         ], [
             'roles.required' => 'Wybierz przynajmniej jedną rolę pracownika.',
-            'roles.min'      => 'Wybierz przynajmniej jedną rolę pracownika.',
+            'roles.min' => 'Wybierz przynajmniej jedną rolę pracownika.',
             'roles.*.exists' => 'Wybrana rola nie istnieje.',
         ]);
 
@@ -85,14 +85,16 @@ class RecruitmentProcessController extends Controller
 
         $employee = Employee::create([
             'first_name' => $candidate->first_name,
-            'last_name'  => $candidate->last_name,
-            'email'      => $candidate->email,
-            'phone'      => $candidate->phone,
-            'notes'      => null,
+            'last_name' => $candidate->last_name,
+            'email' => $candidate->email,
+            'phone' => $candidate->phone,
+            'notes' => null,
             'image_path' => $imagePath,
         ]);
 
         $employee->roles()->attach($request->roles);
+
+        $candidate->update(['employee_id' => $employee->id]);
 
         $recruitmentProcess->transitionTo(RecruitmentStatus::Zatrudniony, auth()->id());
         $recruitmentProcess->update(['employee_id' => $employee->id]);

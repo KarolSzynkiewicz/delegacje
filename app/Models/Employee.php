@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\EmployeeTerminationReason;
 use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
@@ -28,6 +30,9 @@ class Employee extends Model
         'image_path',
         'outside_base',
         'last_departure_id',
+        'terminated_at',
+        'termination_reason',
+        'termination_note',
     ];
 
     /**
@@ -37,7 +42,24 @@ class Employee extends Model
      */
     protected $casts = [
         'outside_base' => 'boolean',
+        'terminated_at' => 'datetime',
+        'termination_reason' => EmployeeTerminationReason::class,
     ];
+
+    /**
+     * The recruitment candidate identity linked to this employee, if any.
+     * This FK on recruitment_candidates.employee_id is the source of truth for
+     * "is this candidate currently/formerly an employee" — not a status flag.
+     */
+    public function candidate(): HasOne
+    {
+        return $this->hasOne(RecruitmentCandidate::class, 'employee_id');
+    }
+
+    public function isTerminated(): bool
+    {
+        return $this->terminated_at !== null;
+    }
 
     /**
      * Get all roles associated with the employee.

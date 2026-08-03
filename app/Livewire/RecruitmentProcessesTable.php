@@ -636,14 +636,16 @@ class RecruitmentProcessesTable extends Component
 
         $employee = Employee::create([
             'first_name' => $candidate->first_name,
-            'last_name'  => $candidate->last_name,
-            'email'      => $candidate->email,
-            'phone'      => $candidate->phone,
-            'notes'      => null,
+            'last_name' => $candidate->last_name,
+            'email' => $candidate->email,
+            'phone' => $candidate->phone,
+            'notes' => null,
             'image_path' => $imagePath,
         ]);
 
         $employee->roles()->attach($this->hireRoles);
+
+        $candidate->update(['employee_id' => $employee->id]);
 
         $process->transitionTo(RecruitmentStatus::Zatrudniony, auth()->id());
         $process->update(['employee_id' => $employee->id]);

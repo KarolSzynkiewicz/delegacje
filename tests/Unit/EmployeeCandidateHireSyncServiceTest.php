@@ -5,8 +5,6 @@ namespace Tests\Unit;
 use App\Enums\RecruitmentStatus;
 use App\Models\Employee;
 use App\Models\RecruitmentCandidate;
-use App\Models\RecruitmentLead;
-use App\Models\RecruitmentProcess;
 use App\Services\EmployeeCandidateHireSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,7 +18,7 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
         return new EmployeeCandidateHireSyncService;
     }
 
-    public function test_preview_classifies_missing_unhired_hired_and_no_phone(): void
+    public function test_preview_classifies_missing_unhired_hired_conflict_and_no_phone(): void
     {
         $missing = Employee::factory()->create([
             'first_name' => 'Brak',
@@ -38,29 +36,33 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
             'last_name' => 'Niezatrudniony',
             'phone' => '501999888',
         ]);
-        $lead = RecruitmentLead::create(['candidate_id' => $unhiredCandidate->id]);
-        RecruitmentProcess::create([
-            'lead_id' => $lead->id,
-            'candidate_id' => $unhiredCandidate->id,
-            'status' => RecruitmentStatus::Nowy,
-        ]);
 
+        // Already linked via FK — the source of truth, regardless of process history.
         $hiredEmployee = Employee::factory()->create([
             'first_name' => 'Juz',
             'last_name' => 'Zatrudniony',
             'phone' => '604555666',
         ]);
-        $hiredCandidate = RecruitmentCandidate::create([
+        RecruitmentCandidate::create([
             'first_name' => 'Juz',
             'last_name' => 'Zatrudniony',
             'phone' => '604555666',
-        ]);
-        $hiredLead = RecruitmentLead::create(['candidate_id' => $hiredCandidate->id]);
-        RecruitmentProcess::create([
-            'lead_id' => $hiredLead->id,
-            'candidate_id' => $hiredCandidate->id,
-            'status' => RecruitmentStatus::Zatrudniony,
             'employee_id' => $hiredEmployee->id,
+        ]);
+
+        // Same phone as an existing candidate, but that candidate is linked to a
+        // DIFFERENT employee — must be flagged as a conflict, not auto-fixed.
+        $conflictEmployee = Employee::factory()->create([
+            'first_name' => 'Konflikt',
+            'last_name' => 'Telefonu',
+            'phone' => '699111222',
+        ]);
+        $otherEmployee = Employee::factory()->create(['phone' => '111222333']);
+        RecruitmentCandidate::create([
+            'first_name' => 'Inny',
+            'last_name' => 'Wlasciciel',
+            'phone' => '699111222',
+            'employee_id' => $otherEmployee->id,
         ]);
 
         Employee::factory()->create([
@@ -78,16 +80,20 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
         $this->assertSame('unhired', $byId[$unhiredEmployee->id]['status']);
         $this->assertTrue($byId[$unhiredEmployee->id]['actionable']);
         $this->assertSame('48501999888', $byId[$unhiredEmployee->id]['phone']);
+        $this->assertSame($unhiredCandidate->id, $byId[$unhiredEmployee->id]['candidate_id']);
 
         $this->assertSame('hired', $byId[$hiredEmployee->id]['status']);
         $this->assertFalse($byId[$hiredEmployee->id]['actionable']);
+
+        $this->assertSame('conflict', $byId[$conflictEmployee->id]['status']);
+        $this->assertFalse($byId[$conflictEmployee->id]['actionable']);
 
         $noPhone = $byId->firstWhere('status', 'no_phone');
         $this->assertNotNull($noPhone);
         $this->assertFalse($noPhone['actionable']);
     }
 
-    public function test_apply_creates_missing_marks_unhired_and_skips_hired(): void
+    public function test_apply_creates_missing_links_unhired_and_skips_hired_and_conflict(): void
     {
         $missing = Employee::factory()->create([
             'phone' => '600100200',
@@ -101,25 +107,22 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
             'phone' => '501999888',
             'email' => 'anna@example.com',
         ]);
-        $lead = RecruitmentLead::create(['candidate_id' => $unhiredCandidate->id]);
-        RecruitmentProcess::create([
-            'lead_id' => $lead->id,
-            'candidate_id' => $unhiredCandidate->id,
-            'status' => RecruitmentStatus::WTrakcieKontaktu,
-        ]);
 
         $hiredEmployee = Employee::factory()->create(['phone' => '604555666']);
-        $hiredCandidate = RecruitmentCandidate::create([
+        RecruitmentCandidate::create([
             'first_name' => 'Piotr',
             'last_name' => 'Wisniewski',
             'phone' => '604555666',
-        ]);
-        $hiredLead = RecruitmentLead::create(['candidate_id' => $hiredCandidate->id]);
-        RecruitmentProcess::create([
-            'lead_id' => $hiredLead->id,
-            'candidate_id' => $hiredCandidate->id,
-            'status' => RecruitmentStatus::Zatrudniony,
             'employee_id' => $hiredEmployee->id,
+        ]);
+
+        $conflictEmployee = Employee::factory()->create(['phone' => '699111222']);
+        $otherEmployee = Employee::factory()->create(['phone' => '111222333']);
+        RecruitmentCandidate::create([
+            'first_name' => 'Inny',
+            'last_name' => 'Wlasciciel',
+            'phone' => '699111222',
+            'employee_id' => $otherEmployee->id,
         ]);
 
         $preview = $this->service()->preview();
@@ -127,10 +130,11 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
 
         $this->assertSame(1, $result['created']);
         $this->assertSame(1, $result['marked']);
-        $this->assertGreaterThanOrEqual(1, $result['skipped']);
+        $this->assertGreaterThanOrEqual(2, $result['skipped']); // hired + conflict
 
         $createdCandidate = RecruitmentCandidate::where('phone', '48600100200')->first();
         $this->assertNotNull($createdCandidate);
+        $this->assertSame($missing->id, $createdCandidate->employee_id);
         $this->assertTrue(
             $createdCandidate->processes()
                 ->where('status', RecruitmentStatus::Zatrudniony)
@@ -138,16 +142,23 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
                 ->exists()
         );
 
-        $this->assertSame(2, $unhiredCandidate->fresh()->processes()->count());
+        $this->assertSame($unhiredEmployee->id, $unhiredCandidate->fresh()->employee_id);
+        $this->assertSame('anna@example.com', $unhiredCandidate->fresh()->email);
         $this->assertTrue(
             $unhiredCandidate->processes()
                 ->where('status', RecruitmentStatus::Zatrudniony)
                 ->where('employee_id', $unhiredEmployee->id)
                 ->exists()
         );
-        $this->assertSame('anna@example.com', $unhiredCandidate->fresh()->email);
 
-        $this->assertSame(1, $hiredCandidate->fresh()->processes()->count());
+        // Conflict candidate stays linked to the original owner — untouched.
+        $this->assertSame(
+            $otherEmployee->id,
+            RecruitmentCandidate::where('phone', '48699111222')->first()->employee_id
+        );
+        $this->assertFalse(
+            RecruitmentCandidate::where('employee_id', $conflictEmployee->id)->exists()
+        );
     }
 
     public function test_apply_is_idempotent(): void
@@ -162,9 +173,5 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
         $this->assertSame(0, $second['created']);
         $this->assertSame(0, $second['marked']);
         $this->assertSame(1, RecruitmentCandidate::where('phone', '48600100200')->count());
-        $this->assertSame(
-            1,
-            RecruitmentProcess::where('status', RecruitmentStatus::Zatrudniony)->count()
-        );
     }
 }

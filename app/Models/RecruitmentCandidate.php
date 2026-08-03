@@ -7,6 +7,7 @@ use App\Enums\RecruitmentShipyardExperience;
 use App\Support\PhoneNormalizer;
 use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class RecruitmentCandidate extends Model
 {
     use HasComments;
+
     protected $fillable = [
         'first_name',
         'last_name',
@@ -31,6 +33,7 @@ class RecruitmentCandidate extends Model
         'expected_rate_eur',
         'shipyard_experience',
         'available_from',
+        'employee_id',
     ];
 
     protected $casts = [
@@ -57,6 +60,27 @@ class RecruitmentCandidate extends Model
     public function latestProcess(): HasOne
     {
         return $this->hasOne(RecruitmentProcess::class, 'candidate_id')->latestOfMany();
+    }
+
+    /**
+     * The employee record this candidate identity is linked to, if any.
+     * Source of truth for employment status — see isHired()/isFormerEmployee().
+     */
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    /** Currently employed: linked to an employee who has not been terminated. */
+    public function isHired(): bool
+    {
+        return $this->employee_id !== null && ! $this->employee?->isTerminated();
+    }
+
+    /** Former employee: linked to an employee whose employment has ended. */
+    public function isFormerEmployee(): bool
+    {
+        return $this->employee_id !== null && (bool) $this->employee?->isTerminated();
     }
 
     public function roles(): BelongsToMany

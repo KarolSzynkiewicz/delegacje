@@ -6,8 +6,13 @@
     </button>
 
     @if($show)
-    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.6);" wire:click.self="closeModal">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    {{-- Teleport do body: inaczej modal jest przycinany przez kartę / .app-content-wrapper --}}
+    @teleport('body')
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
+         style="background:rgba(0,0,0,.75);z-index:2000;"
+         wire:click.self="closeModal"
+         wire:key="employee-candidate-hire-sync-modal">
+        <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
             <div class="modal-content" style="background:var(--bg-card,#1e2535);border:1px solid var(--glass-border,rgba(255,255,255,.1));color:var(--text-main,#f1f5f9);">
 
                 <div class="modal-header" style="border-color:var(--glass-border);">
@@ -23,10 +28,12 @@
                         <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
                         <div>
                             Porównuje pracowników z kandydatami po <strong>znormalizowanym numerze telefonu</strong>
-                            (ten sam normalizer co w module rekrutacji).<br>
-                            <strong>Brak w bazie kandydatów</strong> → utworzy kandydata + lead + proces w statusie <em>Zatrudniony</em> (z linkiem do pracownika).<br>
-                            <strong>Kandydat niezatrudniony</strong> → doda nowy proces <em>Zatrudniony</em> (bez nadpisywania danych kandydata).<br>
-                            <strong>Już zatrudniony / bez telefonu</strong> → pominięte.
+                            (ten sam normalizer co w module rekrutacji). Ustawia FK <code>candidate.employee_id</code> —
+                            to jest źródło prawdy o tym, kto jest zatrudniony, nie sam status procesu.<br>
+                            <strong>Brak w bazie kandydatów</strong> → utworzy kandydata, podlinkuje do pracownika i doda audytowy lead + proces <em>Zatrudniony</em>.<br>
+                            <strong>Kandydat niezatrudniony</strong> → podlinkuje istniejącego kandydata (bez nadpisywania jego danych) i doda audytowy proces <em>Zatrudniony</em>.<br>
+                            <strong>Już podlinkowany / bez telefonu</strong> → pominięte.<br>
+                            <strong>Konflikt</strong> (telefon zgadza się, ale kandydat jest już podlinkowany do innego pracownika) → pominięte, wymaga ręcznego sprawdzenia.
                         </div>
                     </div>
 
@@ -69,6 +76,7 @@
                             $unhiredCount = $previewCol->where('status', 'unhired')->count();
                             $hiredCount = $previewCol->where('status', 'hired')->count();
                             $noPhoneCount = $previewCol->where('status', 'no_phone')->count();
+                            $conflictCount = $previewCol->where('status', 'conflict')->count();
                         @endphp
 
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -79,7 +87,11 @@
                                 &nbsp;·&nbsp;
                                 <span style="color:#fbbf24">{{ $unhiredCount }} kandydat (niezatrudniony)</span>
                                 &nbsp;·&nbsp;
-                                <span style="color:#a78bfa">{{ $hiredCount }} już zatrudniony</span>
+                                <span style="color:#a78bfa">{{ $hiredCount }} już połączony</span>
+                                @if($conflictCount > 0)
+                                    &nbsp;·&nbsp;
+                                    <span style="color:#f87171">{{ $conflictCount }} konflikt</span>
+                                @endif
                                 @if($noPhoneCount > 0)
                                     &nbsp;·&nbsp;
                                     <span style="color:#f87171">{{ $noPhoneCount }} bez telefonu</span>
@@ -87,7 +99,7 @@
                             </span>
                         </div>
 
-                        <div class="table-responsive" style="max-height:380px;overflow-y:auto;">
+                        <div class="table-responsive" style="max-height:calc(100vh - 280px);overflow-y:auto;">
                             <table class="table table-sm mb-0" style="font-size:.8rem;border-collapse:collapse;">
                                 <thead style="position:sticky;top:0;z-index:1;background:var(--bg-card,#1e2535);">
                                     <tr style="color:var(--text-muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;">
@@ -103,8 +115,9 @@
                                         @php
                                             $status = $row['status'] ?? '';
                                             $dimRow = in_array($status, ['hired', 'no_phone'], true);
+                                            $warnRow = $status === 'conflict';
                                         @endphp
-                                        <tr style="border-bottom:1px solid var(--glass-border);{{ $dimRow ? 'opacity:.45;' : '' }}">
+                                        <tr style="border-bottom:1px solid var(--glass-border);{{ $dimRow ? 'opacity:.45;' : '' }}{{ $warnRow ? 'background:rgba(239,68,68,.08);' : '' }}">
                                             <td style="padding:.35rem .6rem;color:var(--text-muted);">{{ $i + 1 }}</td>
                                             <td style="padding:.35rem .6rem;">
                                                 {{ trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? '')) ?: '—' }}
@@ -128,7 +141,10 @@
                                                         <span class="badge" style="background:rgba(251,191,36,.15);color:#fbbf24;font-size:.62rem;">Kandydat (niezatrudniony)</span>
                                                         @break
                                                     @case('hired')
-                                                        <span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;font-size:.62rem;">Kandydat zatrudniony</span>
+                                                        <span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;font-size:.62rem;">Już połączony</span>
+                                                        @break
+                                                    @case('conflict')
+                                                        <span class="badge" style="background:rgba(239,68,68,.2);color:#f87171;font-size:.62rem;">Konflikt — kandydat już połączony z innym pracownikiem</span>
                                                         @break
                                                     @default
                                                         <span class="badge" style="background:rgba(239,68,68,.2);color:#f87171;font-size:.62rem;">Brak telefonu</span>
@@ -165,5 +181,6 @@
             </div>
         </div>
     </div>
+    @endteleport
     @endif
 </div>

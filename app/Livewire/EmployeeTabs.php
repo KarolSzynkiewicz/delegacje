@@ -2,14 +2,24 @@
 
 namespace App\Livewire;
 
+use App\Enums\EmployeeTerminationReason;
 use App\Models\Employee;
+use App\Services\EmployeeTerminationService;
 use Livewire\Component;
 
 class EmployeeTabs extends Component
 {
     public Employee $employee;
+
     public string $activeTab = 'info';
+
     public array $availableTabs = [];
+
+    public bool $showTerminateModal = false;
+
+    public string $terminationReason = '';
+
+    public string $terminationNote = '';
 
     protected $queryString = ['activeTab' => ['except' => 'info', 'as' => 'tab']];
 
@@ -18,6 +28,60 @@ class EmployeeTabs extends Component
         $this->employee = $employee;
         $this->buildAvailableTabs();
         $this->validateActiveTab();
+    }
+
+    public function openTerminateModal(): void
+    {
+        if (! auth()->user()->hasPermission('employees.update')) {
+            return;
+        }
+
+        $this->terminationReason = '';
+        $this->terminationNote = '';
+        $this->showTerminateModal = true;
+    }
+
+    public function closeTerminateModal(): void
+    {
+        $this->showTerminateModal = false;
+    }
+
+    public function terminate(): void
+    {
+        if (! auth()->user()->hasPermission('employees.update')) {
+            return;
+        }
+
+        $this->validate([
+            'terminationReason' => ['required', 'in:'.implode(',', array_column(EmployeeTerminationReason::cases(), 'value'))],
+            'terminationNote' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'terminationReason.required' => 'Wybierz powód zwolnienia.',
+        ]);
+
+        app(EmployeeTerminationService::class)->terminate(
+            $this->employee,
+            EmployeeTerminationReason::from($this->terminationReason),
+            $this->terminationNote !== '' ? $this->terminationNote : null,
+        );
+
+        $this->employee = $this->employee->fresh();
+        $this->showTerminateModal = false;
+
+        session()->flash('success', 'Pracownik został zwolniony.');
+    }
+
+    public function reinstate(): void
+    {
+        if (! auth()->user()->hasPermission('employees.update')) {
+            return;
+        }
+
+        app(EmployeeTerminationService::class)->reinstate($this->employee);
+
+        $this->employee = $this->employee->fresh();
+
+        session()->flash('success', 'Zwolnienie zostało cofnięte.');
     }
 
     protected function buildAvailableTabs()
@@ -41,7 +105,7 @@ class EmployeeTabs extends Component
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp
-        $this->availableTabs = array_filter($allTabs, function($tab) {
+        $this->availableTabs = array_filter($allTabs, function ($tab) {
             // permission === null (np. info) zawsze dostępny
             // lub user ma wymagane permission
             return $tab['permission'] === null || auth()->user()->hasPermission($tab['permission']);
@@ -50,14 +114,14 @@ class EmployeeTabs extends Component
 
     protected function validateActiveTab()
     {
-        if (!isset($this->availableTabs[$this->activeTab])) {
+        if (! isset($this->availableTabs[$this->activeTab])) {
             $this->activeTab = array_key_first($this->availableTabs) ?? 'info';
         }
     }
 
     public function setTab(string $tab)
     {
-        if (!isset($this->availableTabs[$tab])) {
+        if (! isset($this->availableTabs[$tab])) {
             return; // Ignoruj, fallback w validateActiveTab()
         }
         $this->activeTab = $tab;
@@ -66,7 +130,7 @@ class EmployeeTabs extends Component
     protected function getTabData()
     {
         // Filtracja przez relacje hasMany - bez osobnych route
-        return match($this->activeTab) {
+        return match ($this->activeTab) {
             'documents' => $this->employee->employeeDocuments()->with('document')->get(),
             'rotations' => $this->employee->rotations()->get(),
             'assignments' => $this->employee->assignments()->with(['project', 'role'])->orderBy('start_date', 'desc')->get(),
@@ -76,9 +140,9 @@ class EmployeeTabs extends Component
             'employee-rates' => \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->orderBy('start_date', 'desc')->get(),
             'company-assignments' => $this->employee->companyAssignments()->with('company')->orderBy('start_date', 'desc')->get(),
             'advances' => $this->employee->advances()->orderBy('date', 'desc')->get(),
-            'time-logs' => \App\Models\TimeLog::whereHas('projectAssignment', function($query) {
-                    $query->where('employee_id', $this->employee->id);
-                })
+            'time-logs' => \App\Models\TimeLog::whereHas('projectAssignment', function ($query) {
+                $query->where('employee_id', $this->employee->id);
+            })
                 ->with(['projectAssignment.project', 'projectAssignment.role'])
                 ->orderBy('start_time', 'desc')
                 ->get(),
@@ -92,7 +156,7 @@ class EmployeeTabs extends Component
     public function render()
     {
         $tabData = $this->getTabData();
-        
+
         // Load counts for tabs - użyj snake_case dla loadCount
         $this->employee->loadCount([
             'employeeDocuments',
@@ -105,24 +169,24 @@ class EmployeeTabs extends Component
             'advances',
             'evaluations',
             'adjustments',
-            'comments'
+            'comments',
         ]);
-        
+
         // Load roles for info tab
         $this->employee->load('roles');
-        
+
         // Load employee rates count manually
         $employeeRatesCount = \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->count();
-        
+
         // Load time logs count manually
-        $timeLogsCount = \App\Models\TimeLog::whereHas('projectAssignment', function($query) {
+        $timeLogsCount = \App\Models\TimeLog::whereHas('projectAssignment', function ($query) {
             $query->where('employee_id', $this->employee->id);
         })->count();
-        
+
         // Przygotuj taby dla komponentu
         $tabsForComponent = [];
         foreach ($this->availableTabs as $tabKey => $tab) {
-            $count = match($tabKey) {
+            $count = match ($tabKey) {
                 'documents' => $this->employee->employee_documents_count ?? 0,
                 'rotations' => $this->employee->rotations_count ?? 0,
                 'assignments' => $this->employee->assignments_count ?? 0,
@@ -138,7 +202,7 @@ class EmployeeTabs extends Component
                 'comments' => $this->employee->comments_count ?? 0,
                 default => null,
             };
-            
+
             $tabsForComponent[$tabKey] = [
                 'label' => $tab['label'],
                 'icon' => $tab['icon'] ?? null,
@@ -146,7 +210,7 @@ class EmployeeTabs extends Component
                 'wireClick' => "setTab('{$tabKey}')",
             ];
         }
-        
+
         return view('livewire.employee-tabs', compact('tabData', 'employeeRatesCount', 'timeLogsCount', 'tabsForComponent'));
     }
 }

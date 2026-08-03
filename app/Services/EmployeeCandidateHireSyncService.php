@@ -13,20 +13,27 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Backfill recruitment pipeline so every employee with a phone has a matching
- * candidate marked as hired (RecruitmentProcess status Zatrudniony + employee_id).
- *
- * Preview / apply mirror the MBS import UX: inspect first, then commit.
+ * Backfill `recruitment_candidates.employee_id` — the FK that is the source of
+ * truth for "which candidate identity is this employee" — for every employee
+ * with a phone number. Also creates an audit Lead + RecruitmentProcess (status
+ * Zatrudniony) for traceability, mirroring the MBS import UX: inspect first,
+ * then commit. RecruitmentProcess history itself is never mutated.
  */
 class EmployeeCandidateHireSyncService
 {
     public const STATUS_NO_PHONE = 'no_phone';
 
+    /** Already linked via employee_id — nothing to do. */
     public const STATUS_HIRED = 'hired';
 
+    /** Candidate found by phone but not linked to any employee — actionable. */
     public const STATUS_UNHIRED = 'unhired';
 
+    /** No candidate found by phone or link — actionable (creates one). */
     public const STATUS_MISSING = 'missing';
+
+    /** Candidate found by phone but already linked to a DIFFERENT employee — needs manual review. */
+    public const STATUS_CONFLICT = 'conflict';
 
     /**
      * Build a preview row per employee. No DB writes.
@@ -46,17 +53,21 @@ class EmployeeCandidateHireSyncService
      */
     public function preview(): Collection
     {
-        $candidates = RecruitmentCandidate::query()
+        $candidatesByPhone = RecruitmentCandidate::query()
             ->whereNotNull('phone')
-            ->with(['processes:id,candidate_id,status,employee_id'])
             ->get()
             ->keyBy('phone');
+
+        $candidatesByEmployeeId = RecruitmentCandidate::query()
+            ->whereNotNull('employee_id')
+            ->get()
+            ->keyBy('employee_id');
 
         return Employee::query()
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get()
-            ->map(fn (Employee $employee) => $this->buildRow($employee, $candidates));
+            ->map(fn (Employee $employee) => $this->buildRow($employee, $candidatesByPhone, $candidatesByEmployeeId));
     }
 
     /**
@@ -101,6 +112,7 @@ class EmployeeCandidateHireSyncService
 
     /**
      * @param  Collection<string, RecruitmentCandidate>  $candidatesByPhone
+     * @param  Collection<int, RecruitmentCandidate>  $candidatesByEmployeeId
      * @return array{
      *   employee_id: int,
      *   first_name: string,
@@ -114,9 +126,15 @@ class EmployeeCandidateHireSyncService
      *   actionable: bool,
      * }
      */
-    private function buildRow(Employee $employee, Collection $candidatesByPhone): array
+    private function buildRow(Employee $employee, Collection $candidatesByPhone, Collection $candidatesByEmployeeId): array
     {
         $phone = PhoneNormalizer::normalize($employee->phone);
+
+        /** @var RecruitmentCandidate|null $linked */
+        $linked = $candidatesByEmployeeId->get($employee->id);
+        if ($linked) {
+            return $this->rowPayload($employee, $phone, $linked, self::STATUS_HIRED, false);
+        }
 
         if ($phone === null) {
             return $this->rowPayload($employee, null, null, self::STATUS_NO_PHONE, false);
@@ -129,32 +147,13 @@ class EmployeeCandidateHireSyncService
             return $this->rowPayload($employee, $phone, null, self::STATUS_MISSING, true);
         }
 
-        $status = $this->resolveMatchStatus($employee, $candidate);
-
-        return $this->rowPayload(
-            $employee,
-            $phone,
-            $candidate,
-            $status,
-            $status === self::STATUS_UNHIRED || $status === self::STATUS_MISSING,
-        );
-    }
-
-    private function resolveMatchStatus(Employee $employee, RecruitmentCandidate $candidate): string
-    {
-        $processes = $candidate->relationLoaded('processes')
-            ? $candidate->processes
-            : $candidate->processes()->get(['id', 'candidate_id', 'status', 'employee_id']);
-
-        if ($processes->contains(fn (RecruitmentProcess $p) => (int) $p->employee_id === (int) $employee->id)) {
-            return self::STATUS_HIRED;
+        if ($candidate->employee_id !== null) {
+            // Phone matches this employee, but the candidate row is already linked
+            // to a different employee — do not silently repoint the FK.
+            return $this->rowPayload($employee, $phone, $candidate, self::STATUS_CONFLICT, false);
         }
 
-        if ($processes->contains(fn (RecruitmentProcess $p) => $p->status === RecruitmentStatus::Zatrudniony)) {
-            return self::STATUS_HIRED;
-        }
-
-        return self::STATUS_UNHIRED;
+        return $this->rowPayload($employee, $phone, $candidate, self::STATUS_UNHIRED, true);
     }
 
     /**
@@ -162,21 +161,23 @@ class EmployeeCandidateHireSyncService
      */
     private function applyForEmployee(Employee $employee): string
     {
+        if (RecruitmentCandidate::where('employee_id', $employee->id)->exists()) {
+            return 'skipped';
+        }
+
         $phone = PhoneNormalizer::normalize($employee->phone);
         if ($phone === null) {
             return 'skipped';
         }
 
-        $candidate = RecruitmentCandidate::where('phone', $phone)
-            ->with(['processes:id,candidate_id,status,employee_id'])
-            ->first();
+        $candidate = RecruitmentCandidate::where('phone', $phone)->first();
 
         if ($candidate) {
-            $status = $this->resolveMatchStatus($employee, $candidate);
-            if ($status === self::STATUS_HIRED) {
-                return 'skipped';
+            if ($candidate->employee_id !== null) {
+                return 'skipped'; // conflict — needs manual resolution
             }
 
+            $candidate->update(['employee_id' => $employee->id]);
             $this->createHiredProcess($candidate, $employee);
 
             return 'marked';
@@ -187,6 +188,7 @@ class EmployeeCandidateHireSyncService
             'last_name' => $employee->last_name,
             'email' => $employee->email ?: null,
             'phone' => $employee->phone,
+            'employee_id' => $employee->id,
         ]);
 
         $roleIds = $employee->roles()->pluck('roles.id');
