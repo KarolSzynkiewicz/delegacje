@@ -199,6 +199,34 @@
             </div>
 
             <div class="col-lg-8 mt-4">
+                <x-ui.card label="Rekrutacja">
+                    <p class="text-muted mb-4">
+                        Narzędzia do utrzymania spójności bazy kandydatów z bazą pracowników.
+                    </p>
+
+                    <div class="border rounded p-3 mb-0 bg-success bg-opacity-10">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-people text-success"></i>
+                                    Synchronizuj zatrudnionych (pracownicy → kandydaci)
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    Porównuje numery telefonów pracowników z kandydatami (z normalizacją jak w rekrutacji).
+                                    Pokazuje podgląd: <em>brak w bazie</em>, <em>niezatrudniony</em>, <em>już zatrudniony</em>,
+                                    a następnie tworzy / oznacza procesy w statusie <strong>Zatrudniony</strong>.
+                                    Idempotentna.
+                                </p>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <livewire:employee-candidate-hire-sync wire:key="employee-candidate-hire-sync" />
+                            </div>
+                        </div>
+                    </div>
+                </x-ui.card>
+            </div>
+
+            <div class="col-lg-8 mt-4">
                 <x-ui.card label="Backup danych">
                     <p class="text-muted mb-4">
                         Pobierz pełny backup wszystkich danych z bazy danych jako plik JSON. Backup zawiera wszystkie rekordy ze wszystkich tabel — bez plików graficznych przechowywanych na dysku.

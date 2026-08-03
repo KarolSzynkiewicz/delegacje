@@ -20,8 +20,10 @@ return new class extends Migration
     public function up(): void
     {
         $today = now();
-        
-        foreach (Employee::all() as $employee) {
+
+        // Avoid SoftDeletes global scope — deleted_at may not exist yet when this
+        // migration runs (soft deletes were added in a later migration).
+        foreach (Employee::withoutGlobalScopes()->cursor() as $employee) {
             $shouldBeOutside = false;
             $lastDepartureId = null;
             

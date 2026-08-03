@@ -6,29 +6,31 @@ enum RecruitmentReferralSource: string
 {
     // --- channels available in the public application form ---
     case MetaBusinessSuite = 'meta_business_suite';
-    case OLX               = 'olx';
-    case Trojmiasto        = 'trojmiasto';
-    case PracujPl          = 'pracuj_pl';
-    case LinkedIn          = 'linkedin';
-    case JobPortalOther    = 'job_portal_other';    // follow-up: which portal?
-    case EmployeeReferral  = 'employee_referral';   // follow-up: which employee?
+    case OLX = 'olx';
+    case Trojmiasto = 'trojmiasto';
+    case PracujPl = 'pracuj_pl';
+    case LinkedIn = 'linkedin';
+    case JobPortalOther = 'job_portal_other';    // follow-up: which portal?
+    case EmployeeReferral = 'employee_referral';   // follow-up: which employee?
 
     // --- internal only (added by recruiter, not shown in public form) ---
-    case Messenger         = 'messenger';
-    case ContactCenter     = 'contact_center';
+    case Messenger = 'messenger';
+    case ContactCenter = 'contact_center';
+    case SystemBackfill = 'system_backfill';
 
     public function label(): string
     {
         return match ($this) {
             self::MetaBusinessSuite => 'Meta Business Suite (FB/IG)',
-            self::OLX               => 'OLX',
-            self::Trojmiasto        => 'Trojmiasto.pl',
-            self::PracujPl          => 'Pracuj.pl',
-            self::LinkedIn          => 'LinkedIn',
-            self::JobPortalOther    => 'Portal z ogłoszeniem o pracę (inny)',
-            self::EmployeeReferral  => 'Polecenie przez pracownika',
-            self::Messenger         => 'Messenger / wiadomość bezpośrednia',
-            self::ContactCenter     => 'Contact center',
+            self::OLX => 'OLX',
+            self::Trojmiasto => 'Trojmiasto.pl',
+            self::PracujPl => 'Pracuj.pl',
+            self::LinkedIn => 'LinkedIn',
+            self::JobPortalOther => 'Portal z ogłoszeniem o pracę (inny)',
+            self::EmployeeReferral => 'Polecenie przez pracownika',
+            self::Messenger => 'Messenger / wiadomość bezpośrednia',
+            self::ContactCenter => 'Contact center',
+            self::SystemBackfill => 'Backfill systemowy (pracownik → kandydat)',
         };
     }
 
@@ -36,7 +38,7 @@ enum RecruitmentReferralSource: string
     public function isPublicForm(): bool
     {
         return match ($this) {
-            self::Messenger, self::ContactCenter => false,
+            self::Messenger, self::ContactCenter, self::SystemBackfill => false,
             default => true,
         };
     }
@@ -53,9 +55,9 @@ enum RecruitmentReferralSource: string
     public function detailPlaceholder(): string
     {
         return match ($this) {
-            self::JobPortalOther   => 'Nazwa portalu…',
+            self::JobPortalOther => 'Nazwa portalu…',
             self::EmployeeReferral => 'Imię i nazwisko pracownika…',
-            default                => '',
+            default => '',
         };
     }
 
