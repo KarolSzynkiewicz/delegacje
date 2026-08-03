@@ -10,6 +10,9 @@ namespace App\Models {
 	 * @property mixed $image_path
 	 * @property \Illuminate\Support\Carbon|null $deleted_at
 	 * @property int|null $last_departure_id
+	 * @property mixed $termination_note
+	 * @property \App\Enums\EmployeeTerminationReason|null $termination_reason
+	 * @property \Illuminate\Support\Carbon|null $terminated_at
 	 * @property boolean $outside_base
 	 * @property mixed $notes
 	 * @property mixed $phone
@@ -20,6 +23,7 @@ namespace App\Models {
 	 * @property-read mixed $current_projects
 	 * @property-read mixed $full_name
 	 * @property-read mixed $image_url
+	 * @property-read \App\Models\RecruitmentCandidate $candidate
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Role> $roles
 	 * @property-read int|null $roles_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ProjectAssignment> $assignments
@@ -62,6 +66,9 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee wherePhone($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereNotes($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereOutsideBase($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereTerminatedAt($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereTerminationReason($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereTerminationNote($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereLastDepartureId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereDeletedAt($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<Employee>|Employee whereImagePath($value)
@@ -2423,6 +2430,7 @@ namespace App\Models {
 	 * @property mixed $email
 	 * @property mixed $last_name
 	 * @property mixed $first_name
+	 * @property int|null $employee_id
 	 * @property int $id
 	 * @property-read mixed $phone
 	 * @property-read mixed $full_name
@@ -2432,6 +2440,7 @@ namespace App\Models {
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RecruitmentProcess> $processes
 	 * @property-read int|null $processes_count
 	 * @property-read \App\Models\RecruitmentProcess $latestProcess
+	 * @property-read \App\Models\Employee $employee
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Role> $roles
 	 * @property-read int|null $roles_count
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RecruitmentConsent> $consents
@@ -2441,6 +2450,7 @@ namespace App\Models {
 	 * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Comment> $comments
 	 * @property-read int|null $comments_count
 	 * @method static \Illuminate\Database\Eloquent\Builder<RecruitmentCandidate>|RecruitmentCandidate whereId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<RecruitmentCandidate>|RecruitmentCandidate whereEmployeeId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<RecruitmentCandidate>|RecruitmentCandidate whereFirstName($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<RecruitmentCandidate>|RecruitmentCandidate whereLastName($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<RecruitmentCandidate>|RecruitmentCandidate whereEmail($value)
@@ -9003,6 +9013,8 @@ namespace App\Models {
 	 * @property \App\Enums\ProcedureRunStatus $status
 	 * @property array $path
 	 * @property mixed $current_node_id
+	 * @property mixed $slot_lock_key
+	 * @property mixed $slot_key
 	 * @property int|null $subject_id
 	 * @property mixed $subject_type
 	 * @property array $definition_snapshot
@@ -9021,6 +9033,8 @@ namespace App\Models {
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereDefinitionSnapshot($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereSubjectType($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereSubjectId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereSlotKey($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereSlotLockKey($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereCurrentNodeId($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun wherePath($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureRun>|ProcedureRun whereStatus($value)
@@ -9848,9 +9862,23 @@ namespace App\Models {
 	/**
 	 * App\Models\ProcedureSlotBinding
 	 *
+	 * @property \Illuminate\Support\Carbon|null $updated_at
+	 * @property \Illuminate\Support\Carbon|null $created_at
+	 * @property int|null $updated_by
+	 * @property int|null $created_by
+	 * @property int|null $procedure_template_id
+	 * @property mixed $key
+	 * @property int $id
 	 * @property-read \App\Models\ProcedureTemplate $template
 	 * @property-read \App\Models\User $createdBy
 	 * @property-read \App\Models\User $updatedBy
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereKey($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereProcedureTemplateId($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereCreatedBy($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereUpdatedBy($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereCreatedAt($value)
+	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding whereUpdatedAt($value)
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding newModelQuery()
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding newQuery()
 	 * @method static \Illuminate\Database\Eloquent\Builder<ProcedureSlotBinding>|ProcedureSlotBinding query()
