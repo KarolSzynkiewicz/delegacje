@@ -123,12 +123,13 @@ class EmployeesTable extends Component
             $query->whereIn('id', $this->filterEmployeeIds);
         }
 
-        // Filtrowanie po imieniu/nazwisku/emailu
+        // Filtrowanie po imieniu/nazwisku/emailu/telefonie
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('first_name', 'like', '%'.$this->search.'%')
                     ->orWhere('last_name', 'like', '%'.$this->search.'%')
-                    ->orWhere('email', 'like', '%'.$this->search.'%');
+                    ->orWhere('email', 'like', '%'.$this->search.'%')
+                    ->orWhere('phone', 'like', '%'.$this->search.'%');
             });
         }
 

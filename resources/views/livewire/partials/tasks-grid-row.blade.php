@@ -102,6 +102,15 @@
                     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; flex:1; color:var(--text-main,#f1f5f9)"
                           title="{{ $task->name }}">{{ $task->name }}</span>
                 @endif
+                @if($recruitmentUrl = $task->recruitmentCardUrl())
+                    <a href="{{ $recruitmentUrl }}"
+                       class="btn btn-link btn-sm p-0 flex-shrink-0"
+                       style="color:#60a5fa; line-height:1"
+                       title="Otwórz kartę kandydata"
+                       onclick="event.stopPropagation()">
+                        <i class="bi bi-person-badge"></i>
+                    </a>
+                @endif
             </div>
         @endif
     </td>
@@ -433,6 +442,15 @@
                                         class="btn btn-link btn-sm p-0 ms-1"
                                         style="font-size:0.8rem">Dodaj opis</button>
                             @endif
+                        </div>
+                    @endif
+                    @if($recruitmentUrl = $task->recruitmentCardUrl())
+                        <div class="mt-2">
+                            <a href="{{ $recruitmentUrl }}"
+                               class="btn btn-sm btn-outline-primary"
+                               style="font-size:0.75rem">
+                                <i class="bi bi-person-badge me-1"></i>Karta kandydata
+                            </a>
                         </div>
                     @endif
                 @endif

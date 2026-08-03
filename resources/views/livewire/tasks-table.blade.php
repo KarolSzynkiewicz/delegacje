@@ -154,6 +154,13 @@
                                         
                                         </x-ui.hero-card>
                                     </a>
+                                    @if($recruitmentUrl = $task->recruitmentCardUrl())
+                                        <div class="mt-2">
+                                            <a href="{{ $recruitmentUrl }}" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-person-badge me-1"></i>Karta kandydata
+                                            </a>
+                                        </div>
+                                    @endif
                                 </div>
                                 
                                 <!-- Prawa strona: Badge (Status, Projekt, Kategoria, Termin, Komentarze) -->

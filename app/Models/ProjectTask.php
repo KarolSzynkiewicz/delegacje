@@ -68,6 +68,36 @@ class ProjectTask extends Model
     }
 
     /**
+     * ID procesu rekrutacji powiązanego z zadaniem — bezpośrednio lub przez subject procedury.
+     */
+    public function linkedRecruitmentProcessId(): ?int
+    {
+        if ($this->recruitment_process_id) {
+            return (int) $this->recruitment_process_id;
+        }
+
+        $this->loadMissing('procedureRun');
+
+        if ($this->procedureRun?->subject_type === 'recruitment_process' && $this->procedureRun->subject_id) {
+            return (int) $this->procedureRun->subject_id;
+        }
+
+        return null;
+    }
+
+    /**
+     * URL karty kandydata w module rekrutacji (lista z otwartym procesem).
+     */
+    public function recruitmentCardUrl(): ?string
+    {
+        $processId = $this->linkedRecruitmentProcessId();
+
+        return $processId
+            ? route('recruitment-processes.index', ['process' => $processId])
+            : null;
+    }
+
+    /**
      * Get the user assigned to the task.
      */
     public function assignedTo(): BelongsTo

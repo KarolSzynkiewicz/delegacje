@@ -25,7 +25,7 @@ class UpdateEmployeeRequest extends FormRequest
         return [
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', Rule::unique('employees', 'email')->ignore($this->route('employee'))],
+            'email' => ['nullable', 'email', Rule::unique('employees', 'email')->ignore($this->route('employee'))],
             'phone' => ['nullable', 'string', 'max:20'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['exists:roles,id'],
@@ -44,7 +44,6 @@ class UpdateEmployeeRequest extends FormRequest
         return [
             'first_name.required' => 'Imię jest wymagane.',
             'last_name.required' => 'Nazwisko jest wymagane.',
-            'email.required' => 'Email jest wymagany.',
             'email.email' => 'Email musi być poprawnym adresem email.',
             'email.unique' => 'Ten email jest już używany.',
             'roles.required' => 'Przynajmniej jedna rola jest wymagana.',

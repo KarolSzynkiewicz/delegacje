@@ -833,7 +833,7 @@ class TasksGrid extends Component
             $query->orderBy('project_tasks.created_at', 'desc');
         }
 
-        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments']);
+        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments', 'procedureRun', 'recruitmentProcess']);
 
         if ($this->groupBy) {
             $allTasks = $query->limit(500)->get();

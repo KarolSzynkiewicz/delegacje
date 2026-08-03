@@ -200,7 +200,7 @@ class TasksTable extends Component
             }
 
             // ✅ NAPRAWIONE: Eager loading PRZED paginacją (zapobiega N+1 query)
-            $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments.user']);
+            $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments.user', 'procedureRun', 'recruitmentProcess']);
 
             $tasks = $query->paginate(20);
         } catch (\Exception $e) {

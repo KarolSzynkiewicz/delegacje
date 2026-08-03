@@ -40,7 +40,7 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <h5>Email</h5>
-                            <p>{{ $employee->email }}</p>
+                            <p>{{ $employee->email ?? '-' }}</p>
                         </div>
                         <div class="col-md-6">
                             <h5>Telefon</h5>

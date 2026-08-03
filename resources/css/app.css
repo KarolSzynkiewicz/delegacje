@@ -1691,14 +1691,26 @@ body.min-vh-100 {
     position: relative;
 }
 
-/* App content wrapper - OVERRIDE Bootstrap */
+/* App content wrapper - OVERRIDE Bootstrap
+   Blur na ::before (nie na samym wrapperze): backdrop-filter na elemencie
+   tworzy containing block dla position:fixed potomków — modal rekrutacji
+   i inne fixed overlaye lądowały na środku długiej strony zamiast w viewportcie. */
 .app-content-wrapper {
     background: rgba(30, 41, 59, 0.3) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
     border-radius: 20px 20px 0 0;
     margin-top: 0;
     border: 1px solid var(--glass-border) !important;
+    isolation: isolate;
+}
+.app-content-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .app-content-wrapper * {
@@ -3043,7 +3055,8 @@ html .text-muted,
 }
 
 /* Portal modali kalendarza (create-v2). Zostaje w drzewie Livewire — nie appendChild na body,
-   bo inaczej wire:click przestaje działać. fixed jest względem przodka z backdrop-filter (.app-content-wrapper). */
+   bo inaczej wire:click przestaje działać. Blur tła jest na ::before wrappera, więc fixed
+   odnosi się do viewportu. */
 .modal-portal-to-body {
     position: fixed;
     inset: 0;

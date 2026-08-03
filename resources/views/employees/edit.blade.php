@@ -38,7 +38,6 @@
                             name="email" 
                             label="Email"
                             value="{{ old('email', $employee->email) }}"
-                            required="true"
                         />
                     </div>
 

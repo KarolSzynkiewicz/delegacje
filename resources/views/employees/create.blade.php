@@ -53,7 +53,6 @@
                             name="email" 
                             label="Email"
                             value="{{ old('email') }}"
-                            required="true"
                         />
                     </div>
 

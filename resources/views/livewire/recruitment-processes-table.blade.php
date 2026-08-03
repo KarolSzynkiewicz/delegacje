@@ -25,13 +25,14 @@
         @endforeach
     </div>
 
-    {{-- ════════ SEARCH ════════ --}}
-    <div class="mb-3">
-        <div class="position-relative" style="max-width:360px;">
+    {{-- ════════ SEARCH + IMPORT ════════ --}}
+    <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+        <div class="position-relative flex-grow-1" style="max-width:360px;">
             <i class="bi bi-search position-absolute" style="left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"></i>
             <input type="text" wire:model.live.debounce.300ms="search" class="form-control" style="padding-left:40px;"
                    placeholder="Szukaj kandydata…">
         </div>
+        <livewire:mbs-lead-import wire:key="mbs-import" />
     </div>
 
     {{-- ════════ PROCESS TABLE: grouped by candidate ════════ --}}
@@ -378,6 +379,23 @@
                                 @endif
 
                                 {{-- Skillset --}}
+                                @php
+                                    $missingRoles     = empty($editRoles);
+                                    $missingShipyard  = $editShipyardExperience === '';
+                                    $missingRate      = $editRate === null || $editRate === '';
+                                    $missingAvailable = $editAvailableFrom === '';
+                                    $missingInne      = ! $editSpeaksEnglish && ! $editSpeaksFrench && ! $editSpeaksGerman && ! $editDrivingLicense;
+
+                                    // helper: zwraca style dla etykiety sekcji gdy brak danych
+                                    $missingLabelStyle = fn(bool $missing) => $missing
+                                        ? 'font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:rgba(239,68,68,.65);'
+                                        : 'font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);';
+
+                                    // helper: zwraca style dla kontenera sekcji gdy brak danych
+                                    $missingBoxStyle = fn(bool $missing) => $missing
+                                        ? 'border-radius:6px;padding:6px 8px;margin:-6px -8px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.18);'
+                                        : '';
+                                @endphp
                                 <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Skillset</div>
@@ -388,43 +406,83 @@
                                         @endif
                                     </div>
 
-                                    <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Role / stanowiska</div>
-                                    <div class="d-flex flex-wrap gap-1 mb-3">
-                                        @foreach($roles as $role)
-                                            <label class="form-check-compact" wire:key="er-{{ $role->id }}">
-                                                <input type="checkbox" wire:model.live.debounce.300ms="editRoles" value="{{ $role->id }}">
-                                                <span>{{ $role->name }}</span>
-                                            </label>
-                                        @endforeach
+                                    {{-- Role / stanowiska --}}
+                                    <div class="mb-3" style="{{ $missingBoxStyle($missingRoles) }}">
+                                        <div style="{{ $missingLabelStyle($missingRoles) }}margin-bottom:.4rem;">
+                                            Role / stanowiska
+                                            @if($missingRoles)
+                                                <span style="font-size:.6rem;opacity:.8;margin-left:4px;font-style:italic;text-transform:none;letter-spacing:0;">· nie wybrano</span>
+                                            @endif
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach($roles as $role)
+                                                <label class="form-check-compact" wire:key="er-{{ $role->id }}">
+                                                    <input type="checkbox" wire:model.live.debounce.300ms="editRoles" value="{{ $role->id }}">
+                                                    <span>{{ $role->name }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
                                     </div>
 
-                                    <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Doświadczenie na stoczni</div>
-                                    <div class="rp-exp-picker mb-3">
-                                        @foreach(\App\Enums\RecruitmentShipyardExperience::cases() as $exp)
-                                            <button type="button"
-                                                    wire:click="$set('editShipyardExperience', '{{ $editShipyardExperience === $exp->value ? '' : $exp->value }}')"
-                                                    class="rp-exp-btn {{ $editShipyardExperience === $exp->value ? 'rp-exp-active' : '' }}">
-                                                {{ $exp->label() }}
-                                            </button>
-                                        @endforeach
+                                    {{-- Doświadczenie na stoczni --}}
+                                    <div class="mb-3" style="{{ $missingBoxStyle($missingShipyard) }}">
+                                        <div style="{{ $missingLabelStyle($missingShipyard) }}margin-bottom:.4rem;">
+                                            Doświadczenie na stoczni
+                                            @if($missingShipyard)
+                                                <span style="font-size:.6rem;opacity:.8;margin-left:4px;font-style:italic;text-transform:none;letter-spacing:0;">· nie uzupełniono</span>
+                                            @endif
+                                        </div>
+                                        <div class="rp-exp-picker">
+                                            @foreach(\App\Enums\RecruitmentShipyardExperience::cases() as $exp)
+                                                <button type="button"
+                                                        wire:click="$set('editShipyardExperience', '{{ $editShipyardExperience === $exp->value ? '' : $exp->value }}')"
+                                                        class="rp-exp-btn {{ $editShipyardExperience === $exp->value ? 'rp-exp-active' : '' }}">
+                                                    {{ $exp->label() }}
+                                                </button>
+                                            @endforeach
+                                        </div>
                                     </div>
 
-                                    <div class="d-flex flex-wrap align-items-end gap-3">
-                                        <div>
-                                            <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Stawka oczekiwana</div>
+                                    <div class="d-flex flex-wrap align-items-start gap-3">
+                                        {{-- Stawka oczekiwana --}}
+                                        <div style="{{ $missingBoxStyle($missingRate) }}">
+                                            <div style="{{ $missingLabelStyle($missingRate) }}margin-bottom:.3rem;">
+                                                Stawka oczekiwana
+                                                @if($missingRate)
+                                                    <span style="font-size:.6rem;opacity:.8;margin-left:4px;font-style:italic;text-transform:none;letter-spacing:0;">· nie uzupełniono</span>
+                                                @endif
+                                            </div>
                                             <div class="input-group input-group-sm" style="width:140px;">
-                                                <input type="number" step="0.01" min="0" wire:model.live.debounce.300ms="editRate" class="form-control" placeholder="0.00">
-                                                <span class="input-group-text" style="background:var(--bg-input);border-color:var(--glass-border);color:var(--text-muted);">€/h</span>
+                                                <input type="number" step="0.01" min="0" wire:model.live.debounce.300ms="editRate" class="form-control" placeholder="0.00"
+                                                       style="{{ $missingRate ? 'border-color:rgba(239,68,68,.4);' : '' }}">
+                                                <span class="input-group-text" style="background:var(--bg-input);border-color:{{ $missingRate ? 'rgba(239,68,68,.4)' : 'var(--glass-border)' }};color:var(--text-muted);">€/h</span>
                                             </div>
+                                            @error('editRate') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                                         </div>
-                                        <div>
-                                            <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Dostępny od</div>
+
+                                        {{-- Dostępny od --}}
+                                        <div style="{{ $missingBoxStyle($missingAvailable) }}">
+                                            <div style="{{ $missingLabelStyle($missingAvailable) }}margin-bottom:.3rem;">
+                                                Dostępny od
+                                                @if($missingAvailable)
+                                                    <span style="font-size:.6rem;opacity:.8;margin-left:4px;font-style:italic;text-transform:none;letter-spacing:0;">· nie uzupełniono</span>
+                                                @endif
+                                            </div>
                                             <div class="input-group input-group-sm" style="width:170px;">
-                                                <input type="date" wire:model.live.debounce.300ms="editAvailableFrom" class="form-control">
+                                                <input type="date" wire:model.live.debounce.300ms="editAvailableFrom" class="form-control"
+                                                       style="{{ $missingAvailable ? 'border-color:rgba(239,68,68,.4);' : '' }}">
                                             </div>
+                                            @error('editAvailableFrom') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                                         </div>
-                                        <div>
-                                            <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Inne</div>
+
+                                        {{-- Inne --}}
+                                        <div style="{{ $missingBoxStyle($missingInne) }}">
+                                            <div style="{{ $missingLabelStyle($missingInne) }}margin-bottom:.3rem;">
+                                                Inne
+                                                @if($missingInne)
+                                                    <span style="font-size:.6rem;opacity:.8;margin-left:4px;font-style:italic;text-transform:none;letter-spacing:0;">· nie uzupełniono</span>
+                                                @endif
+                                            </div>
                                             <div class="d-flex flex-wrap gap-1">
                                                 <button type="button" wire:click="$toggle('editSpeaksEnglish')" class="btn btn-sm {{ $editSpeaksEnglish ? 'btn-primary' : 'btn-outline-secondary' }}" style="padding:4px 10px;height:31px;" title="Angielski">🇬🇧 EN</button>
                                                 <button type="button" wire:click="$toggle('editSpeaksFrench')" class="btn btn-sm {{ $editSpeaksFrench ? 'btn-primary' : 'btn-outline-secondary' }}" style="padding:4px 10px;height:31px;" title="Francuski">🇫🇷 FR</button>
@@ -433,18 +491,20 @@
                                             </div>
                                         </div>
                                     </div>
-                                    @error('editRate') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
-                                    @error('editAvailableFrom') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                                 </div>
 
                                 {{-- Komentarze o kandydacie --}}
                                 @if($candidate)
+                                @php $candidateComments = $candidate->comments->sortByDesc('created_at'); $missingComments = $candidateComments->count() === 0; @endphp
                                 <div class="mt-3 pt-3" style="border-top:1px solid var(--glass-border);">
-                                    @php $candidateComments = $candidate->comments->sortByDesc('created_at'); @endphp
                                     <div class="d-flex align-items-center justify-content-between mb-1">
-                                        <span style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
+                                        <span style="font-size:.68rem;{{ $missingComments ? 'color:rgba(239,68,68,.65);' : 'color:var(--text-muted);' }}text-transform:uppercase;letter-spacing:.05em;">
                                             <i class="bi bi-chat-dots me-1"></i>Komentarze o kandydacie
-                                            @if($candidateComments->count()) <span class="badge badge-secondary ms-1" style="font-size:.6rem;">{{ $candidateComments->count() }}</span> @endif
+                                            @if($candidateComments->count())
+                                                <span class="badge badge-secondary ms-1" style="font-size:.6rem;">{{ $candidateComments->count() }}</span>
+                                            @else
+                                                <span style="font-size:.6rem;opacity:.8;margin-left:4px;font-style:italic;text-transform:none;letter-spacing:0;">· nie uzupełniono</span>
+                                            @endif
                                         </span>
                                         <button type="button" wire:click="openCommentModal('candidate')" class="btn btn-sm btn-outline-secondary" style="padding:1px 7px;font-size:.7rem;line-height:1.6;">
                                             <i class="bi bi-plus me-1"></i>Dodaj

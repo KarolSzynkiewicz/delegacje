@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -146,6 +147,17 @@ class RecruitmentProcessesTable extends Component
         $this->resetPage();
     }
 
+    public function mount(): void
+    {
+        // When the page loads from a shared URL (?process=X) or after a full-page
+        // redirect (e.g. after saving a comment via the standard POST form), Livewire
+        // hydrates selectedId from the query string but never calls selectProcess().
+        // We must populate the edit fields here so they reflect the actual DB values.
+        if ($this->selectedId) {
+            $this->loadCandidateEditFields();
+        }
+    }
+
     public function selectProcess(int $id): void
     {
         if ($this->selectedId === $id) {
@@ -159,25 +171,31 @@ class RecruitmentProcessesTable extends Component
         $this->editingCandidateIdentity = false;
         $this->skillsetSaved = false;
         $this->contactSaved = false;
+        $this->loadCandidateEditFields();
+    }
 
+    protected function loadCandidateEditFields(): void
+    {
         $process = $this->getSelectedProcess();
-        if ($process && $process->candidate) {
-            $this->editRoles = $process->candidate->roles->pluck('id')->all();
-            $this->editRate = $process->candidate->expected_rate_eur !== null ? (string) $process->candidate->expected_rate_eur : null;
-            $this->editCity = $process->candidate->city ?? '';
-            $this->editDrivingLicense = (bool) $process->candidate->has_driving_license_b;
-            $this->editSpeaksEnglish = (bool) $process->candidate->speaks_english;
-            $this->editSpeaksFrench = (bool) $process->candidate->speaks_french;
-            $this->editSpeaksGerman = (bool) $process->candidate->speaks_german;
-            $this->editShipyardExperience = $process->candidate->shipyard_experience?->value ?? '';
-            $this->editAvailableFrom = $process->candidate->available_from?->format('Y-m-d') ?? '';
-            $this->editAssignedRecruiterId = $process->assigned_recruiter_id;
-            $this->hireRoles = $this->editRoles;
-            $this->editFirstName = $process->candidate->first_name;
-            $this->editLastName = $process->candidate->last_name;
-            $this->editEmail = $process->candidate->email ?? '';
-            $this->editPhone = $process->candidate->phone ?? '';
+        if (! $process || ! $process->candidate) {
+            return;
         }
+
+        $this->editRoles = $process->candidate->roles->pluck('id')->all();
+        $this->editRate = $process->candidate->expected_rate_eur !== null ? (string) $process->candidate->expected_rate_eur : null;
+        $this->editCity = $process->candidate->city ?? '';
+        $this->editDrivingLicense = (bool) $process->candidate->has_driving_license_b;
+        $this->editSpeaksEnglish = (bool) $process->candidate->speaks_english;
+        $this->editSpeaksFrench = (bool) $process->candidate->speaks_french;
+        $this->editSpeaksGerman = (bool) $process->candidate->speaks_german;
+        $this->editShipyardExperience = $process->candidate->shipyard_experience?->value ?? '';
+        $this->editAvailableFrom = $process->candidate->available_from?->format('Y-m-d') ?? '';
+        $this->editAssignedRecruiterId = $process->assigned_recruiter_id;
+        $this->hireRoles = $this->editRoles;
+        $this->editFirstName = $process->candidate->first_name;
+        $this->editLastName = $process->candidate->last_name;
+        $this->editEmail = $process->candidate->email ?? '';
+        $this->editPhone = $process->candidate->phone ?? '';
     }
 
     public function closeDrawer(): void
@@ -656,6 +674,12 @@ class RecruitmentProcessesTable extends Component
             'tasks.assignedTo',
             'comments.user',
         ])->find($this->selectedId);
+    }
+
+    #[On('leads-imported')]
+    public function refreshAfterLeadsImport(): void
+    {
+        $this->resetPage();
     }
 
     public function render()

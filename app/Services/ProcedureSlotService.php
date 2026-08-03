@@ -6,6 +6,7 @@ use App\Enums\ProcedureRunStatus;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureSlotBinding;
 use App\Models\ProcedureTemplate;
+use App\Models\RecruitmentProcess;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
@@ -87,7 +88,7 @@ class ProcedureSlotService
         }
 
         try {
-            return $this->runs->startRun($binding->template, [
+            return $this->runs->startRun($binding->template, array_merge([
                 'task_name'    => $taskName ?: $binding->template->name,
                 'assigned_to'  => null,
                 'due_date'     => null,
@@ -95,7 +96,7 @@ class ProcedureSlotService
                 'subject_id'   => $subject->getKey(),
                 'slot_key'     => $slotKey,
                 'variables'    => $variables ?: null,
-            ]);
+            ], $this->taskContextFromSubject($subject)));
         } catch (QueryException $e) {
             // Lost a race against a concurrent request for the same (slot, subject) —
             // the unique index on slot_lock_key rejected our insert. Return the run
@@ -106,6 +107,52 @@ class ProcedureSlotService
 
             throw $e;
         }
+    }
+
+    /**
+     * Extra ProjectTask fields derived from the slot subject (e.g. candidate card link).
+     *
+     * @return array{description?: string, category?: string, recruitment_process_id?: int, assigned_to?: int|null}
+     */
+    private function taskContextFromSubject(Model $subject): array
+    {
+        if (! $subject instanceof RecruitmentProcess) {
+            return [];
+        }
+
+        $subject->loadMissing('candidate');
+
+        return [
+            'description'            => $this->recruitmentTaskDescription($subject),
+            'category'               => 'Rekrutacja',
+            'recruitment_process_id' => $subject->id,
+            'assigned_to'            => $subject->assigned_recruiter_id,
+        ];
+    }
+
+    private function recruitmentTaskDescription(RecruitmentProcess $process): string
+    {
+        $lines = [];
+
+        $name = $process->candidate?->full_name;
+        if ($name) {
+            $lines[] = 'Kandydat: '.$name;
+        }
+
+        $status = $process->status?->label();
+        $lines[] = 'Proces rekrutacji #'.$process->id.($status ? ' — '.$status : '');
+
+        if ($phone = $process->candidate?->phone) {
+            $lines[] = 'Telefon: '.$phone;
+        }
+
+        if ($email = $process->candidate?->email) {
+            $lines[] = 'E-mail: '.$email;
+        }
+
+        $lines[] = 'Karta kandydata: '.route('recruitment-processes.index', ['process' => $process->id]);
+
+        return implode("\n", $lines);
     }
 
     private function isDuplicateSlotLockError(QueryException $e): bool

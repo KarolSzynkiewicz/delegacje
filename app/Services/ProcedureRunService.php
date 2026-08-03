@@ -19,12 +19,15 @@ class ProcedureRunService
      *
      * @param  array{
      *     task_name: string,
+     *     description: string|null,
+     *     category: string|null,
      *     assigned_to: int|null,
      *     due_date: string|null,
      *     subject_type: string|null,
      *     subject_id: int|null,
      *     slot_key: string|null,
      *     variables: array|null,
+     *     recruitment_process_id: int|null,
      * } $params
      */
     public function startRun(ProcedureTemplate $template, array $params): ProcedureRun
@@ -64,14 +67,21 @@ class ProcedureRunService
                 'data'             => null,
             ]);
 
+            $recruitmentProcessId = $params['recruitment_process_id']
+                ?? (($params['subject_type'] ?? null) === 'recruitment_process'
+                    ? ($params['subject_id'] ?? null)
+                    : null);
+
             ProjectTask::create([
-                'name'              => $params['task_name'],
-                'description'       => null,
-                'status'            => TaskStatus::IN_PROGRESS,
-                'assigned_to'       => $params['assigned_to'] ?? null,
-                'due_date'          => $params['due_date'] ?? null,
-                'created_by'        => Auth::id(),
-                'procedure_run_id'  => $run->id,
+                'name'                   => $params['task_name'],
+                'description'            => $params['description'] ?? null,
+                'category'               => $params['category'] ?? null,
+                'status'                 => TaskStatus::IN_PROGRESS,
+                'assigned_to'            => $params['assigned_to'] ?? null,
+                'due_date'               => $params['due_date'] ?? null,
+                'created_by'             => Auth::id(),
+                'procedure_run_id'       => $run->id,
+                'recruitment_process_id' => $recruitmentProcessId,
             ]);
 
             return $run;

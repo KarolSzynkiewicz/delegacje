@@ -43,7 +43,15 @@
                                 <small class="text-muted d-block mb-1">
                                     <i class="bi bi-card-text me-1"></i>Opis
                                 </small>
-                                <div class="text-break">{{ $task->plainDescription() }}</div>
+                                <div class="text-break" style="white-space:pre-wrap">{{ $task->plainDescription() }}</div>
+                            </div>
+                        @endif
+
+                        @if($recruitmentUrl = $task->recruitmentCardUrl())
+                            <div class="mt-3">
+                                <a href="{{ $recruitmentUrl }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-person-badge me-1"></i>Karta kandydata
+                                </a>
                             </div>
                         @endif
 

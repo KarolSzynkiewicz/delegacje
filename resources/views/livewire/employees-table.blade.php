@@ -33,7 +33,7 @@
                     <i class="bi bi-search me-1"></i> Szukaj
                 </label>
                 <input type="text" wire:model.live.debounce.300ms="search" 
-                    placeholder="Imię, nazwisko..."
+                    placeholder="Imię, nazwisko, telefon..."
                     class="form-control">
             </div>
 
