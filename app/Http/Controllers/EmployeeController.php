@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Role;
 use App\Services\EmployeeLifecycleService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class EmployeeController extends Controller
@@ -49,10 +50,17 @@ class EmployeeController extends Controller
         $roles = $validated['roles'] ?? [];
         unset($validated['roles']);
 
-        $employee = Employee::create($validated);
-        $employee->roles()->attach($roles);
+        // Jedna transakcja: jeśli zapis leada cyklu życia (recordHireOutsideProcess) się nie powiedzie,
+        // cofamy też utworzenie pracownika i ról — inaczej użytkownik widziałby błąd 500,
+        // mimo że pracownik już zostałby zapisany, i mógłby spróbować dodać go drugi raz.
+        $employee = DB::transaction(function () use ($validated, $roles) {
+            $employee = Employee::create($validated);
+            $employee->roles()->attach($roles);
 
-        $this->employeeLifecycle->recordHireOutsideProcess($employee);
+            $this->employeeLifecycle->recordHireOutsideProcess($employee);
+
+            return $employee;
+        });
 
         return redirect()->route('employees.index')->with('success', 'Pracownik został dodany.');
     }
