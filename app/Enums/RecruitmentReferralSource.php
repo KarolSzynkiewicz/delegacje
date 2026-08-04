@@ -18,6 +18,7 @@ enum RecruitmentReferralSource: string
     case ContactCenter = 'contact_center';
     case SystemBackfill = 'system_backfill';
     case EmployeeLifecycle = 'employee_lifecycle';
+    case HistoricalImport = 'historical_import';
 
     public function label(): string
     {
@@ -33,6 +34,7 @@ enum RecruitmentReferralSource: string
             self::ContactCenter => 'Contact center',
             self::SystemBackfill => 'Backfill systemowy (pracownik → kandydat)',
             self::EmployeeLifecycle => 'Cykl życia pracownika',
+            self::HistoricalImport => 'Import historyczny (baza kandydatów)',
         };
     }
 
@@ -40,7 +42,7 @@ enum RecruitmentReferralSource: string
     public function isPublicForm(): bool
     {
         return match ($this) {
-            self::Messenger, self::ContactCenter, self::SystemBackfill, self::EmployeeLifecycle => false,
+            self::Messenger, self::ContactCenter, self::SystemBackfill, self::EmployeeLifecycle, self::HistoricalImport => false,
             default => true,
         };
     }

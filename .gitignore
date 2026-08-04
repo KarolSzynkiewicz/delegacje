@@ -19,3 +19,5 @@ yarn-error.log
 database/database.sqlite
 docs/GEMINI.md
 DEPLOY.mdpublic/hot
+merge-candidates.php
+merged-candidates.csv

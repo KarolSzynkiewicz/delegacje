@@ -223,6 +223,26 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="border rounded p-3 mt-3 mb-0 bg-primary bg-opacity-10">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">
+                                    <i class="bi bi-person-lines-fill text-primary"></i>
+                                    Import pełnego profilu kandydata
+                                </h5>
+                                <p class="text-muted mb-0 small">
+                                    Import z gotowego CSV o ustalonym schemacie (kandydat + lead + proces + notatki + rola) —
+                                    do jednorazowych migracji historycznych baz kandydatów. Wzbogaca istniejących kandydatów
+                                    bez nadpisywania danych i ponownie wykorzystuje procesy już wpisane przez codzienny import MBS,
+                                    dzięki czemu jest bezpieczny do ponownego uruchomienia na tym samym pliku.
+                                </p>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <livewire:candidate-base-import wire:key="candidate-base-import" />
+                            </div>
+                        </div>
+                    </div>
                 </x-ui.card>
             </div>
 
