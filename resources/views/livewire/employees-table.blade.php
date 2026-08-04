@@ -7,21 +7,37 @@
                 <div>
                     <h3 class="fs-5 fw-semibold mb-1">Pracownicy</h3>
                 <p class="small text-muted mb-0">
-                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter)
+                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
                         Znaleziono: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
                         @if($statusDate)
                             <span class="text-primary">(stan na {{ \Carbon\Carbon::parse($statusDate)->format('d.m.Y') }})</span>
+                        @endif
+                        @if($showTerminated)
+                            <span class="text-muted">(z uwzględnieniem zwolnionych)</span>
                         @endif
                     @else
                         Łącznie: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
                     @endif
                 </p>
                 </div>
-                @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter)
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                @endif
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="form-check mb-0">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="showTerminated"
+                            wire:model.live="showTerminated"
+                        >
+                        <label class="form-check-label small" for="showTerminated">
+                            Pokaż zwolnionych
+                        </label>
+                    </div>
+                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
+                        <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
+                            <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                        </x-ui.button>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -144,7 +160,12 @@
                                 {{ $employee->id }}
                             </td>
                             <td>
-                                <x-employee-cell :employee="$employee"  />
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <x-employee-cell :employee="$employee"  />
+                                    @if($employee->isTerminated())
+                                        <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                                    @endif
+                                </div>
                             </td>
 
                             <!-- Status (Baza/W podróży/Poza bazą) -->

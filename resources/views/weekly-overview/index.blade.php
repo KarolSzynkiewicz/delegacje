@@ -174,6 +174,92 @@
         </div>
     @endif
 
+    <!-- Sekcja: Zwolnieni pracownicy z wiszącymi przypisaniami -->
+    @if(isset($terminatedEmployeesWithAssignments) && $terminatedEmployeesWithAssignments->isNotEmpty())
+        <div class="mt-4">
+            <x-ui.alert variant="danger" title="Zwolnieni z aktywnymi przypisaniami">
+                <p class="mb-3">Następujący pracownicy są zwolnieni, ale nadal mają przypisania w tym tygodniu — zamknij lub usuń te przypisania:</p>
+                <div class="row g-3">
+                    @foreach($terminatedEmployeesWithAssignments as $employeeData)
+                        @php
+                            $employee = $employeeData['employee'];
+                            $projectAssignments = $employeeData['project_assignments'];
+                            $vehicleAssignments = $employeeData['vehicle_assignments'];
+                            $accommodationAssignments = $employeeData['accommodation_assignments'];
+                        @endphp
+                        <div class="col-md-6 col-lg-4">
+                            <x-ui.card>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <x-employee-cell :employee="$employee" />
+                                    <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                                </div>
+                                @if($employee->terminated_at)
+                                    <div class="small text-muted mb-2">
+                                        Od {{ $employee->terminated_at->format('Y-m-d') }}
+                                        @if($employee->termination_reason)
+                                            · {{ $employee->termination_reason->label() }}
+                                        @endif
+                                    </div>
+                                @endif
+                                <div class="small">
+                                    @if($projectAssignments->isNotEmpty())
+                                        <div class="mb-1">
+                                            <i class="bi bi-briefcase text-danger"></i>
+                                            <span class="text-muted">Projekt:</span>
+                                            @foreach($projectAssignments as $assignment)
+                                                <a href="{{ route('project-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                    {{ $assignment->project?->name ?? '—' }}
+                                                    @if($assignment->role)
+                                                        ({{ $assignment->role->name }})
+                                                    @endif
+                                                </a>@if(!$loop->last), @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                    @if($vehicleAssignments->isNotEmpty())
+                                        <div class="mb-1">
+                                            <i class="bi bi-car-front text-primary"></i>
+                                            <span class="text-muted">Auto:</span>
+                                            @foreach($vehicleAssignments as $assignment)
+                                                @if($assignment->vehicle)
+                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                        {{ $assignment->vehicle->registration_number }}
+                                                    </a>@if(!$loop->last), @endif
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                    @if($accommodationAssignments->isNotEmpty())
+                                        <div>
+                                            <i class="bi bi-house text-success"></i>
+                                            <span class="text-muted">Dom:</span>
+                                            @foreach($accommodationAssignments as $assignment)
+                                                @if($assignment->accommodation)
+                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
+                                                        {{ $assignment->accommodation->name }}
+                                                    </a>@if(!$loop->last), @endif
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="mt-2">
+                                    <x-ui.button
+                                        variant="ghost"
+                                        size="sm"
+                                        href="{{ route('employees.show', $employee) }}"
+                                    >
+                                        <i class="bi bi-person"></i> Kartoteka
+                                    </x-ui.button>
+                                </div>
+                            </x-ui.card>
+                        </div>
+                    @endforeach
+                </div>
+            </x-ui.alert>
+        </div>
+    @endif
+
     <!-- Projekty -->
     @php
         // Pre-load all project assignments for all employees in vehicles/accommodations to avoid N+1 queries
