@@ -123,13 +123,26 @@
             </x-ui.card>
 
             @if($application->employee_id && $application->employee)
-                <x-ui.alert variant="success" class="mb-4">
-                    <i class="bi bi-person-check-fill me-2"></i>
-                    Kandydat został zatrudniony.
-                    <a href="{{ route('employees.show', $application->employee) }}" class="fw-semibold">
-                        Przejdź do profilu pracownika →
-                    </a>
-                </x-ui.alert>
+                @if($application->employee->isTerminated())
+                    <x-ui.alert variant="info" class="mb-4">
+                        <i class="bi bi-person-x me-2"></i>
+                        Kandydat był pracownikiem — zwolniony {{ $application->employee->terminated_at->format('d.m.Y') }}
+                        @if($application->employee->termination_reason)
+                            ({{ $application->employee->termination_reason->label() }})
+                        @endif.
+                        <a href="{{ route('employees.show', $application->employee) }}" class="fw-semibold ms-1">
+                            Kartoteka pracownika →
+                        </a>
+                    </x-ui.alert>
+                @else
+                    <x-ui.alert variant="success" class="mb-4">
+                        <i class="bi bi-person-check-fill me-2"></i>
+                        Kandydat jest zatrudnionym pracownikiem.
+                        <a href="{{ route('employees.show', $application->employee) }}" class="fw-semibold ms-1">
+                            Przejdź do profilu pracownika →
+                        </a>
+                    </x-ui.alert>
+                @endif
             @endif
 
             <x-comments :commentable="$application" class="mb-4" />

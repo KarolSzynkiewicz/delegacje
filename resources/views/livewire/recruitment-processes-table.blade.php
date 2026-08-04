@@ -331,7 +331,11 @@
                                             <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
                                                 <h5 class="mb-0" style="font-size:1rem;">{{ $selected->full_name }}</h5>
                                                 @if($selected->employee)
-                                                    <a href="{{ route('employees.show', $selected->employee) }}" class="badge badge-success text-decoration-none ms-1" style="font-size:.65rem;"><i class="bi bi-person-check me-1"></i>Pracownik</a>
+                                                    @if($selected->employee->isTerminated())
+                                                        <a href="{{ route('employees.show', $selected->employee) }}" class="badge badge-secondary text-decoration-none ms-1" style="font-size:.65rem;"><i class="bi bi-person-x me-1"></i>Były pracownik</a>
+                                                    @else
+                                                        <a href="{{ route('employees.show', $selected->employee) }}" class="badge badge-success text-decoration-none ms-1" style="font-size:.65rem;"><i class="bi bi-person-check me-1"></i>Pracownik</a>
+                                                    @endif
                                                 @endif
                                                 @if($isStarred)
                                                     <span class="badge badge-warning ms-1" style="font-size:.65rem;"><i class="bi bi-star-fill me-1"></i>Wartościowy</span>
