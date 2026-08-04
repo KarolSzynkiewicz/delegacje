@@ -17,6 +17,7 @@ enum RecruitmentReferralSource: string
     case Messenger = 'messenger';
     case ContactCenter = 'contact_center';
     case SystemBackfill = 'system_backfill';
+    case EmployeeLifecycle = 'employee_lifecycle';
 
     public function label(): string
     {
@@ -31,6 +32,7 @@ enum RecruitmentReferralSource: string
             self::Messenger => 'Messenger / wiadomość bezpośrednia',
             self::ContactCenter => 'Contact center',
             self::SystemBackfill => 'Backfill systemowy (pracownik → kandydat)',
+            self::EmployeeLifecycle => 'Cykl życia pracownika',
         };
     }
 
@@ -38,7 +40,7 @@ enum RecruitmentReferralSource: string
     public function isPublicForm(): bool
     {
         return match ($this) {
-            self::Messenger, self::ContactCenter, self::SystemBackfill => false,
+            self::Messenger, self::ContactCenter, self::SystemBackfill, self::EmployeeLifecycle => false,
             default => true,
         };
     }

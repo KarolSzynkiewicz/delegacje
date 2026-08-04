@@ -39,8 +39,8 @@ class EmployeeTerminationService
 
             $lead = RecruitmentLead::create([
                 'candidate_id' => $candidate->id,
-                'referral_source' => RecruitmentReferralSource::SystemBackfill,
-                'referral_source_detail' => 'Pracownik zwolniony dnia '.$terminatedAt->format('d.m.Y').' – przeniesiony systemowo do byłych pracowników',
+                'referral_source' => RecruitmentReferralSource::EmployeeLifecycle,
+                'referral_source_detail' => 'Zwolnienie pracownika – '.$terminatedAt->format('d.m.Y'),
             ]);
 
             RecruitmentProcess::create([
