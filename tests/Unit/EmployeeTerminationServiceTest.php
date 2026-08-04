@@ -60,6 +60,10 @@ class EmployeeTerminationServiceTest extends TestCase
                 ->exists()
         );
 
+        $terminationLead = $candidate->leads()->latest('id')->first();
+        $this->assertSame(\App\Enums\RecruitmentReferralSource::EmployeeLifecycle, $terminationLead->referral_source);
+        $this->assertStringStartsWith('Zwolnienie pracownika – ', $terminationLead->referral_source_detail);
+
         $this->assertTrue($candidate->fresh()->isFormerEmployee());
         $this->assertFalse($candidate->fresh()->isHired());
     }
