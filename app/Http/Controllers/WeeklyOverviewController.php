@@ -104,6 +104,9 @@ class WeeklyOverviewController extends Controller
         // Get employees without project but with vehicle or accommodation
         $employeesWithoutProject = $this->weeklyOverviewService->getEmployeesWithoutProjectButWithResources($weekStart, $weekEnd);
 
+        // Terminated employees who still have dangling assignments in this week
+        $terminatedEmployeesWithAssignments = $this->weeklyOverviewService->getTerminatedEmployeesWithAssignments($weekStart, $weekEnd);
+
         // Get expiring documents, vehicle inspections, and leases for this month
         $expiringItems = $this->expiringDocumentsService->getExpiringThisMonth();
 
@@ -119,7 +122,7 @@ class WeeklyOverviewController extends Controller
         $employeesInFieldCount = $this->weeklyDashboardKpiService->countEmployeesInFieldForWeek($weekStart, $weekEnd);
         $employeesInFieldByProject = $this->weeklyDashboardKpiService->employeesInFieldByProjectForWeek($weekStart, $weekEnd);
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'expiringItems', 'employeesInFieldCount', 'employeesInFieldByProject', 'projectsEndingThisMonth'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesInFieldByProject', 'projectsEndingThisMonth'));
     }
 
     /**

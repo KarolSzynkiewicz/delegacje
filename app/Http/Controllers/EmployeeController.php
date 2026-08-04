@@ -2,17 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
-use App\Models\Role;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
-use Illuminate\View\View;
+use App\Models\Employee;
+use App\Models\Role;
+use App\Services\EmployeeLifecycleService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class EmployeeController extends Controller
 {
     use HandlesImageUpload;
+
+    public function __construct(
+        protected EmployeeLifecycleService $employeeLifecycle
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -29,6 +35,7 @@ class EmployeeController extends Controller
     {
         $roles = Role::all();
         $hasRoles = $roles->count() > 0;
+
         return view('employees.create', compact('roles', 'hasRoles'));
     }
 
@@ -38,13 +45,15 @@ class EmployeeController extends Controller
     public function store(StoreEmployeeRequest $request): RedirectResponse
     {
         $validated = $this->processImageUpload($request->validated(), $request, 'employees');
-        
+
         $roles = $validated['roles'] ?? [];
         unset($validated['roles']);
-        
+
         $employee = Employee::create($validated);
         $employee->roles()->attach($roles);
-        
+
+        $this->employeeLifecycle->recordHireOutsideProcess($employee);
+
         return redirect()->route('employees.index')->with('success', 'Pracownik został dodany.');
     }
 
@@ -55,6 +64,7 @@ class EmployeeController extends Controller
     {
         // Tylko podstawowe dane - reszta w Livewire EmployeeTabs
         $employee->load('roles');
+
         return view('employees.show', compact('employee'));
     }
 
@@ -64,6 +74,7 @@ class EmployeeController extends Controller
     public function edit(Employee $employee): View
     {
         $roles = Role::all();
+
         return view('employees.edit', compact('employee', 'roles'));
     }
 
@@ -73,14 +84,13 @@ class EmployeeController extends Controller
     public function update(UpdateEmployeeRequest $request, Employee $employee): RedirectResponse
     {
         $validated = $this->processImageUpload($request->validated(), $request, 'employees', $employee->image_path);
-        
+
         $roles = $validated['roles'] ?? [];
         unset($validated['roles']);
-        
+
         $employee->update($validated);
         $employee->roles()->sync($roles);
-        
+
         return redirect()->route('employees.show', $employee)->with('success', 'Pracownik został zaktualizowany.');
     }
-
 }

@@ -3,22 +3,84 @@
 namespace Tests\Unit;
 
 use App\Enums\EmployeeTerminationReason;
+use App\Enums\RecruitmentReferralSource;
 use App\Enums\RecruitmentStatus;
 use App\Models\Employee;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentLead;
 use App\Models\RecruitmentProcess;
-use App\Services\EmployeeTerminationService;
+use App\Models\Role;
+use App\Services\EmployeeLifecycleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class EmployeeTerminationServiceTest extends TestCase
+class EmployeeLifecycleServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function service(): EmployeeTerminationService
+    private function service(): EmployeeLifecycleService
     {
-        return new EmployeeTerminationService;
+        return new EmployeeLifecycleService;
+    }
+
+    public function test_record_hire_outside_process_creates_candidate_lead_and_hired_process(): void
+    {
+        $role = Role::factory()->create();
+        $employee = Employee::factory()->create([
+            'phone' => '600100200',
+            'email' => 'jan@example.com',
+        ]);
+        $employee->roles()->sync([$role->id]);
+
+        $this->service()->recordHireOutsideProcess($employee);
+
+        $candidate = RecruitmentCandidate::query()->where('employee_id', $employee->id)->first();
+        $this->assertNotNull($candidate);
+        $this->assertSame('48600100200', $candidate->phone);
+        $this->assertTrue($candidate->roles->contains('id', $role->id));
+
+        $lead = $candidate->leads()->latest('id')->first();
+        $this->assertSame(RecruitmentReferralSource::EmployeeLifecycle, $lead->referral_source);
+        $this->assertStringStartsWith('Zatrudnienie poza procesem – ', $lead->referral_source_detail);
+
+        $this->assertTrue(
+            $candidate->processes()
+                ->where('status', RecruitmentStatus::Zatrudniony)
+                ->where('employee_id', $employee->id)
+                ->exists()
+        );
+    }
+
+    public function test_record_hire_outside_process_links_existing_unhired_candidate_by_phone(): void
+    {
+        $employee = Employee::factory()->create(['phone' => '501999888']);
+        $existing = RecruitmentCandidate::create([
+            'first_name' => 'Anna',
+            'last_name' => 'Nowak',
+            'phone' => '501999888',
+            'email' => 'anna@example.com',
+        ]);
+
+        $this->service()->recordHireOutsideProcess($employee);
+
+        $this->assertSame(1, RecruitmentCandidate::where('phone', '48501999888')->count());
+        $this->assertSame($employee->id, $existing->fresh()->employee_id);
+        $this->assertSame('anna@example.com', $existing->fresh()->email);
+        $this->assertStringStartsWith(
+            'Zatrudnienie poza procesem – ',
+            $existing->leads()->latest('id')->first()->referral_source_detail
+        );
+    }
+
+    public function test_record_hire_outside_process_is_idempotent(): void
+    {
+        $employee = Employee::factory()->create(['phone' => '600100200']);
+
+        $this->service()->recordHireOutsideProcess($employee);
+        $this->service()->recordHireOutsideProcess($employee);
+
+        $this->assertSame(1, RecruitmentCandidate::where('employee_id', $employee->id)->count());
+        $this->assertSame(1, RecruitmentProcess::where('employee_id', $employee->id)->count());
     }
 
     public function test_terminate_sets_fields_and_adds_audit_process_without_touching_history(): void
@@ -31,7 +93,6 @@ class EmployeeTerminationServiceTest extends TestCase
             'employee_id' => $employee->id,
         ]);
 
-        // Pre-existing history that must remain untouched.
         $oldLead = RecruitmentLead::create(['candidate_id' => $candidate->id]);
         $oldProcess = RecruitmentProcess::create([
             'lead_id' => $oldLead->id,
@@ -48,10 +109,8 @@ class EmployeeTerminationServiceTest extends TestCase
         $this->assertSame('Naruszenie regulaminu', $employee->termination_note);
         $this->assertTrue($employee->isTerminated());
 
-        // Old process untouched.
         $this->assertSame(RecruitmentStatus::Zatrudniony, $oldProcess->fresh()->status);
 
-        // New audit process added, linked to the same candidate + employee.
         $this->assertSame(2, $candidate->processes()->count());
         $this->assertTrue(
             $candidate->processes()
@@ -61,7 +120,7 @@ class EmployeeTerminationServiceTest extends TestCase
         );
 
         $terminationLead = $candidate->leads()->latest('id')->first();
-        $this->assertSame(\App\Enums\RecruitmentReferralSource::EmployeeLifecycle, $terminationLead->referral_source);
+        $this->assertSame(RecruitmentReferralSource::EmployeeLifecycle, $terminationLead->referral_source);
         $this->assertStringStartsWith('Zwolnienie pracownika – ', $terminationLead->referral_source_detail);
 
         $this->assertTrue($candidate->fresh()->isFormerEmployee());
@@ -100,7 +159,6 @@ class EmployeeTerminationServiceTest extends TestCase
         $this->assertNull($employee->termination_reason);
         $this->assertNull($employee->termination_note);
 
-        // Reinstating does not rewrite or remove the audit trail.
         $this->assertSame($processCountAfterTerminate, RecruitmentProcess::count());
         $this->assertTrue($candidate->fresh()->isHired());
     }

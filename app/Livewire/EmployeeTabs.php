@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Enums\EmployeeTerminationReason;
 use App\Models\Employee;
-use App\Services\EmployeeTerminationService;
+use App\Services\EmployeeLifecycleService;
 use Livewire\Component;
 
 class EmployeeTabs extends Component
@@ -59,7 +59,7 @@ class EmployeeTabs extends Component
             'terminationReason.required' => 'Wybierz powód zwolnienia.',
         ]);
 
-        app(EmployeeTerminationService::class)->terminate(
+        app(EmployeeLifecycleService::class)->terminate(
             $this->employee,
             EmployeeTerminationReason::from($this->terminationReason),
             $this->terminationNote !== '' ? $this->terminationNote : null,
@@ -77,7 +77,7 @@ class EmployeeTabs extends Component
             return;
         }
 
-        app(EmployeeTerminationService::class)->reinstate($this->employee);
+        app(EmployeeLifecycleService::class)->reinstate($this->employee);
 
         $this->employee = $this->employee->fresh();
 

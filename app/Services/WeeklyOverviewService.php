@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Models\AccommodationAssignment;
+use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
@@ -1188,6 +1189,79 @@ class WeeklyOverviewService
             // Only include if they actually have at least one resource
             return $data['has_vehicle'] || $data['has_accommodation'];
         })->values();
+    }
+
+    /**
+     * Terminated employees who still have a project / vehicle / accommodation
+     * assignment overlapping the week — dangling assignments after termination.
+     *
+     * @return Collection<int, array{
+     *   employee: \App\Models\Employee,
+     *   project_assignments: Collection,
+     *   vehicle_assignments: Collection,
+     *   accommodation_assignments: Collection,
+     * }>
+     */
+    public function getTerminatedEmployeesWithAssignments(Carbon $weekStart, Carbon $weekEnd): Collection
+    {
+        $terminatedIds = Employee::query()
+            ->whereNotNull('terminated_at')
+            ->pluck('id');
+
+        if ($terminatedIds->isEmpty()) {
+            return collect();
+        }
+
+        $projectByEmployee = ProjectAssignment::overlappingWith($weekStart, $weekEnd)
+            ->whereIn('employee_id', $terminatedIds)
+            ->with(['project', 'role'])
+            ->get()
+            ->groupBy('employee_id');
+
+        $vehicleByEmployee = VehicleAssignment::where('is_return_trip', false)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->whereIn('employee_id', $terminatedIds)
+            ->with('vehicle')
+            ->get()
+            ->groupBy('employee_id');
+
+        $accommodationByEmployee = AccommodationAssignment::overlappingWith($weekStart, $weekEnd)
+            ->whereIn('employee_id', $terminatedIds)
+            ->with('accommodation')
+            ->get()
+            ->groupBy('employee_id');
+
+        $employeeIds = $projectByEmployee->keys()
+            ->merge($vehicleByEmployee->keys())
+            ->merge($accommodationByEmployee->keys())
+            ->unique()
+            ->values();
+
+        if ($employeeIds->isEmpty()) {
+            return collect();
+        }
+
+        $employees = Employee::query()
+            ->whereIn('id', $employeeIds)
+            ->with('roles')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->keyBy('id');
+
+        return $employeeIds->map(function ($employeeId) use ($employees, $projectByEmployee, $vehicleByEmployee, $accommodationByEmployee) {
+            $employee = $employees->get($employeeId);
+            if (! $employee) {
+                return null;
+            }
+
+            return [
+                'employee' => $employee,
+                'project_assignments' => $projectByEmployee->get($employeeId) ?? collect(),
+                'vehicle_assignments' => $vehicleByEmployee->get($employeeId) ?? collect(),
+                'accommodation_assignments' => $accommodationByEmployee->get($employeeId) ?? collect(),
+            ];
+        })->filter()->values();
     }
 
     /**

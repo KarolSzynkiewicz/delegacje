@@ -24,6 +24,9 @@ class EmployeesTable extends Component
 
     public $statusDate = ''; // Nowy filtr daty
 
+    /** When false (default), terminated employees are hidden from the list. */
+    public bool $showTerminated = false;
+
     public $sortField = 'last_name';
 
     public $sortDirection = 'asc';
@@ -40,6 +43,7 @@ class EmployeesTable extends Component
         'rotationFilter' => ['except' => ''],
         'companyFilter' => ['except' => ''],
         'statusDate' => ['except' => ''],
+        'showTerminated' => ['except' => false],
         'sortField' => ['except' => 'last_name'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -74,6 +78,11 @@ class EmployeesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingShowTerminated()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->search = '';
@@ -82,6 +91,7 @@ class EmployeesTable extends Component
         $this->rotationFilter = '';
         $this->companyFilter = '';
         $this->statusDate = '';
+        $this->showTerminated = false;
         $this->sortField = 'last_name';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -121,6 +131,11 @@ class EmployeesTable extends Component
         // Filtrowanie po pracownikach (dla /mine/*)
         if ($this->filterEmployeeIds && is_array($this->filterEmployeeIds) && ! empty($this->filterEmployeeIds)) {
             $query->whereIn('id', $this->filterEmployeeIds);
+        }
+
+        // Domyślnie ukrywaj zwolnionych; checkbox „Pokaż zwolnionych” pokazuje wszystkich
+        if (! $this->showTerminated) {
+            $query->whereNull('terminated_at');
         }
 
         // Filtrowanie po imieniu/nazwisku/emailu/telefonie
