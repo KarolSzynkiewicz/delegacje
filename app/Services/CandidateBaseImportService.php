@@ -115,10 +115,11 @@ class CandidateBaseImportService
     ];
 
     /**
-     * Rows processed per HTTP request / DB transaction. Sized so a Railway proxy
-     * (~60s) never sees one giant Livewire round-trip for thousands of writes.
+     * Rows processed per HTTP request / DB transaction.
+     * Large enough to keep round-trips low; still chunked so a full CSV cannot
+     * hold one multi-minute transaction / proxy request.
      */
-    public const IMPORT_CHUNK_SIZE = 50;
+    public const IMPORT_CHUNK_SIZE = 500;
 
     /** Memoized map of normalised employee phone → Employee, built once per request. */
     private ?Collection $employeesByPhone = null;
@@ -316,7 +317,8 @@ class CandidateBaseImportService
     }
 
     /**
-     * Prefetch candidates + their processes for the phones present in $rows.
+     * Prefetch candidates + processes (+ roles / contact attempts / comments) for
+     * the phones in $rows — keeps per-row work to writes, not N×SELECT.
      *
      * @param  Collection<int, array<string, mixed>>  $rows
      */
@@ -333,6 +335,7 @@ class CandidateBaseImportService
 
         $this->candidatesByPhone = RecruitmentCandidate::query()
             ->whereIn('phone', $phones)
+            ->with('roles')
             ->get()
             ->keyBy('phone');
 
@@ -342,7 +345,7 @@ class CandidateBaseImportService
             ? collect()
             : RecruitmentProcess::query()
                 ->whereIn('candidate_id', $candidateIds)
-                ->with('lead')
+                ->with(['lead', 'contactAttempts', 'comments'])
                 ->latest('id')
                 ->get()
                 ->groupBy('candidate_id');
@@ -702,41 +705,86 @@ class CandidateBaseImportService
                 'expected_rate_eur' => $row['expected_rate_eur'],
                 'available_from' => $this->resolveAvailableFrom($row['available_from_raw']),
             ]);
+            $candidate->setRelation('roles', collect());
             $this->rememberCandidate($candidate);
         } else {
             $this->enrichCandidate($candidate, $row);
         }
 
-        if (! empty($row['matched_role_names'])) {
-            $roleIds = collect($row['matched_role_names'])
-                ->map(fn (string $name) => $this->roleIdsByName[$name] ?? null)
-                ->filter()
-                ->values();
-
-            if ($roleIds->isNotEmpty()) {
-                $candidate->roles()->syncWithoutDetaching($roleIds);
-            }
-        }
+        $this->syncMatchedRoles($candidate, $row['matched_role_names'] ?? []);
 
         $statusInfo = $this->resolveStatusMapping($row, $candidate);
 
+        $postCreateUpdates = [];
         if ($statusInfo['rating'] && ! $candidate->rating) {
-            $candidate->update(['rating' => $statusInfo['rating']->value]);
+            $postCreateUpdates['rating'] = $statusInfo['rating']->value;
         }
-
         if ($statusInfo['employee'] && ! $candidate->employee_id) {
-            $candidate->update(['employee_id' => $statusInfo['employee']->id]);
+            $postCreateUpdates['employee_id'] = $statusInfo['employee']->id;
+        }
+        if (! empty($postCreateUpdates)) {
+            $candidate->update($postCreateUpdates);
         }
 
         $process = $this->resolveOrCreateProcess($candidate, $row, $statusInfo);
 
         $this->recordContactAttempt($process, $row, $statusInfo);
 
-        if ($statusInfo['process_comment'] && ! $process->comments()->where('body', $statusInfo['process_comment'])->exists()) {
-            $process->addComment($statusInfo['process_comment'], auth()->user());
+        if ($statusInfo['process_comment']) {
+            $alreadyCommented = $process->relationLoaded('comments')
+                ? $process->comments->contains(fn ($c) => $c->body === $statusInfo['process_comment'])
+                : $process->comments()->where('body', $statusInfo['process_comment'])->exists();
+
+            if (! $alreadyCommented) {
+                $comment = $process->addComment($statusInfo['process_comment'], auth()->user());
+                if ($process->relationLoaded('comments')) {
+                    $process->setRelation('comments', $process->comments->prepend($comment));
+                }
+            }
         }
 
         return ['action' => $isNew ? 'created' : 'enriched', 'warnings' => $statusInfo['warnings']];
+    }
+
+    /** @param  array<int, string>  $matchedRoleNames */
+    private function syncMatchedRoles(RecruitmentCandidate $candidate, array $matchedRoleNames): void
+    {
+        if ($matchedRoleNames === []) {
+            return;
+        }
+
+        $roleIds = collect($matchedRoleNames)
+            ->map(fn (string $name) => $this->roleIdsByName[$name] ?? null)
+            ->filter()
+            ->values();
+
+        if ($roleIds->isEmpty()) {
+            return;
+        }
+
+        $existingIds = $candidate->relationLoaded('roles')
+            ? $candidate->roles->pluck('id')
+            : $candidate->roles()->pluck('roles.id');
+
+        $toAttach = $roleIds->diff($existingIds)->values();
+        if ($toAttach->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        $candidate->roles()->attach(
+            $toAttach->mapWithKeys(fn ($id) => [$id => ['created_at' => $now, 'updated_at' => $now]])->all()
+        );
+
+        if ($candidate->relationLoaded('roles')) {
+            $stubs = $toAttach->map(function ($id) {
+                $role = new Role(['id' => $id]);
+                $role->exists = true;
+
+                return $role;
+            });
+            $candidate->setRelation('roles', $candidate->roles->concat($stubs)->unique('id')->values());
+        }
     }
 
     private function enrichCandidate(RecruitmentCandidate $candidate, array $row): void
@@ -787,20 +835,22 @@ class CandidateBaseImportService
         }
         $lead->save();
 
-        $process = RecruitmentProcess::create([
+        $attributes = [
             'lead_id' => $lead->id,
             'candidate_id' => $candidate->id,
             'status' => $statusInfo['status'],
             'employee_id' => $statusInfo['employee']?->id,
-        ]);
-        $process->setRelation('lead', $lead);
+        ];
 
         if ($statusInfo['status'] === RecruitmentStatus::Odrzucony) {
-            $process->update([
-                'rejection_reason' => $statusInfo['rejection_reason'],
-                'rejection_reason_note' => $statusInfo['rejection_note'],
-            ]);
+            $attributes['rejection_reason'] = $statusInfo['rejection_reason'];
+            $attributes['rejection_reason_note'] = $statusInfo['rejection_note'];
         }
+
+        $process = RecruitmentProcess::create($attributes);
+        $process->setRelation('lead', $lead);
+        $process->setRelation('contactAttempts', collect());
+        $process->setRelation('comments', collect());
 
         $this->rememberProcess($process);
 
@@ -832,16 +882,31 @@ class CandidateBaseImportService
         $comment = trim(implode("\n\n", array_filter([$row['notes'], $statusInfo['extra_note']])));
         $comment = $comment !== '' ? $comment : null;
         $attemptDate = $this->parseDate($row['contact_date']) ?? $this->parseDate($row['lead_created_at']);
+        $attemptDateString = $attemptDate?->toDateString();
 
-        // Re-running this import on the same CSV must not pile up duplicate contact
-        // attempts — skip if the exact same comment is already recorded for the same
-        // day (or, when the row carries no date at all, anywhere on this process).
-        $duplicateQuery = $process->contactAttempts()->where('comment', $comment);
-        if ($attemptDate) {
-            $duplicateQuery->whereDate('created_at', $attemptDate->toDateString());
-        }
-        if ($duplicateQuery->exists()) {
-            return;
+        // Prefer in-memory attempts (prefetched / previously created in this chunk)
+        // so re-imports and same-chunk duplicates do not hit exists() per row.
+        if ($process->relationLoaded('contactAttempts')) {
+            $duplicate = $process->contactAttempts->contains(function ($attempt) use ($comment, $attemptDateString) {
+                if ($attempt->comment !== $comment) {
+                    return false;
+                }
+
+                return $attemptDateString === null
+                    || $attempt->created_at?->toDateString() === $attemptDateString;
+            });
+
+            if ($duplicate) {
+                return;
+            }
+        } else {
+            $duplicateQuery = $process->contactAttempts()->where('comment', $comment);
+            if ($attemptDate) {
+                $duplicateQuery->whereDate('created_at', $attemptDate->toDateString());
+            }
+            if ($duplicateQuery->exists()) {
+                return;
+            }
         }
 
         $attempt = $process->contactAttempts()->make([
@@ -853,6 +918,10 @@ class CandidateBaseImportService
             $attempt->created_at = $attemptDate;
         }
         $attempt->save();
+
+        if ($process->relationLoaded('contactAttempts')) {
+            $process->setRelation('contactAttempts', $process->contactAttempts->prepend($attempt));
+        }
 
         if ($comment !== null && ! $process->admin_notes) {
             $process->update(['admin_notes' => $comment]);
