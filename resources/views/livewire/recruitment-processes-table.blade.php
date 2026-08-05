@@ -280,8 +280,25 @@
                             <div style="border:1px solid var(--glass-border);border-radius:12px;padding:1rem;background:rgba(255,255,255,.02);">
 
                                 {{-- Kandydat --}}
-                                <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">
-                                    <i class="bi bi-person me-1"></i>Kandydat
+                                @php
+                                    $linkedEmployee = $selected->employee ?? $candidate?->employee;
+                                    $isFormerEmployee = $linkedEmployee?->isTerminated() ?? false;
+                                @endphp
+                                <div class="d-flex align-items-center justify-content-between gap-2" style="margin-bottom:.25rem;">
+                                    <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
+                                        <i class="bi bi-person me-1"></i>Kandydat
+                                    </div>
+                                    @if($linkedEmployee)
+                                        <a href="{{ route('employees.show', $linkedEmployee) }}"
+                                           class="badge {{ $isFormerEmployee ? 'badge-warning' : 'badge-success' }} text-decoration-none"
+                                           style="font-size:.68rem;padding:4px 9px;"
+                                           title="{{ $isFormerEmployee
+                                               ? 'Zwolniony'.($linkedEmployee->terminated_at ? ' '.$linkedEmployee->terminated_at->format('d.m.Y') : '')
+                                               : 'Zatrudniony pracownik' }}">
+                                            <i class="bi bi-person-{{ $isFormerEmployee ? 'x' : 'check' }} me-1"></i>{{ $isFormerEmployee ? 'Były pracownik' : 'Pracownik' }}
+                                            <i class="bi bi-box-arrow-up-right ms-1" style="font-size:.55rem;opacity:.75;"></i>
+                                        </a>
+                                    @endif
                                 </div>
                                 <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.6rem;">
                                     Profil osoby — kontakt i skillset są wspólne dla wszystkich procesów tego kandydata.
@@ -333,13 +350,6 @@
                                         <div class="flex-grow-1 min-width-0">
                                             <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
                                                 <h5 class="mb-0" style="font-size:1rem;">{{ $selected->full_name }}</h5>
-                                                @if($selected->employee)
-                                                    @if($selected->employee->isTerminated())
-                                                        <a href="{{ route('employees.show', $selected->employee) }}" class="badge badge-secondary text-decoration-none ms-1" style="font-size:.65rem;"><i class="bi bi-person-x me-1"></i>Były pracownik</a>
-                                                    @else
-                                                        <a href="{{ route('employees.show', $selected->employee) }}" class="badge badge-success text-decoration-none ms-1" style="font-size:.65rem;"><i class="bi bi-person-check me-1"></i>Pracownik</a>
-                                                    @endif
-                                                @endif
                                                 @if($isStarred)
                                                     <span class="badge badge-warning ms-1" style="font-size:.65rem;"><i class="bi bi-star-fill me-1"></i>Wartościowy</span>
                                                 @endif
@@ -684,7 +694,11 @@
                                                         <strong>{{ $entry->to_status->label() }}</strong>
                                                         <div style="color:var(--text-muted);font-size:.68rem;">{{ $entry->changedBy?->name ?? 'System' }}</div>
                                                     </div>
-                                                    <small style="color:var(--text-muted);white-space:nowrap;">{{ $entry->created_at->format('d.m H:i') }}</small>
+                                                    <small style="color:var(--text-muted);white-space:nowrap;text-align:right;line-height:1.25;"
+                                                           title="{{ $entry->created_at->format('d.m.Y H:i') }}">
+                                                        <div>{{ $entry->created_at->diffForHumans() }}</div>
+                                                        <div style="font-size:.62rem;opacity:.8;">{{ $entry->created_at->format('d.m.Y H:i') }}</div>
+                                                    </small>
                                                 </div>
                                             </div>
                                         @empty
@@ -747,54 +761,56 @@
                             </div>{{-- /karta procesu --}}
                         </div>
 
-                        {{-- Inne procesy tego kandydata --}}
-                        @if($candidate && $candidate->processes->count() > 1)
+                        {{-- Inne procesy tego kandydata (bez bieżącego) --}}
+                        @php
+                            $siblingProcesses = $candidate
+                                ? $candidate->processes->where('id', '!=', $selected->id)->sortByDesc('created_at')
+                                : collect();
+                        @endphp
+                        @if($siblingProcesses->isNotEmpty())
                             <div style="margin-bottom:1rem;">
                                 <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:.6rem;padding-left:.25rem;">
                                     <i class="bi bi-diagram-2 me-1"></i>Inne procesy tego kandydata
+                                    <span class="badge badge-secondary ms-1" style="font-size:.55rem;">{{ $siblingProcesses->count() }}</span>
                                 </div>
-                                @foreach($candidate->processes->sortByDesc('created_at') as $proc)
-                                    @php $isCurrent = $proc->id === $selected->id; @endphp
+                                @foreach($siblingProcesses as $proc)
+                                    @php $procStatus = $proc->status; @endphp
                                     <div class="d-flex align-items-center gap-2 mb-2 p-2"
-                                         style="border-radius:8px;background:{{ $isCurrent ? 'rgba(var(--primary-rgb),.08)' : 'rgba(255,255,255,.02)' }};border:1px solid {{ $isCurrent ? 'rgba(var(--primary-rgb),.2)' : 'var(--glass-border)' }};"
+                                         style="border-radius:8px;background:rgba(255,255,255,.02);border:1px solid var(--glass-border);"
                                          wire:key="sibling-{{ $proc->id }}">
                                         <div class="flex-grow-1 min-width-0">
-                                            @php $procStatus = $proc->status; @endphp
                                             <div class="d-flex align-items-center gap-1 flex-wrap">
                                                 @if($procStatus)
                                                     <span class="badge badge-{{ $procStatus->variant() }}" style="font-size:.62rem;">{{ $procStatus->label() }}</span>
                                                 @endif
-                                                @if($isCurrent)
-                                                    <span class="badge badge-secondary" style="font-size:.58rem;">bieżący</span>
-                                                @endif
-                                                <span style="font-size:.72rem;color:var(--text-muted);">
-                                                    {{ $proc->lead?->created_at->format('d.m.Y') ?? $proc->created_at->format('d.m.Y') }}
+                                                <span style="font-size:.72rem;color:var(--text-muted);"
+                                                      title="{{ ($proc->lead?->created_at ?? $proc->created_at)->format('d.m.Y H:i') }}">
+                                                    {{ ($proc->lead?->created_at ?? $proc->created_at)->diffForHumans() }}
+                                                    · {{ ($proc->lead?->created_at ?? $proc->created_at)->format('d.m.Y') }}
                                                 </span>
                                                 @if($proc->assignedRecruiter)
                                                     <span style="font-size:.7rem;color:var(--text-muted);">· {{ $proc->assignedRecruiter->name }}</span>
                                                 @endif
                                             </div>
                                         </div>
-                                        @if(! $isCurrent)
-                                            <div class="d-flex gap-1 flex-shrink-0">
+                                        <div class="d-flex gap-1 flex-shrink-0">
+                                            <button type="button"
+                                                    wire:click="selectProcess({{ $proc->id }})"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    style="padding:2px 8px;font-size:.68rem;"
+                                                    title="Przejdź do tego procesu">
+                                                <i class="bi bi-arrow-right"></i>
+                                            </button>
+                                            @if($procStatus !== \App\Enums\RecruitmentStatus::Odrzucony && $procStatus !== \App\Enums\RecruitmentStatus::Zatrudniony)
                                                 <button type="button"
-                                                        wire:click="selectProcess({{ $proc->id }})"
-                                                        class="btn btn-sm btn-outline-secondary"
+                                                        wire:click="updateStatus({{ $proc->id }}, 'odrzucony')"
+                                                        class="btn btn-sm btn-outline-danger"
                                                         style="padding:2px 8px;font-size:.68rem;"
-                                                        title="Przejdź do tego procesu">
-                                                    <i class="bi bi-arrow-right"></i>
+                                                        title="Odrzuć ten proces">
+                                                    <i class="bi bi-x-circle"></i>
                                                 </button>
-                                                @if($procStatus !== \App\Enums\RecruitmentStatus::Odrzucony && $procStatus !== \App\Enums\RecruitmentStatus::Zatrudniony)
-                                                    <button type="button"
-                                                            wire:click="updateStatus({{ $proc->id }}, 'odrzucony')"
-                                                            class="btn btn-sm btn-outline-danger"
-                                                            style="padding:2px 8px;font-size:.68rem;"
-                                                            title="Odrzuć ten proces">
-                                                        <i class="bi bi-x-circle"></i>
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        @endif
+                                            @endif
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>
@@ -853,7 +869,11 @@
                                     <div class="flex-grow-1">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <span style="font-size:.8rem;font-weight:600;">{{ $attempt->user?->name ?? '—' }}</span>
-                                            <small style="color:var(--text-muted);font-size:.72rem;white-space:nowrap;margin-left:.5rem;">{{ $attempt->created_at->format('d.m H:i') }}</small>
+                                            <small style="color:var(--text-muted);font-size:.72rem;white-space:nowrap;margin-left:.5rem;text-align:right;line-height:1.25;"
+                                                   title="{{ $attempt->created_at->format('d.m.Y H:i') }}">
+                                                <div>{{ $attempt->created_at->diffForHumans() }}</div>
+                                                <div style="font-size:.62rem;opacity:.8;">{{ $attempt->created_at->format('d.m.Y H:i') }}</div>
+                                            </small>
                                         </div>
                                         <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
                                             <span class="badge {{ $aBadge }}" style="font-size:.65rem;padding:2px 6px;">{{ $attempt->outcome->label() }}</span>

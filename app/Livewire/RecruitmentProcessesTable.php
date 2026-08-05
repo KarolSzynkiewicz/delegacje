@@ -680,6 +680,7 @@ class RecruitmentProcessesTable extends Component
         return RecruitmentProcess::with([
             'candidate.consents',
             'candidate.roles',
+            'candidate.employee',
             'candidate.allContactAttempts.user',
             'candidate.allContactAttempts.recruitmentProcess',
             'candidate.processes.lead',
@@ -785,11 +786,10 @@ class RecruitmentProcessesTable extends Component
             $selectedCandidateId = $selected->candidate_id;
             $pinnedCandidate = $listCandidates->firstWhere('id', $selectedCandidateId) ?? $selected->candidate;
 
+            // Newest processes first — the active one is highlighted, no need to pin it on top.
             $pinnedCandidate->setRelation(
                 'processes',
-                $pinnedCandidate->processes
-                    ->sortBy(fn ($p) => $p->id === $this->selectedId ? 0 : 1)
-                    ->values()
+                $pinnedCandidate->processes->sortByDesc('created_at')->values()
             );
 
             $listCandidates = $listCandidates
