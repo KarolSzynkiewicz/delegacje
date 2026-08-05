@@ -23,18 +23,30 @@ class CandidateBaseImport extends Component
 
     public ?array $importResult = null;
 
+    /** True while chunked import is in progress across Livewire requests. */
+    public bool $importing = false;
+
+    public int $importOffset = 0;
+
+    public int $importTotal = 0;
+
     // ─────────────────────────────────────────────────────────────────────────
 
     public function openModal(): void
     {
-        $this->reset(['csvFile', 'preview', 'parseError', 'importResult']);
+        $this->reset(['csvFile', 'preview', 'parseError', 'importResult', 'importing', 'importOffset', 'importTotal']);
         $this->show = true;
     }
 
     public function closeModal(): void
     {
+        // Don't allow closing mid-import — a half-written chunked run is confusing.
+        if ($this->importing) {
+            return;
+        }
+
         $this->show = false;
-        $this->reset(['csvFile', 'preview', 'parseError', 'importResult']);
+        $this->reset(['csvFile', 'preview', 'parseError', 'importResult', 'importing', 'importOffset', 'importTotal']);
     }
 
     public function updatedCsvFile(): void
@@ -42,6 +54,9 @@ class CandidateBaseImport extends Component
         $this->preview = [];
         $this->parseError = null;
         $this->importResult = null;
+        $this->importing = false;
+        $this->importOffset = 0;
+        $this->importTotal = 0;
 
         $this->validateOnly('csvFile');
 
@@ -65,18 +80,72 @@ class CandidateBaseImport extends Component
 
     public function doImport(): void
     {
-        if (empty($this->preview)) {
+        if (empty($this->preview) || $this->importing) {
+            return;
+        }
+
+        $this->parseError = null;
+        $this->importing = true;
+        $this->importOffset = 0;
+        $this->importTotal = count($this->preview);
+        $this->importResult = [
+            'created' => 0,
+            'enriched' => 0,
+            'skipped' => 0,
+            'warnings' => [],
+        ];
+
+        $this->processImportChunk();
+    }
+
+    /**
+     * One HTTP request = one DB chunk. Called from doImport and then via wire:poll
+     * so Railway's proxy timeout never sees a multi-minute single request.
+     */
+    public function processImportChunk(): void
+    {
+        if (! $this->importing || empty($this->preview)) {
+            return;
+        }
+
+        $chunkSize = CandidateBaseImportService::IMPORT_CHUNK_SIZE;
+        $chunk = collect(array_slice($this->preview, $this->importOffset, $chunkSize));
+
+        if ($chunk->isEmpty()) {
+            $this->finishImport();
+
             return;
         }
 
         try {
-            $this->importResult = app(CandidateBaseImportService::class)->import(collect($this->preview));
+            $stats = app(CandidateBaseImportService::class)->importChunk($chunk);
         } catch (\Exception $e) {
-            $this->parseError = 'Błąd importu: '.$e->getMessage();
+            $this->importing = false;
+            $this->parseError = 'Błąd importu (przerwano po '.$this->importOffset.' z '.$this->importTotal.' wierszy): '.$e->getMessage();
 
             return;
         }
 
+        $this->importResult['created'] += $stats['created'];
+        $this->importResult['enriched'] += $stats['enriched'];
+        $this->importResult['skipped'] += $stats['skipped'];
+        $this->importResult['warnings'] = array_merge($this->importResult['warnings'], $stats['warnings']);
+        $this->importOffset += $chunk->count();
+
+        if ($this->importOffset >= $this->importTotal) {
+            $this->finishImport();
+
+            return;
+        }
+
+        // Chain the next chunk only after this request finishes — avoids wire:poll races
+        // where two overlapping requests would re-process the same offset.
+        $this->js('queueMicrotask(() => $wire.processImportChunk())');
+    }
+
+    private function finishImport(): void
+    {
+        $this->importing = false;
         $this->preview = [];
         // Use reset() so Livewire properly handles the TemporaryUploadedFile lifecycle
         // instead of forcing it to null (which triggers a toJSON serialization error).

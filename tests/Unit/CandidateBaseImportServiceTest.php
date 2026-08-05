@@ -479,4 +479,44 @@ class CandidateBaseImportServiceTest extends TestCase
         $this->assertSame(['created' => 0, 'enriched' => 0, 'skipped' => 1, 'warnings' => []], $result);
         $this->assertSame(0, RecruitmentCandidate::count());
     }
+
+    public function test_import_chunk_matches_full_import_for_a_batch(): void
+    {
+        $this->actingAsRecruiter();
+
+        $headers = CandidateBaseImportService::EXPECTED_HEADERS;
+        $line = fn (array $values) => implode(',', array_map(
+            fn ($v) => '"'.str_replace('"', '""', (string) $v).'"',
+            $values
+        ));
+
+        $body = '';
+        for ($i = 0; $i < 3; $i++) {
+            $row = [
+                'first_name' => 'Jan'.$i,
+                'last_name' => 'Test',
+                'phone' => '60020030'.$i,
+                'email' => '',
+                'city' => '',
+                'has_driving_license_b' => '',
+                'roles_raw' => '',
+                'expected_rate_eur' => '',
+                'available_from_raw' => '',
+                'legacy_status' => 'Kandydat',
+                'referral_source' => '',
+                'referral_source_detail' => '',
+                'lead_created_at' => '2026-05-0'.($i + 1).' 08:00:00',
+                'contact_date' => '',
+                'notes' => '',
+            ];
+            $body .= $line(array_map(fn ($h) => $row[$h], $headers))."\n";
+        }
+
+        $rows = $this->service()->parseOnly($line($headers)."\n".$body)['rows'];
+        $result = $this->service()->importChunk($rows);
+
+        $this->assertSame(3, $result['created']);
+        $this->assertSame(3, RecruitmentCandidate::count());
+        $this->assertSame(3, RecruitmentProcess::count());
+    }
 }

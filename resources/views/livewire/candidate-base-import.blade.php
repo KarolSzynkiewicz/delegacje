@@ -42,7 +42,7 @@
                     </div>
 
                     {{-- File picker --}}
-                    @if(! $preview && ! $importResult)
+                    @if(! $preview && ! $importing && (! $importResult || $parseError))
                     <div class="mb-3">
                         <label class="form-label" style="font-size:.85rem;color:var(--text-muted);">Plik CSV (schemat scalonej bazy kandydatów)</label>
                         <input type="file"
@@ -70,8 +70,34 @@
                         </button>
                     @endif
 
+                    {{-- Chunked import progress (one HTTP request ≈ one chunk — avoids Railway proxy 500) --}}
+                    @if($importing)
+                        @php
+                            $pct = $importTotal > 0 ? min(100, (int) round(($importOffset / $importTotal) * 100)) : 0;
+                        @endphp
+                        <div class="alert alert-info d-flex gap-2 align-items-start mb-3" style="font-size:.9rem;background:rgba(37,99,235,.15);border-color:rgba(37,99,235,.3);color:#93c5fd;">
+                            <i class="bi bi-hourglass-split flex-shrink-0 mt-1"></i>
+                            <div class="w-100">
+                                <div class="mb-2">
+                                    Import w toku — zapisuję paczkami po {{ \App\Services\CandidateBaseImportService::IMPORT_CHUNK_SIZE }} wierszy
+                                    (bez długiego pojedynczego requestu).<br>
+                                    <strong>{{ $importOffset }}</strong> / <strong>{{ $importTotal }}</strong> wierszy
+                                    @if($importResult)
+                                        &nbsp;·&nbsp; {{ $importResult['created'] }} nowych
+                                        &nbsp;·&nbsp; {{ $importResult['enriched'] }} wzbogaconych
+                                    @endif
+                                </div>
+                                <div class="progress" style="height:8px;background:rgba(255,255,255,.08);">
+                                    <div class="progress-bar" role="progressbar"
+                                         style="width:{{ $pct }}%;background:#34d399;"
+                                         aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     {{-- Import success --}}
-                    @if($importResult)
+                    @if($importResult && ! $importing && empty($preview) && ! $parseError)
                         <div class="alert alert-success d-flex gap-2 align-items-start" style="font-size:.9rem;">
                             <i class="bi bi-check-circle-fill flex-shrink-0 mt-1"></i>
                             <div>
@@ -110,7 +136,7 @@
                     @endif
 
                     {{-- Preview table --}}
-                    @if(!empty($preview))
+                    @if(!empty($preview) && ! $importing)
                         @php
                             $previewCol = collect($preview);
                             $totalRows = $previewCol->count();
@@ -225,7 +251,7 @@
 
                 {{-- Footer --}}
                 <div class="modal-footer" style="border-color:var(--glass-border);">
-                    @if(!empty($preview))
+                    @if(!empty($preview) && ! $importing)
                         @php $toImport = collect($preview)->where('candidate_action', '!=', 'skip')->count(); @endphp
                         <button type="button" wire:click="doImport"
                                 wire:loading.attr="disabled"
@@ -235,12 +261,14 @@
                                 <i class="bi bi-check-lg me-1"></i>Importuj {{ $toImport }} wierszy
                             </span>
                             <span wire:loading wire:target="doImport">
-                                <i class="bi bi-hourglass-split me-1"></i>Importuję (może to potrwać dłużej)…
+                                <i class="bi bi-hourglass-split me-1"></i>Startuję import…
                             </span>
                         </button>
                     @endif
-                    <button type="button" wire:click="closeModal" class="btn btn-outline-secondary">
-                        Anuluj
+                    <button type="button" wire:click="closeModal" class="btn btn-outline-secondary"
+                            @disabled($importing)
+                            @if($importing) title="Poczekaj na zakończenie importu" @endif>
+                        {{ $importing ? 'Import w toku…' : 'Anuluj' }}
                     </button>
                 </div>
 

@@ -114,8 +114,23 @@ class CandidateBaseImportService
         ],
     ];
 
+    /**
+     * Rows processed per HTTP request / DB transaction. Sized so a Railway proxy
+     * (~60s) never sees one giant Livewire round-trip for thousands of writes.
+     */
+    public const IMPORT_CHUNK_SIZE = 50;
+
     /** Memoized map of normalised employee phone → Employee, built once per request. */
     private ?Collection $employeesByPhone = null;
+
+    /** @var Collection<string, RecruitmentCandidate>|null phone → candidate */
+    private ?Collection $candidatesByPhone = null;
+
+    /** @var Collection<int, Collection<int, RecruitmentProcess>>|null candidate_id → processes (with lead) */
+    private ?Collection $processesByCandidateId = null;
+
+    /** @var array<string, int>|null role name → id */
+    private ?array $roleIdsByName = null;
 
     /**
      * Parse CSV into structured rows. No DB access — safe to call for validation.
@@ -183,12 +198,15 @@ class CandidateBaseImportService
      */
     public function preview(Collection $rows): Collection
     {
+        $this->warmSharedCaches();
+        $this->warmRowCaches($rows);
+
         return $rows->map(function (array $row) {
             if (! $row['phone']) {
                 return $row + ['candidate_action' => 'skip', 'warnings' => array_merge($row['warnings'], ['Brak numeru telefonu'])];
             }
 
-            $candidate = RecruitmentCandidate::where('phone', $row['phone'])->first();
+            $candidate = $this->candidatesByPhone->get($row['phone']);
             $row['candidate_action'] = $candidate ? 'enrich' : 'create';
             $row['candidate_id'] = $candidate?->id;
 
@@ -211,19 +229,53 @@ class CandidateBaseImportService
     }
 
     /**
-     * Persist rows to the database inside a single transaction.
+     * Persist all rows, committing in chunks so a multi-thousand-row run does not
+     * hold one giant transaction open for minutes.
+     *
+     * For HTTP (Livewire) prefer {@see importChunk()} driven across requests —
+     * this full-file path is mainly for tests / artisan.
      *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return array{created: int, enriched: int, skipped: int, warnings: array<int, string>}
      */
     public function import(Collection $rows): array
     {
+        $totals = ['created' => 0, 'enriched' => 0, 'skipped' => 0, 'warnings' => []];
+
+        $this->warmSharedCaches();
+
+        foreach ($rows->chunk(self::IMPORT_CHUNK_SIZE) as $chunk) {
+            $stats = $this->importChunk($chunk, warmShared: false);
+            $totals['created'] += $stats['created'];
+            $totals['enriched'] += $stats['enriched'];
+            $totals['skipped'] += $stats['skipped'];
+            $totals['warnings'] = array_merge($totals['warnings'], $stats['warnings']);
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Persist a single chunk inside one transaction, with prefetch for that chunk.
+     * Intended to be called repeatedly from Livewire (one HTTP request ≈ one chunk).
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array{created: int, enriched: int, skipped: int, warnings: array<int, string>}
+     */
+    public function importChunk(Collection $rows, bool $warmShared = true): array
+    {
+        if ($warmShared) {
+            $this->warmSharedCaches();
+        }
+
         $created = 0;
         $enriched = 0;
         $skipped = 0;
         $warnings = [];
 
         DB::transaction(function () use ($rows, &$created, &$enriched, &$skipped, &$warnings) {
+            $this->warmRowCaches($rows);
+
             foreach ($rows as $row) {
                 if (! $row['phone']) {
                     $skipped++;
@@ -246,6 +298,54 @@ class CandidateBaseImportService
         });
 
         return compact('created', 'enriched', 'skipped', 'warnings');
+    }
+
+    /** Load roles + employees once — reused across preview / many import chunks. */
+    private function warmSharedCaches(): void
+    {
+        if ($this->roleIdsByName === null) {
+            $this->roleIdsByName = Role::query()->pluck('id', 'name')->all();
+        }
+
+        if ($this->employeesByPhone === null) {
+            $this->employeesByPhone = Employee::query()
+                ->whereNotNull('phone')
+                ->get()
+                ->keyBy(fn (Employee $e) => PhoneNormalizer::normalize($e->phone));
+        }
+    }
+
+    /**
+     * Prefetch candidates + their processes for the phones present in $rows.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     */
+    private function warmRowCaches(Collection $rows): void
+    {
+        $phones = $rows->pluck('phone')->filter()->unique()->values();
+
+        if ($phones->isEmpty()) {
+            $this->candidatesByPhone = collect();
+            $this->processesByCandidateId = collect();
+
+            return;
+        }
+
+        $this->candidatesByPhone = RecruitmentCandidate::query()
+            ->whereIn('phone', $phones)
+            ->get()
+            ->keyBy('phone');
+
+        $candidateIds = $this->candidatesByPhone->pluck('id');
+
+        $this->processesByCandidateId = $candidateIds->isEmpty()
+            ? collect()
+            : RecruitmentProcess::query()
+                ->whereIn('candidate_id', $candidateIds)
+                ->with('lead')
+                ->latest('id')
+                ->get()
+                ->groupBy('candidate_id');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -524,14 +624,18 @@ class CandidateBaseImportService
      */
     private function findReusableProcess(RecruitmentCandidate $candidate, ?Carbon $leadCreatedAt): ?RecruitmentProcess
     {
+        $processes = $this->processesForCandidate($candidate);
+
         if ($leadCreatedAt) {
-            return RecruitmentProcess::where('candidate_id', $candidate->id)
-                ->whereHas('lead', fn ($q) => $q->whereDate('created_at', $leadCreatedAt->toDateString()))
-                ->latest()
-                ->first();
+            $date = $leadCreatedAt->toDateString();
+
+            return $processes->first(function (RecruitmentProcess $process) use ($date) {
+                $lead = $process->relationLoaded('lead') ? $process->lead : $process->lead()->first();
+
+                return $lead && $lead->created_at?->toDateString() === $date;
+            });
         }
 
-        $processes = RecruitmentProcess::where('candidate_id', $candidate->id)->get();
         if ($processes->count() === 1) {
             $only = $processes->first();
             if ($only->status === RecruitmentStatus::Nowy && ! $only->admin_notes) {
@@ -542,6 +646,41 @@ class CandidateBaseImportService
         return null;
     }
 
+    /** @return Collection<int, RecruitmentProcess> */
+    private function processesForCandidate(RecruitmentCandidate $candidate): Collection
+    {
+        if ($this->processesByCandidateId !== null) {
+            return $this->processesByCandidateId->get($candidate->id, collect());
+        }
+
+        return RecruitmentProcess::where('candidate_id', $candidate->id)
+            ->with('lead')
+            ->latest('id')
+            ->get();
+    }
+
+    private function rememberCandidate(RecruitmentCandidate $candidate): void
+    {
+        if ($this->candidatesByPhone === null) {
+            $this->candidatesByPhone = collect();
+        }
+
+        $this->candidatesByPhone->put($candidate->phone, $candidate);
+    }
+
+    private function rememberProcess(RecruitmentProcess $process): void
+    {
+        if ($this->processesByCandidateId === null) {
+            $this->processesByCandidateId = collect();
+        }
+
+        $bucket = $this->processesByCandidateId->get($process->candidate_id, collect());
+        $this->processesByCandidateId->put(
+            $process->candidate_id,
+            $bucket->prepend($process)->unique('id')->values()
+        );
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Persistence
     // ─────────────────────────────────────────────────────────────────────────
@@ -549,7 +688,7 @@ class CandidateBaseImportService
     /** @return array{action: 'created'|'enriched'|'skipped', warnings: array<int, string>} */
     private function importRow(array $row): array
     {
-        $candidate = RecruitmentCandidate::where('phone', $row['phone'])->first();
+        $candidate = $this->candidatesByPhone?->get($row['phone']);
         $isNew = $candidate === null;
 
         if (! $candidate) {
@@ -563,12 +702,17 @@ class CandidateBaseImportService
                 'expected_rate_eur' => $row['expected_rate_eur'],
                 'available_from' => $this->resolveAvailableFrom($row['available_from_raw']),
             ]);
+            $this->rememberCandidate($candidate);
         } else {
             $this->enrichCandidate($candidate, $row);
         }
 
         if (! empty($row['matched_role_names'])) {
-            $roleIds = Role::whereIn('name', $row['matched_role_names'])->pluck('id');
+            $roleIds = collect($row['matched_role_names'])
+                ->map(fn (string $name) => $this->roleIdsByName[$name] ?? null)
+                ->filter()
+                ->values();
+
             if ($roleIds->isNotEmpty()) {
                 $candidate->roles()->syncWithoutDetaching($roleIds);
             }
@@ -633,16 +777,15 @@ class CandidateBaseImportService
             return $existing;
         }
 
-        $lead = RecruitmentLead::create([
+        $lead = new RecruitmentLead([
             'candidate_id' => $candidate->id,
             'referral_source' => $this->resolveReferralSource($row['referral_source']) ?? RecruitmentReferralSource::HistoricalImport,
             'referral_source_detail' => $row['referral_source_detail'],
         ]);
-
         if ($leadCreatedAt) {
             $lead->created_at = $leadCreatedAt;
-            $lead->save();
         }
+        $lead->save();
 
         $process = RecruitmentProcess::create([
             'lead_id' => $lead->id,
@@ -650,6 +793,7 @@ class CandidateBaseImportService
             'status' => $statusInfo['status'],
             'employee_id' => $statusInfo['employee']?->id,
         ]);
+        $process->setRelation('lead', $lead);
 
         if ($statusInfo['status'] === RecruitmentStatus::Odrzucony) {
             $process->update([
@@ -657,6 +801,8 @@ class CandidateBaseImportService
                 'rejection_reason_note' => $statusInfo['rejection_note'],
             ]);
         }
+
+        $this->rememberProcess($process);
 
         return $process;
     }
@@ -698,16 +844,15 @@ class CandidateBaseImportService
             return;
         }
 
-        $attempt = $process->contactAttempts()->create([
+        $attempt = $process->contactAttempts()->make([
             'user_id' => auth()->id(),
             'outcome' => $statusInfo['outcome'],
             'comment' => $comment,
         ]);
-
         if ($attemptDate) {
             $attempt->created_at = $attemptDate;
-            $attempt->save();
         }
+        $attempt->save();
 
         if ($comment !== null && ! $process->admin_notes) {
             $process->update(['admin_notes' => $comment]);
