@@ -2733,13 +2733,40 @@ html .text-muted,
     width: 270px;
     flex-shrink: 0;
     border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+/* Open lead: fixed block above the scrolling list, never scrolls out of view. */
+.rp-modal-left__pinned {
+    flex-shrink: 0;
+    background: rgba(59, 130, 246, 0.08);
+    border-bottom: 2px solid var(--primary);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+.rp-modal-left__pinned .rp-cand-group {
+    border-bottom: none;
+}
+.rp-modal-left__list {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--glass-border) transparent;
 }
-.rp-modal-left::-webkit-scrollbar { width: 4px; }
-.rp-modal-left::-webkit-scrollbar-track { background: transparent; }
-.rp-modal-left::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 9999px; }
+.rp-modal-left__list::-webkit-scrollbar { width: 4px; }
+.rp-modal-left__list::-webkit-scrollbar-track { background: transparent; }
+.rp-modal-left__list::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 9999px; }
+.rp-modal-left__pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .35rem;
+    padding: .45rem .55rem;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.02);
+    flex-shrink: 0;
+}
 /* Center: details */
 .rp-modal-center {
     flex: 1;

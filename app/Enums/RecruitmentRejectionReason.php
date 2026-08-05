@@ -8,6 +8,7 @@ enum RecruitmentRejectionReason: string
     case PracujeGdzieIndziej = 'pracuje_gdzie_indziej';
     case Duplikat = 'duplikat';
     case BrakDoswiadczenia = 'brak_doswiadczenia';
+    case BledneDaneKontaktowe = 'bledne_dane_kontaktowe';
     case Inne = 'inne';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum RecruitmentRejectionReason: string
             self::PracujeGdzieIndziej => 'Pracuje gdzie indziej',
             self::Duplikat => 'Duplikat',
             self::BrakDoswiadczenia => 'Brak doświadczenia',
+            self::BledneDaneKontaktowe => 'Błędne dane kontaktowe',
             self::Inne => 'Inne',
         };
     }

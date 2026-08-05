@@ -746,41 +746,39 @@ class RecruitmentProcessesTable extends Component
             ->orderBy('recruitment_candidates.last_name')
             ->paginate(20);
 
-        // Compact candidate-grouped list for the drawer left panel
-        $listCandidates = RecruitmentCandidate::query()
-            ->select(['recruitment_candidates.*', $lastCandidateContactSubquery])
-            ->whereHas('processes', function ($q) use ($status) {
-                $q->when($status, fn ($q) => $q->where('status', $status));
-            })
-            ->with([
-                'processes' => function ($q) {
-                    $q->with(['lead'])
-                        ->withMax('contactAttempts as last_contact_at', 'created_at')
-                        ->orderBy('created_at', 'desc');
-                },
-            ])
-            ->when($search, function ($q) use ($search, $phoneSearch) {
-                $q->where(function ($q) use ($search, $phoneSearch) {
-                    $q->where('recruitment_candidates.first_name', 'like', "%{$search}%")
-                        ->orWhere('recruitment_candidates.last_name', 'like', "%{$search}%")
-                        ->orWhere('recruitment_candidates.phone', 'like', "%{$search}%")
-                        ->orWhere('recruitment_candidates.email', 'like', "%{$search}%")
-                        ->when($phoneSearch, fn ($q) => $q->orWhere('recruitment_candidates.phone', 'like', "%{$phoneSearch}%"));
-                });
-            })
-            ->orderByRaw('ISNULL(last_candidate_contact_at) DESC')
-            ->orderBy('last_candidate_contact_at', 'asc')
-            ->limit(40)
-            ->get();
+        $selected = $this->getSelectedProcess();
+
+        // Left drawer list must mirror the main table page (same filters/sort/page).
+        // The open lead's candidate is lifted out of the list and rendered above it,
+        // so scrolling the list never hides the record being worked on.
+        $listCandidates = $applications->getCollection()->values();
+        $pinnedCandidate = null;
+
+        if ($selected?->candidate) {
+            $selectedCandidateId = $selected->candidate_id;
+            $pinnedCandidate = $listCandidates->firstWhere('id', $selectedCandidateId) ?? $selected->candidate;
+
+            $pinnedCandidate->setRelation(
+                'processes',
+                $pinnedCandidate->processes
+                    ->sortBy(fn ($p) => $p->id === $this->selectedId ? 0 : 1)
+                    ->values()
+            );
+
+            $listCandidates = $listCandidates
+                ->reject(fn ($c) => $c->id === $selectedCandidateId)
+                ->values();
+        }
 
         return view('livewire.recruitment-processes-table', [
             'applications' => $applications,
             'listCandidates' => $listCandidates,
+            'pinnedCandidate' => $pinnedCandidate,
             'counts' => $counts,
             'total' => RecruitmentCandidate::whereHas('processes')->count(),
             'roles' => Role::orderBy('name')->get(),
             'recruiters' => User::orderBy('name')->get(),
-            'selected' => $this->getSelectedProcess(),
+            'selected' => $selected,
         ]);
     }
 }
