@@ -62,6 +62,11 @@ class RecruitmentProcess extends Model
         return $this->hasMany(RecruitmentStatusHistory::class)->latest();
     }
 
+    public function assignmentHistory(): HasMany
+    {
+        return $this->hasMany(RecruitmentAssignmentHistory::class)->latest();
+    }
+
     public function tasks(): HasMany
     {
         return $this->hasMany(ProjectTask::class, 'recruitment_process_id');
@@ -106,6 +111,26 @@ class RecruitmentProcess extends Model
         $this->statusHistory()->create([
             'from_status' => $fromStatus?->value,
             'to_status' => $status->value,
+            'changed_by' => $changedBy,
+        ]);
+    }
+
+    /**
+     * Change assigned recruiter and record the transition in recruitment_assignment_history.
+     */
+    public function assignRecruiter(?int $recruiterId, ?int $changedBy = null): void
+    {
+        if ($this->assigned_recruiter_id === $recruiterId) {
+            return;
+        }
+
+        $fromRecruiterId = $this->assigned_recruiter_id;
+
+        $this->update(['assigned_recruiter_id' => $recruiterId]);
+
+        $this->assignmentHistory()->create([
+            'from_recruiter_id' => $fromRecruiterId,
+            'to_recruiter_id' => $recruiterId,
             'changed_by' => $changedBy,
         ]);
     }

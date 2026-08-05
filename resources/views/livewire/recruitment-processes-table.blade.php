@@ -34,6 +34,7 @@
         </div>
         <x-recruitment.mine-filter :mine="$mine" :mine-count="$mineCount" />
         <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
+        <livewire:recruitment-workload-distribution wire:key="workload-distribution" />
         <livewire:mbs-lead-import wire:key="mbs-import" />
     </div>
 
@@ -670,30 +671,41 @@
                                     @endif
                                 </div>
 
-                                {{-- Historia statusów tego procesu --}}
+                                {{-- Historia procesu (statusy + przypisania) --}}
                                 <div class="mb-3" style="border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);padding:.75rem .85rem;">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-                                            Historia statusów
+                                            Historia procesu
                                         </div>
                                         <span style="font-size:.65rem;color:var(--text-muted);">proces #{{ $selected->id }}</span>
                                     </div>
-                                    <div style="max-height:120px;overflow-y:auto;">
-                                        @forelse($selected->statusHistory as $entry)
-                                            <div class="d-flex gap-2 mb-2" wire:key="hist-{{ $entry->id }}" style="font-size:.78rem;">
+                                    <div style="max-height:160px;overflow-y:auto;">
+                                        @forelse($processTimeline as $timelineItem)
+                                            @php
+                                                $entry = $timelineItem['entry'];
+                                                $isStatus = $timelineItem['type'] === 'status';
+                                            @endphp
+                                            <div class="d-flex gap-2 mb-2" wire:key="timeline-{{ $timelineItem['type'] }}-{{ $entry->id }}" style="font-size:.78rem;">
                                                 <div style="padding-top:5px;flex-shrink:0;">
-                                                    <div style="width:8px;height:8px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 3px rgba(var(--primary-rgb,59,130,246),.15);"></div>
+                                                    <div style="width:8px;height:8px;border-radius:50%;background:{{ $isStatus ? 'var(--primary)' : '#a78bfa' }};box-shadow:0 0 0 3px {{ $isStatus ? 'rgba(var(--primary-rgb,59,130,246),.15)' : 'rgba(167,139,250,.15)' }};"></div>
                                                 </div>
                                                 <div class="flex-grow-1 d-flex justify-content-between align-items-start gap-2">
                                                     <div>
-                                                        @if($entry->from_status)
-                                                            <span style="color:var(--text-muted);">{{ $entry->from_status->label() }}</span>
-                                                            <i class="bi bi-arrow-right mx-1" style="color:var(--text-muted);font-size:.7rem;"></i>
+                                                        @if($isStatus)
+                                                            @if($entry->from_status)
+                                                                <span style="color:var(--text-muted);">{{ $entry->from_status->label() }}</span>
+                                                                <i class="bi bi-arrow-right mx-1" style="color:var(--text-muted);font-size:.7rem;"></i>
+                                                            @else
+                                                                <span style="color:var(--text-muted);">Utworzono</span>
+                                                                <i class="bi bi-arrow-right mx-1" style="color:var(--text-muted);font-size:.7rem;"></i>
+                                                            @endif
+                                                            <strong>{{ $entry->to_status->label() }}</strong>
                                                         @else
-                                                            <span style="color:var(--text-muted);">Utworzono</span>
+                                                            <i class="bi bi-person-badge me-1" style="color:#a78bfa;font-size:.75rem;"></i>
+                                                            <span style="color:var(--text-muted);">{{ $entry->fromRecruiter?->name ?? 'Nieprzypisany' }}</span>
                                                             <i class="bi bi-arrow-right mx-1" style="color:var(--text-muted);font-size:.7rem;"></i>
+                                                            <strong>{{ $entry->toRecruiter?->name ?? 'Nieprzypisany' }}</strong>
                                                         @endif
-                                                        <strong>{{ $entry->to_status->label() }}</strong>
                                                         <div style="color:var(--text-muted);font-size:.68rem;">{{ $entry->changedBy?->name ?? 'System' }}</div>
                                                     </div>
                                                     <small style="color:var(--text-muted);white-space:nowrap;text-align:right;line-height:1.25;"
@@ -704,7 +716,7 @@
                                                 </div>
                                             </div>
                                         @empty
-                                            <p style="color:var(--text-muted);font-size:.78rem;margin:0;">Brak zmian statusu — historia pojawi się po pierwszej zmianie.</p>
+                                            <p style="color:var(--text-muted);font-size:.78rem;margin:0;">Brak historii — wpisy pojawią się po zmianie statusu lub przypisania.</p>
                                         @endforelse
                                     </div>
                                 </div>

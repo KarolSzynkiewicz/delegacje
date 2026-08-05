@@ -274,9 +274,10 @@ class RecruitmentProcessesTable extends Component
             return;
         }
 
-        $process->update([
-            'assigned_recruiter_id' => $recruiterId !== '' ? (int) $recruiterId : null,
-        ]);
+        $process->assignRecruiter(
+            $recruiterId !== '' ? (int) $recruiterId : null,
+            auth()->id()
+        );
 
         if ($this->selectedId === $id) {
             $this->editAssignedRecruiterId = $process->assigned_recruiter_id;
@@ -402,9 +403,7 @@ class RecruitmentProcessesTable extends Component
             return;
         }
 
-        $process->update([
-            'assigned_recruiter_id' => $recruiterId ?: null,
-        ]);
+        $process->assignRecruiter($recruiterId ?: null, auth()->id());
     }
 
     public function saveSkillset(): void
@@ -701,6 +700,9 @@ class RecruitmentProcessesTable extends Component
             'employee',
             'assignedRecruiter',
             'statusHistory.changedBy',
+            'assignmentHistory.fromRecruiter',
+            'assignmentHistory.toRecruiter',
+            'assignmentHistory.changedBy',
             'tasks.assignedTo',
             'comments.user',
         ])->find($this->selectedId);
@@ -710,6 +712,42 @@ class RecruitmentProcessesTable extends Component
     public function refreshAfterLeadsImport(): void
     {
         $this->resetPage();
+    }
+
+    #[On('workload-distributed')]
+    public function refreshAfterWorkloadDistribution(): void
+    {
+        $this->resetPage();
+    }
+
+    /**
+     * @return array<int, array{type: string, created_at: \Carbon\Carbon, entry: mixed}>
+     */
+    protected function buildProcessTimeline(?RecruitmentProcess $process): array
+    {
+        if (! $process) {
+            return [];
+        }
+
+        $entries = collect();
+
+        foreach ($process->statusHistory as $entry) {
+            $entries->push([
+                'type' => 'status',
+                'created_at' => $entry->created_at,
+                'entry' => $entry,
+            ]);
+        }
+
+        foreach ($process->assignmentHistory as $entry) {
+            $entries->push([
+                'type' => 'assignment',
+                'created_at' => $entry->created_at,
+                'entry' => $entry,
+            ]);
+        }
+
+        return $entries->sortByDesc(fn ($item) => $item['created_at']->timestamp)->values()->all();
     }
 
     public function render()
@@ -828,6 +866,7 @@ class RecruitmentProcessesTable extends Component
             'roles' => Role::orderBy('name')->get(),
             'recruiters' => User::orderBy('name')->get(),
             'selected' => $selected,
+            'processTimeline' => $this->buildProcessTimeline($selected),
         ]);
     }
 }
