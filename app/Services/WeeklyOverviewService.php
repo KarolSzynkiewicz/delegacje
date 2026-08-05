@@ -4,12 +4,16 @@ namespace App\Services;
 
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
+use App\Enums\VehiclePosition;
+use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectDemand;
+use App\Models\Rotation;
+use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Models\VehicleRepair;
 use Carbon\Carbon;
@@ -41,23 +45,20 @@ class WeeklyOverviewService
 
     /**
      * Get all projects with their weekly data.
+     *
+     * Loads week-scoped relations once (not per project) to avoid N×queries.
      */
     public function getProjectsWithWeeklyData(array $weeks): array
     {
         $weekStart = $weeks[0]['start'];
         $weekEnd = $weeks[0]['end'];
 
-        // Eager load all necessary relationships to avoid N+1 queries
         $projects = Project::with([
             'location',
-            'demands.role',
-            'assignments.employee.roles',
-            'assignments.role',
             'tasks.assignedTo',
             'tasks.createdBy',
         ])
             // Show only projects that overlap the selected week by at least one day.
-            // Exclude projects that already ended before the week, or haven't started yet.
             ->where(function ($q) use ($weekEnd) {
                 $q->whereNull('start_date')
                     ->orWhereDate('start_date', '<=', $weekEnd->toDateString());
@@ -68,11 +69,13 @@ class WeeklyOverviewService
             })
             ->get();
 
-        return $projects->map(function ($project) use ($weeks) {
+        $ctx = $this->loadWeekContext($projects->pluck('id'), $weekStart, $weekEnd);
+
+        return $projects->map(function ($project) use ($weeks, $ctx) {
             $weeksData = [];
 
             foreach ($weeks as $week) {
-                $weeksData[] = $this->getProjectWeekData($project, $week);
+                $weeksData[] = $this->assembleProjectWeekData($project, $week, $ctx);
             }
 
             return [
@@ -84,33 +87,211 @@ class WeeklyOverviewService
 
     /**
      * Get project data for a specific week.
+     *
+     * For a single project this still batch-loads that project's week context
+     * (same shape as the multi-project path). Prefer getProjectsWithWeeklyData
+     * when rendering many projects.
      */
     public function getProjectWeekData(Project $project, array $week): array
+    {
+        $ctx = $this->loadWeekContext(collect([$project->id]), $week['start'], $week['end']);
+
+        return $this->assembleProjectWeekData($project, $week, $ctx);
+    }
+
+    /**
+     * Batch-load everything needed to assemble per-project week cards.
+     *
+     * @param  Collection<int, int|string>  $projectIds
+     * @return array<string, mixed>
+     */
+    protected function loadWeekContext(Collection $projectIds, Carbon $weekStart, Carbon $weekEnd): array
+    {
+        $projectIds = $projectIds->filter()->unique()->values();
+
+        if ($projectIds->isEmpty()) {
+            return $this->emptyWeekContext();
+        }
+
+        $demands = ProjectDemand::whereIn('project_id', $projectIds)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with('role')
+            ->get();
+
+        $assignments = ProjectAssignment::whereIn('project_id', $projectIds)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with(['employee.roles', 'role', 'project'])
+            ->get();
+
+        $employeeIds = $assignments->pluck('employee_id')->unique()->filter()->values();
+
+        $employeeAccommodationAssignments = $employeeIds->isEmpty()
+            ? collect()
+            : AccommodationAssignment::whereIn('employee_id', $employeeIds)
+                ->overlappingWith($weekStart, $weekEnd)
+                ->with(['accommodation', 'employee'])
+                ->get();
+
+        $employeeVehicleAssignments = $employeeIds->isEmpty()
+            ? collect()
+            : VehicleAssignment::whereIn('employee_id', $employeeIds)
+                ->overlappingWith($weekStart, $weekEnd)
+                ->with(['vehicle', 'employee'])
+                ->get();
+
+        $accommodationIds = $employeeAccommodationAssignments->pluck('accommodation_id')->unique()->filter()->values();
+        $vehicleIds = $employeeVehicleAssignments->pluck('vehicle_id')->unique()->filter()->values();
+
+        $accommodations = $accommodationIds->isEmpty()
+            ? collect()
+            : Accommodation::whereIn('id', $accommodationIds)->get()->keyBy('id');
+
+        $allAccommodationAssignments = $accommodationIds->isEmpty()
+            ? collect()
+            : AccommodationAssignment::whereIn('accommodation_id', $accommodationIds)
+                ->overlappingWith($weekStart, $weekEnd)
+                ->get();
+
+        $vehicles = $vehicleIds->isEmpty()
+            ? collect()
+            : Vehicle::whereIn('id', $vehicleIds)->get()->keyBy('id');
+
+        $allVehicleAssignments = $vehicleIds->isEmpty()
+            ? collect()
+            : VehicleAssignment::whereIn('vehicle_id', $vehicleIds)
+                ->overlappingWith($weekStart, $weekEnd)
+                ->with('employee')
+                ->get();
+
+        $returnTripsByVehicle = collect();
+        $departureEventsByVehicle = collect();
+        $transferEventsByVehicle = collect();
+
+        if ($vehicleIds->isNotEmpty()) {
+            $returnTripsByVehicle = LogisticsEvent::where('type', LogisticsEventType::RETURN)
+                ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+                ->whereIn('vehicle_id', $vehicleIds)
+                ->whereNotNull('end_date')
+                ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+                ->with(['participants.employee', 'vehicle'])
+                ->get()
+                ->groupBy('vehicle_id');
+
+            $departureEventsByVehicle = LogisticsEvent::query()
+                ->where('type', LogisticsEventType::DEPARTURE)
+                ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+                ->whereNotNull('vehicle_id')
+                ->whereIn('vehicle_id', $vehicleIds)
+                ->where('event_date', '<=', $weekEnd->copy()->endOfDay())
+                ->whereRaw('COALESCE(end_date, event_date) >= ?', [$weekStart->copy()->startOfDay()])
+                ->orderBy('event_date')
+                ->get()
+                ->groupBy('vehicle_id');
+
+            $transferEventsByVehicle = LogisticsEvent::query()
+                ->where('type', LogisticsEventType::TRANSFER)
+                ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+                ->whereNotNull('vehicle_id')
+                ->whereIn('vehicle_id', $vehicleIds)
+                ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+                ->with(['fromLocation', 'toLocation'])
+                ->orderBy('event_date')
+                ->get()
+                ->groupBy('vehicle_id');
+        }
+
+        $rotations = $employeeIds->isEmpty()
+            ? collect()
+            : Rotation::whereIn('employee_id', $employeeIds)
+                ->where(function ($q) use ($weekStart, $weekEnd) {
+                    $q->where(function ($query) use ($weekStart, $weekEnd) {
+                        $query->whereDate('start_date', '<=', $weekEnd->toDateString())
+                            ->whereDate('end_date', '>=', $weekStart->toDateString());
+                    })->orWhereNull('end_date');
+                })
+                ->orderBy('end_date', 'asc')
+                ->get()
+                ->groupBy('employee_id');
+
+        $serviceRepairs = VehicleRepair::whereIn('project_id', $projectIds)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with(['vehicle', 'location'])
+            ->orderBy('start_date')
+            ->get();
+
+        return [
+            'demands' => $demands,
+            'assignments' => $assignments,
+            'accommodation_assignments_by_employee' => $employeeAccommodationAssignments->groupBy('employee_id'),
+            'vehicle_assignments_by_employee' => $employeeVehicleAssignments->groupBy('employee_id'),
+            'accommodations' => $accommodations,
+            'all_accommodation_assignments_by_accommodation' => $allAccommodationAssignments->groupBy('accommodation_id'),
+            'vehicles' => $vehicles,
+            'all_vehicle_assignments_by_vehicle' => $allVehicleAssignments->groupBy('vehicle_id'),
+            'return_trips_by_vehicle' => $returnTripsByVehicle,
+            'departure_events_by_vehicle' => $departureEventsByVehicle,
+            'transfer_events_by_vehicle' => $transferEventsByVehicle,
+            'rotations' => $rotations,
+            'service_repairs' => $serviceRepairs,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function emptyWeekContext(): array
+    {
+        return [
+            'demands' => collect(),
+            'assignments' => collect(),
+            'accommodation_assignments_by_employee' => collect(),
+            'vehicle_assignments_by_employee' => collect(),
+            'accommodations' => collect(),
+            'all_accommodation_assignments_by_accommodation' => collect(),
+            'vehicles' => collect(),
+            'all_vehicle_assignments_by_vehicle' => collect(),
+            'return_trips_by_vehicle' => collect(),
+            'departure_events_by_vehicle' => collect(),
+            'transfer_events_by_vehicle' => collect(),
+            'rotations' => collect(),
+            'service_repairs' => collect(),
+        ];
+    }
+
+    /**
+     * Assemble one project's week card from a preloaded week context (no extra queries).
+     *
+     * @param  array<string, mixed>  $ctx
+     */
+    protected function assembleProjectWeekData(Project $project, array $week, array $ctx): array
     {
         $weekStart = $week['start'];
         $weekEnd = $week['end'];
 
-        // Get demands for this week
-        $demands = $this->getDemandsForWeek($project, $weekStart, $weekEnd);
+        $demands = $this->groupDemandsForWeek(
+            $ctx['demands']->where('project_id', $project->id)
+        );
 
-        // Get assignments for this week
-        $assignments = $this->getAssignmentsForWeek($project, $weekStart, $weekEnd);
+        $assignments = $ctx['assignments']->where('project_id', $project->id)->values();
 
-        // Calculate requirements summary
         $requirementsSummary = $this->calculateRequirementsSummary($demands, $assignments, $weekStart, $weekEnd);
 
-        // Get accommodations and vehicles used in this week
-        $accommodations = $this->getAccommodationsForWeek($assignments, $weekStart, $weekEnd);
-        $vehicles = $this->getVehiclesForWeek($assignments, $weekStart, $weekEnd);
+        $accommodations = $this->buildAccommodationsForWeek($assignments, $ctx);
+        $vehicles = $this->buildVehiclesForWeek($assignments, $ctx);
+        $assignedEmployees = $this->buildAssignedEmployeesDetails($assignments, $weekStart, $weekEnd, $ctx);
 
-        // Get assigned employees with their details
-        $assignedEmployees = $this->getAssignedEmployeesDetails($assignments, $weekStart, $weekEnd);
-
-        // Get project tasks (already eager loaded in getProjectsWithWeeklyData)
-        $tasks = $project->tasks;
-
-        // Get vehicles in service (akcje serwisowe) for this project in this week
-        $serviceRepairs = $this->getServiceRepairsForWeek($project, $weekStart, $weekEnd);
+        $serviceRepairs = $ctx['service_repairs']
+            ->where('project_id', $project->id)
+            ->map(function (VehicleRepair $repair) {
+                return [
+                    'repair' => $repair,
+                    'vehicle' => $repair->vehicle,
+                    'vehicle_name' => $repair->vehicle
+                        ? trim("{$repair->vehicle->brand} {$repair->vehicle->model} {$repair->vehicle->registration_number}")
+                        : '—',
+                ];
+            })
+            ->values();
 
         return [
             'week' => $week,
@@ -120,24 +301,24 @@ class WeeklyOverviewService
             'accommodations' => $accommodations,
             'vehicles' => $vehicles,
             'assigned_employees' => $assignedEmployees,
-            'tasks' => $tasks,
+            'tasks' => $project->tasks,
             'service_repairs' => $serviceRepairs,
             'has_data' => $demands->isNotEmpty() || $assignments->isNotEmpty(),
         ];
     }
 
     /**
-     * Get demands that overlap with the week.
+     * Group overlapping demands by role (in-memory).
      */
-    protected function getDemandsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
+    protected function groupDemandsForWeek(Collection $demands): Collection
     {
-        return $this->getOverlappingDemands($project, $weekStart, $weekEnd)
+        return $demands
             ->groupBy('role_id')
-            ->map(function ($demands) {
+            ->map(function ($roleDemands) {
                 return [
-                    'role' => $demands->first()->role,
-                    'required_count' => $demands->sum('required_count'),
-                    'demands' => $demands,
+                    'role' => $roleDemands->first()->role,
+                    'required_count' => $roleDemands->sum('required_count'),
+                    'demands' => $roleDemands,
                 ];
             });
     }
@@ -151,28 +332,6 @@ class WeeklyOverviewService
             ->overlappingWith($startDate, $endDate)
             ->with('role')
             ->get();
-    }
-
-    /**
-     * Get vehicles in service (akcje serwisowe) linked to this project, overlapping the given week.
-     */
-    protected function getServiceRepairsForWeek(Project $project, Carbon $weekStart, Carbon $weekEnd): Collection
-    {
-        return VehicleRepair::forProject($project->id)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->with(['vehicle', 'location'])
-            ->orderBy('start_date')
-            ->get()
-            ->map(function (VehicleRepair $repair) {
-                return [
-                    'repair' => $repair,
-                    'vehicle' => $repair->vehicle,
-                    'vehicle_name' => $repair->vehicle
-                        ? trim("{$repair->vehicle->brand} {$repair->vehicle->model} {$repair->vehicle->registration_number}")
-                        : '—',
-                ];
-            })
-            ->values();
     }
 
     /**
@@ -332,42 +491,37 @@ class WeeklyOverviewService
     }
 
     /**
-     * Get accommodations used in this week by assigned employees.
-     * Returns unique accommodations with total usage count (all employees, not just from this project).
+     * Build accommodations used by this project's assigned employees (from preloaded context).
+     *
+     * @param  array<string, mixed>  $ctx
      */
-    protected function getAccommodationsForWeek(Collection $assignments, Carbon $weekStart, Carbon $weekEnd): Collection
+    protected function buildAccommodationsForWeek(Collection $assignments, array $ctx): Collection
     {
-        // Get employee IDs from project assignments
-        $employeeIds = $assignments->pluck('employee_id')->unique();
+        $employeeIds = $assignments->pluck('employee_id')->unique()->filter();
 
-        // Find accommodation assignments for these employees in this week
-        // Note: Don't use ->active() here - it only checks today, not the week
-        $accommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->with(['accommodation', 'employee'])
-            ->get();
+        if ($employeeIds->isEmpty()) {
+            return collect();
+        }
 
-        // Get unique accommodation IDs used by project employees
-        $accommodationIds = $accommodationAssignments->pluck('accommodation_id')->unique();
+        $accommodationIds = collect();
+        foreach ($employeeIds as $employeeId) {
+            $rows = $ctx['accommodation_assignments_by_employee']->get($employeeId) ?? collect();
+            $accommodationIds = $accommodationIds->merge($rows->pluck('accommodation_id'));
+        }
+        $accommodationIds = $accommodationIds->unique()->filter()->values();
 
         if ($accommodationIds->isEmpty()) {
             return collect();
         }
 
-        // Eager load all accommodations and their assignments for this week
-        $accommodations = \App\Models\Accommodation::whereIn('id', $accommodationIds)->get();
+        return $accommodationIds->map(function ($accommodationId) use ($ctx) {
+            $accommodation = $ctx['accommodations']->get($accommodationId);
+            if (! $accommodation) {
+                return null;
+            }
 
-        // Get all accommodation assignments for these accommodations in this week (single query)
-        $allAccommodationAssignments = AccommodationAssignment::whereIn('accommodation_id', $accommodationIds)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->get()
-            ->groupBy('accommodation_id');
-
-        // Map accommodations with their counts
-        return $accommodations->map(function ($accommodation) use ($allAccommodationAssignments) {
-            $assignments = $allAccommodationAssignments->get($accommodation->id) ?? collect();
-            // Count unique employees (not assignments!) - one employee can have multiple assignments
-            $uniqueEmployeeIds = $assignments->pluck('employee_id')->unique();
+            $assignmentsForAccommodation = $ctx['all_accommodation_assignments_by_accommodation']->get($accommodationId) ?? collect();
+            $uniqueEmployeeIds = $assignmentsForAccommodation->pluck('employee_id')->unique();
             $totalEmployeeCount = $uniqueEmployeeIds->count();
 
             return [
@@ -378,121 +532,69 @@ class WeeklyOverviewService
                 'usage_percentage' => $accommodation->capacity > 0
                     ? round(($totalEmployeeCount / $accommodation->capacity) * 100, 0)
                     : 0,
-                'assignments' => $assignments->values(),
+                'assignments' => $assignmentsForAccommodation->values(),
             ];
-        })->values();
+        })->filter()->values();
     }
 
     /**
-     * Get vehicles used in this week by assigned employees.
-     * Returns unique vehicles with total usage count (all employees, not just from this project).
+     * Build vehicles used by this project's assigned employees (from preloaded context).
+     *
+     * @param  array<string, mixed>  $ctx
      */
-    protected function getVehiclesForWeek(Collection $assignments, Carbon $weekStart, Carbon $weekEnd): Collection
+    protected function buildVehiclesForWeek(Collection $assignments, array $ctx): Collection
     {
-        // Get employee IDs from project assignments
-        $employeeIds = $assignments->pluck('employee_id')->unique();
+        $employeeIds = $assignments->pluck('employee_id')->unique()->filter();
 
-        // Find vehicle assignments for these employees in this week
-        // Note: Don't use ->active() here - it only checks today, not the week
-        $vehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->with(['vehicle', 'employee'])
-            ->get();
+        if ($employeeIds->isEmpty()) {
+            return collect();
+        }
 
-        // Get unique vehicle IDs used by project employees
-        $vehicleIds = $vehicleAssignments->pluck('vehicle_id')->unique();
+        $vehicleIds = collect();
+        foreach ($employeeIds as $employeeId) {
+            $rows = $ctx['vehicle_assignments_by_employee']->get($employeeId) ?? collect();
+            $vehicleIds = $vehicleIds->merge($rows->pluck('vehicle_id'));
+        }
+        $vehicleIds = $vehicleIds->unique()->filter()->values();
 
         if ($vehicleIds->isEmpty()) {
             return collect();
         }
 
-        // Eager load all vehicles and their assignments for this week
-        $vehicles = \App\Models\Vehicle::whereIn('id', $vehicleIds)->get();
+        return $vehicleIds->map(function ($vehicleId) use ($ctx) {
+            $vehicle = $ctx['vehicles']->get($vehicleId);
+            if (! $vehicle) {
+                return null;
+            }
 
-        // Get all vehicle assignments for these vehicles in this week (single query with eager loading)
-        $allVehicleAssignments = VehicleAssignment::whereIn('vehicle_id', $vehicleIds)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->with('employee')
-            ->get()
-            ->groupBy('vehicle_id');
+            $assignmentsForVehicle = $ctx['all_vehicle_assignments_by_vehicle']->get($vehicleId) ?? collect();
 
-        // Get return trips (zjazdy) for these vehicles in this week (exclude CANCELLED)
-        // Use end_date (arrival date) instead of event_date (departure date)
-        $returnTrips = LogisticsEvent::where('type', LogisticsEventType::RETURN)
-            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
-            ->whereIn('vehicle_id', $vehicleIds)
-            ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
-            ->with(['participants.employee', 'vehicle'])
-            ->get()
-            ->groupBy('vehicle_id');
+            $regularAssignments = $assignmentsForVehicle->filter(fn ($assignment) => ! $assignment->is_return_trip);
+            $returnTripAssignments = $assignmentsForVehicle->filter(fn ($assignment) => $assignment->is_return_trip);
 
-        // Wyjazdy: pojazd przypisany do zdarzenia, trasa nachodzi na wybrany tydzień
-        $departureEventsByVehicle = LogisticsEvent::query()
-            ->where('type', LogisticsEventType::DEPARTURE)
-            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
-            ->whereNotNull('vehicle_id')
-            ->whereIn('vehicle_id', $vehicleIds)
-            ->where('event_date', '<=', $weekEnd->copy()->endOfDay())
-            ->whereRaw('COALESCE(end_date, event_date) >= ?', [$weekStart->copy()->startOfDay()])
-            ->orderBy('event_date')
-            ->get()
-            ->groupBy('vehicle_id');
-
-        // Transfery w tygodniu (dzień zdarzenia)
-        $transferEventsByVehicle = LogisticsEvent::query()
-            ->where('type', LogisticsEventType::TRANSFER)
-            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
-            ->whereNotNull('vehicle_id')
-            ->whereIn('vehicle_id', $vehicleIds)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
-            ->with(['fromLocation', 'toLocation'])
-            ->orderBy('event_date')
-            ->get()
-            ->groupBy('vehicle_id');
-
-        // Map vehicles with their counts and drivers
-        return $vehicles->map(function ($vehicle) use ($allVehicleAssignments, $returnTrips, $departureEventsByVehicle, $transferEventsByVehicle) {
-            $assignments = $allVehicleAssignments->get($vehicle->id) ?? collect();
-
-            // Separate regular assignments from return trip assignments
-            $regularAssignments = $assignments->filter(function ($assignment) {
-                return ! $assignment->is_return_trip;
-            });
-
-            $returnTripAssignments = $assignments->filter(function ($assignment) {
-                return $assignment->is_return_trip;
-            });
-
-            // Show all employees who have this vehicle at least one day in the week
-            // Get unique employees (don't filter by longest assignment - show anyone who has it any day)
             $uniqueEmployees = $regularAssignments->unique('employee_id');
-
             $totalEmployeeCount = $uniqueEmployees->count();
 
-            // Find driver assignment (position = 'driver') from regular assignments
             $driverAssignment = $uniqueEmployees->first(function ($assignment) {
                 $position = $assignment->position;
-                if ($position instanceof \App\Enums\VehiclePosition) {
-                    return $position === \App\Enums\VehiclePosition::DRIVER;
+                if ($position instanceof VehiclePosition) {
+                    return $position === VehiclePosition::DRIVER;
                 }
 
-                return $position === 'driver' || $position === \App\Enums\VehiclePosition::DRIVER->value;
+                return $position === 'driver' || $position === VehiclePosition::DRIVER->value;
             });
 
-            // Get return trip for this vehicle
-            $returnTrip = $returnTrips->get($vehicle->id)?->first();
+            $returnTrip = $ctx['return_trips_by_vehicle']->get($vehicleId)?->first();
 
             $returnTripPassengers = collect();
             if ($returnTrip) {
-                $returnTrip->loadMissing('participants.employee');
                 $returnTripPassengers = $returnTrip->participants
                     ->map(fn ($p) => $p->employee)
                     ->filter()
                     ->unique('id')
                     ->values();
             }
-            // Legacy: stare zjazdy z VehicleAssignment is_return_trip (przed zmianą architektury)
+
             foreach ($returnTripAssignments as $assignment) {
                 if ($assignment->employee && ! $returnTripPassengers->contains('id', $assignment->employee_id)) {
                     $returnTripPassengers->push($assignment->employee);
@@ -510,97 +612,48 @@ class WeeklyOverviewService
                     ? round(($totalEmployeeCount / $vehicle->capacity) * 100, 0)
                     : 0,
                 'assignments' => $uniqueEmployees->sortBy(function ($assignment) {
-                    // Sort: drivers first, then passengers
                     $position = $assignment->position;
-                    if ($position instanceof \App\Enums\VehiclePosition) {
-                        return $position === \App\Enums\VehiclePosition::DRIVER ? 0 : 1;
+                    if ($position instanceof VehiclePosition) {
+                        return $position === VehiclePosition::DRIVER ? 0 : 1;
                     }
 
-                    return ($position === 'driver' || $position === \App\Enums\VehiclePosition::DRIVER->value) ? 0 : 1;
+                    return ($position === 'driver' || $position === VehiclePosition::DRIVER->value) ? 0 : 1;
                 })->values(),
-                'return_trip' => $returnTrip, // LogisticsEvent for return trip
-                // Stare zjazdy (VA is_return_trip); prefer return_trip_passengers
+                'return_trip' => $returnTrip,
                 'return_trip_assignments' => $returnTripAssignments->values(),
                 'return_trip_passengers' => $returnTripPassengers,
-                'departure_events' => ($departureEventsByVehicle->get($vehicle->id) ?? collect())->values(),
-                'transfer_events' => ($transferEventsByVehicle->get($vehicle->id) ?? collect())->values(),
+                'departure_events' => ($ctx['departure_events_by_vehicle']->get($vehicleId) ?? collect())->values(),
+                'transfer_events' => ($ctx['transfer_events_by_vehicle']->get($vehicleId) ?? collect())->values(),
             ];
-        })->values();
+        })->filter()->values();
     }
 
     /**
-     * Get assigned employees with their accommodation and vehicle details.
+     * Build assigned employee rows for a project (from preloaded context).
+     *
+     * @param  array<string, mixed>  $ctx
      */
-    protected function getAssignedEmployeesDetails(Collection $assignments, Carbon $weekStart, Carbon $weekEnd): Collection
-    {
+    protected function buildAssignedEmployeesDetails(
+        Collection $assignments,
+        Carbon $weekStart,
+        Carbon $weekEnd,
+        array $ctx
+    ): Collection {
         if ($assignments->isEmpty()) {
             return collect();
         }
 
-        // Get all employee IDs
-        $employeeIds = $assignments->pluck('employee_id')->unique();
-
-        // Eager load all accommodation assignments for these employees in this week (single query)
-        // Note: Don't use ->active() here - it only checks today, not the week
-        $accommodationAssignments = AccommodationAssignment::whereIn('employee_id', $employeeIds)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->with('accommodation')
-            ->get()
-            ->groupBy('employee_id');
-
-        // Eager load all vehicle assignments for these employees in this week (single query)
-        // Note: Don't use ->active() here - it only checks today, not the week
-        $vehicleAssignments = VehicleAssignment::whereIn('employee_id', $employeeIds)
-            ->overlappingWith($weekStart, $weekEnd)
-            ->with('vehicle')
-            ->get()
-            ->groupBy('employee_id');
-
-        // Eager load rotations for all employees
-        // Pobierz wszystkie rotacje, które przecinają się z tygodniem (nawet jeśli już się skończyły)
-        // Rotacja przecina się z tygodniem, jeśli: start_date <= weekEnd AND end_date >= weekStart
-        $employeeIds = $assignments->pluck('employee_id')->unique();
-        $rotations = \App\Models\Rotation::whereIn('employee_id', $employeeIds)
-            ->where(function ($q) use ($weekStart, $weekEnd) {
-                $q->where(function ($query) use ($weekStart, $weekEnd) {
-                    // Rotacja przecina się z tygodniem
-                    $query->whereDate('start_date', '<=', $weekEnd->toDateString())
-                        ->whereDate('end_date', '>=', $weekStart->toDateString());
-                })
-                    ->orWhereNull('end_date'); // Rotacje bez daty zakończenia
-            })
-            ->orderBy('end_date', 'asc')
-            ->get()
-            ->groupBy('employee_id');
-
-        // Get return trips for employees in this week to check if they're returning (exclude CANCELLED)
-        // Use end_date (arrival date) instead of event_date (departure date)
-        $returnTripsForEmployees = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::RETURN)
-            ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
-            ->whereHas('participants', function ($q) use ($employeeIds) {
-                $q->whereIn('employee_id', $employeeIds);
-            })
-            ->with(['participants.employee', 'vehicle'])
-            ->get();
-
-        // Create a map: employee_id => return_trip
-        $returnTripsByEmployee = collect();
-        foreach ($returnTripsForEmployees as $returnTrip) {
-            foreach ($returnTrip->participants as $participant) {
-                $returnTripsByEmployee->put($participant->employee_id, $returnTrip);
-            }
-        }
-
-        // Group assignments by employee
         $assignmentsByEmployee = $assignments->groupBy('employee_id');
-
-        // Get unique employees (each employee should appear only once)
         $uniqueEmployeeIds = $assignments->pluck('employee_id')->unique();
+        $days = $this->getDaysInWeek($weekStart, $weekEnd);
 
-        // Map unique employees with their details (not assignments!)
-        return $uniqueEmployeeIds->map(function ($employeeId) use ($assignmentsByEmployee, $accommodationAssignments, $vehicleAssignments, $weekStart, $weekEnd, $rotations) {
+        return $uniqueEmployeeIds->map(function ($employeeId) use (
+            $assignmentsByEmployee,
+            $weekStart,
+            $weekEnd,
+            $ctx,
+            $days
+        ) {
             $employeeAssignments = $assignmentsByEmployee->get($employeeId) ?? collect();
             $firstAssignment = $employeeAssignments->first();
 
@@ -609,25 +662,17 @@ class WeeklyOverviewService
             }
 
             $employee = $firstAssignment->employee;
-
-            // Check if employee has multiple assignments with different roles in this week
             $roleIds = $employeeAssignments->pluck('role_id')->unique();
             $isRoleStable = $roleIds->count() <= 1;
 
-            // Get accommodation and vehicle from pre-loaded collections
-            $accommodationAssignment = $accommodationAssignments->get($employeeId)?->first();
+            $accommodationAssignment = ($ctx['accommodation_assignments_by_employee']->get($employeeId) ?? collect())->first();
+            $employeeVehicleAssignments = $ctx['vehicle_assignments_by_employee']->get($employeeId) ?? collect();
 
-            // Check if employee has vehicle for all assigned days in this week
-            $employeeVehicleAssignments = $vehicleAssignments->get($employeeId) ?? collect();
-            $days = $this->getDaysInWeek($weekStart, $weekEnd);
-
-            // Check vehicle coverage for ALL employee's assignments in this week
             $hasVehicleAllDays = true;
             $anyDayAssigned = false;
             $firstVehicleAssignment = null;
 
             foreach ($days as $day) {
-                // Check if employee is assigned to project on this day (any assignment)
                 $isAssignedOnDay = $employeeAssignments->contains(function ($ass) use ($day) {
                     return $ass->start_date->lte($day) &&
                            ($ass->end_date === null || $ass->end_date->gte($day));
@@ -649,51 +694,41 @@ class WeeklyOverviewService
                 }
             }
 
-            // has_vehicle_in_week should be true only if they have it for ALL assigned days
             $hasVehicleInWeek = $anyDayAssigned && $hasVehicleAllDays;
-
-            // Get vehicle assignment for display (first one found)
             $vehicleAssignment = $firstVehicleAssignment;
 
-            // Check if employee coverage is partial (not full week)
-            // Employee is partial if NONE of their assignments cover the entire week
             $coversFullWeek = $employeeAssignments->contains(function ($ass) use ($weekStart, $weekEnd) {
                 return $ass->start_date->lte($weekStart) &&
                        ($ass->end_date === null || $ass->end_date->gte($weekEnd));
             });
             $isPartial = ! $coversFullWeek;
 
-            // Get overall date range for employee (union of all assignments)
             $assignmentStart = $employeeAssignments->min('start_date');
             $assignmentEnd = $employeeAssignments->max(function ($ass) {
                 return $ass->end_date ?? Carbon::parse('2099-12-31');
             });
 
-            // Clamp to week boundaries
             $assignmentStart = max($assignmentStart, $weekStart);
             $assignmentEnd = min($assignmentEnd ?? $weekEnd, $weekEnd);
 
-            // Get rotation info
-            $employeeRotations = $rotations->get($employeeId);
+            $employeeRotations = $ctx['rotations']->get($employeeId);
             $activeRotation = $employeeRotations?->first();
             $rotationInfo = null;
 
             if ($activeRotation) {
-                // Oblicz ile dni zostało do końca rotacji (ujemne jeśli już się skończyła)
                 $daysLeft = now()->startOfDay()->diffInDays($activeRotation->end_date->startOfDay(), true);
                 $rotationInfo = [
                     'id' => $activeRotation->id,
-                    'rotation' => $activeRotation, // Przekaż cały obiekt dla łatwego dostępu
+                    'rotation' => $activeRotation,
                     'start_date' => $activeRotation->start_date,
                     'end_date' => $activeRotation->end_date,
                     'days_left' => $daysLeft,
                 ];
             }
 
-            // Format date range - show days of week if partial
             $dateRangeText = 'cały tydzień';
             if ($isPartial) {
-                $startDay = $assignmentStart->format('N'); // 1-7 (Monday-Sunday)
+                $startDay = $assignmentStart->format('N');
                 $endDay = $assignmentEnd->format('N');
                 $dayNames = ['', 'pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nie'];
                 if ($startDay == $endDay) {
@@ -703,16 +738,13 @@ class WeeklyOverviewService
                 }
             }
 
-            // Get primary role (first assignment's role, or show multiple if different)
-            $primaryRole = $firstAssignment->role;
-
             return [
-                'assignment' => $firstAssignment, // Primary assignment for links
+                'assignment' => $firstAssignment,
                 'employee' => $employee,
-                'role' => $primaryRole,
+                'role' => $firstAssignment->role,
                 'role_stable' => $isRoleStable,
                 'accommodation' => $accommodationAssignment?->accommodation,
-                'accommodation_assignment' => $accommodationAssignment, // Full assignment for link
+                'accommodation_assignment' => $accommodationAssignment,
                 'vehicle' => $vehicleAssignment?->vehicle,
                 'vehicle_assignment' => $vehicleAssignment,
                 'has_vehicle_in_week' => $hasVehicleInWeek,
@@ -720,7 +752,7 @@ class WeeklyOverviewService
                 'date_range' => $dateRangeText,
                 'rotation' => $rotationInfo,
             ];
-        })->filter() // Remove nulls
+        })->filter()
             ->sortBy(fn ($item) => mb_strtolower($item['employee']->last_name.' '.$item['employee']->first_name))
             ->values();
     }

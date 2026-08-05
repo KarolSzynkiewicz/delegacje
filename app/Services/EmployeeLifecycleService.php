@@ -89,17 +89,39 @@ class EmployeeLifecycleService
     }
 
     /**
-     * Undo a termination. Does not touch recruitment history — the audit trail
-     * created by terminate() stays as-is; this only restores the employee's
-     * active status.
+     * Undo a termination. Existing audit history (including the BylyPracownik
+     * process from terminate()) stays as-is; we only clear employee termination
+     * fields and append a new Zatrudniony audit lead+process.
      */
     public function reinstate(Employee $employee): void
     {
-        $employee->update([
-            'terminated_at' => null,
-            'termination_reason' => null,
-            'termination_note' => null,
-        ]);
+        DB::transaction(function () use ($employee) {
+            $employee->update([
+                'terminated_at' => null,
+                'termination_reason' => null,
+                'termination_note' => null,
+            ]);
+
+            $candidate = RecruitmentCandidate::query()->where('employee_id', $employee->id)->first();
+            if (! $candidate) {
+                return;
+            }
+
+            $reinstatedAt = now();
+
+            $lead = RecruitmentLead::create([
+                'candidate_id' => $candidate->id,
+                'referral_source' => RecruitmentReferralSource::EmployeeLifecycle,
+                'referral_source_detail' => 'Przywrócenie pracownika – '.$reinstatedAt->format('d.m.Y'),
+            ]);
+
+            RecruitmentProcess::create([
+                'lead_id' => $lead->id,
+                'candidate_id' => $candidate->id,
+                'status' => RecruitmentStatus::Zatrudniony,
+                'employee_id' => $employee->id,
+            ]);
+        });
     }
 
     /**

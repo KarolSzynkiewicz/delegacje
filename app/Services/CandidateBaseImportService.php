@@ -445,6 +445,7 @@ class CandidateBaseImportService
 
         if (($legend['special'] ?? null) === 'aktualny_pracownik') {
             $employee = $this->findEmployeeByPhone($row['phone']);
+            $processComment = null;
 
             if ($employee) {
                 if ($candidate && $candidate->employee_id && $candidate->employee_id !== $employee->id) {
@@ -455,8 +456,13 @@ class CandidateBaseImportService
                     $status = RecruitmentStatus::Zatrudniony;
                 }
             } else {
-                $status = RecruitmentStatus::WTrakcieKontaktu;
-                $warnings[] = 'Oznaczony jako Aktualny pracownik w bazie historycznej — brak dopasowania po telefonie, zweryfikuj ręcznie.';
+                // No phone match against current Employees — can't safely guess who this
+                // is, so it's routed to Weryfikacja (manual check) instead of Zatrudniony,
+                // with the reason left as a visible comment rather than only a fleeting
+                // import warning.
+                $status = RecruitmentStatus::Zaakceptowany;
+                $processComment = 'Oznaczony jako Aktualny pracownik w bazie historycznej — brak dopasowania po telefonie, zweryfikuj ręcznie.';
+                $warnings[] = $processComment;
             }
 
             return [
@@ -466,6 +472,7 @@ class CandidateBaseImportService
                 'rejection_note' => null,
                 'outcome' => RecruitmentContactOutcome::Odebrano,
                 'extra_note' => null,
+                'process_comment' => $processComment,
                 'employee' => $employee,
                 'warnings' => $warnings,
             ];
@@ -485,6 +492,7 @@ class CandidateBaseImportService
                 : null,
             'outcome' => $legend['outcome'] ?? RecruitmentContactOutcome::Odebrano,
             'extra_note' => $legend['extra_note'] ?? null,
+            'process_comment' => null,
             'employee' => null,
             'warnings' => $warnings,
         ];
@@ -580,6 +588,10 @@ class CandidateBaseImportService
 
         $this->recordContactAttempt($process, $row, $statusInfo);
 
+        if ($statusInfo['process_comment'] && ! $process->comments()->where('body', $statusInfo['process_comment'])->exists()) {
+            $process->addComment($statusInfo['process_comment'], auth()->user());
+        }
+
         return ['action' => $isNew ? 'created' : 'enriched', 'warnings' => $statusInfo['warnings']];
     }
 
@@ -672,20 +684,32 @@ class CandidateBaseImportService
     private function recordContactAttempt(RecruitmentProcess $process, array $row, array $statusInfo): void
     {
         $comment = trim(implode("\n\n", array_filter([$row['notes'], $statusInfo['extra_note']])));
+        $comment = $comment !== '' ? $comment : null;
+        $attemptDate = $this->parseDate($row['contact_date']) ?? $this->parseDate($row['lead_created_at']);
+
+        // Re-running this import on the same CSV must not pile up duplicate contact
+        // attempts — skip if the exact same comment is already recorded for the same
+        // day (or, when the row carries no date at all, anywhere on this process).
+        $duplicateQuery = $process->contactAttempts()->where('comment', $comment);
+        if ($attemptDate) {
+            $duplicateQuery->whereDate('created_at', $attemptDate->toDateString());
+        }
+        if ($duplicateQuery->exists()) {
+            return;
+        }
 
         $attempt = $process->contactAttempts()->create([
             'user_id' => auth()->id(),
             'outcome' => $statusInfo['outcome'],
-            'comment' => $comment !== '' ? $comment : null,
+            'comment' => $comment,
         ]);
 
-        $attemptDate = $this->parseDate($row['contact_date']) ?? $this->parseDate($row['lead_created_at']);
         if ($attemptDate) {
             $attempt->created_at = $attemptDate;
             $attempt->save();
         }
 
-        if ($comment !== '' && ! $process->admin_notes) {
+        if ($comment !== null && ! $process->admin_notes) {
             $process->update(['admin_notes' => $comment]);
         }
     }

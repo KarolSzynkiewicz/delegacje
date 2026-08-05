@@ -139,7 +139,7 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertSame(0, RecruitmentProcess::count());
     }
 
-    public function test_reinstate_clears_termination_fields_without_touching_processes(): void
+    public function test_reinstate_clears_termination_fields_and_adds_audit_process(): void
     {
         $employee = Employee::factory()->create();
         $candidate = RecruitmentCandidate::create([
@@ -150,7 +150,8 @@ class EmployeeLifecycleServiceTest extends TestCase
         ]);
 
         $this->service()->terminate($employee, EmployeeTerminationReason::Other);
-        $processCountAfterTerminate = RecruitmentProcess::count();
+        $formerProcess = $candidate->processes()->where('status', RecruitmentStatus::BylyPracownik)->first();
+        $this->assertNotNull($formerProcess);
 
         $this->service()->reinstate($employee->fresh());
 
@@ -159,7 +160,38 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertNull($employee->termination_reason);
         $this->assertNull($employee->termination_note);
 
-        $this->assertSame($processCountAfterTerminate, RecruitmentProcess::count());
+        // History is append-only — termination audit stays.
+        $this->assertSame(RecruitmentStatus::BylyPracownik, $formerProcess->fresh()->status);
+
+        $this->assertSame(2, $candidate->processes()->count());
+        $this->assertTrue(
+            $candidate->processes()
+                ->where('status', RecruitmentStatus::Zatrudniony)
+                ->where('employee_id', $employee->id)
+                ->exists()
+        );
+
+        $reinstateLead = $candidate->leads()->latest('id')->first();
+        $this->assertSame(RecruitmentReferralSource::EmployeeLifecycle, $reinstateLead->referral_source);
+        $this->assertStringStartsWith('Przywrócenie pracownika – ', $reinstateLead->referral_source_detail);
+
         $this->assertTrue($candidate->fresh()->isHired());
+        $this->assertFalse($candidate->fresh()->isFormerEmployee());
+    }
+
+    public function test_reinstate_without_linked_candidate_only_updates_employee(): void
+    {
+        $employee = Employee::factory()->create([
+            'terminated_at' => now(),
+            'termination_reason' => EmployeeTerminationReason::Other,
+        ]);
+
+        $this->service()->reinstate($employee);
+
+        $employee->refresh();
+        $this->assertFalse($employee->isTerminated());
+        $this->assertNull($employee->termination_reason);
+        $this->assertSame(0, RecruitmentProcess::count());
+        $this->assertSame(0, RecruitmentLead::count());
     }
 }

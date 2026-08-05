@@ -255,9 +255,7 @@ class WeeklyOverviewController extends Controller
                 $projectData['project'],
                 $week
             );
-            $projectData['weeks_data'] = [
-                $this->weeklyOverviewService->getProjectWeekData($projectData['project'], $week),
-            ];
+            // weeks_data already assembled by getProjectsWithWeeklyData (batched) — do not re-query.
 
             return $projectData;
         }, $projects);

@@ -311,7 +311,12 @@ class CandidateBaseImportServiceTest extends TestCase
 
         $candidate = RecruitmentCandidate::where('phone', '48600100208')->first();
         $this->assertNull($candidate->employee_id);
-        $this->assertSame(RecruitmentStatus::WTrakcieKontaktu, $candidate->processes()->first()->status);
+        $process = $candidate->processes()->first();
+        $this->assertSame(RecruitmentStatus::Zaakceptowany, $process->status);
+        $this->assertTrue(
+            $process->comments()->where('body', 'like', '%brak dopasowania po telefonie%')->exists(),
+            'Expected a process comment flagging the unmatched "Aktualny pracownik" case.'
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -447,6 +452,21 @@ class CandidateBaseImportServiceTest extends TestCase
         $candidate = RecruitmentCandidate::where('phone', '48600100212')->first();
         $this->assertSame(1, RecruitmentCandidate::where('phone', '48600100212')->count());
         $this->assertSame(1, RecruitmentProcess::where('candidate_id', $candidate->id)->count());
+        // Re-importing the exact same row must not pile up duplicate contact attempts.
+        $this->assertSame(1, $candidate->processes()->first()->contactAttempts()->count());
+    }
+
+    public function test_contact_attempt_is_attributed_to_the_admin_running_the_import(): void
+    {
+        $admin = $this->actingAsRecruiter();
+
+        $rows = $this->service()->parseOnly($this->csvRow(['phone' => '600100213']))['rows'];
+        $this->service()->import($rows);
+
+        $attempt = RecruitmentCandidate::where('phone', '48600100213')->first()
+            ->processes()->first()->contactAttempts()->first();
+
+        $this->assertSame($admin->id, $attempt->user_id);
     }
 
     public function test_rows_without_phone_are_skipped(): void
