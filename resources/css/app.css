@@ -745,6 +745,13 @@ textarea.form-control {
     color: var(--accent);
     border: 1px solid rgba(168, 85, 247, 0.3);
 }
+/* Neutralny wariant — Bootstrap 5 nie ma już .badge-secondary, a bez tego
+   znaczniki pomocnicze renderowały się jako sam tekst bez tła. */
+.badge-secondary {
+    background: rgba(148, 163, 184, 0.15);
+    color: var(--text-muted);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
 
 /* Clickable badge - hover effect podobny do przycisku */
 /* Używamy takiej samej struktury jak w buttonach */

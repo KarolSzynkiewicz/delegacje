@@ -173,6 +173,14 @@ return [
         'routePattern' => 'recruitment-processes.*',
     ],
 
+    'recruitment_analytics' => [
+        'route' => 'recruitment-analytics.index',
+        'icon' => 'bi bi-graph-up-arrow',
+        'label' => 'Analityka rekrutacji',
+        'permission' => 'employees.view',
+        'routePattern' => 'recruitment-analytics.*',
+    ],
+
     'roles' => [
         'route' => 'roles.index',
         'icon' => 'bi bi-person-badge',

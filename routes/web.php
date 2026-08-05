@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccommodationAssignmentController;
+use App\Http\Controllers\RecruitmentAnalyticsController;
 use App\Http\Controllers\RecruitmentProcessController;
 use App\Http\Controllers\RecruitmentConsentController;
 use App\Http\Controllers\AccommodationController;
@@ -295,6 +296,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->defaults('resource', 'employees');
         Route::post('recruitment-processes/{recruitmentProcess}/convert', [RecruitmentProcessController::class, 'convert'])
             ->name('recruitment-processes.convert')
+            ->defaults('resource', 'employees');
+
+        Route::get('recruitment-analytics', [RecruitmentAnalyticsController::class, 'index'])
+            ->name('recruitment-analytics.index')
             ->defaults('resource', 'employees');
 
         // Employees + assignments + documents
