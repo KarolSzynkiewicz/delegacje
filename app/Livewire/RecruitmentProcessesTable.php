@@ -31,6 +31,9 @@ class RecruitmentProcessesTable extends Component
     /** Candidate flag filter: '' | wartosciowy | czarna_lista */
     public string $flag = '';
 
+    /** When true, only candidates with a process assigned to the logged-in recruiter. */
+    public bool $mine = false;
+
     public string $search = '';
 
     public string $sortField = 'created_at';
@@ -117,6 +120,7 @@ class RecruitmentProcessesTable extends Component
     protected $queryString = [
         'status' => ['except' => ''],
         'flag' => ['except' => ''],
+        'mine' => ['except' => false],
         'search' => ['except' => '', 'as' => 'q'],
         'sortField' => ['except' => 'created_at', 'as' => 'sort'],
         'sortDirection' => ['except' => 'desc', 'as' => 'dir'],
@@ -141,6 +145,13 @@ class RecruitmentProcessesTable extends Component
         }
 
         $this->flag = $this->flag === $flag ? '' : $flag;
+        $this->resetPage();
+    }
+
+    /** Show only recruitments where the logged-in user is the assigned recruiter. */
+    public function toggleMine(): void
+    {
+        $this->mine = ! $this->mine;
         $this->resetPage();
     }
 
@@ -729,6 +740,13 @@ class RecruitmentProcessesTable extends Component
             ->groupBy('rating')
             ->pluck('total', 'rating');
 
+        $userId = auth()->id();
+        $mineCount = $userId
+            ? RecruitmentCandidate::query()
+                ->whereHas('processes', fn ($q) => $q->where('assigned_recruiter_id', $userId))
+                ->count()
+            : 0;
+
         $sortColumn = match ($this->sortField) {
             'last_contact_at' => 'last_candidate_contact_at',
             'created_at' => 'recruitment_candidates.created_at',
@@ -737,15 +755,17 @@ class RecruitmentProcessesTable extends Component
         };
 
         // Each row in the main table = one candidate. Their processes are sub-rows.
-        // Status filter only decides which candidates appear; all of their processes
-        // are loaded so sibling pipelines stay visible informatively.
+        // Status / mine filters only decide which candidates appear; all of their
+        // processes are loaded so sibling pipelines stay visible informatively.
         $status = $this->status;
         $search = $this->search;
         $flag = $this->flag;
+        $mine = $this->mine;
         $applications = RecruitmentCandidate::query()
             ->select(['recruitment_candidates.*', $lastCandidateContactSubquery])
-            ->whereHas('processes', function ($q) use ($status) {
-                $q->when($status, fn ($q) => $q->where('status', $status));
+            ->whereHas('processes', function ($q) use ($status, $mine, $userId) {
+                $q->when($status, fn ($q) => $q->where('status', $status))
+                    ->when($mine && $userId, fn ($q) => $q->where('assigned_recruiter_id', $userId));
             })
             ->when($flag, fn ($q) => $q->where('recruitment_candidates.rating', $flag))
             ->with([
@@ -803,6 +823,7 @@ class RecruitmentProcessesTable extends Component
             'pinnedCandidate' => $pinnedCandidate,
             'counts' => $counts,
             'flagCounts' => $flagCounts,
+            'mineCount' => $mineCount,
             'total' => RecruitmentCandidate::whereHas('processes')->count(),
             'roles' => Role::orderBy('name')->get(),
             'recruiters' => User::orderBy('name')->get(),

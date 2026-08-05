@@ -32,6 +32,7 @@
             <input type="text" wire:model.live.debounce.300ms="search" class="form-control"
                    placeholder="Szukaj kandydata…">
         </div>
+        <x-recruitment.mine-filter :mine="$mine" :mine-count="$mineCount" />
         <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
         <livewire:mbs-lead-import wire:key="mbs-import" />
     </div>
@@ -189,6 +190,7 @@
                                 <i class="bi bi-search"></i>
                                 <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" placeholder="Szukaj…">
                             </div>
+                            <x-recruitment.mine-filter :mine="$mine" :mine-count="$mineCount" />
                             <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
                             <span class="rp-topbar-label ms-2">Sortuj:</span>
                             @foreach(['last_contact_at' => ['Ost. kontakt', 'bi-telephone'], 'created_at' => ['Dodano', 'bi-calendar-plus'], 'last_name' => ['Nazwisko', 'bi-person'], 'expected_rate_eur' => ['Stawka', 'bi-currency-euro']] as $field => [$label, $icon])
