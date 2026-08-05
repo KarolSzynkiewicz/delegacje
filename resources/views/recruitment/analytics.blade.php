@@ -1,10 +1,13 @@
 @php
+    use App\Enums\RecruitmentContactOutcome;
     use App\Enums\RecruitmentStatus;
     use App\Services\RecruitmentAnalyticsService;
 
     $h = $data['headline'];
     $q = $data['dataQuality'];
     $wq = $data['workQueue'];
+    $oq = $data['ownerQueue'];
+    $cbd = $data['callsByDay'];
     $rt = $data['response'];
 
     /** Renders a percentage that may legitimately be unknown (empty denominator). */
@@ -15,6 +18,19 @@
     $realConversion = $h['leads_real'] > 0
         ? round($h['hired_real'] * 100 / $h['leads_real'], 2)
         : null;
+
+    /** Tooltip: rozbicie po wyniku połączenia. */
+    $callOutcomeTooltip = function (array $outcomes) use ($num): string {
+        $parts = [];
+        foreach (RecruitmentContactOutcome::cases() as $case) {
+            $n = $outcomes[$case->value] ?? 0;
+            if ($n > 0) {
+                $parts[] = $case->label().': '.$num($n);
+            }
+        }
+
+        return implode(', ', $parts);
+    };
 @endphp
 
 <x-app-layout>
@@ -85,6 +101,17 @@
             .ra-reco li:last-child { margin-bottom: 0; }
             .ra-reco strong { color: var(--text-main); }
             .ra-chart-wrap { position: relative; min-height: 240px; }
+            .ra-scroll-table { overflow-x: auto; }
+            .ra-scroll-table table { min-width: max-content; }
+            .ra-sticky-col {
+                position: sticky;
+                left: 0;
+                z-index: 1;
+                background: var(--bg-card, #1e2535);
+                box-shadow: 2px 0 4px rgba(0, 0, 0, .15);
+            }
+            .ra-day-cell { min-width: 34px; text-align: center; font-size: .72rem; }
+            .ra-day-cell--has { font-weight: 600; cursor: help; }
     </style>
 
     <x-recruitment.tabs active="analytics" />
@@ -95,6 +122,84 @@
                 Wskaźniki lejka i czasów reakcji liczone są dla leadów, które <em>wpadły</em> w tym okresie;
                 liczba telefonów i zatrudnień — dla zdarzeń, które <em>zaszły</em> w tym okresie.
             </div>
+
+            {{-- ── Telefony: kto ile dzwonił per dzień ───────────────────── --}}
+            <x-ui.card label="Telefony — kto ile dzwonił" class="mb-4">
+                <p class="ra-note mt-2 mb-3">
+                    Liczba zarejestrowanych prób kontaktu per rekruter i dzień kalendarzowy w wybranym okresie.
+                    Najedź na liczbę, żeby zobaczyć rozbicie: odebrane, brak odpowiedzi, numer nieaktywny, prośba o oddzwonienie.
+                </p>
+
+                @if($cbd['grand_total'] === 0)
+                    <x-ui.empty-state icon="telephone-x" message="Brak zarejestrowanych telefonów w tym okresie" />
+                @else
+                    <div class="ra-scroll-table">
+                        <table class="table table-sm table-hover ra-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ra-sticky-col">Rekruter</th>
+                                    <th class="text-end ra-sticky-col" style="left:140px;">Razem</th>
+                                    @foreach($cbd['days'] as $day)
+                                        <th class="ra-day-cell text-muted" title="{{ $day['key'] }}">{{ $day['label'] }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($cbd['rows'] as $row)
+                                    <tr>
+                                        <td class="ra-sticky-col fw-semibold">{{ $row['name'] }}</td>
+                                        <td class="text-end fw-semibold ra-sticky-col {{ $row['total'] > 0 ? 'ra-day-cell--has' : '' }}"
+                                            style="left:140px;"
+                                            @if($row['total'] > 0) title="{{ $callOutcomeTooltip($row['outcomes']) }}" @endif>
+                                            {{ $num($row['total']) }}
+                                        </td>
+                                        @foreach($cbd['days'] as $day)
+                                            @php
+                                                $cell = $row['by_day'][$day['key']] ?? ['total' => 0, 'outcomes' => []];
+                                                $n = $cell['total'];
+                                            @endphp
+                                            <td class="ra-day-cell {{ $n > 0 ? 'ra-day-cell--has' : 'text-muted' }}"
+                                                @if($n > 0) title="{{ $callOutcomeTooltip($cell['outcomes']) }}" @endif>
+                                                {{ $n === 0 ? '·' : $num($n) }}
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr style="border-top:2px solid var(--glass-border);">
+                                    <td class="ra-sticky-col fw-semibold">Razem</td>
+                                    <td class="text-end fw-semibold ra-sticky-col {{ $cbd['grand_total'] > 0 ? 'ra-day-cell--has' : '' }}"
+                                        style="left:140px;"
+                                        @if($cbd['grand_total'] > 0) title="{{ $callOutcomeTooltip($cbd['grand_outcomes']) }}" @endif>
+                                        {{ $num($cbd['grand_total']) }}
+                                    </td>
+                                    @foreach($cbd['days'] as $day)
+                                        @php
+                                            $dayOutcomes = array_fill_keys(
+                                                array_map(fn ($o) => $o->value, RecruitmentContactOutcome::cases()),
+                                                0
+                                            );
+                                            $dayTotal = 0;
+                                            foreach ($cbd['rows'] as $r) {
+                                                $cell = $r['by_day'][$day['key']] ?? ['total' => 0, 'outcomes' => []];
+                                                $dayTotal += $cell['total'];
+                                                foreach ($cell['outcomes'] as $outcome => $count) {
+                                                    $dayOutcomes[$outcome] = ($dayOutcomes[$outcome] ?? 0) + $count;
+                                                }
+                                            }
+                                        @endphp
+                                        <td class="ra-day-cell {{ $dayTotal > 0 ? 'fw-semibold ra-day-cell--has' : 'text-muted' }}"
+                                            @if($dayTotal > 0) title="{{ $callOutcomeTooltip($dayOutcomes) }}" @endif>
+                                            {{ $dayTotal === 0 ? '·' : $num($dayTotal) }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                @endif
+            </x-ui.card>
 
             {{-- ── Co z tego wynika ───────────────────────────────────────── --}}
             @if(count($data['insights']))
@@ -276,6 +381,67 @@
                     warto je czyścić hurtowo albo uruchomić kampanię odzyskową, zamiast trzymać
                     w lejku i zawyżać liczbę „aktywnych” procesów.
                 </p>
+            </x-ui.card>
+
+            {{-- ── Właściciele procesów vs etap (stan na teraz) ───────────── --}}
+            <x-ui.card label="Właściciele procesów vs etap (stan na teraz)" class="mb-4">
+                <p class="ra-note mt-2 mb-3">
+                    Niezależne od wybranego okresu — aktualny podział aktywnych procesów według
+                    przypisanego rekrutera i statusu w lejku. Wiersz „Nieprzypisany” to procesy
+                    bez właściciela.
+                </p>
+
+                @if($oq['grand_total'] === 0)
+                    <x-ui.empty-state icon="inbox" message="Brak aktywnych procesów w lejku" />
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover ra-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Właściciel</th>
+                                    <th class="text-end">Razem</th>
+                                    @foreach($oq['statuses'] as $status)
+                                        <th class="text-end">{{ $status->label() }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($oq['rows'] as $row)
+                                    <tr class="{{ $row['user_id'] === null ? 'opacity-75' : '' }}">
+                                        <td class="fw-semibold">
+                                            {{ $row['name'] }}
+                                            @if($row['user_id'] === null)
+                                                <span class="badge badge-secondary ms-1" style="font-size:.55rem;">brak właściciela</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end fw-semibold">{{ $num($row['total']) }}</td>
+                                        @foreach($oq['statuses'] as $status)
+                                            @php $n = $row['by_status'][$status->value] ?? 0; @endphp
+                                            <td class="text-end {{ $n === 0 ? 'text-muted' : '' }}">
+                                                {{ $n === 0 ? '—' : $num($n) }}
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr style="border-top:2px solid var(--glass-border);">
+                                    <td class="fw-semibold">Razem</td>
+                                    <td class="text-end fw-semibold">{{ $num($oq['grand_total']) }}</td>
+                                    @foreach($oq['statuses'] as $status)
+                                        @php
+                                            $statusTotal = array_sum(array_map(
+                                                fn ($row) => $row['by_status'][$status->value] ?? 0,
+                                                $oq['rows']
+                                            ));
+                                        @endphp
+                                        <td class="text-end fw-semibold">{{ $statusTotal === 0 ? '—' : $num($statusTotal) }}</td>
+                                    @endforeach
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                @endif
             </x-ui.card>
 
             {{-- ── Trend ──────────────────────────────────────────────────── --}}

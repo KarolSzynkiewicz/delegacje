@@ -52,10 +52,12 @@ class RecruitmentAnalyticsService
             'headline' => $headline,
             'funnel' => $funnel,
             'response' => $response,
+            'callsByDay' => $this->callsByRecruiterAndDay($from, $to),
             'sources' => $this->bySource($from, $to),
             'recruiters' => $this->byRecruiter($from, $to),
             'trend' => $this->monthlyTrend(12),
             'workQueue' => $workQueue,
+            'ownerQueue' => $this->ownerWorkQueue(),
             'rejections' => $this->rejectionReasons($from, $to),
             'outcomes' => $this->outcomeBreakdown($from, $to),
             'callHeatmap' => $this->callHeatmap($from, $to),
@@ -404,6 +406,161 @@ class RecruitmentAnalyticsService
         }
 
         return $out;
+    }
+
+    /**
+     * Call volume per recruiter per calendar day in the selected period.
+     *
+     * @return array{
+     *     days: array<int, array{key: string, label: string}>,
+     *     outcome_order: array<int, RecruitmentContactOutcome>,
+     *     rows: array<int, array{
+     *         user_id: int|null,
+     *         name: string,
+     *         by_day: array<string, array{total: int, outcomes: array<string, int>}>,
+     *         total: int,
+     *         outcomes: array<string, int>
+     *     }>,
+     *     grand_total: int,
+     *     grand_outcomes: array<string, int>
+     * }
+     */
+    public function callsByRecruiterAndDay(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $outcomeOrder = RecruitmentContactOutcome::cases();
+        $outcomeValues = array_map(fn (RecruitmentContactOutcome $o) => $o->value, $outcomeOrder);
+
+        $counts = DB::table('recruitment_contact_attempts as ca')
+            ->leftJoin('users as u', 'u.id', '=', 'ca.user_id')
+            ->whereBetween('ca.created_at', [$from, $to])
+            ->groupBy('ca.user_id', 'u.name', 'day', 'ca.outcome')
+            ->selectRaw('ca.user_id, COALESCE(u.name, ?) as name, DATE(ca.created_at) as day, ca.outcome, COUNT(*) as n', ['Nieprzypisany'])
+            ->get();
+
+        $days = [];
+        $current = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+        while ($current <= $end) {
+            $key = $current->format('Y-m-d');
+            $days[] = [
+                'key' => $key,
+                'label' => $current->format('d.m'),
+            ];
+            $current->addDay();
+        }
+
+        $emptyOutcomes = fn (): array => array_fill_keys($outcomeValues, 0);
+        $dayKeys = array_column($days, 'key');
+        $makeEmptyByDay = function () use ($dayKeys, $emptyOutcomes): array {
+            $byDay = [];
+            foreach ($dayKeys as $key) {
+                $byDay[$key] = ['total' => 0, 'outcomes' => $emptyOutcomes()];
+            }
+
+            return $byDay;
+        };
+
+        $byUser = [];
+        foreach ($counts as $row) {
+            $userId = $row->user_id;
+            if (! isset($byUser[$userId])) {
+                $byUser[$userId] = [
+                    'user_id' => $userId !== null ? (int) $userId : null,
+                    'name' => $row->name,
+                    'by_day' => $makeEmptyByDay(),
+                    'total' => 0,
+                    'outcomes' => $emptyOutcomes(),
+                ];
+            }
+
+            $dayKey = $row->day;
+            $outcome = $row->outcome;
+            $n = (int) $row->n;
+
+            if (! isset($byUser[$userId]['by_day'][$dayKey])) {
+                $byUser[$userId]['by_day'][$dayKey] = ['total' => 0, 'outcomes' => $emptyOutcomes()];
+            }
+
+            $byUser[$userId]['by_day'][$dayKey]['total'] += $n;
+            if (isset($byUser[$userId]['by_day'][$dayKey]['outcomes'][$outcome])) {
+                $byUser[$userId]['by_day'][$dayKey]['outcomes'][$outcome] += $n;
+            }
+            $byUser[$userId]['total'] += $n;
+            if (isset($byUser[$userId]['outcomes'][$outcome])) {
+                $byUser[$userId]['outcomes'][$outcome] += $n;
+            }
+        }
+
+        $rows = array_values($byUser);
+        usort($rows, fn ($a, $b) => $b['total'] <=> $a['total']);
+
+        $grandOutcomes = $emptyOutcomes();
+        foreach ($rows as $row) {
+            foreach ($outcomeValues as $value) {
+                $grandOutcomes[$value] += $row['outcomes'][$value] ?? 0;
+            }
+        }
+
+        return [
+            'days' => $days,
+            'outcome_order' => $outcomeOrder,
+            'rows' => $rows,
+            'grand_total' => array_sum(array_column($rows, 'total')),
+            'grand_outcomes' => $grandOutcomes,
+        ];
+    }
+
+    /**
+     * Current pipeline snapshot by assigned owner and stage.
+     * Same active statuses as {@see workQueue()}, but rows are recruiters.
+     *
+     * @return array{statuses: array<int, RecruitmentStatus>, rows: array<int, array{user_id: int|null, name: string, total: int, by_status: array<string, int>}>}
+     */
+    public function ownerWorkQueue(): array
+    {
+        $statuses = [
+            RecruitmentStatus::Nowy,
+            RecruitmentStatus::WTrakcieKontaktu,
+            RecruitmentStatus::Zaakceptowany,
+            RecruitmentStatus::Onboarding,
+        ];
+
+        $statusValues = array_map(fn (RecruitmentStatus $s) => $s->value, $statuses);
+
+        $query = DB::table('recruitment_processes as p')
+            ->leftJoin('users as u', 'u.id', '=', 'p.assigned_recruiter_id')
+            ->whereIn('p.status', $statusValues)
+            ->groupBy('p.assigned_recruiter_id', 'u.name')
+            ->selectRaw('p.assigned_recruiter_id as user_id, COALESCE(u.name, ?) as name', ['Nieprzypisany'])
+            ->selectRaw('COUNT(*) as total');
+
+        foreach ($statuses as $status) {
+            $query->selectRaw(
+                'SUM(p.status = ?) as status_'.$status->value,
+                [$status->value]
+            );
+        }
+
+        $rows = $query->orderByDesc('total')->get()->map(function ($row) use ($statuses) {
+            $byStatus = [];
+            foreach ($statuses as $status) {
+                $key = 'status_'.$status->value;
+                $byStatus[$status->value] = (int) ($row->{$key} ?? 0);
+            }
+
+            return [
+                'user_id' => $row->user_id !== null ? (int) $row->user_id : null,
+                'name' => $row->name,
+                'total' => (int) $row->total,
+                'by_status' => $byStatus,
+            ];
+        })->all();
+
+        return [
+            'statuses' => $statuses,
+            'rows' => $rows,
+            'grand_total' => array_sum(array_column($rows, 'total')),
+        ];
     }
 
     /**
