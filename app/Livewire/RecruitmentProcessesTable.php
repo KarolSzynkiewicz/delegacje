@@ -28,6 +28,9 @@ class RecruitmentProcessesTable extends Component
 
     public string $status = '';
 
+    /** Candidate flag filter: '' | wartosciowy | czarna_lista */
+    public string $flag = '';
+
     public string $search = '';
 
     public string $sortField = 'created_at';
@@ -113,6 +116,7 @@ class RecruitmentProcessesTable extends Component
 
     protected $queryString = [
         'status' => ['except' => ''],
+        'flag' => ['except' => ''],
         'search' => ['except' => '', 'as' => 'q'],
         'sortField' => ['except' => 'created_at', 'as' => 'sort'],
         'sortDirection' => ['except' => 'desc', 'as' => 'dir'],
@@ -129,9 +133,20 @@ class RecruitmentProcessesTable extends Component
         $this->resetPage();
     }
 
+    /** Star / blacklist filter — clicking the active flag clears it. */
+    public function toggleFlag(string $flag): void
+    {
+        if (! in_array($flag, array_column(RecruitmentCandidateFlag::cases(), 'value'), true)) {
+            return;
+        }
+
+        $this->flag = $this->flag === $flag ? '' : $flag;
+        $this->resetPage();
+    }
+
     public function sortBy(string $field): void
     {
-        $allowed = ['created_at', 'last_name', 'status', 'expected_rate_eur', 'last_contact_at'];
+        $allowed = ['created_at', 'last_name', 'expected_rate_eur', 'last_contact_at'];
 
         if (! in_array($field, $allowed, true)) {
             return;
@@ -141,7 +156,8 @@ class RecruitmentProcessesTable extends Component
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
             $this->sortField = $field;
-            $this->sortDirection = 'asc';
+            // Dates are most useful newest-first, names A→Z.
+            $this->sortDirection = in_array($field, ['created_at', 'last_contact_at'], true) ? 'desc' : 'asc';
         }
 
         $this->resetPage();
@@ -705,8 +721,17 @@ class RecruitmentProcessesTable extends Component
             .' WHERE rp2.candidate_id = recruitment_candidates.id) as last_candidate_contact_at'
         );
 
+        $flagCounts = RecruitmentCandidate::query()
+            ->whereHas('processes')
+            ->whereNotNull('rating')
+            ->selectRaw('rating, COUNT(*) as total')
+            ->groupBy('rating')
+            ->pluck('total', 'rating');
+
         $sortColumn = match ($this->sortField) {
             'last_contact_at' => 'last_candidate_contact_at',
+            'created_at' => 'recruitment_candidates.created_at',
+            'expected_rate_eur' => 'recruitment_candidates.expected_rate_eur',
             default => 'recruitment_candidates.last_name',
         };
 
@@ -715,11 +740,13 @@ class RecruitmentProcessesTable extends Component
         // are loaded so sibling pipelines stay visible informatively.
         $status = $this->status;
         $search = $this->search;
+        $flag = $this->flag;
         $applications = RecruitmentCandidate::query()
             ->select(['recruitment_candidates.*', $lastCandidateContactSubquery])
             ->whereHas('processes', function ($q) use ($status) {
                 $q->when($status, fn ($q) => $q->where('status', $status));
             })
+            ->when($flag, fn ($q) => $q->where('recruitment_candidates.rating', $flag))
             ->with([
                 'roles',
                 'processes' => function ($q) {
@@ -775,6 +802,7 @@ class RecruitmentProcessesTable extends Component
             'listCandidates' => $listCandidates,
             'pinnedCandidate' => $pinnedCandidate,
             'counts' => $counts,
+            'flagCounts' => $flagCounts,
             'total' => RecruitmentCandidate::whereHas('processes')->count(),
             'roles' => Role::orderBy('name')->get(),
             'recruiters' => User::orderBy('name')->get(),

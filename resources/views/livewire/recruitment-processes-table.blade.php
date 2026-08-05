@@ -25,13 +25,14 @@
         @endforeach
     </div>
 
-    {{-- ════════ SEARCH + IMPORT ════════ --}}
+    {{-- ════════ SEARCH + FLAGS + IMPORT ════════ --}}
     <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
-        <div class="position-relative flex-grow-1" style="max-width:360px;">
-            <i class="bi bi-search position-absolute" style="left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"></i>
-            <input type="text" wire:model.live.debounce.300ms="search" class="form-control" style="padding-left:40px;"
+        <div class="rp-search flex-grow-1" style="max-width:360px;">
+            <i class="bi bi-search"></i>
+            <input type="text" wire:model.live.debounce.300ms="search" class="form-control"
                    placeholder="Szukaj kandydata…">
         </div>
+        <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
         <livewire:mbs-lead-import wire:key="mbs-import" />
     </div>
 
@@ -44,7 +45,7 @@
                             <th style="padding-left:1rem;border-bottom:0;" colspan="2">Kandydat</th>
                             <th style="border-bottom:0;">Źródło</th>
                             <th style="border-bottom:0;">Rekruter</th>
-                            <th style="border-bottom:0;"><button type="button" wire:click="sortBy('status')" class="rp-sort-btn">Status @if($sortField==='status')<i class="bi bi-arrow-{{ $sortDirection==='asc'?'up':'down' }}"></i>@endif</button></th>
+                            <th style="border-bottom:0;">Status</th>
                             <th style="border-bottom:0;"><button type="button" wire:click="sortBy('last_contact_at')" class="rp-sort-btn">Ost. kontakt @if($sortField==='last_contact_at')<i class="bi bi-arrow-{{ $sortDirection==='asc'?'up':'down' }}"></i>@endif</button></th>
                             <th style="border-bottom:0;">Próby</th>
                             <th style="border-bottom:0;"></th>
@@ -175,19 +176,32 @@
 
                 {{-- Top bar --}}
                 <div class="rp-modal-topbar">
-                    <div class="d-flex align-items-center gap-1 flex-wrap flex-grow-1 min-width-0">
-                        <span style="font-size:.75rem;color:var(--text-muted);flex-shrink:0;">Filtr:</span>
-                        <button type="button" wire:click="$set('status','')" class="btn btn-sm {{ $status==='' ? 'btn-primary' : 'btn-outline-secondary' }}" style="padding:3px 10px;font-size:.72rem;">Wszystkie <span class="badge badge-info ms-1" style="font-size:.6rem;">{{ $total }}</span></button>
-                        @foreach(RecruitmentStatus::tabOrder() as $case)
-                            <button type="button" wire:click="$set('status','{{ $case->value }}')" class="btn btn-sm {{ $status===$case->value ? 'btn-'.$case->variant() : 'btn-outline-secondary' }}" style="padding:3px 10px;font-size:.72rem;">{{ $case->label() }}@if($counts->has($case->value))<span class="badge ms-1" style="font-size:.6rem;">{{ $counts[$case->value] }}</span>@endif</button>
-                        @endforeach
-                        <div class="position-relative ms-1" style="min-width:180px;max-width:240px;">
-                            <i class="bi bi-search position-absolute" style="left:9px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:.75rem;pointer-events:none;"></i>
-                            <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" style="padding-left:28px;border-radius:8px;" placeholder="Szukaj…">
+                    <div class="rp-topbar-main">
+                        <div class="rp-topbar-row">
+                            <span class="rp-topbar-label">Filtr:</span>
+                            <button type="button" wire:click="$set('status','')" class="btn btn-sm rp-topbar-btn {{ $status==='' ? 'btn-primary' : 'btn-outline-secondary' }}">Wszystkie <span class="badge badge-info ms-1" style="font-size:.6rem;">{{ $total }}</span></button>
+                            @foreach(RecruitmentStatus::tabOrder() as $case)
+                                <button type="button" wire:click="$set('status','{{ $case->value }}')" class="btn btn-sm rp-topbar-btn {{ $status===$case->value ? 'btn-'.$case->variant() : 'btn-outline-secondary' }}">{{ $case->label() }}@if($counts->has($case->value))<span class="badge ms-1" style="font-size:.6rem;">{{ $counts[$case->value] }}</span>@endif</button>
+                            @endforeach
+                        </div>
+                        <div class="rp-topbar-row">
+                            <div class="rp-search rp-search--sm rp-topbar-search">
+                                <i class="bi bi-search"></i>
+                                <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" placeholder="Szukaj…">
+                            </div>
+                            <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
+                            <span class="rp-topbar-label ms-2">Sortuj:</span>
+                            @foreach(['last_contact_at' => ['Ost. kontakt', 'bi-telephone'], 'created_at' => ['Dodano', 'bi-calendar-plus'], 'last_name' => ['Nazwisko', 'bi-person'], 'expected_rate_eur' => ['Stawka', 'bi-currency-euro']] as $field => [$label, $icon])
+                                <button type="button" wire:click="sortBy('{{ $field }}')"
+                                        class="btn btn-sm rp-topbar-btn {{ $sortField===$field ? 'btn-primary' : 'btn-outline-secondary' }}">
+                                    <i class="bi {{ $icon }} me-1"></i>{{ $label }}
+                                    @if($sortField===$field)<i class="bi bi-arrow-{{ $sortDirection==='asc'?'up':'down' }} ms-1"></i>@endif
+                                </button>
+                            @endforeach
                         </div>
                     </div>
-                    <button type="button" wire:click="closeDrawer" class="btn btn-sm btn-outline-secondary ms-2 flex-shrink-0">
-                        <i class="bi bi-x-lg me-1"></i>Zamknij
+                    <button type="button" wire:click="closeDrawer" class="rp-modal-close" title="Zamknij" aria-label="Zamknij">
+                        <i class="bi bi-x-lg"></i>
                     </button>
                 </div>
 

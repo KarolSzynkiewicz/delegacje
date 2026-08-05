@@ -2711,16 +2711,86 @@ html .text-muted,
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
     pointer-events: auto;
 }
-/* Top bar */
+/* Top bar — filters/search wrap internally so the close button keeps its corner */
 .rp-modal-topbar {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     padding: .6rem 1rem;
     border-bottom: 1px solid var(--glass-border);
     background: rgba(255, 255, 255, 0.02);
     flex-shrink: 0;
     gap: .5rem;
+}
+.rp-topbar-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+}
+.rp-topbar-row {
+    display: flex;
+    align-items: center;
     flex-wrap: wrap;
+    gap: .35rem;
+}
+.rp-topbar-label {
+    font-size: .72rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+.rp-topbar-btn {
+    padding: 3px 10px !important;
+    font-size: .72rem !important;
+    white-space: nowrap;
+}
+.rp-topbar-search {
+    width: 200px;
+    flex-shrink: 0;
+}
+.rp-modal-close {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: .8rem;
+    transition: background .12s, color .12s, border-color .12s;
+}
+.rp-modal-close:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+/* Search field: the icon sits inside, so the input needs room for it.
+   Global .form-control padding is !important, hence the override. */
+.rp-search {
+    position: relative;
+}
+.rp-search > .bi-search {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 2;
+}
+.rp-search > .form-control {
+    padding-left: 40px !important;
+}
+.rp-search--sm > .bi-search {
+    left: 10px;
+    font-size: .75rem;
+}
+.rp-search--sm > .form-control {
+    padding-left: 28px !important;
+    border-radius: 8px;
 }
 /* Three-column body */
 .rp-modal-body {
