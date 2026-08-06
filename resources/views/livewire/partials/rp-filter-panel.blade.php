@@ -205,12 +205,22 @@
                 <span class="rp-filter-option__label">Ma zadanie</span>
             </button>
 
-            <div class="rp-filter-label mt-2">Ostatni komentarz starszy niż</div>
+            <div class="rp-filter-label mt-2">Ostatni kontakt</div>
             <div class="rp-filter-chips">
-                @foreach(['1' => '1 dzień', '2' => '2 dni', '3' => '3 dni', '4' => '4 dni', '5' => '5+ dni'] as $value => $label)
+                @foreach([
+                    'none' => 'Brak',
+                    'today' => 'Dziś',
+                    'yesterday' => 'Wczoraj',
+                    'days_3' => '3 dni temu',
+                    'last_week' => 'W zeszłym tygodniu',
+                    'month_plus' => 'Ponad miesiąc temu',
+                    'half_year_plus' => 'Ponad pół roku temu',
+                    'year_plus' => 'Ponad rok temu',
+                    'years_2_plus' => 'Ponad 2 lata temu',
+                ] as $value => $label)
                     <button type="button"
-                            wire:click="$set('draftCommentOlderThanDays', '{{ $draftCommentOlderThanDays === $value ? '' : $value }}')"
-                            class="rp-filter-chip {{ $draftCommentOlderThanDays === $value ? 'is-active' : '' }}">
+                            wire:click="$set('draftLastContact', '{{ $draftLastContact === $value ? '' : $value }}')"
+                            class="rp-filter-chip {{ $draftLastContact === $value ? 'is-active' : '' }}">
                         {{ $label }}
                     </button>
                 @endforeach

@@ -79,8 +79,11 @@ class RecruitmentProcessesTable extends Component
 
     public bool $hasTask = false;
 
-    /** '' | 1 | 2 | 3 | 4 | 5 — ostatni komentarz starszy niż N dni. */
-    public string $commentOlderThanDays = '';
+    /**
+     * Ostatni kontakt (próba kontaktu):
+     * '' | none | today | yesterday | days_3 | last_week | month_plus | half_year_plus | year_plus | years_2_plus
+     */
+    public string $lastContact = '';
 
     public string $search = '';
 
@@ -126,7 +129,7 @@ class RecruitmentProcessesTable extends Component
 
     public bool $draftHasTask = false;
 
-    public string $draftCommentOlderThanDays = '';
+    public string $draftLastContact = '';
 
     public string $draftRejectionFilter = '';
 
@@ -152,7 +155,7 @@ class RecruitmentProcessesTable extends Component
         'skillDriving',
         'minProcesses',
         'hasTask',
-        'commentOlderThanDays',
+        'lastContact',
         'recruiter',
         'referralSource',
         'rejectionFilter',
@@ -259,7 +262,7 @@ class RecruitmentProcessesTable extends Component
         'skillDriving' => ['except' => false, 'as' => 'license_b', 'history' => true],
         'minProcesses' => ['except' => '', 'as' => 'min_proc', 'history' => true],
         'hasTask' => ['except' => false, 'as' => 'has_task', 'history' => true],
-        'commentOlderThanDays' => ['except' => '', 'as' => 'comment_days', 'history' => true],
+        'lastContact' => ['except' => '', 'as' => 'last_contact', 'history' => true],
         'recruiter' => ['except' => '', 'history' => true],
         'referralSource' => ['except' => '', 'as' => 'source', 'history' => true],
         'rejectionFilter' => ['except' => '', 'as' => 'rejection', 'history' => true],
@@ -376,7 +379,7 @@ class RecruitmentProcessesTable extends Component
         $this->draftSkillDriving = $this->skillDriving;
         $this->draftMinProcesses = $this->minProcesses;
         $this->draftHasTask = $this->hasTask;
-        $this->draftCommentOlderThanDays = $this->commentOlderThanDays;
+        $this->draftLastContact = $this->lastContact;
         $this->draftRejectionFilter = $this->rejectionFilter;
     }
 
@@ -406,9 +409,7 @@ class RecruitmentProcessesTable extends Component
             ? $this->draftMinProcesses
             : '';
         $this->hasTask = $this->draftHasTask;
-        $this->commentOlderThanDays = in_array($this->draftCommentOlderThanDays, ['1', '2', '3', '4', '5'], true)
-            ? $this->draftCommentOlderThanDays
-            : '';
+        $this->lastContact = $this->sanitizeLastContact($this->draftLastContact);
         $this->rejectionFilter = $this->draftRejectionFilter;
         $this->resetPage();
         $this->persistActiveView();
@@ -435,7 +436,7 @@ class RecruitmentProcessesTable extends Component
         $this->skillDriving = false;
         $this->minProcesses = '';
         $this->hasTask = false;
-        $this->commentOlderThanDays = '';
+        $this->lastContact = '';
         $this->rejectionFilter = '';
         $this->batchingViewPersist = false;
         $this->syncDraftFilters();
@@ -558,9 +559,8 @@ class RecruitmentProcessesTable extends Component
             $labels[] = 'Ma zadanie';
         }
 
-        if ($this->commentOlderThanDays !== '') {
-            $days = $this->commentOlderThanDays;
-            $labels[] = 'Komentarz starszy niż '.($days === '1' ? '1 dzień' : $days.' dni');
+        if ($this->lastContact !== '') {
+            $labels[] = 'Ost. kontakt: '.($this->lastContactFilterOptions()[$this->lastContact] ?? $this->lastContact);
         }
 
         if ($this->rejectionFilter === 'none') {
@@ -602,6 +602,83 @@ class RecruitmentProcessesTable extends Component
     }
 
     /**
+     * @return array<string, string>
+     */
+    protected function lastContactFilterOptions(): array
+    {
+        return [
+            'none' => 'Brak',
+            'today' => 'Dziś',
+            'yesterday' => 'Wczoraj',
+            'days_3' => '3 dni temu',
+            'last_week' => 'W zeszłym tygodniu',
+            'month_plus' => 'Ponad miesiąc temu',
+            'half_year_plus' => 'Ponad pół roku temu',
+            'year_plus' => 'Ponad rok temu',
+            'years_2_plus' => 'Ponad 2 lata temu',
+        ];
+    }
+
+    protected function sanitizeLastContact(string $value): string
+    {
+        return array_key_exists($value, $this->lastContactFilterOptions()) ? $value : '';
+    }
+
+    protected function lastCandidateContactSql(): string
+    {
+        return '(SELECT MAX(rca.created_at)'
+            .' FROM recruitment_contact_attempts rca'
+            .' JOIN recruitment_processes rp2 ON rp2.id = rca.recruitment_process_id'
+            .' WHERE rp2.candidate_id = recruitment_candidates.id)';
+    }
+
+    /**
+     * @param  Builder<\App\Models\RecruitmentCandidate>  $query
+     */
+    protected function applyLastContactFilter(Builder $query, string $lastContact): void
+    {
+        $lastContact = $this->sanitizeLastContact($lastContact);
+        if ($lastContact === '') {
+            return;
+        }
+
+        $expr = $this->lastCandidateContactSql();
+
+        match ($lastContact) {
+            'none' => $query->whereRaw("{$expr} IS NULL"),
+            'today' => $query->whereRaw("{$expr} >= ? AND {$expr} < ?", [
+                now()->startOfDay()->toDateTimeString(),
+                now()->addDay()->startOfDay()->toDateTimeString(),
+            ]),
+            'yesterday' => $query->whereRaw("{$expr} >= ? AND {$expr} < ?", [
+                now()->subDay()->startOfDay()->toDateTimeString(),
+                now()->startOfDay()->toDateTimeString(),
+            ]),
+            'days_3' => $query->whereRaw("{$expr} >= ? AND {$expr} < ?", [
+                now()->subDays(3)->startOfDay()->toDateTimeString(),
+                now()->subDays(2)->startOfDay()->toDateTimeString(),
+            ]),
+            'last_week' => $query->whereRaw("{$expr} >= ? AND {$expr} < ?", [
+                now()->copy()->startOfWeek()->subWeek()->toDateTimeString(),
+                now()->copy()->startOfWeek()->toDateTimeString(),
+            ]),
+            'month_plus' => $query->whereRaw("{$expr} IS NOT NULL AND {$expr} < ?", [
+                now()->subMonth()->toDateTimeString(),
+            ]),
+            'half_year_plus' => $query->whereRaw("{$expr} IS NOT NULL AND {$expr} < ?", [
+                now()->subMonths(6)->toDateTimeString(),
+            ]),
+            'year_plus' => $query->whereRaw("{$expr} IS NOT NULL AND {$expr} < ?", [
+                now()->subYear()->toDateTimeString(),
+            ]),
+            'years_2_plus' => $query->whereRaw("{$expr} IS NOT NULL AND {$expr} < ?", [
+                now()->subYears(2)->toDateTimeString(),
+            ]),
+            default => null,
+        };
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function advancedFiltersPayload(): array
@@ -619,7 +696,7 @@ class RecruitmentProcessesTable extends Component
             'skill_driving' => $this->skillDriving,
             'min_processes' => $this->minProcesses,
             'has_task' => $this->hasTask,
-            'comment_older_than_days' => $this->commentOlderThanDays,
+            'last_contact' => $this->lastContact,
         ];
     }
 
@@ -647,9 +724,7 @@ class RecruitmentProcessesTable extends Component
             ? (string) $filters['min_processes']
             : '';
         $this->hasTask = (bool) ($filters['has_task'] ?? false);
-        $this->commentOlderThanDays = in_array((string) ($filters['comment_older_than_days'] ?? ''), ['1', '2', '3', '4', '5'], true)
-            ? (string) $filters['comment_older_than_days']
-            : '';
+        $this->lastContact = $this->sanitizeLastContact((string) ($filters['last_contact'] ?? ''));
     }
 
     public function saveView(): void
@@ -900,7 +975,7 @@ class RecruitmentProcessesTable extends Component
             'skill_driving' => $this->skillDriving,
             'min_processes' => $this->minProcesses,
             'has_task' => $this->hasTask,
-            'comment_older_than_days' => $this->commentOlderThanDays,
+            'last_contact' => $this->lastContact,
             'recruiter' => $this->recruiter,
             'referral_source' => $this->referralSource,
             'rejection_filter' => $this->rejectionFilter,
@@ -932,7 +1007,7 @@ class RecruitmentProcessesTable extends Component
             'skill_driving' => (bool) ($advanced['skill_driving'] ?? false),
             'min_processes' => (string) ($advanced['min_processes'] ?? ''),
             'has_task' => (bool) ($advanced['has_task'] ?? false),
-            'comment_older_than_days' => (string) ($advanced['comment_older_than_days'] ?? ''),
+            'last_contact' => $this->sanitizeLastContact((string) ($advanced['last_contact'] ?? '')),
             'recruiter' => $view->recruiter ?? '',
             'referral_source' => $view->referral_source ?? '',
             'rejection_filter' => $view->rejection_filter ?? '',
@@ -969,9 +1044,7 @@ class RecruitmentProcessesTable extends Component
         $skillDriving = (bool) ($filters['skill_driving'] ?? false);
         $minProcesses = ($filters['min_processes'] ?? '') !== '' ? (int) $filters['min_processes'] : 0;
         $hasTask = (bool) ($filters['has_task'] ?? false);
-        $commentOlderThanDays = ($filters['comment_older_than_days'] ?? '') !== ''
-            ? (int) $filters['comment_older_than_days']
-            : 0;
+        $lastContact = $this->sanitizeLastContact((string) ($filters['last_contact'] ?? ''));
         $search = (string) ($filters['search'] ?? '');
         $userId = auth()->id();
 
@@ -980,7 +1053,7 @@ class RecruitmentProcessesTable extends Component
             ? PhoneNormalizer::normalize($search)
             : null;
 
-        return RecruitmentCandidate::query()
+        $query = RecruitmentCandidate::query()
             ->withCount('processes')
             ->whereHas('processes', function ($q) use ($status, $mine, $userId, $recruiter, $referralSource, $rejectionFilter, $hasTask) {
                 $q->when($status, fn ($q) => $q->where('status', $status))
@@ -1013,55 +1086,20 @@ class RecruitmentProcessesTable extends Component
                         ->orWhereHas('processes', fn ($pq) => $pq->where('status', RecruitmentStatus::BylyPracownik->value));
                 });
             })
-            ->when($minProcesses >= 2, fn ($q) => $q->having('processes_count', '>=', $minProcesses))
-            ->when($commentOlderThanDays > 0, function ($q) use ($commentOlderThanDays) {
-                $cutoff = now()->subDays($commentOlderThanDays)->toDateTimeString();
-                $q->whereRaw(
-                    '(SELECT MAX(c.created_at) FROM comments c
-                      WHERE c.deleted_at IS NULL
-                        AND (
-                          (c.commentable_type = ? AND c.commentable_id = recruitment_candidates.id)
-                          OR (
-                            c.commentable_type = ?
-                            AND c.commentable_id IN (
-                              SELECT rp.id FROM recruitment_processes rp
-                              WHERE rp.candidate_id = recruitment_candidates.id
-                            )
-                          )
-                        )
-                    ) IS NOT NULL
-                    AND (SELECT MAX(c.created_at) FROM comments c
-                      WHERE c.deleted_at IS NULL
-                        AND (
-                          (c.commentable_type = ? AND c.commentable_id = recruitment_candidates.id)
-                          OR (
-                            c.commentable_type = ?
-                            AND c.commentable_id IN (
-                              SELECT rp.id FROM recruitment_processes rp
-                              WHERE rp.candidate_id = recruitment_candidates.id
-                            )
-                          )
-                        )
-                    ) < ?',
-                    [
-                        'recruitment_candidate',
-                        'recruitment_process',
-                        'recruitment_candidate',
-                        'recruitment_process',
-                        $cutoff,
-                    ]
-                );
-            })
-            ->when($search, function ($q) use ($search, $phoneSearch) {
-                $q->where(function ($q) use ($search, $phoneSearch) {
-                    $q->where('recruitment_candidates.first_name', 'like', "%{$search}%")
-                        ->orWhere('recruitment_candidates.last_name', 'like', "%{$search}%")
-                        ->orWhere('recruitment_candidates.phone', 'like', "%{$search}%")
-                        ->orWhere('recruitment_candidates.email', 'like', "%{$search}%")
-                        ->orWhereHas('roles', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
-                        ->when($phoneSearch, fn ($q) => $q->orWhere('recruitment_candidates.phone', 'like', "%{$phoneSearch}%"));
-                });
+            ->when($minProcesses >= 2, fn ($q) => $q->having('processes_count', '>=', $minProcesses));
+
+        $this->applyLastContactFilter($query, $lastContact);
+
+        return $query->when($search, function ($q) use ($search, $phoneSearch) {
+            $q->where(function ($q) use ($search, $phoneSearch) {
+                $q->where('recruitment_candidates.first_name', 'like', "%{$search}%")
+                    ->orWhere('recruitment_candidates.last_name', 'like', "%{$search}%")
+                    ->orWhere('recruitment_candidates.phone', 'like', "%{$search}%")
+                    ->orWhere('recruitment_candidates.email', 'like', "%{$search}%")
+                    ->orWhereHas('roles', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
+                    ->when($phoneSearch, fn ($q) => $q->orWhere('recruitment_candidates.phone', 'like', "%{$phoneSearch}%"));
             });
+        });
     }
 
     /**
