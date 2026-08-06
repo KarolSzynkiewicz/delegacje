@@ -51,6 +51,7 @@
             <button type="button" wire:click="loadView('{{ $savedView->slug }}')"
                     class="btn btn-sm rp-topbar-btn {{ $view === $savedView->slug ? 'btn-info' : 'btn-outline-secondary' }}">
                 <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"></i>{{ $savedView->name }}
+                <span class="rp-view-count">{{ $viewCounts[$savedView->slug] ?? 0 }}</span>
             </button>
         @endforeach
 

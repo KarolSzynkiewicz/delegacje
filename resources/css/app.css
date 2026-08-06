@@ -2751,6 +2751,24 @@ html .text-muted,
     font-size: .72rem !important;
     white-space: nowrap;
 }
+.rp-view-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35em;
+    margin-left: .35rem;
+    padding: 0 .35rem;
+    border-radius: 999px;
+    font-size: .65rem;
+    font-weight: 700;
+    line-height: 1.35;
+    background: rgba(15, 23, 42, 0.08);
+    color: inherit;
+    opacity: .85;
+}
+.btn-info .rp-view-count {
+    background: rgba(255, 255, 255, 0.28);
+}
 .rp-topbar-search {
     width: 200px;
     flex-shrink: 0;

@@ -111,6 +111,7 @@
                                             style="font-size:.82rem;color:var(--text-main);">
                                         <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"
                                            style="color:var(--primary);font-size:.75rem"></i>{{ $savedView->name }}
+                                        <span class="text-muted ms-1" style="font-size:.75rem">({{ $viewCounts[$savedView->slug] ?? 0 }})</span>
                                     </button>
                                     <button type="button" wire:click="deleteView('{{ $savedView->slug }}')"
                                             class="btn btn-sm btn-link p-1 flex-shrink-0"
