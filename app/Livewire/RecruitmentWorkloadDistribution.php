@@ -5,10 +5,13 @@ namespace App\Livewire;
 use App\Models\User;
 use App\Services\RecruitmentAssignmentService;
 use InvalidArgumentException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class RecruitmentWorkloadDistribution extends Component
 {
+    public bool $hideTrigger = false;
+
     public bool $show = false;
 
     /** 'unassigned' | 'vacation' */
@@ -36,6 +39,12 @@ class RecruitmentWorkloadDistribution extends Component
     {
         $this->resetForm();
         $this->show = true;
+    }
+
+    #[On('open-workload-modal')]
+    public function openFromEvent(): void
+    {
+        $this->openModal();
     }
 
     public function closeModal(): void

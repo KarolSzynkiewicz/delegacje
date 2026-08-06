@@ -9,34 +9,74 @@
         <x-ui.alert variant="success" dismissible class="mb-3">{{ session('success') }}</x-ui.alert>
     @endif
 
-    {{-- ════════ STATUS FILTERS ════════ --}}
-    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
-        <button type="button" wire:click="$set('status','')"
-                class="btn btn-sm {{ $status==='' ? 'btn-primary' : 'btn-outline-secondary' }}">
-            Wszystkie <span class="badge badge-info ms-1">{{ $total }}</span>
-        </button>
-        @foreach(RecruitmentStatus::tabOrder() as $case)
-            @php $tBadge = match($case->variant()) { 'success'=>'badge-success','danger'=>'badge-danger','warning'=>'badge-warning',default=>'badge-info' }; @endphp
-            <button type="button" wire:click="$set('status','{{ $case->value }}')"
-                    class="btn btn-sm {{ $status===$case->value ? 'btn-'.$case->variant() : 'btn-outline-secondary' }}">
-                {{ $case->label() }}
-                @if($counts->has($case->value))<span class="badge {{ $tBadge }} ms-1">{{ $counts[$case->value] }}</span>@endif
-            </button>
-        @endforeach
-    </div>
+    {{-- ════════ SEARCH + FILTERS + TOOLS ════════ --}}
+    @if($flash)
+        <div class="alert alert-success alert-dismissible py-2 mb-2 d-flex align-items-center gap-2 small" role="alert">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span class="flex-grow-1">{{ $flash }}</span>
+            <button type="button" wire:click="$set('flash', null)" class="btn-close" style="font-size:.8rem"></button>
+        </div>
+    @endif
 
-    {{-- ════════ SEARCH + FLAGS + IMPORT ════════ --}}
-    <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+    <div class="rp-toolbar mb-2 d-flex align-items-center gap-2 flex-wrap">
         <div class="rp-search flex-grow-1" style="max-width:360px;">
             <i class="bi bi-search"></i>
             <input type="text" wire:model.live.debounce.300ms="search" class="form-control"
                    placeholder="Szukaj kandydata…">
         </div>
-        <x-recruitment.mine-filter :mine="$mine" :mine-count="$mineCount" />
-        <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
-        <livewire:recruitment-workload-distribution wire:key="workload-distribution" />
-        <livewire:mbs-lead-import wire:key="mbs-import" />
+
+        {{-- Filtry (SharePoint-style dropdown) --}}
+        <div x-data="{ open: false, top: 0, left: 0, openCandidate: false, openProcess: false, openLead: false, openOther: false }">
+            <button type="button"
+                    @click.stop="if(open){open=false;$wire.syncDraftFilters();return} $wire.syncDraftFilters(); const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.min(r.left, window.innerWidth-620); open=true"
+                    class="btn btn-sm {{ $activeFilterCount > 0 ? 'btn-primary' : 'btn-outline-secondary' }}">
+                <i class="bi bi-sliders me-1"></i>Filtry
+                @if($activeFilterCount > 0)
+                    <span class="badge bg-light text-dark ms-1" style="font-size:.6rem;">{{ $activeFilterCount }}</span>
+                @endif
+                <i class="bi bi-chevron-down ms-1" style="font-size:.6rem;"></i>
+            </button>
+            <template x-teleport="body">
+                <div x-show="open" x-cloak
+                     @click.outside="open=false; $wire.syncDraftFilters()"
+                     :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;`"
+                     class="rp-filter-panel">
+                    @include('livewire.partials.rp-filter-panel')
+                </div>
+            </template>
+        </div>
+
+        {{-- Badge’e zapisanych widoków (przełączanie) --}}
+        @foreach($savedViews as $savedView)
+            <button type="button" wire:click="loadView('{{ $savedView->slug }}')"
+                    class="btn btn-sm rp-topbar-btn {{ $view === $savedView->slug ? 'btn-info' : 'btn-outline-secondary' }}">
+                <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"></i>{{ $savedView->name }}
+            </button>
+        @endforeach
+
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <div x-data="{ open: false, showViews: false }">
+                <button type="button" @click="open = true; showViews = false"
+                        class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-tools me-1"></i>Narzędzia
+                </button>
+                @include('livewire.partials.rp-tools-modal')
+            </div>
+        </div>
     </div>
+
+    @if(count($activeFilterLabels) > 0)
+        <div class="rp-active-filters mb-3">
+            <span class="rp-active-filters__label">Filtry:</span>
+            @foreach($activeFilterLabels as $filterLabel)
+                <span class="rp-active-filters__chip">{{ $filterLabel }}</span>
+            @endforeach
+            <button type="button" wire:click="clearFilters" class="rp-active-filters__clear">Wyczyść</button>
+        </div>
+    @endif
+
+    <livewire:recruitment-workload-distribution :hide-trigger="true" wire:key="workload-distribution" />
+    <livewire:mbs-lead-import :hide-trigger="true" wire:key="mbs-import" />
 
     {{-- ════════ PROCESS TABLE: grouped by candidate ════════ --}}
     <x-ui.card class="p-0">
@@ -157,7 +197,7 @@
                                 </tr>
                             @endforeach
                         @empty
-                            <tr><td colspan="8"><x-ui.empty-state :in-table="false" icon="person-lines-fill" :message="$status || $search ? 'Brak kandydatów spełniających kryteria.' : 'Nie przesłano jeszcze żadnych zgłoszeń.'" /></td></tr>
+                            <tr><td colspan="8"><x-ui.empty-state :in-table="false" icon="person-lines-fill" :message="$status || $search || $recruiter || $rejectionFilter || $referralSource || $flag || $mine || $formerEmployee ? 'Brak kandydatów spełniających kryteria.' : 'Nie przesłano jeszcze żadnych zgłoszeń.'" /></td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -180,20 +220,18 @@
                 <div class="rp-modal-topbar">
                     <div class="rp-topbar-main">
                         <div class="rp-topbar-row">
-                            <span class="rp-topbar-label">Filtr:</span>
-                            <button type="button" wire:click="$set('status','')" class="btn btn-sm rp-topbar-btn {{ $status==='' ? 'btn-primary' : 'btn-outline-secondary' }}">Wszystkie <span class="badge badge-info ms-1" style="font-size:.6rem;">{{ $total }}</span></button>
-                            @foreach(RecruitmentStatus::tabOrder() as $case)
-                                <button type="button" wire:click="$set('status','{{ $case->value }}')" class="btn btn-sm rp-topbar-btn {{ $status===$case->value ? 'btn-'.$case->variant() : 'btn-outline-secondary' }}">{{ $case->label() }}@if($counts->has($case->value))<span class="badge ms-1" style="font-size:.6rem;">{{ $counts[$case->value] }}</span>@endif</button>
-                            @endforeach
-                        </div>
-                        <div class="rp-topbar-row">
                             <div class="rp-search rp-search--sm rp-topbar-search">
                                 <i class="bi bi-search"></i>
                                 <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" placeholder="Szukaj…">
                             </div>
-                            <x-recruitment.mine-filter :mine="$mine" :mine-count="$mineCount" />
-                            <x-recruitment.flag-filters :flag="$flag" :flag-counts="$flagCounts" />
-                            <span class="rp-topbar-label ms-2">Sortuj:</span>
+                            @if(count($activeFilterLabels) > 0)
+                                <div class="rp-active-filters rp-active-filters--compact">
+                                    @foreach($activeFilterLabels as $filterLabel)
+                                        <span class="rp-active-filters__chip">{{ $filterLabel }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+                            <span class="rp-topbar-label ms-1">Sortuj:</span>
                             @foreach(['last_contact_at' => ['Ost. kontakt', 'bi-telephone'], 'created_at' => ['Dodano', 'bi-calendar-plus'], 'last_name' => ['Nazwisko', 'bi-person'], 'expected_rate_eur' => ['Stawka', 'bi-currency-euro']] as $field => [$label, $icon])
                                 <button type="button" wire:click="sortBy('{{ $field }}')"
                                         class="btn btn-sm rp-topbar-btn {{ $sortField===$field ? 'btn-primary' : 'btn-outline-secondary' }}">

@@ -114,7 +114,11 @@
             .ra-day-cell--has { font-weight: 600; cursor: help; }
     </style>
 
-    <x-recruitment.tabs active="analytics" />
+    <div class="mb-3">
+        <a href="{{ route('recruitment-processes.index') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Wróć do kandydatów
+        </a>
+    </div>
 
             <div class="ra-note mb-4">
                 <i class="bi bi-calendar3 me-1"></i>

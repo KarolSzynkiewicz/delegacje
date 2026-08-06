@@ -2,11 +2,13 @@
     use App\Enums\RecruitmentStatus;
 @endphp
 <div>
+    @unless($hideTrigger)
     <button type="button" wire:click="openModal"
             class="btn btn-sm btn-outline-secondary"
             title="Podziel procesy rekrutacyjne między rekruterów">
         <i class="bi bi-people me-1"></i>Podziel pracę
     </button>
+    @endunless
 
     @if($show)
     @teleport('body')

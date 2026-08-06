@@ -14,7 +14,5 @@
         </x-ui.page-header>
     </x-slot>
 
-    <x-recruitment.tabs active="candidates" />
-
     <livewire:recruitment-processes-table />
 </x-app-layout>

@@ -1,10 +1,12 @@
 <div>
+    @unless($hideTrigger)
     {{-- ══════════ TRIGGER BUTTON ══════════ --}}
     <button type="button" wire:click="openModal"
             class="btn btn-sm btn-outline-secondary"
             title="Importuj leady z Meta Business Suite">
         <i class="bi bi-cloud-upload me-1"></i>Import MBS
     </button>
+    @endunless
 
     {{-- ══════════ MODAL ══════════ --}}
     @if($show)

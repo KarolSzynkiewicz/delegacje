@@ -12,12 +12,15 @@ use App\Models\Employee;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentConsent;
+use App\Models\RecruitmentGridView;
 use App\Models\RecruitmentProcess;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -34,7 +37,128 @@ class RecruitmentProcessesTable extends Component
     /** When true, only candidates with a process assigned to the logged-in recruiter. */
     public bool $mine = false;
 
+    /** '' | unassigned | user id — filter by assigned recruiter on matching processes. */
+    public string $recruiter = '';
+
+    /** '' | none | rejection reason value — filter by rejection reason on matching processes. */
+    public string $rejectionFilter = '';
+
+    /** '' | referral source value (or employee_lifecycle:reinstate|terminate). */
+    public string $referralSource = '';
+
+    /** When true, only candidates with a process in status „Były pracownik”. */
+    public bool $formerEmployee = false;
+
+    /** '' | hired | former — employment link on candidate. */
+    public string $employment = '';
+
+    /** Stawka: więcej niż / mniej niż (€/h). */
+    public string $rateMin = '';
+
+    public string $rateMax = '';
+
+    /** '' | brak | 1_3 | 4_10 | 10_plus */
+    public string $shipyardExperience = '';
+
+    /** Dostępny od — później niż / wcześniej niż (Y-m-d). */
+    public string $availableAfter = '';
+
+    public string $availableBefore = '';
+
+    public bool $skillEnglish = false;
+
+    public bool $skillFrench = false;
+
+    public bool $skillGerman = false;
+
+    public bool $skillDriving = false;
+
+    /** '' | 2 | 3 | 4 — minimalna liczba procesów kandydata. */
+    public string $minProcesses = '';
+
+    public bool $hasTask = false;
+
+    /** '' | 1 | 2 | 3 | 4 | 5 — ostatni komentarz starszy niż N dni. */
+    public string $commentOlderThanDays = '';
+
     public string $search = '';
+
+    /** Saved view slug (?view=…) */
+    public string $view = '';
+
+    public string $saveViewName = '';
+
+    /** Draft values for the SharePoint-style filter panel (applied on „Zastosuj”). */
+    public string $draftStatus = '';
+
+    public string $draftRecruiter = '';
+
+    public string $draftReferralSource = '';
+
+    public string $draftFlag = '';
+
+    public bool $draftMine = false;
+
+    public bool $draftFormerEmployee = false;
+
+    public string $draftEmployment = '';
+
+    public string $draftRateMin = '';
+
+    public string $draftRateMax = '';
+
+    public string $draftShipyardExperience = '';
+
+    public string $draftAvailableAfter = '';
+
+    public string $draftAvailableBefore = '';
+
+    public bool $draftSkillEnglish = false;
+
+    public bool $draftSkillFrench = false;
+
+    public bool $draftSkillGerman = false;
+
+    public bool $draftSkillDriving = false;
+
+    public string $draftMinProcesses = '';
+
+    public bool $draftHasTask = false;
+
+    public string $draftCommentOlderThanDays = '';
+
+    public string $draftRejectionFilter = '';
+
+    public ?string $flash = null;
+
+    private bool $batchingViewPersist = false;
+
+    /** @var list<string> */
+    protected array $persistableViewProperties = [
+        'status',
+        'flag',
+        'mine',
+        'formerEmployee',
+        'employment',
+        'rateMin',
+        'rateMax',
+        'shipyardExperience',
+        'availableAfter',
+        'availableBefore',
+        'skillEnglish',
+        'skillFrench',
+        'skillGerman',
+        'skillDriving',
+        'minProcesses',
+        'hasTask',
+        'commentOlderThanDays',
+        'recruiter',
+        'referralSource',
+        'rejectionFilter',
+        'search',
+        'sortField',
+        'sortDirection',
+    ];
 
     public string $sortField = 'created_at';
 
@@ -118,12 +242,30 @@ class RecruitmentProcessesTable extends Component
     public string $commentModalTarget = ''; // 'process' | 'candidate'
 
     protected $queryString = [
-        'status' => ['except' => ''],
-        'flag' => ['except' => ''],
-        'mine' => ['except' => false],
-        'search' => ['except' => '', 'as' => 'q'],
-        'sortField' => ['except' => 'created_at', 'as' => 'sort'],
-        'sortDirection' => ['except' => 'desc', 'as' => 'dir'],
+        'status' => ['except' => '', 'history' => true],
+        'flag' => ['except' => '', 'history' => true],
+        'mine' => ['except' => false, 'history' => true],
+        'formerEmployee' => ['except' => false, 'history' => true],
+        'employment' => ['except' => '', 'history' => true],
+        'rateMin' => ['except' => '', 'as' => 'rate_min', 'history' => true],
+        'rateMax' => ['except' => '', 'as' => 'rate_max', 'history' => true],
+        'shipyardExperience' => ['except' => '', 'as' => 'exp', 'history' => true],
+        'availableAfter' => ['except' => '', 'as' => 'avail_after', 'history' => true],
+        'availableBefore' => ['except' => '', 'as' => 'avail_before', 'history' => true],
+        'skillEnglish' => ['except' => false, 'as' => 'en', 'history' => true],
+        'skillFrench' => ['except' => false, 'as' => 'fr', 'history' => true],
+        'skillGerman' => ['except' => false, 'as' => 'de', 'history' => true],
+        'skillDriving' => ['except' => false, 'as' => 'license_b', 'history' => true],
+        'minProcesses' => ['except' => '', 'as' => 'min_proc', 'history' => true],
+        'hasTask' => ['except' => false, 'as' => 'has_task', 'history' => true],
+        'commentOlderThanDays' => ['except' => '', 'as' => 'comment_days', 'history' => true],
+        'recruiter' => ['except' => '', 'history' => true],
+        'referralSource' => ['except' => '', 'as' => 'source', 'history' => true],
+        'rejectionFilter' => ['except' => '', 'as' => 'rejection', 'history' => true],
+        'search' => ['except' => '', 'as' => 'q', 'history' => true],
+        'sortField' => ['except' => 'created_at', 'as' => 'sort', 'history' => true],
+        'sortDirection' => ['except' => 'desc', 'as' => 'dir', 'history' => true],
+        'view' => ['except' => '', 'history' => true],
         'selectedId' => ['except' => null, 'as' => 'process'],
     ];
 
@@ -133,6 +275,26 @@ class RecruitmentProcessesTable extends Component
     }
 
     public function updatingStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingRecruiter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingRejectionFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingReferralSource(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFormerEmployee(): void
     {
         $this->resetPage();
     }
@@ -176,6 +338,12 @@ class RecruitmentProcessesTable extends Component
 
     public function mount(): void
     {
+        if ($this->view !== '' && $this->gridViewsTableExists()) {
+            $this->loadViewFromSlug($this->view, flash: false);
+        }
+
+        $this->syncDraftFilters();
+
         // When the page loads from a shared URL (?process=X) or after a full-page
         // redirect (e.g. after saving a comment via the standard POST form), Livewire
         // hydrates selectedId from the query string but never calls selectProcess().
@@ -183,6 +351,528 @@ class RecruitmentProcessesTable extends Component
         if ($this->selectedId) {
             $this->loadCandidateEditFields();
         }
+    }
+
+    public function syncDraftFilters(): void
+    {
+        $this->draftStatus = $this->status;
+        $this->draftRecruiter = $this->recruiter;
+        $this->draftReferralSource = $this->referralSource;
+        $this->draftFlag = $this->flag;
+        $this->draftMine = $this->mine;
+        $this->draftFormerEmployee = $this->formerEmployee;
+        $this->draftEmployment = $this->employment !== ''
+            ? $this->employment
+            : ($this->formerEmployee ? 'former' : '');
+        $this->draftRateMin = $this->rateMin;
+        $this->draftRateMax = $this->rateMax;
+        $this->draftShipyardExperience = $this->shipyardExperience;
+        $this->draftAvailableAfter = $this->availableAfter;
+        $this->draftAvailableBefore = $this->availableBefore;
+        $this->draftSkillEnglish = $this->skillEnglish;
+        $this->draftSkillFrench = $this->skillFrench;
+        $this->draftSkillGerman = $this->skillGerman;
+        $this->draftSkillDriving = $this->skillDriving;
+        $this->draftMinProcesses = $this->minProcesses;
+        $this->draftHasTask = $this->hasTask;
+        $this->draftCommentOlderThanDays = $this->commentOlderThanDays;
+        $this->draftRejectionFilter = $this->rejectionFilter;
+    }
+
+    public function applyDraftFilters(): void
+    {
+        $this->status = $this->draftStatus;
+        $this->recruiter = $this->draftRecruiter;
+        $this->referralSource = $this->draftReferralSource;
+        $this->flag = $this->draftFlag;
+        $this->mine = $this->draftMine;
+        $this->employment = in_array($this->draftEmployment, ['hired', 'former'], true)
+            ? $this->draftEmployment
+            : '';
+        $this->formerEmployee = $this->employment === 'former';
+        $this->rateMin = $this->sanitizeDecimal($this->draftRateMin);
+        $this->rateMax = $this->sanitizeDecimal($this->draftRateMax);
+        $this->shipyardExperience = in_array($this->draftShipyardExperience, array_column(RecruitmentShipyardExperience::cases(), 'value'), true)
+            ? $this->draftShipyardExperience
+            : '';
+        $this->availableAfter = $this->sanitizeDate($this->draftAvailableAfter);
+        $this->availableBefore = $this->sanitizeDate($this->draftAvailableBefore);
+        $this->skillEnglish = $this->draftSkillEnglish;
+        $this->skillFrench = $this->draftSkillFrench;
+        $this->skillGerman = $this->draftSkillGerman;
+        $this->skillDriving = $this->draftSkillDriving;
+        $this->minProcesses = in_array($this->draftMinProcesses, ['2', '3', '4'], true)
+            ? $this->draftMinProcesses
+            : '';
+        $this->hasTask = $this->draftHasTask;
+        $this->commentOlderThanDays = in_array($this->draftCommentOlderThanDays, ['1', '2', '3', '4', '5'], true)
+            ? $this->draftCommentOlderThanDays
+            : '';
+        $this->rejectionFilter = $this->draftRejectionFilter;
+        $this->resetPage();
+        $this->persistActiveView();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->batchingViewPersist = true;
+        $this->status = '';
+        $this->recruiter = '';
+        $this->referralSource = '';
+        $this->flag = '';
+        $this->mine = false;
+        $this->formerEmployee = false;
+        $this->employment = '';
+        $this->rateMin = '';
+        $this->rateMax = '';
+        $this->shipyardExperience = '';
+        $this->availableAfter = '';
+        $this->availableBefore = '';
+        $this->skillEnglish = false;
+        $this->skillFrench = false;
+        $this->skillGerman = false;
+        $this->skillDriving = false;
+        $this->minProcesses = '';
+        $this->hasTask = false;
+        $this->commentOlderThanDays = '';
+        $this->rejectionFilter = '';
+        $this->batchingViewPersist = false;
+        $this->syncDraftFilters();
+        $this->resetPage();
+        $this->persistActiveView();
+    }
+
+    public function applyQuickFilter(string $type): void
+    {
+        $this->view = '';
+        $this->clearFilters();
+        $this->batchingViewPersist = true;
+
+        match ($type) {
+            'mine' => $this->mine = true,
+            'wartosciowy' => $this->flag = RecruitmentCandidateFlag::Wartosciowy->value,
+            'czarna_lista' => $this->flag = RecruitmentCandidateFlag::CzarnaLista->value,
+            'byly_pracownik' => $this->setEmployment('former'),
+            default => null,
+        };
+
+        $this->batchingViewPersist = false;
+        $this->syncDraftFilters();
+        $this->resetPage();
+    }
+
+    protected function setEmployment(string $value): void
+    {
+        $this->employment = in_array($value, ['hired', 'former'], true) ? $value : '';
+        $this->formerEmployee = $this->employment === 'former';
+    }
+
+    public function activeFilterCount(): int
+    {
+        return count($this->activeFilterLabels());
+    }
+
+    /**
+     * Dyskretne etykiety aktywnych filtrów (do paska pod toolbarem).
+     *
+     * @return list<string>
+     */
+    public function activeFilterLabels(): array
+    {
+        $labels = [];
+
+        if ($this->status !== '') {
+            $labels[] = 'Etap: '.(RecruitmentStatus::tryFrom($this->status)?->label() ?? $this->status);
+        }
+
+        if ($this->flag !== '') {
+            $labels[] = RecruitmentCandidateFlag::tryFrom($this->flag)?->label() ?? $this->flag;
+        }
+
+        if ($this->employment === 'hired') {
+            $labels[] = 'Zatrudniony';
+        } elseif ($this->employment === 'former' || $this->formerEmployee) {
+            $labels[] = 'Były pracownik';
+        }
+
+        if ($this->shipyardExperience !== '') {
+            $labels[] = 'Doświadczenie: '.(RecruitmentShipyardExperience::tryFrom($this->shipyardExperience)?->label() ?? $this->shipyardExperience);
+        }
+
+        $skills = [];
+        if ($this->skillEnglish) {
+            $skills[] = 'EN';
+        }
+        if ($this->skillFrench) {
+            $skills[] = 'FR';
+        }
+        if ($this->skillGerman) {
+            $skills[] = 'DE';
+        }
+        if ($this->skillDriving) {
+            $skills[] = 'Kat. B';
+        }
+        if ($skills !== []) {
+            $labels[] = 'Umiejętności: '.implode(', ', $skills);
+        }
+
+        if ($this->rateMin !== '' && $this->rateMax !== '') {
+            $labels[] = "Stawka: {$this->rateMin}–{$this->rateMax} €/h";
+        } elseif ($this->rateMin !== '') {
+            $labels[] = "Stawka > {$this->rateMin} €/h";
+        } elseif ($this->rateMax !== '') {
+            $labels[] = "Stawka < {$this->rateMax} €/h";
+        }
+
+        if ($this->availableAfter !== '' && $this->availableBefore !== '') {
+            $labels[] = 'Dostępny: '.$this->formatFilterDate($this->availableAfter).' – '.$this->formatFilterDate($this->availableBefore);
+        } elseif ($this->availableAfter !== '') {
+            $labels[] = 'Dostępny od '.$this->formatFilterDate($this->availableAfter);
+        } elseif ($this->availableBefore !== '') {
+            $labels[] = 'Dostępny do '.$this->formatFilterDate($this->availableBefore);
+        }
+
+        if ($this->recruiter === 'unassigned') {
+            $labels[] = 'Rekruter: nieprzypisany';
+        } elseif ($this->recruiter !== '') {
+            $name = User::query()->whereKey((int) $this->recruiter)->value('name');
+            $labels[] = 'Rekruter: '.($name ?: '#'.$this->recruiter);
+        }
+
+        if ($this->mine) {
+            $labels[] = 'Moje';
+        }
+
+        if ($this->minProcesses !== '') {
+            $labels[] = 'Procesy: '.$this->minProcesses.'+';
+        }
+
+        if ($this->referralSource !== '') {
+            $sourceLabel = collect($this->referralSourceFilterOptions())
+                ->firstWhere('key', $this->referralSource)['label'] ?? $this->referralSource;
+            $labels[] = 'Źródło: '.$sourceLabel;
+        }
+
+        if ($this->hasTask) {
+            $labels[] = 'Ma zadanie';
+        }
+
+        if ($this->commentOlderThanDays !== '') {
+            $days = $this->commentOlderThanDays;
+            $labels[] = 'Komentarz starszy niż '.($days === '1' ? '1 dzień' : $days.' dni');
+        }
+
+        if ($this->rejectionFilter === 'none') {
+            $labels[] = 'Bez powodu odrzucenia';
+        } elseif ($this->rejectionFilter !== '') {
+            $labels[] = 'Powód: '.(RecruitmentRejectionReason::tryFrom($this->rejectionFilter)?->label() ?? $this->rejectionFilter);
+        }
+
+        return $labels;
+    }
+
+    protected function formatFilterDate(string $ymd): string
+    {
+        try {
+            return \Carbon\Carbon::createFromFormat('Y-m-d', $ymd)->format('d.m.Y');
+        } catch (\Throwable) {
+            return $ymd;
+        }
+    }
+
+    protected function sanitizeDecimal(string $value): string
+    {
+        $value = trim(str_replace(',', '.', $value));
+        if ($value === '' || ! is_numeric($value)) {
+            return '';
+        }
+
+        return (string) max(0, (float) $value);
+    }
+
+    protected function sanitizeDate(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return '';
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function advancedFiltersPayload(): array
+    {
+        return [
+            'employment' => $this->employment,
+            'rate_min' => $this->rateMin,
+            'rate_max' => $this->rateMax,
+            'shipyard_experience' => $this->shipyardExperience,
+            'available_after' => $this->availableAfter,
+            'available_before' => $this->availableBefore,
+            'skill_english' => $this->skillEnglish,
+            'skill_french' => $this->skillFrench,
+            'skill_german' => $this->skillGerman,
+            'skill_driving' => $this->skillDriving,
+            'min_processes' => $this->minProcesses,
+            'has_task' => $this->hasTask,
+            'comment_older_than_days' => $this->commentOlderThanDays,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $filters
+     */
+    protected function applyAdvancedFiltersPayload(?array $filters): void
+    {
+        $filters = $filters ?? [];
+        $this->employment = in_array($filters['employment'] ?? '', ['hired', 'former'], true)
+            ? $filters['employment']
+            : '';
+        $this->rateMin = $this->sanitizeDecimal((string) ($filters['rate_min'] ?? ''));
+        $this->rateMax = $this->sanitizeDecimal((string) ($filters['rate_max'] ?? ''));
+        $this->shipyardExperience = in_array($filters['shipyard_experience'] ?? '', array_column(RecruitmentShipyardExperience::cases(), 'value'), true)
+            ? $filters['shipyard_experience']
+            : '';
+        $this->availableAfter = $this->sanitizeDate((string) ($filters['available_after'] ?? ''));
+        $this->availableBefore = $this->sanitizeDate((string) ($filters['available_before'] ?? ''));
+        $this->skillEnglish = (bool) ($filters['skill_english'] ?? false);
+        $this->skillFrench = (bool) ($filters['skill_french'] ?? false);
+        $this->skillGerman = (bool) ($filters['skill_german'] ?? false);
+        $this->skillDriving = (bool) ($filters['skill_driving'] ?? false);
+        $this->minProcesses = in_array((string) ($filters['min_processes'] ?? ''), ['2', '3', '4'], true)
+            ? (string) $filters['min_processes']
+            : '';
+        $this->hasTask = (bool) ($filters['has_task'] ?? false);
+        $this->commentOlderThanDays = in_array((string) ($filters['comment_older_than_days'] ?? ''), ['1', '2', '3', '4', '5'], true)
+            ? (string) $filters['comment_older_than_days']
+            : '';
+    }
+
+    public function saveView(): void
+    {
+        if (! $this->gridViewsTableExists()) {
+            $this->flash = 'Brak tabeli widoków — uruchom migracje (php artisan migrate).';
+
+            return;
+        }
+
+        $name = trim($this->saveViewName);
+        if ($name === '') {
+            return;
+        }
+
+        $slug = Str::slug($name) ?: 'widok';
+
+        $existing = RecruitmentGridView::query()
+            ->where('user_id', auth()->id())
+            ->where(fn ($q) => $q->where('name', $name)->orWhere('slug', $slug))
+            ->first();
+
+        if ($existing) {
+            $slug = $existing->slug;
+        } elseif (RecruitmentGridView::query()->where('user_id', auth()->id())->where('slug', $slug)->exists()) {
+            $slug = $this->uniqueViewSlug($name);
+        }
+
+        RecruitmentGridView::updateOrCreate(
+            ['user_id' => auth()->id(), 'slug' => $slug],
+            array_merge(['name' => $name], $this->viewPayload()),
+        );
+
+        $this->view = $slug;
+        $this->saveViewName = '';
+        $this->flash = "Widok „{$name}” zapisany.";
+    }
+
+    public function loadView(string $slug): void
+    {
+        $this->loadViewFromSlug($slug);
+    }
+
+    public function deleteView(string $slug): void
+    {
+        RecruitmentGridView::query()
+            ->where('user_id', auth()->id())
+            ->where('slug', $slug)
+            ->delete();
+
+        if ($this->view === $slug) {
+            $this->view = '';
+        }
+    }
+
+    public function clearView(): void
+    {
+        $this->view = '';
+        $this->flash = 'Widok domyślny.';
+    }
+
+    protected function gridViewsTableExists(): bool
+    {
+        return Schema::hasTable('recruitment_grid_views');
+    }
+
+    protected function loadViewFromSlug(string $slug, bool $flash = true): void
+    {
+        $record = RecruitmentGridView::query()
+            ->where('user_id', auth()->id())
+            ->where('slug', $slug)
+            ->first();
+
+        if (! $record) {
+            if ($flash) {
+                $this->flash = 'Nie znaleziono widoku.';
+            }
+            $this->view = '';
+
+            return;
+        }
+
+        $this->view = $slug;
+        $this->applyViewRecord($record);
+
+        if ($flash) {
+            $this->flash = "Załadowano „{$record->name}”.";
+        }
+    }
+
+    protected function applyViewRecord(RecruitmentGridView $record): void
+    {
+        $this->batchingViewPersist = true;
+        $this->status = $record->status ?? '';
+        $this->flag = $record->flag ?? '';
+        $this->mine = (bool) ($record->mine ?? false);
+        $this->formerEmployee = (bool) ($record->former_employee ?? false);
+        $this->recruiter = $record->recruiter ?? '';
+        $this->referralSource = $record->referral_source ?? '';
+        $this->rejectionFilter = $record->rejection_filter ?? '';
+        $this->search = $record->search ?? '';
+        $this->sortField = $record->sort_field ?: 'created_at';
+        $this->sortDirection = $record->sort_direction ?: 'desc';
+        $this->applyAdvancedFiltersPayload($record->advanced_filters);
+        if ($this->employment === '' && $this->formerEmployee) {
+            $this->employment = 'former';
+        }
+        $this->formerEmployee = $this->employment === 'former' || $this->formerEmployee;
+        $this->batchingViewPersist = false;
+        $this->syncDraftFilters();
+        $this->resetPage();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function viewPayload(): array
+    {
+        return [
+            'status' => $this->status,
+            'flag' => $this->flag,
+            'mine' => $this->mine,
+            'former_employee' => $this->formerEmployee || $this->employment === 'former',
+            'recruiter' => $this->recruiter,
+            'referral_source' => $this->referralSource,
+            'rejection_filter' => $this->rejectionFilter,
+            'advanced_filters' => $this->advancedFiltersPayload(),
+            'search' => $this->search,
+            'sort_field' => $this->sortField,
+            'sort_direction' => $this->sortDirection,
+        ];
+    }
+
+    protected function persistActiveView(): void
+    {
+        if ($this->view === '' || ! $this->gridViewsTableExists()) {
+            return;
+        }
+
+        RecruitmentGridView::query()
+            ->where('user_id', auth()->id())
+            ->where('slug', $this->view)
+            ->update($this->viewPayload());
+    }
+
+    protected function uniqueViewSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'widok';
+        $slug = $base;
+        $i = 2;
+
+        while (RecruitmentGridView::query()
+            ->where('user_id', auth()->id())
+            ->where('slug', $slug)
+            ->exists()) {
+            $slug = "{$base}-{$i}";
+            $i++;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\RecruitmentProcess>  $query
+     */
+    protected function applyReferralSourceFilter($query, string $referralSource): void
+    {
+        if ($referralSource === '') {
+            return;
+        }
+
+        $query->whereHas('lead', function ($leadQuery) use ($referralSource) {
+            if (str_starts_with($referralSource, 'employee_lifecycle:')) {
+                $subtype = substr($referralSource, strlen('employee_lifecycle:'));
+                $leadQuery->where('referral_source', 'employee_lifecycle');
+
+                if ($subtype === 'reinstate') {
+                    $leadQuery->where('referral_source_detail', 'like', 'Przywrócenie%');
+                } elseif ($subtype === 'terminate') {
+                    $leadQuery->where('referral_source_detail', 'like', 'Zwolnienie%');
+                }
+
+                return;
+            }
+
+            $leadQuery->where('referral_source', $referralSource);
+        });
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string}>
+     */
+    protected function referralSourceFilterOptions(): array
+    {
+        return [
+            ['key' => 'meta_business_suite', 'label' => 'Meta Business Suite (FB/IG)'],
+            ['key' => 'historical_import', 'label' => 'Import historyczny (baza kandydatów)'],
+            ['key' => 'employee_lifecycle:reinstate', 'label' => 'Cykl życia pracownika — Przywrócenie'],
+            ['key' => 'employee_lifecycle:terminate', 'label' => 'Cykl życia pracownika — Zwolnienie'],
+            ['key' => 'employee_referral', 'label' => 'Polecenie przez pracownika'],
+            ['key' => 'olx', 'label' => 'OLX'],
+            ['key' => 'trojmiasto', 'label' => 'Trojmiasto.pl'],
+            ['key' => 'pracuj_pl', 'label' => 'Pracuj.pl'],
+            ['key' => 'linkedin', 'label' => 'LinkedIn'],
+            ['key' => 'job_portal_other', 'label' => 'Portal z ogłoszeniem o pracę (inny)'],
+            ['key' => 'messenger', 'label' => 'Messenger / wiadomość bezpośrednia'],
+            ['key' => 'contact_center', 'label' => 'Contact center'],
+            ['key' => 'system_backfill', 'label' => 'Backfill systemowy (pracownik → kandydat)'],
+        ];
+    }
+
+    /**
+     * Licznik opcji w panelu filtrów — procesy (nie kandydaci), spójnie z badge’ami statusów.
+     *
+     * @param  callable(\Illuminate\Database\Eloquent\Builder<\App\Models\RecruitmentProcess>): void  $processConstraint
+     */
+    protected function countProcessesForFilter(callable $processConstraint): int
+    {
+        $query = RecruitmentProcess::query()
+            ->when($this->status, fn ($q) => $q->where('status', $this->status));
+
+        $processConstraint($query);
+
+        return $query->count();
     }
 
     public function selectProcess(int $id): void
@@ -387,6 +1077,10 @@ class RecruitmentProcessesTable extends Component
 
         if ($property === 'editAssignedRecruiterId') {
             $this->saveAssignedRecruiterFromDraft();
+        }
+
+        if (! $this->batchingViewPersist && in_array($property, $this->persistableViewProperties, true)) {
+            $this->persistActiveView();
         }
     }
 
@@ -772,7 +1466,7 @@ class RecruitmentProcessesTable extends Component
         );
 
         $flagCounts = RecruitmentCandidate::query()
-            ->whereHas('processes')
+            ->whereHas('processes', fn ($q) => $q->when($this->status, fn ($q) => $q->where('status', $this->status)))
             ->whereNotNull('rating')
             ->selectRaw('rating, COUNT(*) as total')
             ->groupBy('rating')
@@ -781,7 +1475,9 @@ class RecruitmentProcessesTable extends Component
         $userId = auth()->id();
         $mineCount = $userId
             ? RecruitmentCandidate::query()
-                ->whereHas('processes', fn ($q) => $q->where('assigned_recruiter_id', $userId))
+                ->whereHas('processes', fn ($q) => $q
+                    ->when($this->status, fn ($q) => $q->where('status', $this->status))
+                    ->where('assigned_recruiter_id', $userId))
                 ->count()
             : 0;
 
@@ -799,13 +1495,98 @@ class RecruitmentProcessesTable extends Component
         $search = $this->search;
         $flag = $this->flag;
         $mine = $this->mine;
+        $employment = $this->employment !== ''
+            ? $this->employment
+            : ($this->formerEmployee ? 'former' : '');
+        $recruiter = $this->recruiter;
+        $referralSource = $this->referralSource;
+        $rejectionFilter = $this->rejectionFilter;
+        $rateMin = $this->rateMin;
+        $rateMax = $this->rateMax;
+        $shipyardExperience = $this->shipyardExperience;
+        $availableAfter = $this->availableAfter;
+        $availableBefore = $this->availableBefore;
+        $skillEnglish = $this->skillEnglish;
+        $skillFrench = $this->skillFrench;
+        $skillGerman = $this->skillGerman;
+        $skillDriving = $this->skillDriving;
+        $minProcesses = $this->minProcesses !== '' ? (int) $this->minProcesses : 0;
+        $hasTask = $this->hasTask;
+        $commentOlderThanDays = $this->commentOlderThanDays !== '' ? (int) $this->commentOlderThanDays : 0;
+
         $applications = RecruitmentCandidate::query()
             ->select(['recruitment_candidates.*', $lastCandidateContactSubquery])
-            ->whereHas('processes', function ($q) use ($status, $mine, $userId) {
+            ->withCount('processes')
+            ->whereHas('processes', function ($q) use ($status, $mine, $userId, $recruiter, $referralSource, $rejectionFilter, $hasTask) {
                 $q->when($status, fn ($q) => $q->where('status', $status))
-                    ->when($mine && $userId, fn ($q) => $q->where('assigned_recruiter_id', $userId));
+                    ->when($mine && $userId, fn ($q) => $q->where('assigned_recruiter_id', $userId))
+                    ->when($recruiter === 'unassigned', fn ($q) => $q->whereNull('assigned_recruiter_id'))
+                    ->when($recruiter !== '' && $recruiter !== 'unassigned', fn ($q) => $q->where('assigned_recruiter_id', (int) $recruiter))
+                    ->when($rejectionFilter === 'none', fn ($q) => $q->whereNull('rejection_reason'))
+                    ->when($rejectionFilter !== '' && $rejectionFilter !== 'none', fn ($q) => $q->where('rejection_reason', $rejectionFilter))
+                    ->when($hasTask, fn ($q) => $q->whereHas('tasks'));
+
+                $this->applyReferralSourceFilter($q, $referralSource);
             })
             ->when($flag, fn ($q) => $q->where('recruitment_candidates.rating', $flag))
+            ->when($rateMin !== '', fn ($q) => $q->where('recruitment_candidates.expected_rate_eur', '>=', (float) $rateMin))
+            ->when($rateMax !== '', fn ($q) => $q->where('recruitment_candidates.expected_rate_eur', '<=', (float) $rateMax))
+            ->when($shipyardExperience !== '', fn ($q) => $q->where('recruitment_candidates.shipyard_experience', $shipyardExperience))
+            ->when($availableAfter !== '', fn ($q) => $q->whereDate('recruitment_candidates.available_from', '>=', $availableAfter))
+            ->when($availableBefore !== '', fn ($q) => $q->whereDate('recruitment_candidates.available_from', '<=', $availableBefore))
+            ->when($skillEnglish, fn ($q) => $q->where('recruitment_candidates.speaks_english', true))
+            ->when($skillFrench, fn ($q) => $q->where('recruitment_candidates.speaks_french', true))
+            ->when($skillGerman, fn ($q) => $q->where('recruitment_candidates.speaks_german', true))
+            ->when($skillDriving, fn ($q) => $q->where('recruitment_candidates.has_driving_license_b', true))
+            ->when($employment === 'hired', function ($q) {
+                $q->whereNotNull('recruitment_candidates.employee_id')
+                    ->whereHas('employee', fn ($eq) => $eq->whereNull('terminated_at'));
+            })
+            ->when($employment === 'former', function ($q) {
+                $q->where(function ($q) {
+                    $q->whereHas('employee', fn ($eq) => $eq->whereNotNull('terminated_at'))
+                        ->orWhereHas('processes', fn ($pq) => $pq->where('status', RecruitmentStatus::BylyPracownik->value));
+                });
+            })
+            ->when($minProcesses >= 2, fn ($q) => $q->having('processes_count', '>=', $minProcesses))
+            ->when($commentOlderThanDays > 0, function ($q) use ($commentOlderThanDays) {
+                $cutoff = now()->subDays($commentOlderThanDays)->toDateTimeString();
+                $q->whereRaw(
+                    '(SELECT MAX(c.created_at) FROM comments c
+                      WHERE c.deleted_at IS NULL
+                        AND (
+                          (c.commentable_type = ? AND c.commentable_id = recruitment_candidates.id)
+                          OR (
+                            c.commentable_type = ?
+                            AND c.commentable_id IN (
+                              SELECT rp.id FROM recruitment_processes rp
+                              WHERE rp.candidate_id = recruitment_candidates.id
+                            )
+                          )
+                        )
+                    ) IS NOT NULL
+                    AND (SELECT MAX(c.created_at) FROM comments c
+                      WHERE c.deleted_at IS NULL
+                        AND (
+                          (c.commentable_type = ? AND c.commentable_id = recruitment_candidates.id)
+                          OR (
+                            c.commentable_type = ?
+                            AND c.commentable_id IN (
+                              SELECT rp.id FROM recruitment_processes rp
+                              WHERE rp.candidate_id = recruitment_candidates.id
+                            )
+                          )
+                        )
+                    ) < ?',
+                    [
+                        'recruitment_candidate',
+                        'recruitment_process',
+                        'recruitment_candidate',
+                        'recruitment_process',
+                        $cutoff,
+                    ]
+                );
+            })
             ->with([
                 'roles',
                 'processes' => function ($q) {
@@ -832,7 +1613,35 @@ class RecruitmentProcessesTable extends Component
             ->orderBy('recruitment_candidates.last_name')
             ->paginate(20);
 
+        $recruiters = User::orderBy('name')->get();
         $selected = $this->getSelectedProcess();
+
+        $recruiterCounts = [
+            'unassigned' => $this->countProcessesForFilter(fn ($q) => $q->whereNull('assigned_recruiter_id')),
+        ];
+        foreach ($recruiters as $recruiterUser) {
+            $recruiterCounts[(string) $recruiterUser->id] = $this->countProcessesForFilter(
+                fn ($q) => $q->where('assigned_recruiter_id', $recruiterUser->id)
+            );
+        }
+
+        $referralSourceCounts = [];
+        foreach ($this->referralSourceFilterOptions() as $option) {
+            $referralSourceCounts[$option['key']] = $this->countProcessesForFilter(
+                fn ($q) => $this->applyReferralSourceFilter($q, $option['key'])
+            );
+        }
+
+        $formerEmployeeCount = $this->countProcessesForFilter(
+            fn ($q) => $q->where('status', RecruitmentStatus::BylyPracownik->value)
+        );
+
+        $savedViews = $this->gridViewsTableExists()
+            ? RecruitmentGridView::query()
+                ->where('user_id', auth()->id())
+                ->orderBy('name')
+                ->get()
+            : collect();
 
         // Left drawer list must mirror the main table page (same filters/sort/page).
         // The open lead's candidate is lifted out of the list and rendered above it,
@@ -862,9 +1671,19 @@ class RecruitmentProcessesTable extends Component
             'counts' => $counts,
             'flagCounts' => $flagCounts,
             'mineCount' => $mineCount,
+            'formerEmployeeCount' => $formerEmployeeCount,
+            'recruiterCounts' => $recruiterCounts,
+            'referralSourceCounts' => $referralSourceCounts,
+            'referralSourceOptions' => $this->referralSourceFilterOptions(),
+            'activeFilterCount' => $this->activeFilterCount(),
+            'activeFilterLabels' => $this->activeFilterLabels(),
+            'savedViews' => $savedViews,
+            'activeViewName' => $this->view !== ''
+                ? ($savedViews->firstWhere('slug', $this->view)?->name ?? $this->view)
+                : null,
             'total' => RecruitmentCandidate::whereHas('processes')->count(),
             'roles' => Role::orderBy('name')->get(),
-            'recruiters' => User::orderBy('name')->get(),
+            'recruiters' => $recruiters,
             'selected' => $selected,
             'processTimeline' => $this->buildProcessTimeline($selected),
         ]);

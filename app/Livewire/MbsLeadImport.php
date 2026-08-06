@@ -12,6 +12,8 @@ class MbsLeadImport extends Component
 {
     use WithFileUploads;
 
+    public bool $hideTrigger = false;
+
     public bool $show = false;
 
     #[Validate('required|file|mimes:csv,txt|max:2048')]
@@ -33,6 +35,12 @@ class MbsLeadImport extends Component
     {
         $this->reset(['csvFile', 'preview', 'detectedHeaders', 'parseError', 'importResult']);
         $this->show = true;
+    }
+
+    #[On('open-mbs-import')]
+    public function openFromEvent(): void
+    {
+        $this->openModal();
     }
 
     public function closeModal(): void
