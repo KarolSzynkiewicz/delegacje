@@ -393,9 +393,10 @@
                 @else
                     <p class="ra-note mt-2 mb-3">
                         Rozkład wyników {{ $num($engagement['outcomes']['total']) }} prób kontaktu zarejestrowanych w okresie.
+                        Najedź na wiersz, żeby zobaczyć, kto ile razy zarejestrował dany wynik.
                     </p>
                     @foreach($engagement['outcomes']['rows'] as $o)
-                        <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2 mb-2 ra-has-tip" tabindex="0" style="cursor:help;">
                             <span class="badge badge-{{ $o['variant'] === 'secondary' ? 'info' : $o['variant'] }}" style="min-width:130px;font-size:.65rem;">
                                 {{ $o['label'] }}
                             </span>
@@ -405,6 +406,17 @@
                             <span style="font-size:.75rem;min-width:80px;text-align:right;">
                                 {{ $num($o['n']) }} <span class="text-muted">({{ $pct($o['pct']) }})</span>
                             </span>
+                            <div class="ra-tip ra-tip--up">
+                                <div class="ra-tip__title">{{ $o['label'] }} — {{ $num($o['n']) }}</div>
+                                @forelse($o['by_recruiter'] as $rec)
+                                    <div class="ra-tip__row">
+                                        <span>{{ $rec['name'] }}</span>
+                                        <strong>{{ $num($rec['n']) }} <span class="text-muted" style="font-weight:400;">({{ $pct($rec['pct']) }})</span></strong>
+                                    </div>
+                                @empty
+                                    <div class="ra-tip__line">Brak rozbicia</div>
+                                @endforelse
+                            </div>
                         </div>
                     @endforeach
                 @endif
@@ -547,9 +559,12 @@
                 @if($engagement['rejections']['total'] === 0)
                     <x-ui.empty-state icon="hand-thumbs-down" message="Brak odrzuceń w tym okresie" />
                 @else
+                    <p class="ra-note mt-2 mb-2">
+                        Najedź na powód, żeby zobaczyć, kto ile razy zarejestrował to odrzucenie.
+                    </p>
                     <div class="mt-2">
                         @foreach($engagement['rejections']['rows'] as $r)
-                            <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="d-flex align-items-center gap-2 mb-2 ra-has-tip" tabindex="0" style="cursor:help;">
                                 <span style="font-size:.75rem;min-width:150px;">{{ $r['label'] }}</span>
                                 <div class="ra-minibar flex-grow-1">
                                     <span style="width: {{ $r['pct'] }}%; background: var(--danger);"></span>
@@ -557,6 +572,17 @@
                                 <span style="font-size:.75rem;min-width:80px;text-align:right;">
                                     {{ $num($r['n']) }} <span class="text-muted">({{ $pct($r['pct']) }})</span>
                                 </span>
+                                <div class="ra-tip ra-tip--up">
+                                    <div class="ra-tip__title">{{ $r['label'] }} — {{ $num($r['n']) }}</div>
+                                    @forelse($r['by_recruiter'] as $rec)
+                                        <div class="ra-tip__row">
+                                            <span>{{ $rec['name'] }}</span>
+                                            <strong>{{ $num($rec['n']) }} <span class="text-muted" style="font-weight:400;">({{ $pct($rec['pct']) }})</span></strong>
+                                        </div>
+                                    @empty
+                                        <div class="ra-tip__line">Brak rozbicia</div>
+                                    @endforelse
+                                </div>
                             </div>
                         @endforeach
                     </div>

@@ -619,54 +619,111 @@ class RecruitmentAnalyticsService
         ];
     }
 
-    /** Why we say no — only useful once recruiters actually pick a reason. */
+    /**
+     * Why we say no — totals per rejection reason, with a per-recruiter split for
+     * the hover (who flipped the status to rejected).
+     */
     public function rejectionReasons(CarbonInterface $from, CarbonInterface $to): array
     {
-        $rows = DB::table('recruitment_status_history as sh')
+        $totals = DB::table('recruitment_status_history as sh')
             ->join('recruitment_processes as p', 'p.id', '=', 'sh.recruitment_process_id')
             ->where('sh.to_status', RecruitmentStatus::Odrzucony->value)
             ->whereBetween('sh.created_at', [$from, $to])
             ->groupBy('p.rejection_reason')
             ->selectRaw('p.rejection_reason as reason, COUNT(*) as n')
             ->orderByDesc('n')
-            ->get();
+            ->get()
+            ->keyBy(fn ($r) => $r->reason ?? '');
 
-        $total = $rows->sum('n');
+        $byRecruiter = DB::table('recruitment_status_history as sh')
+            ->join('recruitment_processes as p', 'p.id', '=', 'sh.recruitment_process_id')
+            ->leftJoin('users as u', 'u.id', '=', 'sh.changed_by')
+            ->where('sh.to_status', RecruitmentStatus::Odrzucony->value)
+            ->whereBetween('sh.created_at', [$from, $to])
+            ->groupBy('p.rejection_reason', 'sh.changed_by', 'u.name')
+            ->selectRaw('p.rejection_reason as reason, sh.changed_by as user_id, COALESCE(u.name, ?) as name, COUNT(*) as n', ['Nieprzypisany'])
+            ->orderByDesc('n')
+            ->get()
+            ->groupBy(fn ($r) => $r->reason ?? '');
+
+        $total = (int) $totals->sum('n');
 
         return [
-            'total' => (int) $total,
-            'rows' => $rows->map(fn ($r) => [
-                'reason' => $r->reason,
-                'label' => $r->reason
-                    ? (RecruitmentRejectionReason::tryFrom($r->reason)?->label() ?? $r->reason)
-                    : 'Nie podano powodu',
-                'n' => (int) $r->n,
-                'pct' => $this->pct((int) $r->n, (int) $total),
-            ])->all(),
+            'total' => $total,
+            'rows' => $totals->map(function ($r) use ($total, $byRecruiter) {
+                $reasonKey = $r->reason ?? '';
+                $reasonTotal = (int) $r->n;
+                $recruiters = ($byRecruiter->get($reasonKey) ?? collect())
+                    ->map(fn ($row) => [
+                        'user_id' => $row->user_id !== null ? (int) $row->user_id : null,
+                        'name' => $row->name,
+                        'n' => (int) $row->n,
+                        'pct' => $this->pct((int) $row->n, $reasonTotal),
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'reason' => $r->reason,
+                    'label' => $r->reason
+                        ? (RecruitmentRejectionReason::tryFrom($r->reason)?->label() ?? $r->reason)
+                        : 'Nie podano powodu',
+                    'n' => $reasonTotal,
+                    'pct' => $this->pct($reasonTotal, $total),
+                    'by_recruiter' => $recruiters,
+                ];
+            })->values()->all(),
         ];
     }
 
-    /** What happens when we dial. */
+    /**
+     * What happens when we dial — totals per outcome, with a per-recruiter split
+     * for the hover on each bar (e.g. Odebrał 55 → Emilka 20, Kinga 20, Iwona 15).
+     */
     public function outcomeBreakdown(CarbonInterface $from, CarbonInterface $to): array
     {
-        $rows = DB::table('recruitment_contact_attempts')
+        $totals = DB::table('recruitment_contact_attempts')
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('outcome')
             ->selectRaw('outcome, COUNT(*) as n')
             ->orderByDesc('n')
-            ->get();
+            ->get()
+            ->keyBy('outcome');
 
-        $total = $rows->sum('n');
+        $byRecruiter = DB::table('recruitment_contact_attempts as ca')
+            ->leftJoin('users as u', 'u.id', '=', 'ca.user_id')
+            ->whereBetween('ca.created_at', [$from, $to])
+            ->groupBy('ca.outcome', 'ca.user_id', 'u.name')
+            ->selectRaw('ca.outcome, ca.user_id, COALESCE(u.name, ?) as name, COUNT(*) as n', ['Nieprzypisany'])
+            ->orderByDesc('n')
+            ->get()
+            ->groupBy('outcome');
+
+        $total = (int) $totals->sum('n');
 
         return [
-            'total' => (int) $total,
-            'rows' => $rows->map(fn ($r) => [
-                'outcome' => $r->outcome,
-                'label' => RecruitmentContactOutcome::tryFrom($r->outcome)?->label() ?? $r->outcome,
-                'variant' => RecruitmentContactOutcome::tryFrom($r->outcome)?->variant() ?? 'secondary',
-                'n' => (int) $r->n,
-                'pct' => $this->pct((int) $r->n, (int) $total),
-            ])->all(),
+            'total' => $total,
+            'rows' => $totals->map(function ($r) use ($total, $byRecruiter) {
+                $outcomeTotal = (int) $r->n;
+                $recruiters = ($byRecruiter->get($r->outcome) ?? collect())
+                    ->map(fn ($row) => [
+                        'user_id' => $row->user_id !== null ? (int) $row->user_id : null,
+                        'name' => $row->name,
+                        'n' => (int) $row->n,
+                        'pct' => $this->pct((int) $row->n, $outcomeTotal),
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'outcome' => $r->outcome,
+                    'label' => RecruitmentContactOutcome::tryFrom($r->outcome)?->label() ?? $r->outcome,
+                    'variant' => RecruitmentContactOutcome::tryFrom($r->outcome)?->variant() ?? 'secondary',
+                    'n' => $outcomeTotal,
+                    'pct' => $this->pct($outcomeTotal, $total),
+                    'by_recruiter' => $recruiters,
+                ];
+            })->values()->all(),
         ];
     }
 
