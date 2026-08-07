@@ -17,6 +17,7 @@ use App\Models\RecruitmentProcess;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\PhoneNormalizer;
+use App\Support\RecruitmentBacklog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -78,6 +79,12 @@ class RecruitmentProcessesTable extends Component
     public string $minProcesses = '';
 
     public bool $hasTask = false;
+
+    /**
+     * Preset backlogu z analityki (?backlog=…) — warunek, którego nie da się wyrazić
+     * samym statusem. Dozwolone wartości: {@see RecruitmentBacklog::filterKeys()}.
+     */
+    public string $backlog = '';
 
     /**
      * Ostatni kontakt (próba kontaktu):
@@ -262,6 +269,7 @@ class RecruitmentProcessesTable extends Component
         'skillDriving' => ['except' => false, 'as' => 'license_b', 'history' => true],
         'minProcesses' => ['except' => '', 'as' => 'min_proc', 'history' => true],
         'hasTask' => ['except' => false, 'as' => 'has_task', 'history' => true],
+        'backlog' => ['except' => '', 'history' => true],
         'lastContact' => ['except' => '', 'as' => 'last_contact', 'history' => true],
         'recruiter' => ['except' => '', 'history' => true],
         'referralSource' => ['except' => '', 'as' => 'source', 'history' => true],
@@ -342,6 +350,8 @@ class RecruitmentProcessesTable extends Component
 
     public function mount(): void
     {
+        $this->backlog = RecruitmentBacklog::sanitizeFilterKey($this->backlog);
+
         if ($this->view !== '' && $this->gridViewsTableExists()) {
             $this->loadViewFromSlug($this->view, flash: false);
         }
@@ -436,6 +446,7 @@ class RecruitmentProcessesTable extends Component
         $this->skillDriving = false;
         $this->minProcesses = '';
         $this->hasTask = false;
+        $this->backlog = '';
         $this->lastContact = '';
         $this->rejectionFilter = '';
         $this->batchingViewPersist = false;
@@ -557,6 +568,10 @@ class RecruitmentProcessesTable extends Component
 
         if ($this->hasTask) {
             $labels[] = 'Ma zadanie';
+        }
+
+        if ($this->backlog !== '') {
+            $labels[] = 'Backlog: '.(RecruitmentBacklog::label($this->backlog) ?? $this->backlog);
         }
 
         if ($this->lastContact !== '') {
@@ -975,6 +990,7 @@ class RecruitmentProcessesTable extends Component
             'skill_driving' => $this->skillDriving,
             'min_processes' => $this->minProcesses,
             'has_task' => $this->hasTask,
+            'backlog' => $this->backlog,
             'last_contact' => $this->lastContact,
             'recruiter' => $this->recruiter,
             'referral_source' => $this->referralSource,
@@ -1044,6 +1060,7 @@ class RecruitmentProcessesTable extends Component
         $skillDriving = (bool) ($filters['skill_driving'] ?? false);
         $minProcesses = ($filters['min_processes'] ?? '') !== '' ? (int) $filters['min_processes'] : 0;
         $hasTask = (bool) ($filters['has_task'] ?? false);
+        $backlog = RecruitmentBacklog::sanitizeFilterKey((string) ($filters['backlog'] ?? ''));
         $lastContact = $this->sanitizeLastContact((string) ($filters['last_contact'] ?? ''));
         $search = (string) ($filters['search'] ?? '');
         $userId = auth()->id();
@@ -1055,7 +1072,7 @@ class RecruitmentProcessesTable extends Component
 
         $query = RecruitmentCandidate::query()
             ->withCount('processes')
-            ->whereHas('processes', function ($q) use ($status, $mine, $userId, $recruiter, $referralSource, $rejectionFilter, $hasTask) {
+            ->whereHas('processes', function ($q) use ($status, $mine, $userId, $recruiter, $referralSource, $rejectionFilter, $hasTask, $backlog) {
                 $q->when($status, fn ($q) => $q->where('status', $status))
                     ->when($mine && $userId, fn ($q) => $q->where('assigned_recruiter_id', $userId))
                     ->when($recruiter === 'unassigned', fn ($q) => $q->whereNull('assigned_recruiter_id'))
@@ -1063,6 +1080,10 @@ class RecruitmentProcessesTable extends Component
                     ->when($rejectionFilter === 'none', fn ($q) => $q->whereNull('rejection_reason'))
                     ->when($rejectionFilter !== '' && $rejectionFilter !== 'none', fn ($q) => $q->where('rejection_reason', $rejectionFilter))
                     ->when($hasTask, fn ($q) => $q->whereHas('tasks'));
+
+                if ($backlog !== '') {
+                    RecruitmentBacklog::constrain($q, $backlog);
+                }
 
                 $this->applyReferralSourceFilter($q, $referralSource);
             })

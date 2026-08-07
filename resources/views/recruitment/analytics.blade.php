@@ -1,6 +1,7 @@
 @php
     use App\Enums\RecruitmentContactOutcome;
     use App\Services\RecruitmentAnalyticsService;
+    use App\Support\RecruitmentBacklog;
 
     $eh = $engagement['headline'];
     $calls = $engagement['calls'];
@@ -136,6 +137,16 @@
             .ra-minibar > span { display: block; height: 100%; border-radius: 3px; }
 
             .ra-note { font-size: .72rem; color: var(--text-muted); }
+
+            /* ── Tabela backlogu ──────────────────────────────────────────── */
+            .ra-backlog th, .ra-backlog td { white-space: nowrap; }
+            .ra-backlog th:first-child, .ra-backlog td:first-child { white-space: normal; min-width: 15rem; }
+            .ra-backlog__row-label { font-size: .8rem; font-weight: 600; }
+            .ra-backlog__hint { font-size: .68rem; color: var(--text-muted); margin: .1rem 0 0; max-width: 46ch; }
+            .ra-backlog__num { font-variant-numeric: tabular-nums; }
+            .ra-backlog__num a { font-weight: 600; text-decoration: none; border-bottom: 1px dashed rgba(255, 255, 255, .25); }
+            .ra-backlog__num a:hover { border-bottom-style: solid; }
+            .ra-backlog__all { background: rgba(255, 255, 255, .035); }
             .ra-reco { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--text-muted); }
             .ra-reco li { margin-bottom: .3rem; }
             .ra-reco li:last-child { margin-bottom: 0; }
@@ -345,6 +356,71 @@
             </div>
         @endforeach
     </div>
+
+    {{-- ── Backlog (stan na teraz) ─────────────────────────────────────────── --}}
+    @php $backlog = $engagement['backlog']; @endphp
+    <x-ui.card label="Backlog — co czeka na działanie" class="mb-4">
+        <p class="ra-note mt-2 mb-3">
+            Liczby to <strong>stan na teraz</strong>, nie zdarzenia z okresu — zaległość leży w kolejce
+            niezależnie od wybranego zakresu dat. Okres decyduje tylko o tym, czyje kolumny widzisz:
+            @if($backlog['has_recruiters'])
+                @if($backlog['columns_from_history'])
+                    rekruterów, którym w tym okresie przypisano choć jeden proces.
+                @else
+                    w tym okresie nikomu nic nie przypisano, więc pokazani są obecni właściciele
+                    otwartych procesów.
+                @endif
+            @else
+                nikt nie ma dziś przypisanego żadnego otwartego procesu, więc zostaje sam podział
+                na nieprzypisane i całość.
+            @endif
+            Każda liczba prowadzi do listy kandydatów zawężonej dokładnie tym samym warunkiem.
+        </p>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover ra-table ra-backlog mb-0">
+                <thead>
+                    <tr>
+                        <th>Co czeka</th>
+                        @foreach($backlog['columns'] as $col)
+                            <th class="text-end {{ $col['key'] === 'total' ? 'ra-backlog__all' : '' }}">
+                                {{ $col['label'] }}
+                            </th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($backlog['rows'] as $row)
+                        <tr>
+                            <td>
+                                <div class="ra-backlog__row-label">{{ $row['label'] }}</div>
+                                <p class="ra-backlog__hint">{{ $row['hint'] }}</p>
+                            </td>
+                            @foreach($backlog['columns'] as $col)
+                                @php $n = $row['cells'][$col['key']] ?? 0; @endphp
+                                <td class="text-end ra-backlog__num {{ $col['key'] === 'total' ? 'ra-backlog__all' : '' }}">
+                                    @if($n > 0)
+                                        <a href="{{ route('recruitment-processes.index', array_merge($row['params'], $col['params'])) }}"
+                                           title="{{ $row['short'] }} — {{ $col['label'] }}: pokaż listę">
+                                            {{ $num($n) }}
+                                        </a>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <p class="ra-note mt-3 mb-0">
+            Wiersze się nakładają — ten sam kandydat może być jednocześnie „mniej niż
+            {{ RecruitmentBacklog::FAIR_ATTEMPTS }} próby” i „wartościowy”, więc nie ma sensu ich sumować.
+            Kolumna <strong>Wszyscy</strong> to całość razem z nieprzypisanymi, a nie suma kolumn rekruterów.
+        </p>
+    </x-ui.card>
 
     <div class="row g-3 mb-4">
         {{-- ── Kto ile dzwonił (wykres kołowy) ────────────────────────────── --}}

@@ -3,9 +3,10 @@
 namespace App\Services;
 
 use App\Enums\RecruitmentContactOutcome;
-use App\Enums\RecruitmentRejectionReason;
 use App\Enums\RecruitmentReferralSource;
+use App\Enums\RecruitmentRejectionReason;
 use App\Enums\RecruitmentStatus;
+use App\Support\RecruitmentBacklog;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -54,6 +55,7 @@ class RecruitmentAnalyticsService
             'outcomes' => $this->outcomeBreakdown($from, $to),
             'recruiters' => $this->byRecruiter($from, $to),
             'rejections' => $this->rejectionReasons($from, $to),
+            'backlog' => $this->backlog($from, $to),
         ];
     }
 
@@ -491,6 +493,105 @@ class RecruitmentAnalyticsService
         return [
             'rows' => $rows,
             'total' => $total,
+        ];
+    }
+
+    /**
+     * Zaległości „stan na teraz”, rozbite na właścicieli procesów.
+     *
+     * Kolumny to rekruterzy, którym w wybranym okresie przypisano choć jeden proces —
+     * czyli ci, którzy w tym okresie faktycznie dostali robotę. Same liczby są jednak
+     * stanem bieżącym, bo zaległość nie jest zdarzeniem z okresu: proces przypisany
+     * w poniedziałek i nietknięty od tygodnia ma leżeć w tej tabeli niezależnie od
+     * tego, jaki zakres dat jest wybrany u góry.
+     *
+     * Liczone są kandydaci (nie procesy), bo lista, do której linkuje każda komórka,
+     * pokazuje właśnie kandydatów — jeden kandydat z dwoma procesami to jeden wiersz.
+     *
+     * @return array{columns: array<int, array{key: string, label: string, params: array<string, string>, muted: bool}>, rows: array<int, array{key: string, label: string, short: string, hint: string, params: array<string, string>, cells: array<string, int>}>, columns_from_history: bool, has_recruiters: bool}
+     */
+    public function backlog(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $openStatuses = array_map(
+            fn (RecruitmentStatus $s) => $s->value,
+            RecruitmentBacklog::OPEN_STATUSES
+        );
+
+        $recruiters = DB::table('recruitment_assignment_history as ah')
+            ->join('users as u', 'u.id', '=', 'ah.to_recruiter_id')
+            ->whereBetween('ah.created_at', [$from, $to])
+            ->groupBy('ah.to_recruiter_id', 'u.name')
+            ->selectRaw('ah.to_recruiter_id as id, u.name as name')
+            ->orderBy('u.name')
+            ->get();
+
+        $fromHistory = $recruiters->isNotEmpty();
+
+        // Historia przypisań jest młodsza niż baza procesów, więc dla okresu bez ani
+        // jednego przypisania spadamy na obecnych właścicieli otwartych procesów —
+        // inaczej tabela zwężałaby się do dwóch kolumn i przestawała cokolwiek mówić.
+        if (! $fromHistory) {
+            $recruiters = DB::table('recruitment_processes as p')
+                ->join('users as u', 'u.id', '=', 'p.assigned_recruiter_id')
+                ->whereIn('p.status', $openStatuses)
+                ->groupBy('p.assigned_recruiter_id', 'u.name')
+                ->selectRaw('p.assigned_recruiter_id as id, u.name as name')
+                ->orderBy('u.name')
+                ->get();
+        }
+
+        $columns = [
+            ['key' => 'unassigned', 'label' => 'Nieprzypisany', 'params' => ['recruiter' => 'unassigned'], 'muted' => false],
+            ['key' => 'total', 'label' => 'Wszyscy', 'params' => [], 'muted' => true],
+        ];
+
+        foreach ($recruiters as $recruiter) {
+            $columns[] = [
+                'key' => 'r'.$recruiter->id,
+                'label' => $recruiter->name,
+                'params' => ['recruiter' => (string) $recruiter->id],
+                'muted' => false,
+            ];
+        }
+
+        $rows = [];
+
+        foreach (RecruitmentBacklog::rows() as $key => $meta) {
+            $query = DB::table('recruitment_processes as p')
+                ->selectRaw('COUNT(DISTINCT p.candidate_id) as total')
+                ->selectRaw('COUNT(DISTINCT CASE WHEN p.assigned_recruiter_id IS NULL THEN p.candidate_id END) as unassigned');
+
+            foreach ($recruiters as $recruiter) {
+                $query->selectRaw(
+                    'COUNT(DISTINCT CASE WHEN p.assigned_recruiter_id = ? THEN p.candidate_id END) as r'.$recruiter->id,
+                    [$recruiter->id]
+                );
+            }
+
+            RecruitmentBacklog::constrain($query, $key, 'p');
+
+            $counts = $query->first();
+
+            $cells = [];
+            foreach ($columns as $column) {
+                $cells[$column['key']] = (int) ($counts?->{$column['key']} ?? 0);
+            }
+
+            $rows[] = [
+                'key' => $key,
+                'label' => $meta['label'],
+                'short' => $meta['short'],
+                'hint' => $meta['hint'],
+                'params' => $meta['params'],
+                'cells' => $cells,
+            ];
+        }
+
+        return [
+            'columns' => $columns,
+            'rows' => $rows,
+            'columns_from_history' => $fromHistory,
+            'has_recruiters' => $recruiters->isNotEmpty(),
         ];
     }
 
