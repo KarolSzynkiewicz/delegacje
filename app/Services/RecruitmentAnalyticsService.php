@@ -40,7 +40,29 @@ class RecruitmentAnalyticsService
     /** A brand new lead nobody called within this many days missed the window. */
     public const NEW_LEAD_SLA_DAYS = 3;
 
-    public function build(CarbonInterface $from, CarbonInterface $to): array
+    /**
+     * Short-horizon view: what the team did in a single day / week / month.
+     * Everything here answers "how is the engagement going right now", so it is
+     * cheap enough to recompute on every step of the period navigation.
+     */
+    public function buildEngagement(CarbonInterface $from, CarbonInterface $to): array
+    {
+        return [
+            'headline' => $this->headline($from, $to),
+            'calls' => $this->callsByRecruiter($from, $to),
+            'funnel' => $this->funnel($from, $to),
+            'outcomes' => $this->outcomeBreakdown($from, $to),
+            'recruiters' => $this->byRecruiter($from, $to),
+            'rejections' => $this->rejectionReasons($from, $to),
+        ];
+    }
+
+    /**
+     * Long-horizon view: channel quality, ageing backlog, trends and how much the
+     * numbers can be trusted. Read over a wide preset range, where single-day noise
+     * averages out and structural problems become visible.
+     */
+    public function buildLongTerm(CarbonInterface $from, CarbonInterface $to): array
     {
         $headline = $this->headline($from, $to);
         $funnel = $this->funnel($from, $to);
@@ -50,16 +72,11 @@ class RecruitmentAnalyticsService
 
         return [
             'headline' => $headline,
-            'funnel' => $funnel,
             'response' => $response,
-            'callsByDay' => $this->callsByRecruiterAndDay($from, $to),
             'sources' => $this->bySource($from, $to),
-            'recruiters' => $this->byRecruiter($from, $to),
             'trend' => $this->monthlyTrend(12),
             'workQueue' => $workQueue,
             'ownerQueue' => $this->ownerWorkQueue(),
-            'rejections' => $this->rejectionReasons($from, $to),
-            'outcomes' => $this->outcomeBreakdown($from, $to),
             'callHeatmap' => $this->callHeatmap($from, $to),
             'dataQuality' => $dataQuality,
             'insights' => $this->insights($headline, $funnel, $response, $workQueue, $dataQuality),
@@ -409,104 +426,71 @@ class RecruitmentAnalyticsService
     }
 
     /**
-     * Call volume per recruiter per calendar day in the selected period.
+     * Who dialled how much in the selected period, with the per-outcome split each
+     * slice of the pie needs behind its hover.
      *
      * @return array{
-     *     days: array<int, array{key: string, label: string}>,
-     *     outcome_order: array<int, RecruitmentContactOutcome>,
      *     rows: array<int, array{
      *         user_id: int|null,
      *         name: string,
-     *         by_day: array<string, array{total: int, outcomes: array<string, int>}>,
-     *         total: int,
+     *         calls: int,
+     *         processes: int,
+     *         answered: int,
+     *         answer_rate: float|null,
+     *         share: float|null,
+     *         calls_per_process: float,
      *         outcomes: array<string, int>
      *     }>,
-     *     grand_total: int,
-     *     grand_outcomes: array<string, int>
+     *     total: int
      * }
      */
-    public function callsByRecruiterAndDay(CarbonInterface $from, CarbonInterface $to): array
+    public function callsByRecruiter(CarbonInterface $from, CarbonInterface $to): array
     {
         $outcomeOrder = RecruitmentContactOutcome::cases();
-        $outcomeValues = array_map(fn (RecruitmentContactOutcome $o) => $o->value, $outcomeOrder);
 
-        $counts = DB::table('recruitment_contact_attempts as ca')
+        $query = DB::table('recruitment_contact_attempts as ca')
             ->leftJoin('users as u', 'u.id', '=', 'ca.user_id')
             ->whereBetween('ca.created_at', [$from, $to])
-            ->groupBy('ca.user_id', 'u.name', 'day', 'ca.outcome')
-            ->selectRaw('ca.user_id, COALESCE(u.name, ?) as name, DATE(ca.created_at) as day, ca.outcome, COUNT(*) as n', ['Nieprzypisany'])
-            ->get();
+            ->groupBy('ca.user_id', 'u.name')
+            ->selectRaw('ca.user_id, COALESCE(u.name, ?) as name, COUNT(*) as calls', ['Nieprzypisany'])
+            ->selectRaw('COUNT(DISTINCT ca.recruitment_process_id) as processes');
 
-        $days = [];
-        $current = $from->copy()->startOfDay();
-        $end = $to->copy()->startOfDay();
-        while ($current <= $end) {
-            $key = $current->format('Y-m-d');
-            $days[] = [
-                'key' => $key,
-                'label' => $current->format('d.m'),
+        foreach ($outcomeOrder as $outcome) {
+            $query->selectRaw(
+                'SUM(ca.outcome = ?) as outcome_'.$outcome->value,
+                [$outcome->value]
+            );
+        }
+
+        $raw = $query->orderByDesc('calls')->get();
+        $total = (int) $raw->sum('calls');
+
+        $rows = $raw->map(function ($row) use ($outcomeOrder, $total) {
+            $outcomes = [];
+            foreach ($outcomeOrder as $outcome) {
+                $outcomes[$outcome->value] = (int) ($row->{'outcome_'.$outcome->value} ?? 0);
+            }
+
+            $calls = (int) $row->calls;
+            $processes = (int) $row->processes;
+            $answered = $outcomes[RecruitmentContactOutcome::Odebrano->value] ?? 0;
+
+            return [
+                'user_id' => $row->user_id !== null ? (int) $row->user_id : null,
+                'name' => $row->name,
+                'calls' => $calls,
+                'processes' => $processes,
+                'answered' => $answered,
+                'answer_rate' => $this->pct($answered, $calls),
+                'share' => $this->pct($calls, $total),
+                'calls_per_process' => $processes > 0 ? round($calls / $processes, 2) : 0.0,
+                'outcomes' => $outcomes,
             ];
-            $current->addDay();
-        }
-
-        $emptyOutcomes = fn (): array => array_fill_keys($outcomeValues, 0);
-        $dayKeys = array_column($days, 'key');
-        $makeEmptyByDay = function () use ($dayKeys, $emptyOutcomes): array {
-            $byDay = [];
-            foreach ($dayKeys as $key) {
-                $byDay[$key] = ['total' => 0, 'outcomes' => $emptyOutcomes()];
-            }
-
-            return $byDay;
-        };
-
-        $byUser = [];
-        foreach ($counts as $row) {
-            $userId = $row->user_id;
-            if (! isset($byUser[$userId])) {
-                $byUser[$userId] = [
-                    'user_id' => $userId !== null ? (int) $userId : null,
-                    'name' => $row->name,
-                    'by_day' => $makeEmptyByDay(),
-                    'total' => 0,
-                    'outcomes' => $emptyOutcomes(),
-                ];
-            }
-
-            $dayKey = $row->day;
-            $outcome = $row->outcome;
-            $n = (int) $row->n;
-
-            if (! isset($byUser[$userId]['by_day'][$dayKey])) {
-                $byUser[$userId]['by_day'][$dayKey] = ['total' => 0, 'outcomes' => $emptyOutcomes()];
-            }
-
-            $byUser[$userId]['by_day'][$dayKey]['total'] += $n;
-            if (isset($byUser[$userId]['by_day'][$dayKey]['outcomes'][$outcome])) {
-                $byUser[$userId]['by_day'][$dayKey]['outcomes'][$outcome] += $n;
-            }
-            $byUser[$userId]['total'] += $n;
-            if (isset($byUser[$userId]['outcomes'][$outcome])) {
-                $byUser[$userId]['outcomes'][$outcome] += $n;
-            }
-        }
-
-        $rows = array_values($byUser);
-        usort($rows, fn ($a, $b) => $b['total'] <=> $a['total']);
-
-        $grandOutcomes = $emptyOutcomes();
-        foreach ($rows as $row) {
-            foreach ($outcomeValues as $value) {
-                $grandOutcomes[$value] += $row['outcomes'][$value] ?? 0;
-            }
-        }
+        })->all();
 
         return [
-            'days' => $days,
-            'outcome_order' => $outcomeOrder,
             'rows' => $rows,
-            'grand_total' => array_sum(array_column($rows, 'total')),
-            'grand_outcomes' => $grandOutcomes,
+            'total' => $total,
         ];
     }
 
