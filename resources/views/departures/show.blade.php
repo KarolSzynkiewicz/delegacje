@@ -453,9 +453,17 @@
                 <p class="small text-muted mb-0" style="line-height: 1.55; max-width: 42rem;">
                     Kolejność z planu wyjazdu: start z bazy, przystanki po drodze (mieszkania i ewentualne lokalizacje dodane ręcznie), na końcu adres docelowy zapisany przy wyjeździe.
                 </p>
-                @if($departure->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
-                    <livewire:departure-route-editor :departure="$departure" :key="'dep-route-'.$departure->id" />
-                @endif
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <a href="{{ route('departures.route-pdf', $departure) }}"
+                       class="btn btn-sm btn-outline-secondary"
+                       target="_blank"
+                       rel="noopener">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>PDF dla kierowcy
+                    </a>
+                    @if($departure->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
+                        <livewire:departure-route-editor :departure="$departure" :key="'dep-route-'.$departure->id" />
+                    @endif
+                </div>
             </div>
 
             @if($departure->hasRouteData())

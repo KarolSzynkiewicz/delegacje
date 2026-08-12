@@ -83,6 +83,64 @@ class LocationTrackingService
         ];
     }
 
+    /**
+     * ID pracowników, którzy w danym dniu NIE są w bazie (w podróży albo poza bazą).
+     * Do list wyjazdu — zostają tylko osoby w bazie.
+     *
+     * @return list<int>
+     */
+    public function employeeIdsNotInBaseOn(Carbon $date): array
+    {
+        $dateDay = $date->copy()->startOfDay();
+
+        $withProject = ProjectAssignment::query()
+            ->where('start_date', '<=', $dateDay)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $dateDay))
+            ->pluck('employee_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $inTransit = LogisticsEvent::query()
+            ->forLocationTracking()
+            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->where('event_date', '<=', $dateDay)
+            ->where('end_date', '>', $dateDay)
+            ->with(['participants:id,logistics_event_id,employee_id'])
+            ->get()
+            ->flatMap(fn (LogisticsEvent $e) => $e->participants->pluck('employee_id'))
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $events = LogisticsEvent::query()
+            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN])
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->where('event_date', '<=', $dateDay)
+            ->with(['participants:id,logistics_event_id,employee_id'])
+            ->orderByDesc('event_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $lastByEmployee = [];
+        foreach ($events as $event) {
+            foreach ($event->participants as $participant) {
+                $empId = (int) $participant->employee_id;
+                if ($empId > 0 && ! isset($lastByEmployee[$empId])) {
+                    $lastByEmployee[$empId] = $event;
+                }
+            }
+        }
+
+        $outsideByLastEvent = [];
+        foreach ($lastByEmployee as $empId => $event) {
+            if ($this->deriveStateFromEvent($event, $dateDay) !== EmployeeLocationState::IN_BASE) {
+                $outsideByLastEvent[] = (int) $empId;
+            }
+        }
+
+        return array_values(array_unique(array_merge($withProject, $inTransit, $outsideByLastEvent)));
+    }
+
     public function getEmployeeLocation(Employee $employee): ?Location
     {
         $status = $this->getLocationStatus($employee, now());

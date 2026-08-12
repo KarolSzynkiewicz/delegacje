@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\Vehicle;
 use App\Services\DeparturePlannerService;
 use App\Services\ExpiringDocumentsService;
+use App\Services\LocationTrackingService;
 use App\Services\RotationService;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -60,6 +61,12 @@ class Step1ProjectAssignments extends Component
 
     public $projectSearch = '';
 
+    /**
+     * Domyślnie lista po lewej = tylko osoby z aktywną rotacją na datę wyjazdu.
+     * Po włączeniu doładowujemy też pracowników bez rotacji (np. żeby dodać rotację).
+     */
+    public bool $showEmployeesWithoutRotation = false;
+
     // Cache for Projects and Roles to avoid N+1 queries
     protected $projectsCache = [];
 
@@ -103,6 +110,8 @@ class Step1ProjectAssignments extends Component
 
     protected $rotationService;
 
+    protected $locationTrackingService;
+
     protected $listeners = [
         'refresh-assignments' => 'refreshAssignments',
         'vehicle-seats-updated' => 'updateVehicleSeatsFromParent',
@@ -111,11 +120,13 @@ class Step1ProjectAssignments extends Component
     public function boot(
         DeparturePlannerService $departurePlannerService,
         ExpiringDocumentsService $expiringDocumentsService,
-        RotationService $rotationService
+        RotationService $rotationService,
+        LocationTrackingService $locationTrackingService
     ) {
         $this->departurePlannerService = $departurePlannerService;
         $this->expiringDocumentsService = $expiringDocumentsService;
         $this->rotationService = $rotationService;
+        $this->locationTrackingService = $locationTrackingService;
     }
 
     public function refreshAssignments()
@@ -273,6 +284,16 @@ class Step1ProjectAssignments extends Component
             ->when($this->forTransfer && ! empty($this->allowedEmployeeIds), function ($q) {
                 $q->whereIn('id', $this->allowedEmployeeIds);
             })
+            // Domyślnie: tylko osoby z rotacją obejmującą dzień wyjazdu (mniej danych, szybszy Step1).
+            ->when(! $this->showEmployeesWithoutRotation, function ($q) use ($departureDate) {
+                $q->whereHas('rotations', function ($rq) use ($departureDate) {
+                    $rq->whereDate('start_date', '<=', $departureDate->toDateString())
+                        ->where(function ($rq2) use ($departureDate) {
+                            $rq2->whereNull('end_date')
+                                ->orWhereDate('end_date', '>=', $departureDate->toDateString());
+                        });
+                });
+            })
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get()
@@ -383,6 +404,12 @@ class Step1ProjectAssignments extends Component
         // Apply pagination
         $this->employeesPage = 1;
         $this->loadEmployeesPage();
+    }
+
+    public function updatedShowEmployeesWithoutRotation(): void
+    {
+        $this->employeesPage = 1;
+        $this->loadAvailableEmployees();
     }
 
     public function loadEmployeesPage()
@@ -620,6 +647,13 @@ class Step1ProjectAssignments extends Component
         $startDate = $this->departureDate ? Carbon::parse($this->departureDate) : null;
         $endDate = $this->endDate ? Carbon::parse($this->endDate) : null;
 
+        // Poza bazą / w podróży / z aktywnym projektem w dniu wyjazdu — nie na listę wyjazdu
+        // (dotyczy też trybu „pokaż bez rotacji”).
+        $notInBaseIds = [];
+        if (! $this->forTransfer && $startDate) {
+            $notInBaseIds = $this->locationTrackingService->employeeIdsNotInBaseOn($startDate);
+        }
+
         // Get all employee IDs that have assignments in database for this date range
         $employeesWithDbAssignments = [];
         if (! $this->forTransfer && $startDate && $endDate) {
@@ -640,9 +674,14 @@ class Step1ProjectAssignments extends Component
         }
 
         // Filter from all available employees (not just current page)
-        $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments) {
+        $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments, $notInBaseIds) {
             // Filter out already assigned employees (in form)
             if (in_array($employee['id'], $assignedIds)) {
+                return false;
+            }
+
+            // Tylko osoby w bazie w dniu wyjazdu
+            if (in_array((int) $employee['id'], $notInBaseIds, true)) {
                 return false;
             }
 

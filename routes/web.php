@@ -127,6 +127,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('departures/{departure}/participants/{employee}/remove', [\App\Http\Controllers\DepartureController::class, 'removeParticipant'])
             ->name('departures.participants.remove')
             ->defaults('resource', 'departures');
+        Route::get('departures/{departure}/route-pdf', [\App\Http\Controllers\DepartureController::class, 'downloadRoutePdf'])
+            ->name('departures.route-pdf')
+            ->defaults('resource', 'departures');
 
         // New V2 departure form with Livewire
         Route::match(['get', 'post'], 'departures/store-v2', [\App\Http\Controllers\DepartureController::class, 'storeV2'])

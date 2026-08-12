@@ -31,14 +31,42 @@
                                wire:model.live.debounce.300ms="employeeSearch"
                                class="form-control form-control-sm"
                                placeholder="Szukaj pracownika…">
+                        @unless($forTransfer)
+                            @if(filled($departureDate))
+                                <label class="s1-rotation-toggle d-flex align-items-start gap-2 mt-2 mb-0 small"
+                                       style="cursor: pointer; color: #94a3b8; line-height: 1.35;">
+                                    <input type="checkbox"
+                                           class="form-check-input mt-1 flex-shrink-0"
+                                           wire:model.live="showEmployeesWithoutRotation">
+                                    <span>Pokaż pracowników bez rotacji</span>
+                                </label>
+                            @endif
+                        @endunless
                     </div>
 
-                    <div class="s1-hint">
-                        <i class="bi bi-grip-horizontal"></i>
-                        Przeciągnij pracownika na rolę po prawej
-                    </div>
+                    @if(filled($departureDate))
+                        <div class="s1-hint">
+                            <i class="bi bi-grip-horizontal"></i>
+                            @if($showEmployeesWithoutRotation)
+                                Osoby w bazie w dniu wyjazdu — także bez rotacji (możesz dodać rotację przy karcie). Poza bazą / w podróży nie są na liście.
+                            @else
+                                Tylko osoby w bazie z rotacją na datę wyjazdu. Zaznacz powyżej, by pokazać też osoby w bazie bez rotacji.
+                            @endif
+                        </div>
+                    @else
+                        <div class="s1-hint">
+                            <i class="bi bi-calendar-event"></i>
+                            Najpierw wybierz datę wyjazdu (i przybycia), żeby zobaczyć dostępnych pracowników.
+                        </div>
+                    @endif
 
                     <div class="employee-list">
+                        @if(! filled($departureDate))
+                            <div class="s1-empty-state">
+                                <i class="bi bi-calendar-x s1-empty-state__icon"></i>
+                                <span class="s1-empty-state__text">Wybierz datę wyjazdu, aby załadować listę</span>
+                            </div>
+                        @else
                         @forelse($employees as $employee)
                             <div class="s1-emp-card"
                                  draggable="true"
@@ -120,6 +148,7 @@
                                     <i class="bi bi-chevron-right"></i>
                                 </button>
                             </div>
+                        @endif
                         @endif
                     </div>
                 @endunless

@@ -21,10 +21,12 @@ use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\VehicleValidationService;
 use App\Support\DepartureRoutePlan;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -82,6 +84,59 @@ class DepartureController extends Controller
         $vehicles = Vehicle::where('type', 'company_vehicle')->orderBy('registration_number')->get();
 
         return view('departures.index', compact('departures', 'sort', 'dir', 'vehicles', 'employeeSearch', 'vehicleFilter', 'transport'));
+    }
+
+    /**
+     * PDF — instrukcja / rozpiska trasy dla kierowcy (transport własny).
+     */
+    public function downloadRoutePdf(LogisticsEvent $departure): Response|RedirectResponse
+    {
+        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+            abort(404);
+        }
+
+        if (! $departure->vehicle_id) {
+            return redirect()
+                ->route('departures.show', $departure)
+                ->with('error', 'Rozpiska PDF jest dostępna tylko dla wyjazdu transportem własnym.');
+        }
+
+        $departure->load([
+            'vehicle',
+            'fromLocation',
+            'toLocation',
+            'participants.employee',
+            'accommodationAssignments.employee',
+            'accommodationAssignments.accommodation',
+        ]);
+
+        $driverAdj = Adjustment::query()
+            ->where('logistics_event_id', $departure->id)
+            ->where('type', 'bonus')
+            ->with('employee')
+            ->orderBy('id')
+            ->first();
+
+        $driverName = $driverAdj?->employee?->full_name;
+
+        $participants = $departure->participants
+            ->map(fn ($p) => $p->employee?->full_name)
+            ->filter()
+            ->sort()
+            ->values();
+
+        $routeStops = $departure->getRouteStopsForDetailView();
+
+        $pdf = Pdf::loadView('departures.route-driver-pdf', [
+            'departure' => $departure,
+            'routeStops' => $routeStops,
+            'participants' => $participants,
+            'driverName' => $driverName,
+        ])->setPaper('a4', 'portrait');
+
+        $filename = 'instrukcja-kierowcy-wyjazd-'.$departure->id.'.pdf';
+
+        return $pdf->download($filename);
     }
 
     /**
