@@ -874,14 +874,15 @@ class DeparturePlannerV2 extends Component
 
     public function handleTransferConfigUpdated($data)
     {
-        $this->transferConfig = $data;
-        if (empty($this->routeSegments) || $this->transportMode !== 'public' || ! empty($this->vehicleId)) {
+        // Tylko własny samochód: config kierowcy/uznania + waypoints na wyjeździe.
+        // Transport publiczny nie tworzy już odcinków TRANSFER z kreatora.
+        if ($this->transportMode === 'public' || empty($this->vehicleId)) {
+            $this->transferConfig = [];
+
             return;
         }
-        $idx = DepartureRoutePlan::primaryPostAirportOwnSegmentIndex($this->routeSegments);
-        if ($idx !== null) {
-            $this->routeSegments[$idx]['transfer_config'] = $data;
-        }
+
+        $this->transferConfig = is_array($data) ? $data : [];
     }
 
     public function requestSaveDeparture(): void
@@ -995,13 +996,9 @@ class DeparturePlannerV2 extends Component
     /**
      * @param  array<int>  $employeeIds
      * @param  list<array<string, mixed>>  $ticketCostsLineItems
-     * @param  list<array<string, mixed>>  $transferConfigsList
      */
-    protected function validateAndBuildTicketsForRouteSegments(array $employeeIds, array &$ticketCostsLineItems, array &$transferConfigsList): void
+    protected function validateAndBuildTicketsForRouteSegments(array $employeeIds, array &$ticketCostsLineItems): void
     {
-        // Transfery ziemne nie są już częścią kreatora wyjazdu — nie tworzymy auto-TRANSFER.
-        $transferConfigsList = [];
-
         foreach ($this->routeSegments as $segIndex => $seg) {
             if (($seg['mode'] ?? '') !== 'public') {
                 continue;
@@ -1087,7 +1084,6 @@ class DeparturePlannerV2 extends Component
 
         $ticketCostsPerEmployee = [];
         $ticketCostsLineItems = [];
-        $transferConfigsList = [];
 
         if (empty($this->vehicleId)) {
             $employeeIds = $this->getSelectedEmployeeIds();
@@ -1095,7 +1091,7 @@ class DeparturePlannerV2 extends Component
             if (! empty($this->routeSegments)) {
                 $this->pushTicketsToFirstPublicSegment();
                 $this->pushAirportsToFirstPublicSegment();
-                $this->validateAndBuildTicketsForRouteSegments($employeeIds, $ticketCostsLineItems, $transferConfigsList);
+                $this->validateAndBuildTicketsForRouteSegments($employeeIds, $ticketCostsLineItems);
             } else {
                 $startAirportLocationId = $this->sharedStartAirportLocationId;
                 $endAirportLocationId = $this->sharedEndAirportLocationId;
@@ -1200,10 +1196,10 @@ class DeparturePlannerV2 extends Component
                 'route_data' => $routeDataForSession,
                 'ticket_costs_per_employee' => $ticketCostsPerEmployee,
                 'ticket_costs_line_items' => $ticketCostsLineItems,
-                // Zawsze przekazuj transfer_config z kroku 4 (kierowca, uznanie, waypoints) — przy vehicle_id w nagłówku
-                // i tak tworzymy jeden LogisticsEvent wyjazdu; wcześniej zerowanie tu blokowało zapis Adjustment (bonus).
-                'transfer_config' => is_array($this->transferConfig) ? $this->transferConfig : [],
-                'transfer_configs_list' => $transferConfigsList,
+                // Własny samochód: kierowca + uznanie na wyjeździe. Publiczny: pusto (bez auto-TRANSFER).
+                'transfer_config' => (! empty($this->vehicleId) && is_array($this->transferConfig))
+                    ? $this->transferConfig
+                    : [],
             ],
         ]);
 

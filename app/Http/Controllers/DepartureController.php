@@ -530,8 +530,8 @@ class DepartureController extends Controller
             'route_data.merged_own_route_waypoints' => 'nullable|array',
             'ticket_costs_per_employee' => 'nullable|array',
             'ticket_costs_line_items' => 'nullable|array',
+            // Tylko własny samochód: kierowca + uznanie na wyjeździe (nie tworzy osobnego TRANSFER).
             'transfer_config' => 'nullable|array',
-            'transfer_configs_list' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -851,8 +851,8 @@ class DepartureController extends Controller
                 ]);
             }
 
-            // Uznanie za kierowanie — własny pojazd wyjazdu (vehicle_id w nagłówku). Transfer z lotniska używa osobnego
-            // LogisticsEvent + Adjustment w bloku niżej (tylko gdy brak vehicle_id).
+            // Uznanie za kierowanie — wyłącznie własny pojazd wyjazdu (vehicle_id w nagłówku).
+            // Transfery ziemne (na/z lotniska) dodaje się później osobnym kreatorem — nie z tego zapisu.
             if (! empty($validated['vehicle_id'])) {
                 $ownTransferCfg = $validated['transfer_config'] ?? [];
                 if (is_array($ownTransferCfg) && $ownTransferCfg !== []) {
@@ -1061,93 +1061,7 @@ class DepartureController extends Controller
                 }
             }
 
-            // Create transfer event(s) (public transport only, if configured in step 4)
-            $transferConfigsList = $validated['transfer_configs_list'] ?? [];
-            $transferConfigsToCreate = [];
-            if (is_array($transferConfigsList) && $transferConfigsList !== []) {
-                foreach ($transferConfigsList as $cfg) {
-                    if (is_array($cfg) && $cfg !== []) {
-                        $transferConfigsToCreate[] = $cfg;
-                    }
-                }
-            }
-            if ($transferConfigsToCreate === []) {
-                $single = $validated['transfer_config'] ?? [];
-                if (is_array($single) && $single !== []) {
-                    $transferConfigsToCreate[] = $single;
-                }
-            }
-
-            if (empty($validated['vehicle_id']) && $transferConfigsToCreate !== []) {
-                foreach ($transferConfigsToCreate as $transferIndex => $transferConfig) {
-                    $transferVehicleId = ! empty($transferConfig['vehicle_id']) ? (int) $transferConfig['vehicle_id'] : null;
-                    $transferDriverEmployeeId = ! empty($transferConfig['driver_employee_id']) ? (int) $transferConfig['driver_employee_id'] : null;
-                    $transferBonusAmount = ! empty($transferConfig['bonus_amount']) ? (float) $transferConfig['bonus_amount'] : null;
-                    $transferBonusCurrency = ! empty($transferConfig['bonus_currency']) ? strtoupper($transferConfig['bonus_currency']) : 'PLN';
-                    $transferPickupLocationId = ! empty($transferConfig['pickup_location_id']) ? (int) $transferConfig['pickup_location_id'] : null;
-                    $transferRouteDistance = $transferConfig['route_distance'] ?? null;
-                    $transferRouteDuration = $transferConfig['route_duration'] ?? null;
-                    $normalizedTransferWaypoints = LogisticsEvent::normalizeRouteWaypointsFromPayload(
-                        ! empty($transferConfig['route_waypoints']) && is_array($transferConfig['route_waypoints'])
-                            ? $transferConfig['route_waypoints']
-                            : null
-                    );
-                    $transferLocationStopNotes = LogisticsEvent::sanitizeLocationStopNotes(
-                        isset($transferConfig['location_stop_notes']) && is_array($transferConfig['location_stop_notes'])
-                            ? $transferConfig['location_stop_notes']
-                            : null,
-                        $normalizedTransferWaypoints
-                    );
-                    $endAirportLocationId = ! empty($transferConfig['end_airport_location_id']) ? (int) $transferConfig['end_airport_location_id'] : null;
-
-                    // from_location = pickup location (or end airport if no pickup), to_location = destination (last accommodation)
-                    $transferFromLocationId = $transferPickupLocationId ?? $endAirportLocationId ?? $destinationLocationId;
-
-                    $transferNoteSuffix = count($transferConfigsToCreate) > 1
-                        ? ' (odcinek '.($transferIndex + 1).')'
-                        : '';
-                    $transferAttributes = [
-                        'type' => LogisticsEventType::TRANSFER,
-                        'event_date' => $departureDate,
-                        'end_date' => $departureDate,
-                        'from_location_id' => $transferFromLocationId,
-                        'to_location_id' => $destinationLocationId,
-                        'vehicle_id' => $transferVehicleId,
-                        'status' => LogisticsEventStatus::COMPLETED,
-                        'notes' => 'Transfer z lotniska'.$transferNoteSuffix.' – automatycznie z wyjazdu #'.$departure->id,
-                        'related_departure_id' => $departure->id,
-                        'has_reassignment' => false,
-                        'has_transport' => ! empty($transferVehicleId),
-                        'created_by' => auth()->id() ?? 1,
-                        'route_distance' => $transferRouteDistance,
-                        'route_duration' => $transferRouteDuration ? (int) $transferRouteDuration : null,
-                        'route_waypoints' => $normalizedTransferWaypoints !== [] ? $normalizedTransferWaypoints : null,
-                        'destination_stop_location' => null,
-                    ];
-                    if (Schema::hasColumn('logistics_events', 'location_stop_notes')) {
-                        $transferAttributes['location_stop_notes'] = $transferLocationStopNotes;
-                    }
-
-                    $transfer = LogisticsEvent::create($transferAttributes);
-
-                    foreach ($employeeIds as $employeeId) {
-                        $transfer->participants()->create(['employee_id' => $employeeId]);
-                    }
-
-                    if ($transferDriverEmployeeId && $transferBonusAmount > 0) {
-                        \App\Models\Adjustment::create([
-                            'employee_id' => $transferDriverEmployeeId,
-                            'payroll_id' => null,
-                            'logistics_event_id' => $transfer->id,
-                            'type' => 'bonus',
-                            'amount' => $transferBonusAmount,
-                            'currency' => $transferBonusCurrency,
-                            'notes' => 'Uznanie za kierowanie transferem #'.$transfer->id,
-                            'date' => $departureDate->toDateString(),
-                        ]);
-                    }
-                }
-            }
+            // Transfery ziemne (na/z lotniska) nie powstają z wyjazdu — dodaje się je później osobnym kreatorem.
 
             DB::commit();
 

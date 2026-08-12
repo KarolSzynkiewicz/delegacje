@@ -339,7 +339,10 @@ class Step4RoutePlanning extends Component
             $this->dispatch('route-planned', $this->buildRoutePlannedPayload());
         }
 
-        $this->dispatchTransferConfig();
+        // Config kierowcy/uznania tylko przy własnym aucie (publiczny nie tworzy TRANSFER).
+        if (! $this->isPublicTransport) {
+            $this->dispatchTransferConfig();
+        }
     }
 
     /**
@@ -2585,6 +2588,10 @@ class Step4RoutePlanning extends Component
 
     protected function dispatchTransferConfig(): void
     {
+        if ($this->isPublicTransport) {
+            return;
+        }
+
         $rd = is_array($this->routeData) ? $this->routeData : [];
         $this->dispatch('transfer-config-updated', [
             'vehicle_id' => $this->transferVehicleId,
