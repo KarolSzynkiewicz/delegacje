@@ -126,10 +126,13 @@
                                     <i class="bi bi-truck me-1"></i>
                                     Pojazd
                                 </th>
-                                <th class="text-uppercase small text-muted fw-semibold py-3 pe-4">
+                                <th class="text-uppercase small text-muted fw-semibold py-3">
                                     <i class="bi bi-house me-1"></i>
                                     Zakwaterowanie
                                 </th>
+                                @if(!empty($canRemoveParticipants))
+                                    <th class="text-uppercase small text-muted fw-semibold py-3 pe-4 text-end">Akcja</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
@@ -146,6 +149,8 @@
                                     $accommodationAssignment = $departure->accommodationAssignments
                                         ->where('employee_id', $participant->employee_id)
                                         ->first();
+
+                                    $removalBlock = ($participantRemovalBlocks ?? [])[(int) $participant->employee_id] ?? null;
                                 @endphp
                                 <tr>
                                     <td class="ps-4 py-3">
@@ -195,7 +200,7 @@
                                             @endif
                                         @endif
                                     </td>
-                                    <td class="py-3 pe-4">
+                                    <td class="py-3{{ empty($canRemoveParticipants) ? ' pe-4' : '' }}">
                                         @if($accommodationAssignment)
                                             <div>
                                                 <span class="badge bg-success me-1">✓</span>
@@ -216,6 +221,28 @@
                                             @endif
                                         @endif
                                     </td>
+                                    @if(!empty($canRemoveParticipants))
+                                        <td class="py-3 pe-4 text-end">
+                                            @if($removalBlock)
+                                                <span class="small text-muted"
+                                                      title="{{ $removalBlock }}"
+                                                      data-bs-toggle="tooltip"
+                                                      data-bs-placement="left">
+                                                    <i class="bi bi-lock-fill me-1"></i>Zablokowane
+                                                </span>
+                                            @else
+                                                <form method="POST"
+                                                      action="{{ route('departures.participants.remove', [$departure, $participant->employee]) }}"
+                                                      class="d-inline"
+                                                      onsubmit="return confirm('Wypisać {{ addslashes($participant->employee->full_name ?? 'uczestnika') }} z tego wyjazdu? Usunięte zostaną przypisania (projekt / auto / mieszkanie) tej osoby powiązane z wyjazdem.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger border-opacity-50">
+                                                        <i class="bi bi-person-dash me-1"></i>Wypisz
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>
@@ -368,12 +395,12 @@
     @endif
 
     @if(!$isPublicTransportDeparture)
-        <x-ui.card label="Bilety" class="mb-0">
         @php
             $ticketCosts = $departure->transportCosts->where('cost_type', 'ticket')->values();
         @endphp
 
         @if($ticketCosts->isNotEmpty())
+        <x-ui.card label="Bilety" class="mb-0">
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
@@ -413,10 +440,8 @@
                     </tbody>
                 </table>
             </div>
-        @else
-            <p class="text-muted mb-0">Brak kosztów biletów dla tego wyjazdu.</p>
+        </x-ui.card>
         @endif
-    </x-ui.card>
     @endif
 
     @if(!$isPublicTransportDeparture)
@@ -424,9 +449,14 @@
             $routeStops = $departure->getRouteStopsForDetailView();
         @endphp
         <x-ui.card label="Przebieg trasy" class="mb-0">
-            <p class="small text-muted mb-4" style="line-height: 1.55;">
-                Kolejność z planu wyjazdu: start z bazy, przystanki po drodze (mieszkania i ewentualne lokalizacje dodane ręcznie), na końcu adres docelowy zapisany przy wyjeździe.
-            </p>
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+                <p class="small text-muted mb-0" style="line-height: 1.55; max-width: 42rem;">
+                    Kolejność z planu wyjazdu: start z bazy, przystanki po drodze (mieszkania i ewentualne lokalizacje dodane ręcznie), na końcu adres docelowy zapisany przy wyjeździe.
+                </p>
+                @if($departure->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
+                    <livewire:departure-route-editor :departure="$departure" :key="'dep-route-'.$departure->id" />
+                @endif
+            </div>
 
             @if($departure->hasRouteData())
                 <div class="row g-3 mb-4">
@@ -538,10 +568,8 @@
         </x-ui.card>
     @endif
 
+    @if(($relatedUznania ?? collect())->isNotEmpty())
     <x-ui.card label="Powiązane uznania" class="mb-0">
-        @if(($relatedUznania ?? collect())->isEmpty())
-            <p class="text-muted mb-0">Brak uznania powiązanego z tym wyjazdem lub powiązanymi transferami.</p>
-        @else
             <div class="table-responsive rounded-3 border" style="border-color: rgba(255,255,255,0.08) !important;">
                 <table class="table table-hover departure-participants-table mb-0 align-middle">
                     <thead class="table-light" style="--bs-table-bg: rgba(255,255,255,0.04);">
@@ -595,8 +623,8 @@
                     </tbody>
                 </table>
             </div>
-        @endif
     </x-ui.card>
+    @endif
 
     </div>
 

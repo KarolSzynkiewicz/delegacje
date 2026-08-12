@@ -65,6 +65,12 @@ class TransferCreateBoard extends Component
     /** assignment | transport */
     public string $mode = 'assignment';
 
+    /** FK do wyjazdu (DEPARTURE) — zapisywane na transferze jako related_departure_id */
+    public ?int $relatedDepartureId = null;
+
+    /** Remount EmployeePicker po powiązaniu z wyjazdem (żeby przejąć listę osób). */
+    public int $employeePickerKey = 0;
+
     public ?string $successBanner = null;
 
     // --- Transport bez reassignment ---
@@ -193,6 +199,94 @@ class TransferCreateBoard extends Component
     public function onGroundTransferSlotUpdated(string $slotKey, array $config): void
     {
         $this->groundTransferConfig = $config;
+    }
+
+    public function updatedRelatedDepartureId(mixed $value): void
+    {
+        $id = $value === null || $value === '' ? null : (int) $value;
+        $this->relatedDepartureId = $id > 0 ? $id : null;
+
+        if ($this->relatedDepartureId === null) {
+            return;
+        }
+
+        $departure = LogisticsEvent::query()
+            ->whereKey($this->relatedDepartureId)
+            ->where('type', LogisticsEventType::DEPARTURE)
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->with(['participants', 'fromLocation', 'toLocation'])
+            ->first();
+
+        if (! $departure) {
+            $this->relatedDepartureId = null;
+            session()->flash('warning', 'Nie znaleziono wyjazdu do powiązania.');
+
+            return;
+        }
+
+        $employeeIds = $departure->participants
+            ->pluck('employee_id')
+            ->map(fn ($eid) => (int) $eid)
+            ->filter(fn (int $eid) => $eid > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->mode = 'transport';
+        $this->selectedEmployeeIds = $employeeIds;
+        $this->employeePickerKey++;
+
+        if ($this->departureDate === '' && $departure->event_date) {
+            $this->departureDate = $departure->event_date->format('Y-m-d');
+        }
+        if ($this->endDate === '' && ($departure->end_date || $departure->event_date)) {
+            $this->endDate = ($departure->end_date ?? $departure->event_date)->format('Y-m-d');
+        }
+
+        if ($this->transportMode === 'own' && ! empty($this->vehicleId)) {
+            $this->initVehicleSeats();
+        }
+
+        if ($this->transportMode === 'public') {
+            $this->ticketCostsByEmployee = array_intersect_key(
+                $this->ticketCostsByEmployee,
+                array_flip($this->selectedEmployeeIds)
+            );
+            $this->ticketAttachmentUploads = array_intersect_key(
+                $this->ticketAttachmentUploads,
+                array_flip($this->selectedEmployeeIds)
+            );
+        }
+    }
+
+    /**
+     * Wyjazdy do dropdownu „Powiąż z innym transportem”.
+     *
+     * @return \Illuminate\Support\Collection<int, array{id: int, label: string}>
+     */
+    public function getLinkableDeparturesProperty()
+    {
+        return LogisticsEvent::query()
+            ->where('type', LogisticsEventType::DEPARTURE)
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->with(['participants', 'fromLocation', 'toLocation'])
+            ->orderByDesc('event_date')
+            ->orderByDesc('id')
+            ->limit(80)
+            ->get()
+            ->map(function (LogisticsEvent $event) {
+                $people = $event->participants->count();
+                $transport = $event->vehicle_id ? 'własny' : 'publiczny';
+                $from = $event->fromLocation?->name ?? '?';
+                $to = $event->toLocation?->name ?? '?';
+                $date = $event->event_date?->format('Y-m-d') ?? '—';
+
+                return [
+                    'id' => (int) $event->id,
+                    'label' => '#'.$event->id.' · '.$date.' · '.$transport.' · '.$people.' os. · '.$from.' → '.$to,
+                ];
+            })
+            ->values();
     }
 
     #[On('ground-transfer-slot-request-default-waypoints')]
@@ -1382,6 +1476,7 @@ class TransferCreateBoard extends Component
                 'driver_payroll_id' => $config->driverPayrollId,
                 'location_stop_notes' => $locationStopNotes,
                 'public_ticket_lines' => $publicTicketLines,
+                'related_departure_id' => $this->relatedDepartureId,
             ]);
         } catch (ValidationException $e) {
             session()->flash('warning', collect($e->errors())->flatten()->first() ?: $e->getMessage());
@@ -1545,6 +1640,7 @@ class TransferCreateBoard extends Component
             'driver_payment_amount' => null,
             'driver_payment_currency' => null,
             'driver_payroll_id' => null,
+            'related_departure_id' => $this->relatedDepartureId,
         ];
     }
 

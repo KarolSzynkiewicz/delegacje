@@ -49,6 +49,7 @@ class TransferService
      *     driver_payroll_id: int|null,
      *     location_stop_notes?: array<string, string>|null,
      *     public_ticket_lines?: list<array{employee_id: int, amount: float, currency: string, attachment_path?: string|null, description?: string, notes?: string|null}>,
+     *     related_departure_id?: int|null,
      * }  $data
      */
     public function commitTransfer(array $data): LogisticsEvent
@@ -71,6 +72,22 @@ class TransferService
                 }
             }
 
+            $relatedDepartureId = isset($data['related_departure_id']) ? (int) $data['related_departure_id'] : null;
+            if ($relatedDepartureId !== null && $relatedDepartureId <= 0) {
+                $relatedDepartureId = null;
+            }
+            if ($relatedDepartureId !== null) {
+                $relatedExists = LogisticsEvent::query()
+                    ->whereKey($relatedDepartureId)
+                    ->where('type', LogisticsEventType::DEPARTURE)
+                    ->exists();
+                if (! $relatedExists) {
+                    throw ValidationException::withMessages([
+                        'related_departure_id' => 'Wybrany wyjazd do powiązania nie istnieje.',
+                    ]);
+                }
+            }
+
             $eventAttributes = [
                 'type' => LogisticsEventType::TRANSFER,
                 'event_date' => $data['transfer_date'],
@@ -86,6 +103,7 @@ class TransferService
                 'route_duration' => $data['route_duration'],
                 'route_waypoints' => $data['route_waypoints'],
                 'created_by' => auth()->id() ?? 1,
+                'related_departure_id' => $relatedDepartureId,
             ];
 
             $locationStopNotes = $data['location_stop_notes'] ?? null;

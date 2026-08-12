@@ -332,6 +332,13 @@ class Step4RoutePlanning extends Component
 
         $this->ownRouteModalPrefillDone = $hadPersistedRouteWaypointsFromParent;
 
+        // Własny transport: od razu zbuduj kolejność przystanków + notatki (dom/projekt),
+        // żeby podgląd „Przebieg trasy” był widoczny bez otwierania modalu.
+        if (! $this->isPublicTransport && ! $this->ownRouteModalPrefillDone) {
+            $this->prepareOwnRouteModalState();
+            $this->ownRouteModalPrefillDone = true;
+        }
+
         $restored = $this->hydrateRouteMetricsFromParent($initialRouteDistance, $initialRouteDuration, (bool) $initialRouteManual);
 
         // Bez automatycznego wywołania API przy wejściu — użytkownik klika „Przelicz trasę”.
@@ -2015,14 +2022,28 @@ class Step4RoutePlanning extends Component
                 } elseif ((int) ($loc->accommodations_count ?? 0) > 0) {
                     $typeLabel = 'Dom';
                 } else {
-                    $projectNames = Project::where('location_id', $loc->id)
-                        ->where('status', ProjectStatus::ACTIVE)
-                        ->orderBy('name')
-                        ->pluck('name')
+                    // Tylko projekty z przypisań tego wyjazdu — nie wszystkie aktywne na lokalizacji.
+                    $assignedProjectIds = collect($this->assignmentRanges)
+                        ->filter(fn ($r) => is_array($r) && ! empty($r['project_id']))
+                        ->pluck('project_id')
+                        ->map(fn ($id) => (int) $id)
                         ->unique()
-                        ->values();
+                        ->filter()
+                        ->values()
+                        ->all();
+
+                    $projectNames = $assignedProjectIds === []
+                        ? collect()
+                        : Project::query()
+                            ->where('location_id', $loc->id)
+                            ->whereIn('id', $assignedProjectIds)
+                            ->orderBy('name')
+                            ->pluck('name')
+                            ->unique()
+                            ->values();
+
                     $typeLabel = $projectNames->isNotEmpty()
-                        ? ($projectNames->count() === 1 ? 'Projekt: ' . $projectNames->first() : 'Projekty: ' . $projectNames->join(', '))
+                        ? ($projectNames->count() === 1 ? 'Projekt: '.$projectNames->first() : 'Projekty: '.$projectNames->join(', '))
                         : 'Lokalizacja';
                 }
                 $tiles[] = [
@@ -2060,6 +2081,61 @@ class Step4RoutePlanning extends Component
         }
 
         return $tiles;
+    }
+
+    /**
+     * Podgląd przebiegu trasy (jak na show wyjazdu): start / przystanki z notatkami / cel.
+     * Nie wymaga dystansu — wystarczą waypointy + locationStopNotes.
+     *
+     * @return array{
+     *   start: ?array{name: string, address_line: string, purpose: ?string},
+     *   stops: list<array{position: int, name: string, address_line: string, type_label: ?string, purpose: ?string}>,
+     *   end: ?array{name: string, address_line: string, purpose: ?string},
+     * }
+     */
+    public function getOwnRoutePreviewProperty(): array
+    {
+        $tiles = $this->ownRouteTiles;
+        if ($tiles === []) {
+            return ['start' => null, 'stops' => [], 'end' => null];
+        }
+
+        $notes = $this->locationStopNotes;
+        $enriched = [];
+        foreach ($tiles as $tile) {
+            $noteKey = (string) ($tile['id'] ?? '');
+            // acc_* nie ma notatek loc — spróbuj też czystego id z klucza loc:
+            if (str_starts_with($noteKey, 'acc_')) {
+                $purpose = null;
+            } else {
+                $purpose = isset($notes[$noteKey]) && trim((string) $notes[$noteKey]) !== ''
+                    ? trim((string) $notes[$noteKey])
+                    : null;
+            }
+            $addressLine = trim(implode(', ', array_filter([
+                $tile['address'] ?? null,
+                $tile['city'] ?? null,
+            ])));
+            $enriched[] = [
+                'name' => (string) ($tile['name'] ?? '—'),
+                'address_line' => $addressLine,
+                'type_label' => $tile['type_label'] ?? null,
+                'purpose' => $purpose,
+            ];
+        }
+
+        $start = array_shift($enriched);
+        $end = count($enriched) > 0 ? array_pop($enriched) : null;
+        $stops = [];
+        foreach ($enriched as $i => $row) {
+            $stops[] = array_merge($row, ['position' => $i + 1]);
+        }
+
+        return [
+            'start' => $start,
+            'stops' => $stops,
+            'end' => $end,
+        ];
     }
 
     /** Wszystkie lokalizacje do selekta "dodaj przystanek" w modalu trasy własnego samochodu. */

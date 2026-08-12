@@ -12,9 +12,31 @@
     $missingFirst = empty($$fw);
     $missingEnd = empty($endDate);
     $datesIncomplete = $missingFirst || $missingEnd;
+    $enableRelatedDepartureLink = ! empty($cfg['enableRelatedDepartureLink']);
+    $linkableDepartures = $linkableDepartures ?? collect();
 @endphp
 
-<x-logistics.section-header :title="$cfg['title'] ?? 'Szczegóły'" />
+<x-logistics.section-header :title="$cfg['title'] ?? 'Szczegóły'">
+    @if($enableRelatedDepartureLink)
+        <x-slot:actions>
+            <div class="w-100" style="min-width: 12rem;">
+                <label class="form-label small text-muted mb-1 text-nowrap" for="related-departure-link" style="font-size: 0.68rem;">
+                    Powiąż z innym transportem
+                </label>
+                <select
+                    id="related-departure-link"
+                    class="form-select form-select-sm logistics-trip-header-control"
+                    wire:model.live="relatedDepartureId"
+                >
+                    <option value="">— bez powiązania —</option>
+                    @foreach($linkableDepartures as $opt)
+                        <option value="{{ $opt['id'] }}">{{ $opt['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </x-slot:actions>
+    @endif
+</x-logistics.section-header>
 
 <div class="row g-3 g-lg-4 align-items-stretch logistics-trip-header-row">
     {{-- Daty — poniżej lg pełna szerokość (unikamy nachodzenia kolumn na ~md) --}}

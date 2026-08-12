@@ -474,7 +474,8 @@ class LogisticsEvent extends Model
     }
 
     /**
-     * Przystanki w kolejności do widoku szczegółów (mieszkania + lokalizacje dodane ręcznie).
+     * Przystanki pośrednie w kolejności do widoku szczegółów (mieszkania + lokalizacje dodane ręcznie).
+     * Pomija start/cel zdarzenia (from/to) — te są renderowane osobno jako „Start” / „Cel podróży”.
      *
      * @return Collection<int, array{position: int, kind: string, model_id: int, name: string, address_line: string, employees_label: ?string, purpose: ?string}>
      */
@@ -483,8 +484,14 @@ class LogisticsEvent extends Model
         $notes = $this->location_stop_notes ?? [];
         $items = collect();
         $pos = 0;
+        $fromId = $this->from_location_id ? (int) $this->from_location_id : null;
+        $toId = $this->to_location_id ? (int) $this->to_location_id : null;
+        $toLocation = $toId ? ($this->relationLoaded('toLocation') ? $this->toLocation : Location::find($toId)) : null;
 
-        foreach ($this->route_waypoints ?? [] as $w) {
+        $raw = array_values($this->route_waypoints ?? []);
+        $lastIndex = count($raw) - 1;
+
+        foreach ($raw as $index => $w) {
             $p = self::parseRouteWaypointKey($w);
             if ($p === null) {
                 continue;
@@ -492,31 +499,23 @@ class LogisticsEvent extends Model
             if (($p['type'] ?? '') === 'base' || ($p['type'] ?? '') === 'sap') {
                 continue;
             }
-            $pos++;
-            if ($p['type'] === 'acc') {
-                $acc = Accommodation::find($p['id']);
-                if (! $acc) {
+
+            if ($p['type'] === 'loc') {
+                $locId = (int) $p['id'];
+                // Duplikat startu/celu: w planie często jest loc:baza i loc:cel, a widok i tak rysuje from/to.
+                if ($fromId && $locId === $fromId) {
                     continue;
                 }
-                $emps = $this->relationLoaded('accommodationAssignments')
-                    ? $this->accommodationAssignments->where('accommodation_id', $acc->id)->map(fn ($a) => $a->employee?->full_name)->filter()
-                    : collect();
-                $addressLine = trim(implode(', ', array_filter([$acc->address, $acc->city ?? null])));
-                $items->push([
-                    'position' => $pos,
-                    'kind' => 'accommodation',
-                    'model_id' => $acc->id,
-                    'name' => $acc->name,
-                    'address_line' => $addressLine,
-                    'employees_label' => $emps->isNotEmpty() ? $emps->join(', ') : null,
-                    'purpose' => null,
-                ]);
-            } else {
-                $loc = Location::find($p['id']);
+                if ($toId && $locId === $toId) {
+                    continue;
+                }
+
+                $loc = Location::find($locId);
                 if (! $loc) {
                     continue;
                 }
-                $noteKey = (string) $p['id'];
+                $pos++;
+                $noteKey = (string) $locId;
                 $purpose = isset($notes[$noteKey]) && trim((string) $notes[$noteKey]) !== ''
                     ? trim((string) $notes[$noteKey])
                     : null;
@@ -530,9 +529,58 @@ class LogisticsEvent extends Model
                     'employees_label' => null,
                     'purpose' => $purpose,
                 ]);
+
+                continue;
+            }
+
+            if ($p['type'] === 'acc') {
+                $acc = Accommodation::find($p['id']);
+                if (! $acc) {
+                    continue;
+                }
+
+                // Ostatnie mieszkanie często = cel (to_location utworzone z tego adresu) — nie dubluj z kartą „Cel podróży”.
+                if ($index === $lastIndex && $toLocation && $this->accommodationMatchesLocation($acc, $toLocation)) {
+                    continue;
+                }
+
+                $pos++;
+                $emps = $this->relationLoaded('accommodationAssignments')
+                    ? $this->accommodationAssignments->where('accommodation_id', $acc->id)->map(fn ($a) => $a->employee?->full_name)->filter()
+                    : collect();
+                $addressLine = trim(implode(', ', array_filter([$acc->address, $acc->city ?? null])));
+                $items->push([
+                    'position' => $pos,
+                    'kind' => 'accommodation',
+                    'model_id' => $acc->id,
+                    'name' => $acc->name,
+                    'address_line' => $addressLine,
+                    'employees_label' => $emps->isNotEmpty() ? $emps->join(', ') : null,
+                    'purpose' => null,
+                ]);
             }
         }
 
         return $items;
+    }
+
+    /**
+     * Czy mieszkanie odpowiada lokalizacji docelowej (ten sam adres / miasto).
+     */
+    protected function accommodationMatchesLocation(Accommodation $acc, Location $location): bool
+    {
+        $norm = static fn (?string $v): string => mb_strtolower(trim((string) $v));
+
+        if ($norm($acc->address) !== '' && $norm($acc->address) === $norm($location->address)
+            && $norm($acc->city) === $norm($location->city)) {
+            return true;
+        }
+
+        if ($norm($acc->name) !== '' && $norm($acc->name) === $norm($location->name)
+            && $norm($acc->city) === $norm($location->city)) {
+            return true;
+        }
+
+        return false;
     }
 }

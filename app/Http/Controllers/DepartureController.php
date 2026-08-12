@@ -153,12 +153,43 @@ class DepartureController extends Controller
             })->values()->all();
         }
 
+        $canRemoveParticipants = in_array($departure->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)
+            && $departure->participants->count() > 1;
+
+        $participantRemovalBlocks = [];
+        if ($canRemoveParticipants) {
+            $assignmentIdsByEmployee = $departure->projectAssignments
+                ->groupBy('employee_id')
+                ->map(fn ($rows) => $rows->pluck('id')->all());
+
+            $allAssignmentIds = $assignmentIdsByEmployee->flatten()->unique()->values()->all();
+            $assignmentIdsWithTimeLogs = $allAssignmentIds === []
+                ? []
+                : \App\Models\TimeLog::query()
+                    ->whereIn('project_assignment_id', $allAssignmentIds)
+                    ->pluck('project_assignment_id')
+                    ->unique()
+                    ->flip()
+                    ->all();
+
+            foreach ($departure->participants as $participant) {
+                $empId = (int) $participant->employee_id;
+                $ids = $assignmentIdsByEmployee->get($empId, []);
+                $blocked = collect($ids)->contains(fn ($aid) => isset($assignmentIdsWithTimeLogs[$aid]));
+                $participantRemovalBlocks[$empId] = $blocked
+                    ? 'Są zarejestrowane godziny pracy na przypisaniu projektu z tego wyjazdu.'
+                    : null;
+            }
+        }
+
         return view('departures.show', [
             'departure' => $departure,
             'transfer' => $transfer,
             'linkedTransfers' => $linkedTransfers,
             'groundLegTicketRows' => $groundLegTicketRows,
             'relatedUznania' => $relatedUznania,
+            'canRemoveParticipants' => $canRemoveParticipants,
+            'participantRemovalBlocks' => $participantRemovalBlocks,
         ]);
     }
 
@@ -477,6 +508,63 @@ class DepartureController extends Controller
             return redirect()
                 ->route('departures.show', $departure)
                 ->with('error', 'Wystąpił błąd podczas anulowania wyjazdu: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Wypisz jednego uczestnika z wyjazdu (bez anulowania całego wyjazdu).
+     */
+    public function removeParticipant(LogisticsEvent $departure, Employee $employee): RedirectResponse
+    {
+        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+            abort(404);
+        }
+
+        try {
+            $result = $this->departureService->removeParticipant($departure, (int) $employee->id);
+
+            $parts = [];
+            $assignTotal = $result['project_assignments_deleted']
+                + $result['vehicle_assignments_deleted']
+                + $result['accommodation_assignments_deleted'];
+            if ($assignTotal > 0) {
+                $parts[] = 'usunięto '.$assignTotal.' przypisań';
+            }
+            if ($result['tickets_deleted'] > 0) {
+                $parts[] = 'usunięto '.$result['tickets_deleted'].' biletów';
+            }
+            if ($result['adjustments_deleted'] > 0) {
+                $parts[] = 'usunięto '.$result['adjustments_deleted'].' uznania';
+            }
+            if ($result['transfer_participants_removed'] > 0) {
+                $parts[] = 'wypisano z '.$result['transfer_participants_removed'].' transferów';
+            }
+            if ($result['transfers_cancelled_empty'] > 0) {
+                $parts[] = 'anulowano '.$result['transfers_cancelled_empty'].' pustych transferów';
+            }
+
+            $message = 'Wypisano uczestnika: '.$employee->full_name.'.';
+            if ($parts !== []) {
+                $message .= ' '.ucfirst(implode(', ', $parts)).'.';
+            }
+
+            return redirect()
+                ->route('departures.show', $departure)
+                ->with('success', $message);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->route('departures.show', $departure)
+                ->with('error', collect($e->errors())->flatten()->first() ?: $e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Error removing departure participant', [
+                'departure_id' => $departure->id,
+                'employee_id' => $employee->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('departures.show', $departure)
+                ->with('error', 'Wystąpił błąd podczas wypisywania uczestnika: '.$e->getMessage());
         }
     }
 

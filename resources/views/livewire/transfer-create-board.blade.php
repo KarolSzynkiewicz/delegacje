@@ -225,6 +225,7 @@
             'firstLabel' => 'Data transferu',
             'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
             'vehiclePoolHint' => $mode === 'assignment' ? 'transfer_assignment' : 'transfer_transport',
+            'enableRelatedDepartureLink' => true,
         ]"
         :end-date="$endDate"
         :departure-date="$departureDate"
@@ -248,6 +249,7 @@
         ticket-wire-key-prefix="transfer-ticket"
         attachment-flat-binding-key="ticketAttachmentUploads"
         :flat-attachment-uploads="$ticketAttachmentUploads"
+        :linkable-departures="$this->linkableDepartures"
     />
 
     @if($transportMode === 'own' && $vehicleId && $this->selectedVehicleActiveEventInfo)
@@ -312,7 +314,10 @@
     </div>
 
     @if($mode === 'transport')
-    <livewire:employee-picker />
+    <livewire:employee-picker
+        :selected-employee-ids="$selectedEmployeeIds"
+        :key="'emp-picker-'.$employeePickerKey"
+    />
 
     <div class="d-flex align-items-center gap-3 mb-4">
         <button type="button"

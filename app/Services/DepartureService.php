@@ -13,6 +13,7 @@ use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Service for handling departures (wyjazdy) - employees going from base to project location.
@@ -289,5 +290,150 @@ class DepartureService
         }
 
         return $result;
+    }
+
+    /**
+     * Wypisuje jednego uczestnika z wyjazdu (bez anulowania całego wyjazdu).
+     *
+     * Blokada: gdy na przypisaniach projektu z tego wyjazdu są już time_logs.
+     * Blokada: nie można wypisać ostatniego uczestnika.
+     *
+     * @return array{
+     *     project_assignments_deleted: int,
+     *     vehicle_assignments_deleted: int,
+     *     accommodation_assignments_deleted: int,
+     *     tickets_deleted: int,
+     *     adjustments_deleted: int,
+     *     transfer_participants_removed: int,
+     *     transfers_cancelled_empty: int,
+     * }
+     */
+    public function removeParticipant(LogisticsEvent $departure, int $employeeId): array
+    {
+        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+            throw new \InvalidArgumentException('Zdarzenie nie jest wyjazdem.');
+        }
+
+        if (! in_array($departure->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Można wypisać uczestnika tylko z aktywnego wyjazdu.',
+            ]);
+        }
+
+        $participant = $departure->participants()->where('employee_id', $employeeId)->first();
+        if (! $participant) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Ta osoba nie jest uczestnikiem tego wyjazdu.',
+            ]);
+        }
+
+        if ($departure->participants()->count() <= 1) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Nie można wypisać ostatniego uczestnika — anuluj cały wyjazd.',
+            ]);
+        }
+
+        $projectAssignmentIds = $departure->projectAssignments()
+            ->where('employee_id', $employeeId)
+            ->pluck('id');
+
+        if (
+            $projectAssignmentIds->isNotEmpty()
+            && \App\Models\TimeLog::query()->whereIn('project_assignment_id', $projectAssignmentIds)->exists()
+        ) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Nie można wypisać uczestnika: są już zarejestrowane godziny pracy na przypisaniu projektu z tego wyjazdu.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($departure, $employeeId, $participant) {
+            $result = [
+                'project_assignments_deleted' => 0,
+                'vehicle_assignments_deleted' => 0,
+                'accommodation_assignments_deleted' => 0,
+                'tickets_deleted' => 0,
+                'adjustments_deleted' => 0,
+                'transfer_participants_removed' => 0,
+                'transfers_cancelled_empty' => 0,
+            ];
+
+            $employee = \App\Models\Employee::find($employeeId);
+            $employeeName = $employee?->full_name;
+
+            $result['project_assignments_deleted'] = $departure->projectAssignments()
+                ->where('employee_id', $employeeId)
+                ->get()
+                ->each->delete()
+                ->count();
+
+            $result['vehicle_assignments_deleted'] = $departure->vehicleAssignments()
+                ->where('employee_id', $employeeId)
+                ->get()
+                ->each->delete()
+                ->count();
+
+            $result['accommodation_assignments_deleted'] = $departure->accommodationAssignments()
+                ->where('employee_id', $employeeId)
+                ->get()
+                ->each->delete()
+                ->count();
+
+            if ($employeeName) {
+                $tickets = TransportCost::query()
+                    ->where('logistics_event_id', $departure->id)
+                    ->where('cost_type', 'ticket')
+                    ->where('description', 'like', '%'.$employeeName.'%')
+                    ->get();
+                foreach ($tickets as $ticket) {
+                    $ticket->delete();
+                    $result['tickets_deleted']++;
+                }
+            }
+
+            foreach (
+                Adjustment::query()
+                    ->where('logistics_event_id', $departure->id)
+                    ->where('employee_id', $employeeId)
+                    ->where('type', 'bonus')
+                    ->get() as $adj
+            ) {
+                if ($adj->payroll_id !== null) {
+                    continue;
+                }
+                $adj->delete();
+                $result['adjustments_deleted']++;
+            }
+
+            $transfers = $this->activeTransfersLinkedToDeparture($departure);
+            foreach ($transfers as $transfer) {
+                $tp = $transfer->participants()->where('employee_id', $employeeId)->get();
+                foreach ($tp as $row) {
+                    $row->delete();
+                    $result['transfer_participants_removed']++;
+                }
+
+                if ($transfer->participants()->count() === 0) {
+                    foreach (
+                        Adjustment::query()
+                            ->where('logistics_event_id', $transfer->id)
+                            ->whereNull('payroll_id')
+                            ->get() as $adj
+                    ) {
+                        $adj->delete();
+                        $result['adjustments_deleted']++;
+                    }
+                    $transfer->update(['status' => LogisticsEventStatus::CANCELLED]);
+                    $result['transfers_cancelled_empty']++;
+                }
+            }
+
+            $participant->delete();
+
+            if ($employee) {
+                app(LocationTrackingService::class)->getLocationStatus($employee, now());
+            }
+
+            return $result;
+        });
     }
 }

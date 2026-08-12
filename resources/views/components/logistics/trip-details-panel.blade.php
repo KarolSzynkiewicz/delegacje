@@ -37,6 +37,7 @@
     'currencies' => null,
     'attachmentFlatBindingKey' => null,
     'flatAttachmentUploads' => null,
+    'linkableDepartures' => null,
 ])
 
 @php
@@ -48,6 +49,7 @@
     $flatUploads = $flatAttachmentUploads ?? [];
     $headerVehicles = $availableVehicles ?? collect();
     $headerHubs = $availablePublicTransportHubs ?? collect();
+    $headerLinkableDepartures = $linkableDepartures ?? collect();
 @endphp
 
 <x-ui.card {{ $attributes->class(['mb-4']) }}>
@@ -63,6 +65,7 @@
         'vehicleId' => $vehicleId,
         'availableVehicles' => $headerVehicles,
         'availablePublicTransportHubs' => $headerHubs,
+        'linkableDepartures' => $headerLinkableDepartures,
     ])
 
     @if($showOwnGrid)

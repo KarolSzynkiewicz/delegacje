@@ -149,14 +149,24 @@
         <div class="col-md-7">
             <div class="rtp-card rounded-3 p-3" style="background: var(--bg-card); border: 1px solid rgba(255,255,255,0.08);">
 
-                <div class="small fw-semibold text-muted text-uppercase mb-3" style="letter-spacing: 0.05em; font-size: 0.7rem;">
-                    Trasa — przystanki i dystans
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div class="small fw-semibold text-muted text-uppercase" style="letter-spacing: 0.05em; font-size: 0.7rem;">
+                        Przebieg trasy
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-info" wire:click="openOwnTransferModal">
+                            <i class="bi bi-sliders me-1"></i>Wynagrodzenie
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="openOwnRouteModal">
+                            <i class="bi bi-signpost-split me-1"></i>Edytuj trasę / km
+                        </button>
+                    </div>
                 </div>
 
-                {{-- Status trasy (pełna szerokość) --}}
+                {{-- Metryki: osobno od przebiegu przystanków --}}
                 @if($ownRouteOk)
                     <div class="rounded-2 px-3 py-2 mb-3 d-flex align-items-center gap-2 step4-gts-route-metric-badge">
-                        <i class="bi bi-signpost-split"></i>
+                        <i class="bi bi-speedometer2"></i>
                         <span class="fw-semibold">
                             {{ number_format((float) $ownRouteDistKm, 1, ',', ' ') }} km
                             @if($ownRouteDurS !== null)
@@ -167,19 +177,107 @@
                             <i class="bi bi-pencil ms-auto" title="Wpisane ręcznie" style="opacity: 0.7;"></i>
                         @endif
                     </div>
+                @elseif(count($this->ownRouteTiles) > 0)
+                    <div class="rounded-2 px-3 py-2 mb-3 d-flex align-items-center gap-2"
+                         style="background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.35); color: #fcd34d;">
+                        <i class="bi bi-info-circle"></i>
+                        <span class="fw-semibold small">Przystanki gotowe — brak dystansu/czasu. Użyj „Edytuj trasę / km” (ORS lub wpis ręczny).</span>
+                    </div>
                 @else
                     <div class="rounded-2 px-3 py-2 mb-3 d-flex align-items-center gap-2 step4-gts-missing-route-badge">
                         <i class="bi bi-signpost-split"></i>
-                        <span class="fw-semibold">Brak trasy</span>
+                        <span class="fw-semibold">Brak przystanków — otwórz edycję trasy</span>
                     </div>
                 @endif
 
-                <p class="small text-muted mb-3" style="font-size: 0.8rem;">
-                    Przystanki dodajesz w modalu <strong class="text-white">Konfiguruj trasę</strong> (kolejność = kolejność przejazdu, notatki przy każdym punkcie, opcjonalnie km i minuty ręcznie). Pojazd z karty powyżej jest synchronizowany z tą konfiguracją przy zapisie transferu.
-                </p>
+                @php $preview = $this->ownRoutePreview; @endphp
+                @if($preview['start'] || $preview['end'] || count($preview['stops']) > 0)
+                    <div class="vstack gap-2 mb-3">
+                        @if($preview['start'])
+                            <div class="d-flex gap-3 p-3 rounded-3 border"
+                                 style="border-color: rgba(99,102,241,0.35) !important; background: rgba(99,102,241,0.06);">
+                                <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold text-white flex-shrink-0"
+                                     style="width: 36px; height: 36px; font-size: 0.85rem; background: #6366f1;">A</div>
+                                <div class="min-w-0 flex-grow-1">
+                                    <div class="small text-muted mb-1">Start</div>
+                                    <div class="fw-semibold small">{{ $preview['start']['name'] }}</div>
+                                    @if($preview['start']['address_line'] !== '')
+                                        <div class="small text-muted mt-1" style="line-height: 1.4;">{{ $preview['start']['address_line'] }}</div>
+                                    @endif
+                                    @if(!empty($preview['start']['purpose']))
+                                        <div class="mt-2 p-2 rounded-2" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06);">
+                                            <div class="small" style="line-height: 1.45; white-space: pre-wrap;">{{ $preview['start']['purpose'] }}</div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+
+                        @foreach($preview['stops'] as $stop)
+                            <div class="d-flex gap-3 p-3 rounded-3 border"
+                                 style="border-color: rgba(34,197,94,0.35) !important; background: rgba(34,197,94,0.05);">
+                                <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0"
+                                     style="width: 36px; height: 36px; font-size: 0.85rem; background: rgba(34,197,94,0.25); color: #bbf7d0; border: 1px solid rgba(34,197,94,0.45);">
+                                    {{ $stop['position'] }}
+                                </div>
+                                <div class="min-w-0 flex-grow-1">
+                                    @if(!empty($stop['type_label']))
+                                        <div class="mb-1">
+                                            <span class="badge rounded-pill border fw-normal"
+                                                  style="font-size: 0.65rem; background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.35) !important;">
+                                                {{ $stop['type_label'] }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                    <div class="fw-semibold small">{{ $stop['name'] }}</div>
+                                    @if($stop['address_line'] !== '')
+                                        <div class="small text-muted mt-1" style="line-height: 1.4;">{{ $stop['address_line'] }}</div>
+                                    @endif
+                                    @if(!empty($stop['purpose']))
+                                        <div class="mt-2 p-2 rounded-2" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06);">
+                                            <div class="small text-muted mb-1">Po co tu jedziemy</div>
+                                            <div class="small" style="line-height: 1.45; white-space: pre-wrap;">{{ $stop['purpose'] }}</div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+
+                        @if($preview['end'])
+                            <div class="d-flex gap-3 p-3 rounded-3 border"
+                                 style="border-color: rgba(16,185,129,0.4) !important; background: rgba(16,185,129,0.06);">
+                                <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold text-white flex-shrink-0"
+                                     style="width: 36px; height: 36px; font-size: 0.85rem; background: #22c55e;">
+                                    <i class="bi bi-flag-fill" style="font-size: 0.85rem;"></i>
+                                </div>
+                                <div class="min-w-0 flex-grow-1">
+                                    <div class="small text-muted mb-1">Cel podróży</div>
+                                    @if(!empty($preview['end']['type_label']))
+                                        <div class="mb-1">
+                                            <span class="badge rounded-pill border fw-normal"
+                                                  style="font-size: 0.65rem; background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.35) !important;">
+                                                {{ $preview['end']['type_label'] }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                    <div class="fw-semibold small">{{ $preview['end']['name'] }}</div>
+                                    @if($preview['end']['address_line'] !== '')
+                                        <div class="small text-muted mt-1" style="line-height: 1.4;">{{ $preview['end']['address_line'] }}</div>
+                                    @endif
+                                    @if(!empty($preview['end']['purpose']))
+                                        <div class="mt-2 p-2 rounded-2" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06);">
+                                            <div class="small text-muted mb-1">Po co tu jedziemy</div>
+                                            <div class="small" style="line-height: 1.45; white-space: pre-wrap;">{{ $preview['end']['purpose'] }}</div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                @endif
 
                 {{-- Wiersz podsumowania transferu --}}
-                <div class="d-flex flex-wrap align-items-center gap-2 pb-3 mb-3" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <div class="d-flex flex-wrap align-items-center gap-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.06);">
                     <span class="fw-semibold small text-muted">Transfer</span>
                     @if($ownVehicle)
                         <span class="badge rounded-pill bg-secondary bg-opacity-15 text-secondary-emphasis small">
@@ -207,16 +305,6 @@
                             @endif
                         </div>
                     </div>
-                </div>
-
-                {{-- Przyciski akcji --}}
-                <div class="d-flex flex-wrap gap-2 justify-content-end">
-                    <button type="button" class="btn btn-sm btn-outline-info" wire:click="openOwnTransferModal">
-                        <i class="bi bi-sliders me-1"></i>Konfiguruj transfer — wynagrodzenie za transport
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="openOwnRouteModal">
-                        <i class="bi bi-signpost-split me-1"></i>Konfiguruj trasę
-                    </button>
                 </div>
 
             </div>
