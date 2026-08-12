@@ -710,9 +710,9 @@ class DeparturePlannerV2 extends Component
         );
     }
 
-    public function handleSyncRouteSegments(array $segments): void
+    public function handleSyncRouteSegments(array $route_segments = []): void
     {
-        $this->routeSegments = $segments;
+        $this->routeSegments = $route_segments;
         if ($this->transportMode === 'public') {
             $this->routeSegments = $this->onlyPublicRouteSegments($this->routeSegments);
             $this->transferConfig = [];
@@ -856,22 +856,15 @@ class DeparturePlannerV2 extends Component
         ];
 
         if (! empty($data['route_segments']) && is_array($data['route_segments'])) {
-            $this->routeSegments = $data['route_segments'];
-        } elseif (! empty($this->routeSegments) && $this->transportMode === 'public' && empty($this->vehicleId)) {
-            $idx = DepartureRoutePlan::primaryPostAirportOwnSegmentIndex($this->routeSegments);
-            if ($idx !== null) {
-                $tc = is_array($this->routeSegments[$idx]['transfer_config'] ?? null)
-                    ? $this->routeSegments[$idx]['transfer_config']
-                    : [];
-                $this->routeSegments[$idx]['transfer_config'] = array_merge($tc, [
-                    'route_distance' => $this->routeData['route_distance'] ?? null,
-                    'route_duration' => $this->routeData['route_duration'] ?? null,
-                    'route_waypoints' => $this->routeData['route_waypoints'] ?? [],
-                    'location_stop_notes' => $this->routeData['location_stop_notes'] ?? [],
-                ]);
-                $this->routeSegments[$idx]['route_waypoints'] = $this->routeData['route_waypoints'] ?? [];
-                $this->routeSegments[$idx]['location_stop_notes'] = $this->routeData['location_stop_notes'] ?? [];
+            $this->routeSegments = $this->transportMode === 'public'
+                ? $this->onlyPublicRouteSegments($data['route_segments'])
+                : $data['route_segments'];
+            if ($this->transportMode === 'public') {
+                $this->transferConfig = [];
             }
+        } elseif (! empty($this->routeSegments) && $this->transportMode === 'public' && empty($this->vehicleId)) {
+            $this->routeSegments = $this->onlyPublicRouteSegments($this->routeSegments);
+            $this->transferConfig = [];
         }
 
         if (! empty($this->routeSegments)) {
