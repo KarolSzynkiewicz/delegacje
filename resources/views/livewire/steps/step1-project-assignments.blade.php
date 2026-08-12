@@ -57,10 +57,24 @@
                                             <span class="s1-emp-role-pill">{{ $role['name'] }}</span>
                                         @endforeach
                                     </div>
-                                    @if($employee['rotation_label'])
+                                    @if($employee['has_rotation'])
                                         <div class="s1-emp-rotation">
                                             <i class="bi bi-arrow-repeat"></i>
                                             {{ $employee['rotation_label'] }}
+                                        </div>
+                                    @else
+                                        <div class="s1-emp-rotation s1-emp-rotation--missing">
+                                            <span>
+                                                <i class="bi bi-exclamation-circle"></i>
+                                                Brak rotacji
+                                            </span>
+                                            <button type="button"
+                                                    class="s1-emp-add-rotation"
+                                                    draggable="false"
+                                                    wire:click.stop="openRotationModal({{ $employee['id'] }})"
+                                                    title="Dodaj rotację">
+                                                Dodaj
+                                            </button>
                                         </div>
                                     @endif
                                     @if($employee['docs_warning'])
@@ -234,6 +248,78 @@
         </div>
     </div>
 
+    <!-- Modal: Dodaj rotację -->
+    @if($showRotationModal && $rotationModalEmployeeId)
+        @teleport('body')
+            <div class="modal fade show d-block departure-planner-teleport-modal" tabindex="-1" role="dialog" aria-modal="true"
+                 style="background-color: rgba(0,0,0,0.55);">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0;">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">
+                                <i class="bi bi-arrow-repeat text-warning me-2"></i>
+                                Dodaj rotację: {{ $rotationModalEmployeeName }}
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" wire:click="closeRotationModal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="rotationStartDate" class="form-label">Data rozpoczęcia *</label>
+                                    <input type="date"
+                                           id="rotationStartDate"
+                                           class="form-control @error('rotationStartDate') is-invalid @enderror"
+                                           wire:model="rotationStartDate">
+                                    @error('rotationStartDate')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="rotationEndDate" class="form-label">Data zakończenia *</label>
+                                    <input type="date"
+                                           id="rotationEndDate"
+                                           class="form-control @error('rotationEndDate') is-invalid @enderror"
+                                           wire:model="rotationEndDate">
+                                    @error('rotationEndDate')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-12">
+                                    <label for="rotationNotes" class="form-label">Notatki</label>
+                                    <textarea id="rotationNotes"
+                                              class="form-control @error('rotationNotes') is-invalid @enderror"
+                                              rows="3"
+                                              wire:model="rotationNotes"></textarea>
+                                    @error('rotationNotes')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                            <p class="text-muted small mt-3 mb-0">
+                                Daty domyślnie pokrywają okres wyjazdu. Status rotacji ustala się automatycznie na podstawie dat.
+                            </p>
+                        </div>
+                        <div class="modal-footer border-secondary gap-2">
+                            <button type="button" class="btn btn-outline-light" wire:click="closeRotationModal">Anuluj</button>
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    wire:click="saveRotation"
+                                    wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="saveRotation">
+                                    <i class="bi bi-plus-circle me-1"></i>Zapisz rotację
+                                </span>
+                                <span wire:loading wire:target="saveRotation">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Zapisywanie…
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endteleport
+    @endif
+
     <!-- Modal: Employee Assignment Calendar -->
     @if($showEmployeeModal && $selectedEmployee && $selectedProject && $selectedRole)
         <div class="modal-portal-to-body">
@@ -335,6 +421,10 @@
     }
 
     document.addEventListener('dragstart', function(e) {
+        if (e.target.closest('.s1-emp-add-rotation')) {
+            e.preventDefault();
+            return;
+        }
         const card = e.target.closest('.s1-emp-card, .employee-card');
         if (card && card.hasAttribute('draggable')) {
             const employeeId = card.getAttribute('data-employee-id');

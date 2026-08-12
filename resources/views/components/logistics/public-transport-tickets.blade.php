@@ -168,7 +168,7 @@
                         <div class="pt-ticket-currency">
                             <select wire:model.live="{{ $bind }}.{{ $employee->id }}.currency" class="form-select form-select-sm">
                                 @foreach($currencyValues as $val)
-                                    <option value="{{ $val }}">{{ $val }}</option>
+                                    <option value="{{ $val }}" @selected(($ticket['currency'] ?? 'PLN') === $val)>{{ $val }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -287,7 +287,7 @@
                                 <select wire:model.live="{{ $bind }}.{{ $employee->id }}.currency"
                                         class="form-select form-select-sm">
                                     @foreach($currencyValues as $val)
-                                        <option value="{{ $val }}">{{ $val }}</option>
+                                        <option value="{{ $val }}" @selected(($ticket['currency'] ?? 'PLN') === $val)>{{ $val }}</option>
                                     @endforeach
                                 </select>
                             </td>

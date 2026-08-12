@@ -770,7 +770,9 @@ class DeparturePlannerV2 extends Component
         }
         foreach ($this->routeSegments as $i => $seg) {
             if (($seg['mode'] ?? '') === 'public') {
-                $this->routeSegments[$i]['ticket_costs_by_employee'] = $this->ticketCostsByEmployee;
+                $this->routeSegments[$i]['ticket_costs_by_employee'] = PublicTransportTicketCosts::ensureCurrencies(
+                    is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : []
+                );
 
                 return;
             }
@@ -795,6 +797,10 @@ class DeparturePlannerV2 extends Component
 
     public function updatedTicketCostsByEmployee(): void
     {
+        // Select w UI pokazuje PLN wizualnie przy pustym modelu — dopisz domyślną walutę do stanu Livewire.
+        $this->ticketCostsByEmployee = PublicTransportTicketCosts::ensureCurrencies(
+            is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : []
+        );
         $this->pushTicketsToFirstPublicSegment();
     }
 
@@ -1013,7 +1019,7 @@ class DeparturePlannerV2 extends Component
             foreach ($employeeIds as $employeeId) {
                 $employeeCost = $tickets[$employeeId] ?? $tickets[(string) $employeeId] ?? [];
                 $amount = $employeeCost['amount'] ?? null;
-                $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                $currency = PublicTransportTicketCosts::normalizeCurrency($employeeCost['currency'] ?? null);
 
                 if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                     $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu (odcinek #'.($segIndex + 1).').');
@@ -1118,7 +1124,7 @@ class DeparturePlannerV2 extends Component
                 foreach ($employeeIds as $employeeId) {
                     $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
                     $amount = $employeeCost['amount'] ?? null;
-                    $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                    $currency = PublicTransportTicketCosts::normalizeCurrency($employeeCost['currency'] ?? null);
 
                     if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                         $this->addError("ticketCostsByEmployee.{$employeeId}.amount", 'Podaj poprawny koszt biletu dla tego pracownika.');
@@ -1141,7 +1147,7 @@ class DeparturePlannerV2 extends Component
                 foreach ($employeeIds as $employeeId) {
                     $employeeCost = $this->ticketCostsByEmployee[$employeeId] ?? [];
                     $amount = $employeeCost['amount'] ?? null;
-                    $currency = strtoupper(trim((string) ($employeeCost['currency'] ?? '')));
+                    $currency = PublicTransportTicketCosts::normalizeCurrency($employeeCost['currency'] ?? null);
                     $attachment = $employeeCost['attachment'] ?? null;
 
                     $attachmentPath = $employeeCost['attachment_path'] ?? null;

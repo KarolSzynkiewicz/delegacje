@@ -113,7 +113,10 @@ final class DepartureRoutePlan
                 if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
                     continue;
                 }
-                $currency = strtoupper(trim((string) ($cost['currency'] ?? 'PLN')));
+                $currency = strtoupper(trim((string) ($cost['currency'] ?? PublicTransportTicketCosts::DEFAULT_CURRENCY)));
+                if (strlen($currency) !== 3) {
+                    $currency = PublicTransportTicketCosts::DEFAULT_CURRENCY;
+                }
                 $attachmentPath = ! empty($cost['attachment_path']) ? (string) $cost['attachment_path'] : null;
                 $lines[] = [
                     'employee_id' => $eid,

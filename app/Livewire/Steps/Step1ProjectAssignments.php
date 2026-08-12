@@ -9,7 +9,9 @@ use App\Models\Role;
 use App\Models\Vehicle;
 use App\Services\DeparturePlannerService;
 use App\Services\ExpiringDocumentsService;
+use App\Services\RotationService;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Step1ProjectAssignments extends Component
@@ -82,19 +84,38 @@ class Step1ProjectAssignments extends Component
 
     public $calendarMonthStart = null;
 
+    // Modal: dodawanie rotacji (SPA, bez opuszczania planera)
+    public bool $showRotationModal = false;
+
+    public ?int $rotationModalEmployeeId = null;
+
+    public ?string $rotationModalEmployeeName = null;
+
+    public ?string $rotationStartDate = null;
+
+    public ?string $rotationEndDate = null;
+
+    public ?string $rotationNotes = null;
+
     protected $departurePlannerService;
 
     protected $expiringDocumentsService;
+
+    protected $rotationService;
 
     protected $listeners = [
         'refresh-assignments' => 'refreshAssignments',
         'vehicle-seats-updated' => 'updateVehicleSeatsFromParent',
     ];
 
-    public function boot(DeparturePlannerService $departurePlannerService, ExpiringDocumentsService $expiringDocumentsService)
-    {
+    public function boot(
+        DeparturePlannerService $departurePlannerService,
+        ExpiringDocumentsService $expiringDocumentsService,
+        RotationService $rotationService
+    ) {
         $this->departurePlannerService = $departurePlannerService;
         $this->expiringDocumentsService = $expiringDocumentsService;
+        $this->rotationService = $rotationService;
     }
 
     public function refreshAssignments()
@@ -248,6 +269,7 @@ class Step1ProjectAssignments extends Component
         $now = Carbon::now();
 
         $allEmployees = Employee::with(['roles', 'employeeDocuments.document', 'rotations'])
+            ->whereNull('terminated_at')
             ->when($this->forTransfer && ! empty($this->allowedEmployeeIds), function ($q) {
                 $q->whereIn('id', $this->allowedEmployeeIds);
             })
@@ -794,6 +816,90 @@ class Step1ProjectAssignments extends Component
         $this->calendarMonthStart = null;
     }
 
+    public function openRotationModal(int $employeeId): void
+    {
+        $employee = collect($this->allAvailableEmployees)->firstWhere('id', $employeeId);
+        if (! $employee) {
+            return;
+        }
+
+        $this->rotationModalEmployeeId = $employeeId;
+        $this->rotationModalEmployeeName = $employee['full_name'];
+        $this->rotationStartDate = $this->departureDate
+            ? Carbon::parse($this->departureDate)->format('Y-m-d')
+            : now()->format('Y-m-d');
+        $this->rotationEndDate = $this->endDate
+            ? Carbon::parse($this->endDate)->format('Y-m-d')
+            : Carbon::parse($this->rotationStartDate)->addDays(30)->format('Y-m-d');
+        $this->rotationNotes = null;
+        $this->resetErrorBag(['rotationStartDate', 'rotationEndDate', 'rotationNotes']);
+        $this->showRotationModal = true;
+    }
+
+    public function closeRotationModal(): void
+    {
+        $this->showRotationModal = false;
+        $this->rotationModalEmployeeId = null;
+        $this->rotationModalEmployeeName = null;
+        $this->rotationStartDate = null;
+        $this->rotationEndDate = null;
+        $this->rotationNotes = null;
+        $this->resetErrorBag(['rotationStartDate', 'rotationEndDate', 'rotationNotes']);
+    }
+
+    public function saveRotation(): void
+    {
+        if (! $this->rotationModalEmployeeId) {
+            return;
+        }
+
+        $this->validate([
+            'rotationStartDate' => ['required', 'date'],
+            'rotationEndDate' => ['required', 'date', 'after_or_equal:rotationStartDate'],
+            'rotationNotes' => ['nullable', 'string'],
+        ], [
+            'rotationStartDate.required' => 'Data rozpoczęcia jest wymagana.',
+            'rotationStartDate.date' => 'Data rozpoczęcia musi być poprawną datą.',
+            'rotationEndDate.required' => 'Data zakończenia jest wymagana.',
+            'rotationEndDate.date' => 'Data zakończenia musi być poprawną datą.',
+            'rotationEndDate.after_or_equal' => 'Data zakończenia musi być późniejsza lub równa dacie rozpoczęcia.',
+        ]);
+
+        $employee = Employee::find($this->rotationModalEmployeeId);
+        if (! $employee) {
+            $this->addError('rotationStartDate', 'Nie znaleziono pracownika.');
+
+            return;
+        }
+
+        try {
+            $this->rotationService->createRotation(
+                $employee,
+                Carbon::parse($this->rotationStartDate),
+                Carbon::parse($this->rotationEndDate),
+                $this->rotationNotes ?: null
+            );
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $target = match ($field) {
+                    'start_date' => 'rotationStartDate',
+                    'end_date' => 'rotationEndDate',
+                    'notes' => 'rotationNotes',
+                    default => 'rotationEndDate',
+                };
+                foreach ($messages as $message) {
+                    $this->addError($target, $message);
+                }
+            }
+
+            return;
+        }
+
+        $this->closeRotationModal();
+        $this->loadAvailableEmployees();
+        $this->dispatch('success', message: 'Rotacja została dodana.');
+    }
+
     protected function loadEmployeeAvailabilityForMonth()
     {
         if (! $this->selectedEmployee || ! $this->selectedProject || ! $this->selectedRole || ! $this->calendarMonthStart) {
@@ -1067,6 +1173,7 @@ class Step1ProjectAssignments extends Component
         return collect($this->getFilteredEmployees())
             ->map(fn ($e) => array_merge($e, [
                 'initials' => mb_substr($e['first_name'], 0, 1).mb_substr($e['last_name'], 0, 1),
+                'has_rotation' => ! empty($e['rotation']),
                 'rotation_label' => $this->formatRotationLabel($e['rotation'] ?? null),
                 'docs_warning' => $this->buildDocsWarning($e['expiring_documents'] ?? []),
             ]))

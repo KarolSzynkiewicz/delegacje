@@ -38,6 +38,27 @@
 }
 .s1-emp-doc-warn { font-size:.68rem; color:#fbbf24; margin-top:3px; }
 .s1-emp-rotation { font-size:.68rem; color:#94a3b8; margin-top:2px; opacity:.75; }
+.s1-emp-rotation--missing {
+    display:flex; align-items:center; justify-content:space-between; gap:6px;
+    color:#fca5a5; opacity:1;
+}
+.s1-emp-add-rotation {
+    flex:0 0 auto;
+    border:1px solid rgba(252,165,165,0.35);
+    background:rgba(239,68,68,0.12);
+    color:#fecaca;
+    border-radius:999px;
+    font-size:.65rem;
+    font-weight:600;
+    line-height:1;
+    padding:3px 8px;
+    cursor:pointer;
+}
+.s1-emp-add-rotation:hover {
+    background:rgba(239,68,68,0.22);
+    border-color:rgba(252,165,165,0.55);
+    color:#fff;
+}
 .s1-emp-drag-hint {
     font-size:.68rem; color:rgba(148,163,184,0.5);
     margin-top:3px; display:flex; align-items:center; gap:3px;
