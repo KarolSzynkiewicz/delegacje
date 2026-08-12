@@ -84,7 +84,7 @@
             <div class="col-md-6">
                 <h6 class="text-muted small mb-2 d-flex align-items-center gap-1">
                     Typ transportu
-                    <x-tooltip title="Transport publiczny: lot i ewentualnie transfer z lotniska. Transport własny: przejazd pojazdem firmowym — szczegóły pojazdu w tabeli uczestników.">
+                    <x-tooltip title="Transport publiczny: lot i bilety w wyjeździe; dojazd na/z lotniska planujesz osobnym transferem. Transport własny: przejazd pojazdem firmowym — szczegóły pojazdu w tabeli uczestników.">
                         <i class="bi bi-signpost-split text-warning fs-6"></i>
                     </x-tooltip>
                 </h6>
@@ -279,186 +279,91 @@
         </x-ui.card>
     @endif
 
-    @if($isPublicTransportDeparture)
-        <x-ui.card label="Transfer" class="mb-0">
+    @php
+        $hasLinkedTransfers = isset($linkedTransfers) && $linkedTransfers->isNotEmpty();
+        $hasGroundLegTickets = ! empty($groundLegTicketRows);
+    @endphp
+
+    @if($isPublicTransportDeparture && ($hasLinkedTransfers || $hasGroundLegTickets))
+        <x-ui.card label="Powiązane transfery" class="mb-0">
             <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
-            @if(isset($linkedTransfers) && $linkedTransfers->isNotEmpty())
-                @foreach($linkedTransfers as $transfer)
-                @php
-                    $transferDrivingStops = $transfer->getRouteStopsForDetailView();
-                    if ($transferDrivingStops->isEmpty()) {
-                        $transferDrivingStops = $departure->getRouteStopsForDetailView();
-                    }
-                    $segNum = $loop->iteration;
-                    $ticketForRow = $departure->transportCosts->where('cost_type', 'ticket')->first(function ($c) use ($segNum) {
-                        return (bool) preg_match('/\(odcinek\s*'.$segNum.'\)/u', (string) ($c->description ?? ''));
-                    }) ?? $departure->transportCosts->where('cost_type', 'ticket')->first();
-                    $transferTicketFlightLine = null;
-                    $transferEndAirportLocation = null;
-                    if ($ticketForRow && $ticketForRow->notes && preg_match('/Lotnisko:\s*(.+?)\s*→\s*(.+?)(?:\s*\||$)/u', $ticketForRow->notes, $m)) {
-                        $transferTicketFlightLine = trim($m[1]).' → '.trim($m[2]);
-                        $arrivalAirportName = trim($m[2]);
-                        $transferEndAirportLocation = \App\Models\Location::query()
-                            ->where(function ($q) use ($arrivalAirportName) {
-                                $q->where('name', $arrivalAirportName)
-                                    ->orWhere('name', 'like', '%'.addcslashes($arrivalAirportName, '%_\\').'%');
-                            })
-                            ->first();
-                    }
-                @endphp
-                <div class="transfer-block @if(!$loop->last) mb-4 pb-4 border-bottom @endif" style="border-color: rgba(255,255,255,0.08) !important;">
-                @if($linkedTransfers->count() > 1)
-                    <h6 class="text-muted small text-uppercase mb-3" style="font-size: 0.72rem; letter-spacing: .06em;">Odcinek {{ $segNum }} z {{ $linkedTransfers->count() }}</h6>
-                @endif
-                <div class="transfer-summary-grid mb-3">
-                    <div class="row g-3 g-md-4">
-                        <div class="col-12 col-md-4">
-                            <h6 class="text-muted small mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: .04em;">Zdarzenie</h6>
-                            <p class="fw-semibold mb-0">
-                                <a href="{{ route('transfers.show', $transfer) }}" class="text-decoration-none">
-                                    Transfer #{{ $transfer->id }}
+
+            @if($hasLinkedTransfers)
+                <div class="d-flex flex-column gap-3">
+                    @foreach($linkedTransfers as $transfer)
+                        @php
+                            $driverAdj = $transfer->driverAdjustments->first();
+                        @endphp
+                        <div class="rounded-3 p-3 border" style="border-color: rgba(255,255,255,0.08) !important; background: rgba(255,255,255,0.03);">
+                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                <div>
+                                    <a href="{{ route('transfers.show', $transfer) }}" class="fw-semibold text-decoration-none">
+                                        Transfer #{{ $transfer->id }}
+                                    </a>
+                                    @if($linkedTransfers->count() > 1)
+                                        <span class="text-muted small ms-1">({{ $loop->iteration }}/{{ $linkedTransfers->count() }})</span>
+                                    @endif
+                                </div>
+                                <a href="{{ route('transfers.show', $transfer) }}" class="btn btn-sm btn-outline-light border-opacity-25">
+                                    Szczegóły
                                 </a>
-                            </p>
-                        </div>
-                        <div class="col-6 col-md-4">
-                            <h6 class="text-muted small mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: .04em;">Dystans</h6>
-                            <p class="fw-semibold mb-0">{{ $transfer->getFormattedDistance() ?? '—' }}</p>
-                        </div>
-                        <div class="col-6 col-md-4">
-                            <h6 class="text-muted small mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: .04em;">Czas</h6>
-                            <p class="fw-semibold mb-0">{{ $transfer->getFormattedDuration() ?? '—' }}</p>
-                        </div>
-                    </div>
-                    <div class="row g-3 g-md-4 mt-1 mt-md-2 pt-3 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
-                        <div class="col-12 col-md-6">
-                            <h6 class="text-muted small mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: .04em;">Pojazd transferu</h6>
-                            <p class="fw-semibold mb-0">
-                                {{ $transfer->vehicle ? ($transfer->vehicle->registration_number.' — '.$transfer->vehicle->brand.' '.$transfer->vehicle->model) : '—' }}
-                            </p>
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <h6 class="text-muted small mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: .04em;">Kierowca / uznanie</h6>
-                            @if($transfer->driverAdjustments->isNotEmpty())
-                                @php $adj = $transfer->driverAdjustments->first(); @endphp
-                                <p class="fw-semibold mb-0">
-                                    {{ $adj->employee?->full_name ?? '—' }}
-                                    <span class="text-muted">·</span>
-                                    {{ number_format((float) $adj->amount, 2) }} {{ $adj->currency }}
-                                </p>
-                                @if(!$adj->payroll_id)
-                                    <div class="small text-muted mt-1">Bez payrollu</div>
-                                @endif
-                            @else
-                                <p class="text-muted mb-0">—</p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <div class="border-top pt-3">
-                    <h6 class="fw-semibold mb-3"><i class="bi bi-map me-1"></i>Trasa transferu</h6>
-
-                    @if(!empty($transferTicketFlightLine))
-                        <div class="mb-3 p-2 px-3 rounded-2 small" style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2);">
-                            <span class="text-muted">Lot pasażerski:</span>
-                            <span class="fw-semibold ms-1"><i class="bi bi-airplane text-primary me-1"></i>{{ $transferTicketFlightLine }}</span>
-                        </div>
-                    @endif
-
-                    @php
-                        $stepNum = 1;
-                        $arrivalAirportTitle = null;
-                        if (!empty($transferTicketFlightLine) && preg_match('/→\s*(.+)$/u', $transferTicketFlightLine, $__m)) {
-                            $arrivalAirportTitle = trim($__m[1]);
-                        }
-                    @endphp
-
-                    <div class="vstack gap-3 mb-0">
-                        @if($transfer->fromLocation)
-                            <div class="p-3 rounded-3 border" style="border-color: rgba(14,165,233,0.35) !important; background: rgba(14,165,233,0.06);">
-                                <div class="d-flex align-items-baseline gap-2 flex-wrap mb-1">
-                                    <span class="badge bg-primary" style="font-size: 0.75rem;">{{ $stepNum }}</span>
-                                    <span class="fw-semibold">Skąd rusza</span>
-                                </div>
-                                <div class="fw-semibold">{{ $transfer->fromLocation->name }}</div>
-                                @if($transfer->fromLocation->address || $transfer->fromLocation->city)
-                                    <div class="small text-muted mt-1" style="line-height: 1.45;">
-                                        {{ $transfer->fromLocation->address }}@if($transfer->fromLocation->city), {{ $transfer->fromLocation->city }}@endif
-                                    </div>
-                                @endif
                             </div>
-                            @php $stepNum++; @endphp
-
-                            <div class="p-3 rounded-3 border" style="border-color: rgba(59,130,246,0.35) !important; background: rgba(59,130,246,0.06);">
-                                <div class="d-flex align-items-baseline gap-2 flex-wrap mb-1">
-                                    <span class="badge bg-primary" style="font-size: 0.75rem;">{{ $stepNum }}</span>
-                                    <span class="fw-semibold">Lotnisko</span>
+                            <div class="row g-2 small">
+                                <div class="col-6 col-md-3">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Dystans</div>
+                                    <div class="fw-semibold">{{ $transfer->getFormattedDistance() ?? '—' }}</div>
                                 </div>
-                                <div class="small text-muted mb-2">Odbiór po przylocie</div>
-                                @if($transferEndAirportLocation)
-                                    <div class="fw-semibold">{{ $transferEndAirportLocation->name }}</div>
-                                    @if($transferEndAirportLocation->address || $transferEndAirportLocation->city)
-                                        <div class="small text-muted mt-1" style="line-height: 1.45;">
-                                            {{ $transferEndAirportLocation->address }}@if($transferEndAirportLocation->city), {{ $transferEndAirportLocation->city }}@endif
-                                        </div>
-                                    @endif
-                                @else
-                                    <div class="fw-semibold">{{ $arrivalAirportTitle ?? 'Lotnisko docelowe' }}</div>
-                                @endif
+                                <div class="col-6 col-md-3">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Czas</div>
+                                    <div class="fw-semibold">{{ $transfer->getFormattedDuration() ?? '—' }}</div>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Pojazd</div>
+                                    <div class="fw-semibold">
+                                        {{ $transfer->vehicle ? ($transfer->vehicle->registration_number.' — '.$transfer->vehicle->brand.' '.$transfer->vehicle->model) : '—' }}
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Kierowca / uznanie</div>
+                                    <div class="fw-semibold">
+                                        @if($driverAdj)
+                                            {{ $driverAdj->employee?->full_name ?? '—' }}
+                                            · {{ number_format((float) $driverAdj->amount, 2) }} {{ $driverAdj->currency }}
+                                        @else
+                                            —
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
-                            @php $stepNum++; @endphp
-                        @endif
-
-                        @forelse($transferDrivingStops as $row)
-                            @if($row['kind'] === 'extra_location')
-                                <div class="p-3 rounded-3 border" style="border-color: rgba(251,191,36,0.45) !important; background: rgba(251,191,36,0.05);">
-                                    <div class="d-flex align-items-baseline gap-2 flex-wrap mb-1">
-                                        <span class="badge bg-secondary" style="font-size: 0.75rem;">{{ $stepNum }}</span>
-                                        <span class="badge rounded-pill border fw-normal"
-                                              style="font-size: 0.7rem; background: rgba(251,191,36,0.1); color: #fcd34d; border-color: rgba(251,191,36,0.35) !important;">Przystanek dodatkowy</span>
-                                    </div>
-                                    <div class="fw-semibold">{{ $row['name'] }}</div>
-                                    @if(!empty($row['address_line']))
-                                        <div class="small text-muted">{{ $row['address_line'] }}</div>
-                                    @endif
-                                    @if(!empty($row['purpose']))
-                                        <div class="mt-2 pt-2 border-top border-secondary border-opacity-25">
-                                            <div class="small text-muted mb-1">Po co tu jedziemy?</div>
-                                            <div class="small" style="white-space: pre-wrap;">{{ $row['purpose'] }}</div>
-                                        </div>
-                                    @endif
-                                </div>
-                            @else
-                                <div class="p-3 rounded-3 border" style="border-color: rgba(34,197,94,0.35) !important; background: rgba(34,197,94,0.04);">
-                                    <div class="d-flex align-items-baseline gap-2 flex-wrap mb-1">
-                                        <span class="badge bg-secondary" style="font-size: 0.75rem;">{{ $stepNum }}</span>
-                                        <span class="badge rounded-pill border fw-normal"
-                                              style="font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.3) !important;">Mieszkanie / dom</span>
-                                    </div>
-                                    <div class="fw-semibold">{{ $row['name'] }}</div>
-                                    @if(!empty($row['address_line']))
-                                        <div class="small text-muted">{{ $row['address_line'] }}</div>
-                                    @endif
-                                    @if(!empty($row['employees_label']))
-                                        <div class="small mt-2" style="color:#94a3b8;">
-                                            <span class="text-muted">Wysiadka dla:</span> {{ $row['employees_label'] }}
-                                        </div>
-                                    @endif
+                            @if($transfer->fromLocation || $transfer->toLocation)
+                                <div class="small text-muted mt-2 pt-2 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
+                                    {{ $transfer->fromLocation?->name ?? '—' }}
+                                    <span class="mx-1">→</span>
+                                    {{ $transfer->toLocation?->name ?? '—' }}
                                 </div>
                             @endif
-                            @php $stepNum++; @endphp
-                        @empty
-                            @if($stepNum < 2)
-                                <x-ui.empty-state icon="map" message="Brak zapisanej kolejności przystanków w wyjeździe (krok 4)." />
-                            @endif
-                        @endforelse
-                    </div>
+                        </div>
+                    @endforeach
                 </div>
-                </div>
-                @endforeach
-            @else
-                <p class="text-muted mb-0">Brak powiązanego transferu (dla wyjazdów transportem publicznym transfer tworzy się automatycznie w kroku 4).</p>
             @endif
+
+            <div class="mt-3 pt-3 border-top d-flex flex-wrap align-items-center gap-2" style="border-color: rgba(255,255,255,0.08) !important;">
+                <span class="small text-muted">Transfer na/z lotniska dodajesz osobno w kreatorze transferów.</span>
+                <a href="{{ route('transfers.create') }}" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-plus-lg me-1"></i>Nowy transfer
+                </a>
+            </div>
+        </x-ui.card>
+    @elseif($isPublicTransportDeparture)
+        <x-ui.card label="Transfery" class="mb-0">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <p class="text-muted mb-0 small">
+                    Brak powiązanych transferów. Dojazd na lotnisko lub z lotniska do mieszkań planujesz w osobnym kreatorze — nie w wyjeździe.
+                </p>
+                <a href="{{ route('transfers.create') }}" class="btn btn-sm btn-outline-info flex-shrink-0">
+                    <i class="bi bi-plus-lg me-1"></i>Nowy transfer
+                </a>
+            </div>
         </x-ui.card>
     @endif
 
@@ -635,7 +540,7 @@
 
     <x-ui.card label="Powiązane uznania" class="mb-0">
         @if(($relatedUznania ?? collect())->isEmpty())
-            <p class="text-muted mb-0">Brak uznania powiązanego z tym wyjazdem lub transferami z lotniska.</p>
+            <p class="text-muted mb-0">Brak uznania powiązanego z tym wyjazdem lub powiązanymi transferami.</p>
         @else
             <div class="table-responsive rounded-3 border" style="border-color: rgba(255,255,255,0.08) !important;">
                 <table class="table table-hover departure-participants-table mb-0 align-middle">
