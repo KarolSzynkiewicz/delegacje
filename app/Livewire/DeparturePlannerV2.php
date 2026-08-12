@@ -707,16 +707,33 @@ class DeparturePlannerV2 extends Component
             $this->sharedStartAirportLocationId,
             $this->sharedEndAirportLocationId,
             is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : [],
-            is_array($this->transferConfig) ? $this->transferConfig : [],
-            data_get($this->routeData, 'route_waypoints', []) ?: [],
-            data_get($this->routeData, 'location_stop_notes', []) ?: [],
         );
     }
 
     public function handleSyncRouteSegments(array $segments): void
     {
         $this->routeSegments = $segments;
+        if ($this->transportMode === 'public') {
+            $this->routeSegments = $this->onlyPublicRouteSegments($this->routeSegments);
+            $this->transferConfig = [];
+        }
         $this->deriveLegacyFieldsFromRouteSegments();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $segments
+     * @return list<array<string, mixed>>
+     */
+    protected function onlyPublicRouteSegments(array $segments): array
+    {
+        $public = [];
+        foreach ($segments as $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                $public[] = $seg;
+            }
+        }
+
+        return $public !== [] ? $public : $segments;
     }
 
     /**
@@ -751,6 +768,13 @@ class DeparturePlannerV2 extends Component
         // Zawsze nadpisz bilety w pierwszym segmencie publicznym autorytatywnym stanem nagłówka rodzica
         // — niezależnie od tego, co przyszło zwrotnie z eventu (tam pliki są już uszkodzone).
         $this->pushTicketsToFirstPublicSegment();
+
+        if ($this->transportMode === 'public') {
+            $this->routeSegments = $this->onlyPublicRouteSegments($this->routeSegments);
+            $this->transferConfig = [];
+
+            return;
+        }
 
         $ground = DepartureRoutePlan::primaryPostAirportOwnSegment($this->routeSegments);
         if ($ground !== null) {
@@ -911,7 +935,7 @@ class DeparturePlannerV2 extends Component
             $out[] = 'Krok 3: część osób nie ma przypisanego pojazdu dojazdowego.';
         }
         if ($this->step4TabIncomplete) {
-            $out[] = 'Krok 4: niekompletna trasa (dystans/czas) lub konfiguracja transferu.';
+            $out[] = 'Krok 4: niekompletna trasa (dystans/czas) dla transportu własnego.';
         }
 
         if ($this->transportMode === 'public') {
@@ -982,15 +1006,8 @@ class DeparturePlannerV2 extends Component
      */
     protected function validateAndBuildTicketsForRouteSegments(array $employeeIds, array &$ticketCostsLineItems, array &$transferConfigsList): void
     {
+        // Transfery ziemne nie są już częścią kreatora wyjazdu — nie tworzymy auto-TRANSFER.
         $transferConfigsList = [];
-        foreach ($this->routeSegments as $seg) {
-            if (($seg['mode'] ?? '') === 'own') {
-                $tc = $seg['transfer_config'] ?? [];
-                if (is_array($tc) && $tc !== []) {
-                    $transferConfigsList[] = $tc;
-                }
-            }
-        }
 
         foreach ($this->routeSegments as $segIndex => $seg) {
             if (($seg['mode'] ?? '') !== 'public') {
@@ -1364,9 +1381,13 @@ class DeparturePlannerV2 extends Component
         return false;
     }
 
-    /** Krok 4: brak trasy (dystans/czas) lub przy locie — niewypełniona konfiguracja transferu. */
+    /** Krok 4: przy własnym aucie — brak trasy; przy publicznym — transfery ziemne poza kreatorem. */
     public function getStep4TabIncompleteProperty(): bool
     {
+        if ($this->transportMode === 'public') {
+            return false;
+        }
+
         $rd = $this->routeData;
         $dist = data_get($rd, 'route_distance', data_get($rd, 'distance'));
         $dur = data_get($rd, 'route_duration', data_get($rd, 'duration'));
@@ -1374,36 +1395,7 @@ class DeparturePlannerV2 extends Component
             && $dist !== null && $dist !== '' && is_numeric($dist) && (float) $dist > 0
             && $dur !== null && $dur !== '' && (int) $dur > 0;
 
-        if ($this->transportMode === 'own') {
-            return ! $routeOk;
-        }
-
-        $fromSeg = DepartureRoutePlan::primaryPostAirportOwnSegment($this->routeSegments);
-        if ($fromSeg === null) {
-            return false;
-        }
-
-        if (! $routeOk) {
-            return true;
-        }
-
-        if (($fromSeg['leg_kind'] ?? 'own') === 'public') {
-            return false;
-        }
-
-        $tc = $this->transferConfig;
-        if (! is_array($tc) || empty($tc['vehicle_id']) || empty($tc['driver_employee_id'])) {
-            return true;
-        }
-
-        $bonus = $tc['bonus_amount'] ?? null;
-        if ($bonus === null || $bonus === '' || ! is_numeric($bonus) || (float) $bonus <= 0) {
-            return true;
-        }
-
-        $cur = strtoupper(trim((string) ($tc['bonus_currency'] ?? 'PLN')));
-
-        return strlen($cur) !== 3;
+        return ! $routeOk;
     }
 
     /** Tytuł sekcji biletów: lotnisko vs dworzec. */

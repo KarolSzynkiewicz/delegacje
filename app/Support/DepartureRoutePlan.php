@@ -20,12 +20,13 @@ use Illuminate\Support\Str;
 final class DepartureRoutePlan
 {
     /**
-     * Domyślny układ: lot + transfer z lotniska (zgodny ze starym kreatorem).
+     * Domyślny układ: wyłącznie odcinek lotu / transportu publicznego.
+     * Transfery ziemne na/z lotniska planujemy osobnym kreatorem transferów.
      *
      * @param  array<int|string, array<string, mixed>>  $ticketCostsByEmployee
-     * @param  array<string, mixed>  $transferConfig
-     * @param  array<int, string>  $routeWaypoints
-     * @param  array<string, string>  $locationStopNotes
+     * @param  array<string, mixed>  $transferConfig  unused (BC)
+     * @param  array<int, string>  $routeWaypoints  unused (BC)
+     * @param  array<string, string>  $locationStopNotes  unused (BC)
      * @return list<array<string, mixed>>
      */
     public static function defaultTwoSegmentPlan(
@@ -33,8 +34,8 @@ final class DepartureRoutePlan
         $startLocationId,
         $endLocationId,
         array $ticketCostsByEmployee,
-        array $transferConfig,
-        array $routeWaypoints,
+        array $transferConfig = [],
+        array $routeWaypoints = [],
         array $locationStopNotes = [],
     ): array {
         return [
@@ -45,15 +46,6 @@ final class DepartureRoutePlan
                 'start_location_id' => $startLocationId !== null && $startLocationId !== '' ? (int) $startLocationId : null,
                 'end_location_id' => $endLocationId !== null && $endLocationId !== '' ? (int) $endLocationId : null,
                 'ticket_costs_by_employee' => $ticketCostsByEmployee,
-            ],
-            [
-                'id' => (string) Str::uuid(),
-                'mode' => 'own',
-                'leg' => 'from_airport',
-                'ground_mode' => 'car',
-                'transfer_config' => $transferConfig,
-                'route_waypoints' => array_values($routeWaypoints),
-                'location_stop_notes' => $locationStopNotes,
             ],
         ];
     }

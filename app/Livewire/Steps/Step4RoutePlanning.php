@@ -315,6 +315,11 @@ class Step4RoutePlanning extends Component
             $this->hydrateOptionalLegsFromRouteSegments();
         }
 
+        // Transfery na/z lotniska wyjęte z kreatora wyjazdu — zostaje tylko odcinek lotu.
+        if ($this->isPublicTransport) {
+            $this->stripEmbeddedAirportTransfersFromPublicPlan();
+        }
+
         $this->hydrateTransferFieldsFromParent($initialTransferConfig);
         $this->pruneInvalidOwnDriverSelection();
         $this->syncPostTransferCollapsedFromStoredState();
@@ -691,7 +696,8 @@ class Step4RoutePlanning extends Component
     }
 
     /**
-     * Składa routeSegments z UI (lot + opcjonalny transfer przed lotem + transfer po locie).
+     * Składa routeSegments z UI — wyłącznie odcinek lotu (public).
+     * Transfery ziemne na/z lotniska robimy osobnym kreatorem transferów.
      */
     protected function rebuildRouteSegmentsFromUiState(): void
     {
@@ -716,119 +722,74 @@ class Step4RoutePlanning extends Component
         $publicSeg['start_location_id'] = $this->sharedStartAirportLocationId;
         $publicSeg['end_location_id'] = $this->sharedEndAirportLocationId;
 
-        // Lot (segment publiczny): bilety z nagłówka — nie mieszają się z transferami ziemnymi; bez tego segment tracił
-        // ticket_costs_by_employee przy zmianie trybu transferu na lotnisko i rodzic nadpisywał nagłówek pustą tablicą.
+        // Lot (segment publiczny): bilety z nagłówka — nie mieszają się z transferami ziemnymi.
         $publicSeg['ticket_costs_by_employee'] = $this->mergePublicFlightTicketCostsForSegment(
             is_array($publicSeg['ticket_costs_by_employee'] ?? null) ? $publicSeg['ticket_costs_by_employee'] : [],
             is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : []
         );
 
-        $fromSeg = null;
-        if ($this->postAirportTransferUserEnabled) {
-            $fromId = null;
-            foreach ($this->routeSegments as $seg) {
-                if (($seg['mode'] ?? '') === 'own' && (($seg['leg'] ?? '') === 'from_airport' || ($seg['leg'] ?? '') === '')) {
-                    $fromId = $seg['id'] ?? null;
+        $this->routeSegments = [$publicSeg];
+        $this->clearEmbeddedAirportTransferUiState();
+    }
 
-                    break;
-                }
-            }
-            if ($fromId === null) {
-                $fromId = (string) Str::uuid();
-            }
+    /**
+     * Usuwa odcinki own (to/from airport) z planu publicznego i czyści stan UI transferów.
+     */
+    protected function stripEmbeddedAirportTransfersFromPublicPlan(): void
+    {
+        if (! $this->isPublicTransport) {
+            return;
+        }
 
-            $postKind = $this->transferFromAirportLegKind
-                ?? (count($this->routeWaypoints) > 0 ? 'own' : 'public');
-            $fromGround = ($postKind === 'public') ? 'other' : $this->transferFromAirportGroundMode;
+        $publicSeg = null;
+        foreach ($this->routeSegments as $seg) {
+            if (($seg['mode'] ?? '') === 'public') {
+                $publicSeg = $seg;
 
-            $fromSeg = [
-                'id' => $fromId,
-                'mode' => 'own',
-                'leg' => 'from_airport',
-                'leg_kind' => $postKind,
-                'ground_mode' => $fromGround,
-                'route_waypoints' => array_values($this->routeWaypoints),
-                'location_stop_notes' => $this->getLocationStopNotesPayload(),
-                'transfer_config' => ($postKind === 'own' && $this->transferFromAirportGroundMode === 'car')
-                    ? $this->buildTransferConfigSnapshot()
-                    : [],
-                'route_metrics' => null,
-                'public_leg_ticket_costs_by_employee' => ($postKind === 'public'
-                    || ($postKind === 'own' && $this->transferFromAirportGroundMode === 'other'))
-                    ? $this->fromAirportPublicTicketCostsByEmployee
-                    : [],
-            ];
-            if (is_array($this->routeData) && isset($this->routeData['distance'], $this->routeData['duration'])) {
-                $fromSeg['route_metrics'] = [
-                    'distance' => (float) $this->routeData['distance'],
-                    'duration' => (int) $this->routeData['duration'],
-                    'is_manual' => (bool) $this->isManualRouteDistance,
-                ];
+                break;
             }
         }
 
-        if ($this->transferToAirportLegKind !== null) {
-            $ownCarPre = $this->transferToAirportLegKind === 'own' && $this->transferToAirportGroundMode === 'car';
-            if ($ownCarPre) {
-                $this->ensureSingleSapInPreTransferWaypoints();
-                $this->syncTransferToAirportStartsFromBaseFromWaypoints();
-            }
+        if ($publicSeg === null) {
+            $this->clearEmbeddedAirportTransferUiState();
 
-            $toId = null;
-            foreach ($this->routeSegments as $seg) {
-                if (($seg['mode'] ?? '') === 'own' && ($seg['leg'] ?? '') === 'to_airport') {
-                    $toId = $seg['id'] ?? null;
-
-                    break;
-                }
-            }
-            if ($toId === null) {
-                $toId = (string) Str::uuid();
-            }
-
-            $preKind = $this->transferToAirportLegKind;
-            $preGround = ($preKind === 'public') ? 'other' : $this->transferToAirportGroundMode;
-
-            $toSeg = [
-                'id' => $toId,
-                'mode' => 'own',
-                'leg' => 'to_airport',
-                'leg_kind' => $preKind,
-                'ground_mode' => $preGround,
-                'route_waypoints' => array_values($this->transferToAirportWaypoints),
-                'location_stop_notes' => $this->getPreLocationStopNotesPayload(),
-                'transfer_config' => ($preKind === 'own' && $this->transferToAirportGroundMode === 'car')
-                    ? $this->buildPreAirportTransferConfigSnapshot()
-                    : (($preKind === 'own' && $this->transferToAirportGroundMode === 'other')
-                        ? $this->buildPreAirportPublicOtherTransferConfigSnapshot()
-                        : []),
-                'route_metrics' => null,
-                'public_leg_ticket_costs_by_employee' => ($preKind === 'public'
-                    || ($preKind === 'own' && $this->transferToAirportGroundMode === 'other'))
-                    ? $this->toAirportPublicTicketCostsByEmployee
-                    : [],
-                'starts_from_base' => $this->transferToAirportStartsFromBase,
-            ];
-            if (is_array($this->preRouteData) && isset($this->preRouteData['distance'], $this->preRouteData['duration'])) {
-                $toSeg['route_metrics'] = [
-                    'distance' => (float) $this->preRouteData['distance'],
-                    'duration' => (int) $this->preRouteData['duration'],
-                    'is_manual' => (bool) $this->isManualPreRouteDistance,
-                ];
-            }
-
-            $pieces = [$toSeg, $publicSeg];
-            if ($fromSeg !== null) {
-                $pieces[] = $fromSeg;
-            }
-            $this->routeSegments = $pieces;
-        } else {
-            $pieces = [$publicSeg];
-            if ($fromSeg !== null) {
-                $pieces[] = $fromSeg;
-            }
-            $this->routeSegments = $pieces;
+            return;
         }
+
+        $publicSeg['hub_kind'] = $publicSeg['hub_kind'] ?? $this->publicTransportHubKind;
+        $publicSeg['start_location_id'] = $this->sharedStartAirportLocationId;
+        $publicSeg['end_location_id'] = $this->sharedEndAirportLocationId;
+        $publicSeg['ticket_costs_by_employee'] = $this->mergePublicFlightTicketCostsForSegment(
+            is_array($publicSeg['ticket_costs_by_employee'] ?? null) ? $publicSeg['ticket_costs_by_employee'] : [],
+            is_array($this->ticketCostsByEmployee) ? $this->ticketCostsByEmployee : []
+        );
+
+        $this->routeSegments = [$publicSeg];
+        $this->clearEmbeddedAirportTransferUiState();
+        $this->dispatch('sync-route-segments', route_segments: $this->routeSegments);
+    }
+
+    protected function clearEmbeddedAirportTransferUiState(): void
+    {
+        $this->transferToAirportLegKind = null;
+        $this->transferToAirportWaypoints = [];
+        $this->transferToAirportStartsFromBase = true;
+        $this->transferToAirportLocationStopNotes = [];
+        $this->toAirportPublicTicketCostsByEmployee = [];
+        $this->toAirportTicketFiles = [];
+        $this->preRouteData = null;
+        $this->isManualPreRouteDistance = false;
+        $this->preTransferVehicleId = null;
+        $this->preTransferDriverEmployeeId = null;
+        $this->preTransferDriverBonusAmount = null;
+        $this->preTransferPublicStationStart = null;
+        $this->preTransferPublicStationEnd = null;
+
+        $this->postAirportTransferUserEnabled = false;
+        $this->transferFromAirportModePickerOpen = false;
+        $this->transferFromAirportLegKind = null;
+        $this->fromAirportPublicTicketCostsByEmployee = [];
+        $this->fromAirportTicketFiles = [];
     }
 
     /**
