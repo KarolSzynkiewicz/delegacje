@@ -21,7 +21,7 @@ return [
 
     'procedures' => [
         'route' => 'procedure-templates.index',
-        'icon'  => 'bi bi-diagram-3',
+        'icon' => 'bi bi-diagram-3',
         'label' => 'Procedury',
     ],
 
@@ -55,6 +55,13 @@ return [
         'route' => 'companies.index',
         'icon' => 'bi bi-building',
         'label' => 'Spółki',
+    ],
+
+    'warehouses' => [
+        'route' => 'warehouses.index',
+        'icon' => 'bi bi-buildings',
+        'label' => 'Magazyny',
+        'permission' => 'equipment.view',
     ],
 
     'locations' => [
@@ -113,14 +120,20 @@ return [
 
     'equipment' => [
         'route' => 'equipment.index',
-        'icon' => 'bi bi-tools',
-        'label' => 'Sprzęt',
+        'icon' => 'bi bi-box-seam',
+        'label' => 'Stany magazynowe',
     ],
 
     'equipment_issues' => [
         'route' => 'equipment-issues.index',
         'icon' => 'bi bi-box-arrow-up',
-        'label' => 'Wydania sprzętu',
+        'label' => 'Wydania z magazynu',
+    ],
+
+    'equipment_consumptions' => [
+        'route' => 'equipment-consumptions.index',
+        'icon' => 'bi bi-dash-circle',
+        'label' => 'Rozchód z magazynu',
     ],
 
     'project_variable_costs' => [

@@ -1,0 +1,202 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\LocationPurposeType;
+use App\Models\Location;
+use App\Models\Warehouse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class WarehouseService
+{
+    public const SESSION_KEY = 'equipment.warehouse_id';
+
+    /**
+     * @return Collection<int, Warehouse>
+     */
+    public function all(): Collection
+    {
+        return Warehouse::query()
+            ->with('location')
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function default(): Warehouse
+    {
+        $warehouse = Warehouse::query()->where('is_default', true)->orderBy('id')->first()
+            ?? Warehouse::query()->orderBy('id')->first();
+
+        if ($warehouse) {
+            return $warehouse;
+        }
+
+        return DB::transaction(function () {
+            $location = Location::query()->where('is_base', true)->first()
+                ?? Location::query()->orderBy('id')->first();
+
+            $created = Warehouse::query()->create([
+                'location_id' => $location?->id,
+                'name' => $location?->name ?? 'Siedziba',
+                'is_default' => true,
+            ]);
+
+            $this->attachWarehousePurpose($location);
+
+            return $created;
+        });
+    }
+
+    public function current(?Request $request = null): Warehouse
+    {
+        $request ??= request();
+        $requestedId = $request->query('warehouse_id');
+
+        if ($request->hasSession()) {
+            $requestedId ??= $request->session()->get(self::SESSION_KEY);
+        }
+
+        if ($requestedId) {
+            $warehouse = Warehouse::query()->with('location')->find($requestedId);
+            if ($warehouse) {
+                $this->remember($warehouse, $request);
+
+                return $warehouse;
+            }
+        }
+
+        $warehouse = $this->default()->loadMissing('location');
+        $this->remember($warehouse, $request);
+
+        return $warehouse;
+    }
+
+    public function remember(Warehouse $warehouse, ?Request $request = null): void
+    {
+        $request ??= request();
+
+        if (! $request->hasSession()) {
+            return;
+        }
+
+        $request->session()->put(self::SESSION_KEY, $warehouse->id);
+    }
+
+    public function createForLocation(Location $location, ?string $name = null): Warehouse
+    {
+        if (Warehouse::query()->where('location_id', $location->id)->exists()) {
+            throw ValidationException::withMessages([
+                'location_id' => 'Ta lokalizacja ma już magazyn.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($location, $name) {
+            $isFirst = ! Warehouse::query()->exists();
+
+            $warehouse = Warehouse::query()->create([
+                'location_id' => $location->id,
+                'name' => filled($name) ? trim($name) : $location->name,
+                'is_default' => $isFirst,
+            ]);
+
+            $this->attachWarehousePurpose($location);
+
+            return $warehouse;
+        });
+    }
+
+    public function update(Warehouse $warehouse, string $name, bool $isDefault = false): Warehouse
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw ValidationException::withMessages([
+                'name' => 'Nazwa magazynu jest wymagana.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($warehouse, $name, $isDefault) {
+            if ($isDefault && ! $warehouse->is_default) {
+                Warehouse::query()->where('is_default', true)->update(['is_default' => false]);
+                $warehouse->is_default = true;
+            }
+
+            if (! $isDefault && $warehouse->is_default) {
+                throw ValidationException::withMessages([
+                    'is_default' => 'Ustaw najpierw inny magazyn jako siedzibę, albo zostaw ten jako domyślny.',
+                ]);
+            }
+
+            $warehouse->name = $name;
+            $warehouse->save();
+            $this->attachWarehousePurpose($warehouse->location);
+
+            return $warehouse->fresh('location');
+        });
+    }
+
+    public function delete(Warehouse $warehouse): void
+    {
+        if ($warehouse->is_default) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć magazynu siedziby. Ustaw najpierw inny magazyn jako domyślny.',
+            ]);
+        }
+
+        if (Warehouse::query()->count() <= 1) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć jedynego magazynu.',
+            ]);
+        }
+
+        if ($warehouse->issues()->exists()) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć magazynu, który ma wydania.',
+            ]);
+        }
+
+        if ($warehouse->movements()->exists()) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć magazynu, który ma rozchody lub inne ruchy stanu.',
+            ]);
+        }
+
+        $hasStock = $warehouse->stocks()->where('quantity_in_stock', '>', 0)->exists();
+        if ($hasStock) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć magazynu, w którym leży sprzęt. Najpierw zeruj stany albo przenieś je.',
+            ]);
+        }
+
+        DB::transaction(function () use ($warehouse) {
+            $location = $warehouse->location;
+            $warehouse->stocks()->delete();
+            $warehouse->delete();
+
+            if ($location) {
+                $location->purposes()
+                    ->where('purpose', LocationPurposeType::WAREHOUSE->value)
+                    ->delete();
+            }
+        });
+    }
+
+    private function attachWarehousePurpose(?Location $location): void
+    {
+        $location?->addPurposes([LocationPurposeType::WAREHOUSE]);
+    }
+
+    /**
+     * @return Collection<int, Location>
+     */
+    public function locationsWithoutWarehouse(): Collection
+    {
+        return Location::query()
+            ->whereDoesntHave('warehouse')
+            ->orderBy('name')
+            ->get();
+    }
+}

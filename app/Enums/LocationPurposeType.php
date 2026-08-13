@@ -11,6 +11,7 @@ enum LocationPurposeType: string
     /** Dworzec (np. autobus, pociąg) — jak lotnisko w planerze transportu zbiorowego. */
     case STATION = 'station';
     case BASE = 'base';
+    case WAREHOUSE = 'warehouse';
     case OTHER = 'other';
 
     public function label(): string
@@ -22,6 +23,7 @@ enum LocationPurposeType: string
             self::AIRPORT => 'Lotnisko',
             self::STATION => 'Dworzec',
             self::BASE => 'Baza (siedziba główna)',
+            self::WAREHOUSE => 'Magazyn',
             self::OTHER => 'Inne',
         };
     }
@@ -35,6 +37,7 @@ enum LocationPurposeType: string
             self::AIRPORT => 'accent',
             self::STATION => 'info',
             self::BASE => 'success',
+            self::WAREHOUSE => 'accent',
             self::OTHER => 'warning',
         };
     }

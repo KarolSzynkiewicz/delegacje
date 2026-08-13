@@ -129,7 +129,7 @@
                     <div class="d-flex justify-content-end align-items-center gap-2">
                         <x-ui.button 
                             variant="ghost" 
-                            href="{{ route('fixed-costs.index') }}"
+                            href="{{ route('fixed-costs.tab.entries') }}"
                             action="cancel"
                         >
                             Anuluj

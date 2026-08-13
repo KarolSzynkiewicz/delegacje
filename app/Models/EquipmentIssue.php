@@ -10,8 +10,20 @@ class EquipmentIssue extends Model
 {
     use HasFactory;
 
+    public const STATUS_ISSUED = 'issued';
+
+    public const STATUS_GIVEN = 'given';
+
+    public const STATUS_RETURNED = 'returned';
+
+    public const STATUS_DAMAGED = 'damaged';
+
+    public const STATUS_LOST = 'lost';
+
     protected $fillable = [
         'equipment_id',
+        'equipment_variant_id',
+        'warehouse_id',
         'employee_id',
         'project_assignment_id',
         'quantity_issued',
@@ -20,6 +32,7 @@ class EquipmentIssue extends Model
         'actual_return_date',
         'status',
         'notes',
+        'batch_id',
         'issued_by',
         'returned_by',
     ];
@@ -31,33 +44,31 @@ class EquipmentIssue extends Model
         'actual_return_date' => 'date',
     ];
 
-    /**
-     * Get the equipment that was issued.
-     */
     public function equipment(): BelongsTo
     {
         return $this->belongsTo(Equipment::class);
     }
 
-    /**
-     * Get the employee who received the equipment.
-     */
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(EquipmentVariant::class, 'equipment_variant_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
     }
 
-    /**
-     * Get the project assignment (if issued for a project).
-     */
     public function projectAssignment(): BelongsTo
     {
         return $this->belongsTo(ProjectAssignment::class);
     }
 
-    /**
-     * Get the user who issued the equipment.
-     */
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by')->withDefault([
@@ -65,17 +76,86 @@ class EquipmentIssue extends Model
         ]);
     }
 
-    /**
-     * Get the user who returned the equipment.
-     */
     public function returner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'returned_by');
     }
 
+    public function getItemLabelAttribute(): string
+    {
+        if ($this->relationLoaded('variant') && $this->variant) {
+            return $this->variant->display_name;
+        }
+
+        if ($this->relationLoaded('equipment') && $this->equipment) {
+            return $this->equipment->name;
+        }
+
+        return $this->variant?->display_name ?? $this->equipment?->name ?? '—';
+    }
+
+    public function isReturnableIssue(): bool
+    {
+        return $this->status === self::STATUS_ISSUED;
+    }
+
+    public function isPermanentIssue(): bool
+    {
+        return $this->status === self::STATUS_GIVEN;
+    }
+
+    public function statusLabel(): string
+    {
+        return self::labelForStatus($this->status);
+    }
+
+    public function statusBadgeVariant(): string
+    {
+        return match ($this->status) {
+            self::STATUS_ISSUED => 'info',
+            self::STATUS_GIVEN => 'accent',
+            self::STATUS_RETURNED => 'success',
+            self::STATUS_DAMAGED => 'danger',
+            self::STATUS_LOST => 'warning',
+            default => 'info',
+        };
+    }
+
+    public function eventLabel(): string
+    {
+        if ($this->isPermanentIssue()) {
+            return 'Wydanie bezzwrotne';
+        }
+
+        return 'Wydanie do zwrotu';
+    }
+
+    public static function labelForStatus(?string $status): string
+    {
+        return match ($status) {
+            self::STATUS_ISSUED => 'Do zwrotu',
+            self::STATUS_GIVEN => 'Bezzwrotne',
+            self::STATUS_RETURNED => 'Zwrócony',
+            self::STATUS_DAMAGED => 'Uszkodzony',
+            self::STATUS_LOST => 'Zgubiony',
+            default => $status ? ucfirst($status) : '—',
+        };
+    }
+
     /**
-     * Mark equipment as returned, damaged, or lost.
+     * @return list<string>
      */
+    public static function filterStatuses(): array
+    {
+        return [
+            self::STATUS_ISSUED,
+            self::STATUS_GIVEN,
+            self::STATUS_RETURNED,
+            self::STATUS_DAMAGED,
+            self::STATUS_LOST,
+        ];
+    }
+
     public function markAsReturned(\Carbon\Carbon $returnDate, ?int $returnedBy = null, string $status = 'returned'): void
     {
         $this->update([

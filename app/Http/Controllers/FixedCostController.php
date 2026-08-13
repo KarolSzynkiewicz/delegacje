@@ -2,23 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FixedCostTemplate;
-use App\Models\FixedCostEntry;
-use App\Services\GenerateFixedCostsService;
 use App\Http\Requests\GenerateFixedCostsRequest;
+use App\Models\FixedCostEntry;
+use App\Models\FixedCostTemplate;
+use App\Services\GenerateFixedCostsService;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Carbon\Carbon;
 
 class FixedCostController extends Controller
 {
     /**
-     * Display a listing of the resource (templates and entries).
+     * Display a listing of the resource (accounting entries by default).
      */
     public function index(): View
     {
-        return $this->indexTemplates();
+        return $this->indexEntries();
     }
 
     /**
@@ -28,16 +28,12 @@ class FixedCostController extends Controller
     {
         $templates = FixedCostTemplate::orderBy('created_at', 'desc')
             ->paginate(20);
-        
-        $entries = FixedCostEntry::with('template')
-            ->orderBy('period_start', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
 
         return view('fixed-costs.index', [
             'templates' => $templates,
-            'entries' => $entries,
-            'activeTab' => 'templates'
+            'templatesCount' => $templates->total(),
+            'entriesCount' => FixedCostEntry::count(),
+            'activeTab' => 'templates',
         ]);
     }
 
@@ -46,18 +42,10 @@ class FixedCostController extends Controller
      */
     public function indexEntries(): View
     {
-        $templates = FixedCostTemplate::orderBy('created_at', 'desc')
-            ->paginate(20);
-        
-        $entries = FixedCostEntry::with('template')
-            ->orderBy('period_start', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
-
         return view('fixed-costs.index', [
-            'templates' => $templates,
-            'entries' => $entries,
-            'activeTab' => 'entries'
+            'templatesCount' => FixedCostTemplate::count(),
+            'entriesCount' => FixedCostEntry::count(),
+            'activeTab' => 'entries',
         ]);
     }
 
@@ -92,7 +80,7 @@ class FixedCostController extends Controller
         FixedCostTemplate::create($validated);
 
         return redirect()
-            ->route('fixed-costs.index')
+            ->route('fixed-costs.tab.templates')
             ->with('success', 'Szablon kosztu stałego został dodany.');
     }
 
@@ -139,7 +127,7 @@ class FixedCostController extends Controller
         $fixedCost->update($validated);
 
         return redirect()
-            ->route('fixed-costs.index')
+            ->route('fixed-costs.tab.templates')
             ->with('success', 'Szablon kosztu stałego został zaktualizowany.');
     }
 
@@ -151,7 +139,7 @@ class FixedCostController extends Controller
         $fixedCost->delete();
 
         return redirect()
-            ->route('fixed-costs.index')
+            ->route('fixed-costs.tab.templates')
             ->with('success', 'Szablon kosztu stałego został usunięty.');
     }
 
@@ -179,11 +167,11 @@ class FixedCostController extends Controller
         if ($result['skipped'] > 0) {
             $message .= " Pominięto {$result['skipped']} (już istnieją).";
         }
-        if (!empty($result['errors'])) {
-            $message .= " Błędy: " . implode(', ', $result['errors']);
+        if (! empty($result['errors'])) {
+            $message .= ' Błędy: '.implode(', ', $result['errors']);
         }
 
-        return redirect()->route('fixed-costs.index')
+        return redirect()->route('fixed-costs.tab.entries')
             ->with('success', $message);
     }
 
@@ -193,6 +181,7 @@ class FixedCostController extends Controller
     public function createEntry(): View
     {
         $templates = FixedCostTemplate::where('is_active', true)->orderBy('name')->get();
+
         return view('fixed-costs.create-entry', compact('templates'));
     }
 
@@ -239,7 +228,7 @@ class FixedCostController extends Controller
 
         return redirect()
             ->route('fixed-costs.tab.entries')
-            ->with('success', 'Dodano ' . count($request->input('entries')) . ' wpisów kosztów.');
+            ->with('success', 'Dodano '.count($request->input('entries')).' wpisów kosztów.');
     }
 
     /**
@@ -260,7 +249,7 @@ class FixedCostController extends Controller
         ]);
 
         // Jeśli wpis pochodzi z szablonu i nie wybrano własnej kategorii — odziedzicz z szablonu.
-        if (empty($validated['category']) && !empty($validated['template_id'])) {
+        if (empty($validated['category']) && ! empty($validated['template_id'])) {
             $template = FixedCostTemplate::find($validated['template_id']);
             if ($template && $template->category) {
                 $validated['category'] = $template->category;

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\Currency;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Equipment extends Model
 {
@@ -17,40 +19,40 @@ class Equipment extends Model
         'name',
         'description',
         'category',
-        'quantity_in_stock',
-        'min_quantity',
-        'unit',
+        'variant_label',
         'unit_cost',
+        'currency',
+        'issuable',
         'returnable',
-        'notes',
     ];
 
     protected $casts = [
-        'quantity_in_stock' => 'integer',
-        'min_quantity' => 'integer',
         'unit_cost' => 'decimal:2',
+        'currency' => Currency::class,
+        'issuable' => 'boolean',
         'returnable' => 'boolean',
     ];
 
-    /**
-     * Get equipment requirements (which roles need this equipment).
-     */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(EquipmentVariant::class)->orderBy('sort_order')->orderBy('value');
+    }
+
     public function requirements(): HasMany
     {
         return $this->hasMany(EquipmentRequirement::class);
     }
 
-    /**
-     * Get equipment issues (who has this equipment).
-     */
     public function issues(): HasMany
     {
         return $this->hasMany(EquipmentIssue::class);
     }
 
-    /**
-     * Get roles that require this equipment.
-     */
+    public function movements(): HasMany
+    {
+        return $this->hasMany(EquipmentStockMovement::class);
+    }
+
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'equipment_requirements')
@@ -58,33 +60,115 @@ class Equipment extends Model
             ->withTimestamps();
     }
 
-    /**
-     * Get available quantity (in stock - issued).
-     * Note: Equipment marked as 'damaged' or 'lost' is not returned to stock.
-     */
-    public function getAvailableQuantityAttribute(): int
+    public function scopeIssuable(Builder $query): Builder
     {
-        // Count only equipment that is currently issued (not returned, damaged, or lost)
-        $issued = $this->issues()
-            ->where('status', 'issued')
-            ->sum('quantity_issued');
-        
-        // Also count equipment marked as damaged or lost (it's not available)
-        $damagedOrLost = $this->issues()
-            ->whereIn('status', ['damaged', 'lost'])
-            ->sum('quantity_issued');
+        return $query->where('issuable', true);
+    }
 
-        // Total unavailable = currently issued + damaged + lost
-        $unavailable = $issued + $damagedOrLost;
+    public function scopeNotIssuable(Builder $query): Builder
+    {
+        return $query->where('issuable', false);
+    }
 
-        return max(0, $this->quantity_in_stock - $unavailable);
+    public function scopeWithWarehouseInventory(Builder $query, Warehouse $warehouse): Builder
+    {
+        return $query->with(['variants' => function ($variants) use ($warehouse) {
+            $variants
+                ->with('stocks')
+                ->withSum([
+                    'issues as unavailable_quantity' => function ($issues) use ($warehouse) {
+                        $issues->where('warehouse_id', $warehouse->id)
+                            ->whereIn('status', EquipmentVariant::UNAVAILABLE_STATUSES);
+                    },
+                ], 'quantity_issued')
+                ->withSum([
+                    'issues as issued_outstanding' => function ($issues) use ($warehouse) {
+                        $issues->where('warehouse_id', $warehouse->id)
+                            ->where('status', 'issued');
+                    },
+                ], 'quantity_issued')
+                ->withSum([
+                    'issues as issued_outstanding_others' => function ($issues) use ($warehouse) {
+                        $issues->where('warehouse_id', '!=', $warehouse->id)
+                            ->where('status', 'issued');
+                    },
+                ], 'quantity_issued');
+        }]);
+    }
+
+    public function hasVariants(): bool
+    {
+        if (filled($this->variant_label)) {
+            return true;
+        }
+
+        $variants = $this->relationLoaded('variants')
+            ? $this->variants
+            : $this->variants()->get();
+
+        return $variants->contains(fn (EquipmentVariant $variant) => filled($variant->value));
+    }
+
+    public function quantityIn(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->quantityIn($warehouse)
+        );
+    }
+
+    public function minQuantityIn(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->minQuantityIn($warehouse)
+        );
+    }
+
+    public function availableIn(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->availableIn($warehouse)
+        );
+    }
+
+    public function quantityInOthers(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->quantityInOthers($warehouse)
+        );
+    }
+
+    public function issuedOutstandingIn(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->issuedOutstandingIn($warehouse)
+        );
+    }
+
+    public function issuedOutstandingInOthers(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->issuedOutstandingInOthers($warehouse)
+        );
+    }
+
+    public function isLowStockIn(Warehouse $warehouse): bool
+    {
+        $variants = $this->variantsForInventory();
+
+        if ($variants->isEmpty()) {
+            return false;
+        }
+
+        return $variants->contains(fn (EquipmentVariant $variant) => $variant->isLowStockIn($warehouse));
     }
 
     /**
-     * Check if equipment is low in stock.
+     * @return \Illuminate\Support\Collection<int, EquipmentVariant>
      */
-    public function isLowStock(): bool
+    private function variantsForInventory()
     {
-        return $this->available_quantity <= $this->min_quantity;
+        return $this->relationLoaded('variants')
+            ? $this->variants
+            : $this->variants()->get();
     }
 }

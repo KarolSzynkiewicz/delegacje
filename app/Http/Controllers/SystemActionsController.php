@@ -9,6 +9,7 @@ use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\Vehicle;
 use App\Models\VehicleRepair;
+use App\Models\Warehouse;
 use App\Services\RoutePermissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Artisan;
@@ -218,7 +219,7 @@ class SystemActionsController extends Controller
     public function syncLocationPurposes(): RedirectResponse
     {
         try {
-            $stats = ['quarter' => 0, 'project' => 0, 'workshop' => 0, 'other' => 0];
+            $stats = ['quarter' => 0, 'project' => 0, 'workshop' => 0, 'warehouse' => 0, 'other' => 0];
 
             // Lokalizacje z mieszkaniami → Kwatera
             Accommodation::whereNotNull('location_id')
@@ -250,6 +251,17 @@ class SystemActionsController extends Controller
                     if ($repair->location) {
                         $repair->location->addPurposes([LocationPurposeType::WORKSHOP]);
                         $stats['workshop']++;
+                    }
+                });
+
+            // Lokalizacje z magazynami → Magazyn
+            Warehouse::whereNotNull('location_id')
+                ->with('location')
+                ->get()
+                ->each(function (Warehouse $warehouse) use (&$stats) {
+                    if ($warehouse->location) {
+                        $warehouse->location->addPurposes([LocationPurposeType::WAREHOUSE]);
+                        $stats['warehouse']++;
                     }
                 });
 
@@ -300,6 +312,7 @@ class SystemActionsController extends Controller
                 ."kwatery: {$stats['quarter']}, "
                 ."projekty: {$stats['project']}, "
                 ."warsztaty: {$stats['workshop']}, "
+                ."magazyny: {$stats['warehouse']}, "
                 ."inne: {$stats['other']}.";
 
             return redirect()->route('system-actions.index')

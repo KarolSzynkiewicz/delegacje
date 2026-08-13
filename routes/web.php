@@ -1,11 +1,10 @@
 <?php
 
 use App\Http\Controllers\AccommodationAssignmentController;
-use App\Http\Controllers\RecruitmentAnalyticsController;
-use App\Http\Controllers\RecruitmentProcessController;
-use App\Http\Controllers\RecruitmentConsentController;
 use App\Http\Controllers\AccommodationController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\CompanyAssignmentController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDocumentController;
@@ -15,13 +14,14 @@ use App\Http\Controllers\ProjectAssignmentController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectDemandController;
 use App\Http\Controllers\PromptEngineController;
+use App\Http\Controllers\RecruitmentAnalyticsController;
+use App\Http\Controllers\RecruitmentConsentController;
+use App\Http\Controllers\RecruitmentProcessController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\RotationController;
 use App\Http\Controllers\SystemActionsController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserRoleController;
-use App\Http\Controllers\CompanyAssignmentController;
-use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\VehicleAssignmentController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WeeklyOverviewController;
@@ -427,8 +427,38 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::resource('users', UserController::class);
 
         // Equipment
+        Route::get('equipment/tab/stock', [\App\Http\Controllers\EquipmentController::class, 'index'])
+            ->name('equipment.tab.stock')
+            ->defaults('resource', 'equipment');
+        Route::get('equipment/tab/issues', [\App\Http\Controllers\EquipmentController::class, 'indexIssues'])
+            ->name('equipment.tab.issues')
+            ->defaults('resource', 'equipment');
         Route::resource('equipment', \App\Http\Controllers\EquipmentController::class);
         Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
+        Route::get('warehouses', [\App\Http\Controllers\WarehouseController::class, 'index'])
+            ->name('warehouses.index')
+            ->defaults('resource', 'equipment');
+        Route::get('warehouses/create', [\App\Http\Controllers\WarehouseController::class, 'create'])
+            ->name('warehouses.create')
+            ->defaults('resource', 'equipment');
+        Route::post('warehouses', [\App\Http\Controllers\WarehouseController::class, 'store'])
+            ->name('warehouses.store')
+            ->defaults('resource', 'equipment');
+        Route::get('warehouses/{warehouse}/edit', [\App\Http\Controllers\WarehouseController::class, 'edit'])
+            ->name('warehouses.edit')
+            ->defaults('resource', 'equipment');
+        Route::put('warehouses/{warehouse}', [\App\Http\Controllers\WarehouseController::class, 'update'])
+            ->name('warehouses.update')
+            ->defaults('resource', 'equipment');
+        Route::delete('warehouses/{warehouse}', [\App\Http\Controllers\WarehouseController::class, 'destroy'])
+            ->name('warehouses.destroy')
+            ->defaults('resource', 'equipment');
+        Route::get('equipment-consumptions', [\App\Http\Controllers\EquipmentConsumptionController::class, 'index'])
+            ->name('equipment-consumptions.index')
+            ->defaults('resource', 'equipment');
+        Route::get('equipment-consumptions/create', [\App\Http\Controllers\EquipmentConsumptionController::class, 'create'])
+            ->name('equipment-consumptions.create')
+            ->defaults('resource', 'equipment');
 
         // Transport Costs
         Route::resource('transport-costs', \App\Http\Controllers\TransportCostController::class);

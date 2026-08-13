@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('fixed-costs.index') }}"
+                    href="{{ route('fixed-costs.tab.templates') }}"
                     action="back"
                 >
                     Powrót

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 
 class Location extends Model
@@ -57,6 +58,11 @@ class Location extends Model
     public function purposes(): HasMany
     {
         return $this->hasMany(LocationPurpose::class);
+    }
+
+    public function warehouse(): HasOne
+    {
+        return $this->hasOne(Warehouse::class);
     }
 
     /**

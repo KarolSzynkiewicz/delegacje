@@ -47,8 +47,7 @@ return [
         'icon' => 'bi bi-tools',
         'items' => [
             'locations',
-            'equipment',
-            'equipment_issues',
+            'warehouses',
             'rotations',
             'return_trips',
             'departures',

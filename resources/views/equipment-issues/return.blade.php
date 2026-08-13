@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Zwróć/Zgłoś Sprzęt: {{ $equipmentIssue->equipment->name }}">
+        <x-ui.page-header title="Zwróć/Zgłoś: {{ $equipmentIssue->item_label }}">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -27,12 +27,12 @@
                     </div>
                     <div class="col-md-4">
                         <h6 class="text-muted small mb-1">Ilość</h6>
-                        <p class="fw-semibold mb-0">{{ $equipmentIssue->quantity_issued }} {{ $equipmentIssue->equipment->unit }}</p>
+                        <p class="fw-semibold mb-0">{{ $equipmentIssue->quantity_issued }}</p>
                     </div>
                 </div>
             </x-ui.card>
 
-            <x-ui.card label="Zwróć/Zgłoś sprzęt">
+            <x-ui.card label="Zwróć/Zgłoś">
                 <x-ui.errors />
 
                 <form method="POST" action="{{ route('equipment-issues.return.store', $equipmentIssue) }}">
