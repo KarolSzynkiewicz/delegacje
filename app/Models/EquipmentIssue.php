@@ -25,10 +25,8 @@ class EquipmentIssue extends Model
         'equipment_variant_id',
         'warehouse_id',
         'employee_id',
-        'project_assignment_id',
         'quantity_issued',
         'issue_date',
-        'expected_return_date',
         'actual_return_date',
         'status',
         'notes',
@@ -40,7 +38,6 @@ class EquipmentIssue extends Model
     protected $casts = [
         'quantity_issued' => 'integer',
         'issue_date' => 'date',
-        'expected_return_date' => 'date',
         'actual_return_date' => 'date',
     ];
 
@@ -62,11 +59,6 @@ class EquipmentIssue extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
-    }
-
-    public function projectAssignment(): BelongsTo
-    {
-        return $this->belongsTo(ProjectAssignment::class);
     }
 
     public function issuer(): BelongsTo

@@ -22,13 +22,8 @@ class EquipmentIssueController extends Controller
     public function create(Request $request)
     {
         $warehouse = $this->warehouseService->current($request);
-        $warehouses = $this->warehouseService->all();
-        $mode = $request->query('mode', 'returnable');
-        if (! in_array($mode, ['returnable', 'given'], true)) {
-            $mode = 'returnable';
-        }
 
-        return view('equipment-issues.create', compact('warehouse', 'warehouses', 'mode'));
+        return view('equipment-issues.create', compact('warehouse'));
     }
 
     public function store()
@@ -38,7 +33,7 @@ class EquipmentIssueController extends Controller
 
     public function show(EquipmentIssue $equipmentIssue)
     {
-        $equipmentIssue->load('equipment', 'variant', 'employee', 'projectAssignment.project', 'issuer', 'returner');
+        $equipmentIssue->load('equipment', 'variant', 'employee', 'issuer', 'returner');
 
         return view('equipment-issues.show', compact('equipmentIssue'));
     }

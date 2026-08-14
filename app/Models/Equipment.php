@@ -24,6 +24,8 @@ class Equipment extends Model
         'currency',
         'issuable',
         'returnable',
+        'is_archived',
+        'removed_at',
     ];
 
     protected $casts = [
@@ -31,6 +33,8 @@ class Equipment extends Model
         'currency' => Currency::class,
         'issuable' => 'boolean',
         'returnable' => 'boolean',
+        'is_archived' => 'boolean',
+        'removed_at' => 'datetime',
     ];
 
     public function variants(): HasMany
@@ -68,6 +72,24 @@ class Equipment extends Model
     public function scopeNotIssuable(Builder $query): Builder
     {
         return $query->where('issuable', false);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_archived', false)->whereNull('removed_at');
+    }
+
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->where(function (Builder $archived) {
+            $archived->where('is_archived', true)
+                ->orWhereNotNull('removed_at');
+        });
+    }
+
+    public function isArchived(): bool
+    {
+        return (bool) $this->is_archived || $this->removed_at !== null;
     }
 
     public function scopeWithWarehouseInventory(Builder $query, Warehouse $warehouse): Builder

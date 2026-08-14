@@ -7,6 +7,11 @@
             'icon' => 'bi bi-box-seam',
             'href' => route('equipment.tab.stock', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
         ],
+        'archived' => [
+            'label' => 'Asortyment historyczny',
+            'icon' => 'bi bi-archive',
+            'href' => route('equipment.tab.archived', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
+        ],
         'issues' => [
             'label' => 'Wydania',
             'icon' => 'bi bi-box-arrow-up',

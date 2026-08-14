@@ -277,6 +277,7 @@ class WarehouseConsumeForm extends Component
     {
         return $this->catalogCache ??= tap(
             Equipment::query()
+                ->active()
                 ->notIssuable()
                 ->withWarehouseInventory($this->warehouse())
                 ->orderBy('name')

@@ -23,7 +23,17 @@ class EquipmentFactory extends Factory
             'currency' => 'PLN',
             'issuable' => true,
             'returnable' => true,
+            'is_archived' => false,
+            'removed_at' => null,
         ];
+    }
+
+    public function archived(): static
+    {
+        return $this->state(fn () => [
+            'is_archived' => true,
+            'removed_at' => now(),
+        ]);
     }
 
     public function withoutKinds(): static

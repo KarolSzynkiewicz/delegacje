@@ -59,6 +59,7 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Magazyn')
             ->assertSee('Dodaj do magazynu')
             ->assertSee('Stan magazynu')
+            ->assertSee('Asortyment historyczny')
             ->assertSee('Wydania');
     }
 
@@ -68,22 +69,23 @@ class WarehouseEquipmentTest extends TestCase
             ->get(route('equipment.tab.issues'))
             ->assertOk()
             ->assertSee('Stan magazynu')
+            ->assertSee('Asortyment historyczny')
             ->assertSee('Wydania')
             ->assertSee('Wydaj')
-            ->assertSee('Wydaj bezzwrotnie')
+            ->assertDontSee('Wydaj bezzwrotnie')
             ->assertSee('Rozchód');
 
         $this->actingAs($this->user)
             ->get(route('equipment-issues.create', ['warehouse_id' => $this->warehouse->id]))
             ->assertOk()
-            ->assertSee('Wydaj do zwrotu')
-            ->assertSee('Wydanie do zwrotu');
-
-        $this->actingAs($this->user)
-            ->get(route('equipment-issues.create', ['warehouse_id' => $this->warehouse->id, 'mode' => 'given']))
-            ->assertOk()
-            ->assertSee('Wydaj bezzwrotnie')
-            ->assertSee('Wydanie bezzwrotne');
+            ->assertSee('Wydaj')
+            ->assertSee('Wydanie dla')
+            ->assertSee('Data wydania')
+            ->assertDontSee('Na stanie')
+            ->assertDontSee('Co ma dostać')
+            ->assertDontSee('Przypisanie do projektu')
+            ->assertSee('Do zwrotu')
+            ->assertSee('Do wydania bezzwrotnie');
 
         $this->actingAs($this->user)
             ->get(route('equipment-consumptions.create', ['warehouse_id' => $this->warehouse->id]))
@@ -147,7 +149,7 @@ class WarehouseEquipmentTest extends TestCase
             ->get(route('equipment.index'))
             ->assertOk()
             ->assertSee('Opony zamienne')
-            ->assertSee('Niewydawalny')
+            ->assertSee('Inny asortyment')
             ->assertDontSee('Niezwracalny');
     }
 
@@ -174,8 +176,28 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Okulary')
             ->assertSee('Przeciwsłoneczne UV')
             ->assertSee('UV400')
-            ->assertSee('Wydawalny')
+            ->assertSee('Asortyment dla pracowników')
             ->assertSee('Zwracalny');
+    }
+
+    public function test_stock_tab_groups_items_by_employee_and_other_assortment(): void
+    {
+        Equipment::factory()->create(['name' => 'Spodnie BHP']);
+        Equipment::factory()->notReturnable()->withoutKinds()->create(['name' => 'Rękawice']);
+        Equipment::factory()->notIssuable()->withoutKinds()->create(['name' => 'Opony zamienne']);
+
+        $html = $this->actingAs($this->user)
+            ->get(route('equipment.tab.stock', ['warehouse_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Asortyment dla pracowników',
+                'Zwracalny',
+                'Spodnie BHP',
+                'Niezwracalny',
+                'Rękawice',
+                'Inny asortyment',
+                'Opony zamienne',
+            ]);
     }
 
     public function test_can_add_warehouse_for_location_and_see_separate_stock(): void
@@ -291,12 +313,9 @@ class WarehouseEquipmentTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
-            ->set('equipmentSearch', 'Spodnie')
             ->assertSee('Spodnie BHP')
-            ->set('equipmentSearch', 'Opony')
-            ->assertDontSee('Opony zamienne')
-            ->set('equipmentSearch', 'Rękawice')
-            ->assertDontSee('Rękawice');
+            ->assertSee('Rękawice')
+            ->assertDontSee('Opony zamienne');
     }
 
     public function test_permanent_issue_decrements_stock_and_is_not_outstanding(): void
@@ -313,16 +332,11 @@ class WarehouseEquipmentTest extends TestCase
         ]);
 
         Livewire::actingAs($this->user)
-            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse, 'mode' => 'given'])
-            ->set('equipmentSearch', 'Rękawice')
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
             ->assertSee('Rękawice')
-            ->set('equipmentSearch', 'Spodnie')
-            ->assertDontSee('Spodnie BHP')
+            ->assertSee('Spodnie BHP')
             ->set('employeeId', $employee->id)
-            ->set('addEquipmentId', $gloves->id)
-            ->set('addVariantId', $variant->id)
-            ->set('addQuantity', 3)
-            ->call('addLine')
+            ->call('addToCart', $variant->id, 'given', 3)
             ->call('save')
             ->assertHasNoErrors()
             ->assertRedirect(route('equipment.tab.issues'));
@@ -358,14 +372,8 @@ class WarehouseEquipmentTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
             ->set('employeeId', $employee->id)
-            ->set('addEquipmentId', $pants->id)
-            ->set('addVariantId', $sizeM->id)
-            ->set('addQuantity', 2)
-            ->call('addLine')
-            ->set('addEquipmentId', $glasses->id)
-            ->set('addVariantId', $uv->id)
-            ->set('addQuantity', 1)
-            ->call('addLine')
+            ->call('addToCart', $sizeM->id, 'returnable', 2)
+            ->call('addToCart', $uv->id, 'returnable', 1)
             ->call('save')
             ->assertHasNoErrors()
             ->assertRedirect(route('equipment.tab.issues'));
@@ -393,13 +401,10 @@ class WarehouseEquipmentTest extends TestCase
 
         $component = Livewire::actingAs($this->user)
             ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
-            ->set('addEquipmentId', $pants->id)
-            ->set('addVariantId', $sizeM->id)
-            ->set('addQuantity', 3)
-            ->call('addLine');
+            ->call('addToCart', $sizeM->id, 'returnable', 3);
 
         $this->assertSame(7, $component->instance()->remainingFor($sizeM->id));
-        $component->assertSee('Zostanie')->assertSee('-3');
+        $component->assertSee('7 / 10');
     }
 
     public function test_cannot_add_more_than_available_stock(): void
@@ -412,11 +417,8 @@ class WarehouseEquipmentTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
-            ->set('addEquipmentId', $pants->id)
-            ->set('addVariantId', $sizeM->id)
-            ->set('addQuantity', 5)
-            ->call('addLine')
-            ->assertHasErrors('addQuantity');
+            ->call('addToCart', $sizeM->id, 'returnable', 5)
+            ->assertHasErrors('lines');
     }
 
     public function test_save_and_next_keeps_form_for_another_person(): void
@@ -431,10 +433,7 @@ class WarehouseEquipmentTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
             ->set('employeeId', $employee->id)
-            ->set('addEquipmentId', $pants->id)
-            ->set('addVariantId', $sizeM->id)
-            ->set('addQuantity', 1)
-            ->call('addLine')
+            ->call('addToCart', $sizeM->id, 'returnable', 1)
             ->call('saveAndNext')
             ->assertHasNoErrors()
             ->assertSet('employeeId', null)
@@ -532,5 +531,98 @@ class WarehouseEquipmentTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('warehouses', ['id' => $this->warehouse->id]);
+    }
+
+    public function test_trashing_equipment_moves_it_to_historical_assortment(): void
+    {
+        $item = Equipment::factory()->withoutKinds()->create(['name' => 'Młotek']);
+        EquipmentVariant::factory()->unnamed()->inStock(3)->create([
+            'equipment_id' => $item->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->delete(route('equipment.destroy', ['equipment' => $item, 'warehouse_id' => $this->warehouse->id]))
+            ->assertRedirect(route('equipment.tab.archived', ['warehouse_id' => $this->warehouse->id]))
+            ->assertSessionHas('success');
+
+        $item->refresh();
+        $this->assertTrue($item->is_archived);
+        $this->assertNotNull($item->removed_at);
+        $this->assertSame(3, $item->variants()->first()->quantityIn($this->warehouse));
+
+        $this->actingAs($this->user)
+            ->get(route('equipment.tab.stock', ['warehouse_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertDontSee('Młotek');
+
+        $this->actingAs($this->user)
+            ->get(route('equipment.tab.archived', ['warehouse_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertSee('Asortyment historyczny')
+            ->assertSee('Młotek');
+    }
+
+    public function test_archived_equipment_can_be_restored_to_stock_tab(): void
+    {
+        $item = Equipment::factory()->archived()->withoutKinds()->create(['name' => 'Kask BHP']);
+        EquipmentVariant::factory()->unnamed()->inStock(2)->create([
+            'equipment_id' => $item->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->post(route('equipment.restore', ['equipment' => $item, 'warehouse_id' => $this->warehouse->id]))
+            ->assertRedirect(route('equipment.tab.stock', ['warehouse_id' => $this->warehouse->id]))
+            ->assertSessionHas('success');
+
+        $item->refresh();
+        $this->assertFalse($item->is_archived);
+        $this->assertNull($item->removed_at);
+
+        $this->actingAs($this->user)
+            ->get(route('equipment.tab.stock', ['warehouse_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertSee('Kask BHP');
+    }
+
+    public function test_issue_form_hides_archived_equipment(): void
+    {
+        $item = Equipment::factory()->archived()->create(['name' => 'Stare spodnie', 'variant_label' => 'Rozmiar']);
+        EquipmentVariant::factory()->inStock(5)->create([
+            'equipment_id' => $item->id,
+            'value' => 'M',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->assertDontSee('Stare spodnie');
+    }
+
+    public function test_issue_form_groups_variants_behind_dropdown(): void
+    {
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP', 'variant_label' => 'Rozmiar']);
+        EquipmentVariant::factory()->inStock(7)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+        EquipmentVariant::factory()->inStock(3)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'L',
+        ]);
+        $gloves = Equipment::factory()->notReturnable()->withoutKinds()->create(['name' => 'Rękawice']);
+        EquipmentVariant::factory()->unnamed()->inStock(12)->create([
+            'equipment_id' => $gloves->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->assertSee('Spodnie BHP')
+            ->assertSee('10 / 10')
+            ->assertSee('Rękawice')
+            ->assertSee('12 / 12')
+            ->assertDontSee('7 / 7')
+            ->assertDontSee('3 / 3')
+            ->call('toggleType', $pants->id)
+            ->assertSee('7 / 7')
+            ->assertSee('3 / 3');
     }
 }

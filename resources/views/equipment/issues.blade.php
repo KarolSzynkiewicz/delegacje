@@ -19,14 +19,6 @@
                     Rozchód
                 </x-ui.button>
                 <x-ui.button
-                    variant="ghost"
-                    href="{{ route('equipment-issues.create', ['warehouse_id' => $warehouse->id, 'mode' => 'given']) }}"
-                    routeName="equipment-issues.create"
-                    action="create"
-                >
-                    Wydaj bezzwrotnie
-                </x-ui.button>
-                <x-ui.button
                     variant="primary"
                     href="{{ route('equipment-issues.create', ['warehouse_id' => $warehouse->id]) }}"
                     routeName="equipment-issues.create"

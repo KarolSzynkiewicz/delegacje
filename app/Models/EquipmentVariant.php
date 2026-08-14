@@ -124,6 +124,27 @@ class EquipmentVariant extends Model
         return $this->availableIn($warehouse) <= $this->minQuantityIn($warehouse);
     }
 
+    public function deletionBlockReason(): ?string
+    {
+        if ($this->issues()->exists()) {
+            return 'Istnieją wydania tego rodzaju.';
+        }
+
+        if ($this->movements()->exists()) {
+            return 'Istnieją rozchody lub inne ruchy stanu tego rodzaju.';
+        }
+
+        $hasStock = $this->relationLoaded('stocks')
+            ? $this->stocks->contains(fn (EquipmentStock $stock) => (int) $stock->quantity_in_stock > 0)
+            : $this->stocks()->where('quantity_in_stock', '>', 0)->exists();
+
+        if ($hasStock) {
+            return 'Ten rodzaj ma jeszcze stan w magazynie.';
+        }
+
+        return null;
+    }
+
     public function getKindLabelAttribute(): string
     {
         if (filled($this->value)) {

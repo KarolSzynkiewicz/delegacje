@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button
                     variant="ghost"
-                    href="{{ route('equipment.index', ['warehouse_id' => $warehouse->id]) }}"
+                    href="{{ route($equipment->isArchived() ? 'equipment.tab.archived' : 'equipment.index', ['warehouse_id' => $warehouse->id]) }}"
                     action="back"
                 >
                     Powrót
@@ -17,23 +17,69 @@
                     'routeName' => 'equipment.show',
                     'routeParams' => $equipment,
                 ])
-                <x-ui.button
-                    variant="ghost"
-                    href="{{ route('equipment.edit', ['equipment' => $equipment, 'warehouse_id' => $warehouse->id]) }}"
-                    routeName="equipment.edit"
-                    action="edit"
-                >
-                    Edytuj
-                </x-ui.button>
+                @if($equipment->isArchived())
+                    <form
+                        action="{{ route('equipment.restore', ['equipment' => $equipment, 'warehouse_id' => $warehouse->id]) }}"
+                        method="POST"
+                        class="d-inline"
+                        onsubmit="return confirm('Przywrócić tę pozycję do bieżącego asortymentu?')"
+                    >
+                        @csrf
+                        <x-ui.button variant="primary" type="submit">
+                            Przywróć
+                        </x-ui.button>
+                    </form>
+                @else
+                    <x-ui.button
+                        variant="ghost"
+                        href="{{ route('equipment.edit', ['equipment' => $equipment, 'warehouse_id' => $warehouse->id]) }}"
+                        routeName="equipment.edit"
+                        action="edit"
+                    >
+                        Edytuj
+                    </x-ui.button>
+                    <form
+                        action="{{ route('equipment.destroy', ['equipment' => $equipment, 'warehouse_id' => $warehouse->id]) }}"
+                        method="POST"
+                        class="d-inline"
+                        onsubmit="return confirm('Przenieść tę pozycję do asortymentu historycznego? Stan i historia wydań zostaną zachowane.')"
+                    >
+                        @csrf
+                        @method('DELETE')
+                        <x-ui.button variant="danger" type="submit">
+                            Do historii
+                        </x-ui.button>
+                    </form>
+                @endif
             </x-slot>
         </x-ui.page-header>
     </x-slot>
+
+    @if(session('success'))
+        <x-ui.alert variant="success" title="Sukces" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
+
+    @if(session('error'))
+        <x-ui.alert variant="danger" title="Błąd" dismissible class="mb-3">
+            {{ session('error') }}
+        </x-ui.alert>
+    @endif
 
     <x-ui.card label="Informacje podstawowe" class="mb-3">
         <div class="row g-4">
             <div class="col-md-6">
                 <h6 class="text-muted small mb-1">Typ</h6>
-                <p class="fw-semibold">{{ $equipment->name }}</p>
+                <p class="fw-semibold mb-0">{{ $equipment->name }}</p>
+                @if($equipment->isArchived())
+                    <div class="mt-1">
+                        <x-ui.badge variant="warning">Asortyment historyczny</x-ui.badge>
+                        @if($equipment->removed_at)
+                            <span class="small text-muted ms-1">od {{ $equipment->removed_at->format('Y-m-d') }}</span>
+                        @endif
+                    </div>
+                @endif
             </div>
             <div class="col-md-6">
                 <h6 class="text-muted small mb-1">Kategoria</h6>

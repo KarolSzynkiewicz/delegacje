@@ -9,7 +9,6 @@ use App\Models\EquipmentIssue;
 use App\Models\EquipmentStock;
 use App\Models\EquipmentStockMovement;
 use App\Models\EquipmentVariant;
-use App\Models\ProjectAssignment;
 use App\Models\Warehouse;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -79,9 +78,10 @@ class EquipmentService
 
             $toDelete = $equipment->variants()->whereNotIn('id', $keptIds)->get();
             foreach ($toDelete as $variant) {
-                if ($variant->issues()->exists()) {
+                $reason = $variant->deletionBlockReason();
+                if ($reason !== null) {
                     throw ValidationException::withMessages([
-                        'variants' => "Nie można usunąć rodzaju „{$variant->kind_label}” — istnieją wydania.",
+                        'variants' => "Nie można usunąć rodzaju „{$variant->kind_label}”. {$reason}",
                     ]);
                 }
                 $variant->delete();
@@ -89,6 +89,34 @@ class EquipmentService
 
             return $equipment->fresh(['variants.stocks']);
         });
+    }
+
+    public function archiveType(Equipment $equipment): void
+    {
+        if ($equipment->isArchived()) {
+            throw ValidationException::withMessages([
+                'equipment' => 'Ta pozycja jest już w asortymencie historycznym.',
+            ]);
+        }
+
+        $equipment->forceFill([
+            'is_archived' => true,
+            'removed_at' => now(),
+        ])->save();
+    }
+
+    public function restoreType(Equipment $equipment): void
+    {
+        if (! $equipment->isArchived()) {
+            throw ValidationException::withMessages([
+                'equipment' => 'Ta pozycja nie jest w asortymencie historycznym.',
+            ]);
+        }
+
+        $equipment->forceFill([
+            'is_archived' => false,
+            'removed_at' => null,
+        ])->save();
     }
 
     /**
@@ -100,8 +128,6 @@ class EquipmentService
         array $lines,
         Warehouse $warehouse,
         Carbon $issueDate,
-        ?Carbon $expectedReturnDate = null,
-        ?ProjectAssignment $projectAssignment = null,
         ?string $notes = null
     ): Collection {
         $lines = $this->normalizeIssueLines($lines);
@@ -112,7 +138,7 @@ class EquipmentService
             ]);
         }
 
-        return DB::transaction(function () use ($employee, $lines, $warehouse, $issueDate, $expectedReturnDate, $projectAssignment, $notes) {
+        return DB::transaction(function () use ($employee, $lines, $warehouse, $issueDate, $notes) {
             $variantIds = collect($lines)->pluck('variant_id')->unique()->sort()->values();
             $variants = EquipmentVariant::query()
                 ->with('equipment')
@@ -171,10 +197,8 @@ class EquipmentService
                     'equipment_variant_id' => $variant->id,
                     'warehouse_id' => $warehouse->id,
                     'employee_id' => $employee->id,
-                    'project_assignment_id' => $projectAssignment?->id,
                     'quantity_issued' => $line['quantity'],
                     'issue_date' => $issueDate,
-                    'expected_return_date' => $returnable ? $expectedReturnDate : null,
                     'status' => $returnable ? EquipmentIssue::STATUS_ISSUED : EquipmentIssue::STATUS_GIVEN,
                     'notes' => $notes,
                     'batch_id' => $batchId,
@@ -274,8 +298,6 @@ class EquipmentService
         Warehouse $warehouse,
         int $quantityIssued,
         Carbon $issueDate,
-        ?Carbon $expectedReturnDate = null,
-        ?ProjectAssignment $projectAssignment = null,
         ?string $notes = null
     ): EquipmentIssue {
         return $this->issueItems(
@@ -283,8 +305,6 @@ class EquipmentService
             [['variant_id' => $variant->id, 'quantity' => $quantityIssued]],
             $warehouse,
             $issueDate,
-            $expectedReturnDate,
-            $projectAssignment,
             $notes
         )->first();
     }

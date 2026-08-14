@@ -49,12 +49,6 @@
                         <h6 class="text-muted small mb-1">Data wydania</h6>
                         <p class="fw-semibold mb-0">{{ $equipmentIssue->issue_date->format('Y-m-d') }}</p>
                     </div>
-                    @if($equipmentIssue->expected_return_date)
-                    <div class="col-md-6">
-                        <h6 class="text-muted small mb-1">Oczekiwana data zwrotu</h6>
-                        <p class="fw-semibold mb-0">{{ $equipmentIssue->expected_return_date->format('Y-m-d') }}</p>
-                    </div>
-                    @endif
                     @if($equipmentIssue->actual_return_date)
                     <div class="col-md-6">
                         <h6 class="text-muted small mb-1">Rzeczywista data zwrotu</h6>
@@ -65,12 +59,6 @@
                         <h6 class="text-muted small mb-1">Status</h6>
                         <x-ui.badge variant="{{ $equipmentIssue->statusBadgeVariant() }}">{{ $equipmentIssue->statusLabel() }}</x-ui.badge>
                     </div>
-                    @if($equipmentIssue->projectAssignment)
-                    <div class="col-md-6">
-                        <h6 class="text-muted small mb-1">Projekt</h6>
-                        <p class="fw-semibold mb-0">{{ $equipmentIssue->projectAssignment->project->name }}</p>
-                    </div>
-                    @endif
                     @if($equipmentIssue->notes)
                     <div class="col-12">
                         <h6 class="text-muted small mb-1">Notatki</h6>

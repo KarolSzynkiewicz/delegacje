@@ -430,8 +430,14 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('equipment/tab/stock', [\App\Http\Controllers\EquipmentController::class, 'index'])
             ->name('equipment.tab.stock')
             ->defaults('resource', 'equipment');
+        Route::get('equipment/tab/archived', [\App\Http\Controllers\EquipmentController::class, 'indexArchived'])
+            ->name('equipment.tab.archived')
+            ->defaults('resource', 'equipment');
         Route::get('equipment/tab/issues', [\App\Http\Controllers\EquipmentController::class, 'indexIssues'])
             ->name('equipment.tab.issues')
+            ->defaults('resource', 'equipment');
+        Route::post('equipment/{equipment}/restore', [\App\Http\Controllers\EquipmentController::class, 'restore'])
+            ->name('equipment.restore')
             ->defaults('resource', 'equipment');
         Route::resource('equipment', \App\Http\Controllers\EquipmentController::class);
         Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
