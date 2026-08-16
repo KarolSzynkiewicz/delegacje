@@ -2,7 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Models\Employee;
+use App\Livewire\Concerns\PicksConsumptionDestination;
 use App\Models\Equipment;
 use App\Models\EquipmentVariant;
 use App\Models\Warehouse;
@@ -14,11 +14,9 @@ use Livewire\Component;
 
 class WarehouseConsumeForm extends Component
 {
+    use PicksConsumptionDestination;
+
     public int $warehouseId;
-
-    public $employeeId = null;
-
-    public string $employeeSearch = '';
 
     public ?string $notes = null;
 
@@ -49,36 +47,6 @@ class WarehouseConsumeForm extends Component
         if ($variants->count() === 1) {
             $this->addVariantId = $variants->first()->id;
         }
-    }
-
-    public function updatedEmployeeSearch(): void
-    {
-        $selectedName = $this->employeeId
-            ? Employee::query()->find($this->employeeId)?->full_name
-            : null;
-
-        if ($selectedName !== null && $this->employeeSearch === $selectedName) {
-            return;
-        }
-
-        $this->employeeId = null;
-    }
-
-    public function selectEmployee(int $id): void
-    {
-        $employee = Employee::query()->find($id);
-        if (! $employee) {
-            return;
-        }
-
-        $this->employeeId = $employee->id;
-        $this->employeeSearch = $employee->full_name;
-    }
-
-    public function clearEmployee(): void
-    {
-        $this->employeeId = null;
-        $this->employeeSearch = '';
     }
 
     public function updatedEquipmentSearch(): void
@@ -162,26 +130,30 @@ class WarehouseConsumeForm extends Component
 
     public function save(EquipmentService $equipmentService)
     {
-        $this->validate([
-            'employeeId' => 'nullable|exists:employees,id',
+        $this->validate(array_merge($this->destinationValidationRules(), [
             'notes' => 'nullable|string',
             'lines' => 'required|array|min:1',
             'lines.*.variant_id' => 'required|exists:equipment_variants,id',
             'lines.*.quantity' => 'required|integer|min:1',
-        ], [
+        ]), [
+            'destinationType.required' => 'Wybierz, na co schodzi rozchód.',
+            'destinationId.required' => 'Wskaż konkretne przeznaczenie.',
             'lines.required' => 'Dodaj co najmniej jedną pozycję do rozchodu.',
             'lines.min' => 'Dodaj co najmniej jedną pozycję do rozchodu.',
         ]);
 
-        try {
-            $employee = $this->employeeId
-                ? Employee::query()->findOrFail($this->employeeId)
-                : null;
+        $destination = $this->resolveDestination();
+        if (! $destination) {
+            $this->addError('destinationId', 'Wskaż konkretne przeznaczenie.');
 
+            return;
+        }
+
+        try {
             $movements = $equipmentService->consumeItems(
                 $this->lines,
                 $this->warehouse(),
-                $employee,
+                $destination,
                 filled($this->notes) ? $this->notes : null
             );
         } catch (ValidationException $e) {
@@ -214,41 +186,13 @@ class WarehouseConsumeForm extends Component
 
         return view('livewire.warehouse-consume-form', [
             'warehouse' => $this->warehouse(),
-            'employeeMatches' => $this->employeeMatches(),
             'equipmentMatches' => $this->equipmentMatches(),
             'catalog' => $catalog,
             'selectedType' => $selectedType,
             'selectedVariants' => $this->variantsForSelectedType(),
             'lineRows' => $this->lineRows(),
+            ...$this->destinationPickerViewData(),
         ]);
-    }
-
-    /**
-     * @return Collection<int, Employee>
-     */
-    private function employeeMatches(): Collection
-    {
-        $query = Employee::query()
-            ->whereNull('terminated_at')
-            ->orderBy('last_name')
-            ->orderBy('first_name');
-
-        $term = trim($this->employeeSearch);
-        if ($term === '') {
-            return collect();
-        }
-
-        $like = '%'.addcslashes(mb_strtolower($term), '%_\\').'%';
-        $query->where(function ($employees) use ($like) {
-            $employees->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', [$like])
-                ->orWhereRaw(
-                    'LOWER(TRIM(CONCAT(COALESCE(first_name, \'\'), \' \', COALESCE(last_name, \'\')))) LIKE ?',
-                    [$like]
-                );
-        });
-
-        return $query->limit(12)->get();
     }
 
     /**

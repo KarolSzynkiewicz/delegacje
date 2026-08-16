@@ -394,6 +394,8 @@
         </x-ui.card>
     @endif
 
+    <livewire:logistics-event-warehouse-transfers :event="$departure" :key="'dep-wh-mm-'.$departure->id" />
+
     @if(!$isPublicTransportDeparture)
         @php
             $ticketCosts = $departure->transportCosts->where('cost_type', 'ticket')->values();

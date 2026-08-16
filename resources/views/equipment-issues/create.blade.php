@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Wydaj">
+        <x-ui.page-header title="Zlecenie wydania">
             <x-slot name="left">
                 <x-ui.button
                     variant="ghost"
@@ -13,7 +13,7 @@
         </x-ui.page-header>
     </x-slot>
 
-    <x-ui.card>
+    <div style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;padding:1.25rem;">
         <livewire:warehouse-issue-form :warehouse="$warehouse" />
-    </x-ui.card>
+    </div>
 </x-app-layout>

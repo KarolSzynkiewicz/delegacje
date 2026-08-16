@@ -1,8 +1,17 @@
 @php
     $value = (int) ($value ?? 0);
     $compact = (bool) ($compact ?? false);
-    $padding = $compact ? '.45rem .75rem' : '.65rem .75rem';
+    $tone = $tone ?? null;
+    $classes = 'text-end eq-qty';
+    if ($compact) {
+        $classes .= ' eq-qty--compact';
+    }
+    if ($value === 0) {
+        $classes .= ' eq-qty--zero';
+    } elseif ($tone) {
+        $classes .= ' eq-qty--'.$tone;
+    }
 @endphp
-<td class="text-end" style="padding:{{ $padding }};font-variant-numeric:tabular-nums;{{ $value === 0 ? 'color:var(--text-muted);' : '' }}">
+<td class="{{ $classes }}">
     {{ $value }}
 </td>

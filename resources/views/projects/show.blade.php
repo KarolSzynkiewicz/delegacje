@@ -112,6 +112,15 @@
             </div>
         </div>
 
+        <div class="row mb-3">
+            <div class="col-12">
+                <x-equipment.destination-consumptions
+                    :consumable="$project"
+                    empty="Brak rozchodów z magazynu na ten projekt."
+                />
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-md-12">
                 <livewire:project-tabs :project="$project" />

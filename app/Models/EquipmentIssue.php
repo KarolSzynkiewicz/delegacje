@@ -10,6 +10,8 @@ class EquipmentIssue extends Model
 {
     use HasFactory;
 
+    public const STATUS_RESERVED = 'reserved';
+
     public const STATUS_ISSUED = 'issued';
 
     public const STATUS_GIVEN = 'given';
@@ -19,6 +21,8 @@ class EquipmentIssue extends Model
     public const STATUS_DAMAGED = 'damaged';
 
     public const STATUS_LOST = 'lost';
+
+    public const STATUS_UNFULFILLED = 'unfulfilled';
 
     protected $fillable = [
         'equipment_id',
@@ -31,6 +35,7 @@ class EquipmentIssue extends Model
         'status',
         'notes',
         'batch_id',
+        'warehouse_dispatch_id',
         'issued_by',
         'returned_by',
     ];
@@ -54,6 +59,11 @@ class EquipmentIssue extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function dispatch(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseDispatch::class, 'warehouse_dispatch_id');
     }
 
     public function employee(): BelongsTo
@@ -86,6 +96,11 @@ class EquipmentIssue extends Model
         return $this->variant?->display_name ?? $this->equipment?->name ?? '—';
     }
 
+    public function isReserved(): bool
+    {
+        return $this->status === self::STATUS_RESERVED;
+    }
+
     public function isReturnableIssue(): bool
     {
         return $this->status === self::STATUS_ISSUED;
@@ -104,6 +119,8 @@ class EquipmentIssue extends Model
     public function statusBadgeVariant(): string
     {
         return match ($this->status) {
+            self::STATUS_RESERVED => 'warning',
+            self::STATUS_UNFULFILLED => 'secondary',
             self::STATUS_ISSUED => 'info',
             self::STATUS_GIVEN => 'accent',
             self::STATUS_RETURNED => 'success',
@@ -115,6 +132,14 @@ class EquipmentIssue extends Model
 
     public function eventLabel(): string
     {
+        if ($this->status === self::STATUS_UNFULFILLED) {
+            return 'Nie wydano';
+        }
+
+        if ($this->isReserved()) {
+            return 'Zlecenie wydania';
+        }
+
         if ($this->isPermanentIssue()) {
             return 'Wydanie bezzwrotne';
         }
@@ -125,6 +150,8 @@ class EquipmentIssue extends Model
     public static function labelForStatus(?string $status): string
     {
         return match ($status) {
+            self::STATUS_RESERVED => 'Zarezerwowane',
+            self::STATUS_UNFULFILLED => 'Nie wydano',
             self::STATUS_ISSUED => 'Do zwrotu',
             self::STATUS_GIVEN => 'Bezzwrotne',
             self::STATUS_RETURNED => 'Zwrócony',
@@ -145,6 +172,7 @@ class EquipmentIssue extends Model
             self::STATUS_RETURNED,
             self::STATUS_DAMAGED,
             self::STATUS_LOST,
+            self::STATUS_UNFULFILLED,
         ];
     }
 

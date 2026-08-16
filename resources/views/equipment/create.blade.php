@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Dodaj do magazynu">
+        <x-ui.page-header title="Nowa pozycja asortymentowa">
             <x-slot name="left">
                 <x-ui.button
                     variant="ghost"
@@ -22,7 +22,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Nowa pozycja magazynowa">
+            <x-ui.card label="Cechy katalogu">
                 <livewire:equipment-form :warehouse="$warehouse" :key="'eq-form-'.$warehouse->id" />
             </x-ui.card>
         </div>

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\LocationPurposeType;
+use App\Models\EquipmentStock;
 use App\Models\Location;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
@@ -24,6 +25,34 @@ class WarehouseService
             ->orderByDesc('is_default')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Ile typów asortymentu ma stan > 0 w danym magazynie.
+     *
+     * @param  Collection<int, Warehouse>  $warehouses
+     * @return Collection<int, int>
+     */
+    public function assortmentCounts(Collection $warehouses): Collection
+    {
+        if ($warehouses->isEmpty()) {
+            return collect();
+        }
+
+        $counts = EquipmentStock::query()
+            ->join('equipment_variants', 'equipment_variants.id', '=', 'equipment_stocks.equipment_variant_id')
+            ->join('equipment', 'equipment.id', '=', 'equipment_variants.equipment_id')
+            ->whereIn('equipment_stocks.warehouse_id', $warehouses->pluck('id'))
+            ->where('equipment_stocks.quantity_in_stock', '>', 0)
+            ->where('equipment.is_archived', false)
+            ->whereNull('equipment.removed_at')
+            ->groupBy('equipment_stocks.warehouse_id')
+            ->selectRaw('equipment_stocks.warehouse_id, COUNT(DISTINCT equipment.id) as aggregate')
+            ->pluck('aggregate', 'warehouse_id');
+
+        return $warehouses->mapWithKeys(
+            fn (Warehouse $warehouse) => [$warehouse->id => (int) ($counts[$warehouse->id] ?? 0)]
+        );
     }
 
     public function default(): Warehouse

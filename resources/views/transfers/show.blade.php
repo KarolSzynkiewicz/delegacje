@@ -405,6 +405,10 @@
         </x-ui.card>
     @endif
 
+    <div class="mb-4">
+        <livewire:logistics-event-warehouse-transfers :event="$transfer" :key="'tr-wh-mm-'.$transfer->id" />
+    </div>
+
     <!-- Meta -->
     <x-ui.card label="Informacje systemowe">
         <div class="row g-3">

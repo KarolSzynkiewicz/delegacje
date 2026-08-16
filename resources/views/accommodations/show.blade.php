@@ -341,6 +341,12 @@
                 @endif
             </x-ui.card>
 
+            <x-equipment.destination-consumptions
+                class="mt-4"
+                :consumable="$accommodation"
+                empty="Brak rozchodów z magazynu na ten dom."
+            />
+
             <div class="mt-4">
                 <x-comments :commentable="$accommodation" />
             </div>

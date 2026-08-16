@@ -6,6 +6,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
 use App\Traits\HasComments;
 use App\Traits\HasDateRange;
+use App\Traits\HasEquipmentConsumptions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Project extends Model
 {
-    use HasComments, HasDateRange, HasFactory;
+    use HasComments, HasDateRange, HasEquipmentConsumptions, HasFactory;
 
     /**
      * The attributes that are mass assignable.

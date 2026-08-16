@@ -18,6 +18,7 @@ class Equipment extends Model
     protected $fillable = [
         'name',
         'description',
+        'image_path',
         'category',
         'variant_label',
         'unit_cost',
@@ -92,15 +93,24 @@ class Equipment extends Model
         return (bool) $this->is_archived || $this->removed_at !== null;
     }
 
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image_path) {
+            return null;
+        }
+
+        return asset('storage/'.$this->image_path);
+    }
+
     public function scopeWithWarehouseInventory(Builder $query, Warehouse $warehouse): Builder
     {
         return $query->with(['variants' => function ($variants) use ($warehouse) {
             $variants
                 ->with('stocks')
                 ->withSum([
-                    'issues as unavailable_quantity' => function ($issues) use ($warehouse) {
+                    'issues as reserved_quantity' => function ($issues) use ($warehouse) {
                         $issues->where('warehouse_id', $warehouse->id)
-                            ->whereIn('status', EquipmentVariant::UNAVAILABLE_STATUSES);
+                            ->where('status', EquipmentIssue::STATUS_RESERVED);
                     },
                 ], 'quantity_issued')
                 ->withSum([
@@ -156,6 +166,13 @@ class Equipment extends Model
     {
         return (int) $this->variantsForInventory()->sum(
             fn (EquipmentVariant $variant) => $variant->quantityInOthers($warehouse)
+        );
+    }
+
+    public function reservedIn(Warehouse $warehouse): int
+    {
+        return (int) $this->variantsForInventory()->sum(
+            fn (EquipmentVariant $variant) => $variant->reservedIn($warehouse)
         );
     }
 

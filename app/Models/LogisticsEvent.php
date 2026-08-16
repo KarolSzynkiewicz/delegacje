@@ -139,6 +139,11 @@ class LogisticsEvent extends Model
         return $this->hasMany(TransportCost::class);
     }
 
+    public function equipmentStockMovements(): HasMany
+    {
+        return $this->hasMany(EquipmentStockMovement::class);
+    }
+
     /**
      * Get driver payment adjustments linked to this transfer.
      */

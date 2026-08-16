@@ -4,6 +4,7 @@
     'deleteRoute' => null,
     'resource' => null, // Nazwa zasobu (np. 'equipment') - automatycznie generuje route names (opcjonalne, wyciągane z route names)
     'deleteMessage' => 'Czy na pewno chcesz usunąć ten element?',
+    'deleteTitle' => 'Usuń',
     'size' => 'sm', // sm, null, lg
 ])
 
@@ -94,7 +95,7 @@
                 type="submit"
                 routeName="{{ $deleteRouteName }}"
                 action="delete"
-                title="Usuń"
+                title="{{ $deleteTitle }}"
                 class="{{ $sizeClass }}"
             />
         </form>

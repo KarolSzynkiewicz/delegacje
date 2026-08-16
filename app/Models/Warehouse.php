@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Magazyn fizyczny w lokalizacji. Katalog sprzętu jest wspólny;
  * stany (equipment_stocks) i wydania są zawsze w kontekście magazynu.
  *
- * Przyszłe przesunięcia międzymagazynowe (MM) powinny operować na tej samej
- * parze warehouse_id + equipment_variant_id, bez duplikowania katalogu.
+ * Przesunięcia międzymagazynowe (MM) operują na parze warehouse_id + equipment_variant_id,
+ * bez duplikowania katalogu.
  */
 class Warehouse extends Model
 {
@@ -41,6 +41,11 @@ class Warehouse extends Model
     public function issues(): HasMany
     {
         return $this->hasMany(EquipmentIssue::class);
+    }
+
+    public function dispatches(): HasMany
+    {
+        return $this->hasMany(WarehouseDispatch::class);
     }
 
     public function movements(): HasMany

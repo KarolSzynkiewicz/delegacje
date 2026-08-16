@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Vehicle;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
-use Illuminate\View\View;
+use App\Models\Vehicle;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class VehicleController extends Controller
 {
     use HandlesImageUpload;
+
     /**
      * Display a listing of the resource.
      */
@@ -36,7 +37,7 @@ class VehicleController extends Controller
     {
         $validated = $this->processImageUpload($request->validated(), $request, 'vehicles');
         Vehicle::create($validated);
-        
+
         return redirect()->route('vehicles.index')->with('success', 'Pojazd został dodany.');
     }
 
@@ -46,20 +47,25 @@ class VehicleController extends Controller
     public function show(Vehicle $vehicle, \Illuminate\Http\Request $request): View
     {
         $filter = $request->get('filter', 'all'); // 'all' or 'active'
-        
+
         $assignmentsQuery = $vehicle->assignments()
             ->with(['employee'])
             ->orderBy('start_date', 'desc');
-        
+
         if ($filter === 'active') {
             $assignmentsQuery->active();
         }
-        
+
         $assignments = $assignmentsQuery->paginate(10)->withQueryString();
-        
-        // Load comments for the vehicle
-        $vehicle->load('comments.user');
-        
+
+        $vehicle->load([
+            'comments.user',
+            'equipmentConsumptions' => fn ($movements) => $movements
+                ->with(['equipment', 'variant', 'warehouse.location', 'creator'])
+                ->latest('id')
+                ->limit(50),
+        ]);
+
         return view('vehicles.show', compact('vehicle', 'assignments', 'filter'));
     }
 
@@ -78,7 +84,7 @@ class VehicleController extends Controller
     {
         $validated = $this->processImageUpload($request->validated(), $request, 'vehicles', $vehicle->image_path);
         $vehicle->update($validated);
-        
+
         return redirect()->route('vehicles.show', $vehicle)->with('success', 'Pojazd został zaktualizowany.');
     }
 
@@ -88,6 +94,7 @@ class VehicleController extends Controller
     public function destroy(Vehicle $vehicle): RedirectResponse
     {
         $vehicle->delete();
+
         return redirect()->route('vehicles.index')->with('success', 'Pojazd został usunięty.');
     }
 }

@@ -34,6 +34,7 @@ class EquipmentIssueFactory extends Factory
             'status' => 'issued',
             'notes' => null,
             'batch_id' => null,
+            'warehouse_dispatch_id' => null,
             'issued_by' => User::factory(),
             'returned_by' => null,
         ];

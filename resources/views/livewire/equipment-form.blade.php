@@ -3,8 +3,9 @@
 
     @if($warehouse)
         <p class="text-muted small mb-3">
-            Stan zapiszesz w magazynie <strong>{{ $warehouse->display_name }}</strong>.
-            Katalog (nazwa, warianty, wydawalność) jest wspólny dla wszystkich magazynów.
+            Tu zapisujesz cechy katalogu (nazwa, warianty, wydawalność) — wspólne dla wszystkich magazynów.
+            Minimalny próg dotyczy magazynu <strong>{{ $warehouse->display_name }}</strong>.
+            Sztuki dodasz później przez przyjęcie, nie wpisując stanu na karcie.
         </p>
     @endif
 
@@ -29,6 +30,45 @@
             placeholder="Krótki opis, widoczny na liście magazynu"
         ></textarea>
         @error('description') <div class="invalid-feedback">{{ $message }}</div> @enderror
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="equipment-image">Zdjęcie</label>
+        @if($existingImageUrl && ! $removeImage && ! $image)
+            <div class="mb-2">
+                <img
+                    src="{{ $existingImageUrl }}"
+                    alt="Aktualne zdjęcie"
+                    class="img-thumbnail"
+                    style="max-height:160px;object-fit:contain;"
+                >
+            </div>
+            <div class="form-check mb-2">
+                <input id="equipment-remove-image" type="checkbox" class="form-check-input" wire:model.live="removeImage">
+                <label class="form-check-label small" for="equipment-remove-image">Usuń zdjęcie</label>
+            </div>
+        @endif
+        @if($image)
+            <div class="mb-2">
+                <p class="text-muted small mb-1">Nowe zdjęcie:</p>
+                <img
+                    src="{{ $image->temporaryUrl() }}"
+                    alt="Podgląd"
+                    class="img-thumbnail"
+                    style="max-height:160px;object-fit:contain;"
+                >
+            </div>
+        @endif
+        <input
+            id="equipment-image"
+            type="file"
+            class="form-control @error('image') is-invalid @enderror"
+            accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+            wire:model="image"
+        >
+        @error('image') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        <div wire:loading wire:target="image" class="small text-muted mt-1">Wgrywam zdjęcie…</div>
+        <small class="form-text text-muted">Jedno zdjęcie typu (wszystkie rozmiary). Maks. 2 MB — JPEG, PNG, GIF, WEBP.</small>
     </div>
 
     <div class="mb-3">
@@ -105,7 +145,7 @@
             <input id="equipment-has-variants" type="checkbox" class="form-check-input" wire:model.live="has_variants">
             <label class="form-check-label" for="equipment-has-variants">Ten sprzęt ma warianty</label>
         </div>
-        <small class="form-text text-muted">Np. rozmiar spodni, rodzaj filtra. Jeśli nie — to jedna pozycja ze stanem.</small>
+        <small class="form-text text-muted">Np. rozmiar spodni, rodzaj filtra. Jeśli nie — to jedna pozycja w katalogu.</small>
         @error('has_variants') <div class="text-danger small">{{ $message }}</div> @enderror
     </div>
 
@@ -138,7 +178,6 @@
                     <thead>
                         <tr>
                             <th>{{ $variant_label !== '' ? $variant_label : 'Wariant' }}</th>
-                            <th>Ilość w tym magazynie</th>
                             <th>Minimalna ilość</th>
                             <th></th>
                         </tr>
@@ -154,17 +193,6 @@
                                         placeholder="np. M, UV400"
                                     >
                                     @error('variants.'.$index.'.value')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </td>
-                                <td style="width: 9rem;">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        class="form-control @error('variants.'.$index.'.quantity_in_stock') is-invalid @enderror"
-                                        wire:model="variants.{{ $index }}.quantity_in_stock"
-                                    >
-                                    @error('variants.'.$index.'.quantity_in_stock')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </td>
@@ -197,33 +225,20 @@
             </div>
         </div>
     @else
-        <div class="row mb-4">
-            <div class="col-md-6 mb-3 mb-md-0">
-                <label class="form-label" for="equipment-qty">Ilość w tym magazynie</label>
-                <input
-                    id="equipment-qty"
-                    type="number"
-                    min="0"
-                    class="form-control @error('variants.0.quantity_in_stock') is-invalid @enderror"
-                    wire:model="variants.0.quantity_in_stock"
-                >
-                @error('variants.0.quantity_in_stock')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="equipment-min">Minimalna ilość</label>
-                <input
-                    id="equipment-min"
-                    type="number"
-                    min="0"
-                    class="form-control @error('variants.0.min_quantity') is-invalid @enderror"
-                    wire:model="variants.0.min_quantity"
-                >
-                @error('variants.0.min_quantity')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
+        <div class="mb-4">
+            <label class="form-label" for="equipment-min">Minimalna ilość</label>
+            <input
+                id="equipment-min"
+                type="number"
+                min="0"
+                class="form-control @error('variants.0.min_quantity') is-invalid @enderror"
+                wire:model="variants.0.min_quantity"
+                style="max-width:12rem;"
+            >
+            @error('variants.0.min_quantity')
+                <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
+            <small class="form-text text-muted">Próg alarmu w tym magazynie, nie stan na półce.</small>
         </div>
     @endif
 

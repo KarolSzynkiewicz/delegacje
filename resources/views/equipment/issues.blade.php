@@ -18,14 +18,6 @@
                 >
                     Rozchód
                 </x-ui.button>
-                <x-ui.button
-                    variant="primary"
-                    href="{{ route('equipment-issues.create', ['warehouse_id' => $warehouse->id]) }}"
-                    routeName="equipment-issues.create"
-                    action="create"
-                >
-                    Wydaj
-                </x-ui.button>
             </x-slot>
         </x-ui.page-header>
     </x-slot>
@@ -112,7 +104,8 @@
                             <th>Zdarzenie</th>
                             <th>Magazyn</th>
                             <th>Pozycja</th>
-                            <th>Pracownik</th>
+                            <th>Przeznaczenie</th>
+                            <th>ZW</th>
                             <th class="text-end">Ilość</th>
                             <th>Status</th>
                             <th>Kto</th>
@@ -135,6 +128,15 @@
                                     </td>
                                     <td>
                                         <x-employee-cell :employee="$issue->employee" />
+                                    </td>
+                                    <td>
+                                        @if($issue->dispatch)
+                                            <a href="{{ route('warehouse-dispatches.show', $issue->dispatch) }}" class="text-decoration-none">
+                                                {{ $issue->dispatch->number }}
+                                            </a>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
                                     </td>
                                     <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $issue->quantity_issued }}</td>
                                     <td>
@@ -165,12 +167,19 @@
                                         <div class="small text-muted">{{ $movement->variant?->kind_label ?? '—' }}</div>
                                     </td>
                                     <td>
-                                        @if($movement->employee)
-                                            <x-employee-cell :employee="$movement->employee" />
+                                        @if($movement->destinationLabel())
+                                            @if($movement->destinationHref())
+                                                <a href="{{ $movement->destinationHref() }}" class="text-decoration-none">
+                                                    {{ $movement->destinationMeta() }}
+                                                </a>
+                                            @else
+                                                {{ $movement->destinationMeta() }}
+                                            @endif
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
                                     </td>
+                                    <td class="text-muted">—</td>
                                     <td class="text-end" style="font-variant-numeric:tabular-nums;">−{{ $movement->quantity }}</td>
                                     <td>
                                         <x-ui.badge variant="accent">Zdjęto ze stanu</x-ui.badge>

@@ -41,7 +41,7 @@ class AccommodationController extends Controller
                 'start_date' => $validated['lease_start_date'] ?? null,
                 'end_date' => $validated['lease_end_date'] ?? null,
                 'monthly_rent' => $validated['lease_monthly_rent'] ?? null,
-                'currency' => !empty($validated['lease_monthly_rent']) ? ($validated['lease_currency'] ?? 'EUR') : null,
+                'currency' => ! empty($validated['lease_monthly_rent']) ? ($validated['lease_currency'] ?? 'EUR') : null,
             ]);
         }
 
@@ -55,7 +55,15 @@ class AccommodationController extends Controller
 
     public function show(Accommodation $accommodation): View
     {
-        $accommodation->load(['activeLease', 'leases', 'location']);
+        $accommodation->load([
+            'activeLease',
+            'leases',
+            'location',
+            'equipmentConsumptions' => fn ($movements) => $movements
+                ->with(['equipment', 'variant', 'warehouse.location', 'creator'])
+                ->latest('id')
+                ->limit(50),
+        ]);
 
         $assignments = $accommodation->assignments()
             ->with(['employee'])
@@ -88,7 +96,7 @@ class AccommodationController extends Controller
                 'start_date' => $validated['lease_start_date'] ?? null,
                 'end_date' => $validated['lease_end_date'] ?? null,
                 'monthly_rent' => $validated['lease_monthly_rent'] ?? null,
-                'currency' => !empty($validated['lease_monthly_rent']) ? ($validated['lease_currency'] ?? 'EUR') : null,
+                'currency' => ! empty($validated['lease_monthly_rent']) ? ($validated['lease_currency'] ?? 'EUR') : null,
             ];
 
             if ($activeLease) {
@@ -141,7 +149,7 @@ class AccommodationController extends Controller
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'] ?? null,
             'monthly_rent' => $validated['monthly_rent'] ?? null,
-            'currency' => !empty($validated['monthly_rent']) ? ($validated['currency'] ?? 'EUR') : null,
+            'currency' => ! empty($validated['monthly_rent']) ? ($validated['currency'] ?? 'EUR') : null,
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -165,7 +173,7 @@ class AccommodationController extends Controller
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'] ?? null,
             'monthly_rent' => $validated['monthly_rent'] ?? null,
-            'currency' => !empty($validated['monthly_rent']) ? ($validated['currency'] ?? $lease->currency ?? 'EUR') : null,
+            'currency' => ! empty($validated['monthly_rent']) ? ($validated['currency'] ?? $lease->currency ?? 'EUR') : null,
             'notes' => $validated['notes'] ?? null,
         ]);
 

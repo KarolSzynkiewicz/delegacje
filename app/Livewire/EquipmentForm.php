@@ -6,13 +6,18 @@ use App\Enums\Currency;
 use App\Models\Equipment;
 use App\Models\Warehouse;
 use App\Services\EquipmentService;
+use App\Services\ImageService;
 use App\Services\WarehouseService;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 class EquipmentForm extends Component
 {
+    use WithFileUploads;
+
     public ?int $equipmentId = null;
 
     public int $warehouseId;
@@ -35,7 +40,14 @@ class EquipmentForm extends Component
 
     public bool $returnable = true;
 
-    /** @var array<int, array{id: int|null, value: string, quantity_in_stock: int|string, min_quantity: int|string}> */
+    /** @var TemporaryUploadedFile|null */
+    public $image = null;
+
+    public bool $removeImage = false;
+
+    public ?string $existingImageUrl = null;
+
+    /** @var array<int, array{id: int|null, value: string, min_quantity: int|string}> */
     public array $variants = [];
 
     public function mount(?Equipment $equipment = null, ?Warehouse $warehouse = null): void
@@ -58,10 +70,10 @@ class EquipmentForm extends Component
             $this->currency = $equipment->currency?->value ?? 'PLN';
             $this->issuable = (bool) $equipment->issuable;
             $this->returnable = (bool) $equipment->returnable;
+            $this->existingImageUrl = $equipment->image_url;
             $this->variants = $equipment->variants->map(fn ($variant) => [
                 'id' => $variant->id,
                 'value' => $variant->value ?? '',
-                'quantity_in_stock' => $variant->quantityIn($warehouse),
                 'min_quantity' => $variant->minQuantityIn($warehouse),
             ])->values()->all();
         }
@@ -111,7 +123,13 @@ class EquipmentForm extends Component
         $this->variants = array_values($this->variants);
     }
 
-    public function save(EquipmentService $equipmentService)
+    public function updatedImage(): void
+    {
+        $this->validateOnly('image');
+        $this->removeImage = false;
+    }
+
+    public function save(EquipmentService $equipmentService, ImageService $imageService)
     {
         $this->validate($this->rules());
 
@@ -121,17 +139,33 @@ class EquipmentForm extends Component
                 : null;
             $warehouse = Warehouse::query()->findOrFail($this->warehouseId);
 
+            $attributes = [
+                'name' => $this->name,
+                'description' => $this->description !== '' ? $this->description : null,
+                'category' => $this->category !== '' ? $this->category : null,
+                'variant_label' => $this->has_variants && $this->variant_label !== '' ? $this->variant_label : null,
+                'unit_cost' => $this->unit_cost !== '' && $this->unit_cost !== null ? $this->unit_cost : null,
+                'currency' => $this->currency,
+                'issuable' => $this->issuable,
+                'returnable' => $this->issuable && $this->returnable,
+            ];
+
+            if ($this->image || $this->removeImage) {
+                $oldPath = $equipment?->image_path;
+                if ($this->removeImage && ! $this->image) {
+                    $imageService->deleteImage($oldPath);
+                    $attributes['image_path'] = null;
+                } elseif ($this->image) {
+                    $attributes['image_path'] = $imageService->handleImageUpload(
+                        $this->image,
+                        'equipment',
+                        $oldPath
+                    );
+                }
+            }
+
             $saved = $equipmentService->saveType(
-                [
-                    'name' => $this->name,
-                    'description' => $this->description !== '' ? $this->description : null,
-                    'category' => $this->category !== '' ? $this->category : null,
-                    'variant_label' => $this->has_variants && $this->variant_label !== '' ? $this->variant_label : null,
-                    'unit_cost' => $this->unit_cost !== '' && $this->unit_cost !== null ? $this->unit_cost : null,
-                    'currency' => $this->currency,
-                    'issuable' => $this->issuable,
-                    'returnable' => $this->issuable && $this->returnable,
-                ],
+                $attributes,
                 $this->variantsForSave(),
                 $warehouse,
                 $equipment
@@ -144,7 +178,9 @@ class EquipmentForm extends Component
 
         session()->flash(
             'success',
-            $this->equipmentId ? 'Pozycja magazynowa została zaktualizowana.' : 'Pozycja magazynowa została dodana.'
+            $this->equipmentId
+                ? 'Pozycja katalogu została zaktualizowana.'
+                : 'Pozycja dodana do katalogu. Przyjmij towar, żeby pojawił się stan.'
         );
 
         return $this->redirect(route('equipment.show', [
@@ -175,29 +211,28 @@ class EquipmentForm extends Component
             'currency' => ['required', 'string', Rule::in(Currency::values())],
             'issuable' => 'boolean',
             'returnable' => 'boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'variants' => 'required|array|min:1',
             'variants.*.id' => 'nullable|integer',
             'variants.*.value' => $this->has_variants ? 'required|string|max:255' : 'nullable|string|max:255',
-            'variants.*.quantity_in_stock' => 'required|integer|min:0',
             'variants.*.min_quantity' => 'required|integer|min:0',
         ];
     }
 
     /**
-     * @return array{id: null, value: string, quantity_in_stock: int, min_quantity: int}
+     * @return array{id: null, value: string, min_quantity: int}
      */
     private function blankVariant(): array
     {
         return [
             'id' => null,
             'value' => '',
-            'quantity_in_stock' => 0,
             'min_quantity' => 0,
         ];
     }
 
     /**
-     * @return array<int, array{id: int|null, value: string|null, quantity_in_stock: int|string, min_quantity: int|string}>
+     * @return array<int, array{id: int|null, value: string|null, min_quantity: int|string}>
      */
     private function variantsForSave(): array
     {
@@ -210,7 +245,6 @@ class EquipmentForm extends Component
         return [[
             'id' => $first['id'] ?? null,
             'value' => null,
-            'quantity_in_stock' => $first['quantity_in_stock'] ?? 0,
             'min_quantity' => $first['min_quantity'] ?? 0,
         ]];
     }

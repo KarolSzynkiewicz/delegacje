@@ -27,6 +27,7 @@ class EquipmentStockMovementFactory extends Factory
                 ]);
             },
             'type' => StockMovementType::CONSUMPTION,
+            'reason' => null,
             'quantity' => 1,
             'employee_id' => null,
             'notes' => null,

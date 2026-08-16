@@ -9,7 +9,8 @@
         'danger' => 'danger',
         'warning' => 'warning',
         'info' => 'info',
-        'accent' => 'accent', // własna klasa
+        'accent' => 'accent',
+        'secondary' => 'secondary',
         default => 'info'
     };
     $classes = 'badge badge-' . $bootstrapVariant;

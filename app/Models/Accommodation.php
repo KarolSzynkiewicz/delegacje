@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasComments;
+use App\Traits\HasEquipmentConsumptions;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Accommodation extends Model
 {
-    use HasComments, HasFactory;
+    use HasComments, HasEquipmentConsumptions, HasFactory;
 
     protected $fillable = [
         'location_id',

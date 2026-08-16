@@ -17,6 +17,7 @@ class EquipmentFactory extends Factory
         return [
             'name' => fake()->unique()->words(2, true),
             'description' => null,
+            'image_path' => null,
             'category' => 'Ochrona',
             'variant_label' => 'Rozmiar',
             'unit_cost' => null,

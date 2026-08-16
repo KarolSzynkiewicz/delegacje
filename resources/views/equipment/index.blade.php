@@ -1,17 +1,23 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Magazyn">
+        <x-ui.page-header title="Magazyn — {{ $warehouse->name }}">
             <x-slot name="right">
-                @if(! ($archived ?? false))
-                    <x-ui.button
-                        variant="primary"
-                        href="{{ route('equipment.create', ['warehouse_id' => $warehouse->id]) }}"
-                        routeName="equipment.create"
-                        action="create"
-                    >
-                        Dodaj do magazynu
-                    </x-ui.button>
-                @endif
+                <x-ui.button
+                    variant="ghost"
+                    href="{{ route('equipment-issues.create', ['warehouse_id' => $warehouse->id]) }}"
+                    routeName="equipment-issues.create"
+                    action="create"
+                >
+                    Zleć wydanie
+                </x-ui.button>
+                <x-ui.button
+                    variant="primary"
+                    href="{{ route('equipment.create', ['warehouse_id' => $warehouse->id]) }}"
+                    routeName="equipment.create"
+                    action="create"
+                >
+                    Dodaj do magazynu
+                </x-ui.button>
             </x-slot>
         </x-ui.page-header>
     </x-slot>
@@ -29,50 +35,81 @@
     @endif
 
     @php
-        $archived = $archived ?? false;
-        $tabRoute = $archived ? 'equipment.tab.archived' : 'equipment.tab.stock';
+        $showWithdrawn = $showWithdrawn ?? false;
+        $filterParams = array_filter([
+            'warehouse_id' => $warehouse->id,
+            'withdrawn' => $showWithdrawn ? 1 : null,
+        ]);
+        $cardKeep = array_filter([
+            'search' => request('search'),
+            'category' => request('category'),
+            'withdrawn' => $showWithdrawn ? 1 : null,
+        ]);
     @endphp
+
+    @include('equipment._warehouse-cards', [
+        'warehouses' => $warehouses,
+        'current' => $warehouse,
+        'counts' => $warehouseCounts,
+        'routeName' => 'equipment.tab.stock',
+        'keep' => $cardKeep,
+    ])
+
     <x-ui.card class="mb-4">
         @include('equipment._tabs', ['activeTab' => $activeTab ?? 'stock'])
-        <form method="GET" action="{{ route($tabRoute) }}" id="filter-form" class="js-auto-submit">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label small">
-                        <i class="bi bi-buildings me-1"></i> Magazyn
-                    </label>
-                    <select name="warehouse_id" class="form-control" onchange="this.form.submit()">
-                        @foreach($warehouses as $option)
-                            <option value="{{ $option->id }}" @selected($option->id === $warehouse->id)>
-                                {{ $option->display_name }}{{ $option->is_default ? ' — siedziba' : '' }}
+        <form method="GET" action="{{ route('equipment.tab.stock') }}" id="filter-form" class="js-auto-submit eq-stock-filters">
+            <input type="hidden" name="warehouse_id" value="{{ $warehouse->id }}">
+            <div class="eq-stock-filters__grid">
+                <div>
+                    <label class="form-label small" for="stock-filter-search">Szukaj</label>
+                    <input
+                        id="stock-filter-search"
+                        type="search"
+                        name="search"
+                        value="{{ request('search') }}"
+                        placeholder="Nazwa typu lub rodzaj…"
+                        class="form-control js-debounced"
+                        autocomplete="off"
+                    >
+                </div>
+                <div>
+                    <label class="form-label small" for="stock-filter-category">Kategoria</label>
+                    <select
+                        id="stock-filter-category"
+                        name="category"
+                        class="form-select"
+                        onchange="this.form.submit()"
+                    >
+                        <option value="">Wszystkie</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category }}" @selected(request('category') === $category)>
+                                {{ $category }}
                             </option>
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label small">
-                        <i class="bi bi-search me-1"></i> Szukaj
-                    </label>
-                    <input type="search" name="search" value="{{ request('search') }}"
-                        placeholder="Nazwa typu lub rodzaj..."
-                        class="form-control js-debounced"
-                        autocomplete="off">
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label small">
-                        <i class="bi bi-tags me-1"></i> Kategoria
-                    </label>
-                    <input type="search" name="category" value="{{ request('category') }}"
-                        placeholder="Szukaj kategorii…"
-                        class="form-control js-debounced"
-                        autocomplete="off">
+                <div class="eq-stock-filters__check">
+                    <div class="form-check mb-0">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="withdrawn"
+                            value="1"
+                            id="show-withdrawn"
+                            @checked($showWithdrawn)
+                            onchange="this.form.submit()"
+                        >
+                        <label class="form-check-label" for="show-withdrawn" title="Pozycje, których już nie ewidencjonujemy — kiedyś były w asortymencie i mogły być wydawane.">
+                            Pokaż wycofane
+                        </label>
+                    </div>
                 </div>
             </div>
         </form>
 
         @if(request('search') || request('category'))
-            <div class="mt-3 pt-3 border-top">
-                <a href="{{ route($tabRoute, ['warehouse_id' => $warehouse->id]) }}" class="btn btn-sm btn-outline-secondary">
+            <div class="eq-stock-filters__clear">
+                <a href="{{ route('equipment.tab.stock', $filterParams) }}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                 </a>
             </div>
@@ -82,33 +119,30 @@
     <x-ui.card class="p-0">
         @if($sections->isNotEmpty())
             <div class="table-responsive">
-                <table class="table mb-0 align-middle" style="border-collapse:collapse;">
+                <table class="table mb-0 align-middle eq-stock-table">
                     <thead>
-                        <tr style="font-size:.67rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">
-                            <th style="padding-left:1rem;border-bottom:0;">Typ / rodzaj</th>
-                            <th class="text-end" style="border-bottom:0;width:7.5rem;">W magazynie</th>
-                            <th class="text-end" style="border-bottom:0;width:9.5rem;">W innych magazynach</th>
-                            <th class="text-end" style="border-bottom:0;width:8.5rem;">Do zwrotu tutaj</th>
-                            <th class="text-end" style="border-bottom:0;width:10.5rem;">Do zwrotu w innych magazynach</th>
-                            <th style="border-bottom:0;width:7rem;"></th>
+                        <tr>
+                            <th>Typ / rodzaj</th>
+                            <th class="text-end">W magazynie</th>
+                            <th class="text-end">Zarezerwowane</th>
+                            <th class="text-end">W innych magazynach</th>
+                            <th class="text-end">Do zwrotu tutaj</th>
+                            <th class="text-end">Do zwrotu w innych magazynach</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($sections as $section)
-                            <tr>
-                                <td colspan="6" style="padding:.85rem 1rem .35rem;background:rgba(255,255,255,.04);border-top:2px solid var(--glass-border);">
-                                    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);">
-                                        {{ $section['title'] }}
-                                    </span>
+                            <tr class="eq-stock-section">
+                                <td colspan="7">
+                                    <span class="eq-stock-section__label">{{ $section['title'] }}</span>
                                 </td>
                             </tr>
                             @foreach ($section['groups'] as $group)
                                 @if($group['title'])
-                                    <tr>
-                                        <td colspan="6" style="padding:.5rem 1rem .2rem;border-top:0;">
-                                            <span style="font-size:.67rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);">
-                                                {{ $group['title'] }}
-                                            </span>
+                                    <tr class="eq-stock-group">
+                                        <td colspan="7">
+                                            <span class="eq-stock-group__label">{{ $group['title'] }}</span>
                                         </td>
                                     </tr>
                                 @endif
@@ -116,7 +150,6 @@
                                     @include('equipment._stock-item', [
                                         'item' => $item,
                                         'warehouse' => $warehouse,
-                                        'archived' => $archived,
                                     ])
                                 @endforeach
                             @endforeach
@@ -130,21 +163,19 @@
                 icon="inbox"
                 :message="request('search') || request('category')
                     ? 'Brak pozycji spełniających kryteria wyszukiwania'
-                    : ($archived ? 'Brak asortymentu historycznego.' : 'Magazyn jest pusty.')"
+                    : ($showWithdrawn ? 'Brak pozycji w asortymencie.' : 'Asortyment jest pusty.')"
             >
                 @if(!request('search') && !request('category'))
-                    @if(! $archived)
-                        <x-ui.button
-                            variant="primary"
-                            href="{{ route('equipment.create', ['warehouse_id' => $warehouse->id]) }}"
-                            routeName="equipment.create"
-                            action="create"
-                        >
-                            Dodaj pierwszą pozycję
-                        </x-ui.button>
-                    @endif
+                    <x-ui.button
+                        variant="primary"
+                        href="{{ route('equipment.create', ['warehouse_id' => $warehouse->id]) }}"
+                        routeName="equipment.create"
+                        action="create"
+                    >
+                        Dodaj pierwszą pozycję
+                    </x-ui.button>
                 @else
-                    <a href="{{ route($tabRoute, ['warehouse_id' => $warehouse->id]) }}" class="btn btn-outline-secondary">
+                    <a href="{{ route('equipment.tab.stock', $filterParams) }}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                     </a>
                 @endif
@@ -154,4 +185,22 @@
     </x-ui.card>
 
     @include('equipment._filter-debounce')
+
+    @push('scripts')
+    <script>
+        (function () {
+            document.querySelectorAll('[data-eq-stock-toggle]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const id = button.getAttribute('data-eq-stock-toggle');
+                    const open = button.getAttribute('aria-expanded') !== 'true';
+                    button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    button.closest('.eq-stock-item')?.classList.toggle('is-open', open);
+                    document.querySelectorAll('[data-eq-stock-parent="' + id + '"]').forEach((row) => {
+                        row.hidden = !open;
+                    });
+                });
+            });
+        })();
+    </script>
+    @endpush
 </x-app-layout>

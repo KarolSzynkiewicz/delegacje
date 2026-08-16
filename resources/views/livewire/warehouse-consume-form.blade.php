@@ -2,40 +2,10 @@
     <x-ui.errors />
 
     <p class="text-muted small mb-3">
-        Rozchód zdejmuje stan od razu. Nie wisi jako wydanie — możesz opcjonalnie wskazać osobę, na którą to poszło (np. kierowca, serwis).
+        Rozchód zdejmuje stan od razu — tylko pozycje niewydawalne. Najpierw wybierz przeznaczenie (projekt, dom, auto albo osobę), potem konkretną pozycję.
     </p>
 
-    <div class="mb-3">
-        <label class="form-label">Przypisane do (opcjonalnie)</label>
-        @if($employeeId)
-            <div class="d-flex align-items-center justify-content-between gap-2 border rounded px-3 py-2">
-                <span class="fw-semibold">{{ $employeeSearch }}</span>
-                <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="clearEmployee">Zmień</button>
-            </div>
-        @else
-            <input
-                type="search"
-                class="form-control @error('employeeId') is-invalid @enderror"
-                placeholder="Szukaj pracownika…"
-                autocomplete="off"
-                wire:model.live.debounce.300ms="employeeSearch"
-            >
-            @if(filled($employeeSearch))
-                <div class="border rounded mt-1" style="max-height:12rem;overflow:auto;">
-                    @forelse($employeeMatches as $employee)
-                        <button type="button" class="dropdown-item" wire:click="selectEmployee({{ $employee->id }})">
-                            {{ $employee->full_name }}
-                        </button>
-                    @empty
-                        <div class="px-3 py-2 small text-muted">Brak wyników.</div>
-                    @endforelse
-                </div>
-            @endif
-        @endif
-        @error('employeeId')
-            <div class="invalid-feedback d-block">{{ $message }}</div>
-        @enderror
-    </div>
+    @include('livewire.partials.consumption-destination-picker')
 
     <div class="mb-4">
         <label class="form-label" for="consume-notes">Notatka</label>

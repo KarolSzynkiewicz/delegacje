@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\VehicleType;
 use App\Traits\HasComments;
+use App\Traits\HasEquipmentConsumptions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vehicle extends Model
 {
-    use HasComments, HasFactory;
+    use HasComments, HasEquipmentConsumptions, HasFactory;
 
     /**
      * The attributes that are mass assignable.

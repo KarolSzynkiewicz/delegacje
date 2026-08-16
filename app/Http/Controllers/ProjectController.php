@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Project;
-use App\Models\Location;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use App\Models\Location;
+use App\Models\Project;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
 
 class ProjectController extends Controller
 {
@@ -27,6 +27,7 @@ class ProjectController extends Controller
     public function create(): View
     {
         $locations = Location::all();
+
         return view('projects.create', compact('locations'));
     }
 
@@ -49,7 +50,15 @@ class ProjectController extends Controller
     public function show(Project $project): View
     {
         // Tylko podstawowe dane - reszta w Livewire ProjectTabs
-        $project->load(['location', 'demands']);
+        $project->load([
+            'location',
+            'demands',
+            'equipmentConsumptions' => fn ($movements) => $movements
+                ->with(['equipment', 'variant', 'warehouse.location', 'creator'])
+                ->latest('id')
+                ->limit(50),
+        ]);
+
         return view('projects.show', compact('project'));
     }
 
@@ -59,6 +68,7 @@ class ProjectController extends Controller
     public function edit(Project $project): View
     {
         $locations = Location::all();
+
         return view('projects.edit', compact('project', 'locations'));
     }
 
@@ -88,36 +98,50 @@ class ProjectController extends Controller
             $filesCount = $project->files()->count();
             $commentsCount = $project->comments()->count();
             $variableCostsCount = $project->variableCosts()->count();
-            
+
             // Sprawdź time logs przez assignments
-            $timeLogsCount = \App\Models\TimeLog::whereHas('projectAssignment', function($query) use ($project) {
+            $timeLogsCount = \App\Models\TimeLog::whereHas('projectAssignment', function ($query) use ($project) {
                 $query->where('project_id', $project->id);
             })->count();
-            
+
             $project->delete();
 
             // Wyczyść cache dla dropdowna projektów
             Cache::forget('active_projects_dropdown');
 
-            $message = "Projekt został usunięty.";
-            if ($assignmentsCount > 0 || $demandsCount > 0 || $tasksCount > 0 || 
+            $message = 'Projekt został usunięty.';
+            if ($assignmentsCount > 0 || $demandsCount > 0 || $tasksCount > 0 ||
                 $filesCount > 0 || $commentsCount > 0 || $variableCostsCount > 0 || $timeLogsCount > 0) {
-                $message .= " Usunięto również: ";
+                $message .= ' Usunięto również: ';
                 $deleted = [];
-                if ($assignmentsCount > 0) $deleted[] = "{$assignmentsCount} przypisania pracowników";
-                if ($timeLogsCount > 0) $deleted[] = "{$timeLogsCount} wpisów czasu pracy";
-                if ($demandsCount > 0) $deleted[] = "{$demandsCount} zapotrzebowań";
-                if ($tasksCount > 0) $deleted[] = "{$tasksCount} zadań";
-                if ($filesCount > 0) $deleted[] = "{$filesCount} plików";
-                if ($commentsCount > 0) $deleted[] = "{$commentsCount} komentarzy";
-                if ($variableCostsCount > 0) $deleted[] = "{$variableCostsCount} kosztów zmiennych";
-                $message .= implode(", ", $deleted) . ".";
+                if ($assignmentsCount > 0) {
+                    $deleted[] = "{$assignmentsCount} przypisania pracowników";
+                }
+                if ($timeLogsCount > 0) {
+                    $deleted[] = "{$timeLogsCount} wpisów czasu pracy";
+                }
+                if ($demandsCount > 0) {
+                    $deleted[] = "{$demandsCount} zapotrzebowań";
+                }
+                if ($tasksCount > 0) {
+                    $deleted[] = "{$tasksCount} zadań";
+                }
+                if ($filesCount > 0) {
+                    $deleted[] = "{$filesCount} plików";
+                }
+                if ($commentsCount > 0) {
+                    $deleted[] = "{$commentsCount} komentarzy";
+                }
+                if ($variableCostsCount > 0) {
+                    $deleted[] = "{$variableCostsCount} kosztów zmiennych";
+                }
+                $message .= implode(', ', $deleted).'.';
             }
 
             return redirect()->route('projects.index')->with('success', $message);
         } catch (\Exception $e) {
             return redirect()->route('projects.index')
-                ->with('error', 'Wystąpił błąd podczas usuwania projektu: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas usuwania projektu: '.$e->getMessage());
         }
     }
 }

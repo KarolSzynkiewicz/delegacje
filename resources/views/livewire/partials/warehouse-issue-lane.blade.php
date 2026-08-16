@@ -1,13 +1,13 @@
 @php
     $side = $side ?? 'stock';
-    $kind = $kind ?? 'returnable';
+    $multipleRecipients = $multipleRecipients ?? false;
 @endphp
 <div
-    class="border rounded p-2 h-100"
-    style="background:rgba(255,255,255,.03);min-height:100%;"
+    class="h-100 p-2"
+    style="background:var(--bg-input);border:1px solid var(--glass-border);border-radius:12px;min-height:100%;color:var(--text-main);"
     @if($side === 'cart')
-        x-on:dragover="over($event, @js($kind))"
-        x-on:drop="drop($event, @js($kind))"
+        x-on:dragover="over($event, 'cart')"
+        x-on:drop="drop($event, 'cart')"
     @endif
 >
     <div class="px-1 pb-2" style="font-size:.67rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);">
@@ -24,77 +24,68 @@
                     $canMove = $remaining > 0;
                     $expanded = $expandedTypeId === $type->id;
                 @endphp
-                <div wire:key="stock-type-{{ $kind }}-{{ $type->id }}">
+                <div wire:key="stock-type-{{ $type->id }}">
                     @if($hasVariants)
                         <div
-                            class="border rounded px-2 py-2"
-                            style="background:rgba(255,255,255,.04);cursor:pointer;{{ $canMove ? '' : 'opacity:.45;' }}"
-                            wire:click="toggleType({{ $type->id }})"
+                            @class(['warehouse-issue-item px-2 py-2', 'is-muted' => ! $canMove])
+                            style="cursor:pointer;"
+                            @if($canMove)
+                                wire:click="addTypeToCart({{ $type->id }})"
+                            @endif
                         >
                             <div class="d-flex align-items-start justify-content-between gap-1">
                                 <div>
-                                    <div class="fw-semibold" style="font-size:.85rem;">{{ $type->name }}</div>
-                                    <div class="small mt-1" style="font-variant-numeric:tabular-nums;">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <div class="fw-semibold" style="font-size:.85rem;color:var(--text-main);">{{ $type->name }}</div>
+                                        @include('livewire.partials.warehouse-issue-returnable-icon', ['type' => $type])
+                                    </div>
+                                    <div class="small mt-1" style="font-variant-numeric:tabular-nums;color:var(--text-muted);">
                                         {{ $remaining }} / {{ $card['stock'] }}
                                     </div>
                                 </div>
-                                <i class="bi bi-chevron-{{ $expanded ? 'up' : 'down' }} small text-muted"></i>
-                            </div>
-                        </div>
-                        @if($expanded)
-                            <div class="border rounded mt-1 p-1" style="background:rgba(0,0,0,.18);">
-                                @foreach($card['variants'] as $option)
-                                    @php
-                                        $variant = $option['variant'];
-                                        $variantCanMove = $option['remaining'] > 0;
-                                    @endphp
-                                    <div
-                                        wire:key="stock-variant-{{ $variant->id }}"
-                                        class="d-flex align-items-center justify-content-between gap-1 rounded px-2 py-1"
-                                        style="{{ $variantCanMove ? 'cursor:grab;' : 'opacity:.45;' }}"
-                                        @if($variantCanMove)
-                                            draggable="true"
-                                            x-on:dragstart.stop="start($event, 'stock', {{ $variant->id }}, @js($kind))"
-                                        @endif
+                                @if($canMove)
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-primary"
+                                        draggable="false"
+                                        wire:click.stop="addTypeToCart({{ $type->id }})"
+                                        title="Dobierz rozmiary"
                                     >
-                                        <div>
-                                            <div class="small fw-semibold">{{ $variant->kind_label }}</div>
-                                            <div class="small text-muted" style="font-variant-numeric:tabular-nums;">
-                                                {{ $option['remaining'] }} / {{ $option['stock'] }}
-                                            </div>
-                                        </div>
-                                        @if($variantCanMove)
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-primary"
-                                                draggable="false"
-                                                wire:click.stop="addToCart({{ $variant->id }}, @js($kind))"
-                                                title="Dodaj"
-                                            >
-                                                <i class="bi bi-plus"></i>
-                                            </button>
-                                        @endif
-                                    </div>
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                @endif
+                            </div>
+                            <div class="d-flex flex-wrap gap-1 mt-2">
+                                @foreach($card['variants'] as $option)
+                                    <span
+                                        class="badge badge-secondary"
+                                        style="font-weight:600;{{ $option['remaining'] < 1 ? 'opacity:.4;' : '' }}"
+                                    >
+                                        {{ $option['variant']->kind_label }} · {{ $option['remaining'] }}
+                                    </span>
                                 @endforeach
                             </div>
-                        @endif
+                        </div>
                     @else
                         @php
                             $variant = $card['variants'][0]['variant'] ?? null;
                         @endphp
                         @if($variant)
                             <div
-                                class="border rounded px-2 py-2"
-                                style="background:rgba(255,255,255,.04);{{ $canMove ? 'cursor:grab;' : 'opacity:.45;' }}"
+                                @class(['warehouse-issue-item px-2 py-2', 'is-muted' => ! $canMove])
+                                style="{{ $canMove ? 'cursor:grab;' : '' }}"
                                 @if($canMove)
                                     draggable="true"
-                                    x-on:dragstart="start($event, 'stock', {{ $variant->id }}, @js($kind))"
+                                    x-on:dragstart="start($event, 'stock', {{ $variant->id }})"
                                 @endif
                             >
                                 <div class="d-flex align-items-start justify-content-between gap-1">
                                     <div>
-                                        <div class="fw-semibold" style="font-size:.85rem;">{{ $type->name }}</div>
-                                        <div class="small mt-1" style="font-variant-numeric:tabular-nums;">
+                                        <div class="d-flex align-items-center gap-1">
+                                            <div class="fw-semibold" style="font-size:.85rem;color:var(--text-main);">{{ $type->name }}</div>
+                                            @include('livewire.partials.warehouse-issue-returnable-icon', ['type' => $type])
+                                        </div>
+                                        <div class="small mt-1" style="font-variant-numeric:tabular-nums;color:var(--text-muted);">
                                             {{ $remaining }} / {{ $card['stock'] }}
                                         </div>
                                     </div>
@@ -103,7 +94,7 @@
                                             type="button"
                                             class="btn btn-sm btn-outline-primary"
                                             draggable="false"
-                                            wire:click.stop="addToCart({{ $variant->id }}, @js($kind))"
+                                            wire:click.stop="addToCart({{ $variant->id }})"
                                             title="Dodaj"
                                         >
                                             <i class="bi bi-plus"></i>
@@ -116,35 +107,69 @@
                 </div>
             @else
                 @php
-                    $variant = $card['variant'];
+                    $type = $card['type'];
+                    $incomplete = $card['has_variants'] && $card['filled'] < $card['total'];
+                    $single = $card['total'] === 1 ? ($card['assignments'][0] ?? null) : null;
                 @endphp
                 <div
-                    wire:key="cart-{{ $kind }}-{{ $variant->id }}"
-                    class="border rounded px-2 py-2"
-                    style="background:rgba(255,255,255,.06);cursor:grab;"
+                    wire:key="cart-{{ $type->id }}"
+                    class="warehouse-issue-item px-2 py-2"
+                    style="cursor:grab;"
                     draggable="true"
-                    x-on:dragstart="start($event, 'cart', {{ $variant->id }}, @js($kind))"
-                >
-                    <div class="fw-semibold" style="font-size:.85rem;">{{ $variant->equipment?->name }}</div>
-                    @if($variant->equipment?->hasVariants())
-                        <div class="small text-muted">{{ $variant->kind_label }}</div>
+                    x-on:dragstart="start($event, 'cart', {{ $type->id }})"
+                    @if($card['has_variants'])
+                        wire:click="openSizePanel({{ $type->id }})"
                     @endif
+                >
+                    <div class="d-flex align-items-start justify-content-between gap-1">
+                        <div class="d-flex align-items-center gap-1">
+                            <div class="fw-semibold" style="font-size:.85rem;color:var(--text-main);">{{ $type->name }}</div>
+                            @include('livewire.partials.warehouse-issue-returnable-icon', ['type' => $type])
+                        </div>
+                        @if($incomplete)
+                            <x-ui.badge variant="warning">rozmiar {{ $card['filled'] }}/{{ $card['total'] }}</x-ui.badge>
+                        @endif
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach($card['variant_badges'] as $badge)
+                            <span
+                                class="badge badge-info position-relative"
+                                style="font-weight:600;"
+                                draggable="false"
+                                x-data="{ tip: false }"
+                                x-on:mouseenter="tip = true"
+                                x-on:mouseleave="tip = false"
+                                x-on:click.stop
+                            >
+                                {{ $badge['label'] }} · {{ $badge['count'] }}
+                                @if(count($badge['recipients']) > 0)
+                                    <span class="warehouse-issue-tip" x-show="tip" x-cloak>
+                                        @foreach($badge['recipients'] as $name)
+                                            <div>{{ $name }}</div>
+                                        @endforeach
+                                    </span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
                     <div class="d-flex align-items-center gap-1 mt-2">
-                        <input
-                            type="number"
-                            min="1"
-                            class="form-control form-control-sm"
-                            style="width:4.5rem;"
-                            value="{{ $card['quantity'] }}"
-                            draggable="false"
-                            wire:change="updateLineQuantity({{ $card['index'] }}, $event.target.value)"
-                            onclick="event.stopPropagation()"
-                        >
+                        @if($single)
+                            <input
+                                type="number"
+                                min="1"
+                                class="form-control form-control-sm"
+                                style="width:4.5rem;"
+                                value="{{ $single['quantity'] }}"
+                                draggable="false"
+                                wire:change="setAssignmentQuantity({{ $type->id }}, {{ $single['employee_id'] }}, $event.target.value)"
+                                onclick="event.stopPropagation()"
+                            >
+                        @endif
                         <button
                             type="button"
                             class="btn btn-sm btn-outline-danger"
                             draggable="false"
-                            wire:click.stop="removeLine({{ $card['index'] }})"
+                            wire:click.stop="removeTypeFromCart({{ $type->id }})"
                             title="Usuń"
                         >
                             <i class="bi bi-x"></i>
@@ -153,7 +178,7 @@
                 </div>
             @endif
         @empty
-            <div class="px-1 py-3 small text-muted">{{ $empty }}</div>
+            <div class="px-1 py-3 small" style="color:var(--text-muted);">{{ $empty }}</div>
         @endforelse
     </div>
 </div>

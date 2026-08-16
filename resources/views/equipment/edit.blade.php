@@ -23,7 +23,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Edytuj pozycję magazynową">
+            <x-ui.card label="Cechy katalogu">
                 <livewire:equipment-form :equipment="$equipment" :warehouse="$warehouse" :key="'eq-form-'.$equipment->id.'-'.$warehouse->id" />
             </x-ui.card>
         </div>

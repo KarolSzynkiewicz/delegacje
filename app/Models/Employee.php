@@ -258,6 +258,14 @@ class Employee extends Model
     }
 
     /**
+     * Wydania asortymentu z magazynu dla tego pracownika.
+     */
+    public function equipmentIssues(): HasMany
+    {
+        return $this->hasMany(EquipmentIssue::class);
+    }
+
+    /**
      * Get all evaluations for this employee.
      */
     public function evaluations(): HasMany

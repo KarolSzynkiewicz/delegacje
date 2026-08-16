@@ -11,7 +11,7 @@ class EquipmentVariant extends Model
 {
     use HasFactory;
 
-    public const UNAVAILABLE_STATUSES = ['issued', 'damaged', 'lost'];
+    public const RESERVED_STATUS = 'reserved';
 
     protected $fillable = [
         'equipment_id',
@@ -85,6 +85,26 @@ class EquipmentVariant extends Model
             ->sum('quantity_issued');
     }
 
+    public function issuedOutstandingTotal(): int
+    {
+        if (array_key_exists('issued_outstanding_total', $this->attributes)) {
+            return (int) $this->attributes['issued_outstanding_total'];
+        }
+
+        return (int) $this->issues()
+            ->where('status', 'issued')
+            ->sum('quantity_issued');
+    }
+
+    public function minQuantityTotal(): int
+    {
+        $stocks = $this->relationLoaded('stocks')
+            ? $this->stocks
+            : $this->stocks()->get();
+
+        return (int) $stocks->sum('min_quantity');
+    }
+
     public function issuedOutstandingInOthers(Warehouse $warehouse): int
     {
         if (array_key_exists('issued_outstanding_others', $this->attributes)) {
@@ -102,21 +122,21 @@ class EquipmentVariant extends Model
         return $this->stockIn($warehouse)->min_quantity;
     }
 
-    public function unavailableIn(Warehouse $warehouse): int
+    public function reservedIn(Warehouse $warehouse): int
     {
-        if (array_key_exists('unavailable_quantity', $this->attributes)) {
-            return (int) $this->attributes['unavailable_quantity'];
+        if (array_key_exists('reserved_quantity', $this->attributes)) {
+            return (int) $this->attributes['reserved_quantity'];
         }
 
         return (int) $this->issues()
             ->where('warehouse_id', $warehouse->id)
-            ->whereIn('status', self::UNAVAILABLE_STATUSES)
+            ->where('status', self::RESERVED_STATUS)
             ->sum('quantity_issued');
     }
 
     public function availableIn(Warehouse $warehouse): int
     {
-        return max(0, $this->quantityIn($warehouse) - $this->unavailableIn($warehouse));
+        return max(0, $this->quantityIn($warehouse) - $this->reservedIn($warehouse));
     }
 
     public function isLowStockIn(Warehouse $warehouse): bool
@@ -170,5 +190,21 @@ class EquipmentVariant extends Model
         }
 
         return "{$name} ({$this->value})";
+    }
+
+    /**
+     * SKU w WMS: nazwa typu × wariant (np. „Spodnie BHP · M”).
+     * Stan magazynowy śledzimy na tej parze, per magazyn.
+     */
+    public function getSkuAttribute(): string
+    {
+        $this->loadMissing('equipment');
+        $name = $this->equipment?->name ?? 'Pozycja magazynowa';
+
+        if (! filled($this->value)) {
+            return $name;
+        }
+
+        return $name.' · '.$this->value;
     }
 }

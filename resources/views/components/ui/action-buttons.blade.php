@@ -3,6 +3,7 @@
     'editRoute' => null,
     'deleteRoute' => null,
     'deleteMessage' => 'Czy na pewno chcesz usunąć ten element?',
+    'deleteTitle' => 'Usuń',
     'size' => 'sm', // sm, null, lg
     'gap' => '1',
     'class' => '',
@@ -36,7 +37,7 @@
             >
                 @csrf
                 @method('DELETE')
-                <x-ui.button variant="danger" type="submit" title="Usuń">
+                <x-ui.button variant="danger" type="submit" title="{{ $deleteTitle }}">
                     <i class="bi bi-trash"></i>
                 </x-ui.button>
             </form>

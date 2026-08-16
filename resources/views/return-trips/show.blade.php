@@ -247,6 +247,10 @@
         @endif
     </x-ui.card>
 
+    <div class="mb-4">
+        <livewire:logistics-event-warehouse-transfers :event="$returnTrip" :key="'rt-wh-mm-'.$returnTrip->id" />
+    </div>
+
     <x-comments
         :commentable="$returnTrip"
         commentable-type="logistics_event"

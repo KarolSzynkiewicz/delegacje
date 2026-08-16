@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header :title="$equipmentIssue->isPermanentIssue() ? 'Wydanie bezzwrotne' : 'Wydanie do zwrotu'">
+        <x-ui.page-header :title="$equipmentIssue->eventLabel()">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -49,6 +49,16 @@
                         <h6 class="text-muted small mb-1">Data wydania</h6>
                         <p class="fw-semibold mb-0">{{ $equipmentIssue->issue_date->format('Y-m-d') }}</p>
                     </div>
+                    @if($equipmentIssue->dispatch)
+                    <div class="col-md-6">
+                        <h6 class="text-muted small mb-1">Dokument ZW</h6>
+                        <p class="fw-semibold mb-0">
+                            <a href="{{ route('warehouse-dispatches.show', $equipmentIssue->dispatch) }}">
+                                {{ $equipmentIssue->dispatch->number }}
+                            </a>
+                        </p>
+                    </div>
+                    @endif
                     @if($equipmentIssue->actual_return_date)
                     <div class="col-md-6">
                         <h6 class="text-muted small mb-1">Rzeczywista data zwrotu</h6>

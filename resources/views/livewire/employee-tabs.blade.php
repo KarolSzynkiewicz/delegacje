@@ -976,6 +976,10 @@
         <div id="comments" role="tabpanel">
             <x-comments :commentable="$employee" />
         </div>
+    @elseif($activeTab === 'equipment')
+        <div id="equipment" role="tabpanel">
+            <livewire:employee-equipment-history :employee="$employee" :wire:key="'employee-equipment-'.$employee->id" />
+        </div>
     @endif
 </div>
 

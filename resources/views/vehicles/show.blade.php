@@ -296,6 +296,12 @@
                 @endif
             </x-ui.card>
 
+    <x-equipment.destination-consumptions
+        class="mt-4"
+        :consumable="$vehicle"
+        empty="Brak rozchodów z magazynu na ten pojazd."
+    />
+
     <x-ui.card class="mt-4">
         <x-comments :commentable="$vehicle" />
     </x-ui.card>

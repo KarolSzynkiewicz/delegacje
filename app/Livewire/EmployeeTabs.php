@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Enums\EmployeeTerminationReason;
 use App\Models\Employee;
+use App\Models\EquipmentIssue;
 use App\Services\EmployeeLifecycleService;
 use Livewire\Component;
 
@@ -94,6 +95,7 @@ class EmployeeTabs extends Component
             'assignments' => ['label' => 'Przypisania do projektów', 'permission' => 'project-assignments.view', 'icon' => 'bi bi-person-check'],
             'vehicle-assignments' => ['label' => 'Przypisania do aut', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
             'accommodation-assignments' => ['label' => 'Przypisania do domów', 'permission' => 'accommodation-assignments.view', 'icon' => 'bi bi-house-fill'],
+            'equipment' => ['label' => 'Asortyment', 'permission' => 'equipment.view', 'icon' => 'bi bi-box-seam'],
             'payrolls' => ['label' => 'Płace', 'permission' => 'payrolls.view', 'icon' => 'bi bi-cash-stack'],
             'employee-rates' => ['label' => 'Stawki', 'permission' => 'employee-rates.view', 'icon' => 'bi bi-currency-dollar'],
             'company-assignments' => ['label' => 'Przypisania do spółek', 'permission' => 'company-assignments.view', 'icon' => 'bi bi-building'],
@@ -149,6 +151,7 @@ class EmployeeTabs extends Component
             'evaluations' => $this->employee->evaluations()->with('createdBy')->orderBy('created_at', 'desc')->get(),
             'adjustments' => $this->employee->adjustments()->orderBy('date', 'desc')->get(),
             'comments' => null, // komentarze ładowane przez komponent x-comments
+            'equipment' => null, // historia wydań ładowana przez EmployeeEquipmentHistory
             default => null,
         };
     }
@@ -170,6 +173,9 @@ class EmployeeTabs extends Component
             'evaluations',
             'adjustments',
             'comments',
+            'equipmentIssues' => fn ($issues) => $issues->whereNotIn('status', [
+                EquipmentIssue::STATUS_UNFULFILLED,
+            ]),
         ]);
 
         // Load roles for info tab
@@ -200,6 +206,7 @@ class EmployeeTabs extends Component
                 'evaluations' => $this->employee->evaluations_count ?? 0,
                 'adjustments' => $this->employee->adjustments_count ?? 0,
                 'comments' => $this->employee->comments_count ?? 0,
+                'equipment' => $this->employee->equipment_issues_count ?? 0,
                 default => null,
             };
 

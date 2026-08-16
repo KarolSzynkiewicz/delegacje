@@ -1,19 +1,26 @@
 @php
     $activeTab = $activeTab ?? 'stock';
     $warehouse = $warehouse ?? null;
+    $pendingOrdersCount = $warehouse
+        ? \App\Models\WarehouseDispatch::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->where('status', \App\Models\WarehouseDispatch::STATUS_RESERVED)
+            ->count()
+        : 0;
     $tabsForComponent = [
         'stock' => [
-            'label' => 'Stan magazynu',
+            'label' => 'Asortyment',
             'icon' => 'bi bi-box-seam',
             'href' => route('equipment.tab.stock', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
         ],
-        'archived' => [
-            'label' => 'Asortyment historyczny',
-            'icon' => 'bi bi-archive',
-            'href' => route('equipment.tab.archived', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
+        'orders' => [
+            'label' => 'Zlecenia',
+            'icon' => 'bi bi-clipboard-check',
+            'href' => route('equipment.tab.orders', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
+            'count' => $pendingOrdersCount,
         ],
         'issues' => [
-            'label' => 'Wydania',
+            'label' => 'Wydane',
             'icon' => 'bi bi-box-arrow-up',
             'href' => route('equipment.tab.issues'),
         ],
