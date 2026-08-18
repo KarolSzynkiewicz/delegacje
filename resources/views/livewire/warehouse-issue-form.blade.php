@@ -194,6 +194,28 @@
         .warehouse-issue-returnable:hover {
             color: var(--primary);
         }
+        .warehouse-issue-thumb {
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--glass-border);
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, .04);
+        }
+        .warehouse-issue-thumb.is-placeholder {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: .85rem;
+        }
+        .warehouse-issue-legend-badge {
+            background: transparent !important;
+            border: 1px dashed var(--glass-border);
+            color: var(--text-muted) !important;
+            font-weight: 600;
+        }
         .warehouse-issue-size-badge.is-over {
             background: rgba(239, 68, 68, .18) !important;
             color: #fecaca !important;

@@ -16,6 +16,10 @@
                     alt=""
                     class="eq-stock-item__photo"
                 >
+            @else
+                <span class="eq-stock-item__photo is-placeholder" aria-hidden="true">
+                    <i class="bi bi-box-seam"></i>
+                </span>
             @endif
             <div>
                 <div class="eq-stock-item__title">

@@ -11,6 +11,7 @@ use App\Livewire\EmployeeEquipmentHistory;
 use App\Livewire\EquipmentForm;
 use App\Livewire\EquipmentIssueHistory;
 use App\Livewire\EquipmentStockMovementForm;
+use App\Livewire\EquipmentStockTimeline;
 use App\Livewire\LogisticsEventWarehouseTransfers;
 use App\Livewire\WarehouseConsumeForm;
 use App\Livewire\WarehouseIssueForm;
@@ -110,6 +111,7 @@ class WarehouseEquipmentTest extends TestCase
             ->assertDontSee('Przypisanie do projektu')
             ->assertSee('Asortyment')
             ->assertSee('Do wydania')
+            ->assertDontSee('nazwa wariantu')
             ->assertDontSee('Do wydania bezzwrotnie')
             ->assertDontSee('Niezwracalny');
 
@@ -871,7 +873,9 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Rękawice')
             ->assertSee('12 / 12')
             ->assertSee('M · 7')
-            ->assertSee('L · 3');
+            ->assertSee('L · 3')
+            ->assertSee('Rozmiar · dostępne')
+            ->assertDontSee('nazwa wariantu');
     }
 
     public function test_can_issue_to_multiple_employees_without_variants(): void
@@ -1290,25 +1294,44 @@ class WarehouseEquipmentTest extends TestCase
 
         $this->actingAs($this->user);
         app(EquipmentService::class)->issueAndFulfill($employee, $variant, $this->warehouse, 2);
+        app(EquipmentService::class)->recordStockMovement(
+            $variant,
+            $this->warehouse,
+            StockMovementType::ADJUSTMENT,
+            1,
+            StockMovementReason::Destruction
+        );
+
+        $oil = Equipment::factory()->notIssuable()->withoutKinds()->create(['name' => 'Olej silnikowy']);
+        $oilVariant = EquipmentVariant::factory()->unnamed()->inStock(10, 0, $this->warehouse)->create([
+            'equipment_id' => $oil->id,
+        ]);
+        $vehicle = Vehicle::factory()->create(['registration_number' => 'WZ 1234']);
+        app(EquipmentService::class)->consumeItems(
+            [['variant_id' => $oilVariant->id, 'quantity' => 3]],
+            $this->warehouse,
+            $vehicle
+        );
 
         $chart = app(EquipmentService::class)->stockMovementChart($equipment);
 
         $this->assertSame(30, $chart['days']);
         $this->assertCount(30, $chart['labels']);
         $this->assertSame(5, $chart['inbound_total']);
-        $this->assertSame(2, $chart['outbound_total']);
+        $this->assertSame(3, $chart['outbound_total']);
         $this->assertContains(5, $chart['inbound']);
-        $this->assertContains(2, $chart['outbound']);
+        $this->assertContains(3, $chart['outbound']);
+
+        $oilChart = app(EquipmentService::class)->stockMovementChart($oil);
+        $this->assertSame(3, $oilChart['outbound_total']);
 
         Livewire::actingAs($this->user)
-            ->test(EquipmentStockMovementForm::class, [
-                'equipment' => $equipment,
-                'warehouse' => $this->warehouse,
-            ])
+            ->test(EquipmentStockTimeline::class, ['equipment' => $equipment])
             ->assertSee('Ruch magazynowy')
             ->assertSee('ostatnie 30 dni')
             ->assertSee('Przyjęcia')
-            ->assertSee('Wydania');
+            ->assertSee('Rozchody')
+            ->assertSee('Zniszczenie');
     }
 
     public function test_can_issue_from_product_page_and_history_shows_issue_and_return(): void
@@ -1427,6 +1450,65 @@ class WarehouseEquipmentTest extends TestCase
             ->call('sortBy', 'quantity')
             ->assertSet('sortField', 'quantity')
             ->assertSet('sortDirection', 'asc');
+    }
+
+    public function test_issue_history_lists_consumptions_and_offers_return_next_to_view(): void
+    {
+        $anna = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP']);
+        $pantsVariant = EquipmentVariant::factory()->inStock(10, 0)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+        $oil = Equipment::factory()->notIssuable()->withoutKinds()->create(['name' => 'Olej silnikowy']);
+        $oilVariant = EquipmentVariant::factory()->unnamed()->inStock(10, 0, $this->warehouse)->create([
+            'equipment_id' => $oil->id,
+        ]);
+        $vehicle = Vehicle::factory()->create([
+            'registration_number' => 'WZ 9999',
+            'brand' => 'Ford',
+            'model' => 'Transit',
+        ]);
+
+        $this->actingAs($this->user);
+        $service = app(EquipmentService::class);
+        $issue = $service->issueAndFulfill($anna, $pantsVariant, $this->warehouse, 1);
+        $service->consumeItems([['variant_id' => $oilVariant->id, 'quantity' => 2]], $this->warehouse, $vehicle, 'wymiana oleju');
+
+        Livewire::actingAs($this->user)
+            ->test(EquipmentIssueHistory::class, ['equipment' => $pants])
+            ->assertSee('Anna Nowak')
+            ->assertSeeHtml(route('equipment-issues.return', $issue));
+
+        Livewire::actingAs($this->user)
+            ->test(EquipmentIssueHistory::class, ['equipment' => $oil])
+            ->assertSee('Rozchód')
+            ->assertSee('wymiana oleju')
+            ->assertDontSee('Ta pozycja nie jest wydawana pracownikom.');
+    }
+
+    public function test_product_timeline_includes_damaged_and_lost_returns(): void
+    {
+        $employee = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $equipment = Equipment::factory()->create(['name' => 'Spodnie BHP']);
+        $variant = EquipmentVariant::factory()->inStock(10, 0)->create([
+            'equipment_id' => $equipment->id,
+            'value' => 'M',
+        ]);
+
+        $this->actingAs($this->user);
+        $issue = app(EquipmentService::class)->issueAndFulfill($employee, $variant, $this->warehouse, 1);
+        $this->post(route('equipment-issues.return.store', $issue), [
+            'return_date' => now()->toDateString(),
+            'status' => 'damaged',
+        ])->assertRedirect();
+
+        $entries = app(EquipmentService::class)->stockTimeline($equipment);
+        $this->assertTrue($entries->contains(fn (array $entry) => $entry['title'] === 'Uszkodzenie'));
+
+        $this->get(route('equipment.show', ['equipment' => $equipment, 'warehouse_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertSee('Uszkodzenie');
     }
 
     public function test_editing_catalog_does_not_overwrite_stock_quantity(): void

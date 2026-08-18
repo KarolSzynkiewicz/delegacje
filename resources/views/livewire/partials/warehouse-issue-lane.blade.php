@@ -23,6 +23,7 @@
                     $remaining = $card['remaining'];
                     $canMove = $remaining > 0;
                     $expanded = $expandedTypeId === $type->id;
+                    $variantLabel = $type->variant_label ?: 'Wariant';
                 @endphp
                 <div wire:key="stock-type-{{ $type->id }}">
                     @if($hasVariants)
@@ -35,10 +36,7 @@
                         >
                             <div class="d-flex align-items-start justify-content-between gap-1">
                                 <div>
-                                    <div class="d-flex align-items-center gap-1">
-                                        <div class="fw-semibold" style="font-size:.85rem;color:var(--text-main);">{{ $type->name }}</div>
-                                        @include('livewire.partials.warehouse-issue-returnable-icon', ['type' => $type])
-                                    </div>
+                                    @include('livewire.partials.warehouse-issue-item-title', ['type' => $type])
                                     <div class="small mt-1" style="font-variant-numeric:tabular-nums;color:var(--text-muted);">
                                         {{ $remaining }} / {{ $card['stock'] }}
                                     </div>
@@ -56,6 +54,7 @@
                                 @endif
                             </div>
                             <div class="d-flex flex-wrap gap-1 mt-2">
+                                <span class="badge warehouse-issue-legend-badge">{{ $variantLabel }} · dostępne</span>
                                 @foreach($card['variants'] as $option)
                                     <span
                                         class="badge badge-secondary"
@@ -81,10 +80,7 @@
                             >
                                 <div class="d-flex align-items-start justify-content-between gap-1">
                                     <div>
-                                        <div class="d-flex align-items-center gap-1">
-                                            <div class="fw-semibold" style="font-size:.85rem;color:var(--text-main);">{{ $type->name }}</div>
-                                            @include('livewire.partials.warehouse-issue-returnable-icon', ['type' => $type])
-                                        </div>
+                                        @include('livewire.partials.warehouse-issue-item-title', ['type' => $type])
                                         <div class="small mt-1" style="font-variant-numeric:tabular-nums;color:var(--text-muted);">
                                             {{ $remaining }} / {{ $card['stock'] }}
                                         </div>
@@ -110,6 +106,7 @@
                     $type = $card['type'];
                     $incomplete = $card['has_variants'] && $card['filled'] < $card['total'];
                     $single = $card['total'] === 1 ? ($card['assignments'][0] ?? null) : null;
+                    $variantLabel = $type->variant_label ?: 'Wariant';
                 @endphp
                 <div
                     wire:key="cart-{{ $type->id }}"
@@ -122,15 +119,28 @@
                     @endif
                 >
                     <div class="d-flex align-items-start justify-content-between gap-1">
-                        <div class="d-flex align-items-center gap-1">
-                            <div class="fw-semibold" style="font-size:.85rem;color:var(--text-main);">{{ $type->name }}</div>
-                            @include('livewire.partials.warehouse-issue-returnable-icon', ['type' => $type])
+                        <div>
+                            @include('livewire.partials.warehouse-issue-item-title', ['type' => $type])
+                            @if($incomplete)
+                                <div class="mt-1">
+                                    <x-ui.badge variant="warning">{{ mb_strtolower($variantLabel) }} {{ $card['filled'] }}/{{ $card['total'] }}</x-ui.badge>
+                                </div>
+                            @endif
                         </div>
-                        @if($incomplete)
-                            <x-ui.badge variant="warning">rozmiar {{ $card['filled'] }}/{{ $card['total'] }}</x-ui.badge>
-                        @endif
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            draggable="false"
+                            wire:click.stop="removeTypeFromCart({{ $type->id }})"
+                            title="Usuń"
+                        >
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
                     <div class="d-flex flex-wrap gap-1 mt-2">
+                        @if($card['has_variants'])
+                            <span class="badge warehouse-issue-legend-badge">{{ $variantLabel }} · do wydania</span>
+                        @endif
                         @foreach($card['variant_badges'] as $badge)
                             <span
                                 class="badge badge-info position-relative"
@@ -152,8 +162,8 @@
                             </span>
                         @endforeach
                     </div>
-                    <div class="d-flex align-items-center gap-1 mt-2">
-                        @if($single)
+                    @if($single)
+                        <div class="mt-2">
                             <input
                                 type="number"
                                 min="1"
@@ -164,17 +174,8 @@
                                 wire:change="setAssignmentQuantity({{ $type->id }}, {{ $single['employee_id'] }}, $event.target.value)"
                                 onclick="event.stopPropagation()"
                             >
-                        @endif
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-danger"
-                            draggable="false"
-                            wire:click.stop="removeTypeFromCart({{ $type->id }})"
-                            title="Usuń"
-                        >
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>
+                        </div>
+                    @endif
                 </div>
             @endif
         @empty

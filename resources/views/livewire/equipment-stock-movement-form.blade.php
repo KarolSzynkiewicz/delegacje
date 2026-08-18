@@ -1,35 +1,6 @@
 <div>
     <x-ui.errors />
 
-    <div class="eq-movement mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-            <div>
-                <h6 class="mb-1">Ruch magazynowy</h6>
-                <p class="small text-muted mb-0">Przyjęcia i wydania — ostatnie {{ $movementChart['days'] }} dni</p>
-            </div>
-            <div class="eq-movement__legend">
-                <span>
-                    <i style="background:#14b8a6;"></i>
-                    Przyjęcia
-                    <strong>{{ $movementChart['inbound_total'] }} szt.</strong>
-                </span>
-                <span>
-                    <i style="background:#f43f5e;"></i>
-                    Wydania
-                    <strong>{{ $movementChart['outbound_total'] }} szt.</strong>
-                </span>
-            </div>
-        </div>
-        <div wire:ignore class="eq-movement__chart">
-            <canvas
-                class="eq-movement-chart"
-                data-labels='@json($movementChart['labels'])'
-                data-inbound='@json($movementChart['inbound'])'
-                data-outbound='@json($movementChart['outbound'])'
-            ></canvas>
-        </div>
-    </div>
-
     @if($action === '')
         <div class="d-flex flex-wrap gap-2">
             <x-ui.button variant="success" type="button" wire:click="startReceipt" action="add">

@@ -280,7 +280,7 @@
         @endif
     </x-ui.card>
 
-    <x-ui.card label="Historia" class="mb-3">
+    <x-ui.card label="Ruch magazynowy" class="mb-3">
         <livewire:equipment-stock-timeline :equipment="$equipment" :key="'eq-timeline-'.$equipment->id" />
     </x-ui.card>
 
@@ -315,7 +315,7 @@
         </x-ui.card>
     @endif
 
-    <x-ui.card label="Historia wydań">
+    <x-ui.card label="Historia wydań i rozchodów">
         <livewire:equipment-issue-history :equipment="$equipment" :key="'eq-issues-'.$equipment->id" />
     </x-ui.card>
     @push('scripts')
@@ -362,11 +362,23 @@
             .eq-movement__legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
             .eq-movement__legend strong { color: var(--text-main); font-variant-numeric: tabular-nums; }
             .eq-movement__chart { height: 220px; position: relative; }
+            .eq-movement-split {
+                display: grid;
+                grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+                gap: 1.75rem;
+                align-items: start;
+            }
+            .eq-movement-split__history {
+                max-height: 22rem;
+                overflow-y: auto;
+            }
             @media (max-width: 991.98px) {
                 .eq-stock-breakdown { flex-direction: column; align-items: stretch; }
                 .eq-stock-breakdown__donut { flex-basis: auto; }
                 .eq-stock-row { grid-template-columns: 4rem minmax(0, 1fr); }
                 .eq-stock-row__status { grid-column: 1 / -1; justify-self: start; }
+                .eq-movement-split { grid-template-columns: minmax(0, 1fr); }
+                .eq-movement-split__history { max-height: none; }
             }
         </style>
         <script>
@@ -456,7 +468,7 @@
                                         borderWidth: 2,
                                     },
                                     {
-                                        label: 'Wydania',
+                                        label: 'Rozchody',
                                         data: outbound,
                                         borderColor: '#f43f5e',
                                         backgroundColor: mkAlpha('#f43f5e', 0.1),

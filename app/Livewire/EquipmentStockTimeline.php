@@ -41,6 +41,7 @@ class EquipmentStockTimeline extends Component
 
         return view('livewire.equipment-stock-timeline', [
             'entries' => $paginator,
+            'movementChart' => $equipmentService->stockMovementChart($equipment),
         ]);
     }
 }

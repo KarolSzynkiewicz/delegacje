@@ -1051,7 +1051,7 @@ class EquipmentService
     }
 
     /**
-     * Przyjęcia i wydania tej pozycji z ostatnich dni — do wykresu na karcie produktu.
+     * Przyjęcia i rozchody tej pozycji z ostatnich dni — do wykresu na karcie produktu.
      *
      * @return array{labels: list<string>, inbound: list<int>, outbound: list<int>, inbound_total: int, outbound_total: int, days: int}
      */
@@ -1072,16 +1072,39 @@ class EquipmentService
             $outbound[$key] = 0;
         }
 
+        $add = function (array &$bucket, $at, int $quantity) use ($start): void {
+            if ($quantity < 1 || ! $at) {
+                return;
+            }
+
+            $at = Carbon::parse($at);
+            if ($at->lt($start)) {
+                return;
+            }
+
+            $key = $at->toDateString();
+            if (array_key_exists($key, $bucket)) {
+                $bucket[$key] += $quantity;
+            }
+        };
+
         EquipmentStockMovement::query()
             ->where('equipment_id', $equipment->id)
-            ->where('type', StockMovementType::RECEIPT)
+            ->whereIn('type', [
+                StockMovementType::RECEIPT,
+                StockMovementType::CONSUMPTION,
+                StockMovementType::ADJUSTMENT,
+            ])
             ->where('created_at', '>=', $start)
-            ->get(['created_at', 'quantity'])
-            ->each(function (EquipmentStockMovement $movement) use (&$inbound) {
-                $key = $movement->created_at?->toDateString();
-                if ($key !== null && array_key_exists($key, $inbound)) {
-                    $inbound[$key] += (int) $movement->quantity;
+            ->get(['created_at', 'quantity', 'type'])
+            ->each(function (EquipmentStockMovement $movement) use (&$inbound, &$outbound, $add): void {
+                if ($movement->type === StockMovementType::RECEIPT) {
+                    $add($inbound, $movement->created_at, (int) $movement->quantity);
+
+                    return;
                 }
+
+                $add($outbound, $movement->created_at, (int) $movement->quantity);
             });
 
         EquipmentIssue::query()
@@ -1089,15 +1112,19 @@ class EquipmentService
             ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED])
             ->with('dispatch')
             ->get()
-            ->each(function (EquipmentIssue $issue) use (&$outbound, $start) {
+            ->each(function (EquipmentIssue $issue) use (&$inbound, &$outbound, $add): void {
                 $issuedAt = $issue->dispatch?->issued_at ?? $issue->created_at;
-                if (! $issuedAt || $issuedAt->lt($start)) {
+                $add($outbound, $issuedAt, (int) $issue->quantity_issued);
+
+                $closedAt = $issue->actual_return_date ?? $issue->updated_at;
+                if ($issue->status === EquipmentIssue::STATUS_RETURNED) {
+                    $add($inbound, $closedAt, (int) $issue->quantity_issued);
+
                     return;
                 }
 
-                $key = $issuedAt->toDateString();
-                if (array_key_exists($key, $outbound)) {
-                    $outbound[$key] += (int) $issue->quantity_issued;
+                if (in_array($issue->status, [EquipmentIssue::STATUS_DAMAGED, EquipmentIssue::STATUS_LOST], true)) {
+                    $add($outbound, $closedAt, (int) $issue->quantity_issued);
                 }
             });
 
@@ -1236,27 +1263,37 @@ class EquipmentService
             ->values();
 
         $returnRows = $issues
-            ->filter(fn (EquipmentIssue $issue) => $issue->status === EquipmentIssue::STATUS_RETURNED)
+            ->filter(fn (EquipmentIssue $issue) => in_array($issue->status, [
+                EquipmentIssue::STATUS_RETURNED,
+                EquipmentIssue::STATUS_DAMAGED,
+                EquipmentIssue::STATUS_LOST,
+            ], true))
             ->map(function (EquipmentIssue $issue) {
                 $sku = $issue->variant?->sku ?? $issue->equipment?->name;
                 $qty = (int) $issue->quantity_issued;
-                $returnedAt = $issue->updated_at ?? $issue->actual_return_date;
+                $closedAt = $issue->updated_at ?? $issue->actual_return_date;
+                $returned = $issue->status === EquipmentIssue::STATUS_RETURNED;
 
                 return [
-                    'occurred_at' => $returnedAt,
-                    'title' => 'Zwrot',
+                    'occurred_at' => $closedAt,
+                    'title' => match ($issue->status) {
+                        EquipmentIssue::STATUS_DAMAGED => 'Uszkodzenie',
+                        EquipmentIssue::STATUS_LOST => 'Zgubienie',
+                        default => 'Zwrot',
+                    },
                     'meta' => collect([
                         $sku,
                         $issue->warehouse?->display_name,
                         $issue->employee?->full_name,
                         $issue->returner?->name,
-                        EquipmentStockMovement::formatHappenedAt($returnedAt),
+                        EquipmentStockMovement::formatHappenedAt($closedAt),
                     ])->filter()->unique()->implode(' · '),
                     'notes' => $issue->notes,
-                    'signed_quantity' => $qty,
-                    'quantity_label' => '+'.$qty.' szt.',
-                    'dot_color' => '#14b8a6',
+                    'signed_quantity' => $returned ? $qty : 0,
+                    'quantity_label' => $returned ? '+'.$qty.' szt.' : $qty.' szt.',
+                    'dot_color' => $returned ? '#14b8a6' : '#f59e0b',
                     'lines' => [],
+                    'href' => route('equipment-issues.show', $issue),
                 ];
             })
             ->values();

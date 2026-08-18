@@ -412,7 +412,6 @@ class EquipmentStockMovementForm extends Component
             'selectedLogisticsEventLabel' => $this->selectedLogisticsEventLabel(),
             'usesQuantityTable' => $this->usesQuantityTable(),
             'variantRows' => $this->variantRows($equipment, $warehouse, $targetWarehouse),
-            'movementChart' => $equipmentService->stockMovementChart($equipment),
             ...$this->destinationPickerViewData(),
         ]);
     }
