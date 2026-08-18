@@ -41,7 +41,15 @@ class EquipmentIssueController extends Controller
 
     public function showDispatch(WarehouseDispatch $warehouseDispatch)
     {
-        $warehouseDispatch->load(['warehouse.location', 'creator', 'issuer', 'issues.employee', 'issues.equipment', 'issues.variant.stocks']);
+        $warehouseDispatch->load([
+            'warehouse.location',
+            'creator',
+            'issuer',
+            'issues.employee',
+            'issues.equipment',
+            'issues.variant.stocks',
+            'tasks.assignedTo',
+        ]);
 
         return view('warehouse-dispatches.show', compact('warehouseDispatch'));
     }

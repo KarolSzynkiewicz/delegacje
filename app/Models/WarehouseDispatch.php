@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Contracts\TaskSubject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class WarehouseDispatch extends Model
+class WarehouseDispatch extends Model implements TaskSubject
 {
     use HasFactory;
 
@@ -59,6 +61,56 @@ class WarehouseDispatch extends Model
     public function issues(): HasMany
     {
         return $this->hasMany(EquipmentIssue::class);
+    }
+
+    public function tasks(): MorphMany
+    {
+        return $this->morphMany(ProjectTask::class, 'subject');
+    }
+
+    public function taskCardUrl(): string
+    {
+        return route('warehouse-dispatches.show', $this);
+    }
+
+    public function taskCardLabel(): string
+    {
+        return $this->number ? 'Dokument '.$this->number : 'Dokument ZW';
+    }
+
+    public function taskCardIcon(): string
+    {
+        return 'bi-box-seam';
+    }
+
+    public function taskName(): string
+    {
+        return 'Kompletacja '.$this->number;
+    }
+
+    public function taskDescription(): string
+    {
+        $summary = $this->summary();
+        $lines = [
+            'Zlecenie wydania '.$summary['number'],
+            'Magazyn: '.$summary['warehouse'],
+            'Data: '.$summary['issue_date'],
+            'Osoby / pozycje: '.$summary['people_count'].' os. · '.$summary['position_count'].' poz.',
+        ];
+
+        if (filled($summary['notes'])) {
+            $lines[] = 'Notatka: '.$summary['notes'];
+        }
+
+        foreach ($summary['recipients'] as $recipient) {
+            foreach ($recipient['lines'] as $line) {
+                $lines[] = $recipient['name'].' — '.$line['item'].' '.$line['variant'].' × '.$line['quantity'];
+            }
+        }
+
+        $lines[] = 'Dokument ZW: '.$this->taskCardUrl();
+
+        return implode("\n", $lines);
     }
 
     /**

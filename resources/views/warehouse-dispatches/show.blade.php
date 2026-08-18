@@ -85,6 +85,22 @@
                         <h6 class="text-muted small mb-1">Zlecił</h6>
                         <p class="fw-semibold mb-0">{{ $warehouseDispatch->creator?->name ?? '—' }}</p>
                     </div>
+                    @if($warehouseDispatch->tasks->isNotEmpty())
+                        <div class="col-md-4">
+                            <h6 class="text-muted small mb-1">Zadanie</h6>
+                            <p class="fw-semibold mb-0">
+                                @foreach($warehouseDispatch->tasks as $task)
+                                    <a href="{{ route('tasks.show', $task) }}" class="text-decoration-none">
+                                        {{ $task->name }}
+                                    </a>
+                                    @if($task->assignedTo)
+                                        <span class="text-muted fw-normal"> · {{ $task->assignedTo->name }}</span>
+                                    @endif
+                                    @if(! $loop->last)<br>@endif
+                                @endforeach
+                            </p>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center gap-3 mb-2">

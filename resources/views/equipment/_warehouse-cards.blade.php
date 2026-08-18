@@ -1,13 +1,24 @@
 @php
     $keep = $keep ?? [];
     $counts = $counts ?? collect();
-    $currentId = $current->id;
+    $highlightAll = $highlightAll ?? false;
+    $currentId = $current->id ?? null;
     $routeName = $routeName ?? 'equipment.tab.stock';
 @endphp
 <nav class="eq-wh-cards" aria-label="Wybór magazynu">
+    @if($highlightAll)
+        <span class="eq-wh-card is-active" data-warehouse-id="*" aria-current="page">
+            <span class="eq-wh-card__top">
+                <span class="eq-wh-card__name">*</span>
+                <span class="eq-wh-card__tag">wszystkie</span>
+            </span>
+            <span class="eq-wh-card__location">Wszystkie magazyny</span>
+            <span class="eq-wh-card__count">{{ (int) $counts->sum() }} poz.</span>
+        </span>
+    @endif
     @foreach($warehouses as $option)
         @php
-            $active = $option->id === $currentId;
+            $active = $highlightAll || $option->id === $currentId;
             $count = (int) $counts->get($option->id, 0);
             $href = route($routeName, array_filter([
                 'warehouse_id' => $option->id,

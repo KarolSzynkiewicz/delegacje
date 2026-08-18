@@ -7,6 +7,7 @@ use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Enums\StockMovementReason;
 use App\Enums\StockMovementType;
+use App\Enums\TaskStatus;
 use App\Models\Employee;
 use App\Models\Equipment;
 use App\Models\EquipmentIssue;
@@ -14,8 +15,11 @@ use App\Models\EquipmentStock;
 use App\Models\EquipmentStockMovement;
 use App\Models\EquipmentVariant;
 use App\Models\LogisticsEvent;
+use App\Models\ProjectTask;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseDispatch;
+use App\Notifications\TaskAssigned;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -157,7 +161,8 @@ class EquipmentService
         array $entries,
         Warehouse $warehouse,
         Carbon $issueDate,
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $assigneeId = null,
     ): Collection {
         $entries = $this->normalizeSessionEntries($entries);
 
@@ -167,7 +172,7 @@ class EquipmentService
             ]);
         }
 
-        return DB::transaction(function () use ($entries, $warehouse, $issueDate, $notes) {
+        return DB::transaction(function () use ($entries, $warehouse, $issueDate, $notes, $assigneeId) {
             $variantIds = collect($entries)->pluck('variant_id')->unique()->sort()->values();
             $variants = EquipmentVariant::query()
                 ->with('equipment')
@@ -241,6 +246,11 @@ class EquipmentService
                     'batch_id' => $batchId,
                     'issued_by' => auth()->id(),
                 ]));
+            }
+
+            $dispatch->setRelation('issues', $issues);
+            if ($assigneeId) {
+                $this->createDispatchTask($dispatch, $assigneeId);
             }
 
             return $issues->each(fn (EquipmentIssue $issue) => $issue->setRelation('dispatch', $dispatch));
@@ -432,8 +442,39 @@ class EquipmentService
                 'issued_by' => auth()->id(),
             ]);
 
+            $this->completeDispatchTasks($dispatch);
+
             return $dispatch->fresh(['warehouse.location', 'creator', 'issuer', 'issues.employee', 'issues.equipment', 'issues.variant']);
         });
+    }
+
+    private function createDispatchTask(WarehouseDispatch $dispatch, int $assigneeId): ProjectTask
+    {
+        $task = ProjectTask::query()->create([
+            'name' => $dispatch->taskName(),
+            'description' => $dispatch->taskDescription(),
+            'category' => 'Magazyn',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $assigneeId,
+            'due_date' => $dispatch->issue_date,
+            'created_by' => auth()->id(),
+            'subject_type' => $dispatch->getMorphClass(),
+            'subject_id' => $dispatch->id,
+        ]);
+
+        if ($assigneeId !== auth()->id()) {
+            User::query()->find($assigneeId)?->notify(new TaskAssigned($task, auth()->user()));
+        }
+
+        return $task;
+    }
+
+    private function completeDispatchTasks(WarehouseDispatch $dispatch): void
+    {
+        $dispatch->tasks()
+            ->whereNotIn('status', [TaskStatus::COMPLETED, TaskStatus::CANCELLED])
+            ->get()
+            ->each(fn (ProjectTask $task) => $task->markCompleted());
     }
 
     /**
@@ -1051,9 +1092,9 @@ class EquipmentService
     }
 
     /**
-     * Przyjęcia i rozchody tej pozycji z ostatnich dni — do wykresu na karcie produktu.
+     * Przyjęcia, rozchody i bieżący stan tej pozycji z ostatnich dni — do wykresu na karcie produktu.
      *
-     * @return array{labels: list<string>, inbound: list<int>, outbound: list<int>, inbound_total: int, outbound_total: int, days: int}
+     * @return array{labels: list<string>, inbound: list<int>, outbound: list<int>, stock: list<int>, inbound_total: int, outbound_total: int, stock_total: int, days: int}
      */
     public function stockMovementChart(Equipment $equipment, int $days = 30): array
     {
@@ -1130,13 +1171,29 @@ class EquipmentService
 
         $inboundValues = array_values($inbound);
         $outboundValues = array_values($outbound);
+        $currentStock = (int) EquipmentStock::query()
+            ->whereIn(
+                'equipment_variant_id',
+                EquipmentVariant::query()->where('equipment_id', $equipment->id)->select('id')
+            )
+            ->sum('quantity_in_stock');
+
+        $stockValues = [];
+        $running = $currentStock;
+        for ($i = count($inboundValues) - 1; $i >= 0; $i--) {
+            $stockValues[$i] = $running;
+            $running = $running - $inboundValues[$i] + $outboundValues[$i];
+        }
+        ksort($stockValues);
 
         return [
             'labels' => $labels,
             'inbound' => $inboundValues,
             'outbound' => $outboundValues,
+            'stock' => array_values($stockValues),
             'inbound_total' => array_sum($inboundValues),
             'outbound_total' => array_sum($outboundValues),
+            'stock_total' => $currentStock,
             'days' => $days,
         ];
     }

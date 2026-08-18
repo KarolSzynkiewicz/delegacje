@@ -59,13 +59,16 @@ class EquipmentController extends Controller
             ));
         }
         $warehouse = $this->warehouseService->current($request);
+        $warehouses = $this->warehouseService->all();
 
         return view('equipment.issues', compact(
             'entries',
             'statuses',
             'warehouse',
+            'warehouses',
             'kind',
         ) + [
+            'warehouseCounts' => $this->warehouseService->assortmentCounts($warehouses),
             'activeTab' => 'issues',
         ]);
     }

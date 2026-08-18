@@ -136,14 +136,6 @@
                             </div>
                         </div>
                     @endif
-                    <div class="col-12">
-                        <h6 class="text-muted small mb-1">SKU</h6>
-                        <div class="d-flex flex-wrap gap-1">
-                            @foreach($equipment->variants as $variant)
-                                <x-ui.badge variant="info">{{ $variant->sku }}</x-ui.badge>
-                            @endforeach
-                        </div>
-                    </div>
                     @if($equipment->unit_cost)
                         <div class="col-md-6">
                             <h6 class="text-muted small mb-1">Koszt jednostkowy</h6>
@@ -449,6 +441,7 @@
                         const labels = JSON.parse(canvas.dataset.labels || '[]');
                         const inbound = JSON.parse(canvas.dataset.inbound || '[]');
                         const outbound = JSON.parse(canvas.dataset.outbound || '[]');
+                        const stock = JSON.parse(canvas.dataset.stock || '[]');
                         if (! labels.length) return;
                         canvas.dataset.chartReady = '1';
                         new Chart(canvas.getContext('2d'), {
@@ -477,6 +470,17 @@
                                         pointRadius: 2,
                                         pointHoverRadius: 4,
                                         borderWidth: 2,
+                                    },
+                                    {
+                                        label: 'Stan',
+                                        data: stock,
+                                        borderColor: '#fbbf24',
+                                        backgroundColor: 'transparent',
+                                        fill: false,
+                                        tension: 0.35,
+                                        pointRadius: 2,
+                                        pointHoverRadius: 4,
+                                        borderWidth: 2.5,
                                     },
                                 ],
                             },

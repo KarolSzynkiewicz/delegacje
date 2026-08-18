@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Location;
 use App\Models\Warehouse;
 use App\Services\WarehouseService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -14,6 +15,12 @@ class WarehouseController extends Controller
 
     public function index(Request $request)
     {
+        $warehouseId = Warehouse::query()->orderBy('id')->value('id');
+
+        if ($warehouseId) {
+            return redirect()->route('equipment.tab.stock', ['warehouse_id' => $warehouseId]);
+        }
+
         $warehouses = $this->warehouseService->all();
 
         return view('warehouses.index', compact('warehouses'));
@@ -24,8 +31,7 @@ class WarehouseController extends Controller
         $locations = $this->warehouseService->locationsWithoutWarehouse();
 
         if ($locations->isEmpty()) {
-            return redirect()
-                ->route('warehouses.index')
+            return $this->redirectToLowestWarehouse()
                 ->with('error', 'Wszystkie lokalizacje mają już magazyn. Dodaj najpierw nową lokalizację.');
         }
 
@@ -51,7 +57,7 @@ class WarehouseController extends Controller
         }
 
         return redirect()
-            ->route('warehouses.index')
+            ->route('equipment.tab.stock', ['warehouse_id' => $created->id])
             ->with('success', "Dodano magazyn „{$created->name}”.");
     }
 
@@ -86,7 +92,7 @@ class WarehouseController extends Controller
         }
 
         return redirect()
-            ->route('warehouses.index')
+            ->route('equipment.tab.stock', ['warehouse_id' => $updated->id])
             ->with('success', "Zapisano magazyn „{$updated->name}”.");
     }
 
@@ -107,8 +113,18 @@ class WarehouseController extends Controller
             $request->session()->put(WarehouseService::SESSION_KEY, $fallbackId);
         }
 
-        return redirect()
-            ->route('warehouses.index')
+        return $this->redirectToLowestWarehouse()
             ->with('success', 'Magazyn został usunięty.');
+    }
+
+    private function redirectToLowestWarehouse(): RedirectResponse
+    {
+        $warehouseId = Warehouse::query()->orderBy('id')->value('id');
+
+        if ($warehouseId) {
+            return redirect()->route('equipment.tab.stock', ['warehouse_id' => $warehouseId]);
+        }
+
+        return redirect()->route('warehouses.index');
     }
 }

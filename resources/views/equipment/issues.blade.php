@@ -28,6 +28,14 @@
         </x-ui.alert>
     @endif
 
+    @include('equipment._warehouse-cards', [
+        'warehouses' => $warehouses,
+        'current' => $warehouse,
+        'counts' => $warehouseCounts,
+        'routeName' => 'equipment.tab.issues',
+        'highlightAll' => true,
+    ])
+
     <x-ui.card class="mb-4">
         @include('equipment._tabs', ['activeTab' => $activeTab ?? 'issues'])
         <form method="GET" action="{{ route('equipment.tab.issues') }}" id="filter-form" class="js-auto-submit">

@@ -18,6 +18,11 @@
                     Rozchody
                     <strong>{{ $movementChart['outbound_total'] }} szt.</strong>
                 </span>
+                <span>
+                    <i style="background:#fbbf24;"></i>
+                    Stan
+                    <strong>{{ $movementChart['stock_total'] }} szt.</strong>
+                </span>
             </div>
         </div>
         <div wire:ignore class="eq-movement__chart">
@@ -26,6 +31,7 @@
                 data-labels='@json($movementChart['labels'])'
                 data-inbound='@json($movementChart['inbound'])'
                 data-outbound='@json($movementChart['outbound'])'
+                data-stock='@json($movementChart['stock'])'
             ></canvas>
         </div>
     </div>

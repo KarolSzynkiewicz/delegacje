@@ -4294,6 +4294,9 @@ a.rp-tool-item {
 .eq-wh-card.is-active .eq-wh-card__count {
     color: #99f6e4;
 }
+span.eq-wh-card {
+    cursor: default;
+}
 
 .eq-stock-filters {
     margin-top: -0.5rem;

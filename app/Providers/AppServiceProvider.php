@@ -80,6 +80,7 @@ class AppServiceProvider extends ServiceProvider
             'employee' => \App\Models\Employee::class,
             'recruitment_process' => \App\Models\RecruitmentProcess::class,
             'recruitment_candidate' => \App\Models\RecruitmentCandidate::class,
+            'warehouse_dispatch' => \App\Models\WarehouseDispatch::class,
             'comment' => \App\Models\Comment::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);

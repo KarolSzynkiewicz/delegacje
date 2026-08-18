@@ -88,16 +88,16 @@ class TasksGrid extends Component
     private bool $batchingViewPersist = false;
 
     protected $queryString = [
-        'searchTask'       => ['except' => '', 'history' => true],
-        'searchProject'    => ['except' => '', 'history' => true],
-        'searchCategory'   => ['except' => '', 'history' => true],
+        'searchTask' => ['except' => '', 'history' => true],
+        'searchProject' => ['except' => '', 'history' => true],
+        'searchCategory' => ['except' => '', 'history' => true],
         'searchAssignedTo' => ['except' => '', 'history' => true],
-        'status'           => ['except' => '', 'history' => true],
-        'myTasksOnly'      => ['except' => false, 'history' => true],
-        'sortField'        => ['except' => 'created_at', 'history' => true],
-        'sortDirection'    => ['except' => 'desc', 'history' => true],
-        'groupBy'          => ['except' => '', 'history' => true],
-        'view'             => ['except' => '', 'history' => true],
+        'status' => ['except' => '', 'history' => true],
+        'myTasksOnly' => ['except' => false, 'history' => true],
+        'sortField' => ['except' => 'created_at', 'history' => true],
+        'sortDirection' => ['except' => 'desc', 'history' => true],
+        'groupBy' => ['except' => '', 'history' => true],
+        'view' => ['except' => '', 'history' => true],
     ];
 
     /** @var list<string> */
@@ -125,17 +125,17 @@ class TasksGrid extends Component
     public function getAvailableColumnsProperty(): array
     {
         return [
-            'name'        => ['label' => 'Nazwa', 'sortable' => true, 'always' => true],
-            'status'      => ['label' => 'Status', 'sortable' => true],
-            'project'     => ['label' => 'Projekt', 'sortable' => true],
-            'category'    => ['label' => 'Kategoria', 'sortable' => true],
+            'name' => ['label' => 'Nazwa', 'sortable' => true, 'always' => true],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'project' => ['label' => 'Projekt', 'sortable' => true],
+            'category' => ['label' => 'Kategoria', 'sortable' => true],
             'assigned_to' => ['label' => 'Przypisany', 'sortable' => false],
-            'priority'    => ['label' => 'Priorytet', 'sortable' => true],
-            'due_date'    => ['label' => 'Termin', 'sortable' => true],
-            'subtasks'    => ['label' => 'Podzadania', 'sortable' => false],
-            'comments'    => ['label' => 'Komentarze', 'sortable' => false],
-            'created_at'  => ['label' => 'Utworzono', 'sortable' => true],
-            'updated_at'  => ['label' => 'Zmodyfikowano', 'sortable' => true],
+            'priority' => ['label' => 'Priorytet', 'sortable' => true],
+            'due_date' => ['label' => 'Termin', 'sortable' => true],
+            'subtasks' => ['label' => 'Podzadania', 'sortable' => false],
+            'comments' => ['label' => 'Komentarze', 'sortable' => false],
+            'created_at' => ['label' => 'Utworzono', 'sortable' => true],
+            'updated_at' => ['label' => 'Zmodyfikowano', 'sortable' => true],
         ];
     }
 
@@ -222,15 +222,15 @@ class TasksGrid extends Component
         $this->editingTaskId = $taskId;
         $this->editingField = $field;
         $this->editingValue = match ($field) {
-            'name'        => $task->name,
-            'status'      => $task->status->value,
-            'project'     => $task->project_id ? (string) $task->project_id : '',
-            'category'    => $task->category ?? '',
+            'name' => $task->name,
+            'status' => $task->status->value,
+            'project' => $task->project_id ? (string) $task->project_id : '',
+            'category' => $task->category ?? '',
             'assigned_to' => $task->assigned_to ? (string) $task->assigned_to : '',
-            'priority'    => $task->priority ? (string) $task->priority : '',
-            'due_date'    => $task->due_date ? $task->due_date->format('Y-m-d') : '',
+            'priority' => $task->priority ? (string) $task->priority : '',
+            'due_date' => $task->due_date ? $task->due_date->format('Y-m-d') : '',
             'description' => $task->plainDescription(),
-            default       => '',
+            default => '',
         };
     }
 
@@ -248,15 +248,15 @@ class TasksGrid extends Component
         }
 
         match ($this->editingField) {
-            'name'        => $task->update(['name' => trim($this->editingValue) ?: $task->name]),
-            'status'      => $this->applyStatusChange($task, $this->editingValue),
-            'project'     => $task->update(['project_id' => $this->editingValue === '' ? null : (int) $this->editingValue]),
-            'category'    => $task->update(['category' => $this->editingValue === '' ? null : trim($this->editingValue)]),
+            'name' => $task->update(['name' => trim($this->editingValue) ?: $task->name]),
+            'status' => $this->applyStatusChange($task, $this->editingValue),
+            'project' => $task->update(['project_id' => $this->editingValue === '' ? null : (int) $this->editingValue]),
+            'category' => $task->update(['category' => $this->editingValue === '' ? null : trim($this->editingValue)]),
             'assigned_to' => $this->applyAssigneeChange($task, $this->editingValue),
-            'priority'    => $task->update(['priority' => $this->editingValue === '' ? null : (int) $this->editingValue]),
-            'due_date'    => $task->update(['due_date' => $this->editingValue === '' ? null : $this->editingValue]),
+            'priority' => $task->update(['priority' => $this->editingValue === '' ? null : (int) $this->editingValue]),
+            'due_date' => $task->update(['due_date' => $this->editingValue === '' ? null : $this->editingValue]),
             'description' => $task->update(['description' => trim($this->editingValue) ?: null]),
-            default       => null,
+            default => null,
         };
 
         $this->flash = 'Zapisano.';
@@ -274,10 +274,10 @@ class TasksGrid extends Component
     {
         match ($status) {
             'in_progress' => $task->markInProgress(),
-            'completed'   => $task->markCompleted(),
-            'cancelled'   => $task->cancel(),
-            'pending'     => $task->update(['status' => TaskStatus::PENDING, 'completed_at' => null]),
-            default       => null,
+            'completed' => $task->markCompleted(),
+            'cancelled' => $task->cancel(),
+            'pending' => $task->update(['status' => TaskStatus::PENDING, 'completed_at' => null]),
+            default => null,
         };
     }
 
@@ -306,23 +306,23 @@ class TasksGrid extends Component
     public function addTask(): void
     {
         $this->validate([
-            'newTaskName'       => 'required|string|max:255',
-            'newTaskProject'    => 'nullable|exists:projects,id',
+            'newTaskName' => 'required|string|max:255',
+            'newTaskProject' => 'nullable|exists:projects,id',
             'newTaskAssignedTo' => 'nullable|exists:users,id',
-            'newTaskPriority'   => 'nullable|integer|min:1|max:5',
-            'newTaskDueDate'    => 'nullable|date',
-            'newTaskCategory'   => 'nullable|string|max:255',
+            'newTaskPriority' => 'nullable|integer|min:1|max:5',
+            'newTaskDueDate' => 'nullable|date',
+            'newTaskCategory' => 'nullable|string|max:255',
         ]);
 
         ProjectTask::create([
-            'name'        => $this->newTaskName,
-            'project_id'  => $this->newTaskProject ?: null,
+            'name' => $this->newTaskName,
+            'project_id' => $this->newTaskProject ?: null,
             'assigned_to' => $this->newTaskAssignedTo ?: null,
-            'priority'    => $this->newTaskPriority ?: null,
-            'due_date'    => $this->newTaskDueDate ?: null,
-            'category'    => $this->newTaskCategory ?: null,
-            'status'      => TaskStatus::PENDING,
-            'created_by'  => auth()->id(),
+            'priority' => $this->newTaskPriority ?: null,
+            'due_date' => $this->newTaskDueDate ?: null,
+            'category' => $this->newTaskCategory ?: null,
+            'status' => TaskStatus::PENDING,
+            'created_by' => auth()->id(),
         ]);
 
         $this->reset(['newTaskName', 'newTaskProject', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate']);
@@ -353,8 +353,8 @@ class TasksGrid extends Component
         }
 
         TaskSubtask::create([
-            'task_id'    => $this->addingSubtaskForTask,
-            'name'       => $name,
+            'task_id' => $this->addingSubtaskForTask,
+            'name' => $name,
             'created_by' => auth()->id(),
         ]);
 
@@ -459,9 +459,9 @@ class TasksGrid extends Component
         }
 
         $user->update([
-            'default_tasks_view'           => 'grid',
+            'default_tasks_view' => 'grid',
             'default_tasks_grid_view_slug' => $query['view'] ?? null,
-            'default_tasks_grid_query'     => $query !== [] ? $query : null,
+            'default_tasks_grid_query' => $query !== [] ? $query : null,
         ]);
 
         $this->flash = 'Domyślny widok z menu zapisany (wraz z filtrami).';
@@ -473,16 +473,16 @@ class TasksGrid extends Component
     public function currentQueryParams(): array
     {
         return TasksGridUrlParams::normalize([
-            'view'             => $this->view,
-            'searchTask'       => $this->searchTask,
-            'searchProject'    => $this->searchProject,
-            'searchCategory'   => $this->searchCategory,
+            'view' => $this->view,
+            'searchTask' => $this->searchTask,
+            'searchProject' => $this->searchProject,
+            'searchCategory' => $this->searchCategory,
             'searchAssignedTo' => $this->searchAssignedTo,
-            'status'           => $this->status,
-            'myTasksOnly'      => $this->myTasksOnly,
-            'groupBy'          => $this->groupBy,
-            'sortField'        => $this->sortField,
-            'sortDirection'    => $this->sortDirection,
+            'status' => $this->status,
+            'myTasksOnly' => $this->myTasksOnly,
+            'groupBy' => $this->groupBy,
+            'sortField' => $this->sortField,
+            'sortDirection' => $this->sortDirection,
         ]);
     }
 
@@ -518,17 +518,17 @@ class TasksGrid extends Component
     protected function applyViewRecord(TaskGridView $record): void
     {
         $this->batchingViewPersist = true;
-        $this->visibleColumns   = $record->visible_columns ?: $this->visibleColumns;
-        $this->columnWidths     = $record->column_widths ?? [];
-        $this->groupBy          = $record->group_by ?? '';
-        $this->sortField        = $record->sort_field ?: 'created_at';
-        $this->sortDirection    = $record->sort_direction ?: 'desc';
-        $this->searchTask       = $record->search_task ?? '';
-        $this->searchProject    = $record->search_project ?? '';
-        $this->searchCategory   = $record->search_category ?? '';
+        $this->visibleColumns = $record->visible_columns ?: $this->visibleColumns;
+        $this->columnWidths = $record->column_widths ?? [];
+        $this->groupBy = $record->group_by ?? '';
+        $this->sortField = $record->sort_field ?: 'created_at';
+        $this->sortDirection = $record->sort_direction ?: 'desc';
+        $this->searchTask = $record->search_task ?? '';
+        $this->searchProject = $record->search_project ?? '';
+        $this->searchCategory = $record->search_category ?? '';
         $this->searchAssignedTo = $record->search_assigned_to ?? '';
-        $this->status           = $record->status ?? '';
-        $this->myTasksOnly      = (bool) ($record->my_tasks_only ?? false);
+        $this->status = $record->status ?? '';
+        $this->myTasksOnly = (bool) ($record->my_tasks_only ?? false);
         $this->batchingViewPersist = false;
         $this->resetPage();
     }
@@ -536,17 +536,17 @@ class TasksGrid extends Component
     protected function viewPayload(): array
     {
         return [
-            'visible_columns'    => $this->visibleColumns,
-            'column_widths'      => $this->columnWidths,
-            'group_by'           => $this->groupBy,
-            'sort_field'         => $this->sortField,
-            'sort_direction'     => $this->sortDirection,
-            'search_task'        => $this->searchTask,
-            'search_project'     => $this->searchProject,
-            'search_category'    => $this->searchCategory,
+            'visible_columns' => $this->visibleColumns,
+            'column_widths' => $this->columnWidths,
+            'group_by' => $this->groupBy,
+            'sort_field' => $this->sortField,
+            'sort_direction' => $this->sortDirection,
+            'search_task' => $this->searchTask,
+            'search_project' => $this->searchProject,
+            'search_category' => $this->searchCategory,
             'search_assigned_to' => $this->searchAssignedTo,
-            'status'             => $this->status,
-            'my_tasks_only'      => $this->myTasksOnly,
+            'status' => $this->status,
+            'my_tasks_only' => $this->myTasksOnly,
         ];
     }
 
@@ -566,7 +566,7 @@ class TasksGrid extends Component
     {
         $base = Str::slug($name) ?: 'widok';
         $slug = $base;
-        $i    = 2;
+        $i = 2;
 
         while (TaskGridView::query()
             ->where('user_id', auth()->id())
@@ -591,7 +591,7 @@ class TasksGrid extends Component
 
     public function moveSubtask(int $subtaskId, int $targetTaskId, ?int $afterSubtaskId = null): void
     {
-        $subtask    = TaskSubtask::find($subtaskId);
+        $subtask = TaskSubtask::find($subtaskId);
         $targetTask = ProjectTask::find($targetTaskId);
 
         if (! $subtask || ! $targetTask || ! $this->canEditTask($targetTask)) {
@@ -599,14 +599,14 @@ class TasksGrid extends Component
         }
 
         $sourceTaskId = $subtask->task_id;
-        $isCrossTask  = $sourceTaskId !== $targetTaskId;
+        $isCrossTask = $sourceTaskId !== $targetTaskId;
 
         // #N references in comments are computed from created_at/id order, independent of
         // sort_order — capture the "before" numbering of the source task so we can reconcile
         // comment references once the subtask has moved out of it.
-        $sourceTask   = $isCrossTask ? ProjectTask::with('subtasks')->find($sourceTaskId) : null;
+        $sourceTask = $isCrossTask ? ProjectTask::with('subtasks')->find($sourceTaskId) : null;
         $oldSourceMap = $sourceTask?->subtaskDisplayNumbers() ?? [];
-        $oldNumber    = $oldSourceMap[$subtaskId] ?? null;
+        $oldNumber = $oldSourceMap[$subtaskId] ?? null;
 
         // Move to target task
         $subtask->update(['task_id' => $targetTaskId]);
@@ -620,7 +620,7 @@ class TasksGrid extends Component
             ->toArray();
 
         if ($afterSubtaskId && in_array($afterSubtaskId, $siblings)) {
-            $pos    = array_search($afterSubtaskId, $siblings);
+            $pos = array_search($afterSubtaskId, $siblings);
             $newOrder = array_merge(
                 array_slice($siblings, 0, $pos + 1),
                 [$subtaskId],
@@ -637,7 +637,7 @@ class TasksGrid extends Component
         if ($isCrossTask && $sourceTask && $oldNumber !== null) {
             $newSourceMap = $sourceTask->refresh()->subtaskDisplayNumbers();
             $newTargetMap = $targetTask->refresh()->subtaskDisplayNumbers();
-            $newNumber    = $newTargetMap[$subtaskId] ?? null;
+            $newNumber = $newTargetMap[$subtaskId] ?? null;
 
             $this->migrateSubtaskCommentReferences(
                 $sourceTask,
@@ -718,7 +718,7 @@ class TasksGrid extends Component
 
                 $comment->update([
                     'commentable_id' => $targetTask->id,
-                    'body'           => $newBody,
+                    'body' => $newBody,
                 ]);
 
                 continue;
@@ -748,16 +748,16 @@ class TasksGrid extends Component
 
     public function reorderColumns(string $from, string $to): void
     {
-        $order    = $this->visibleColumns;
-        $fromIdx  = array_search($from, $order);
-        $toIdx    = array_search($to,   $order);
+        $order = $this->visibleColumns;
+        $fromIdx = array_search($from, $order);
+        $toIdx = array_search($to, $order);
 
         if ($fromIdx === false || $toIdx === false || $fromIdx === $toIdx) {
             return;
         }
 
         array_splice($order, $fromIdx, 1);
-        array_splice($order, $toIdx,   0, [$from]);
+        array_splice($order, $toIdx, 0, [$from]);
         $this->visibleColumns = array_values($order);
     }
 
@@ -833,19 +833,19 @@ class TasksGrid extends Component
             $query->orderBy('project_tasks.created_at', 'desc');
         }
 
-        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments', 'procedureRun', 'recruitmentProcess']);
+        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments', 'procedureRun', 'recruitmentProcess', 'subject']);
 
         if ($this->groupBy) {
             $allTasks = $query->limit(500)->get();
             $groupField = $this->groupBy;
             $groupedTasks = $allTasks->groupBy(function ($task) use ($groupField) {
                 return match ($groupField) {
-                    'status'      => $task->status->label(),
-                    'project'     => $task->project?->name ?? 'Brak projektu',
-                    'category'    => $task->category ?? 'Brak kategorii',
+                    'status' => $task->status->label(),
+                    'project' => $task->project?->name ?? 'Brak projektu',
+                    'category' => $task->category ?? 'Brak kategorii',
                     'assigned_to' => $task->assignedTo?->name ?? 'Nieprzypisane',
-                    'priority'    => $task->priority ? "Priorytet {$task->priority}" : 'Brak priorytetu',
-                    default       => 'Wszystkie',
+                    'priority' => $task->priority ? "Priorytet {$task->priority}" : 'Brak priorytetu',
+                    default => 'Wszystkie',
                 };
             })->sortKeys();
             $tasks = null;
@@ -855,13 +855,13 @@ class TasksGrid extends Component
         }
 
         return view('livewire.tasks-grid', [
-            'tasks'            => $tasks,
-            'groupedTasks'     => $groupedTasks,
-            'allProjects'      => Project::orderBy('name')->get(),
-            'allUsers'         => User::orderBy('name')->get(),
+            'tasks' => $tasks,
+            'groupedTasks' => $groupedTasks,
+            'allProjects' => Project::orderBy('name')->get(),
+            'allUsers' => User::orderBy('name')->get(),
             'availableColumns' => $this->availableColumns,
-            'savedViews'       => $savedViews,
-            'activeViewName'   => $this->view !== ''
+            'savedViews' => $savedViews,
+            'activeViewName' => $this->view !== ''
                 ? (collect($savedViews)->firstWhere('slug', $this->view)?->name ?? $this->view)
                 : null,
             'isMenuDefaultView' => auth()->user()?->usesGridAsDefaultTasksView($this->currentQueryParams()) ?? false,

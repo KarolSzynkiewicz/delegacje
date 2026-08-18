@@ -11,7 +11,29 @@
                 Planista rezerwuje sztuki na półce — nie schodzą jeszcze ze stanu magazynu. Magazynier wydaje sprzęt z dokumentu ZW.
             </p>
             @include('equipment-issues._dispatch-summary', ['summary' => $preview])
-            <div class="d-flex justify-content-end align-items-center gap-2 mt-4">
+            <div class="row g-3 mt-1 mb-3">
+                <div class="col-md-6">
+                    <x-ui.input
+                        type="select"
+                        name="assigneeId"
+                        wire:model="assigneeId"
+                        label="Przypisz kompletację"
+                        required
+                    >
+                        <option value="">Wybierz osobę…</option>
+                        @foreach($assignees as $assignee)
+                            <option value="{{ $assignee->id }}">{{ $assignee->name }}</option>
+                        @endforeach
+                    </x-ui.input>
+                    <p class="small text-muted mb-0 mt-1">
+                        Powstanie zadanie z linkiem do dokumentu ZW.
+                    </p>
+                    @error('assigneeId')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+            <div class="d-flex justify-content-end align-items-center gap-2 mt-2">
                 <x-ui.button variant="ghost" type="button" wire:click="backToEdit" action="back">
                     Wróć do koszyka
                 </x-ui.button>

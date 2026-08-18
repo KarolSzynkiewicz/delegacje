@@ -7,6 +7,7 @@ use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
 use App\Enums\StockMovementReason;
 use App\Enums\StockMovementType;
+use App\Enums\TaskStatus;
 use App\Livewire\EmployeeEquipmentHistory;
 use App\Livewire\EquipmentForm;
 use App\Livewire\EquipmentIssueHistory;
@@ -25,6 +26,7 @@ use App\Models\EquipmentVariant;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
+use App\Models\ProjectTask;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Warehouse;
@@ -65,12 +67,14 @@ class WarehouseEquipmentTest extends TestCase
     {
         $this->actingAs($this->user)
             ->get(route('warehouses.index'))
-            ->assertOk()
-            ->assertSee('Magazyny')
-            ->assertSee('Dodaj magazyn')
-            ->assertSee($this->warehouse->name)
-            ->assertSee('Wydaj')
-            ->assertSee('Rozchód');
+            ->assertRedirect(route('equipment.tab.stock', ['warehouse_id' => $this->warehouse->id]));
+
+        $later = Warehouse::factory()->create(['name' => 'Późniejszy magazyn']);
+        $this->assertGreaterThan($this->warehouse->id, $later->id);
+
+        $this->actingAs($this->user)
+            ->get(route('warehouses.index'))
+            ->assertRedirect(route('equipment.tab.stock', ['warehouse_id' => $this->warehouse->id]));
 
         $this->actingAs($this->user)
             ->get(route('equipment.index'))
@@ -285,6 +289,17 @@ class WarehouseEquipmentTest extends TestCase
             ->assertDontSee($dispatch->number);
     }
 
+    public function test_orders_tab_shows_empty_state_when_nothing_is_waiting(): void
+    {
+        $this->actingAs($this->user)
+            ->get(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertSee('Nic nie czeka na wydanie w tym magazynie.')
+            ->assertSee('empty-state', false)
+            ->assertSee('Zleć wydanie')
+            ->assertSee(route('equipment-issues.create', ['warehouse_id' => $this->warehouse->id]), false);
+    }
+
     public function test_can_add_warehouse_for_location_and_see_separate_stock(): void
     {
         $location = Location::factory()->create(['name' => 'Warsztat Gdańsk']);
@@ -391,7 +406,12 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Nowak')
             ->assertSee('Magazyn Gdańsk')
             ->assertSee($dispatch->number)
-            ->assertSee(route('warehouse-dispatches.show', $dispatch), false);
+            ->assertSee(route('warehouse-dispatches.show', $dispatch), false)
+            ->assertSee('data-warehouse-id="*"', false)
+            ->assertSee('eq-wh-card is-active', false)
+            ->assertSee('Wszystkie magazyny')
+            ->assertSee('data-warehouse-id="'.$this->warehouse->id.'"', false)
+            ->assertSee('data-warehouse-id="'.$other->id.'"', false);
     }
 
     public function test_non_issuable_items_are_hidden_from_issue_form(): void
@@ -438,7 +458,7 @@ class WarehouseEquipmentTest extends TestCase
             ->call('addToCart', $variant->id, 'given', 3)
             ->call('save')
             ->assertHasNoErrors()
-            ->assertRedirect(route('warehouse-dispatches.show', $this->latestDispatch()));
+            ->assertRedirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]));
 
         $issue = EquipmentIssue::query()->where('employee_id', $employee->id)->first();
         $this->assertNotNull($issue);
@@ -472,6 +492,66 @@ class WarehouseEquipmentTest extends TestCase
             ->assertDontSee('Zwróć/Zgłoś');
     }
 
+    public function test_confirming_issue_order_creates_task_linked_to_dispatch(): void
+    {
+        $assignee = User::factory()->create(['name' => 'Magazynier Testowy']);
+        $employee = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $gloves = Equipment::factory()->notReturnable()->withoutKinds()->create(['name' => 'Rękawice']);
+        $variant = EquipmentVariant::factory()->unnamed()->inStock(10, 0, $this->warehouse)->create([
+            'equipment_id' => $gloves->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->set('employeeIds', [$employee->id])
+            ->call('addToCart', $variant->id, 'given', 2)
+            ->set('notes', 'Daj im rękawice')
+            ->set('assigneeId', $assignee->id)
+            ->call('prepare')
+            ->assertSet('confirming', true)
+            ->assertSee('Przypisz kompletację')
+            ->assertSee('Magazynier Testowy')
+            ->call('confirm')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]));
+
+        $dispatch = $this->latestDispatch();
+        $task = ProjectTask::query()
+            ->where('subject_type', $dispatch->getMorphClass())
+            ->where('subject_id', $dispatch->id)
+            ->first();
+
+        $this->assertNotNull($task);
+        $this->assertSame('Kompletacja '.$dispatch->number, $task->name);
+        $this->assertSame('Magazyn', $task->category);
+        $this->assertSame($assignee->id, $task->assigned_to);
+        $this->assertSame(TaskStatus::PENDING, $task->status);
+        $this->assertStringContainsString('Anna Nowak', $task->description);
+        $this->assertStringContainsString('Rękawice', $task->description);
+        $this->assertStringContainsString(route('warehouse-dispatches.show', $dispatch), $task->description);
+
+        $card = $task->sourceCard();
+        $this->assertSame(route('warehouse-dispatches.show', $dispatch), $card['url']);
+        $this->assertSame('Dokument '.$dispatch->number, $card['label']);
+
+        $this->actingAs($this->user)
+            ->get(route('tasks.show', $task))
+            ->assertOk()
+            ->assertSee('Dokument '.$dispatch->number)
+            ->assertSee(route('warehouse-dispatches.show', $dispatch), false);
+
+        $this->actingAs($this->user)
+            ->get(route('warehouse-dispatches.show', $dispatch))
+            ->assertOk()
+            ->assertSee('Kompletacja '.$dispatch->number)
+            ->assertSee('Magazynier Testowy');
+
+        $this->fulfillDispatch($dispatch)
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch));
+
+        $this->assertSame(TaskStatus::COMPLETED, $task->fresh()->status);
+    }
+
     public function test_can_issue_multiple_items_to_one_person(): void
     {
         $employee = Employee::factory()->create();
@@ -493,7 +573,7 @@ class WarehouseEquipmentTest extends TestCase
             ->call('addToCart', $uv->id, 'returnable', 1)
             ->call('save')
             ->assertHasNoErrors()
-            ->assertRedirect(route('warehouse-dispatches.show', $this->latestDispatch()));
+            ->assertRedirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]));
 
         $this->assertSame(2, EquipmentIssue::query()->where('employee_id', $employee->id)->count());
         $this->assertSame(10, $sizeM->fresh()->quantityIn($this->warehouse));
@@ -893,7 +973,7 @@ class WarehouseEquipmentTest extends TestCase
             ->call('addToCart', $variant->id, 'given')
             ->call('save')
             ->assertHasNoErrors()
-            ->assertRedirect(route('warehouse-dispatches.show', $this->latestDispatch()));
+            ->assertRedirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]));
 
         $this->assertSame(1, EquipmentIssue::query()->where('employee_id', $anna->id)->count());
         $this->assertSame(1, EquipmentIssue::query()->where('employee_id', $jan->id)->count());
@@ -953,7 +1033,7 @@ class WarehouseEquipmentTest extends TestCase
         $component
             ->call('confirm')
             ->assertHasNoErrors()
-            ->assertRedirect(route('warehouse-dispatches.show', $this->latestDispatch()));
+            ->assertRedirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]));
 
         $this->assertSame($sizeM->id, EquipmentIssue::query()->where('employee_id', $anna->id)->value('equipment_variant_id'));
         $this->assertSame($sizeL->id, EquipmentIssue::query()->where('employee_id', $jan->id)->value('equipment_variant_id'));
@@ -1034,7 +1114,7 @@ class WarehouseEquipmentTest extends TestCase
         $this->assertSame(0, EquipmentIssue::query()->count());
     }
 
-    public function test_show_page_lists_sku_and_available_stock(): void
+    public function test_show_page_lists_variant_and_available_stock(): void
     {
         $equipment = Equipment::factory()->create([
             'name' => 'Spodnie BHP',
@@ -1048,8 +1128,7 @@ class WarehouseEquipmentTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('equipment.show', ['equipment' => $equipment, 'warehouse_id' => $this->warehouse->id]))
             ->assertOk()
-            ->assertSee('Spodnie BHP · M')
-            ->assertSee('SKU')
+            ->assertSee('Spodnie BHP')
             ->assertSee('Rozmiar')
             ->assertSee('Rozkład sztuk')
             ->assertSee('Powyżej minimum')
@@ -1317,13 +1396,18 @@ class WarehouseEquipmentTest extends TestCase
 
         $this->assertSame(30, $chart['days']);
         $this->assertCount(30, $chart['labels']);
+        $this->assertCount(30, $chart['stock']);
         $this->assertSame(5, $chart['inbound_total']);
         $this->assertSame(3, $chart['outbound_total']);
+        $this->assertSame(17, $chart['stock_total']);
+        $this->assertSame(17, $chart['stock'][29]);
         $this->assertContains(5, $chart['inbound']);
         $this->assertContains(3, $chart['outbound']);
 
         $oilChart = app(EquipmentService::class)->stockMovementChart($oil);
         $this->assertSame(3, $oilChart['outbound_total']);
+        $this->assertSame(7, $oilChart['stock_total']);
+        $this->assertSame(7, $oilChart['stock'][29]);
 
         Livewire::actingAs($this->user)
             ->test(EquipmentStockTimeline::class, ['equipment' => $equipment])
@@ -1331,6 +1415,7 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('ostatnie 30 dni')
             ->assertSee('Przyjęcia')
             ->assertSee('Rozchody')
+            ->assertSee('Stan')
             ->assertSee('Zniszczenie');
     }
 
@@ -1792,6 +1877,8 @@ class WarehouseEquipmentTest extends TestCase
         $chart = app(EquipmentService::class)->stockMovementChart($equipment);
         $this->assertSame(0, $chart['inbound_total']);
         $this->assertSame(0, $chart['outbound_total']);
+        $this->assertSame(10, $chart['stock_total']);
+        $this->assertSame(10, $chart['stock'][29]);
 
         $this->actingAs($this->user)
             ->get(route('equipment.show', ['equipment' => $equipment, 'warehouse_id' => $this->warehouse->id]))

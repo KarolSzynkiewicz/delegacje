@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Equipment;
 use App\Models\EquipmentIssue;
 use App\Models\EquipmentVariant;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\EquipmentService;
 use App\Services\WarehouseService;
@@ -37,12 +38,15 @@ class WarehouseIssueForm extends Component
 
     public bool $confirming = false;
 
+    public ?int $assigneeId = null;
+
     public function mount(?Warehouse $warehouse = null): void
     {
         $this->warehouseId = ($warehouse && $warehouse->exists)
             ? $warehouse->id
             : app(WarehouseService::class)->current()->id;
         $this->issueDate = now()->toDateString();
+        $this->assigneeId = auth()->id();
         app(WarehouseService::class)->remember($this->warehouse());
     }
 
@@ -334,12 +338,20 @@ class WarehouseIssueForm extends Component
             return;
         }
 
+        $this->validate([
+            'assigneeId' => 'required|exists:users,id',
+        ], [
+            'assigneeId.required' => 'Wybierz osobę, która ma skompletować to wydanie.',
+            'assigneeId.exists' => 'Wybrany użytkownik nie istnieje.',
+        ]);
+
         try {
             $issues = $equipmentService->issueSession(
                 $entries,
                 $this->warehouse(),
                 Carbon::parse($this->issueDate),
-                filled($this->notes) ? $this->notes : null
+                filled($this->notes) ? $this->notes : null,
+                $this->assigneeId,
             );
         } catch (ValidationException $e) {
             $this->setErrorBag($e->validator->getMessageBag());
@@ -352,11 +364,7 @@ class WarehouseIssueForm extends Component
         $label = $dispatch?->number ?? $issues->count().' '.$this->positionsLabel($issues->count());
         session()->flash('success', "Zapisano zlecenie {$label}.");
 
-        if ($dispatch) {
-            return $this->redirect(route('warehouse-dispatches.show', $dispatch), navigate: false);
-        }
-
-        return $this->redirect(route('equipment.tab.issues'), navigate: false);
+        return $this->redirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouseId]), navigate: false);
     }
 
     public function remainingFor(int $variantId): int
@@ -386,6 +394,7 @@ class WarehouseIssueForm extends Component
             'multipleRecipients' => count($this->selectedEmployeeIds()) > 1,
             'confirming' => $this->confirming,
             'preview' => $this->confirming ? $this->previewSummary() : null,
+            'assignees' => User::query()->orderBy('name')->get(),
         ]);
     }
 

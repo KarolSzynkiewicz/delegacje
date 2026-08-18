@@ -37,7 +37,7 @@ class TaskController extends Controller
     public function setDefaultView(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'view'       => ['required', 'in:cards,grid'],
+            'view' => ['required', 'in:cards,grid'],
             'grid_query' => ['nullable', 'array'],
         ]);
 
@@ -45,9 +45,9 @@ class TaskController extends Controller
 
         if ($validated['view'] === 'cards') {
             $user->update([
-                'default_tasks_view'           => 'cards',
+                'default_tasks_view' => 'cards',
                 'default_tasks_grid_view_slug' => null,
-                'default_tasks_grid_query'     => null,
+                'default_tasks_grid_query' => null,
             ]);
 
             return back()->with('success', 'Domyślny widok zadań został zapisany.');
@@ -67,9 +67,9 @@ class TaskController extends Controller
         }
 
         $user->update([
-            'default_tasks_view'           => 'grid',
+            'default_tasks_view' => 'grid',
             'default_tasks_grid_view_slug' => $slug,
-            'default_tasks_grid_query'     => $query !== [] ? $query : null,
+            'default_tasks_grid_query' => $query !== [] ? $query : null,
         ]);
 
         return back()->with('success', 'Domyślny widok zadań został zapisany.');
@@ -156,7 +156,7 @@ class TaskController extends Controller
      */
     public function show(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user']);
+        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'recruitmentProcess', 'subject']);
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('tasks.show', compact('task', 'users'));

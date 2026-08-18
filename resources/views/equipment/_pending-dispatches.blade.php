@@ -1,6 +1,19 @@
 <x-ui.card label="Zlecenia do wydania" class="mb-4">
     @if($pendingDispatches->isEmpty())
-        <p class="text-muted mb-0">Nic nie czeka na wydanie w tym magazynie.</p>
+        <x-ui.empty-state
+            icon="clipboard-check"
+            message="Nic nie czeka na wydanie w tym magazynie."
+        >
+            <x-ui.button
+                variant="primary"
+                href="{{ route('equipment-issues.create', ['warehouse_id' => $warehouse->id]) }}"
+                routeName="equipment-issues.create"
+                action="create"
+                class="mt-3"
+            >
+                Zleć wydanie
+            </x-ui.button>
+        </x-ui.empty-state>
     @else
         <div class="table-responsive">
             <table class="table align-middle mb-0">

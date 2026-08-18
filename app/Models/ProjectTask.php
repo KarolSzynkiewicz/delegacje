@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\TaskSubject;
 use App\Enums\TaskStatus;
 use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ProjectTask extends Model
 {
@@ -35,6 +37,8 @@ class ProjectTask extends Model
         'created_by',
         'procedure_run_id',
         'recruitment_process_id',
+        'subject_type',
+        'subject_id',
     ];
 
     protected $casts = [
@@ -65,6 +69,39 @@ class ProjectTask extends Model
     public function recruitmentProcess(): BelongsTo
     {
         return $this->belongsTo(RecruitmentProcess::class, 'recruitment_process_id');
+    }
+
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Link i etykieta źródła zadania: stary FK rekrutacji albo nowy morph (ZW, …).
+     *
+     * @return array{url: string, label: string, icon: string}|null
+     */
+    public function sourceCard(): ?array
+    {
+        if ($url = $this->recruitmentCardUrl()) {
+            return [
+                'url' => $url,
+                'label' => 'Karta kandydata',
+                'icon' => 'bi-person-badge',
+            ];
+        }
+
+        $this->loadMissing('subject');
+        $subject = $this->subject;
+        if ($subject instanceof TaskSubject) {
+            return [
+                'url' => $subject->taskCardUrl(),
+                'label' => $subject->taskCardLabel(),
+                'icon' => $subject->taskCardIcon(),
+            ];
+        }
+
+        return null;
     }
 
     /**

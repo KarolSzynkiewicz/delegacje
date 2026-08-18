@@ -47,10 +47,10 @@
                             </div>
                         @endif
 
-                        @if($recruitmentUrl = $task->recruitmentCardUrl())
+                        @if($sourceCard = $task->sourceCard())
                             <div class="mt-3">
-                                <a href="{{ $recruitmentUrl }}" class="btn btn-outline-primary btn-sm">
-                                    <i class="bi bi-person-badge me-1"></i>Karta kandydata
+                                <a href="{{ $sourceCard['url'] }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi {{ $sourceCard['icon'] }} me-1"></i>{{ $sourceCard['label'] }}
                                 </a>
                             </div>
                         @endif
