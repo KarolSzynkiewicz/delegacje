@@ -23,27 +23,19 @@ class CommentMentioned extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        $commentable = $this->comment->commentable;
-
-        // Spróbuj wyciągnąć URL do obiektu z komentarzem
-        $url = match (true) {
-            $commentable instanceof \App\Models\ProjectTask => route('tasks.show', $commentable),
-            $commentable instanceof \App\Models\Project => route('projects.show', $commentable),
-            default => null,
-        };
-
-        $contextName = $commentable?->name ?? $commentable?->title ?? ('obiekt #' . $this->comment->commentable_id);
+        $context = $this->comment->notificationContextLabel();
 
         return [
             'type' => 'comment_mentioned',
-            'message' => $this->mentionedBy->name . ' wspomniał(-a) o Tobie w komentarzu',
+            'message' => $this->mentionedBy->name.' wspomniał(-a) o Tobie w komentarzu',
             'comment_id' => $this->comment->id,
             'commentable_type' => $this->comment->commentable_type instanceof \BackedEnum
                 ? $this->comment->commentable_type->value
                 : $this->comment->commentable_type,
             'commentable_id' => $this->comment->commentable_id,
-            'context_name' => $contextName,
-            'url' => $url,
+            'context_name' => $context,
+            'url' => $this->comment->urlWithCommentAnchor(),
+            'excerpt' => $this->comment->bodyExcerpt(),
             'mentioned_by_id' => $this->mentionedBy->id,
             'mentioned_by_name' => $this->mentionedBy->name,
         ];

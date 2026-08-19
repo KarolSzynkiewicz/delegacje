@@ -66,8 +66,7 @@ function createNode(type, x, y){
     id: uid('node'), type, x, y,
     name: def.label, description: '', instructions: '',
     estimatedDuration: null, durationUnit: 'min',
-    icon: def.icon, color: def.color, required: false, role: '', tags: [],
-    customJson: '',
+    icon: def.icon, color: def.color, required: false, assigned_user_id: null,
   };
   if(type === 'checklist') node.checklist = [];
   if(type === 'decision') node.decision = { mode:'yesno', options:[{id:uid('opt'),label:'Tak'},{id:uid('opt'),label:'Nie'}] };
@@ -76,6 +75,21 @@ function createNode(type, x, y){
 }
 function createEdge(from, to, label, optionId){
   return { id: uid('edge'), from, to, label: label||'', condition:'', optionId: optionId||null };
+}
+function editorUsers(){
+  return (window.ProcedureEditorData && window.ProcedureEditorData.users) || [];
+}
+function userNameById(id){
+  if(!id) return '';
+  const u = editorUsers().find(x => Number(x.id) === Number(id));
+  return u ? u.name : '';
+}
+function renderAssigneeField(n){
+  if(['start','end','note'].includes(n.type)) return '';
+  const opts = [`<option value="">— nikt —</option>`]
+    .concat(editorUsers().map(u => `<option value="${u.id}" ${Number(n.assigned_user_id)===Number(u.id)?'selected':''}>${esc(u.name)}</option>`))
+    .join('');
+  return `<label class="pe-field"><span class="pe-lbl">Odpowiedzialny</span><select id="propAssignedUser">${opts}</select></label>`;
 }
 
 /* ── 5. UNDO / REDO ────────────────────────────────────────────────── */
@@ -134,7 +148,6 @@ function validateProcess(p){
       opts.forEach(o=>{ if(!p.edges.some(e=>e.from===n.id&&e.optionId===o.id)) issues.push({level:'warning', msg:`Opcja "${o.label}" w węźle "${n.name}" nie ma połączenia.`}); });
     }
     if(n.type==='checklist'&&(!n.checklist||n.checklist.length===0)) issues.push({level:'warning', msg:`Checklista "${n.name}" jest pusta.`});
-    if(n.customJson&&n.customJson.trim()){ try{JSON.parse(n.customJson);}catch(e){issues.push({level:'error', msg:`Nieprawidłowy JSON w węźle "${n.name}".`});} }
     if(n.type!=='end'&&n.type!=='note'&&!p.edges.some(e=>e.from===n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie ma wyjścia.`});
     if(n.type!=='start'&&n.type!=='note'&&!p.edges.some(e=>e.to===n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie ma wejścia.`});
   });
@@ -156,6 +169,7 @@ async function saveToServer(){
       _method: 'PUT',
       name:        state.currentProcess.name,
       category:    state.currentProcess.category || null,
+      subject_type: state.currentProcess.subject_type || null,
       description: state.currentProcess.description || null,
       tags:        state.currentProcess.tags || [],
       definition:  { nodes: state.currentProcess.nodes, edges: state.currentProcess.edges },
@@ -220,7 +234,10 @@ function nodeMetaLine(n){
   if(n.type==='decision')  parts.push(`<span class="pe-chip">${(n.decision?.options||[]).length} opcji</span>`);
   if(n.type==='wait')      parts.push(`<span class="pe-chip">${n.wait?.duration||0} ${n.wait?.unit||'min'}</span>`);
   if(n.estimatedDuration)  parts.push(`<span class="pe-chip">⏱ ${n.estimatedDuration} ${n.durationUnit||'min'}</span>`);
-  if(n.role)               parts.push(`<span class="pe-chip">${esc(n.role)}</span>`);
+  if(n.assigned_user_id){
+    const assigneeName = userNameById(n.assigned_user_id);
+    if(assigneeName) parts.push(`<span class="pe-chip">${esc(assigneeName)}</span>`);
+  }
   if(n.required)           parts.push(`<span class="pe-chip">wymagane</span>`);
   return parts.join('');
 }
@@ -451,12 +468,16 @@ function renderProperties(){
 }
 
 function renderProcessMetaPanel(p){
+  const types = (window.ProcedureEditorData && window.ProcedureEditorData.subjectTypes) || [];
+  const typeOptions = [`<option value="">— bez konkretnej encji —</option>`]
+    .concat(types.map(t => `<option value="${esc(t.value)}" ${p.subject_type===t.value?'selected':''}>${esc(t.label)}</option>`))
+    .join('');
   return `
     <div class="pe-prop-section-title">Informacje o procedurze</div>
     <label class="pe-field"><span class="pe-lbl">Nazwa</span><input type="text" id="metaName" value="${esc(p.name)}"></label>
     <label class="pe-field"><span class="pe-lbl">Kategoria</span><input type="text" id="metaCategory" value="${esc(p.category||'')}"></label>
+    <label class="pe-field"><span class="pe-lbl">Dotyczy</span><select id="metaSubjectType">${typeOptions}</select></label>
     <label class="pe-field"><span class="pe-lbl">Opis</span><textarea id="metaDesc">${esc(p.description||'')}</textarea></label>
-    <label class="pe-field"><span class="pe-lbl">Tagi (przecinkami)</span><input type="text" id="metaTags" value="${esc((p.tags||[]).join(', '))}"></label>
     <div class="pe-hint">Kliknij węzeł lub połączenie, aby edytować jego właściwości.</div>
   `;
 }
@@ -464,8 +485,8 @@ function wireProcessMetaPanel(){
   const p=state.currentProcess;
   document.getElementById('metaName').addEventListener('input',function(){ p.name=this.value; markDirty(); document.getElementById('procNameInput').value=p.name; });
   document.getElementById('metaCategory').addEventListener('input',function(){ p.category=this.value; markDirty(); });
+  document.getElementById('metaSubjectType').addEventListener('change',function(){ p.subject_type=this.value||null; markDirty(); });
   document.getElementById('metaDesc').addEventListener('input',function(){ p.description=this.value; markDirty(); });
-  document.getElementById('metaTags').addEventListener('blur',function(){ p.tags=this.value.split(',').map(s=>s.trim()).filter(Boolean); markDirty(); });
 }
 
 function renderNodePanel(n){
@@ -482,17 +503,13 @@ function renderNodePanel(n){
       <label class="pe-field"><span class="pe-lbl">Ikona</span><input type="text" id="propIcon" maxlength="2" value="${esc(n.icon)}"></label>
       <label class="pe-field"><span class="pe-lbl">Kolor</span><input type="color" id="propColor" value="${n.color}"></label>
     </div>
-    <label class="pe-field"><span class="pe-lbl">Rola / odpowiedzialny</span><input type="text" id="propRole" value="${esc(n.role||'')}" placeholder="np. Kierownik"></label>
-    <label class="pe-field"><span class="pe-lbl">Tagi (przecinkami)</span><input type="text" id="propTags" value="${esc((n.tags||[]).join(', '))}"></label>
+    ${renderAssigneeField(n)}
     <div class="pe-checkbox-row"><input type="checkbox" id="propRequired" ${n.required?'checked':''}> Krok wymagany</div>
   `;
   if(n.type==='checklist') html+=renderChecklistEditor(n);
   if(n.type==='decision')  html+=renderDecisionEditor(n);
   if(n.type==='wait')      html+=renderWaitEditor(n);
   html+=`
-    <div class="pe-prop-section-title">Custom JSON</div>
-    <label class="pe-field"><textarea id="propCustomJson" style="min-height:70px;font-family:monospace;font-size:11.5px;" placeholder='{ "klucz": "wartość" }'>${esc(n.customJson||'')}</textarea></label>
-    <div id="customJsonStatus"></div>
     <div class="pe-prop-section-title">Akcje</div>
     <div style="display:flex;gap:8px;">
       <button class="pe-btn" id="btnDuplicateNode" style="flex:1;">⧉ Duplikuj</button>
@@ -566,13 +583,15 @@ function wireNodePanel(n){
   $('propDurationUnit').addEventListener('change',function(){ n.durationUnit=this.value; markDirty(); updateNodeCanvasLabel(n.id); });
   $('propIcon').addEventListener('input',function(){ n.icon=this.value||NODE_TYPES[n.type].icon; markDirty(); updateNodeCanvasLabel(n.id); });
   $('propColor').addEventListener('input',function(){ n.color=this.value; markDirty(); updateNodeCanvasLabel(n.id); });
-  $('propRole').addEventListener('input',function(){ n.role=this.value; markDirty(); updateNodeCanvasLabel(n.id); });
-  $('propTags').addEventListener('blur',function(){ n.tags=this.value.split(',').map(s=>s.trim()).filter(Boolean); markDirty(); });
+  const assigned=$('propAssignedUser');
+  if(assigned){
+    assigned.addEventListener('change',function(){
+      n.assigned_user_id=this.value?Number(this.value):null;
+      markDirty();
+      updateNodeCanvasLabel(n.id);
+    });
+  }
   $('propRequired').addEventListener('change',function(){ n.required=this.checked; markDirty(); updateNodeCanvasLabel(n.id); });
-
-  const cj=$('propCustomJson'); const cjSt=$('customJsonStatus');
-  function valCJ(){ const v=cj.value.trim(); if(!v){cjSt.innerHTML='';return;} try{JSON.parse(v);cjSt.innerHTML='<div class="pe-oktext">✓ Poprawny JSON</div>';}catch(e){cjSt.innerHTML='<div class="pe-errtext">✕ Nieprawidłowy JSON</div>';} }
-  cj.addEventListener('input',function(){ n.customJson=this.value; markDirty(); valCJ(); }); valCJ();
 
   $('btnDuplicateNode').addEventListener('click',duplicateSelectedNode);
   $('btnDeleteNodeProp').addEventListener('click',()=>deleteNode(n.id));
@@ -672,6 +691,7 @@ function initEditor(){
     id:           cfg.template.id,
     name:         cfg.template.name,
     category:     cfg.template.category || '',
+    subject_type: cfg.template.subject_type || '',
     description:  cfg.template.description || '',
     tags:         cfg.template.tags || [],
     nodes:        Array.isArray(def.nodes) ? def.nodes : [],

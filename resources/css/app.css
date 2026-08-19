@@ -60,6 +60,17 @@ body {
     align-self: center;
 }
 
+/* @wzmianka zalogowanego — delikatny chip, czytelny na ciemnym tle */
+.mention-you {
+    color: #fde68a !important;
+    background: rgba(245, 158, 11, 0.18);
+    border-radius: 0.3rem;
+    padding: 0.08em 0.38em;
+    font-weight: 600;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
 /* Z-index dla Livewire loading overlays */
 .z-3 {
     z-index: 3;

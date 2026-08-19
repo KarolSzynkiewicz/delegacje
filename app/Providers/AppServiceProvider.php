@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Livewire\Pulse\UserRouteUsage;
+use App\Livewire\Pulse\UserRouteVisits;
 use App\Models\AccommodationAssignment;
 use App\Models\Adjustment;
 use App\Models\Employee;
@@ -11,12 +13,15 @@ use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
 use App\Models\RecruitmentCandidate;
 use App\Models\TransportCost;
+use App\Models\User;
 use App\Models\VehicleAssignment;
 use App\Observers\AuditableModelObserver;
 use App\Observers\ProcedureTemplateObserver;
 use App\Services\SystemBootstrapService;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -82,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
             'recruitment_candidate' => \App\Models\RecruitmentCandidate::class,
             'warehouse_dispatch' => \App\Models\WarehouseDispatch::class,
             'comment' => \App\Models\Comment::class,
+            'task_subtask' => \App\Models\TaskSubtask::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 
@@ -96,5 +102,12 @@ class AppServiceProvider extends ServiceProvider
                 // Will retry on next request
             }
         }
+
+        Gate::define('viewPulse', function (?User $user) {
+            return $user instanceof User && $user->isAdmin();
+        });
+
+        Livewire::component('pulse.user-route-visits', UserRouteVisits::class);
+        Livewire::component('pulse.user-route-usage', UserRouteUsage::class);
     }
 }

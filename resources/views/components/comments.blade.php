@@ -116,7 +116,12 @@
 
     @php
         $allCommentsFlat = $commentable->comments()
-            ->with(['user', 'attachments', 'likes.user'])
+            ->with([
+                'user',
+                'attachments',
+                'likes.user',
+                'tasks' => fn ($q) => $q->where('assigned_to', auth()->id()),
+            ])
             ->withCount('likes')
             ->withExists(['likes as liked_by_me' => fn ($q) => $q->where('user_id', auth()->id())])
             ->orderBy('created_at', 'desc')

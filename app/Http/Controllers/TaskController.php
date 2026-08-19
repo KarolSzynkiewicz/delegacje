@@ -156,7 +156,7 @@ class TaskController extends Controller
      */
     public function show(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'recruitmentProcess', 'subject']);
+        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess', 'subject']);
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('tasks.show', compact('task', 'users'));

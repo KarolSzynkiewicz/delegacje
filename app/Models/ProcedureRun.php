@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcedureRunStatus;
+use App\Enums\ProcedureSubjectType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -27,12 +28,12 @@ class ProcedureRun extends Model
     ];
 
     protected $casts = [
-        'status'              => ProcedureRunStatus::class,
+        'status' => ProcedureRunStatus::class,
         'definition_snapshot' => 'array',
-        'path'                => 'array',
-        'variables'           => 'array',
-        'started_at'          => 'datetime',
-        'finished_at'         => 'datetime',
+        'path' => 'array',
+        'variables' => 'array',
+        'started_at' => 'datetime',
+        'finished_at' => 'datetime',
     ];
 
     public function template(): BelongsTo
@@ -75,7 +76,29 @@ class ProcedureRun extends Model
                 return $node;
             }
         }
+
         return null;
+    }
+
+    /**
+     * Link do rekordu, którego dotyczy przebieg (samochód, pracownik, …).
+     *
+     * @return array{url: string, label: string, icon: string}|null
+     */
+    public function sourceCard(): ?array
+    {
+        $type = ProcedureSubjectType::tryFrom((string) $this->subject_type);
+        if ($type === null || ! $this->subject_id) {
+            return null;
+        }
+
+        $this->loadMissing('subject');
+        $subject = $this->subject;
+        if (! $subject) {
+            return null;
+        }
+
+        return $type->sourceCardFor($subject);
     }
 
     /** Outgoing edges from a given node id. */
@@ -99,6 +122,7 @@ class ProcedureRun extends Model
             return 0.0;
         }
         $completed = $this->steps()->whereNotNull('completed_at')->count();
+
         return round(min($completed / $total, 1.0), 2);
     }
 }

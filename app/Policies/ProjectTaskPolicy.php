@@ -17,7 +17,7 @@ class ProjectTaskPolicy
         }
 
         // Jeśli zadanie nie ma projektu, sprawdź uprawnienia do zadań
-        if (!$task->project_id) {
+        if (! $task->project_id) {
             return $user->hasPermission('tasks.update');
         }
 
@@ -30,7 +30,7 @@ class ProjectTaskPolicy
      */
     public function markInProgress(User $user, ProjectTask $task): bool
     {
-        return $this->updateStatus($user, $task);
+        return $this->isAssignee($user, $task) || $this->updateStatus($user, $task);
     }
 
     /**
@@ -38,7 +38,7 @@ class ProjectTaskPolicy
      */
     public function markCompleted(User $user, ProjectTask $task): bool
     {
-        return $this->updateStatus($user, $task);
+        return $this->isAssignee($user, $task) || $this->updateStatus($user, $task);
     }
 
     /**
@@ -47,5 +47,10 @@ class ProjectTaskPolicy
     public function cancel(User $user, ProjectTask $task): bool
     {
         return $this->updateStatus($user, $task);
+    }
+
+    private function isAssignee(User $user, ProjectTask $task): bool
+    {
+        return $task->assigned_to !== null && (int) $task->assigned_to === (int) $user->id;
     }
 }

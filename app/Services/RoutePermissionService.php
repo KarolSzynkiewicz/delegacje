@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Route;
+use Illuminate\Routing\Route as RouteObject;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Routing\Route as RouteObject;
+use Illuminate\Support\Facades\Route;
 
 class RoutePermissionService
 {
@@ -20,9 +20,10 @@ class RoutePermissionService
             now()->addHour(),
             function () use ($routeName) {
                 $route = Route::getRoutes()->getByName($routeName);
-                if (!$route) {
+                if (! $route) {
                     return null;
                 }
+
                 return $this->getPermissionForRouteObject($route);
             }
         );
@@ -35,7 +36,7 @@ class RoutePermissionService
     public function getPermissionForRouteObject(RouteObject $route): ?string
     {
         $routeName = $route->getName();
-        if (!$routeName) {
+        if (! $routeName) {
             return null;
         }
 
@@ -46,27 +47,27 @@ class RoutePermissionService
 
         // Get permission type from route defaults
         // Route groups store defaults in action['defaults'], individual routes in defaults property
-        $permissionType = $route->defaults['permission_type'] 
-            ?? $route->getAction('defaults')['permission_type'] 
+        $permissionType = $route->defaults['permission_type']
+            ?? $route->getAction('defaults')['permission_type']
             ?? null;
-        if (!$permissionType) {
+        if (! $permissionType) {
             return null;
         }
 
         // Get resource from route defaults first (for all types)
-        $resource = $route->defaults['resource'] 
-            ?? $route->getAction('defaults')['resource'] 
+        $resource = $route->defaults['resource']
+            ?? $route->getAction('defaults')['resource']
             ?? null;
-        
+
         // For action routes, if resource is not explicitly set, use full route name
-        if ($permissionType === 'action' && !$resource) {
+        if ($permissionType === 'action' && ! $resource) {
             $resource = $routeName;
-        } elseif (!$resource) {
+        } elseif (! $resource) {
             // For other types, try to extract from route name (fallback)
             $resource = $this->extractResourceFromRoute($routeName, $permissionType);
         }
 
-        if (!$resource) {
+        if (! $resource) {
             return null;
         }
 
@@ -88,7 +89,7 @@ class RoutePermissionService
             return Cache::remember(
                 'all_route_permissions',
                 now()->addHour(),
-                fn() => $this->buildPermissionsFromRoutes()
+                fn () => $this->buildPermissionsFromRoutes()
             );
         } catch (\Exception $e) {
             // Cache not available (e.g., during migrations with permission issues) - return without cache
@@ -104,47 +105,47 @@ class RoutePermissionService
     {
         $routes = Route::getRoutes();
         $permissions = collect();
-        
+
         foreach ($routes as $route) {
             // Get permission type from route defaults
             // Route groups store defaults in action['defaults'], individual routes in defaults property
-            $permissionType = $route->defaults['permission_type'] 
-                ?? $route->getAction('defaults')['permission_type'] 
+            $permissionType = $route->defaults['permission_type']
+                ?? $route->getAction('defaults')['permission_type']
                 ?? null;
-            if (!$permissionType) {
+            if (! $permissionType) {
                 continue;
             }
-            
+
             $routeName = $route->getName();
-            if (!$routeName) {
+            if (! $routeName) {
                 continue;
             }
-            
+
             // Skip excluded routes (same as middleware)
             if ($this->isExcluded($routeName)) {
                 continue;
             }
-            
+
             // Get resource from route defaults first
-            $resource = $route->defaults['resource'] 
-                ?? $route->getAction('defaults')['resource'] 
+            $resource = $route->defaults['resource']
+                ?? $route->getAction('defaults')['resource']
                 ?? null;
-            
+
             // For action routes, if resource is not explicitly set, use full route name
-            if ($permissionType === 'action' && !$resource) {
+            if ($permissionType === 'action' && ! $resource) {
                 $resource = $routeName;
-            } elseif (!$resource) {
+            } elseif (! $resource) {
                 // For other types, try to extract from route name (fallback)
                 $resource = $this->extractResourceFromRoute($routeName, $permissionType);
             }
-            
-            if (!$resource) {
+
+            if (! $resource) {
                 continue;
             }
-            
+
             $routeAction = $this->getRouteAction($routeName);
             $httpMethod = $route->methods()[0] ?? 'GET';
-            
+
             // Generate permission name using same logic as middleware
             $permissionName = $this->generatePermissionName(
                 $permissionType,
@@ -152,17 +153,17 @@ class RoutePermissionService
                 $routeAction,
                 $httpMethod
             );
-            
-            if (!$permissionName) {
+
+            if (! $permissionName) {
                 continue;
             }
-            
+
             // Ensure we never return viewAny - middleware generates view for index/show
             // But for safety, if somehow viewAny appears, replace with view
             if (str_ends_with($permissionName, '.viewAny')) {
                 $permissionName = str_replace('.viewAny', '.view', $permissionName);
             }
-            
+
             $permissions->push([
                 'name' => $permissionName,
                 'type' => $permissionType,
@@ -170,11 +171,11 @@ class RoutePermissionService
                 'action' => $this->getPermissionAction($permissionName, $permissionType),
             ]);
         }
-        
+
         // Remove duplicates and return
         return $permissions->unique('name')->values();
     }
-    
+
     /**
      * Generate permission name based on permission type.
      * Uses same logic as CheckResourcePermission middleware.
@@ -192,7 +193,7 @@ class RoutePermissionService
             default => null,
         };
     }
-    
+
     /**
      * Map resource route to permission (CRUD).
      * IMPORTANT: index and show both map to .view (not viewAny and view).
@@ -208,7 +209,7 @@ class RoutePermissionService
             'update' => 'update',
             'destroy' => 'delete',
         ];
-        
+
         // If route action is explicitly mapped, use it
         if ($routeAction && isset($actionMap[$routeAction])) {
             $action = $actionMap[$routeAction];
@@ -223,10 +224,10 @@ class RoutePermissionService
             ];
             $action = $methodMap[$httpMethod] ?? 'view';
         }
-        
+
         return "{$resource}.{$action}";
     }
-    
+
     /**
      * Map view route to permission (always .view).
      */
@@ -234,7 +235,7 @@ class RoutePermissionService
     {
         return "{$resource}.view";
     }
-    
+
     /**
      * Map action route to permission (always .update).
      */
@@ -242,29 +243,29 @@ class RoutePermissionService
     {
         return "{$resource}.update";
     }
-    
+
     /**
      * Extract resource name from route name.
      * Uses same logic as CheckResourcePermission middleware.
      */
     protected function extractResourceFromRoute(?string $routeName, string $permissionType): ?string
     {
-        if (!$routeName) {
+        if (! $routeName) {
             return null;
         }
-        
+
         // Split route name by dots
         $parts = explode('.', $routeName);
-        
+
         if ($permissionType === 'action') {
             // For action routes: return-trips.cancel -> return-trips.cancel (full route name is the resource)
             // According to documentation: return-trips.cancel -> return-trips.cancel.update
             // So resource is the full route name, not with last part removed
             return $routeName;
         }
-        
+
         if ($permissionType === 'view') {
-            // For view routes: 
+            // For view routes:
             // - "dashboard" -> "dashboard" (no dots, return as-is)
             // - "profitability.index" -> "profitability" (remove action)
             // - "weekly-overview.index" -> "weekly-overview" (remove action)
@@ -275,58 +276,61 @@ class RoutePermissionService
             // Has dots - remove last part (action)
             array_pop($parts);
             $resource = implode('.', $parts);
+
             return $resource ?: null;
         }
-        
+
         // For resource routes: remove the last part (action) to get resource
         array_pop($parts);
-        
+
         // Join remaining parts - this handles nested routes
         // e.g., "projects.assignments.index" -> "assignments"
         // e.g., "vehicle-assignments.show" -> "vehicle-assignments"
         $resource = implode('.', $parts);
-        
+
         // For nested resources, take the last part
         // e.g., "employees.vehicles" -> "vehicles"
         // e.g., "employees.accommodations" -> "accommodations"
         if (str_contains($resource, '.')) {
             $nestedParts = explode('.', $resource);
             $lastPart = end($nestedParts);
-            
+
             // Map nested resources
             $nestedMappings = [
                 'vehicles' => 'vehicle-assignments',
                 'accommodations' => 'accommodation-assignments',
             ];
-            
+
             return $nestedMappings[$lastPart] ?? $lastPart;
         }
-        
+
         return $resource ?: null;
     }
-    
+
     /**
      * Get route action from route name.
      */
     protected function getRouteAction(?string $routeName): ?string
     {
-        if (!$routeName) {
+        if (! $routeName) {
             return null;
         }
-        
+
         $parts = explode('.', $routeName);
+
         return end($parts);
     }
-    
+
     /**
      * Get permission action from permission name (for UI grouping).
      */
     protected function getPermissionAction(string $permissionName, string $permissionType): string
     {
         $parts = explode('.', $permissionName);
+
         return end($parts);
     }
-    
+
     /**
      * Check if route should be excluded from permission generation.
      * Same exclusions as middleware.
@@ -339,25 +343,26 @@ class RoutePermissionService
             'logout',
             'home',
             'dashboard', // Dashboard dostępny dla każdego zalogowanego użytkownika
+            'pulse', // Laravel Pulse — osobny gate viewPulse (tylko admin)
             'mine.*', // Wykluczone na testy - routes dla /mine/*
             'health', // Healthcheck endpoint - no auth/permission required
             'attachments.*', // Autoryzacja kontekstowa przez AttachmentPolicy
         ];
-        
+
         foreach ($excludedRoutes as $pattern) {
             if (str_ends_with($pattern, '.*')) {
                 $prefix = rtrim($pattern, '.*');
-                if (str_starts_with($routeName, $prefix . '.')) {
+                if (str_starts_with($routeName, $prefix.'.')) {
                     return true;
                 }
             } elseif ($routeName === $pattern) {
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     /**
      * Group permissions by resource for UI display.
      */
@@ -371,7 +376,7 @@ class RoutePermissionService
             ];
         });
     }
-    
+
     /**
      * Get Polish name for resource.
      * Uses menu_items.php as single source of truth for labels.
@@ -381,7 +386,7 @@ class RoutePermissionService
     {
         // Get menu items config
         $menuItems = config('menu_items', []);
-        
+
         // Special mappings for resources that don't match menu_items keys directly
         $specialMappings = [
             'project-assignments' => 'assignments', // project-assignments -> assignments
@@ -390,7 +395,7 @@ class RoutePermissionService
             'fixed-cost-entries' => 'fixed_cost_entries', // fixed-cost-entries -> fixed_cost_entries
             'employee-evaluations' => 'employee_evaluations', // employee-evaluations -> employee_evaluations
         ];
-        
+
         // Check special mappings first
         if (isset($specialMappings[$resource])) {
             $menuKey = $specialMappings[$resource];
@@ -398,21 +403,21 @@ class RoutePermissionService
                 return $menuItems[$menuKey]['label'];
             }
         }
-        
+
         // Map resource name (with dashes) to menu_items key (with underscores)
         // e.g., 'user-roles' -> 'user_roles', 'vehicle-assignments' -> 'vehicle_assignments'
         $menuKey = str_replace('-', '_', $resource);
-        
+
         // Try to get label from menu_items
         if (isset($menuItems[$menuKey]['label'])) {
             return $menuItems[$menuKey]['label'];
         }
-        
+
         // Fallback: try direct match (for resources that use same format)
         if (isset($menuItems[$resource]['label'])) {
             return $menuItems[$resource]['label'];
         }
-        
+
         // Final fallback: generate label from resource name
         return ucfirst(str_replace('-', ' ', $resource));
     }

@@ -101,7 +101,9 @@ class ProjectTask extends Model
             ];
         }
 
-        return null;
+        $this->loadMissing('procedureRun');
+
+        return $this->procedureRun?->sourceCard();
     }
 
     /**
@@ -202,6 +204,38 @@ class ProjectTask extends Model
             'status' => TaskStatus::COMPLETED,
             'completed_at' => now(),
         ]);
+
+        $this->syncSubjectSubtask(true);
+    }
+
+    public function reopen(): void
+    {
+        $this->update([
+            'status' => TaskStatus::PENDING,
+            'completed_at' => null,
+        ]);
+
+        $this->syncSubjectSubtask(false);
+    }
+
+    /**
+     * Odhaczenie zadania ze wzmianki w podzadaniu = odhaczenie checkboxa #n.
+     */
+    private function syncSubjectSubtask(bool $done): void
+    {
+        $this->loadMissing('subject');
+        $subject = $this->subject;
+        if (! $subject instanceof TaskSubtask) {
+            return;
+        }
+
+        if ($done && ! $subject->is_completed) {
+            $subject->markCompleted();
+        }
+
+        if (! $done && $subject->is_completed) {
+            $subject->markIncomplete();
+        }
     }
 
     /**

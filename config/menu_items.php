@@ -266,6 +266,13 @@ return [
         'label' => 'Akcje systemowe',
     ],
 
+    'pulse' => [
+        'route' => 'pulse',
+        'icon' => 'bi bi-heart-pulse',
+        'label' => 'Pulse',
+        'permission' => 'system-actions.view',
+    ],
+
     'audit_logs' => [
         'route' => 'audit-logs.index',
         'icon' => 'bi bi-journal-text',

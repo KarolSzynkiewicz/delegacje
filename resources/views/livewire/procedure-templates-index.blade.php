@@ -53,6 +53,9 @@
                                         @if($template->category)
                                             <span class="badge bg-secondary-subtle text-secondary-emphasis small">{{ $template->category }}</span>
                                         @endif
+                                        @if($template->subjectType())
+                                            <span class="badge bg-info-subtle text-info-emphasis small">{{ $template->subjectType()->label() }}</span>
+                                        @endif
                                     </div>
                                     <div class="dropdown flex-shrink-0">
                                         <button class="btn btn-sm btn-outline-secondary px-2 py-1" data-bs-toggle="dropdown" aria-expanded="false">
@@ -137,14 +140,22 @@
                                 <input type="text" class="form-control" wire:model.live.debounce.300ms="startTaskName">
                                 @error('startTaskName')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                             </div>
-                            <div class="col-12">
-                                <label class="form-label small fw-semibold">Dotyczy (opcjonalnie)</label>
-                                <input type="text" class="form-control" wire:model.live.debounce.300ms="startDetailName"
-                                       placeholder="np. Michał Jagiełło">
-                                <div class="form-text small">Dopisane do nazwy zadania, żeby było wiadomo czego/kogo dokładnie dotyczy.</div>
-                                @error('startDetailName')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                            </div>
-                            @if(trim($startDetailName) !== '')
+                            @if($startSubjectType !== '')
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold">
+                                        Dotyczy: {{ $startSubjectTypeLabel }}
+                                        <span class="text-muted fw-normal">(opcjonalnie)</span>
+                                    </label>
+                                    <select class="form-select" wire:model.live="startSubjectId">
+                                        <option value="">— wybierz {{ mb_strtolower($startSubjectTypeLabel) }} —</option>
+                                        @foreach($startSubjectOptions as $option)
+                                            <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('startSubjectId')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                </div>
+                            @endif
+                            @if($this->selectedSubjectLabel() !== '')
                                 <div class="col-12">
                                     <div class="small text-muted">Nazwa zadania po zapisaniu:</div>
                                     <div class="fw-semibold">{{ $this->startFinalTaskName }}</div>
@@ -199,6 +210,17 @@
                                 <label class="form-label small fw-semibold">Kategoria</label>
                                 <input type="text" class="form-control" wire:model.defer="newCategory" placeholder="np. BHP, HR, Produkcja">
                                 @error('newCategory')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold">Dotyczy</label>
+                                <select class="form-select" wire:model.defer="newSubjectType">
+                                    <option value="">— bez konkretnej encji —</option>
+                                    @foreach($subjectTypes as $type)
+                                        <option value="{{ $type['value'] }}">{{ $type['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text small">Przy uruchomieniu wybierzesz konkretny rekord tego typu (np. samochód albo zakwaterowanie).</div>
+                                @error('newSubjectType')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-12">
                                 <label class="form-label small fw-semibold">Opis</label>

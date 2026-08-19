@@ -31,8 +31,10 @@ class SubtaskMentioned extends Notification
             'task_id' => $this->task->id,
             'task_name' => $this->task->name,
             'task_url' => route('tasks.show', $this->task),
+            'context_name' => $this->task->name,
             'subtask_id' => $this->subtask->id,
             'subtask_name' => $this->subtask->name,
+            'excerpt' => $this->subtask->name,
             'mentioned_by_id' => $this->mentionedBy->id,
             'mentioned_by_name' => $this->mentionedBy->name,
         ];

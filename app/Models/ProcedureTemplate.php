@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProcedureSubjectType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,7 @@ class ProcedureTemplate extends Model
     protected $fillable = [
         'name',
         'category',
+        'subject_type',
         'description',
         'tags',
         'definition',
@@ -18,7 +20,7 @@ class ProcedureTemplate extends Model
     ];
 
     protected $casts = [
-        'tags'       => 'array',
+        'tags' => 'array',
         'definition' => 'array',
     ];
 
@@ -40,6 +42,12 @@ class ProcedureTemplate extends Model
     public function nodeCount(): int
     {
         $nodes = $this->definition['nodes'] ?? [];
+
         return count(array_filter($nodes, fn ($n) => ($n['type'] ?? '') !== 'note'));
+    }
+
+    public function subjectType(): ?ProcedureSubjectType
+    {
+        return ProcedureSubjectType::tryFrom((string) $this->subject_type);
     }
 }

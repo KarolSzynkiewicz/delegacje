@@ -25,6 +25,8 @@
     $likeButtonTitle = $likersForTooltip->isNotEmpty()
         ? 'Polubili: '.$likersForTooltip->pluck('name')->implode(', ').' — '.$likeActionHint
         : $likeActionHint;
+    $mentionTask = $comment->mentionTaskFor(auth()->id());
+    $mentionTaskDone = $mentionTask?->status === \App\Enums\TaskStatus::COMPLETED;
 @endphp
 
 <div
@@ -47,6 +49,25 @@
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
+                @if($mentionTask)
+                    <form
+                        action="{{ route('comments.mention-task.toggle', $comment) }}"
+                        method="POST"
+                        class="d-inline"
+                        id="comment-mention-task-{{ $comment->id }}"
+                    >
+                        @csrf
+                        <button
+                            type="submit"
+                            class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                            style="padding:1px 8px;"
+                            title="{{ $mentionTaskDone ? 'Oznacz jako niewykonane' : 'Oznacz jako zrobione' }}"
+                            aria-label="{{ $mentionTaskDone ? 'Oznacz jako niewykonane' : 'Oznacz jako zrobione' }}"
+                        >
+                            <i class="bi bi-check2{{ $mentionTaskDone ? '-square-fill' : '-square' }}"></i>
+                        </button>
+                    </form>
+                @endif
                 <form action="{{ route('comments.like', $comment) }}" method="POST" class="d-inline">
                     @csrf
                     <button
@@ -78,7 +99,7 @@
 
         <div id="comment-body-{{ $comment->id }}">
             @if(filled($comment->body))
-                <div class="mb-0 text-break comment-body">{!! $commentBodyHtml !!}</div>
+                <div class="mb-0 text-break comment-body {{ $mentionTaskDone ? 'text-decoration-line-through text-muted' : '' }}">{!! $commentBodyHtml !!}</div>
             @endif
             <x-attachment-list :attachments="$comment->attachments" :class="filled($comment->body) ? 'mt-2' : ''" />
         </div>

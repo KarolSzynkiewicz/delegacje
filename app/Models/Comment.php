@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Contracts\TaskSubject;
 use App\Enums\CommentableType;
+use App\Enums\LogisticsEventType;
+use App\Enums\TaskStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Comment extends Model
+class Comment extends Model implements TaskSubject
 {
     use HasFactory, SoftDeletes;
 
@@ -70,6 +73,45 @@ class Comment extends Model
         return $this->hasMany(CommentLike::class);
     }
 
+    public function tasks(): MorphMany
+    {
+        return $this->morphMany(ProjectTask::class, 'subject');
+    }
+
+    public function mentionTaskFor(?int $userId): ?ProjectTask
+    {
+        if (! $userId) {
+            return null;
+        }
+
+        $match = fn (ProjectTask $task): bool => (int) $task->assigned_to === $userId
+            && $task->status !== TaskStatus::CANCELLED;
+
+        if ($this->relationLoaded('tasks')) {
+            return $this->tasks->first($match);
+        }
+
+        return $this->tasks()
+            ->where('assigned_to', $userId)
+            ->where('status', '!=', TaskStatus::CANCELLED)
+            ->first();
+    }
+
+    public function taskCardUrl(): string
+    {
+        return $this->urlWithCommentAnchor();
+    }
+
+    public function taskCardLabel(): string
+    {
+        return 'Komentarz';
+    }
+
+    public function taskCardIcon(): string
+    {
+        return 'bi-chat-dots';
+    }
+
     /**
      * Get the user who wrote the comment.
      */
@@ -83,24 +125,91 @@ class Comment extends Model
      */
     public function urlWithCommentAnchor(): string
     {
-        $this->loadMissing('commentable');
-        $morph = $this->commentable;
+        $base = $this->commentableShowUrl();
+
+        return $base ? $base.'#comment-'.$this->id : url('/');
+    }
+
+    public function commentableShowUrl(): ?string
+    {
+        $morph = $this->resolvedCommentable();
         if (! $morph) {
-            return url('/');
+            return null;
         }
 
-        $hash = '#comment-'.$this->id;
+        return match (true) {
+            $morph instanceof ProjectTask => route('tasks.show', $morph),
+            $morph instanceof Project => route('projects.show', $morph),
+            $morph instanceof Vehicle => route('vehicles.show', $morph),
+            $morph instanceof Accommodation => route('accommodations.show', $morph),
+            $morph instanceof Location => route('locations.show', $morph),
+            $morph instanceof Employee => route('employees.show', $morph),
+            $morph instanceof RecruitmentProcess => route('recruitment-processes.show', $morph),
+            $morph instanceof RecruitmentCandidate => route('recruitment-processes.index'),
+            $morph instanceof LogisticsEvent => match ($morph->type) {
+                LogisticsEventType::DEPARTURE => route('departures.show', $morph),
+                LogisticsEventType::TRANSFER => route('transfers.show', $morph),
+                LogisticsEventType::RETURN => route('return-trips.show', $morph),
+            },
+            default => null,
+        };
+    }
+
+    public function notificationContextLabel(): string
+    {
+        $morph = $this->resolvedCommentable();
+        if (! $morph) {
+            return 'komentarz #'.$this->id;
+        }
 
         return match (true) {
-            $morph instanceof ProjectTask => route('tasks.show', $morph).$hash,
-            $morph instanceof Project => route('projects.show', $morph).$hash,
-            $morph instanceof Vehicle => route('vehicles.show', $morph).$hash,
-            $morph instanceof Accommodation => route('accommodations.show', $morph).$hash,
-            $morph instanceof Location => route('locations.show', $morph).$hash,
-            $morph instanceof Employee => route('employees.show', $morph).$hash,
-            $morph instanceof RecruitmentProcess => route('recruitment-processes.show', $morph).$hash,
-            default => url('/'),
+            $morph instanceof ProjectTask => filled($morph->name) ? (string) $morph->name : 'Zadanie #'.$morph->id,
+            $morph instanceof Project => filled($morph->name) ? (string) $morph->name : 'Projekt #'.$morph->id,
+            $morph instanceof Vehicle => filled($morph->registration_number) ? (string) $morph->registration_number : 'Pojazd #'.$morph->id,
+            $morph instanceof Accommodation => filled($morph->name) ? (string) $morph->name : 'Nocleg #'.$morph->id,
+            $morph instanceof Location => filled($morph->name) ? (string) $morph->name : 'Lokalizacja #'.$morph->id,
+            $morph instanceof Employee => filled($morph->full_name) ? $morph->full_name : 'Pracownik #'.$morph->id,
+            $morph instanceof LogisticsEvent => trim($morph->type->label().' '.($morph->event_date?->format('d.m.Y') ?? '')),
+            $morph instanceof RecruitmentProcess => filled($morph->full_name) ? 'Rekrutacja: '.$morph->full_name : 'Rekrutacja #'.$morph->id,
+            $morph instanceof RecruitmentCandidate => filled($morph->full_name) ? 'Kandydat: '.$morph->full_name : 'Kandydat #'.$morph->id,
+            default => class_basename($morph).' #'.$morph->id,
         };
+    }
+
+    public function bodyExcerpt(int $max = 140): ?string
+    {
+        $body = trim(preg_replace('/\s+/u', ' ', (string) ($this->body ?? '')) ?? '');
+        if ($body === '') {
+            return null;
+        }
+
+        if (mb_strlen($body) <= $max) {
+            return $body;
+        }
+
+        return mb_substr($body, 0, $max - 1).'…';
+    }
+
+    public function resolvedCommentable(): ?Model
+    {
+        if ($this->relationLoaded('commentable') && $this->commentable) {
+            return $this->commentable;
+        }
+
+        $this->loadMissing('commentable');
+        if ($this->commentable) {
+            return $this->commentable;
+        }
+
+        $type = $this->commentable_type instanceof CommentableType
+            ? $this->commentable_type
+            : CommentableType::tryFrom((string) $this->commentable_type);
+
+        if (! $type || ! $this->commentable_id) {
+            return null;
+        }
+
+        return $type->modelClass()::query()->find($this->commentable_id);
     }
 
     /**

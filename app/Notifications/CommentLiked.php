@@ -23,8 +23,6 @@ class CommentLiked extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        $this->comment->loadMissing('commentable');
-
         return [
             'type' => 'comment_liked',
             'message' => $this->likedBy->name.' polubił(a) Twój komentarz',
@@ -32,7 +30,8 @@ class CommentLiked extends Notification
             'liked_by_id' => $this->likedBy->id,
             'liked_by_name' => $this->likedBy->name,
             'resource_url' => $this->comment->urlWithCommentAnchor(),
-            'context_name' => 'Zobacz komentarz',
+            'context_name' => $this->comment->notificationContextLabel(),
+            'excerpt' => $this->comment->bodyExcerpt(),
         ];
     }
 }

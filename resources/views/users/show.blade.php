@@ -135,4 +135,8 @@
             <p class="text-muted small mb-0">Brak przypisanych uprawnień</p>
         @endif
     </x-ui.card>
+
+    <div class="mt-3">
+        <livewire:pulse.user-route-usage :user-id="$user->id" :expand="true" :key="'user-route-usage-'.$user->id" />
+    </div>
 </x-app-layout>

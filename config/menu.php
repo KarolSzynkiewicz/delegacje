@@ -97,6 +97,7 @@ return [
             'users',
             'user_roles',
             'system_actions',
+            'pulse',
             'audit_logs',
             'system_changelog',
             'prompt_engine',

@@ -24,6 +24,13 @@
                     <x-ui.badge variant="{{ $run->status->badgeVariant() }}">
                         {{ $run->status->label() }}
                     </x-ui.badge>
+                    @if($subjectCard = $run->sourceCard())
+                        <a href="{{ $subjectCard['url'] }}"
+                           class="badge bg-secondary bg-opacity-50 text-light text-decoration-none"
+                           title="{{ $subjectCard['label'] }}">
+                            <i class="bi {{ $subjectCard['icon'] }} me-1"></i>{{ $subjectCard['label'] }}
+                        </a>
+                    @endif
                 </div>
                 <div class="small text-muted">
                     Uruchomiono przez {{ $run->startedBy?->name ?? '—' }}
@@ -97,7 +104,9 @@
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="badge bg-secondary bg-opacity-50 text-light small">
                         Krok · {{ \App\Enums\ProcedureRunStatus::IN_PROGRESS->label() }}
-                        @if(!empty($node['role'])) · {{ $node['role'] }} @endif
+                        @if($assigneeName = $this->nodeAssigneeName($node))
+                            · {{ $assigneeName }}
+                        @endif
                     </span>
                     @if(!empty($node['estimatedDuration']))
                         <span class="badge bg-secondary bg-opacity-25 text-muted small">

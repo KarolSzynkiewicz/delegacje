@@ -113,6 +113,7 @@
         color: var(--text-muted, #94a3b8) !important;
         letter-spacing: 0.3px;
     }
+    .tg-group-collapsed > td { opacity: .85; }
 
     /* ── Expanded detail panel ── */
     .tg-expand-row > td {
@@ -512,16 +513,15 @@
                 @if($groupedTasks)
                     {{-- GROUPED VIEW --}}
                     @foreach($groupedTasks as $groupName => $groupItems)
-                    <tr class="tg-group-header">
-                        <td colspan="{{ $colCount }}" style="padding:6px 12px">
-                            <i class="bi bi-collection me-1 text-muted"></i>
-                            <span>{{ $groupName }}</span>
-                            <span class="badge bg-secondary ms-1" style="font-size:0.68rem; border-radius:8px">{{ $groupItems->count() }}</span>
-                        </td>
-                    </tr>
-                    @foreach($groupItems as $task)
-                        @include('livewire.partials.tasks-grid-row', compact('task'))
-                    @endforeach
+                    @include('livewire.partials.tasks-grid-group-header', [
+                        'groupName' => $groupName,
+                        'groupItems' => $groupItems,
+                    ])
+                    @unless($this->isGroupCollapsed((string) $groupName))
+                        @foreach($groupItems as $task)
+                            @include('livewire.partials.tasks-grid-row', compact('task'))
+                        @endforeach
+                    @endunless
                     @endforeach
 
                 @elseif($tasks && $tasks->count() > 0)

@@ -19,47 +19,11 @@
                 <ul class="list-unstyled mb-0">
                     @foreach($notifications as $n)
                         @php
-                            $data = $n->data ?? [];
-                            $url  = $data['resource_url'] ?? $data['task_url'] ?? $data['url'] ?? null;
                             $read = $n->read_at !== null;
                         @endphp
 
                         <li @class(['px-3 py-3 border-bottom', 'opacity-75' => $read])>
-                            <div class="d-flex align-items-start gap-3">
-                                <i @class([
-                                    'bi fs-5 flex-shrink-0 mt-1',
-                                    'bi-person-check-fill text-primary' => ($data['type'] ?? '') === 'task_assigned',
-                                    'bi-chat-quote-fill text-info' => ($data['type'] ?? '') === 'comment_mentioned',
-                                    'bi-chat-left-text-fill text-success' => ($data['type'] ?? '') === 'task_comment_added',
-                                    'bi-list-check text-info' => ($data['type'] ?? '') === 'subtask_mentioned',
-                                    'bi-heart-fill text-danger' => ($data['type'] ?? '') === 'comment_liked',
-                                    'bi-bell-fill text-secondary' => !in_array($data['type'] ?? '', ['task_assigned', 'comment_mentioned', 'task_comment_added', 'subtask_mentioned', 'comment_liked']),
-                                ])></i>
-
-                                <div class="min-w-0 flex-grow-1">
-                                    <div class="d-flex align-items-start justify-content-between gap-3">
-                                        <div class="min-w-0">
-                                            <div class="small lh-sm">
-                                                <span class="{{ $read ? 'text-muted' : 'fw-semibold' }}">
-                                                    {{ $data['message'] ?? 'Powiadomienie' }}
-                                                </span>
-                                                @if($url)
-                                                    <span class="text-muted">—</span>
-                                                    <a href="{{ $url }}" class="text-decoration-none">
-                                                        {{ $data['task_name'] ?? $data['context_name'] ?? $data['subtask_name'] ?? 'otwórz' }}
-                                                    </a>
-                                                @endif
-                                            </div>
-                                            <div class="text-muted" style="font-size:.8rem;">
-                                                {{ $n->created_at->diffForHumans() }}
-                                                @if(! $read)
-                                                    · <span class="text-warning fw-semibold">nowe</span>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            @include('notifications._item', ['n' => $n, 'compact' => false, 'largeIcon' => true])
                         </li>
                     @endforeach
                 </ul>

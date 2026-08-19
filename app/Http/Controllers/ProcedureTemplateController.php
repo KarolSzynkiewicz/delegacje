@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ProcedureSubjectType;
 use App\Models\ProcedureTemplate;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProcedureTemplateController extends Controller
@@ -18,17 +20,25 @@ class ProcedureTemplateController extends Controller
 
     public function editor(ProcedureTemplate $procedureTemplate): View
     {
-        return view('procedures.editor', ['template' => $procedureTemplate]);
+        return view('procedures.editor', [
+            'template' => $procedureTemplate,
+            'users' => User::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
+                ->values(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
-            'category'    => ['nullable', 'string', 'max:100'],
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'subject_type' => ['nullable', 'string', Rule::in(ProcedureSubjectType::values())],
             'description' => ['nullable', 'string', 'max:1000'],
-            'tags'        => ['nullable', 'array'],
-            'definition'  => ['nullable', 'array'],
+            'tags' => ['nullable', 'array'],
+            'definition' => ['nullable', 'array'],
         ]);
 
         $template = ProcedureTemplate::create([
@@ -38,17 +48,18 @@ class ProcedureTemplateController extends Controller
         ]);
 
         return redirect()->route('procedure-templates.editor', $template)
-            ->with('success', 'Szablon "' . $template->name . '" został utworzony.');
+            ->with('success', 'Szablon "'.$template->name.'" został utworzony.');
     }
 
     public function update(Request $request, ProcedureTemplate $procedureTemplate): JsonResponse
     {
         $data = $request->validate([
-            'name'        => ['sometimes', 'string', 'max:255'],
-            'category'    => ['nullable', 'string', 'max:100'],
+            'name' => ['sometimes', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'subject_type' => ['nullable', 'string', Rule::in(ProcedureSubjectType::values())],
             'description' => ['nullable', 'string', 'max:1000'],
-            'tags'        => ['nullable', 'array'],
-            'definition'  => ['required', 'array'],
+            'tags' => ['nullable', 'array'],
+            'definition' => ['required', 'array'],
         ]);
 
         $procedureTemplate->update($data);

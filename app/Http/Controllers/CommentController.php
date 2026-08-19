@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\CommentableType;
+use App\Enums\TaskStatus;
 use App\Http\Requests\StoreCommentRequest;
 use App\Models\Attachment;
 use App\Models\Comment;
@@ -151,5 +152,24 @@ class CommentController extends Controller
         }
 
         return redirect()->back();
+    }
+
+    /**
+     * Odhacza / otwiera zadanie z `@nazwa!` przypisane zalogowanemu.
+     */
+    public function toggleMentionTask(Comment $comment): RedirectResponse
+    {
+        $task = $comment->mentionTaskFor(auth()->id());
+        abort_if(! $task, 404);
+
+        if ($task->status === TaskStatus::COMPLETED) {
+            $task->reopen();
+            $message = 'Zadanie z komentarza jest znowu otwarte.';
+        } else {
+            $task->markCompleted();
+            $message = 'Zadanie z komentarza oznaczone jako zrobione.';
+        }
+
+        return redirect()->back()->with('success', $message)->withFragment('comment-'.$comment->id);
     }
 }

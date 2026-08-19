@@ -73,6 +73,8 @@
     <script>
     window.ProcedureEditorData = {
         template: @json($template),
+        subjectTypes: @json(\App\Enums\ProcedureSubjectType::formOptions()),
+        users: @json($users),
         saveUrl:  "{{ route('procedure-templates.update', $template) }}",
         csrfToken: "{{ csrf_token() }}",
         indexUrl: "{{ route('procedure-templates.index') }}",

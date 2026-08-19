@@ -11,7 +11,9 @@ use App\Models\TaskSubtask;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
+use App\Services\UserMentionService;
 use App\Support\TasksGridUrlParams;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -41,6 +43,9 @@ class TasksGrid extends Component
 
     // Grouping
     public string $groupBy = '';
+
+    /** @var list<string> */
+    public array $collapsedGroups = [];
 
     // Column management
     public array $visibleColumns = ['name', 'status', 'project', 'category', 'assigned_to', 'priority', 'due_date', 'subtasks'];
@@ -186,7 +191,36 @@ class TasksGrid extends Component
     public function setGroupBy(string $field): void
     {
         $this->groupBy = $this->groupBy === $field ? '' : $field;
+        $this->collapsedGroups = [];
         $this->resetPage();
+    }
+
+    public function toggleGroupCollapse(string $groupKey): void
+    {
+        $groupKey = $this->groupCollapseKey($groupKey);
+
+        if (in_array($groupKey, $this->collapsedGroups, true)) {
+            $this->collapsedGroups = array_values(array_filter(
+                $this->collapsedGroups,
+                fn ($key) => $key !== $groupKey
+            ));
+        } else {
+            $this->collapsedGroups[] = $groupKey;
+        }
+    }
+
+    public function isGroupCollapsed(string $groupName): bool
+    {
+        return in_array($this->groupCollapseKey($groupName), $this->collapsedGroups, true);
+    }
+
+    public function groupCollapseKey(string $groupName): string
+    {
+        if (preg_match('/^[a-f0-9]{32}$/', $groupName) === 1) {
+            return $groupName;
+        }
+
+        return md5($groupName);
     }
 
     public function toggleColumn(string $key): void
@@ -352,11 +386,21 @@ class TasksGrid extends Component
             return;
         }
 
-        TaskSubtask::create([
+        $subtask = TaskSubtask::create([
             'task_id' => $this->addingSubtaskForTask,
             'name' => $name,
             'created_by' => auth()->id(),
         ]);
+
+        $parent = ProjectTask::query()->find($this->addingSubtaskForTask);
+        if ($parent && auth()->user()) {
+            app(UserMentionService::class)->notifySubtaskMentions(
+                $parent,
+                $subtask,
+                $name,
+                auth()->user()
+            );
+        }
 
         $this->newSubtaskName = '';
         $this->addingSubtaskForTask = null;
@@ -771,16 +815,20 @@ class TasksGrid extends Component
         return 'vendor.livewire.simple-pagination';
     }
 
-    public function render()
+    protected function groupKeyFor(ProjectTask $task): string
     {
-        $savedViews = $this->gridViewsTableExists()
-            ? TaskGridView::query()
-                ->where('user_id', auth()->id())
-                ->orderBy('name')
-                ->get(['slug', 'name'])
-                ->all()
-            : [];
+        return match ($this->groupBy) {
+            'status' => $task->status->label(),
+            'project' => $task->project?->name ?? 'Brak projektu',
+            'category' => $task->category ?? 'Brak kategorii',
+            'assigned_to' => $task->assignedTo?->name ?? 'Nieprzypisane',
+            'priority' => $task->priority ? "Priorytet {$task->priority}" : 'Brak priorytetu',
+            default => 'Wszystkie',
+        };
+    }
 
+    protected function filteredTasksQuery(): Builder
+    {
         $query = ProjectTask::query();
 
         if ($this->myTasksOnly) {
@@ -818,6 +866,21 @@ class TasksGrid extends Component
             $query->where('project_tasks.status', $this->status);
         }
 
+        return $query;
+    }
+
+    public function render()
+    {
+        $savedViews = $this->gridViewsTableExists()
+            ? TaskGridView::query()
+                ->where('user_id', auth()->id())
+                ->orderBy('name')
+                ->get(['slug', 'name'])
+                ->all()
+            : [];
+
+        $query = $this->filteredTasksQuery();
+
         // Sorting
         if ($this->sortField === 'project') {
             $query->leftJoin('projects', 'project_tasks.project_id', '=', 'projects.id')
@@ -833,21 +896,11 @@ class TasksGrid extends Component
             $query->orderBy('project_tasks.created_at', 'desc');
         }
 
-        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments', 'procedureRun', 'recruitmentProcess', 'subject']);
+        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments', 'procedureRun.subject', 'recruitmentProcess', 'subject']);
 
         if ($this->groupBy) {
             $allTasks = $query->limit(500)->get();
-            $groupField = $this->groupBy;
-            $groupedTasks = $allTasks->groupBy(function ($task) use ($groupField) {
-                return match ($groupField) {
-                    'status' => $task->status->label(),
-                    'project' => $task->project?->name ?? 'Brak projektu',
-                    'category' => $task->category ?? 'Brak kategorii',
-                    'assigned_to' => $task->assignedTo?->name ?? 'Nieprzypisane',
-                    'priority' => $task->priority ? "Priorytet {$task->priority}" : 'Brak priorytetu',
-                    default => 'Wszystkie',
-                };
-            })->sortKeys();
+            $groupedTasks = $allTasks->groupBy(fn ($task) => $this->groupKeyFor($task))->sortKeys();
             $tasks = null;
         } else {
             $groupedTasks = null;
