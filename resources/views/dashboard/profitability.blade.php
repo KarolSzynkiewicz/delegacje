@@ -545,47 +545,28 @@
                 </div>
                 <div class="col-lg-8">
                     <x-ui.card class="h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                            <span class="card-label mb-0">Trend 12 miesięcy — przychody, koszty, marża</span>
-                            @if(count($trend['currencies']) > 1)
-                                <div class="btn-group pdb-currency-toggle" role="group">
-                                    @foreach(array_keys($trend['currencies']) as $i => $currency)
-                                        <button type="button" class="btn btn-outline-secondary pdb-currency-btn {{ $i === 0 ? 'active' : '' }}" data-currency="{{ $currency }}">
-                                            {{ $currency }}
-                                        </button>
-                                    @endforeach
+                        <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
+                            <span class="card-label mb-0">Marża % wg projektu (miesiąc)</span>
+                            @if($marginRankingRows->isNotEmpty())
+                                <div class="d-flex align-items-center gap-3 flex-wrap small text-muted">
+                                    <span class="d-inline-flex align-items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block"></span> Zysk (≥ 0%)</span>
+                                    <span class="d-inline-flex align-items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block"></span> Strata (&lt; 0%)</span>
+                                    <x-tooltip title="Marża % = (Przychód − Koszty pracy − Koszty projektowe) / Przychód × 100. Nie uwzględnia kosztów ogólnofirmowych, transportu i najmu — te rozliczane są firmowo, nie per projekt. Najedź na słupek, aby zobaczyć pełne kwoty (przychód / koszty / zysk).">
+                                        <span class="d-inline-flex align-items-center gap-1 text-decoration-underline" style="text-decoration-style:dotted;cursor:help"><i class="bi bi-info-circle"></i> Jak liczona jest marża %?</span>
+                                    </x-tooltip>
                                 </div>
                             @endif
                         </div>
-                        @if(count($trend['currencies']) > 0)
-                            <div class="pdb-chart-wrap" style="min-height:220px">
-                                <canvas id="pdbTrendChart"></canvas>
+                        @if($marginRankingRows->isNotEmpty())
+                            <div class="pdb-chart-wrap" style="min-height:{{ max(220, $marginRankingRows->count() * 28) }}px">
+                                <canvas id="pdbMarginRankChart"></canvas>
                             </div>
                         @else
-                            <x-ui.empty-state icon="graph-up" message="Brak danych historycznych do wyświetlenia trendu" />
+                            <x-ui.empty-state icon="graph-up" message="Brak danych o marży projektów w tym miesiącu" />
                         @endif
                     </x-ui.card>
                 </div>
             </div>
-
-            @if($marginRankingRows->isNotEmpty())
-            <div class="row g-3 mb-4">
-                <div class="col-12">
-                    <x-ui.card label="Marża % wg projektu (miesiąc)">
-                        <div class="d-flex align-items-center gap-3 flex-wrap mb-2 small text-muted">
-                            <span class="d-inline-flex align-items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block"></span> Zysk (marża ≥ 0%)</span>
-                            <span class="d-inline-flex align-items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block"></span> Strata (marża &lt; 0%)</span>
-                            <x-tooltip title="Marża % = (Przychód − Koszty pracy − Koszty projektowe) / Przychód × 100. Nie uwzględnia kosztów ogólnofirmowych, transportu i najmu — te rozliczane są firmowo, nie per projekt. Najedź na słupek, aby zobaczyć pełne kwoty (przychód / koszty / zysk).">
-                                <span class="d-inline-flex align-items-center gap-1 text-decoration-underline" style="text-decoration-style:dotted;cursor:help"><i class="bi bi-info-circle"></i> Jak liczona jest marża %?</span>
-                            </x-tooltip>
-                        </div>
-                        <div class="pdb-chart-wrap" style="min-height:{{ max(200, $marginRankingRows->count() * 34) }}px">
-                            <canvas id="pdbMarginRankChart"></canvas>
-                        </div>
-                    </x-ui.card>
-                </div>
-            </div>
-            @endif
 
             {{-- ── Rankingi rentowności ────────────────────────────────── --}}
             <div class="row g-3 mb-4">
@@ -895,8 +876,6 @@
     @push('scripts')
     <script>
     (function () {
-        const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
-
         function mkAlpha(hex, a) {
             const r = parseInt(hex.slice(1,3),16);
             const g = parseInt(hex.slice(3,5),16);
@@ -905,8 +884,6 @@
         }
 
         const costBreakdown = @json($costBreakdownJs);
-
-        const trendData = @json($trend);
 
         const marginRanking = @json($marginRankingJs);
 
@@ -925,63 +902,6 @@
             const el = document.getElementById(id);
             if (!el || !window.Chart) return null;
             return new Chart(el.getContext('2d'), config);
-        }
-
-        let trendChart = null;
-
-        function renderTrendChart(currency) {
-            const el = document.getElementById('pdbTrendChart');
-            if (!el || !window.Chart) return;
-            const d = trendData.currencies[currency];
-            if (!d) return;
-
-            if (trendChart) { trendChart.destroy(); }
-
-            trendChart = new Chart(el.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: trendData.labels,
-                    datasets: [
-                        {
-                            label: 'Przychód (' + currency + ')',
-                            data: d.revenue,
-                            borderColor: '#10b981',
-                            backgroundColor: mkAlpha('#10b981', .12),
-                            fill: true,
-                            tension: .3,
-                        },
-                        {
-                            label: 'Koszty (' + currency + ')',
-                            data: d.costs,
-                            borderColor: '#ef4444',
-                            backgroundColor: mkAlpha('#ef4444', .08),
-                            fill: true,
-                            tension: .3,
-                        },
-                        {
-                            label: 'Marża (' + currency + ')',
-                            data: d.margin,
-                            borderColor: '#3b82f6',
-                            backgroundColor: mkAlpha('#3b82f6', .06),
-                            borderDash: [5, 4],
-                            fill: false,
-                            tension: .3,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
-                    },
-                    scales: {
-                        x: { grid: { display: false } },
-                        y: { title: { display: true, text: currency, font: { size: 10 } } },
-                    },
-                },
-            });
         }
 
         function initCharts() {
@@ -1013,18 +933,6 @@
                             legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 10 } } },
                         },
                     },
-                });
-            }
-
-            const currencies = Object.keys(trendData.currencies || {});
-            if (currencies.length) {
-                renderTrendChart(currencies[0]);
-                document.querySelectorAll('.pdb-currency-btn').forEach(btn => {
-                    btn.addEventListener('click', function () {
-                        document.querySelectorAll('.pdb-currency-btn').forEach(b => b.classList.remove('active'));
-                        this.classList.add('active');
-                        renderTrendChart(this.dataset.currency);
-                    });
                 });
             }
 

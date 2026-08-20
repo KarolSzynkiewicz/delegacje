@@ -56,18 +56,14 @@ class DashboardController extends Controller
             $monthEnd
         );
 
-        // Trend 12 miesięcy + poprzedni miesiąc z tego samego przebiegu (bez N× ładowania grafu).
-        $trend = $this->profitabilityService->getMonthlyTrend(
-            $monthStart,
-            12,
+        $prevMonthForDelta = $month->copy()->subMonth();
+        $previousSummary = $this->profitabilityService->getRevenueVsCostsSummaryForMonth(
+            $prevMonthForDelta->copy()->startOfMonth(),
+            $prevMonthForDelta->copy()->endOfMonth(),
             $filters['statuses'],
             $filters['type'],
             $filters['search']
         );
-        $prevMonthForDelta = $month->copy()->subMonth();
-        $previousSummary = $trend['summaries'][$prevMonthForDelta->format('Y-m')]
-            ?? $this->profitabilityService->summarizeProjectsProfitability([], $prevMonthForDelta->copy()->startOfMonth(), $prevMonthForDelta->copy()->endOfMonth());
-        unset($trend['summaries']);
 
         // Ranking mieszkań wg kosztu najmu w miesiącu + koszt na osobonoc (kontroling zakwaterowania)
         $topAccommodations = $this->profitabilityService->getTopAccommodationCostsForMonth($monthStart, $monthEnd, 10);
@@ -85,7 +81,6 @@ class DashboardController extends Controller
             'longestRotations',
             'summary',
             'previousSummary',
-            'trend',
             'navigation',
             'month',
             'filters',
