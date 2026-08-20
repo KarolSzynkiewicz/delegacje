@@ -141,7 +141,7 @@ class EquipmentIssueHistory extends Component
     {
         return EquipmentIssue::query()
             ->where('equipment_id', $equipment->id)
-            ->with(['employee', 'variant', 'warehouse.location', 'dispatch', 'equipment'])
+            ->with(['employee', 'variant.equipment', 'warehouse.location', 'dispatch', 'equipment'])
             ->get()
             ->map(function (EquipmentIssue $issue) {
                 $happenedAt = $issue->issue_date?->startOfDay() ?? $issue->created_at;
@@ -170,7 +170,7 @@ class EquipmentIssueHistory extends Component
         return EquipmentStockMovement::query()
             ->where('equipment_id', $equipment->id)
             ->where('type', StockMovementType::CONSUMPTION)
-            ->with(['employee', 'variant', 'warehouse.location', 'consumedFor', 'creator'])
+            ->with(['employee', 'variant.equipment', 'warehouse.location', 'consumedFor', 'creator'])
             ->get()
             ->map(function (EquipmentStockMovement $movement) {
                 return [

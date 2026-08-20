@@ -175,13 +175,26 @@ class Accommodation extends Model
      */
     public function occupancyNightsBetween(CarbonInterface $start, CarbonInterface $end): int
     {
-        $assignments = $this->assignments()
-            ->where('start_date', '<=', $end->toDateString())
-            ->where(function ($q) use ($start) {
-                $q->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $start->toDateString());
+        $assignments = $this->relationLoaded('assignments')
+            ? $this->assignments->filter(function ($assignment) use ($start, $end) {
+                $aStart = $assignment->start_date ? Carbon::parse($assignment->start_date)->toDateString() : null;
+                $aEnd = $assignment->end_date ? Carbon::parse($assignment->end_date)->toDateString() : null;
+                if ($aStart && $aStart > $end->toDateString()) {
+                    return false;
+                }
+                if ($aEnd && $aEnd < $start->toDateString()) {
+                    return false;
+                }
+
+                return true;
             })
-            ->get();
+            : $this->assignments()
+                ->where('start_date', '<=', $end->toDateString())
+                ->where(function ($q) use ($start) {
+                    $q->whereNull('end_date')
+                        ->orWhere('end_date', '>=', $start->toDateString());
+                })
+                ->get();
 
         $totalNights = 0;
         foreach ($assignments as $assignment) {

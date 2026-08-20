@@ -2,17 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\Project;
-use App\Models\TimeLog;
-use App\Models\ProjectAssignment;
-use App\Models\EmployeeRate;
-use App\Models\Rotation;
-use App\Models\ProjectVariableCost;
-use App\Models\FixedCostEntry;
-use App\Models\TransportCost;
-use App\Models\AccommodationLease;
-use App\Models\ExchangeRate;
 use App\Enums\ProjectType;
+use App\Models\AccommodationLease;
+use App\Models\EmployeeRate;
+use App\Models\ExchangeRate;
+use App\Models\FixedCostEntry;
+use App\Models\Project;
+use App\Models\Rotation;
+use App\Models\TimeLog;
+use App\Models\TransportCost;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -28,6 +26,14 @@ class ProfitabilityService
      * @var \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, EmployeeRate>>|null
      */
     protected ?\Illuminate\Support\Collection $employeeRatesByEmployee = null;
+
+    /**
+     * Cache przeliczeń walut (para + data) w ramach requestu — {@see convertedTotal()}
+     * woła ExchangeRate::convert() per waluta, a kurs jest ten sam dla całego miesiąca.
+     *
+     * @var array<string, float|null>
+     */
+    protected array $unitConversionCache = [];
 
     protected function employeeRates(): \Illuminate\Support\Collection
     {
@@ -139,14 +145,14 @@ class ProfitabilityService
         // (to był główny powód, dla którego widok ładował się bardzo długo — N+1 zapytań
         // pomnożone przez liczbę projektów i wpisów godzin, i to jeszcze x12 dla wykresu trendu).
         $query = Project::with([
-                'assignments.employee',
-                'assignments.timeLogs' => function ($q) use ($monthStartDate, $monthEndDate) {
-                    $q->whereBetween('start_time', [$monthStartDate, $monthEndDate]);
-                },
-                'variableCosts' => function ($q) use ($monthStartDate, $monthEndDate) {
-                    $q->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()]);
-                },
-            ])
+            'assignments.employee',
+            'assignments.timeLogs' => function ($q) use ($monthStartDate, $monthEndDate) {
+                $q->whereBetween('start_time', [$monthStartDate, $monthEndDate]);
+            },
+            'variableCosts' => function ($q) use ($monthStartDate, $monthEndDate) {
+                $q->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()]);
+            },
+        ])
             ->where(function (Builder $q) use ($monthStartDate, $monthEndDate) {
                 // 1) Projekt ma przypisanie (pracownika) nakładające się na miesiąc
                 $q->whereHas('assignments', function (Builder $aq) use ($monthStartDate, $monthEndDate) {
@@ -157,23 +163,23 @@ class ProfitabilityService
                         });
                 })
                 // 2) Projekt miał koszt zmienny poniesiony w tym miesiącu
-                ->orWhereHas('variableCosts', function (Builder $vq) use ($monthStartDate, $monthEndDate) {
-                    $vq->where(function (Builder $vq2) use ($monthStartDate, $monthEndDate) {
-                        $vq2->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()])
-                            ->orWhereBetween('created_at', [$monthStartDate, $monthEndDate]);
-                    });
-                })
+                    ->orWhereHas('variableCosts', function (Builder $vq) use ($monthStartDate, $monthEndDate) {
+                        $vq->where(function (Builder $vq2) use ($monthStartDate, $monthEndDate) {
+                            $vq2->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()])
+                                ->orWhereBetween('created_at', [$monthStartDate, $monthEndDate]);
+                        });
+                    })
                 // 3) Projekt ma zdefiniowany zakres dat (start_date) nakładający się na miesiąc
                 //    (dot. przede wszystkim projektów kontraktowych) — start_date musi być ustawiony,
                 //    inaczej warunek dopasowałby wszystkie projekty bez dat.
-                ->orWhere(function (Builder $pq) use ($monthStartDate, $monthEndDate) {
-                    $pq->whereNotNull('start_date')
-                        ->where('start_date', '<=', $monthEndDate)
-                        ->where(function (Builder $pq2) use ($monthStartDate) {
-                            $pq2->whereNull('end_date')
-                                ->orWhere('end_date', '>=', $monthStartDate);
-                        });
-                });
+                    ->orWhere(function (Builder $pq) use ($monthStartDate, $monthEndDate) {
+                        $pq->whereNotNull('start_date')
+                            ->where('start_date', '<=', $monthEndDate)
+                            ->where(function (Builder $pq2) use ($monthStartDate) {
+                                $pq2->whereNull('end_date')
+                                    ->orWhere('end_date', '>=', $monthStartDate);
+                            });
+                    });
             });
 
         if ($statuses !== null && $statuses !== []) {
@@ -250,33 +256,33 @@ class ProfitabilityService
     {
         $assignments = $project->assignments()->with(['employee', 'timeLogs'])->get();
         $variableCosts = $project->variableCosts;
-        
+
         // Calculate labor costs (from payroll/time logs)
         $laborCosts = $this->calculateLaborCosts($project, $assignments);
-        
+
         // Calculate variable costs
         $variableCostsTotal = $this->calculateVariableCosts($variableCosts);
-        
+
         // Calculate revenue based on project type
         $revenue = $this->calculateRevenue($project, $assignments);
-        
+
         // Calculate margin
         $totalCosts = $laborCosts + $variableCostsTotal;
         $margin = $revenue - $totalCosts;
         $marginPercentage = $revenue > 0 ? ($margin / $revenue) * 100 : 0;
-        
+
         // Get employee count (max from assignments)
         $employeeCount = $assignments->count();
-        
+
         // Calculate estimated hours (8h/day on working days)
         $estimatedHours = $this->calculateEstimatedHours($assignments);
-        
+
         // Calculate actual hours from time logs
         $actualHours = $this->calculateActualHours($assignments);
-        
+
         // Calculate plan execution (actual vs estimated)
         $planExecution = $estimatedHours > 0 ? ($actualHours / $estimatedHours) * 100 : 0;
-        
+
         return [
             'project' => $project,
             'revenue' => round($revenue, 2),
@@ -303,26 +309,26 @@ class ProfitabilityService
 
         // Get variable costs for the month (wg daty poniesienia kosztu, nie daty wprowadzenia do systemu)
         $variableCosts = $this->variableCostsForMonth($project, $monthStart, $monthEnd);
-        
+
         // Calculate labor costs (from payroll/time logs) for the month - grouped by currency
         $laborCostsByCurrency = $this->calculateLaborCostsForMonthByCurrency($project, $assignments, $monthStart, $monthEnd);
-        
+
         // Calculate variable costs for the month - grouped by currency
         $variableCostsByCurrency = $this->calculateVariableCostsByCurrency($variableCosts);
-        
+
         // Calculate revenue based on project type for the month
         $revenue = $this->calculateRevenueForMonth($project, $assignments, $monthStart, $monthEnd);
         $revenueCurrency = $project->currency ?? 'EUR';
-        
+
         // Get employee count (max from assignments in the month)
         $employeeCount = $assignments->count();
-        
+
         // Calculate estimated hours (8h/day on working days) for the month
         $estimatedHours = $this->calculateEstimatedHoursForMonth($assignments, $monthStart, $monthEnd);
-        
+
         // Calculate actual hours from time logs for the month
         $actualHours = $this->calculateActualHoursForMonth($assignments, $monthStart, $monthEnd);
-        
+
         // Calculate plan execution (actual vs estimated)
         $planExecution = $estimatedHours > 0 ? ($actualHours / $estimatedHours) * 100 : 0;
 
@@ -378,15 +384,15 @@ class ProfitabilityService
 
         foreach ($assignments as $assignment) {
             $timeLogs = $assignment->timeLogs;
-            
+
             foreach ($timeLogs as $timeLog) {
                 $workDate = Carbon::parse($timeLog->start_time)->toDateString();
                 $hoursWorked = (float) $timeLog->hours_worked;
-                
+
                 if ($hoursWorked <= 0) {
                     continue;
                 }
-                
+
                 // Find employee rate for this date
                 $rate = EmployeeRate::where('employee_id', $assignment->employee_id)
                     ->where('status', 'active')
@@ -398,9 +404,9 @@ class ProfitabilityService
                     ->where('currency', $projectCurrency)
                     ->orderBy('start_date', 'desc')
                     ->first();
-                
+
                 // If no rate in project currency, try any currency
-                if (!$rate) {
+                if (! $rate) {
                     $rate = EmployeeRate::where('employee_id', $assignment->employee_id)
                         ->where('status', 'active')
                         ->where('start_date', '<=', $workDate)
@@ -411,7 +417,7 @@ class ProfitabilityService
                         ->orderBy('start_date', 'desc')
                         ->first();
                 }
-                
+
                 if ($rate) {
                     // TODO: Currency conversion if needed
                     $cost = $hoursWorked * (float) $rate->amount;
@@ -434,25 +440,26 @@ class ProfitabilityService
             // Get time logs only for the month
             $timeLogs = $assignment->timeLogs->filter(function ($timeLog) use ($monthStart, $monthEnd) {
                 $logDate = Carbon::parse($timeLog->start_time);
+
                 return $logDate->gte($monthStart->startOfDay()) && $logDate->lte($monthEnd->endOfDay());
             });
-            
+
             foreach ($timeLogs as $timeLog) {
                 $workDate = Carbon::parse($timeLog->start_time)->toDateString();
                 $hoursWorked = (float) $timeLog->hours_worked;
-                
+
                 if ($hoursWorked <= 0) {
                     continue;
                 }
-                
+
                 // Find employee rate for this date (any currency) — z pamięci, patrz findEmployeeRate()
                 $rate = $this->findEmployeeRate($assignment->employee_id, $workDate);
-                
+
                 if ($rate) {
                     $currency = $rate->currency;
                     $cost = $hoursWorked * (float) $rate->amount;
-                    
-                    if (!isset($costsByCurrency[$currency])) {
+
+                    if (! isset($costsByCurrency[$currency])) {
                         $costsByCurrency[$currency] = 0;
                     }
                     $costsByCurrency[$currency] += $cost;
@@ -476,18 +483,37 @@ class ProfitabilityService
      */
     protected function variableCostsForMonth(Project $project, Carbon $monthStart, Carbon $monthEnd)
     {
-        // Jeśli relacja jest już eager-loadowana i przycięta do miesiąca (patrz monthRelevantProjectsQuery),
-        // użyj jej z pamięci — bez dodatkowego zapytania SQL per projekt.
-        if ($project->relationLoaded('variableCosts')) {
-            return $project->variableCosts;
-        }
-
         $monthStartDate = $monthStart->copy()->startOfDay();
         $monthEndDate = $monthEnd->copy()->endOfDay();
+        $monthStartDay = $monthStartDate->toDateString();
+        $monthEndDay = $monthEndDate->toDateString();
+
+        $matchesMonth = function ($cost) use ($monthStartDate, $monthEndDate, $monthStartDay, $monthEndDay): bool {
+            if ($cost->incurred_date) {
+                $day = Carbon::parse($cost->incurred_date)->toDateString();
+
+                return $day >= $monthStartDay && $day <= $monthEndDay;
+            }
+
+            if (! $cost->created_at) {
+                return false;
+            }
+
+            $created = Carbon::parse($cost->created_at);
+
+            return $created->gte($monthStartDate) && $created->lte($monthEndDate);
+        };
+
+        // Relacja może być przycięta do jednego miesiąca albo załadowana na cały zakres
+        // trendu (12 mies.) — zawsze filtrujemy w pamięci, żeby nie wliczać obcych miesięcy
+        // i nie odpytywać bazy per projekt.
+        if ($project->relationLoaded('variableCosts')) {
+            return $project->variableCosts->filter($matchesMonth)->values();
+        }
 
         return $project->variableCosts()
-            ->where(function ($query) use ($monthStartDate, $monthEndDate) {
-                $query->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()])
+            ->where(function ($query) use ($monthStartDate, $monthEndDate, $monthStartDay, $monthEndDay) {
+                $query->whereBetween('incurred_date', [$monthStartDay, $monthEndDay])
                     ->orWhere(function ($q) use ($monthStartDate, $monthEndDate) {
                         $q->whereNull('incurred_date')
                             ->whereBetween('created_at', [$monthStartDate, $monthEndDate]);
@@ -510,20 +536,20 @@ class ProfitabilityService
     protected function calculateVariableCostsByCurrency($variableCosts): array
     {
         $costsByCurrency = [];
-        
+
         foreach ($variableCosts as $cost) {
             $currency = $cost->currency ?? 'PLN';
-            if (!isset($costsByCurrency[$currency])) {
+            if (! isset($costsByCurrency[$currency])) {
                 $costsByCurrency[$currency] = 0;
             }
             $costsByCurrency[$currency] += (float) $cost->amount;
         }
-        
+
         // Round all values
         foreach ($costsByCurrency as $currency => $cost) {
             $costsByCurrency[$currency] = round($cost, 2);
         }
-        
+
         return $costsByCurrency;
     }
 
@@ -539,6 +565,7 @@ class ProfitabilityService
             // Hourly projects: hourly_rate * actual_hours
             $actualHours = $this->calculateActualHours($assignments);
             $hourlyRate = (float) ($project->hourly_rate ?? 0);
+
             return $actualHours * $hourlyRate;
         }
     }
@@ -551,50 +578,52 @@ class ProfitabilityService
         if ($project->type === ProjectType::CONTRACT) {
             // Contract projects: calculate proportional amount for the month
             // Formula: (days in month that overlap with project / total project days) * contract_amount
-            
+
             // Use project start_date and end_date if available, otherwise fallback to created_at
-            $projectStart = $project->start_date 
-                ? Carbon::parse($project->start_date) 
+            $projectStart = $project->start_date
+                ? Carbon::parse($project->start_date)
                 : ($project->created_at ? Carbon::parse($project->created_at) : $monthStart);
-            
-            $projectEnd = $project->end_date 
-                ? Carbon::parse($project->end_date) 
+
+            $projectEnd = $project->end_date
+                ? Carbon::parse($project->end_date)
                 : null;
-            
+
             // If project has no end_date, we can't calculate proportion - return 0 or full amount?
             // For now, if no end_date, we'll use the month end as project end for calculation
-            if (!$projectEnd) {
+            if (! $projectEnd) {
                 // If project has no end date, we can't calculate proper proportion
                 // Return 0 or handle differently - for now return 0
                 return 0;
             }
-            
+
             // Calculate total project days
             $totalProjectDays = $projectStart->diffInDays($projectEnd) + 1;
-            
+
             if ($totalProjectDays <= 0) {
                 return 0;
             }
-            
+
             // Calculate overlap period between project and month
             $overlapStart = $projectStart->gt($monthStart) ? $projectStart : $monthStart;
             $overlapEnd = $projectEnd->lt($monthEnd) ? $projectEnd : $monthEnd;
-            
+
             // If no overlap, return 0
             if ($overlapStart->gt($overlapEnd)) {
                 return 0;
             }
-            
+
             // Calculate days in month that overlap with project
             $daysInMonthOverlap = $overlapStart->diffInDays($overlapEnd) + 1;
-            
+
             // Calculate revenue: (days in month overlap / total project days) * contract_amount
             $proportion = $daysInMonthOverlap / $totalProjectDays;
+
             return (float) ($project->contract_amount ?? 0) * $proportion;
         } else {
             // Hourly projects: hourly_rate * actual_hours in the month
             $actualHours = $this->calculateActualHoursForMonth($assignments, $monthStart, $monthEnd);
             $hourlyRate = (float) ($project->hourly_rate ?? 0);
+
             return $actualHours * $hourlyRate;
         }
     }
@@ -610,18 +639,18 @@ class ProfitabilityService
         foreach ($assignments as $assignment) {
             $startDate = Carbon::parse($assignment->start_date);
             $endDate = $assignment->end_date ? Carbon::parse($assignment->end_date) : $today;
-            
+
             // Count working days (Monday-Friday)
             $workingDays = 0;
             $currentDate = $startDate->copy();
-            
+
             while ($currentDate->lte($endDate)) {
                 if ($currentDate->isWeekday()) {
                     $workingDays++;
                 }
                 $currentDate->addDay();
             }
-            
+
             $totalHours += $workingDays * 8;
         }
 
@@ -654,9 +683,10 @@ class ProfitabilityService
         foreach ($assignments as $assignment) {
             $monthTimeLogs = $assignment->timeLogs->filter(function ($timeLog) use ($monthStartCopy, $monthEndCopy) {
                 $logDate = Carbon::parse($timeLog->start_time);
+
                 return $logDate->gte($monthStartCopy) && $logDate->lte($monthEndCopy);
             });
-            
+
             $totalHours += $monthTimeLogs->sum('hours_worked');
         }
 
@@ -673,26 +703,26 @@ class ProfitabilityService
         foreach ($assignments as $assignment) {
             $assignmentStart = Carbon::parse($assignment->start_date);
             $assignmentEnd = $assignment->end_date ? Carbon::parse($assignment->end_date) : $monthEnd;
-            
+
             // Calculate overlap period
             $periodStart = $assignmentStart->gt($monthStart) ? $assignmentStart : $monthStart;
             $periodEnd = $assignmentEnd->lt($monthEnd) ? $assignmentEnd : $monthEnd;
-            
+
             if ($periodStart->gt($periodEnd)) {
                 continue; // No overlap
             }
-            
+
             // Count working days (Monday-Friday) in the overlap period
             $workingDays = 0;
             $currentDate = $periodStart->copy();
-            
+
             while ($currentDate->lte($periodEnd)) {
                 if ($currentDate->isWeekday()) {
                     $workingDays++;
                 }
                 $currentDate->addDay();
             }
-            
+
             $totalHours += $workingDays * 8;
         }
 
@@ -705,24 +735,24 @@ class ProfitabilityService
     public function getTopEmployeesByRevenue(int $limit = 10): array
     {
         $employees = [];
-        
+
         $timeLogs = TimeLog::with(['projectAssignment.employee', 'projectAssignment.project'])
             ->whereHas('projectAssignment.project', function ($query) {
                 $query->where('status', 'active');
             })
             ->get();
-        
+
         foreach ($timeLogs as $timeLog) {
             $employee = $timeLog->projectAssignment->employee;
             $project = $timeLog->projectAssignment->project;
             $hoursWorked = (float) $timeLog->hours_worked;
-            
+
             if ($hoursWorked <= 0) {
                 continue;
             }
-            
+
             $workDate = Carbon::parse($timeLog->start_time)->toDateString();
-            
+
             // Get employee rate
             $rate = EmployeeRate::where('employee_id', $employee->id)
                 ->where('status', 'active')
@@ -733,30 +763,30 @@ class ProfitabilityService
                 })
                 ->orderBy('start_date', 'desc')
                 ->first();
-            
-            if (!$rate) {
+
+            if (! $rate) {
                 continue;
             }
-            
+
             $revenue = $hoursWorked * (float) $rate->amount;
-            
-            if (!isset($employees[$employee->id])) {
+
+            if (! isset($employees[$employee->id])) {
                 $employees[$employee->id] = [
                     'employee' => $employee,
                     'total_revenue' => 0,
                     'total_hours' => 0,
                 ];
             }
-            
+
             $employees[$employee->id]['total_revenue'] += $revenue;
             $employees[$employee->id]['total_hours'] += $hoursWorked;
         }
-        
+
         // Sort by revenue and take top N
         usort($employees, function ($a, $b) {
             return $b['total_revenue'] <=> $a['total_revenue'];
         });
-        
+
         return array_slice($employees, 0, $limit);
     }
 
@@ -773,11 +803,11 @@ class ProfitabilityService
     public function getTopEmployeesByRevenueForMonth(Carbon $monthStart, Carbon $monthEnd, int $limit = 10, ?array $statuses = null): array
     {
         $employees = [];
-        
+
         $timeLogsQuery = TimeLog::with(['projectAssignment.employee', 'projectAssignment.project'])
             ->whereBetween('start_time', [
                 $monthStart->copy()->startOfDay(),
-                $monthEnd->copy()->endOfDay()
+                $monthEnd->copy()->endOfDay(),
             ]);
 
         if ($statuses !== null && $statuses !== []) {
@@ -787,7 +817,7 @@ class ProfitabilityService
         }
 
         $timeLogs = $timeLogsQuery->get();
-        
+
         foreach ($timeLogs as $timeLog) {
             if (! $timeLog->projectAssignment || ! $timeLog->projectAssignment->employee) {
                 continue;
@@ -795,38 +825,38 @@ class ProfitabilityService
 
             $employee = $timeLog->projectAssignment->employee;
             $hoursWorked = (float) $timeLog->hours_worked;
-            
+
             if ($hoursWorked <= 0) {
                 continue;
             }
-            
+
             $workDate = Carbon::parse($timeLog->start_time)->toDateString();
-            
+
             // Get employee rate — z pamięci, patrz findEmployeeRate()
             $rate = $this->findEmployeeRate($employee->id, $workDate);
-            
-            if (!$rate) {
+
+            if (! $rate) {
                 continue;
             }
-            
+
             $revenue = $hoursWorked * (float) $rate->amount;
             $currency = $rate->currency;
-            
-            if (!isset($employees[$employee->id])) {
+
+            if (! isset($employees[$employee->id])) {
                 $employees[$employee->id] = [
                     'employee' => $employee,
                     'total_revenue_by_currency' => [],
                     'total_hours' => 0,
                 ];
             }
-            
-            if (!isset($employees[$employee->id]['total_revenue_by_currency'][$currency])) {
+
+            if (! isset($employees[$employee->id]['total_revenue_by_currency'][$currency])) {
                 $employees[$employee->id]['total_revenue_by_currency'][$currency] = 0;
             }
             $employees[$employee->id]['total_revenue_by_currency'][$currency] += $revenue;
             $employees[$employee->id]['total_hours'] += $hoursWorked;
         }
-        
+
         // Calculate total revenue for sorting (sum all currencies)
         foreach ($employees as $employeeId => $employeeData) {
             $employees[$employeeId]['total_revenue'] = array_sum($employeeData['total_revenue_by_currency']);
@@ -835,12 +865,91 @@ class ProfitabilityService
                 $employees[$employeeId]['total_revenue_by_currency'][$currency] = round($amount, 2);
             }
         }
-        
+
         // Sort by total revenue and take top N
         usort($employees, function ($a, $b) {
             return $b['total_revenue'] <=> $a['total_revenue'];
         });
-        
+
+        return array_slice($employees, 0, $limit);
+    }
+
+    /**
+     * Top pracownicy wg przychodu (stawka × godziny) z już załadowanych projektów
+     * ({@see getProjectsProfitabilityForMonth}) — bez drugiego SELECT na time_logs.
+     *
+     * @param  array<int, array<string, mixed>>  $projectsProfitability
+     */
+    public function getTopEmployeesByRevenueFromProjects(
+        array $projectsProfitability,
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        int $limit = 10
+    ): array {
+        $employees = [];
+        $monthStartCopy = $monthStart->copy()->startOfDay();
+        $monthEndCopy = $monthEnd->copy()->endOfDay();
+
+        foreach ($projectsProfitability as $row) {
+            $project = $row['project'] ?? null;
+            if (! $project instanceof Project) {
+                continue;
+            }
+
+            $assignments = $this->assignmentsOverlappingMonth($project, $monthStart, $monthEnd);
+            foreach ($assignments as $assignment) {
+                if (! $assignment->employee) {
+                    continue;
+                }
+
+                $employee = $assignment->employee;
+                $timeLogs = $assignment->timeLogs ?? collect();
+
+                foreach ($timeLogs as $timeLog) {
+                    $hoursWorked = (float) $timeLog->hours_worked;
+                    if ($hoursWorked <= 0) {
+                        continue;
+                    }
+
+                    $logDate = Carbon::parse($timeLog->start_time);
+                    if ($logDate->lt($monthStartCopy) || $logDate->gt($monthEndCopy)) {
+                        continue;
+                    }
+
+                    $rate = $this->findEmployeeRate($employee->id, $logDate->toDateString());
+                    if (! $rate) {
+                        continue;
+                    }
+
+                    $revenue = $hoursWorked * (float) $rate->amount;
+                    $currency = $rate->currency;
+
+                    if (! isset($employees[$employee->id])) {
+                        $employees[$employee->id] = [
+                            'employee' => $employee,
+                            'total_revenue_by_currency' => [],
+                            'total_hours' => 0,
+                        ];
+                    }
+
+                    $employees[$employee->id]['total_revenue_by_currency'][$currency] =
+                        ($employees[$employee->id]['total_revenue_by_currency'][$currency] ?? 0) + $revenue;
+                    $employees[$employee->id]['total_hours'] += $hoursWorked;
+                }
+            }
+        }
+
+        foreach ($employees as $employeeId => $employeeData) {
+            $employees[$employeeId]['total_revenue'] = array_sum($employeeData['total_revenue_by_currency']);
+            foreach ($employees[$employeeId]['total_revenue_by_currency'] as $currency => $amount) {
+                $employees[$employeeId]['total_revenue_by_currency'][$currency] = round($amount, 2);
+            }
+        }
+
+        usort($employees, function ($a, $b) {
+            return $b['total_revenue'] <=> $a['total_revenue'];
+        });
+
         return array_slice($employees, 0, $limit);
     }
 
@@ -853,33 +962,33 @@ class ProfitabilityService
             ->whereNotNull('start_date')
             ->whereNotNull('end_date')
             ->get();
-        
+
         $employees = [];
-        
+
         foreach ($rotations as $rotation) {
             $startDate = Carbon::parse($rotation->start_date);
             $endDate = Carbon::parse($rotation->end_date);
             $duration = $startDate->diffInDays($endDate);
-            
+
             $employeeId = $rotation->employee_id;
-            
-            if (!isset($employees[$employeeId])) {
+
+            if (! isset($employees[$employeeId])) {
                 $employees[$employeeId] = [
                     'employee' => $rotation->employee,
                     'total_days' => 0,
                     'rotation_count' => 0,
                 ];
             }
-            
+
             $employees[$employeeId]['total_days'] += $duration;
             $employees[$employeeId]['rotation_count']++;
         }
-        
+
         // Sort by total days
         usort($employees, function ($a, $b) {
             return $b['total_days'] <=> $a['total_days'];
         });
-        
+
         return array_slice($employees, 0, $limit);
     }
 
@@ -891,26 +1000,26 @@ class ProfitabilityService
         $projects = Project::with(['assignments.timeLogs', 'variableCosts'])
             ->where('status', 'active')
             ->get();
-        
+
         $totalRevenue = 0;
         $totalLaborCosts = 0;
         $totalVariableCosts = 0;
-        
+
         foreach ($projects as $project) {
             $assignments = $project->assignments;
             $revenue = $this->calculateRevenue($project, $assignments);
             $laborCosts = $this->calculateLaborCosts($project, $assignments);
             $variableCosts = $this->calculateVariableCosts($project->variableCosts);
-            
+
             $totalRevenue += $revenue;
             $totalLaborCosts += $laborCosts;
             $totalVariableCosts += $variableCosts;
         }
-        
+
         $totalCosts = $totalLaborCosts + $totalVariableCosts;
         $totalMargin = $totalRevenue - $totalCosts;
         $marginPercentage = $totalRevenue > 0 ? ($totalMargin / $totalRevenue) * 100 : 0;
-        
+
         return [
             'total_revenue' => round($totalRevenue, 2),
             'total_labor_costs' => round($totalLaborCosts, 2),
@@ -933,61 +1042,61 @@ class ProfitabilityService
     public function getRevenueVsCostsSummaryForMonth(Carbon $monthStart, Carbon $monthEnd, ?array $statuses = null, ?string $type = null, ?string $search = null): array
     {
         $projects = $this->monthRelevantProjectsQuery($monthStart, $monthEnd, $statuses, $type, $search)->get();
-        
+
         $revenueByCurrency = [];
         $laborCostsByCurrency = [];
         $variableCostsByCurrency = [];
         $projectCount = $projects->count();
-        
+
         foreach ($projects as $project) {
             // Get assignments that overlap with the month (z pamięci, jeśli eager-loadowane)
             $assignments = $this->assignmentsOverlappingMonth($project, $monthStart, $monthEnd);
-            
+
             // Get variable costs for the month (wg daty poniesienia kosztu, nie daty wprowadzenia do systemu)
             $variableCosts = $this->variableCostsForMonth($project, $monthStart, $monthEnd);
-            
+
             // Calculate revenue by currency
             $revenue = $this->calculateRevenueForMonth($project, $assignments, $monthStart, $monthEnd);
             $revenueCurrency = $project->currency ?? 'EUR';
-            if (!isset($revenueByCurrency[$revenueCurrency])) {
+            if (! isset($revenueByCurrency[$revenueCurrency])) {
                 $revenueByCurrency[$revenueCurrency] = 0;
             }
             $revenueByCurrency[$revenueCurrency] += $revenue;
-            
+
             // Calculate labor costs by currency
             $projectLaborCostsByCurrency = $this->calculateLaborCostsForMonthByCurrency($project, $assignments, $monthStart, $monthEnd);
             foreach ($projectLaborCostsByCurrency as $currency => $cost) {
-                if (!isset($laborCostsByCurrency[$currency])) {
+                if (! isset($laborCostsByCurrency[$currency])) {
                     $laborCostsByCurrency[$currency] = 0;
                 }
                 $laborCostsByCurrency[$currency] += $cost;
             }
-            
+
             // Calculate variable costs by currency
             $projectVariableCostsByCurrency = $this->calculateVariableCostsByCurrency($variableCosts);
             foreach ($projectVariableCostsByCurrency as $currency => $cost) {
-                if (!isset($variableCostsByCurrency[$currency])) {
+                if (! isset($variableCostsByCurrency[$currency])) {
                     $variableCostsByCurrency[$currency] = 0;
                 }
                 $variableCostsByCurrency[$currency] += $cost;
             }
         }
-        
+
         // Get fixed costs for the month (where period overlaps with month) - grouped by currency
         $fixedCosts = FixedCostEntry::where(function ($query) use ($monthStart, $monthEnd) {
             $query->where(function ($q) use ($monthStart, $monthEnd) {
                 $q->where('period_start', '<=', $monthEnd)
-                  ->where('period_end', '>=', $monthStart);
+                    ->where('period_end', '>=', $monthStart);
             });
         })->get();
-        
+
         $fixedCostsByCurrency = $this->calculateFixedCostsForMonthByCurrency($fixedCosts, $monthStart, $monthEnd);
 
         // Koszty transportu i najmu — ogólnofirmowe (nie alokowane per projekt, patrz
         // calculateTransportCostsForMonthByCurrency() / calculateAccommodationCostsForMonthByCurrency()).
         $transportCostsByCurrency = $this->calculateTransportCostsForMonthByCurrency($monthStart, $monthEnd);
         $accommodationCostsByCurrency = $this->calculateAccommodationCostsForMonthByCurrency($monthStart, $monthEnd);
-        
+
         // Round all values
         foreach ($revenueByCurrency as $currency => $value) {
             $revenueByCurrency[$currency] = round($value, 2);
@@ -1001,7 +1110,7 @@ class ProfitabilityService
         foreach ($fixedCostsByCurrency as $currency => $value) {
             $fixedCostsByCurrency[$currency] = round($value, 2);
         }
-        
+
         return [
             'project_count' => $projectCount,
             'revenue_by_currency' => $revenueByCurrency,
@@ -1022,9 +1131,18 @@ class ProfitabilityService
      * jeszcze RAZ (od zera, z tymi samymi filtrami) tylko po to, by policzyć sumę do kart KPI.
      *
      * @param  array<int, array<string, mixed>>  $projectsProfitability  wynik getProjectsProfitabilityForMonth()
+     * @param  \Illuminate\Support\Collection<int, FixedCostEntry>|null  $fixedCosts
+     * @param  \Illuminate\Support\Collection<int, TransportCost>|null  $transportCosts
+     * @param  \Illuminate\Support\Collection<int, AccommodationLease>|null  $leases
      */
-    public function summarizeProjectsProfitability(array $projectsProfitability, Carbon $monthStart, Carbon $monthEnd): array
-    {
+    public function summarizeProjectsProfitability(
+        array $projectsProfitability,
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        $fixedCosts = null,
+        $transportCosts = null,
+        $leases = null
+    ): array {
         $revenueByCurrency = [];
         $laborCostsByCurrency = [];
         $variableCostsByCurrency = [];
@@ -1040,22 +1158,19 @@ class ProfitabilityService
             }
         }
 
-        // Koszty ogólnofirmowe wciąż liczone bezpośrednio — to tylko jedno (lekkie) zapytanie,
-        // niezależne od liczby projektów.
-        $fixedCosts = FixedCostEntry::where(function (Builder $query) use ($monthStart, $monthEnd) {
-            $query->where('period_start', '<=', $monthEnd)
-                ->where('period_end', '>=', $monthStart);
-        })->get();
-        $fixedCostsByCurrency = $this->calculateFixedCostsForMonthByCurrency($fixedCosts, $monthStart, $monthEnd);
-
-        // Koszty transportu i najmu — ogólnofirmowe, patrz komentarz w getRevenueVsCostsSummaryForMonth().
-        $transportCostsByCurrency = $this->calculateTransportCostsForMonthByCurrency($monthStart, $monthEnd);
-        $accommodationCostsByCurrency = $this->calculateAccommodationCostsForMonthByCurrency($monthStart, $monthEnd);
+        $companyCosts = $this->companyWideCostsForMonth(
+            $monthStart,
+            $monthEnd,
+            $fixedCosts,
+            $transportCosts,
+            $leases
+        );
 
         $round = function (array $arr): array {
             foreach ($arr as $currency => $value) {
                 $arr[$currency] = round($value, 2);
             }
+
             return $arr;
         };
 
@@ -1064,9 +1179,9 @@ class ProfitabilityService
             'revenue_by_currency' => $round($revenueByCurrency),
             'labor_costs_by_currency' => $round($laborCostsByCurrency),
             'variable_costs_by_currency' => $round($variableCostsByCurrency),
-            'fixed_costs_by_currency' => $round($fixedCostsByCurrency),
-            'transport_costs_by_currency' => $round($transportCostsByCurrency),
-            'accommodation_costs_by_currency' => $round($accommodationCostsByCurrency),
+            'fixed_costs_by_currency' => $round($companyCosts['fixed_costs_by_currency']),
+            'transport_costs_by_currency' => $round($companyCosts['transport_costs_by_currency']),
+            'accommodation_costs_by_currency' => $round($companyCosts['accommodation_costs_by_currency']),
         ];
     }
 
@@ -1074,14 +1189,41 @@ class ProfitabilityService
      * Trend przychodów/kosztów/marży w ostatnich $monthsBack miesiącach (kontroling).
      * Zwraca dane pogrupowane po walucie, gotowe do wykresu liniowego.
      *
+     * Perf: ładuje projekty, wpisy godzin, koszty zmienne i ogólnofirmowe RAZ dla całego
+     * zakresu, a potem tnie miesiące w pamięci. Dawniej każde z 12 wywołań
+     * {@see getRevenueVsCostsSummaryForMonth()} hydratowało ten sam graf Eloquent od zera.
+     *
+     * `summaries` (klucz Y-m) pozwala UI wziąć poprzedni miesiąc z tego samego przebiegu
+     * — bez drugiego pełnego ładowania.
+     *
      * @param  array<int, string>|null  $statuses
-     * @return array{labels: array<int, string>, currencies: array<string, array{revenue: array<int, float>, costs: array<int, float>, margin: array<int, float>}>}
+     * @return array{
+     *     labels: array<int, string>,
+     *     currencies: array<string, array{revenue: array<int, float>, costs: array<int, float>, margin: array<int, float>}>,
+     *     summaries: array<string, array<string, mixed>>
+     * }
      */
-    public function getMonthlyTrend(Carbon $currentMonthStart, int $monthsBack = 12, ?array $statuses = null, ?string $type = null): array
+    public function getMonthlyTrend(Carbon $currentMonthStart, int $monthsBack = 12, ?array $statuses = null, ?string $type = null, ?string $search = null): array
     {
+        $monthsBack = max(1, $monthsBack);
+        $rangeStart = $currentMonthStart->copy()->subMonths($monthsBack - 1)->startOfMonth();
+        $rangeEnd = $currentMonthStart->copy()->endOfMonth();
+
+        $projects = $this->monthRelevantProjectsQuery($rangeStart, $rangeEnd, $statuses, $type, $search)->get();
+
+        $fixedCosts = FixedCostEntry::query()
+            ->where('period_start', '<=', $rangeEnd)
+            ->where('period_end', '>=', $rangeStart)
+            ->get();
+        $transportCosts = TransportCost::query()
+            ->whereBetween('cost_date', [$rangeStart->toDateString(), $rangeEnd->toDateString()])
+            ->get();
+        $leases = $this->leasesOverlappingPeriod($rangeStart, $rangeEnd);
+
         $labels = [];
         $monthlyCostsByCurrency = [];
         $monthlySummaries = [];
+        $summariesByMonth = [];
 
         for ($i = $monthsBack - 1; $i >= 0; $i--) {
             $monthStart = $currentMonthStart->copy()->subMonths($i)->startOfMonth();
@@ -1089,27 +1231,29 @@ class ProfitabilityService
 
             $labels[] = mb_convert_case($monthStart->locale('pl')->translatedFormat('M Y'), MB_CASE_TITLE, 'UTF-8');
 
-            $summary = $this->getRevenueVsCostsSummaryForMonth($monthStart, $monthEnd, $statuses, $type);
+            $monthProjects = $projects->map(function (Project $project) use ($monthStart, $monthEnd) {
+                return $this->getProjectProfitabilityForMonth($project, $monthStart, $monthEnd);
+            })->all();
+
+            $summary = $this->summarizeProjectsProfitability(
+                $monthProjects,
+                $monthStart,
+                $monthEnd,
+                $fixedCosts,
+                $transportCosts,
+                $leases
+            );
 
             $costsByCurrency = [];
-            foreach ($summary['labor_costs_by_currency'] as $currency => $amount) {
-                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
-            }
-            foreach ($summary['variable_costs_by_currency'] as $currency => $amount) {
-                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
-            }
-            foreach ($summary['fixed_costs_by_currency'] as $currency => $amount) {
-                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
-            }
-            foreach ($summary['transport_costs_by_currency'] as $currency => $amount) {
-                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
-            }
-            foreach ($summary['accommodation_costs_by_currency'] as $currency => $amount) {
-                $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+            foreach (['labor_costs_by_currency', 'variable_costs_by_currency', 'fixed_costs_by_currency', 'transport_costs_by_currency', 'accommodation_costs_by_currency'] as $key) {
+                foreach ($summary[$key] as $currency => $amount) {
+                    $costsByCurrency[$currency] = ($costsByCurrency[$currency] ?? 0) + $amount;
+                }
             }
 
             $monthlySummaries[] = $summary;
             $monthlyCostsByCurrency[] = $costsByCurrency;
+            $summariesByMonth[$monthStart->format('Y-m')] = $summary;
         }
 
         // Zbierz pełny zestaw walut występujących w JAKIMKOLWIEK z miesięcy, żeby
@@ -1147,6 +1291,7 @@ class ProfitabilityService
         return [
             'labels' => $labels,
             'currencies' => $rows,
+            'summaries' => $summariesByMonth,
         ];
     }
 
@@ -1161,19 +1306,19 @@ class ProfitabilityService
         foreach ($fixedCosts as $fixedCost) {
             $costStart = Carbon::parse($fixedCost->period_start);
             $costEnd = Carbon::parse($fixedCost->period_end);
-            
+
             // Calculate overlap period
             $periodStart = $costStart->gt($monthStart) ? $costStart : $monthStart;
             $periodEnd = $costEnd->lt($monthEnd) ? $costEnd : $monthEnd;
-            
+
             if ($periodStart->gt($periodEnd)) {
                 continue; // No overlap
             }
-            
+
             // Calculate proportion
             $costDays = $costStart->diffInDays($costEnd) + 1;
             $overlapDays = $periodStart->diffInDays($periodEnd) + 1;
-            
+
             if ($costDays > 0) {
                 $proportion = $overlapDays / $costDays;
                 $totalCost += (float) $fixedCost->amount * $proportion;
@@ -1200,27 +1345,27 @@ class ProfitabilityService
             // `$monthEnd`, co przeszacowywało koszty wielomiesięczne przy pro-ratowaniu.
             $costEnd = $fixedCost->period_end ? Carbon::parse($fixedCost->period_end) : $monthEnd;
             $currency = $fixedCost->currency ?? 'EUR';
-            
+
             // Calculate overlap period
             $periodStart = $costStart->gt($monthStart) ? $costStart : $monthStart;
             $periodEnd = $costEnd->lt($monthEnd) ? $costEnd : $monthEnd;
-            
+
             if ($periodStart->gt($periodEnd)) {
                 continue; // No overlap
             }
-            
+
             // Calculate proportion
             $costDays = $costStart->diffInDays($costEnd) + 1;
             $overlapDays = $periodStart->diffInDays($periodEnd) + 1;
-            
+
             if ($costDays > 0) {
                 $proportion = $overlapDays / $costDays;
                 $cost = (float) $fixedCost->amount * $proportion;
             } else {
                 $cost = (float) $fixedCost->amount;
             }
-            
-            if (!isset($costsByCurrency[$currency])) {
+
+            if (! isset($costsByCurrency[$currency])) {
                 $costsByCurrency[$currency] = 0;
             }
             $costsByCurrency[$currency] += $cost;
@@ -1235,45 +1380,82 @@ class ProfitabilityService
     }
 
     /**
-     * Koszty transportu (logistyka) za dany miesiąc, grupowane po walucie.
+     * Koszty ogólnofirmowe (stałe + transport + najem) za miesiąc.
+     * Kolekcje można podać z góry (trend 12 mies. ładuje je raz na cały zakres).
      *
-     * WAŻNE: transport nie jest przypisywany do konkretnego projektu — jeden wyjazd/transfer
-     * często obsługuje pracowników z różnych projektów naraz, więc alokacja per-projekt
-     * byłaby myląca. Koszt trafia do puli kosztów OGÓLNOFIRMOWYCH (jak koszty stałe),
-     * a nie do marży pojedynczego projektu. Liczony wg `cost_date` (data poniesienia =
-     * data księgowania — TransportCost nie ma osobnej daty księgowej).
+     * @param  \Illuminate\Support\Collection<int, FixedCostEntry>|null  $fixedCosts
+     * @param  \Illuminate\Support\Collection<int, TransportCost>|null  $transportCosts
+     * @param  \Illuminate\Support\Collection<int, AccommodationLease>|null  $leases
+     * @return array{fixed_costs_by_currency: array<string, float>, transport_costs_by_currency: array<string, float>, accommodation_costs_by_currency: array<string, float>}
      */
-    protected function calculateTransportCostsForMonthByCurrency(Carbon $monthStart, Carbon $monthEnd): array
-    {
-        $costsByCurrency = TransportCost::query()
-            ->whereBetween('cost_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->get()
-            ->groupBy(fn (TransportCost $cost) => $cost->currency ?? 'PLN')
-            ->map(fn ($group) => round((float) $group->sum('amount'), 2))
-            ->all();
+    protected function companyWideCostsForMonth(
+        Carbon $monthStart,
+        Carbon $monthEnd,
+        $fixedCosts = null,
+        $transportCosts = null,
+        $leases = null
+    ): array {
+        $fixedCosts ??= FixedCostEntry::query()
+            ->where('period_start', '<=', $monthEnd)
+            ->where('period_end', '>=', $monthStart)
+            ->get();
 
-        return $costsByCurrency;
+        $transportCosts ??= TransportCost::query()
+            ->whereBetween('cost_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+            ->get();
+        $monthStartDay = $monthStart->toDateString();
+        $monthEndDay = $monthEnd->toDateString();
+        $transportCosts = $transportCosts->filter(function (TransportCost $cost) use ($monthStartDay, $monthEndDay) {
+            if (! $cost->cost_date) {
+                return false;
+            }
+            $day = $cost->cost_date->toDateString();
+
+            return $day >= $monthStartDay && $day <= $monthEndDay;
+        });
+
+        $leases ??= $this->leasesOverlappingPeriod($monthStart, $monthEnd);
+
+        return [
+            'fixed_costs_by_currency' => $this->calculateFixedCostsForMonthByCurrency($fixedCosts, $monthStart, $monthEnd),
+            'transport_costs_by_currency' => $this->groupTransportCostsByCurrency($transportCosts),
+            'accommodation_costs_by_currency' => $this->sumLeaseCostsByCurrency($leases, $monthStart, $monthEnd),
+        ];
     }
 
     /**
-     * Koszty najmu mieszkań (czynsze) za dany miesiąc, grupowane po walucie.
-     *
-     * Analogicznie do transportu: najem NIE jest przypisywany do projektu (te same
-     * mieszkania mieszczą pracowników z różnych projektów naraz) — trafia do kosztów
-     * ogólnofirmowych. Kwota za okres liczona przez {@see AccommodationLease::amountForPeriod()}
-     * (metodologia współdzielona z eksportem JSON w CostPromptBundleService).
+     * @return \Illuminate\Support\Collection<int, AccommodationLease>
      */
-    protected function calculateAccommodationCostsForMonthByCurrency(Carbon $monthStart, Carbon $monthEnd): array
+    protected function leasesOverlappingPeriod(Carbon $periodStart, Carbon $periodEnd)
     {
-        $leases = AccommodationLease::query()
+        return AccommodationLease::query()
             ->whereNotNull('monthly_rent')
-            ->where('start_date', '<=', $monthEnd->toDateString())
-            ->where(function ($q) use ($monthStart) {
+            ->where('start_date', '<=', $periodEnd->toDateString())
+            ->where(function ($q) use ($periodStart) {
                 $q->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $monthStart->toDateString());
+                    ->orWhere('end_date', '>=', $periodStart->toDateString());
             })
             ->get();
+    }
 
+    /**
+     * @param  \Illuminate\Support\Collection<int, TransportCost>  $costs
+     * @return array<string, float>
+     */
+    protected function groupTransportCostsByCurrency($costs): array
+    {
+        return $costs
+            ->groupBy(fn (TransportCost $cost) => $cost->currency ?? 'PLN')
+            ->map(fn ($group) => round((float) $group->sum('amount'), 2))
+            ->all();
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, AccommodationLease>  $leases
+     * @return array<string, float>
+     */
+    protected function sumLeaseCostsByCurrency($leases, Carbon $monthStart, Carbon $monthEnd): array
+    {
         $costsByCurrency = [];
         foreach ($leases as $lease) {
             $amount = $lease->amountForPeriod($monthStart, $monthEnd);
@@ -1293,6 +1475,41 @@ class ProfitabilityService
     }
 
     /**
+     * Koszty transportu (logistyka) za dany miesiąc, grupowane po walucie.
+     *
+     * WAŻNE: transport nie jest przypisywany do konkretnego projektu — jeden wyjazd/transfer
+     * często obsługuje pracowników z różnych projektów naraz, więc alokacja per-projekt
+     * byłaby myląca. Koszt trafia do puli kosztów OGÓLNOFIRMOWYCH (jak koszty stałe),
+     * a nie do marży pojedynczego projektu. Liczony wg `cost_date` (data poniesienia =
+     * data księgowania — TransportCost nie ma osobnej daty księgowej).
+     */
+    protected function calculateTransportCostsForMonthByCurrency(Carbon $monthStart, Carbon $monthEnd): array
+    {
+        $costs = TransportCost::query()
+            ->whereBetween('cost_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+            ->get();
+
+        return $this->groupTransportCostsByCurrency($costs);
+    }
+
+    /**
+     * Koszty najmu mieszkań (czynsze) za dany miesiąc, grupowane po walucie.
+     *
+     * Analogicznie do transportu: najem NIE jest przypisywany do projektu (te same
+     * mieszkania mieszczą pracowników z różnych projektów naraz) — trafia do kosztów
+     * ogólnofirmowych. Kwota za okres liczona przez {@see AccommodationLease::amountForPeriod()}
+     * (metodologia współdzielona z eksportem JSON w CostPromptBundleService).
+     */
+    protected function calculateAccommodationCostsForMonthByCurrency(Carbon $monthStart, Carbon $monthEnd): array
+    {
+        return $this->sumLeaseCostsByCurrency(
+            $this->leasesOverlappingPeriod($monthStart, $monthEnd),
+            $monthStart,
+            $monthEnd
+        );
+    }
+
+    /**
      * Ranking mieszkań wg kosztu najmu w danym miesiącu, z kosztem przypadającym na
      * jedną "osobonoc" (person-night) — wzorem sekcji "Top mieszkania" z /prompts,
      * przeniesiony na dashboard kontrolingowy.
@@ -1301,15 +1518,16 @@ class ProfitabilityService
      */
     public function getTopAccommodationCostsForMonth(Carbon $monthStart, Carbon $monthEnd, int $limit = 10): array
     {
-        $leases = AccommodationLease::query()
-            ->with('accommodation')
-            ->whereNotNull('monthly_rent')
-            ->where('start_date', '<=', $monthEnd->toDateString())
-            ->where(function ($q) use ($monthStart) {
-                $q->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $monthStart->toDateString());
-            })
-            ->get();
+        $leases = $this->leasesOverlappingPeriod($monthStart, $monthEnd);
+        $leases->load([
+            'accommodation.assignments' => function ($q) use ($monthStart, $monthEnd) {
+                $q->where('start_date', '<=', $monthEnd->toDateString())
+                    ->where(function ($inner) use ($monthStart) {
+                        $inner->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $monthStart->toDateString());
+                    });
+            },
+        ]);
 
         $rows = [];
         foreach ($leases as $lease) {
@@ -1332,6 +1550,32 @@ class ProfitabilityService
         usort($rows, fn ($a, $b) => $b['amount'] <=> $a['amount']);
 
         return array_slice($rows, 0, $limit);
+    }
+
+    /**
+     * Przelicza kwotę z cache'em kursu na (from, to, data) w ramach requestu.
+     */
+    protected function convertAmount(float $amount, string $from, string $to, ?Carbon $onDate = null): ?float
+    {
+        $from = strtoupper($from);
+        $to = strtoupper($to);
+        if ($from === $to) {
+            return $amount;
+        }
+
+        $dateKey = ($onDate ?? Carbon::today())->toDateString();
+        $cacheKey = $from.'|'.$to.'|'.$dateKey;
+
+        if (! array_key_exists($cacheKey, $this->unitConversionCache)) {
+            $this->unitConversionCache[$cacheKey] = ExchangeRate::convert(1.0, $from, $to, $onDate);
+        }
+
+        $unit = $this->unitConversionCache[$cacheKey];
+        if ($unit === null) {
+            return null;
+        }
+
+        return round($amount * $unit, 2);
     }
 
     /**
@@ -1360,12 +1604,14 @@ class ProfitabilityService
             if (strtoupper($currency) === $targetCurrency) {
                 $total += $amount;
                 $convertedCurrencies[] = $currency;
+
                 continue;
             }
 
-            $converted = ExchangeRate::convert($amount, $currency, $targetCurrency, $onDate);
+            $converted = $this->convertAmount($amount, $currency, $targetCurrency, $onDate);
             if ($converted === null) {
                 $unconverted[$currency] = ($unconverted[$currency] ?? 0) + $amount;
+
                 continue;
             }
 

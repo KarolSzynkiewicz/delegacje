@@ -1149,6 +1149,54 @@ class WarehouseEquipmentTest extends TestCase
             ->assertDontSee('id="stock-movement-warehouse"', false);
     }
 
+    public function test_issue_history_does_not_query_equipment_per_issue(): void
+    {
+        $equipment = Equipment::factory()->create(['name' => 'Spodnie BHP']);
+        $variants = collect([
+            EquipmentVariant::factory()->inStock(10, 2)->create([
+                'equipment_id' => $equipment->id,
+                'value' => 'M',
+            ]),
+            EquipmentVariant::factory()->inStock(8, 2)->create([
+                'equipment_id' => $equipment->id,
+                'value' => 'L',
+            ]),
+            EquipmentVariant::factory()->inStock(6, 2)->create([
+                'equipment_id' => $equipment->id,
+                'value' => 'XL',
+            ]),
+        ]);
+
+        foreach (range(1, 12) as $i) {
+            EquipmentIssue::factory()->create([
+                'equipment_id' => $equipment->id,
+                'equipment_variant_id' => $variants[$i % 3]->id,
+                'warehouse_id' => $this->warehouse->id,
+                'status' => EquipmentIssue::STATUS_ISSUED,
+            ]);
+        }
+
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+
+        Livewire::actingAs($this->user)
+            ->test(EquipmentIssueHistory::class, ['equipment' => $equipment])
+            ->assertOk()
+            ->assertSee('Spodnie BHP');
+
+        $equipmentTableQueries = collect(\Illuminate\Support\Facades\DB::getQueryLog())
+            ->pluck('query')
+            ->filter(fn (string $sql) => str_contains(strtolower($sql), 'from `equipment`')
+                || str_contains(strtolower($sql), 'from "equipment"'))
+            ->count();
+
+        $this->assertLessThan(
+            4,
+            $equipmentTableQueries,
+            'variant.sku should use eager-loaded equipment, not one query per issue'
+        );
+    }
+
     public function test_show_page_marks_variant_below_minimum_on_location_bars(): void
     {
         $equipment = Equipment::factory()->create([

@@ -141,6 +141,7 @@ class EquipmentController extends Controller
             ->firstOrFail();
 
         $distributions = $this->variantDistributions($equipment, $warehouses);
+        $equipment->variants->each->setRelation('equipment', $equipment);
 
         return view('equipment.show', [
             'equipment' => $equipment,

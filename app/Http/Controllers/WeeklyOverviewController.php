@@ -33,6 +33,12 @@ class WeeklyOverviewController extends Controller
         $weekStart = $weeks[0]['start'];
         $weekEnd = $weeks[0]['end'];
         $projects = $this->weeklyOverviewService->getProjectsWithWeeklyData($weeks);
+
+        $preloadedProjectAssignments = collect($projects)
+            ->flatMap(fn ($projectData) => $projectData['weeks_data'][0]['assignments'] ?? collect())
+            ->unique('id')
+            ->groupBy('employee_id');
+
         $projects = $this->filterProjectsById($projects, $projectId);
 
         // Create ViewModels for each project
@@ -122,7 +128,7 @@ class WeeklyOverviewController extends Controller
         $employeesInFieldCount = $this->weeklyDashboardKpiService->countEmployeesInFieldForWeek($weekStart, $weekEnd);
         $employeesInFieldByProject = $this->weeklyDashboardKpiService->employeesInFieldByProjectForWeek($weekStart, $weekEnd);
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesInFieldByProject', 'projectsEndingThisMonth'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments'));
     }
 
     /**

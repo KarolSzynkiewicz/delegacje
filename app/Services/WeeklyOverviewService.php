@@ -144,12 +144,13 @@ class WeeklyOverviewService
 
         $accommodations = $accommodationIds->isEmpty()
             ? collect()
-            : Accommodation::whereIn('id', $accommodationIds)->get()->keyBy('id');
+            : Accommodation::whereIn('id', $accommodationIds)->with('activeLease')->get()->keyBy('id');
 
         $allAccommodationAssignments = $accommodationIds->isEmpty()
             ? collect()
             : AccommodationAssignment::whereIn('accommodation_id', $accommodationIds)
                 ->overlappingWith($weekStart, $weekEnd)
+                ->with('employee')
                 ->get();
 
         $vehicles = $vehicleIds->isEmpty()

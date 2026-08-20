@@ -261,54 +261,6 @@
     @endif
 
     <!-- Projekty -->
-    @php
-        // Pre-load all project assignments for all employees in vehicles/accommodations to avoid N+1 queries
-        $weekStart = $weeks[0]['start'];
-        $weekEnd = $weeks[0]['end'];
-        $allEmployeeIds = collect();
-        
-        // Collect all employee IDs from vehicles and accommodations across all projects
-        foreach ($projects as $projectData) {
-            $weekData = $projectData['weeks_data'][0] ?? null;
-            if ($weekData) {
-                $projectVehicles = collect($weekData['vehicles'] ?? []);
-                $projectAccommodations = collect($weekData['accommodations'] ?? []);
-                
-                foreach ($projectVehicles as $vehicleData) {
-                    if (isset($vehicleData['assignments'])) {
-                        $allEmployeeIds = $allEmployeeIds->merge(collect($vehicleData['assignments'])->pluck('employee_id'));
-                    }
-                }
-                
-                foreach ($projectAccommodations as $accommodationData) {
-                    if (isset($accommodationData['assignments'])) {
-                        $allEmployeeIds = $allEmployeeIds->merge(collect($accommodationData['assignments'])->pluck('employee_id'));
-                    }
-                }
-            }
-        }
-        
-        $allEmployeeIds = $allEmployeeIds->unique()->filter();
-        
-        // Pre-load all project assignments for these employees in one query
-        $preloadedProjectAssignments = collect();
-        if ($allEmployeeIds->isNotEmpty()) {
-            $preloadedProjectAssignments = \App\Models\ProjectAssignment::whereIn('employee_id', $allEmployeeIds)
-                ->where(function($query) use ($weekStart, $weekEnd) {
-                    $query->where(function($q) use ($weekStart, $weekEnd) {
-                        $q->where('start_date', '<=', $weekEnd)
-                          ->where(function($q2) use ($weekStart) {
-                              $q2->whereNull('end_date')
-                                 ->orWhere('end_date', '>=', $weekStart);
-                          });
-                    });
-                })
-                ->with('project')
-                ->get()
-                ->groupBy('employee_id');
-        }
-    @endphp
-    
     @forelse($projects as $projectData)
         @php
             $project = $projectData['project'];

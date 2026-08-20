@@ -41,11 +41,11 @@ class DashboardController extends Controller
             $filters['type'],
             $filters['search']
         );
-        $topEmployees = $this->profitabilityService->getTopEmployeesByRevenueForMonth(
+        $topEmployees = $this->profitabilityService->getTopEmployeesByRevenueFromProjects(
+            $projectsProfitability,
             $monthStart,
             $monthEnd,
-            10,
-            $filters['statuses']
+            10
         );
         $longestRotations = $this->profitabilityService->getEmployeesWithLongestRotations(10);
         // Podsumowanie dla bieżącego miesiąca liczone z już wyliczonych danych projektów
@@ -56,18 +56,18 @@ class DashboardController extends Controller
             $monthEnd
         );
 
-        // Poprzedni miesiąc — do wyliczenia trendu miesiąc-do-miesiąca (kontroling)
-        $prevMonthForDelta = $month->copy()->subMonth();
-        $previousSummary = $this->profitabilityService->getRevenueVsCostsSummaryForMonth(
-            $prevMonthForDelta->copy()->startOfMonth(),
-            $prevMonthForDelta->copy()->endOfMonth(),
+        // Trend 12 miesięcy + poprzedni miesiąc z tego samego przebiegu (bez N× ładowania grafu).
+        $trend = $this->profitabilityService->getMonthlyTrend(
+            $monthStart,
+            12,
             $filters['statuses'],
             $filters['type'],
             $filters['search']
         );
-
-        // Trend 12 miesięcy do wykresu (kontroling / statystyki)
-        $trend = $this->profitabilityService->getMonthlyTrend($monthStart, 12, $filters['statuses'], $filters['type']);
+        $prevMonthForDelta = $month->copy()->subMonth();
+        $previousSummary = $trend['summaries'][$prevMonthForDelta->format('Y-m')]
+            ?? $this->profitabilityService->summarizeProjectsProfitability([], $prevMonthForDelta->copy()->startOfMonth(), $prevMonthForDelta->copy()->endOfMonth());
+        unset($trend['summaries']);
 
         // Ranking mieszkań wg kosztu najmu w miesiącu + koszt na osobonoc (kontroling zakwaterowania)
         $topAccommodations = $this->profitabilityService->getTopAccommodationCostsForMonth($monthStart, $monthEnd, 10);
@@ -114,11 +114,11 @@ class DashboardController extends Controller
         );
         $projectsProfitability = $this->sortProjects($projectsProfitability, $filters['sortBy'], $filters['sortDir']);
 
-        $filename = 'rentownosc-projektow-' . $monthStart->format('Y-m') . '.csv';
+        $filename = 'rentownosc-projektow-'.$monthStart->format('Y-m').'.csv';
 
         return response()->streamDownload(function () use ($projectsProfitability) {
             $out = fopen('php://output', 'w');
-            fputs($out, "\xEF\xBB\xBF"); // UTF-8 BOM dla Excela
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM dla Excela
 
             fputcsv($out, [
                 'Projekt', 'Klient', 'Status', 'Typ',
@@ -259,7 +259,7 @@ class DashboardController extends Controller
                 'month' => $month->format('m'),
             ]);
 
-            return route('profitability.index') . '?' . http_build_query($query);
+            return route('profitability.index').'?'.http_build_query($query);
         };
 
         return [
@@ -272,7 +272,7 @@ class DashboardController extends Controller
             ],
             'prevUrl' => $buildUrl($prevMonth),
             'nextUrl' => $buildUrl($nextMonth),
-            'exportUrl' => route('profitability.export-csv') . '?' . http_build_query(array_merge($filterQuery, [
+            'exportUrl' => route('profitability.export-csv').'?'.http_build_query(array_merge($filterQuery, [
                 'year' => $currentMonth->format('Y'),
                 'month' => $currentMonth->format('m'),
             ])),
