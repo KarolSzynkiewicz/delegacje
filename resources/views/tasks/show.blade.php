@@ -74,6 +74,16 @@
                 <!-- Szczegóły -->
                 <hr class="my-4">
                 <x-ui.detail-list>
+                    <x-ui.detail-item label="Sprint">
+                        @if($task->sprint)
+                            <a href="{{ route('sprints.show', $task->sprint) }}">{{ $task->sprint->label() }}</a>
+                            @if($task->sprint->goal)
+                                <div class="small text-muted mt-1">Cel: {{ $task->sprint->goal }}</div>
+                            @endif
+                        @else
+                            <span class="text-muted">Poza sprintem</span>
+                        @endif
+                    </x-ui.detail-item>
                     <x-ui.detail-item label="Przypisany do">
                         @if($task->assignedTo)
                             {{ $task->assignedTo->name }}
@@ -154,7 +164,7 @@
             </div>
 
             <x-ui.card label="Akcje" class="mt-4">
-                <x-tasks-actions :task="$task" :project="$task->project" size="sm" gap="2" class="flex-wrap" />
+                <x-tasks-actions :task="$task" size="sm" gap="2" class="flex-wrap" />
             </x-ui.card>
 
             <x-comments :commentable="$task" class="mt-4" />

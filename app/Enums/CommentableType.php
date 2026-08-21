@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentProcess;
+use App\Models\Sprint;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,6 +25,7 @@ enum CommentableType: string
     case EMPLOYEE = 'employee';
     case RECRUITMENT_PROCESS = 'recruitment_process';
     case RECRUITMENT_CANDIDATE = 'recruitment_candidate';
+    case SPRINT = 'sprint';
 
     public function modelClass(): string
     {
@@ -37,6 +39,7 @@ enum CommentableType: string
             self::EMPLOYEE => Employee::class,
             self::RECRUITMENT_PROCESS => RecruitmentProcess::class,
             self::RECRUITMENT_CANDIDATE => RecruitmentCandidate::class,
+            self::SPRINT => Sprint::class,
         };
     }
 
@@ -52,6 +55,7 @@ enum CommentableType: string
             Employee::class => self::EMPLOYEE,
             RecruitmentProcess::class => self::RECRUITMENT_PROCESS,
             RecruitmentCandidate::class => self::RECRUITMENT_CANDIDATE,
+            Sprint::class => self::SPRINT,
             default => throw new \InvalidArgumentException('Model '.$model::class.' is not commentable'),
         };
     }

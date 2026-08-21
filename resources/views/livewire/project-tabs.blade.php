@@ -80,11 +80,6 @@
         <div id="files" role="tabpanel">
             <x-project-files :project="$project" />
         </div>
-    @elseif($activeTab === 'tasks')
-        <!-- Zakładka Zadania -->
-        <div id="tasks" role="tabpanel">
-            <x-project-tasks :project="$project" :users="$users ?? []" :isMineView="$isMineView ?? false" />
-        </div>
     @elseif($activeTab === 'assignments')
         <!-- Zakładka Przypisani pracownicy -->
         <div id="assignments" role="tabpanel">

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -225,17 +226,6 @@ class User extends Authenticatable
                 }
                 break;
 
-            case 'tasks.update':
-                // Sprawdź project_id z zadania w route
-                $route = request()->route();
-                if ($route) {
-                    $task = $route->parameter('task');
-                    if ($task instanceof \App\Models\ProjectTask) {
-                        return $this->managesProject($task->project_id);
-                    }
-                }
-                break;
-
             case 'time-logs.update':
                 // Sprawdź assignments z requestu (bulk-update)
                 $entries = request()->input('entries', []);
@@ -264,6 +254,21 @@ class User extends Authenticatable
         }
 
         return asset('storage/'.$this->image_path);
+    }
+
+    /**
+     * Lista użytkowników do selectów / @wzmianek — raz na żądanie.
+     *
+     * @return Collection<int, User>
+     */
+    public static function orderedDirectory(): Collection
+    {
+        $key = 'users.ordered-directory';
+        if (! app()->bound($key)) {
+            app()->instance($key, static::query()->orderBy('name')->get(['id', 'name']));
+        }
+
+        return app($key);
     }
 
     /**

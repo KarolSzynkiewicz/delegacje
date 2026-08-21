@@ -233,6 +233,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
         // Tasks — tasks2 przed resource, żeby uniknąć konfliktów z tasks/{task}
         Route::group(['defaults' => ['resource' => 'tasks']], function () {
+            Route::resource('sprints', \App\Http\Controllers\SprintController::class);
             Route::get('tasks/home', [\App\Http\Controllers\TaskController::class, 'home'])
                 ->name('tasks.home');
             Route::post('tasks/default-view', [\App\Http\Controllers\TaskController::class, 'setDefaultView'])

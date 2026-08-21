@@ -54,9 +54,7 @@
             x-ref="qePanel"
         >
             <h6 class="mb-3 fw-semibold">
-                @if($quickEditField === 'project')
-                    Projekt
-                @elseif($quickEditField === 'category')
+                @if($quickEditField === 'category')
                     Kategoria
                 @elseif($quickEditField === 'assigned_to')
                     Przypisany
@@ -64,18 +62,7 @@
                     Termin wykonania
                 @endif
             </h6>
-            @if($quickEditField === 'project')
-                <div class="mb-3">
-                    <label class="form-label small text-muted mb-1">Wybierz projekt</label>
-                    <select class="form-select form-select-sm" wire:model="qeProjectId" data-quick-focus>
-                        <option value="">— Bez projektu —</option>
-                        @foreach($allProjects as $p)
-                            <option value="{{ $p->id }}">{{ $p->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('qeProjectId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-                </div>
-            @elseif($quickEditField === 'category')
+            @if($quickEditField === 'category')
                 <div class="mb-3">
                     <label class="form-label small text-muted mb-1">Nazwa kategorii</label>
                     <input type="text" class="form-control form-control-sm" wire:model="qeCategory" placeholder="Opcjonalnie" maxlength="255" data-quick-focus>

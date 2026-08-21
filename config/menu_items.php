@@ -19,6 +19,13 @@ return [
         'label' => 'Zadania',
     ],
 
+    'sprints' => [
+        'route' => 'sprints.index',
+        'icon' => 'bi bi-calendar3',
+        'label' => 'Sprinty',
+        'permission' => 'tasks.view',
+    ],
+
     'procedures' => [
         'route' => 'procedure-templates.index',
         'icon' => 'bi bi-diagram-3',

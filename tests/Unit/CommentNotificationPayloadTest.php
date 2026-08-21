@@ -51,6 +51,19 @@ class CommentNotificationPayloadTest extends TestCase
         $this->assertStringContainsString('Wyjazd', $comment->notificationContextLabel());
     }
 
+    public function test_mention_on_sprint_links_to_sprint_comment(): void
+    {
+        $sprint = new \App\Models\Sprint(['name' => 'Sprint 12']);
+        $sprint->id = 3;
+
+        $comment = new Comment(['body' => 'Trzymamy scope.']);
+        $comment->id = 44;
+        $comment->setRelation('commentable', $sprint);
+
+        $this->assertSame(route('sprints.show', $sprint).'#comment-44', $comment->urlWithCommentAnchor());
+        $this->assertSame('Sprint 12', $comment->notificationContextLabel());
+    }
+
     public function test_task_assigned_from_comment_uses_comment_url(): void
     {
         $project = new Project(['name' => 'Hala']);

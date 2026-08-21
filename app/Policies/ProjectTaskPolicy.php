@@ -16,13 +16,7 @@ class ProjectTaskPolicy
             return true;
         }
 
-        // Jeśli zadanie nie ma projektu, sprawdź uprawnienia do zadań
-        if (! $task->project_id) {
-            return $user->hasPermission('tasks.update');
-        }
-
-        // Sprawdź czy user zarządza projektem zadania
-        return $user->managesProject($task->project_id);
+        return $user->hasPermission('tasks.update');
     }
 
     /**

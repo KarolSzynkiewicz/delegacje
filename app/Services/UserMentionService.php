@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\TaskStatus;
 use App\Models\Comment;
-use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
@@ -209,7 +208,6 @@ class UserMentionService
         }
 
         $comment->loadMissing(['commentable', 'parent']);
-        $projectId = $this->projectIdForComment($comment);
         $description = $this->mentionTaskDescription($comment);
         $assignedIds = [];
 
@@ -238,7 +236,6 @@ class UserMentionService
                 'category' => 'Komentarz',
                 'status' => TaskStatus::PENDING,
                 'assigned_to' => $user->id,
-                'project_id' => $projectId,
                 'created_by' => $author->id,
                 'subject_type' => $comment->getMorphClass(),
                 'subject_id' => $comment->id,
@@ -248,21 +245,6 @@ class UserMentionService
                 $user->notify(new TaskAssigned($task, $author));
             }
         }
-    }
-
-    private function projectIdForComment(Comment $comment): ?int
-    {
-        $morph = $comment->commentable;
-
-        if ($morph instanceof Project) {
-            return $morph->id;
-        }
-
-        if ($morph instanceof ProjectTask) {
-            return $morph->project_id ? (int) $morph->project_id : null;
-        }
-
-        return null;
     }
 
     private function mentionTaskDescription(Comment $comment): string
@@ -334,7 +316,6 @@ class UserMentionService
                 'category' => 'Podzadanie',
                 'status' => TaskStatus::PENDING,
                 'assigned_to' => $user->id,
-                'project_id' => $task->project_id,
                 'due_date' => $task->due_date,
                 'created_by' => $author->id,
                 'subject_type' => $subtask->getMorphClass(),

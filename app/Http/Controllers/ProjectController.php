@@ -94,7 +94,6 @@ class ProjectController extends Controller
             // Sprawdź powiązane rekordy przed usunięciem
             $assignmentsCount = $project->assignments()->count();
             $demandsCount = $project->demands()->count();
-            $tasksCount = $project->tasks()->count();
             $filesCount = $project->files()->count();
             $commentsCount = $project->comments()->count();
             $variableCostsCount = $project->variableCosts()->count();
@@ -110,7 +109,7 @@ class ProjectController extends Controller
             Cache::forget('active_projects_dropdown');
 
             $message = 'Projekt został usunięty.';
-            if ($assignmentsCount > 0 || $demandsCount > 0 || $tasksCount > 0 ||
+            if ($assignmentsCount > 0 || $demandsCount > 0 ||
                 $filesCount > 0 || $commentsCount > 0 || $variableCostsCount > 0 || $timeLogsCount > 0) {
                 $message .= ' Usunięto również: ';
                 $deleted = [];
@@ -122,9 +121,6 @@ class ProjectController extends Controller
                 }
                 if ($demandsCount > 0) {
                     $deleted[] = "{$demandsCount} zapotrzebowań";
-                }
-                if ($tasksCount > 0) {
-                    $deleted[] = "{$tasksCount} zadań";
                 }
                 if ($filesCount > 0) {
                     $deleted[] = "{$filesCount} plików";

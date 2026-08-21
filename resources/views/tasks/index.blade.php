@@ -45,17 +45,17 @@
                     />
                 </div>
                 
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="project_id" 
-                            label="Projekt (opcjonalnie)"
+                    <div class="row mb-3">
+                    <div class="col-md-4">
+                        <x-ui.input
+                            type="select"
+                            name="sprint_id"
+                            label="Sprint"
                         >
-                            <option value="">Brak projektu</option>
-                            @foreach(\App\Models\Project::orderBy('name')->get() as $project)
-                                <option value="{{ $project->id }}" {{ old('project_id') == $project->id ? 'selected' : '' }}>
-                                    {{ $project->name }}
+                            <option value="">Poza sprintem</option>
+                            @foreach(\App\Models\Sprint::query()->orderByDesc('start_date')->get() as $sprintOption)
+                                <option value="{{ $sprintOption->id }}" {{ old('sprint_id') == $sprintOption->id ? 'selected' : '' }}>
+                                    {{ $sprintOption->label() }}
                                 </option>
                             @endforeach
                         </x-ui.input>

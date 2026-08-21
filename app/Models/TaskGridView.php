@@ -26,8 +26,8 @@ class TaskGridView extends Model
 
     protected $casts = [
         'visible_columns' => 'array',
-        'column_widths'   => 'array',
-        'my_tasks_only'   => 'boolean',
+        'column_widths' => 'array',
+        'my_tasks_only' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -47,9 +47,6 @@ class TaskGridView extends Model
         if ($this->search_task !== '') {
             $params['searchTask'] = $this->search_task;
         }
-        if ($this->search_project !== '') {
-            $params['searchProject'] = $this->search_project;
-        }
         if ($this->search_category !== '') {
             $params['searchCategory'] = $this->search_category;
         }
@@ -62,10 +59,10 @@ class TaskGridView extends Model
         if ($this->my_tasks_only) {
             $params['myTasksOnly'] = 'true';
         }
-        if (($this->group_by ?? '') !== '') {
+        if (($this->group_by ?? '') !== '' && $this->group_by !== 'project') {
             $params['groupBy'] = $this->group_by;
         }
-        if (($this->sort_field ?: 'created_at') !== 'created_at') {
+        if (($this->sort_field ?: 'created_at') !== 'created_at' && $this->sort_field !== 'project') {
             $params['sortField'] = $this->sort_field;
         }
         if (($this->sort_direction ?: 'desc') !== 'desc') {

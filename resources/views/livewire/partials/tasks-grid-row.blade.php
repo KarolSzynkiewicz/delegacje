@@ -2,11 +2,12 @@
     $isExpanded  = in_array($task->id, $expandedTasks);
     $canEdit     = $this->canEditTask($task);
     $isEditing   = $editingTaskId === $task->id;
+    $groupValue  = $groupBy !== '' ? $this->groupValueFor($task) : '';
 
     $subtasksAll  = $task->subtasks->sortBy(['sort_order', 'created_at']);
     $subtaskTotal = $subtasksAll->count();
     $subtaskDone  = $subtasksAll->where('is_completed', true)->count();
-    $commentsCount = $task->comments->count();
+    $commentsCount = (int) ($task->comments_count ?? ($task->relationLoaded('comments') ? $task->comments->count() : 0));
 
     $statusMap = [
         'pending'     => ['cls' => 's-pending',    'icon' => '⏳', 'label' => 'Oczekujące', 'variant' => 'warning'],
@@ -54,11 +55,13 @@
 <tr wire:key="tg-row-{{ $task->id }}"
     class="tg-task-row {{ $isExpanded ? 'tg-expanded' : '' }}"
     style="border-left:3px solid {{ $borderColor }}"
-    x-data="{ subOver: false }"
-    @dragover="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { subOver = true; $event.preventDefault(); }"
-    @dragleave="subOver = false"
-    @drop.prevent="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}); window._tgSubDrag = null; subOver = false }"
-    :class="{ 'tg-row-sub-drop': subOver }">
+    x-data="{ subOver: false, taskOver: false, gv: String(@js($groupValue)) }"
+    @dragover="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { subOver = true; $event.preventDefault(); }
+               else if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $event.preventDefault(); taskOver = true; $event.dataTransfer.dropEffect = 'move' }"
+    @dragleave="if (!$el.contains($event.relatedTarget)) { subOver = false; taskOver = false }"
+    @drop.prevent="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}); window._tgSubDrag = null; subOver = false }
+                   else if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $wire.moveTaskToGroup(window._tgTaskDrag.id, gv); window._tgTaskDrag = null; taskOver = false }"
+    :class="{ 'tg-row-sub-drop': subOver, 'tg-group-drop': taskOver }">
 
     {{-- Expand toggle --}}
     <td style="width:36px; padding:5px 4px !important; text-align:center">
@@ -86,6 +89,13 @@
                    x-data x-init="$el.focus(); $el.select()">
         @else
             <div class="d-flex align-items-center gap-1" style="min-width:0">
+                @if($groupBy !== '' && $canEdit)
+                    <i class="bi bi-grip-vertical tg-task-grip flex-shrink-0"
+                       draggable="true"
+                       title="Przenieś do innej grupy"
+                       @dragstart.stop="window._tgSubDrag = null; window._tgTaskDrag = { id: {{ $task->id }}, fromGroup: gv }; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', '{{ $task->id }}')"
+                       @dragend="window._tgTaskDrag = null"></i>
+                @endif
                 @if($subtaskTotal > 0)
                     <span class="badge rounded-pill flex-shrink-0"
                           style="font-size:0.6rem; min-width:32px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)"
@@ -174,30 +184,30 @@
     </td>
     @break
 
-    {{-- ── Project ── --}}
-    @case('project')
-    <td style="max-width:150px">
-        @if($isEditing && $editingField === 'project')
+    {{-- ── Sprint ── --}}
+    @case('sprint')
+    <td style="max-width:180px">
+        @if($isEditing && $editingField === 'sprint')
             <select wire:model="editingValue" class="form-select form-select-sm"
                     wire:change="saveEdit" wire:keydown.escape="cancelEdit"
                     x-data x-init="$el.focus()">
-                <option value="">Brak projektu</option>
-                @foreach($allProjects as $p)
-                    <option value="{{ $p->id }}">{{ $p->name }}</option>
+                <option value="">Poza sprintem</option>
+                @foreach($allSprints as $sprintOption)
+                    <option value="{{ $sprintOption->id }}">{{ $sprintOption->label() }}</option>
                 @endforeach
             </select>
         @else
             @if($canEdit)
-                <span wire:click="startEdit({{ $task->id }}, 'project')" class="tg-hover-edit d-block" style="cursor:pointer; padding:2px 4px; border-radius:3px">
-                    @if($task->project)
-                        <x-ui.badge variant="accent" class="text-truncate" style="max-width:130px">{{ $task->project->name }}</x-ui.badge>
+                <span wire:click="startEdit({{ $task->id }}, 'sprint')" class="tg-hover-edit d-block" style="cursor:pointer; padding:2px 4px; border-radius:3px">
+                    @if($task->sprint)
+                        <x-ui.badge variant="accent" class="text-truncate" style="max-width:160px">{{ $task->sprint->name }}</x-ui.badge>
                     @else
                         <span class="text-muted" style="font-size:0.82rem">—</span>
                     @endif
                 </span>
             @else
-                @if($task->project)
-                    <x-ui.badge variant="accent" class="text-truncate" style="max-width:130px">{{ Str::limit($task->project->name, 18) }}</x-ui.badge>
+                @if($task->sprint)
+                    <x-ui.badge variant="accent" class="text-truncate" style="max-width:160px">{{ Str::limit($task->sprint->name, 22) }}</x-ui.badge>
                 @else
                     <span class="text-muted" style="font-size:0.82rem">—</span>
                 @endif
@@ -486,7 +496,7 @@
                          style="border-bottom:1px solid rgba(255,255,255,0.05); border-radius:4px"
                          draggable="true"
                          wire:key="tg-st-{{ $subtask->id }}"
-                         @dragstart="window._tgSubDrag = { id: {{ $subtask->id }}, fromTask: {{ $task->id }} }; $event.dataTransfer.effectAllowed = 'move'"
+                         @dragstart="window._tgTaskDrag = null; window._tgSubDrag = { id: {{ $subtask->id }}, fromTask: {{ $task->id }} }; $event.dataTransfer.effectAllowed = 'move'"
                          @dragend="window._tgSubDrag = null"
                          @dragover.prevent.stop
                          @drop.prevent.stop="if (window._tgSubDrag && window._tgSubDrag.id !== {{ $subtask->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}, {{ $subtask->id }}); window._tgSubDrag = null }">

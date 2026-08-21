@@ -147,6 +147,16 @@
         box-shadow: inset 0 0 0 2px rgba(16,185,129,.4);
     }
 
+    /* ── Task drag between groups (Kanban) ── */
+    .tg-task-grip { cursor: grab; color: rgba(255,255,255,0.22); font-size: 0.95rem; padding: 2px 4px; user-select: none; }
+    .tg-task-grip:hover { color: rgba(255,255,255,0.6); }
+    .tg-task-grip:active { cursor: grabbing; color: rgba(255,255,255,0.75); }
+    .tg-group-header.tg-group-drop > td,
+    .tg-task-row.tg-group-drop > td {
+        background: rgba(16,185,129,.10) !important;
+        box-shadow: inset 0 0 0 2px rgba(16,185,129,.45);
+    }
+
     /* ── Column drag-to-reorder ── */
     .tg-table th[draggable="true"] { cursor: grab; }
     .tg-table th[draggable="true"]:active { cursor: grabbing; }
@@ -201,11 +211,6 @@
                        class="form-control">
             </div>
 
-            {{-- Search: Project --}}
-            <input wire:model.live.debounce.300ms="searchProject"
-                   type="text" placeholder="Projekt…"
-                   class="form-control" style="width:110px">
-
             {{-- Search: Category --}}
             <input wire:model.live.debounce.300ms="searchCategory"
                    type="text" placeholder="Kategoria…"
@@ -242,7 +247,7 @@
             </button>
 
             {{-- Clear --}}
-            @if($searchTask || $searchProject || $searchCategory || $searchAssignedTo || $myTasksOnly || $groupBy || $sortField !== 'created_at')
+            @if($searchTask || $searchCategory || $searchAssignedTo || $myTasksOnly || $groupBy || $sortField !== 'created_at')
             <button wire:click="clearFilters"
                     class="btn btn-outline-danger"
                     title="Wyczyść filtry">
@@ -281,7 +286,10 @@
                             </button>
                         </li>
                         <li><hr class="dropdown-divider my-1"></li>
-                        @foreach(['status'=>'Status','project'=>'Projekt','category'=>'Kategoria','assigned_to'=>'Przypisany','priority'=>'Priorytet'] as $gf=>$gl)
+                        @foreach(['status'=>'Status','sprint'=>'Sprint','category'=>'Kategoria','assigned_to'=>'Przypisany','priority'=>'Priorytet'] as $gf=>$gl)
+                        @if($this->isLockedToSprint() && $gf === 'sprint')
+                            @continue
+                        @endif
                         <li>
                             <button class="dropdown-item small py-2 {{ $groupBy===$gf ? 'active' : '' }}"
                                     wire:click="setGroupBy('{{ $gf }}')" @click="open=false">
@@ -310,19 +318,27 @@
                             Widoczne kolumny
                         </div>
                         @foreach($availableColumns as $colKey => $col)
+                        @if($this->isLockedToSprint() && $colKey === 'sprint')
+                            @continue
+                        @endif
+                        @php
+                            $colLockedByGroup = $groupBy !== '' && $colKey === $groupBy;
+                            $colChecked = in_array($colKey, $visibleColumns) && ! $colLockedByGroup;
+                            $colDisabled = ($col['always'] ?? false) || $colLockedByGroup;
+                        @endphp
                         <div class="d-flex align-items-center gap-2 py-1">
                             <button type="button"
                                     wire:click="toggleColumn('{{ $colKey }}')"
                                     @click.stop
-                                    {{ ($col['always'] ?? false) ? 'disabled' : '' }}
+                                    {{ $colDisabled ? 'disabled' : '' }}
                                     style="width:18px;height:18px;border-radius:4px;border:2px solid;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s;
-                                        {{ in_array($colKey,$visibleColumns) ? 'background:var(--primary,#3b82f6);border-color:var(--primary,#3b82f6);color:#fff' : 'background:transparent;border-color:rgba(255,255,255,0.25);color:transparent' }};
-                                        {{ ($col['always'] ?? false) ? 'opacity:.4;cursor:not-allowed' : 'cursor:pointer' }}">
+                                        {{ $colChecked ? 'background:var(--primary,#3b82f6);border-color:var(--primary,#3b82f6);color:#fff' : 'background:transparent;border-color:rgba(255,255,255,0.25);color:transparent' }};
+                                        {{ $colDisabled ? 'opacity:.4;cursor:not-allowed' : 'cursor:pointer' }}">
                                 <i class="bi bi-check" style="font-size:0.65rem"></i>
                             </button>
-                            <span style="font-size:0.84rem;cursor:{{ ($col['always'] ?? false) ? 'default' : 'pointer' }};opacity:{{ ($col['always'] ?? false) ? '.5' : '1' }}"
-                                  @if(!($col['always'] ?? false)) wire:click="toggleColumn('{{ $colKey }}')" @click.stop @endif>
-                                {{ $col['label'] }}
+                            <span style="font-size:0.84rem;cursor:{{ $colDisabled ? 'default' : 'pointer' }};opacity:{{ $colDisabled ? '.5' : '1' }}"
+                                  @if(! $colDisabled) wire:click="toggleColumn('{{ $colKey }}')" @click.stop @endif>
+                                {{ $col['label'] }}@if($colLockedByGroup)<span class="text-muted"> · grupowanie</span>@endif
                             </span>
                         </div>
                         @endforeach
@@ -331,6 +347,7 @@
             </div>
 
             {{-- ── Widoki ── --}}
+            @unless($this->isLockedToSprint())
             <div x-data="{ open: false, top: 0, left: 0 }">
                 <button type="button"
                         @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
@@ -400,14 +417,17 @@
                     </div>
                 </template>
             </div>
+            @endunless
 
             {{-- Domyślny widok menu --}}
+            @unless($this->isLockedToSprint())
             <button type="button"
                     wire:click="setAsMenuDefaultView"
                     class="btn btn-sm {{ $isMenuDefaultView ? 'btn-primary' : 'btn-outline-secondary' }}"
                     title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
                 <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }} me-1"></i>Domyślny
             </button>
+            @endunless
 
             {{-- Task count --}}
             <div class="ms-auto" style="font-size:0.78rem;color:var(--text-muted,#94a3b8)">
@@ -417,7 +437,9 @@
                     {{ $groupedTasks->flatten()->count() }} zadań
                 @endif
                 @if($groupBy)
-                    <span class="ms-2 badge" style="font-size:0.65rem;background:rgba(6,182,212,.15);color:#67e8f9;border:1px solid rgba(6,182,212,.25)">grupowanie</span>
+                    <span class="ms-2 badge"
+                          title="Przeciągnij zadanie (uchwyt ⋮⋮) na inną grupę, żeby zmienić: {{ $availableColumns[$groupBy]['label'] ?? '' }}"
+                          style="font-size:0.65rem;background:rgba(6,182,212,.15);color:#67e8f9;border:1px solid rgba(6,182,212,.25)">grupowanie</span>
                 @endif
             </div>
         </div>
@@ -512,12 +534,14 @@
             <tbody>
                 @if($groupedTasks)
                     {{-- GROUPED VIEW --}}
-                    @foreach($groupedTasks as $groupName => $groupItems)
+                    @foreach($groupedTasks as $groupValue => $groupItems)
                     @include('livewire.partials.tasks-grid-group-header', [
-                        'groupName' => $groupName,
+                        'groupName' => $this->groupKeyFor($groupItems->first()),
+                        'groupValue' => (string) $groupValue,
                         'groupItems' => $groupItems,
+                        'groupSubtitle' => $groupBy === 'sprint' ? $groupItems->first()?->sprint?->goal : null,
                     ])
-                    @unless($this->isGroupCollapsed((string) $groupName))
+                    @unless($this->isGroupCollapsed((string) $groupValue))
                         @foreach($groupItems as $task)
                             @include('livewire.partials.tasks-grid-row', compact('task'))
                         @endforeach
@@ -536,7 +560,7 @@
                         <td colspan="{{ $colCount }}" class="text-center text-muted py-5">
                             <i class="bi bi-inbox display-5 d-block mb-2 opacity-30"></i>
                             <div>Brak zadań spełniających kryteria</div>
-                            @if($searchTask || $searchProject || $searchCategory || $searchAssignedTo)
+                            @if($searchTask || $searchCategory || $searchAssignedTo)
                                 <button wire:click="clearFilters" class="btn btn-sm btn-link mt-1">Wyczyść filtry</button>
                             @endif
                         </td>
@@ -576,12 +600,12 @@
                     </td>
                     @endif
 
-                    @if(in_array('project', $visibleColumns))
+                    @if(in_array('sprint', $visibleColumns))
                     <td style="padding:4px 6px">
-                        <select wire:model="newTaskProject" class="form-select form-select-sm" style="min-width:110px">
-                            <option value="">Brak projektu</option>
-                            @foreach($allProjects as $p)
-                                <option value="{{ $p->id }}">{{ $p->name }}</option>
+                        <select wire:model="newTaskSprint" class="form-select form-select-sm" style="min-width:130px">
+                            <option value="">Poza sprintem</option>
+                            @foreach($allSprints as $sprintOption)
+                                <option value="{{ $sprintOption->id }}">{{ $sprintOption->name }}</option>
                             @endforeach
                         </select>
                     </td>

@@ -11,7 +11,7 @@
         <div class="row">
             <div class="col-md-8">
                 <div class="row g-2">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                 <input 
                     type="text" 
                     wire:model.live.debounce.300ms="searchTask" 
@@ -19,15 +19,7 @@
                     class="form-control form-control-sm">
             </div>
           
-                    <div class="col-md-3">
-                <input 
-                    type="text" 
-                    wire:model.live.debounce.300ms="searchProject" 
-                    placeholder="Szukaj projektu..."
-                    class="form-control form-control-sm">
-                    </div>
-
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <input 
                             type="text" 
                             wire:model.live.debounce.300ms="searchCategory" 
@@ -35,7 +27,7 @@
                             class="form-control form-control-sm">
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <input 
                             type="text" 
                             wire:model.live.debounce.300ms="searchAssignedTo" 
@@ -125,7 +117,6 @@
         <div class="row g-3">
             @foreach($tasks as $task)
                 @php
-                    $hasProject = $task->project !== null;
                     $badgeVariant = match($task->status) {
                         \App\Enums\TaskStatus::PENDING => 'warning',
                         \App\Enums\TaskStatus::IN_PROGRESS => 'info',
@@ -142,7 +133,7 @@
                 <div class="col-12" wire:key="task-{{ $task->id }}" id="task-{{ $task->id }}">
                     <div class="card">
                         <div class="card-body">
-                            <!-- GŁÓWNY WIERSZ 1: Tytuł + Opis (lewa) + Badge (Status, Projekt, Due Date) (prawa) -->
+                            <!-- GŁÓWNY WIERSZ 1: Tytuł + Opis (lewa) + Badge (Status, Kategoria, Termin) (prawa) -->
                             <div class="row g-3 mb-3">
                                 <!-- Lewa strona: Tytuł + Opis -->
                                 <div class="col-md-6">
@@ -163,10 +154,10 @@
                                     @endif
                                 </div>
                                 
-                                <!-- Prawa strona: Badge (Status, Projekt, Kategoria, Termin, Komentarze) -->
+                                <!-- Prawa strona: Badge (Status, Kategoria, Termin, Komentarze) -->
                                 <div class="col-md-6">
                                     <div class="d-flex flex-column gap-2">
-                                        <!-- Linia 1: Status / Projekt / Kategoria -->
+                                        <!-- Linia 1: Status / Kategoria -->
                                     <div class="d-flex gap-3 flex-wrap align-items-end">
                                         <!-- Status -->
                                         <div>
@@ -174,34 +165,6 @@
                                                 <i class="bi bi-flag me-1"></i>Status
                                             </small>
                                             <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
-                                        </div>
-                                        
-                                        <!-- Projekt -->
-                                        <div>
-                                            <small class="text-muted d-block mb-1">
-                                                <i class="bi bi-folder me-1"></i>Projekt
-                                            </small>
-                                            @if($this->canQuickEditTask($task))
-                                                @if($task->project)
-                                                    <button type="button" class="badge bg-secondary border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'project', $event.clientX, $event.clientY)">
-                                                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
-                                                    </button>
-                                                @else
-                                                    <button type="button" class="badge bg-light text-dark border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'project', $event.clientX, $event.clientY)">
-                                                        <i class="bi bi-x-circle me-1"></i>Brak projektu
-                                                    </button>
-                                                @endif
-                                            @else
-                                                @if($task->project)
-                                                    <span class="badge bg-secondary">
-                                                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge bg-light text-dark">
-                                                        <i class="bi bi-x-circle me-1"></i>Brak projektu
-                                                    </span>
-                                                @endif
-                                            @endif
                                         </div>
                                         
                                             <!-- Kategoria -->

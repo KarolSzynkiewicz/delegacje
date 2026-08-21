@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\LogisticsEventStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\TaskStatus;
 use Illuminate\Support\Str;
 
 /**
@@ -146,7 +147,7 @@ final class AuditDiff
             return $fallback;
         }
 
-        foreach ([LogisticsEventStatus::class, ProjectStatus::class] as $enumClass) {
+        foreach ([LogisticsEventStatus::class, ProjectStatus::class, TaskStatus::class] as $enumClass) {
             $case = $enumClass::tryFrom($v);
             if ($case !== null) {
                 return $case->label();

@@ -25,7 +25,8 @@ class ProjectTask extends Model
     }
 
     protected $fillable = [
-        'project_id',
+        'sprint_id',
+        'sprint_position',
         'name',
         'description',
         'status',
@@ -47,12 +48,9 @@ class ProjectTask extends Model
         'completed_at' => 'datetime',
     ];
 
-    /**
-     * Get the project that owns the task.
-     */
-    public function project(): BelongsTo
+    public function sprint(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Sprint::class);
     }
 
     /**

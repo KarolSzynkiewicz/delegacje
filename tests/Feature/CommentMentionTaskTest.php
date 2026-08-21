@@ -59,7 +59,6 @@ class CommentMentionTaskTest extends TestCase
         $this->assertSame($this->user->id, $task->created_by);
         $this->assertSame('Komentarz', $task->category);
         $this->assertSame('Wzmianka od karol', $task->name);
-        $this->assertSame($project->id, $task->project_id);
         $this->assertStringContainsString('@robert! sprawdź to', (string) $task->description);
         $this->assertStringContainsString('#comment-'.$comment->id, (string) $task->description);
 

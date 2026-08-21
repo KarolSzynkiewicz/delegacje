@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
 use App\Livewire\TasksGrid;
-use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\Sprint;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -63,39 +63,39 @@ class TasksGridGroupCollapseTest extends TestCase
             ->assertSee('Ukrywane zadanie A');
     }
 
-    public function test_group_chevron_matches_task_expand_and_hides_brak_projektu(): void
+    public function test_group_chevron_matches_task_expand_and_hides_poza_sprintem(): void
     {
         $hidden = ProjectTask::query()->create([
-            'name' => 'Zadanie bez projektu',
+            'name' => 'Zadanie poza sprintem',
             'status' => TaskStatus::PENDING,
             'created_by' => $this->user->id,
-            'project_id' => null,
+            'sprint_id' => null,
         ]);
-        $shown = $this->makeTask('Zadanie z projektem', 'Inne');
+        $shown = $this->makeTask('Zadanie ze sprintem', 'Inne', Sprint::factory()->create()->id);
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->set('groupBy', 'project')
-            ->assertSee('Zadanie bez projektu')
-            ->assertSeeHtml("toggleGroupCollapse('".md5('Brak projektu')."')")
-            ->call('toggleGroupCollapse', md5('Brak projektu'))
-            ->assertDontSee('Zadanie bez projektu')
-            ->assertSee('Zadanie z projektem')
-            ->assertSee('Brak projektu');
+            ->set('groupBy', 'sprint')
+            ->assertSee('Zadanie poza sprintem')
+            ->assertSeeHtml("toggleGroupCollapse('".md5('')."')")
+            ->call('toggleGroupCollapse', md5(''))
+            ->assertDontSee('Zadanie poza sprintem')
+            ->assertSee('Zadanie ze sprintem')
+            ->assertSee('Poza sprintem');
 
-        $this->assertNull($hidden->fresh()->project_id);
+        $this->assertNull($hidden->fresh()->sprint_id);
         $this->assertSame(TaskStatus::PENDING, $hidden->fresh()->status);
-        $this->assertNotNull($shown->fresh()->project_id);
+        $this->assertNotNull($shown->fresh()->sprint_id);
     }
 
-    private function makeTask(string $name, string $category): ProjectTask
+    private function makeTask(string $name, string $category, ?int $sprintId = null): ProjectTask
     {
         return ProjectTask::query()->create([
             'name' => $name,
             'category' => $category,
             'status' => TaskStatus::PENDING,
             'created_by' => $this->user->id,
-            'project_id' => Project::factory()->create()->id,
+            'sprint_id' => $sprintId,
         ]);
     }
 }

@@ -14,6 +14,13 @@ class StoreProjectTaskRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('sprint_id') === '') {
+            $this->merge(['sprint_id' => null]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -22,7 +29,7 @@ class StoreProjectTaskRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'project_id' => ['nullable', 'exists:projects,id'],
+            'sprint_id' => ['nullable', 'exists:sprints,id'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'assigned_to' => ['nullable', 'exists:users,id'],

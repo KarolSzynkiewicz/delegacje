@@ -110,18 +110,6 @@ class AuthServiceProvider extends ServiceProvider
                     }
                     break;
 
-                case 'markInProgress':
-                case 'markCompleted':
-                case 'cancel':
-                    // Dla ProjectTask - sprawdź project_id z modelu
-                    if ($modelClass === \App\Models\ProjectTask::class && isset($arguments[0])) {
-                        $task = $arguments[0];
-                        if ($task instanceof \App\Models\ProjectTask) {
-                            return $user->managesProject($task->project_id) ? true : null;
-                        }
-                    }
-                    break;
-
                 case 'bulkUpdate':
                     // Dla TimeLog - sprawdź assignments z requestu
                     if ($modelClass === \App\Models\TimeLog::class) {

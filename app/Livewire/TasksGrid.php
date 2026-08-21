@@ -4,10 +4,11 @@ namespace App\Livewire;
 
 use App\Enums\TaskStatus;
 use App\Models\Comment;
-use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\Sprint;
 use App\Models\TaskGridView;
 use App\Models\TaskSubtask;
+use App\Models\TaskSubtaskEvent;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
@@ -25,8 +26,6 @@ class TasksGrid extends Component
 
     // Filters
     public string $searchTask = '';
-
-    public string $searchProject = '';
 
     public string $searchCategory = '';
 
@@ -48,7 +47,7 @@ class TasksGrid extends Component
     public array $collapsedGroups = [];
 
     // Column management
-    public array $visibleColumns = ['name', 'status', 'project', 'category', 'assigned_to', 'priority', 'due_date', 'subtasks'];
+    public array $visibleColumns = ['name', 'status', 'sprint', 'category', 'assigned_to', 'priority', 'due_date', 'subtasks'];
 
     public array $columnWidths = [];
 
@@ -56,6 +55,9 @@ class TasksGrid extends Component
     public string $view = '';
 
     public string $saveViewName = '';
+
+    /** Gdy ustawione, siatka pokazuje tylko zadania tego sprintu (np. na stronie sprintu). */
+    public ?int $lockedSprintId = null;
 
     // Expanded rows (task IDs)
     public array $expandedTasks = [];
@@ -72,7 +74,7 @@ class TasksGrid extends Component
 
     public string $newTaskName = '';
 
-    public string $newTaskProject = '';
+    public string $newTaskSprint = '';
 
     public string $newTaskCategory = '';
 
@@ -92,23 +94,30 @@ class TasksGrid extends Component
 
     private bool $batchingViewPersist = false;
 
-    protected $queryString = [
-        'searchTask' => ['except' => '', 'history' => true],
-        'searchProject' => ['except' => '', 'history' => true],
-        'searchCategory' => ['except' => '', 'history' => true],
-        'searchAssignedTo' => ['except' => '', 'history' => true],
-        'status' => ['except' => '', 'history' => true],
-        'myTasksOnly' => ['except' => false, 'history' => true],
-        'sortField' => ['except' => 'created_at', 'history' => true],
-        'sortDirection' => ['except' => 'desc', 'history' => true],
-        'groupBy' => ['except' => '', 'history' => true],
-        'view' => ['except' => '', 'history' => true],
-    ];
+    private ?string $groupByBeforeUpdate = null;
+
+    protected function queryString(): array
+    {
+        if ($this->isLockedToSprint()) {
+            return [];
+        }
+
+        return [
+            'searchTask' => ['except' => '', 'history' => true],
+            'searchCategory' => ['except' => '', 'history' => true],
+            'searchAssignedTo' => ['except' => '', 'history' => true],
+            'status' => ['except' => '', 'history' => true],
+            'myTasksOnly' => ['except' => false, 'history' => true],
+            'sortField' => ['except' => 'created_at', 'history' => true],
+            'sortDirection' => ['except' => 'desc', 'history' => true],
+            'groupBy' => ['except' => '', 'history' => true],
+            'view' => ['except' => '', 'history' => true],
+        ];
+    }
 
     /** @var list<string> */
     protected array $persistableViewProperties = [
         'searchTask',
-        'searchProject',
         'searchCategory',
         'searchAssignedTo',
         'status',
@@ -122,9 +131,32 @@ class TasksGrid extends Component
 
     public function mount(): void
     {
+        if ($this->isLockedToSprint()) {
+            $this->status = 'all';
+            $this->sortField = 'sprint_position';
+            $this->sortDirection = 'asc';
+            $this->groupBy = '';
+            $this->view = '';
+            $this->newTaskSprint = (string) $this->lockedSprintId;
+            $this->visibleColumns = array_values(array_filter(
+                $this->visibleColumns,
+                fn ($col) => $col !== 'sprint'
+            ));
+            $this->hideGroupedColumn();
+
+            return;
+        }
+
         if ($this->view !== '' && $this->gridViewsTableExists()) {
             $this->loadViewFromSlug($this->view, flash: false);
         }
+
+        $this->hideGroupedColumn();
+    }
+
+    public function isLockedToSprint(): bool
+    {
+        return (int) $this->lockedSprintId > 0;
     }
 
     public function getAvailableColumnsProperty(): array
@@ -132,7 +164,7 @@ class TasksGrid extends Component
         return [
             'name' => ['label' => 'Nazwa', 'sortable' => true, 'always' => true],
             'status' => ['label' => 'Status', 'sortable' => true],
-            'project' => ['label' => 'Projekt', 'sortable' => true],
+            'sprint' => ['label' => 'Sprint', 'sortable' => true],
             'category' => ['label' => 'Kategoria', 'sortable' => true],
             'assigned_to' => ['label' => 'Przypisany', 'sortable' => false],
             'priority' => ['label' => 'Priorytet', 'sortable' => true],
@@ -146,7 +178,7 @@ class TasksGrid extends Component
 
     public function updating(string $name, mixed $value): void
     {
-        if (in_array($name, ['searchTask', 'searchProject', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly'], true)) {
+        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly'], true)) {
             $this->resetPage();
         }
     }
@@ -164,14 +196,20 @@ class TasksGrid extends Component
     {
         $this->batchingViewPersist = true;
         $this->searchTask = '';
-        $this->searchProject = '';
         $this->searchCategory = '';
         $this->searchAssignedTo = '';
         $this->status = '';
         $this->myTasksOnly = false;
         $this->sortField = 'created_at';
         $this->sortDirection = 'desc';
+        $previousGroup = $this->groupBy;
         $this->groupBy = '';
+        $this->syncColumnsAfterGroupChange($previousGroup);
+        if ($this->isLockedToSprint()) {
+            $this->status = 'all';
+            $this->sortField = 'sprint_position';
+            $this->sortDirection = 'asc';
+        }
         $this->batchingViewPersist = false;
         $this->resetPage();
         $this->persistActiveView();
@@ -190,7 +228,32 @@ class TasksGrid extends Component
 
     public function setGroupBy(string $field): void
     {
-        $this->groupBy = $this->groupBy === $field ? '' : $field;
+        if ($this->isLockedToSprint() && $field === 'sprint') {
+            return;
+        }
+
+        $previous = $this->groupBy;
+        $this->groupBy = ($field === '' || $previous === $field) ? '' : $field;
+        $this->syncColumnsAfterGroupChange($previous);
+        $this->collapsedGroups = [];
+        $this->resetPage();
+    }
+
+    public function updatingGroupBy(mixed $value): void
+    {
+        $this->groupByBeforeUpdate = $this->groupBy;
+    }
+
+    public function updatedGroupBy(mixed $value): void
+    {
+        if ($this->batchingViewPersist) {
+            $this->hideGroupedColumn();
+
+            return;
+        }
+
+        $this->syncColumnsAfterGroupChange($this->groupByBeforeUpdate ?? '');
+        $this->groupByBeforeUpdate = null;
         $this->collapsedGroups = [];
         $this->resetPage();
     }
@@ -230,6 +293,14 @@ class TasksGrid extends Component
             return;
         }
 
+        if ($key !== '' && $key === $this->groupBy) {
+            return;
+        }
+
+        if ($this->isLockedToSprint() && $key === 'sprint') {
+            return;
+        }
+
         if (in_array($key, $this->visibleColumns)) {
             $this->visibleColumns = array_values(array_filter($this->visibleColumns, fn ($c) => $c !== $key));
         } else {
@@ -258,7 +329,7 @@ class TasksGrid extends Component
         $this->editingValue = match ($field) {
             'name' => $task->name,
             'status' => $task->status->value,
-            'project' => $task->project_id ? (string) $task->project_id : '',
+            'sprint' => $task->sprint_id ? (string) $task->sprint_id : '',
             'category' => $task->category ?? '',
             'assigned_to' => $task->assigned_to ? (string) $task->assigned_to : '',
             'priority' => $task->priority ? (string) $task->priority : '',
@@ -284,7 +355,7 @@ class TasksGrid extends Component
         match ($this->editingField) {
             'name' => $task->update(['name' => trim($this->editingValue) ?: $task->name]),
             'status' => $this->applyStatusChange($task, $this->editingValue),
-            'project' => $task->update(['project_id' => $this->editingValue === '' ? null : (int) $this->editingValue]),
+            'sprint' => $this->applySprintChange($task, $this->editingValue),
             'category' => $task->update(['category' => $this->editingValue === '' ? null : trim($this->editingValue)]),
             'assigned_to' => $this->applyAssigneeChange($task, $this->editingValue),
             'priority' => $task->update(['priority' => $this->editingValue === '' ? null : (int) $this->editingValue]),
@@ -341,16 +412,23 @@ class TasksGrid extends Component
     {
         $this->validate([
             'newTaskName' => 'required|string|max:255',
-            'newTaskProject' => 'nullable|exists:projects,id',
+            'newTaskSprint' => 'nullable|exists:sprints,id',
             'newTaskAssignedTo' => 'nullable|exists:users,id',
             'newTaskPriority' => 'nullable|integer|min:1|max:5',
             'newTaskDueDate' => 'nullable|date',
             'newTaskCategory' => 'nullable|string|max:255',
         ]);
 
+        $sprintId = $this->isLockedToSprint()
+            ? $this->lockedSprintId
+            : ($this->newTaskSprint ?: null);
+
         ProjectTask::create([
             'name' => $this->newTaskName,
-            'project_id' => $this->newTaskProject ?: null,
+            'sprint_id' => $sprintId,
+            'sprint_position' => $sprintId
+                ? (int) ProjectTask::query()->where('sprint_id', $sprintId)->max('sprint_position') + 1
+                : null,
             'assigned_to' => $this->newTaskAssignedTo ?: null,
             'priority' => $this->newTaskPriority ?: null,
             'due_date' => $this->newTaskDueDate ?: null,
@@ -359,7 +437,10 @@ class TasksGrid extends Component
             'created_by' => auth()->id(),
         ]);
 
-        $this->reset(['newTaskName', 'newTaskProject', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate']);
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate']);
+        if ($this->isLockedToSprint()) {
+            $this->newTaskSprint = (string) $this->lockedSprintId;
+        }
         $this->showAddRow = false;
         $this->flash = 'Zadanie dodane.';
     }
@@ -392,6 +473,8 @@ class TasksGrid extends Component
             'created_by' => auth()->id(),
         ]);
 
+        TaskSubtaskEvent::log($subtask, 'created', auth()->id());
+
         $parent = ProjectTask::query()->find($this->addingSubtaskForTask);
         if ($parent && auth()->user()) {
             app(UserMentionService::class)->notifySubtaskMentions(
@@ -420,7 +503,13 @@ class TasksGrid extends Component
             return;
         }
 
-        $subtask->is_completed ? $subtask->markIncomplete() : $subtask->markCompleted();
+        if ($subtask->is_completed) {
+            $subtask->markIncomplete();
+            TaskSubtaskEvent::log($subtask, 'reopened', auth()->id());
+        } else {
+            $subtask->markCompleted();
+            TaskSubtaskEvent::log($subtask, 'completed', auth()->id());
+        }
     }
 
     public function saveView(): void
@@ -519,7 +608,6 @@ class TasksGrid extends Component
         return TasksGridUrlParams::normalize([
             'view' => $this->view,
             'searchTask' => $this->searchTask,
-            'searchProject' => $this->searchProject,
             'searchCategory' => $this->searchCategory,
             'searchAssignedTo' => $this->searchAssignedTo,
             'status' => $this->status,
@@ -532,7 +620,9 @@ class TasksGrid extends Component
 
     protected function gridViewsTableExists(): bool
     {
-        return Schema::hasTable('task_grid_views');
+        static $exists = null;
+
+        return $exists ??= Schema::hasTable('task_grid_views');
     }
 
     protected function loadViewFromSlug(string $slug, bool $flash = true): void
@@ -568,13 +658,86 @@ class TasksGrid extends Component
         $this->sortField = $record->sort_field ?: 'created_at';
         $this->sortDirection = $record->sort_direction ?: 'desc';
         $this->searchTask = $record->search_task ?? '';
-        $this->searchProject = $record->search_project ?? '';
         $this->searchCategory = $record->search_category ?? '';
         $this->searchAssignedTo = $record->search_assigned_to ?? '';
         $this->status = $record->status ?? '';
         $this->myTasksOnly = (bool) ($record->my_tasks_only ?? false);
+        $this->sanitizeRemovedProjectField();
+        $this->hideGroupedColumn();
         $this->batchingViewPersist = false;
         $this->resetPage();
+    }
+
+    /**
+     * Stare zapisane widoki mogły mieć kolumnę / grupowanie / sort po projekcie.
+     */
+    protected function sanitizeRemovedProjectField(): void
+    {
+        $this->visibleColumns = array_values(array_filter(
+            $this->visibleColumns,
+            fn ($col) => $col !== 'project'
+        ));
+
+        if ($this->visibleColumns === []) {
+            $this->visibleColumns = ['name', 'status', 'sprint', 'category', 'assigned_to', 'priority', 'due_date', 'subtasks'];
+        }
+
+        if ($this->groupBy === 'project') {
+            $this->groupBy = '';
+        }
+
+        if ($this->sortField === 'project') {
+            $this->sortField = 'created_at';
+        }
+    }
+
+    protected function hideGroupedColumn(): void
+    {
+        if ($this->groupBy === '' || $this->groupBy === 'name') {
+            return;
+        }
+
+        if (! in_array($this->groupBy, $this->visibleColumns, true)) {
+            return;
+        }
+
+        $this->visibleColumns = array_values(array_filter(
+            $this->visibleColumns,
+            fn ($col) => $col !== $this->groupBy
+        ));
+    }
+
+    protected function syncColumnsAfterGroupChange(string $previous): void
+    {
+        if ($previous !== '' && $previous !== $this->groupBy) {
+            $this->insertVisibleColumn($previous);
+        }
+
+        $this->hideGroupedColumn();
+    }
+
+    protected function insertVisibleColumn(string $key): void
+    {
+        if (in_array($key, $this->visibleColumns, true)) {
+            return;
+        }
+
+        $canonical = array_keys($this->availableColumns);
+        $targetIdx = array_search($key, $canonical, true);
+        $insertAt = count($this->visibleColumns);
+
+        if ($targetIdx !== false) {
+            foreach ($this->visibleColumns as $i => $col) {
+                $colIdx = array_search($col, $canonical, true);
+                if ($colIdx !== false && $colIdx > $targetIdx) {
+                    $insertAt = $i;
+                    break;
+                }
+            }
+        }
+
+        array_splice($this->visibleColumns, $insertAt, 0, [$key]);
+        $this->visibleColumns = array_values($this->visibleColumns);
     }
 
     protected function viewPayload(): array
@@ -586,7 +749,7 @@ class TasksGrid extends Component
             'sort_field' => $this->sortField,
             'sort_direction' => $this->sortDirection,
             'search_task' => $this->searchTask,
-            'search_project' => $this->searchProject,
+            'search_project' => '',
             'search_category' => $this->searchCategory,
             'search_assigned_to' => $this->searchAssignedTo,
             'status' => $this->status,
@@ -596,7 +759,7 @@ class TasksGrid extends Component
 
     protected function persistActiveView(): void
     {
-        if ($this->view === '' || ! $this->gridViewsTableExists()) {
+        if ($this->isLockedToSprint() || $this->view === '' || ! $this->gridViewsTableExists()) {
             return;
         }
 
@@ -633,6 +796,111 @@ class TasksGrid extends Component
         return app(ProjectTaskPolicy::class)->updateStatus($user, $task);
     }
 
+    /**
+     * Przenosi zadanie do innej grupy w widoku grupowanym (jak na tablicy Kanban).
+     * Zmienia pole, po którym aktualnie grupujemy: osobę, sprint, kategorię, status albo priorytet.
+     */
+    public function moveTaskToGroup(int $taskId, mixed $groupValue): void
+    {
+        if (! in_array($this->groupBy, ['status', 'sprint', 'category', 'assigned_to', 'priority'], true)) {
+            return;
+        }
+
+        $groupValue = $groupValue === null ? '' : (string) $groupValue;
+
+        $task = ProjectTask::with(['assignedTo', 'sprint'])->find($taskId);
+        if (! $task || ! $this->canEditTask($task)) {
+            return;
+        }
+
+        if ($this->groupValueFor($task) === $groupValue) {
+            return;
+        }
+
+        match ($this->groupBy) {
+            'status' => $this->applyGroupedStatusChange($task, $groupValue),
+            'sprint' => $this->applyGroupedSprintChange($task, $groupValue),
+            'category' => $this->applyGroupedCategoryChange($task, $groupValue),
+            'assigned_to' => $this->applyGroupedAssigneeChange($task, $groupValue),
+            'priority' => $this->applyGroupedPriorityChange($task, $groupValue),
+            default => null,
+        };
+
+        $this->flash = 'Zadanie przeniesione.';
+    }
+
+    protected function applyGroupedStatusChange(ProjectTask $task, string $value): void
+    {
+        if (TaskStatus::tryFrom($value) === null) {
+            return;
+        }
+
+        $this->applyStatusChange($task, $value);
+    }
+
+    protected function applySprintChange(ProjectTask $task, string $value): void
+    {
+        $this->applyGroupedSprintChange($task, $value);
+    }
+
+    protected function applyGroupedSprintChange(ProjectTask $task, string $value): void
+    {
+        if ($this->isLockedToSprint()) {
+            return;
+        }
+
+        if ($value === '') {
+            $task->update(['sprint_id' => null, 'sprint_position' => null]);
+
+            return;
+        }
+
+        $sprintId = (int) $value;
+        if ($sprintId < 1 || ! Sprint::query()->where('id', $sprintId)->exists()) {
+            return;
+        }
+
+        $position = (int) ProjectTask::query()->where('sprint_id', $sprintId)->max('sprint_position') + 1;
+        $task->update([
+            'sprint_id' => $sprintId,
+            'sprint_position' => $position,
+        ]);
+    }
+
+    protected function applyGroupedCategoryChange(ProjectTask $task, string $value): void
+    {
+        $category = $value === '' ? null : mb_substr(trim($value), 0, 255);
+        $task->update(['category' => $category === '' ? null : $category]);
+    }
+
+    protected function applyGroupedAssigneeChange(ProjectTask $task, string $value): void
+    {
+        if ($value !== '') {
+            $userId = (int) $value;
+            if ($userId < 1 || ! User::query()->where('id', $userId)->exists()) {
+                return;
+            }
+        }
+
+        $this->applyAssigneeChange($task, $value);
+    }
+
+    protected function applyGroupedPriorityChange(ProjectTask $task, string $value): void
+    {
+        if ($value === '') {
+            $task->update(['priority' => null]);
+
+            return;
+        }
+
+        $priority = (int) $value;
+        if (! in_array($priority, [1, 2, 3, 4, 5], true)) {
+            return;
+        }
+
+        $task->update(['priority' => $priority]);
+    }
+
     public function moveSubtask(int $subtaskId, int $targetTaskId, ?int $afterSubtaskId = null): void
     {
         $subtask = TaskSubtask::find($subtaskId);
@@ -654,6 +922,10 @@ class TasksGrid extends Component
 
         // Move to target task
         $subtask->update(['task_id' => $targetTaskId]);
+
+        if ($isCrossTask) {
+            TaskSubtaskEvent::log($subtask, 'moved', auth()->id());
+        }
 
         // Re-compute sort_order within the target task
         $siblings = TaskSubtask::where('task_id', $targetTaskId)
@@ -815,11 +1087,11 @@ class TasksGrid extends Component
         return 'vendor.livewire.simple-pagination';
     }
 
-    protected function groupKeyFor(ProjectTask $task): string
+    public function groupKeyFor(ProjectTask $task): string
     {
         return match ($this->groupBy) {
             'status' => $task->status->label(),
-            'project' => $task->project?->name ?? 'Brak projektu',
+            'sprint' => $task->sprint?->label() ?? 'Poza sprintem',
             'category' => $task->category ?? 'Brak kategorii',
             'assigned_to' => $task->assignedTo?->name ?? 'Nieprzypisane',
             'priority' => $task->priority ? "Priorytet {$task->priority}" : 'Brak priorytetu',
@@ -827,21 +1099,31 @@ class TasksGrid extends Component
         };
     }
 
+    /**
+     * Stabilny identyfikator grupy (ID / wartość pola), niezależny od etykiety na ekranie.
+     */
+    public function groupValueFor(ProjectTask $task): string
+    {
+        return match ($this->groupBy) {
+            'status' => $task->status->value,
+            'sprint' => $task->sprint_id ? (string) $task->sprint_id : '',
+            'category' => $task->category ?? '',
+            'assigned_to' => $task->assigned_to ? (string) $task->assigned_to : '',
+            'priority' => $task->priority ? (string) $task->priority : '',
+            default => '',
+        };
+    }
+
     protected function filteredTasksQuery(): Builder
     {
         $query = ProjectTask::query();
 
-        if ($this->myTasksOnly) {
-            $query->where('project_tasks.assigned_to', auth()->id());
+        if ($this->isLockedToSprint()) {
+            $query->where('project_tasks.sprint_id', $this->lockedSprintId);
         }
 
-        if ($this->searchProject) {
-            $s = strtolower($this->searchProject);
-            if ($s === 'brak projektu') {
-                $query->whereNull('project_tasks.project_id');
-            } else {
-                $query->whereHas('project', fn ($q) => $q->where('name', 'like', '%'.$this->searchProject.'%'));
-            }
+        if ($this->myTasksOnly) {
+            $query->where('project_tasks.assigned_to', auth()->id());
         }
 
         if ($this->searchTask) {
@@ -871,6 +1153,8 @@ class TasksGrid extends Component
 
     public function render()
     {
+        $this->sanitizeRemovedProjectField();
+
         $savedViews = $this->gridViewsTableExists()
             ? TaskGridView::query()
                 ->where('user_id', auth()->id())
@@ -882,25 +1166,32 @@ class TasksGrid extends Component
         $query = $this->filteredTasksQuery();
 
         // Sorting
-        if ($this->sortField === 'project') {
-            $query->leftJoin('projects', 'project_tasks.project_id', '=', 'projects.id')
+        if ($this->sortField === 'sprint') {
+            $query->leftJoin('sprints', 'project_tasks.sprint_id', '=', 'sprints.id')
                 ->select('project_tasks.*')
-                ->orderBy('projects.name', $this->sortDirection);
-        } elseif (in_array($this->sortField, ['priority', 'due_date'])) {
+                ->orderBy('sprints.start_date', $this->sortDirection);
+        } elseif (in_array($this->sortField, ['priority', 'due_date', 'sprint_position'])) {
             $query->orderByRaw("ISNULL(project_tasks.{$this->sortField}), project_tasks.{$this->sortField} {$this->sortDirection}");
         } else {
             $query->orderBy("project_tasks.{$this->sortField}", $this->sortDirection);
         }
 
-        if ($this->sortField !== 'created_at') {
+        if ($this->sortField !== 'created_at' && $this->sortField !== 'sprint_position') {
             $query->orderBy('project_tasks.created_at', 'desc');
         }
 
-        $query->with(['project', 'assignedTo', 'createdBy', 'subtasks', 'comments', 'procedureRun.subject', 'recruitmentProcess', 'subject']);
+        $eager = ['assignedTo', 'createdBy', 'subtasks', 'procedureRun.subject', 'recruitmentProcess', 'subject'];
+        if (! $this->isLockedToSprint()) {
+            $eager[] = 'sprint';
+        }
+
+        $query->with($eager)->withCount('comments');
 
         if ($this->groupBy) {
             $allTasks = $query->limit(500)->get();
-            $groupedTasks = $allTasks->groupBy(fn ($task) => $this->groupKeyFor($task))->sortKeys();
+            $groupedTasks = $allTasks
+                ->groupBy(fn ($task) => $this->groupValueFor($task))
+                ->sortBy(fn ($tasks) => mb_strtolower($this->groupKeyFor($tasks->first())));
             $tasks = null;
         } else {
             $groupedTasks = null;
@@ -910,8 +1201,10 @@ class TasksGrid extends Component
         return view('livewire.tasks-grid', [
             'tasks' => $tasks,
             'groupedTasks' => $groupedTasks,
-            'allProjects' => Project::orderBy('name')->get(),
-            'allUsers' => User::orderBy('name')->get(),
+            'allSprints' => $this->isLockedToSprint()
+                ? collect()
+                : Sprint::query()->orderByDesc('start_date')->get(),
+            'allUsers' => User::orderedDirectory(),
             'availableColumns' => $this->availableColumns,
             'savedViews' => $savedViews,
             'activeViewName' => $this->view !== ''

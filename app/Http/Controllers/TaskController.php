@@ -90,19 +90,13 @@ class TaskController extends Controller
                 ? TaskStatus::from($request->input('status'))
                 : TaskStatus::PENDING;
 
-            $projectId = $request->input('project_id');
-            // Konwertuj pusty string na null
-            if ($projectId === '' || $projectId === null) {
-                $projectId = null;
-            }
-
             $taskData = [
-                'project_id' => $projectId, // nullable
                 'name' => $request->input('name'),
                 'description' => $request->input('description'),
                 'status' => $status,
                 'priority' => $request->input('priority') ?: null,
                 'category' => $request->input('category') ?: null,
+                'sprint_id' => $request->input('sprint_id') ?: null,
                 'assigned_to' => $request->input('assigned_to') ?: null,
                 'due_date' => $request->input('due_date') ?: null,
                 'created_by' => auth()->id(),
@@ -112,7 +106,7 @@ class TaskController extends Controller
 
             $task = ProjectTask::create($taskData);
 
-            \Log::info('Task created', ['task_id' => $task->id, 'project_id' => $task->project_id]);
+            \Log::info('Task created', ['task_id' => $task->id]);
 
             // Powiadomienie dla przypisanego użytkownika (jeśli inny niż tworzący)
             if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
@@ -126,11 +120,6 @@ class TaskController extends Controller
             }
 
             $message = 'Zadanie "'.$task->name.'" zostało utworzone.';
-            if ($task->project) {
-                $message .= ' Przypisane do projektu: '.$task->project->name;
-            } else {
-                $message .= ' (bez projektu)';
-            }
 
             return redirect()->route('tasks.index')
                 ->with('success', $message)
@@ -156,7 +145,7 @@ class TaskController extends Controller
      */
     public function show(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess', 'subject']);
+        $task->load(['assignedTo', 'createdBy', 'sprint', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess', 'subject']);
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('tasks.show', compact('task', 'users'));
@@ -167,7 +156,7 @@ class TaskController extends Controller
      */
     public function edit(ProjectTask $task): View
     {
-        $task->load(['assignedTo', 'createdBy', 'project', 'attachments.uploader']);
+        $task->load(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('tasks.edit', compact('task', 'users'));
@@ -186,7 +175,7 @@ class TaskController extends Controller
         $previousAssignee = $task->assigned_to;
 
         // Aktualizuj podstawowe pola
-        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'project_id', 'priority', 'category']));
+        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'priority', 'category', 'sprint_id']));
 
         // Powiadomienie jeśli przypisano do nowego użytkownika
         $newAssignee = (int) $request->input('assigned_to');

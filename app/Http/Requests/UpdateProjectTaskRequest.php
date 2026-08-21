@@ -14,6 +14,13 @@ class UpdateProjectTaskRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('sprint_id') === '') {
+            $this->merge(['sprint_id' => null]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -25,6 +32,7 @@ class UpdateProjectTaskRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'assigned_to' => ['nullable', 'exists:users,id'],
+            'sprint_id' => ['nullable', 'exists:sprints,id'],
             'due_date' => ['nullable', 'date'],
             'status' => ['nullable', 'in:pending,in_progress,completed,cancelled'],
             'priority' => ['nullable', 'integer', 'min:1', 'max:5'],

@@ -146,6 +146,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof Employee => route('employees.show', $morph),
             $morph instanceof RecruitmentProcess => route('recruitment-processes.show', $morph),
             $morph instanceof RecruitmentCandidate => route('recruitment-processes.index'),
+            $morph instanceof Sprint => route('sprints.show', $morph),
             $morph instanceof LogisticsEvent => match ($morph->type) {
                 LogisticsEventType::DEPARTURE => route('departures.show', $morph),
                 LogisticsEventType::TRANSFER => route('transfers.show', $morph),
@@ -172,6 +173,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof LogisticsEvent => trim($morph->type->label().' '.($morph->event_date?->format('d.m.Y') ?? '')),
             $morph instanceof RecruitmentProcess => filled($morph->full_name) ? 'Rekrutacja: '.$morph->full_name : 'Rekrutacja #'.$morph->id,
             $morph instanceof RecruitmentCandidate => filled($morph->full_name) ? 'Kandydat: '.$morph->full_name : 'Kandydat #'.$morph->id,
+            $morph instanceof Sprint => filled($morph->name) ? (string) $morph->name : 'Sprint #'.$morph->id,
             default => class_basename($morph).' #'.$morph->id,
         };
     }

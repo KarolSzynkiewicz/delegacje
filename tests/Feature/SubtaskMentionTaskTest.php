@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
 use App\Livewire\TaskSubtasks;
-use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
@@ -61,7 +60,6 @@ class SubtaskMentionTaskTest extends TestCase
             "Zadanie „Przygotowanie wyjazdu” (karol) z podzadaniem dla Ciebie\n\nweź klucze",
             $task->description
         );
-        $this->assertSame($parent->project_id, $task->project_id);
         $this->assertSame(route('tasks.show', $parent), $task->sourceCard()['url']);
 
         Notification::assertSentTo($robert, TaskAssigned::class, function (TaskAssigned $notification) use ($robert, $parent): bool {
@@ -147,13 +145,10 @@ class SubtaskMentionTaskTest extends TestCase
 
     private function parentTask(): ProjectTask
     {
-        $project = Project::factory()->create();
-
         return ProjectTask::query()->create([
             'name' => 'Przygotowanie wyjazdu',
             'status' => TaskStatus::PENDING,
             'created_by' => $this->user->id,
-            'project_id' => $project->id,
         ]);
     }
 }

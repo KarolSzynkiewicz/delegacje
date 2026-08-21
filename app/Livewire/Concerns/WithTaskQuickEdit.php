@@ -13,8 +13,6 @@ trait WithTaskQuickEdit
     /** @var int|null */
     public $quickEditTaskId = null;
 
-    public string $qeProjectId = '';
-
     public string $qeCategory = '';
 
     public string $qeDueDate = '';
@@ -23,8 +21,8 @@ trait WithTaskQuickEdit
 
     public ?string $quickEditFlash = null;
 
-    /** project|category|due_date|assigned_to */
-    public string $quickEditField = 'project';
+    /** category|due_date|assigned_to */
+    public string $quickEditField = 'category';
 
     public ?float $quickEditClientX = null;
 
@@ -44,8 +42,8 @@ trait WithTaskQuickEdit
     {
         $this->quickEditFlash = null;
 
-        if (! in_array($field, ['project', 'category', 'due_date', 'assigned_to'], true)) {
-            $field = 'project';
+        if (! in_array($field, ['category', 'due_date', 'assigned_to'], true)) {
+            $field = 'category';
         }
 
         $this->quickEditField = $field;
@@ -58,7 +56,6 @@ trait WithTaskQuickEdit
         }
 
         $this->quickEditTaskId = $task->id;
-        $this->qeProjectId = $task->project_id ? (string) $task->project_id : '';
         $this->qeCategory = (string) ($task->category ?? '');
         $this->qeDueDate = $task->due_date ? $task->due_date->format('Y-m-d') : '';
         $this->qeAssignedTo = $task->assigned_to ? (string) $task->assigned_to : '';
@@ -67,11 +64,10 @@ trait WithTaskQuickEdit
     public function closeQuickEdit(): void
     {
         $this->quickEditTaskId = null;
-        $this->qeProjectId = '';
         $this->qeCategory = '';
         $this->qeDueDate = '';
         $this->qeAssignedTo = '';
-        $this->quickEditField = 'project';
+        $this->quickEditField = 'category';
         $this->quickEditClientX = null;
         $this->quickEditClientY = null;
     }
@@ -87,19 +83,18 @@ trait WithTaskQuickEdit
             abort(403);
         }
 
-        if (! in_array($this->quickEditField, ['project', 'category', 'due_date', 'assigned_to'], true)) {
-            $this->quickEditField = 'project';
+        if (! in_array($this->quickEditField, ['category', 'due_date', 'assigned_to'], true)) {
+            $this->quickEditField = 'category';
         }
 
         match ($this->quickEditField) {
-            'project' => $this->saveQuickEditProject($task),
             'category' => $this->saveQuickEditCategory($task),
             'due_date' => $this->saveQuickEditDueDate($task),
             'assigned_to' => $this->saveQuickEditAssignedTo($task),
         };
 
         $task->refresh();
-        $task->loadMissing('project', 'assignedTo');
+        $task->loadMissing('assignedTo');
 
         $this->afterTaskQuickEditSaved($task);
 
@@ -113,24 +108,6 @@ trait WithTaskQuickEdit
     protected function afterTaskQuickEditSaved(ProjectTask $task): void
     {
         //
-    }
-
-    protected function saveQuickEditProject(ProjectTask $task): void
-    {
-        Validator::make(
-            [
-                'qeProjectId' => $this->qeProjectId === '' ? null : $this->qeProjectId,
-            ],
-            [
-                'qeProjectId' => ['nullable', 'integer', 'exists:projects,id'],
-            ],
-            [
-                'qeProjectId.exists' => 'Wybrany projekt nie istnieje.',
-            ]
-        )->validate();
-
-        $projectId = $this->qeProjectId === '' ? null : (int) $this->qeProjectId;
-        $task->update(['project_id' => $projectId]);
     }
 
     protected function saveQuickEditCategory(ProjectTask $task): void

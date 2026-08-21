@@ -6,12 +6,18 @@ use App\Livewire\Pulse\UserRouteUsage;
 use App\Livewire\Pulse\UserRouteVisits;
 use App\Models\AccommodationAssignment;
 use App\Models\Adjustment;
+use App\Models\Attachment;
+use App\Models\Comment;
 use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
+use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
+use App\Models\Sprint;
+use App\Models\SprintMilestone;
+use App\Models\TaskSubtask;
 use App\Models\TransportCost;
 use App\Models\User;
 use App\Models\VehicleAssignment;
@@ -66,6 +72,12 @@ class AppServiceProvider extends ServiceProvider
         Adjustment::observe(AuditableModelObserver::class);
         LogisticsEventParticipant::observe(AuditableModelObserver::class);
         RecruitmentCandidate::observe(AuditableModelObserver::class);
+        ProjectTask::observe(AuditableModelObserver::class);
+        TaskSubtask::observe(AuditableModelObserver::class);
+        Comment::observe(AuditableModelObserver::class);
+        Sprint::observe(AuditableModelObserver::class);
+        SprintMilestone::observe(AuditableModelObserver::class);
+        Attachment::observe(AuditableModelObserver::class);
 
         ProcedureTemplate::observe(ProcedureTemplateObserver::class);
 
@@ -88,6 +100,7 @@ class AppServiceProvider extends ServiceProvider
             'warehouse_dispatch' => \App\Models\WarehouseDispatch::class,
             'comment' => \App\Models\Comment::class,
             'task_subtask' => \App\Models\TaskSubtask::class,
+            'sprint' => \App\Models\Sprint::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

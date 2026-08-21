@@ -111,14 +111,6 @@ class Project extends Model
     }
 
     /**
-     * Get the tasks for this project.
-     */
-    public function tasks(): HasMany
-    {
-        return $this->hasMany(ProjectTask::class);
-    }
-
-    /**
      * Get the managers (users) for this project.
      */
     public function managers(): BelongsToMany

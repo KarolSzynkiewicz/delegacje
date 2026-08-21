@@ -1,6 +1,5 @@
 @props([
     'task',
-    'project' => null,
     'size' => 'sm',
     'gap' => '1',
     'class' => '',

@@ -23,32 +23,6 @@
             <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
         </div>
 
-        {{-- Projekt --}}
-        <div>
-            <small class="text-muted d-block mb-1">
-                <i class="bi bi-folder me-1"></i>Projekt
-            </small>
-            @if($this->canQuickEditTask($task))
-                @if($task->project)
-                    <button type="button" class="badge bg-secondary border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'project', $event.clientX, $event.clientY)">
-                        <i class="bi bi-folder me-1"></i>{{ $task->project->name }}
-                    </button>
-                @else
-                    <button type="button" class="badge bg-light text-dark border-0" title="Szybka edycja" x-data @click.prevent="$wire.openQuickEdit({{ $task->id }}, 'project', $event.clientX, $event.clientY)">
-                        <i class="bi bi-x-circle me-1"></i>Brak projektu
-                    </button>
-                @endif
-            @else
-                @if($task->project)
-                    <a href="{{ route('projects.show', $task->project) }}" class="text-decoration-none">
-                        <span class="badge bg-secondary">{{ $task->project->name }}</span>
-                    </a>
-                @else
-                    <span class="badge bg-light text-dark"><i class="bi bi-x-circle me-1"></i>Brak projektu</span>
-                @endif
-            @endif
-        </div>
-
         {{-- Przypisany --}}
         <div>
             <small class="text-muted d-block mb-1">

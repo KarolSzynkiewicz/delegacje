@@ -12,6 +12,7 @@ use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentProcess;
+use App\Models\Sprint;
 use App\Models\User;
 use App\Models\Vehicle;
 
@@ -25,6 +26,10 @@ class AttachmentPolicy
 
         $parent = $attachment->attachable;
         if ($parent instanceof ProjectTask) {
+            return $user->hasPermission('tasks.view');
+        }
+
+        if ($parent instanceof Sprint) {
             return $user->hasPermission('tasks.view');
         }
 
@@ -44,14 +49,11 @@ class AttachmentPolicy
         $parent = $attachment->attachable;
 
         if ($parent instanceof ProjectTask) {
-            if (! $user->hasPermission('tasks.update')) {
-                return false;
-            }
-            if (! $parent->project_id) {
-                return true;
-            }
+            return $user->hasPermission('tasks.update');
+        }
 
-            return $user->managesProject($parent->project_id);
+        if ($parent instanceof Sprint) {
+            return $user->hasPermission('tasks.update');
         }
 
         if ($parent instanceof Comment) {
@@ -69,6 +71,9 @@ class AttachmentPolicy
     {
         $ctx = $comment->commentable;
         if ($ctx instanceof ProjectTask) {
+            return $user->hasPermission('tasks.view');
+        }
+        if ($ctx instanceof Sprint) {
             return $user->hasPermission('tasks.view');
         }
         if ($ctx instanceof Project) {

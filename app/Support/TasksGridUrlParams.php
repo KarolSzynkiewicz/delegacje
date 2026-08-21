@@ -8,7 +8,6 @@ class TasksGridUrlParams
     public const KEYS = [
         'view',
         'searchTask',
-        'searchProject',
         'searchCategory',
         'searchAssignedTo',
         'status',

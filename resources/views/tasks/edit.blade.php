@@ -46,20 +46,6 @@
                         <div class="col-md-6 mb-3 mb-md-0">
                             <x-ui.input 
                                 type="select" 
-                                name="project_id" 
-                                label="Projekt (opcjonalnie)"
-                            >
-                                <option value="">Brak projektu</option>
-                                @foreach(\App\Models\Project::orderBy('name')->get() as $project)
-                                    <option value="{{ $project->id }}" {{ old('project_id', $task->project_id) == $project->id ? 'selected' : '' }}>
-                                        {{ $project->name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.input>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <x-ui.input 
-                                type="select" 
                                 name="assigned_to" 
                                 label="Przypisz do"
                             >
@@ -108,6 +94,21 @@
                                 <option value="cancelled" {{ old('status', $task->status->value) === 'cancelled' ? 'selected' : '' }}>Anulowane</option>
                             </x-ui.input>
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input
+                            type="select"
+                            name="sprint_id"
+                            label="Sprint"
+                        >
+                            <option value="">Poza sprintem</option>
+                            @foreach(\App\Models\Sprint::query()->orderByDesc('start_date')->get() as $sprintOption)
+                                <option value="{{ $sprintOption->id }}" {{ old('sprint_id', $task->sprint_id) == $sprintOption->id ? 'selected' : '' }}>
+                                    {{ $sprintOption->label() }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
                     </div>
                     
                     <div class="mb-3">

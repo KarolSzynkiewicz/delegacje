@@ -15,8 +15,7 @@
     $inputLabelText = $inputLabel ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
     $buttonTextValue = $buttonText ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
 
-    $commentAutocompleteUsers = \App\Models\User::orderBy('name')
-        ->get()
+    $commentAutocompleteUsers = \App\Models\User::orderedDirectory()
         ->map(fn ($u) => ['name' => $u->name, 'initials' => $u->initials])
         ->values()
         ->all();

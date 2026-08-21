@@ -55,8 +55,6 @@ class WeeklyOverviewService
 
         $projects = Project::with([
             'location',
-            'tasks.assignedTo',
-            'tasks.createdBy',
         ])
             // Show only projects that overlap the selected week by at least one day.
             ->where(function ($q) use ($weekEnd) {
@@ -302,7 +300,6 @@ class WeeklyOverviewService
             'accommodations' => $accommodations,
             'vehicles' => $vehicles,
             'assigned_employees' => $assignedEmployees,
-            'tasks' => $project->tasks,
             'service_repairs' => $serviceRepairs,
             'has_data' => $demands->isNotEmpty() || $assignments->isNotEmpty(),
         ];

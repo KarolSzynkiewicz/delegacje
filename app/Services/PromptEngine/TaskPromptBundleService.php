@@ -21,7 +21,6 @@ class TaskPromptBundleService
 
         $tasks = ProjectTask::query()
             ->with([
-                'project:id,name',
                 'assignedTo:id,name',
                 'createdBy:id,name',
                 'subtasks' => fn ($q) => $q->orderBy('created_at')->orderBy('id'),
@@ -120,10 +119,6 @@ class TaskPromptBundleService
             'created_at' => $task->created_at?->toIso8601String(),
             'updated_at' => $task->updated_at?->toIso8601String(),
             'subtasks_progress_percent' => $task->subtasks_progress,
-            'project' => $task->project ? [
-                'id' => $task->project->id,
-                'name' => $task->project->name,
-            ] : null,
             'assigned_to' => $task->assignedTo ? [
                 'id' => $task->assignedTo->id,
                 'name' => $task->assignedTo->name,
