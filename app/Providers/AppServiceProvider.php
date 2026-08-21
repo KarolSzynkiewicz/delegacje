@@ -11,6 +11,7 @@ use App\Models\Comment;
 use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
+use App\Models\ProcedureRun;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectTask;
@@ -21,8 +22,10 @@ use App\Models\TaskSubtask;
 use App\Models\TransportCost;
 use App\Models\User;
 use App\Models\VehicleAssignment;
+use App\Models\WarehouseDispatch;
 use App\Observers\AuditableModelObserver;
 use App\Observers\ProcedureTemplateObserver;
+use App\Observers\SyncsWorkItems;
 use App\Services\SystemBootstrapService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
@@ -81,6 +84,11 @@ class AppServiceProvider extends ServiceProvider
 
         ProcedureTemplate::observe(ProcedureTemplateObserver::class);
 
+        ProjectTask::observe(SyncsWorkItems::class);
+        TaskSubtask::observe(SyncsWorkItems::class);
+        ProcedureRun::observe(SyncsWorkItems::class);
+        WarehouseDispatch::observe(SyncsWorkItems::class);
+
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,
             'vehicle_assignment' => \App\Models\VehicleAssignment::class,
@@ -101,6 +109,8 @@ class AppServiceProvider extends ServiceProvider
             'comment' => \App\Models\Comment::class,
             'task_subtask' => \App\Models\TaskSubtask::class,
             'sprint' => \App\Models\Sprint::class,
+            'procedure_run' => \App\Models\ProcedureRun::class,
+            'work_item' => \App\Models\WorkItem::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

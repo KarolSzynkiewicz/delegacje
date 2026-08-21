@@ -277,7 +277,7 @@ class UserMentionService
     }
 
     /**
-     * `@osoba` w podzadaniu = zadanie u tej osoby (kategoria Podzadanie). Bez `@wszyscy`.
+     * `@osoba` w podzadaniu = przypisanie tego checkboxa, nie klon zadania.
      */
     public function createSubtaskMentionTasks(ProjectTask $task, TaskSubtask $subtask, string $name, User $author): void
     {
@@ -286,52 +286,31 @@ class UserMentionService
             return;
         }
 
-        $subtask->loadMissing('task');
-        $work = self::stripMentionTokens($name);
-        $description = $this->subtaskMentionTaskDescription($task, $author, $work);
-        $assignedIds = [];
-
+        $assignee = null;
         foreach ($handles as $handle) {
             if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
                 continue;
             }
 
             $user = self::resolveUserByMentionHandle($handle);
-            if (! $user) {
-                continue;
-            }
-
-            if (isset($assignedIds[$user->id])) {
-                continue;
-            }
-            $assignedIds[$user->id] = true;
-
-            if ($subtask->tasks()->where('assigned_to', $user->id)->exists()) {
-                continue;
-            }
-
-            $mentionTask = ProjectTask::query()->create([
-                'name' => 'Wzmianka od '.$author->name,
-                'description' => $description,
-                'category' => 'Podzadanie',
-                'status' => TaskStatus::PENDING,
-                'assigned_to' => $user->id,
-                'due_date' => $task->due_date,
-                'created_by' => $author->id,
-                'subject_type' => $subtask->getMorphClass(),
-                'subject_id' => $subtask->id,
-            ]);
-
-            if ($user->id !== $author->id) {
-                $user->notify(new TaskAssigned($mentionTask, $author));
+            if ($user) {
+                $assignee = $user;
+                break;
             }
         }
-    }
 
-    private function subtaskMentionTaskDescription(ProjectTask $task, User $author, string $work): string
-    {
-        $label = 'Zadanie „'.$task->name.'” ('.$author->name.') z podzadaniem dla Ciebie';
+        if (! $assignee) {
+            return;
+        }
 
-        return $work !== '' ? $label."\n\n".$work : $label;
+        $work = self::stripMentionTokens($name);
+        $subtask->update([
+            'name' => $work !== '' ? $work : $name,
+            'assigned_to' => $assignee->id,
+        ]);
+
+        if ($assignee->id !== $author->id) {
+            $assignee->notify(new TaskAssigned($subtask->fresh() ?? $subtask, $author));
+        }
     }
 }

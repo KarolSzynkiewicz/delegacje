@@ -31,16 +31,16 @@ class TaskSubtasks extends Component
             'newSubtaskName' => 'required|string|max:255',
         ], [
             'newSubtaskName.required' => 'Nazwa podzadania jest wymagana.',
-            'newSubtaskName.max'      => 'Nazwa podzadania nie może przekraczać 255 znaków.',
+            'newSubtaskName.max' => 'Nazwa podzadania nie może przekraczać 255 znaków.',
         ]);
 
         $name = trim($this->newSubtaskName);
 
         $subtask = TaskSubtask::create([
-            'task_id'      => $this->task->id,
-            'name'         => $name,
+            'task_id' => $this->task->id,
+            'name' => $name,
             'is_completed' => false,
-            'created_by'   => auth()->id(),
+            'created_by' => auth()->id(),
         ]);
 
         TaskSubtaskEvent::log($subtask, 'created', auth()->id());
@@ -83,13 +83,13 @@ class TaskSubtasks extends Component
             abort(403, 'Nieprawidłowe podzadanie.');
         }
 
-        $this->editingSubtaskId   = $subtask->id;
+        $this->editingSubtaskId = $subtask->id;
         $this->editingSubtaskName = $subtask->name;
     }
 
     public function cancelEditSubtask(): void
     {
-        $this->editingSubtaskId   = null;
+        $this->editingSubtaskId = null;
         $this->editingSubtaskName = '';
     }
 
@@ -99,7 +99,7 @@ class TaskSubtasks extends Component
             'editingSubtaskName' => 'required|string|max:255',
         ], [
             'editingSubtaskName.required' => 'Nazwa podzadania jest wymagana.',
-            'editingSubtaskName.max'      => 'Nazwa podzadania nie może przekraczać 255 znaków.',
+            'editingSubtaskName.max' => 'Nazwa podzadania nie może przekraczać 255 znaków.',
         ]);
 
         $subtask = TaskSubtask::findOrFail($subtaskId);
@@ -187,8 +187,8 @@ class TaskSubtasks extends Component
                 : null;
 
             $meta[$subtaskId] = [
-                'created_by'   => $createdEvent?->user?->name,
-                'created_at'   => $createdEvent?->created_at?->format('d.m.Y H:i'),
+                'created_by' => $createdEvent?->user?->name,
+                'created_at' => $createdEvent?->created_at?->format('d.m.Y H:i'),
                 'completed_by' => $completedByEvent?->user?->name,
                 'completed_at' => $completedByEvent?->created_at?->format('d.m.Y H:i'),
             ];
@@ -202,13 +202,14 @@ class TaskSubtasks extends Component
         // Pobieramy świeże podzadania z bazy bez mutowania $this->task
         // (mutacja publicznej właściwości Eloquent w render() miesza Livewire)
         $subtasks = TaskSubtask::where('task_id', $this->task->id)
+            ->with('assignedTo')
             ->orderBy('created_at')
             ->get();
 
-        $pendingSubtasks   = $subtasks->where('is_completed', false)->sortBy('created_at')->values();
+        $pendingSubtasks = $subtasks->where('is_completed', false)->sortBy('created_at')->values();
         $completedSubtasks = $subtasks->where('is_completed', true)->sortByDesc('completed_at')->values();
-        $totalSubtasks     = $subtasks->count();
-        $completedCount    = $completedSubtasks->count();
+        $totalSubtasks = $subtasks->count();
+        $completedCount = $completedSubtasks->count();
         $progressPercentage = $totalSubtasks > 0
             ? round(($completedCount / $totalSubtasks) * 100, 2)
             : 0.0;
@@ -220,19 +221,19 @@ class TaskSubtasks extends Component
         }
 
         return view('livewire.task-subtasks', [
-            'pendingSubtasks'             => $pendingSubtasks,
-            'completedSubtasks'           => $completedSubtasks,
-            'totalSubtasks'               => $totalSubtasks,
-            'completedCount'              => $completedCount,
-            'pendingCount'                => $pendingSubtasks->count(),
-            'progressPercentage'          => $progressPercentage,
-            'progressVariant'             => $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default'),
-            'subtaskNumbers'              => $subtaskNumbers,
-            'subtaskMeta'                 => $this->buildSubtaskMeta($subtasks),
+            'pendingSubtasks' => $pendingSubtasks,
+            'completedSubtasks' => $completedSubtasks,
+            'totalSubtasks' => $totalSubtasks,
+            'completedCount' => $completedCount,
+            'pendingCount' => $pendingSubtasks->count(),
+            'progressPercentage' => $progressPercentage,
+            'progressVariant' => $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default'),
+            'subtaskNumbers' => $subtaskNumbers,
+            'subtaskMeta' => $this->buildSubtaskMeta($subtasks),
             'mentionUsersForAutocomplete' => User::orderBy('name')
                 ->get()
                 ->map(fn (User $u) => [
-                    'name'     => $u->name,
+                    'name' => $u->name,
                     'initials' => $u->initials,
                 ])
                 ->values()

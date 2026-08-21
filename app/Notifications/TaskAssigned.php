@@ -14,7 +14,7 @@ class TaskAssigned extends Notification
     use Queueable;
 
     public function __construct(
-        public readonly ProjectTask $task,
+        public readonly ProjectTask|TaskSubtask $task,
         public readonly User $assignedBy,
     ) {}
 
@@ -25,6 +25,23 @@ class TaskAssigned extends Notification
 
     public function toDatabase(object $notifiable): array
     {
+        if ($this->task instanceof TaskSubtask) {
+            $this->task->loadMissing('task');
+            $parent = $this->task->task;
+
+            return [
+                'type' => 'task_assigned',
+                'message' => $this->assignedBy->name.' przypisał(-a) Ci podzadanie',
+                'task_id' => $parent?->id,
+                'task_name' => $this->task->name,
+                'task_url' => $parent ? route('tasks.show', $parent) : url('/tasks2'),
+                'context_name' => $parent?->name,
+                'excerpt' => $this->task->name,
+                'assigned_by_id' => $this->assignedBy->id,
+                'assigned_by_name' => $this->assignedBy->name,
+            ];
+        }
+
         $this->task->loadMissing('subject');
         $card = $this->task->sourceCard();
         $subject = $this->task->subject;

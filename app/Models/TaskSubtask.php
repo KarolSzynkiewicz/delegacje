@@ -32,6 +32,7 @@ class TaskSubtask extends Model implements TaskSubject
         'is_completed',
         'completed_at',
         'created_by',
+        'assigned_to',
     ];
 
     protected $casts = [
@@ -47,6 +48,11 @@ class TaskSubtask extends Model implements TaskSubject
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     public function events(): HasMany

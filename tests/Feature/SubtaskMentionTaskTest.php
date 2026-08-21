@@ -32,7 +32,7 @@ class SubtaskMentionTaskTest extends TestCase
         }
     }
 
-    public function test_mention_in_subtask_creates_task_for_that_user(): void
+    public function test_mention_in_subtask_assigns_that_user(): void
     {
         Notification::fake();
 
@@ -46,21 +46,9 @@ class SubtaskMentionTaskTest extends TestCase
 
         $subtask = TaskSubtask::query()->where('task_id', $parent->id)->first();
         $this->assertNotNull($subtask);
-
-        $task = ProjectTask::query()
-            ->where('subject_type', 'task_subtask')
-            ->where('subject_id', $subtask->id)
-            ->first();
-
-        $this->assertNotNull($task);
-        $this->assertSame($robert->id, $task->assigned_to);
-        $this->assertSame('Podzadanie', $task->category);
-        $this->assertSame('Wzmianka od karol', $task->name);
-        $this->assertSame(
-            "Zadanie „Przygotowanie wyjazdu” (karol) z podzadaniem dla Ciebie\n\nweź klucze",
-            $task->description
-        );
-        $this->assertSame(route('tasks.show', $parent), $task->sourceCard()['url']);
+        $this->assertSame($robert->id, $subtask->assigned_to);
+        $this->assertSame('weź klucze', $subtask->name);
+        $this->assertSame(0, ProjectTask::query()->where('subject_type', 'task_subtask')->count());
 
         Notification::assertSentTo($robert, TaskAssigned::class, function (TaskAssigned $notification) use ($robert, $parent): bool {
             $data = $notification->toDatabase($robert);
@@ -70,7 +58,7 @@ class SubtaskMentionTaskTest extends TestCase
         });
     }
 
-    public function test_everyone_mention_in_subtask_does_not_create_tasks(): void
+    public function test_everyone_mention_in_subtask_does_not_assign(): void
     {
         User::factory()->create(['name' => 'robert']);
         $parent = $this->parentTask();
@@ -80,10 +68,12 @@ class SubtaskMentionTaskTest extends TestCase
             ->set('newSubtaskName', '@wszyscy pilne')
             ->call('addSubtask');
 
+        $subtask = TaskSubtask::query()->where('task_id', $parent->id)->first();
+        $this->assertNull($subtask->assigned_to);
         $this->assertSame(0, ProjectTask::query()->where('category', 'Podzadanie')->count());
     }
 
-    public function test_self_mention_in_subtask_creates_task_without_assign_notification(): void
+    public function test_self_mention_in_subtask_assigns_without_notification(): void
     {
         Notification::fake();
         $parent = $this->parentTask();
@@ -93,15 +83,13 @@ class SubtaskMentionTaskTest extends TestCase
             ->set('newSubtaskName', '@karol sobie')
             ->call('addSubtask');
 
-        $this->assertDatabaseHas('project_tasks', [
-            'assigned_to' => $this->user->id,
-            'category' => 'Podzadanie',
-            'created_by' => $this->user->id,
-        ]);
+        $subtask = TaskSubtask::query()->where('task_id', $parent->id)->first();
+        $this->assertSame($this->user->id, $subtask->assigned_to);
+        $this->assertSame(0, ProjectTask::query()->where('category', 'Podzadanie')->count());
         Notification::assertNotSentTo($this->user, TaskAssigned::class);
     }
 
-    public function test_checking_subtask_completes_linked_mention_task(): void
+    public function test_checking_assigned_subtask_marks_it_complete(): void
     {
         $robert = User::factory()->create(['name' => 'robert']);
         $parent = $this->parentTask();
@@ -112,35 +100,14 @@ class SubtaskMentionTaskTest extends TestCase
             ->call('addSubtask');
 
         $subtask = TaskSubtask::query()->where('task_id', $parent->id)->first();
-        $task = $subtask->tasks()->first();
-        $this->assertSame(TaskStatus::PENDING, $task->status);
+        $this->assertFalse($subtask->is_completed);
 
         Livewire::actingAs($this->user)
             ->test(TaskSubtasks::class, ['task' => $parent])
             ->call('toggleSubtask', $subtask->id);
 
         $this->assertTrue($subtask->fresh()->is_completed);
-        $this->assertSame(TaskStatus::COMPLETED, $task->fresh()->status);
-        $this->assertSame($robert->id, $task->assigned_to);
-    }
-
-    public function test_completing_mention_task_checks_off_subtask(): void
-    {
-        User::factory()->create(['name' => 'robert']);
-        $parent = $this->parentTask();
-
-        Livewire::actingAs($this->user)
-            ->test(TaskSubtasks::class, ['task' => $parent])
-            ->set('newSubtaskName', '@robert weź klucze')
-            ->call('addSubtask');
-
-        $subtask = TaskSubtask::query()->where('task_id', $parent->id)->first();
-        $task = $subtask->tasks()->first();
-
-        $task->markCompleted();
-
-        $this->assertTrue($subtask->fresh()->is_completed);
-        $this->assertSame(TaskStatus::COMPLETED, $task->fresh()->status);
+        $this->assertSame($robert->id, $subtask->fresh()->assigned_to);
     }
 
     private function parentTask(): ProjectTask

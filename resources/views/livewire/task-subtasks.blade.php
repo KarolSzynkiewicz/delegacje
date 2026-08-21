@@ -149,6 +149,9 @@
                                                 title="Numer podzadania w tym zadaniu"
                                             >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                             {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
+                                            @if($subtask->assignedTo)
+                                                <span class="badge bg-primary bg-opacity-25 text-primary ms-1">{{ $subtask->assignedTo->name }}</span>
+                                            @endif
                                         </label>
                                         @if(!empty($meta['created_by']))
                                             @php
