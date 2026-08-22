@@ -14,7 +14,7 @@
     --bs-danger: #ef4444;
     
     /* Nasze własne zmienne */
-    --bg-body: #0a0f1d;
+    --bg-body: #070a13;
     --bg-card: rgba(30, 41, 59, 0.5);
     --bg-input: rgba(15, 23, 42, 0.8);
     --primary: #3b82f6;
@@ -150,6 +150,59 @@ body {
 
 .weekly-overview-assigned-table .wo-sort-icon {
     font-size: 0.85rem;
+}
+
+/* Weekly overview: na mobile 6 kolumn (Pracownik/Rola/Pokrycie/Auto/Dom/Do rotacji)
+   nie mieści się na ekranie — zamiast osobnego widoku kart (który duplikowałby
+   całą logikę odznak w tych komórkach), przepinamy TĘ SAMĄ tabelę w kolumnę
+   "etykieta: wartość" na wiersz. Zero duplikacji Blade/PHP, zero rozjazdu
+   między wersją mobile i desktop. */
+@media (max-width: 767.98px) {
+    .weekly-overview-assigned-table thead {
+        display: none;
+    }
+    .weekly-overview-assigned-table,
+    .weekly-overview-assigned-table tbody,
+    .weekly-overview-assigned-table tr {
+        display: block;
+        width: 100%;
+    }
+    .weekly-overview-assigned-table tr {
+        margin-bottom: 0.65rem;
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 0.15rem 0.85rem;
+        background: rgba(255, 255, 255, 0.03);
+    }
+    .weekly-overview-assigned-table td {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: none !important;
+        padding: 0.5rem 0 !important;
+        border-top: 1px solid var(--glass-border) !important;
+        text-align: right;
+    }
+    .weekly-overview-assigned-table td::before {
+        content: attr(data-label);
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+    .weekly-overview-assigned-table td:first-child {
+        border-top: 0 !important;
+        padding-top: 0.65rem !important;
+    }
+    .weekly-overview-assigned-table td:first-child::before {
+        content: none;
+    }
+    .weekly-overview-assigned-table .wo-cell-truncate {
+        max-width: 65%;
+    }
 }
 
 /* Weekly overview: demand donut — no extra classes needed, inline styles used */
@@ -1273,6 +1326,29 @@ header.bg-white h6 {
     margin-bottom: 0 !important;
 }
 
+/* Przyciski w nagłówku strony — mono font + fioletowy akcent na hover,
+   ten sam zabieg co wcześniej tylko na /tasks2 (teraz globalnie, żeby
+   "Poprzedni tydzień"/"Wyczyść filtry"/"Powrót" itd. wyglądały tak samo
+   na każdej stronie). Nadpisujemy tylko właściwości, które mają się różnić —
+   tło/filter/box-shadow z bazowego .btn-outline-secondary nadal działają. */
+.app-header .btn-outline-secondary {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: .8rem;
+    border-color: var(--glass-border);
+    transition: border-color .15s ease, color .15s ease, transform .15s ease, filter .3s;
+}
+.app-header .btn-outline-secondary:hover {
+    border-color: var(--accent);
+    color: #c084fc;
+    transform: translateY(-1px);
+}
+.app-header .btn-primary,
+.app-header .btn-danger,
+.app-header .btn-warning {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: .8rem;
+}
+
 /* Nagłówki w tabelach - pozostawiamy oryginalny styl z ui test */
 .table thead th {
     color: var(--text-muted);
@@ -1795,8 +1871,21 @@ body::after {
    Blur na ::before (nie na samym wrapperze): backdrop-filter na elemencie
    tworzy containing block dla position:fixed potomków — modal rekrutacji
    i inne fixed overlaye lądowały na środku długiej strony zamiast w viewportcie. */
+/* Uwaga: .app-content-wrapper::before robi backdrop-filter:blur(12px), co
+   blurruje WSZYSTKO co jest za nim — czyli globalną siatkę/ziarno z body::before
+   (patrz sekcja "Ambient tło ChronoLogic" niżej) rozmywa do nierozpoznania.
+   .app-content-wrapper wypełnia praktycznie cały viewport na każdej stronie,
+   więc bez własnego, NIE-blurowanego wzoru na tym elemencie, ambient w
+   praktyce "znikał" — widoczny tylko w wąskich marginesach poza wrapperem
+   (stąd zgłoszenie: widać go tylko na części widoków/zadań). Wzór dokładamy
+   więc TU, na tym samym ::before: backdrop-filter blurruje tylko to, co jest
+   ZA elementem, a jego własne background-image rysuje się już ostro NA tym
+   rozmyciu — więc siatka zostaje wyraźna niezależnie od reszty strony. */
 .app-content-wrapper {
-    background: rgba(30, 41, 59, 0.3) !important;
+    background:
+        radial-gradient(circle at 15% 0%, rgba(168, 85, 247, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 85% 100%, rgba(59, 130, 246, 0.10) 0%, transparent 45%),
+        rgba(9, 13, 24, 0.55) !important;
     border-radius: 20px 20px 0 0;
     margin-top: 0;
     border: 1px solid var(--glass-border) !important;
@@ -1811,6 +1900,10 @@ body::after {
     border-radius: inherit;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    background-image:
+        linear-gradient(to right, rgba(168, 85, 247, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(168, 85, 247, 0.05) 1px, transparent 1px);
+    background-size: 46px 46px;
 }
 
 .app-content-wrapper * {
@@ -4632,6 +4725,39 @@ span.eq-wh-card {
     top: 50%;
     bottom: 0;
     border-left: 1px solid rgba(148, 163, 184, 0.45);
+}
+
+/* Mobile: tabela asortymentu ma 5 kolumn liczb + akcje — na wąskim ekranie
+   i tak trzeba scrollować w bok, ale bez tego NIE WIADOMO której pozycji te
+   liczby dotyczą, bo nazwa (pierwsza kolumna) ucieka poza ekran razem z resztą.
+   Przypinamy więc kolumnę z nazwą/zdjęciem, żeby zawsze była widoczna. */
+@media (max-width: 767.98px) {
+    .eq-stock-table thead th:first-child,
+    .eq-stock-item td:first-child,
+    .eq-stock-variant td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.35);
+    }
+    .eq-stock-table thead th:first-child {
+        z-index: 3;
+        background: #0d1424;
+    }
+    .eq-stock-item td:first-child {
+        background: #0d1424;
+        max-width: 62vw;
+    }
+    .eq-stock-variant td:first-child {
+        background: #0d1424;
+        max-width: 62vw;
+    }
+    .eq-stock-item__desc {
+        display: none;
+    }
+    .eq-stock-filters__grid {
+        gap: 0.65rem;
+    }
 }
 
 .eq-qty {

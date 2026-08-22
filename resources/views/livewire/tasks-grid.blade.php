@@ -25,8 +25,9 @@
     }
     /* Nagłówek strony ("Backlog" + Sprinty/Widok kart) żyje poza tym komponentem
        (renderowany przez x-app-layout), więc dociągamy go tą samą klasą na <body>.
-       Tytuł ma już globalny gradient primary→accent (niebiesko-fioletowy, patrz
-       "header h1..h6" w app.css) — zostawiamy go bez zmian, dokładamy tylko font. */
+       Tytuł ma już globalny gradient primary→accent, a mono-font na przyciskach
+       w headerze jest już globalny (".app-header .btn-outline-secondary" w
+       app.css) — tu zostaje już tylko treść specyficzna dla /tasks2: kicker. */
     body.xuiv2-page header h2::before {
         content: 'ZARZĄDZANIE ZADANIAMI';
         display: block;
@@ -37,17 +38,6 @@
         text-transform: uppercase;
         color: #a855f7;
         margin-bottom: 7px;
-    }
-    body.xuiv2-page header .btn-outline-secondary {
-        font-family: 'JetBrains Mono', ui-monospace, monospace !important;
-        font-size: .78rem !important;
-        border-color: #1e2740 !important;
-        transition: border-color .15s ease, color .15s ease, transform .15s ease;
-    }
-    body.xuiv2-page header .btn-outline-secondary:hover {
-        border-color: #a855f7 !important;
-        color: #c084fc !important;
-        transform: translateY(-1px);
     }
 
     /* Magnetyczne CTA (Filtry, Dodaj zadanie) — zostaje lokalne (opt-in przez klasę),

@@ -1,14 +1,14 @@
-<div>
+<div x-data="{ filtersOpen: window.innerWidth >= 768 }" @resize.window="if (window.innerWidth >= 768) filtersOpen = true">
     <!-- Statystyki i Filtry -->
     <x-ui.card class="mb-4">
         <!-- Statystyki -->
-        <div class="mb-4 pb-3 border-top border-bottom">
+        <div class="mb-0 mb-md-4 pb-3 border-top border-bottom">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div>
                     <h3 class="fs-5 fw-semibold mb-1">Pracownicy</h3>
                 <p class="small text-muted mb-0">
                     @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
-                        Znaleziono: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
+                        Znaleziono: <span class="fw-semibold font-mono">{{ $employees->total() }}</span> pracowników
                         @if($statusDate)
                             <span class="text-primary">(stan na {{ \Carbon\Carbon::parse($statusDate)->format('d.m.Y') }})</span>
                         @endif
@@ -16,12 +16,12 @@
                             <span class="text-muted">(z uwzględnieniem zwolnionych)</span>
                         @endif
                     @else
-                        Łącznie: <span class="fw-semibold">{{ $employees->total() }}</span> pracowników
+                        Łącznie: <span class="fw-semibold font-mono">{{ $employees->total() }}</span> pracowników
                     @endif
                 </p>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-3">
-                    <div class="form-check mb-0">
+                    <div class="form-check mb-0 d-none d-md-flex">
                         <input
                             type="checkbox"
                             class="form-check-input"
@@ -33,16 +33,40 @@
                         </label>
                     </div>
                     @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
-                        <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
+                        <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm d-none d-md-inline-flex">
                             <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
                         </x-ui.button>
                     @endif
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm d-md-none"
+                        @click="filtersOpen = !filtersOpen"
+                        :aria-expanded="filtersOpen"
+                    >
+                        <i class="bi bi-funnel me-1"></i> Filtry
+                        @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
+                            <span class="badge badge-accent ms-1">{{ collect([$search, $roleFilter, $locationFilter, $rotationFilter, $statusDate, $companyFilter, $showTerminated ?: null])->filter()->count() }}</span>
+                        @endif
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Filtry -->
-        <div class="row g-3">
+        <!-- Filtry: zwijane na mobile pod przyciskiem "Filtry" (6 pól naraz zajmowało cały ekran) -->
+        <div x-show="filtersOpen" x-transition class="row g-3 mt-3 mt-md-0">
+            <div class="col-12 d-md-none">
+                <div class="form-check mb-0">
+                    <input
+                        type="checkbox"
+                        class="form-check-input"
+                        id="showTerminatedMobile"
+                        wire:model.live="showTerminated"
+                    >
+                    <label class="form-check-label small" for="showTerminatedMobile">
+                        Pokaż zwolnionych
+                    </label>
+                </div>
+            </div>
             <!-- Wyszukiwanie -->
             <div class="col-md-2">
                 <label class="form-label small">
@@ -113,11 +137,111 @@
                     @endforeach
                 </select>
             </div>
+
+            @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
+                <div class="col-12 d-md-none">
+                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm w-100">
+                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
+                    </x-ui.button>
+                </div>
+            @endif
         </div>
     </x-ui.card>
 
-    <!-- Tabela -->
-    <x-ui.card>
+    <!-- Karty na mobile: 8 kolumn tabeli (status/dom/auto/projekt/rotacja/spółka) nie
+         mieszczą się na wąskim ekranie nawet ze scrollem — czytelniejszy jest jeden
+         pracownik na kartę z tymi samymi odznakami ułożonymi w siatkę. -->
+    <div class="d-md-none">
+        @forelse ($employees as $employee)
+            @php
+                $locationTracker = app(\App\Services\LocationTrackingService::class);
+                $locationStatus = $locationTracker->getLocationStatus($employee, $checkDate);
+                $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($checkDate) {
+                    $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
+                    $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
+                    if (! $startDate) {
+                        return false;
+                    }
+
+                    return $startDate->lte($checkDate) && ($endDate === null || $endDate->gte($checkDate));
+                })->isNotEmpty();
+                $companyAssignment = $employee->companyAssignments->first();
+                $inBaseOrTransit = in_array($locationStatus['state'], [
+                    \App\Enums\EmployeeLocationState::IN_BASE,
+                    \App\Enums\EmployeeLocationState::IN_TRANSIT,
+                ], true);
+            @endphp
+            <x-ui.card class="mb-2 py-3">
+                <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <x-employee-cell :employee="$employee" />
+                        @if($employee->isTerminated())
+                            <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                        @endif
+                    </div>
+                    <x-ui.action-buttons>
+                        <x-ui.button variant="ghost" href="{{ route('employees.show', $employee) }}" class="btn-sm">
+                            <i class="bi bi-eye"></i>
+                        </x-ui.button>
+                        <x-ui.button variant="ghost" href="{{ route('employees.edit', $employee) }}" class="btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </x-ui.button>
+                    </x-ui.action-buttons>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
+                        <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
+                    @elseif($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE)
+                        <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
+                    @else
+                        <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
+                    @endif
+                    <x-ui.badge :variant="$hasActiveRotation ? 'success' : 'danger'">
+                        {{ $hasActiveRotation ? '✓' : '✗' }} Rotacja
+                    </x-ui.badge>
+                    @if($companyAssignment && $companyAssignment->company)
+                        <x-ui.badge variant="secondary">🏢 {{ $companyAssignment->company->name }}</x-ui.badge>
+                    @endif
+                </div>
+                @unless($inBaseOrTransit)
+                    <div class="d-flex flex-wrap gap-1 small">
+                        @if(!empty($locationStatus['accommodation_names']))
+                            @foreach($locationStatus['accommodation_names'] as $accName)
+                                <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏡 {{ $accName }}</x-ui.badge>
+                            @endforeach
+                        @else
+                            <x-ui.badge variant="danger">❌ Brak domu</x-ui.badge>
+                        @endif
+                        @if(!empty($locationStatus['vehicle_labels']))
+                            @foreach($locationStatus['vehicle_labels'] as $reg)
+                                <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🚗 {{ $reg }}</x-ui.badge>
+                            @endforeach
+                        @else
+                            <x-ui.badge variant="danger">❌ Brak auta</x-ui.badge>
+                        @endif
+                        @if(!empty($locationStatus['project_names']))
+                            @foreach($locationStatus['project_names'] as $pname)
+                                <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏢 {{ $pname }}</x-ui.badge>
+                            @endforeach
+                        @else
+                            <x-ui.badge variant="danger">❌ Brak projektu</x-ui.badge>
+                        @endif
+                    </div>
+                @endunless
+            </x-ui.card>
+        @empty
+            <x-ui.empty-state icon="people" message="Brak pracowników do wyświetlenia" />
+        @endforelse
+
+        @if($employees->hasPages())
+            <div class="mt-3">
+                {{ $employees->links() }}
+            </div>
+        @endif
+    </div>
+
+    <!-- Tabela (desktop/tablet — na mobile zastąpiona kartami wyżej) -->
+    <x-ui.card class="d-none d-md-block">
         <div class="table-responsive">
             <table class="table">
                 <thead>

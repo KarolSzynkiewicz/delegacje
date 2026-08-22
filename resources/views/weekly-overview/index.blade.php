@@ -789,10 +789,10 @@
                                             $isFullWeek = ($dateRange === 'cały tydzień' || $dateRange === 'pon-nie');
                                         @endphp
                                         <tr>
-                                            <td data-sort-value="{{ mb_strtolower($employeeData['employee']->last_name.' '.$employeeData['employee']->first_name) }}">
+                                            <td data-label="Pracownik" data-sort-value="{{ mb_strtolower($employeeData['employee']->last_name.' '.$employeeData['employee']->first_name) }}">
                                                 <x-employee-cell :employee="$employeeData['employee']"  />
                                             </td>
-                                            <td data-sort-value="{{ mb_strtolower($employeeData['role']->name ?? '') }}">
+                                            <td data-label="Rola w projekcie" data-sort-value="{{ mb_strtolower($employeeData['role']->name ?? '') }}">
                                                 @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
                                                     <x-ui.badge variant="warning" title="Rola zmienia się w trakcie tygodnia">
                                                         <i class="bi bi-arrow-left-right"></i> Zmienna
@@ -816,10 +816,10 @@
                                                     <x-ui.badge variant="info" title="{{ $roleName }}" class="wo-cell-truncate">{{ $roleDisplay }}</x-ui.badge>
                                                 @endif
                                             </td>
-                                            <td class="text-center {{ !$isFullWeek ? 'bg-danger bg-opacity-25' : '' }}" data-sort-value="{{ $isFullWeek ? 1 : 0 }}">
+                                            <td class="text-center {{ !$isFullWeek ? 'bg-danger bg-opacity-25' : '' }}" data-label="Pokrycie" data-sort-value="{{ $isFullWeek ? 1 : 0 }}">
                                                 <span class="fw-semibold small">{{ $dateRange }}</span>
                                             </td>
-                                            <td data-sort-value="{{ mb_strtolower($employeeData['vehicle']->registration_number ?? '') }}">
+                                            <td data-label="Auto" data-sort-value="{{ mb_strtolower($employeeData['vehicle']->registration_number ?? '') }}">
                                                 @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
                                                     <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
                                                         <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
@@ -834,7 +834,7 @@
                                                     </x-ui.clickable-badge>
                                                 @endif
                                             </td>
-                                            <td data-sort-value="{{ mb_strtolower($employeeData['accommodation']->name ?? '') }}">
+                                            <td data-label="Dom" data-sort-value="{{ mb_strtolower($employeeData['accommodation']->name ?? '') }}">
                                                 @if(isset($employeeData['accommodation']) && $employeeData['accommodation'])
                                                     @php
                                                         $accommodationName = $employeeData['accommodation']->name;
@@ -849,7 +849,7 @@
                                                     </x-ui.clickable-badge>
                                                 @endif
                                             </td>
-                                            <td data-sort-value="{{ $employeeData['rotation']['days_left'] ?? 999999 }}">
+                                            <td data-label="Do rotacji" data-sort-value="{{ $employeeData['rotation']['days_left'] ?? 999999 }}">
                                                 @if(isset($employeeData['rotation']) && $employeeData['rotation'])
                                                     @php
                                                         $rotation = $employeeData['rotation']['rotation'] ?? null;
