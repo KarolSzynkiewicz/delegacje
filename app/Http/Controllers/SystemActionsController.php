@@ -11,6 +11,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleRepair;
 use App\Models\Warehouse;
 use App\Services\RoutePermissionService;
+use App\Services\WorkItemSync;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -174,6 +175,26 @@ class SystemActionsController extends Controller
         } catch (\Exception $e) {
             return redirect()->route('system-actions.index')
                 ->with('error', 'Błąd: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Jednorazowy backfill indeksu /tasks2. Stare project_tasks sprzed tabeli
+     * work_items nie mają wiersza w backlogu, dopóki ktoś ich nie edytuje —
+     * stąd grid na produkcji pokazuje tylko dzisiejsze zadania.
+     */
+    public function syncWorkItems(WorkItemSync $sync): RedirectResponse
+    {
+        try {
+            set_time_limit(0);
+
+            $count = $sync->backfill();
+
+            return redirect()->route('system-actions.index')
+                ->with('success', "Fix tasków — backfill zakończony. Zapisano {$count} wierszy backlogu. Odśwież /tasks2.");
+        } catch (\Exception $e) {
+            return redirect()->route('system-actions.index')
+                ->with('error', 'Błąd backfillu zadań: '.$e->getMessage());
         }
     }
 
