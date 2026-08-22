@@ -184,7 +184,7 @@ class TasksGrid extends Component
     {
         return [
             'name' => ['label' => 'Nazwa', 'sortable' => true, 'always' => true],
-            'type' => ['label' => 'Typ', 'sortable' => true],
+            'type' => ['label' => 'Typ pracy', 'sortable' => true],
             'status' => ['label' => 'Status', 'sortable' => true],
             'sprint' => ['label' => 'Sprint', 'sortable' => true],
             'category' => ['label' => 'Kategoria', 'sortable' => true],

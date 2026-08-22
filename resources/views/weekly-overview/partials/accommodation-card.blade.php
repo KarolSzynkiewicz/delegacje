@@ -40,7 +40,7 @@
 
         {{-- Baner ze zdjęciem --}}
         <a href="{{ route('accommodations.show', $accommodation) }}" class="d-block text-decoration-none" style="flex-shrink:0;">
-            <div style="height:148px; position:relative; background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%); display:flex; align-items:center; justify-content:center;">
+            <div class="wo-media-banner" style="height:148px; position:relative; background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%); display:flex; align-items:center; justify-content:center;">
                 @if($accommodation->image_path)
                     <img src="{{ $accommodation->image_url }}"
                          alt="{{ $accommodation->name }}"

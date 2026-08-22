@@ -81,7 +81,7 @@
                 @php
                     $groupFields = ['status' => 'Status'];
                     if ($this->usesWorkItems()) {
-                        $groupFields['type'] = 'Typ';
+                        $groupFields['type'] = 'Typ pracy';
                     }
                     $groupFields += [
                         'sprint' => 'Sprint',

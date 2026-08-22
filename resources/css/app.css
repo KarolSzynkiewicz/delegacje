@@ -15,7 +15,12 @@
     
     /* Nasze własne zmienne */
     --bg-body: #070a13;
-    --bg-card: rgba(30, 41, 59, 0.5);
+    /* Dociągnięte do ciemniejszego, mniej przezroczystego wzornika z /tasks2
+       (tam karty żyją na własnym, niemal jednolitym tle .xuiv2-tasks #070a13
+       i wypadają wyraźnie ciemniej/bardziej "matowo" niż gdzie indziej, gdzie
+       jasne badge/ikony/gradienty prześwitywały przez lekkie 0.5 rgba(30,41,59)
+       i backdrop-filter, robiąc karty zauważalnie jaśniejszymi). */
+    --bg-card: rgba(13, 18, 30, 0.72);
     --bg-input: rgba(15, 23, 42, 0.8);
     --primary: #3b82f6;
     --accent: #a855f7;
@@ -202,6 +207,21 @@ body {
     }
     .weekly-overview-assigned-table .wo-cell-truncate {
         max-width: 65%;
+    }
+}
+
+/* Weekly overview: karty auto/dom (vehicle-card, accommodation-card) mają
+   148px baner ze zdjęciem/ikoną — świetnie na desktop w gridzie col-lg-3,
+   ale na mobile karty stackują się col-12 pod sobą i ten baner staje się
+   głównym winowajcą "za dużo pustej przestrzeni → długi scroll" (patrz audyt
+   frontend-design). Skracamy baner i ikonę fallback tylko na mobile — reszta
+   karty (lista osób, statusy) zostaje bez zmian. */
+@media (max-width: 767.98px) {
+    .wo-media-banner {
+        height: 84px !important;
+    }
+    .wo-media-banner i.bi {
+        font-size: 2.1rem !important;
     }
 }
 
@@ -1883,9 +1903,9 @@ body::after {
    rozmyciu — więc siatka zostaje wyraźna niezależnie od reszty strony. */
 .app-content-wrapper {
     background:
-        radial-gradient(circle at 15% 0%, rgba(168, 85, 247, 0.12) 0%, transparent 45%),
-        radial-gradient(circle at 85% 100%, rgba(59, 130, 246, 0.10) 0%, transparent 45%),
-        rgba(9, 13, 24, 0.55) !important;
+        radial-gradient(circle at 15% 0%, rgba(168, 85, 247, 0.09) 0%, transparent 45%),
+        radial-gradient(circle at 85% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 45%),
+        rgba(7, 10, 19, 0.8) !important;
     border-radius: 20px 20px 0 0;
     margin-top: 0;
     border: 1px solid var(--glass-border) !important;

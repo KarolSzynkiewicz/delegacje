@@ -22,7 +22,7 @@
 
         {{-- Baner ze zdjęciem --}}
         <a href="{{ route('vehicles.show', $vehicleData['vehicle']) }}" class="d-block text-decoration-none" style="flex-shrink:0;">
-            <div style="height:148px; position:relative; background: linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(14,165,233,0.05) 100%); display:flex; align-items:center; justify-content:center;">
+            <div class="wo-media-banner" style="height:148px; position:relative; background: linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(14,165,233,0.05) 100%); display:flex; align-items:center; justify-content:center;">
                 @if($vehicleData['vehicle']->image_path)
                     <img src="{{ $vehicleData['vehicle']->image_url }}"
                          alt="{{ $vehicleData['vehicle_name'] }}"

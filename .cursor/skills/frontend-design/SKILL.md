@@ -29,7 +29,11 @@ Defined in `resources/css/app.css` `:root` (~line 8):
   never a flat single color, never a different hue (no teal/cyan — that was
   the original `chronologic-landing.html` reference but was deliberately
   recolored to this blue→purple pair to match the rest of the app).
-- `--bg-body: #070a13`, `--bg-card: rgba(30, 41, 59, 0.5)`,
+- `--bg-body: #070a13`, `--bg-card: rgba(13, 18, 30, 0.72)` (darkened/less
+  transparent on purpose — the original `rgba(30,41,59,0.5)` let too much
+  light bleed through `backdrop-filter` from bright content behind the card,
+  making cards elsewhere look noticeably lighter than `/tasks2`'s own
+  `.xuiv2-tasks` wrapper, which sits on a near-solid `#070a13`),
   `--text-main: #f1f5f9`, `--text-muted: #94a3b8`, `--glass-border: rgba(255,255,255,0.1)`.
 - Fonts: **Space Grotesk** is the global body/display font (loaded via
   `<link>` in `layouts/app.blade.php` + `layouts/guest.blade.php`, applied via
@@ -136,6 +140,32 @@ and the more elaborate grouped version in `tg-filter-panel.blade.php` /
 `/recruitment-processes` (grouped sections instead of a flat wall of toggles
 — prefer this over one-checkbox-per-concept when there are many filter
 *types*, not just many filter *values*).
+
+## Two more traps worth knowing about
+
+**Sticky header cells silently losing `position: sticky`**: if a `<th>` (or
+any sticky element) also has an inline `style="position:relative"` (common
+when a child needs `position:absolute`, e.g. a column-resize handle), that
+inline declaration wins over a non-`!important` CSS class rule setting
+`position: sticky`, even if the class rule has higher specificity — inline
+style always beats an external rule unless the external rule uses
+`!important`. Symptom looked exactly like "only one weird square stays
+pinned while scrolling, not the whole header row": in `tasks-grid.blade.php`
+only the empty checkbox `<th>` (no inline `position`) actually stuck; every
+other `<th>` had `style="position:relative"` (for `.tg-resize-handle`) which
+silently overrode the sticky rule. Fix: `position: sticky !important` on the
+class rule (sticky, like relative, still establishes a containing block for
+absolutely-positioned children, so nothing else needs to change).
+
+**Fixed-position dropdown/panel math must match the panel's actual responsive
+width**: teleported panels positioned via `:style="`left:${left}px`"` computed
+from `getBoundingClientRect()` (see the filter-panel pattern in
+`tasks-grid.blade.php` / `tg-filter-panel.blade.php`) must clamp `left`
+against the *real* rendered width, not a hardcoded desktop number. If the
+panel's CSS is `width: min(600px, calc(100vw - 24px))` but the JS clamps with
+a stale constant like `window.innerWidth - 620`, on a narrow phone that goes
+deeply negative and shoves most of the panel off-screen. Compute the same
+formula in JS (`Math.min(600, window.innerWidth - 24)`) before clamping.
 
 ## Performance checklist before shipping a visual change
 

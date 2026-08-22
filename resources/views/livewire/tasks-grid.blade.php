@@ -151,9 +151,15 @@
         opacity: .6; z-index: 6; pointer-events: none;
     }
 
-    /* ── Sticky header ── */
+    /* ── Sticky header ──
+       WAŻNE: !important jest tu konieczne — komórki kolumn danych mają
+       inline style="position:relative" (do pozycjonowania uchwytu do
+       zmiany szerokości .tg-resize-handle), który bez !important
+       nadpisywał by position:sticky. Bez tego tylko pierwsza, "pusta"
+       komórka (checkbox/expand, bez inline position) łapała sticky —
+       stąd błąd "przykleja się jeden mały kwadracik, a nie cały wiersz". ── */
     .tg-table > thead > tr > th {
-        position: sticky;
+        position: sticky !important;
         top: 0;
         z-index: 5;
         background: rgba(10, 15, 29, 0.97) !important;
@@ -396,7 +402,7 @@
             {{-- Filtry: jeden przycisk, panel z pogrupowanymi sekcjami (SharePoint-style, jak w rekrutacji) --}}
             <div x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openSearch: false, openGroup: false, openColumns: false }">
                 <button type="button"
-                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.min(r.left, window.innerWidth-620); open=true"
+                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); const pw=Math.min(600, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.left, window.innerWidth-pw-4)); open=true"
                         class="btn btn-sm xuiv2-magnetic {{ count($this->activeFilterChips()) > 0 ? 'btn-primary' : 'btn-outline-secondary' }}">
                     <i class="bi bi-sliders me-1"></i>Filtry
                     @if(count($this->activeFilterChips()) > 0)
