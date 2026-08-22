@@ -1,20 +1,14 @@
 <div class="xuiv2-tasks" id="xuiv2Tasks">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
     /* ══════════════════════════════════════════════════════════
-       xuiv2 — probka z /2 przeniesiona na /tasks2: Space Grotesk +
-       JetBrains Mono, cichutkie tło (siatka/ziarno/poświata). --primary/
-       --accent to DOKŁADNIE te same dwa kolory co gradient nagłówka
-       "Backlog" (patrz "header h1..h6" w app.css) — dzięki temu przyciski
-       typu .btn-primary, aktywna strona paginacji itd. mają to samo
-       niebiesko-fioletowe przejście, a nie płaski jeden kolor.
-       Nadpisujemy TYLKO w obrębie tego komponentu (nic globalnego).
+       xuiv2 — probka z /2, oryginalnie testowana na /tasks2. Fonty
+       (Space Grotesk/JetBrains Mono), tło ambient (siatka/ziarno/poświata)
+       i fiolet primary→accent są teraz GLOBALNE (app.css + app.js) — patrz
+       body::before/::after, .cl-cursor-glow, ".card::before" i ".font-mono"
+       w app.css. Ten blok zawiera już tylko rzeczy specyficzne dla /tasks2
+       (nagłówek "Backlog", panel filtrów, status pills, magnetyczne CTA).
        ══════════════════════════════════════════════════════════ */
     .xuiv2-tasks {
-        --primary: #3b82f6;
-        --accent: #a855f7;
-        --bs-primary: #3b82f6;
         position: relative;
         isolation: isolate;
         background: #070a13;
@@ -29,28 +23,10 @@
         border-color: transparent !important;
         color: #fff !important;
     }
-    /* Tło całej strony /tasks2 (nawigacja + nagłówek + karta) — czarne jak we wzorcu.
-       Klasa na <body> jest dopisywana przez mały JS niżej (taniej niż CSS :has(),
-       które przy częstych morphach Livewire potrafi realnie mulić). */
-    body.xuiv2-page {
-        background-color: #070a13 !important;
-        background-image:
-            radial-gradient(circle at 12% 15%, rgba(168,85,247,0.10) 0%, transparent 42%),
-            radial-gradient(circle at 88% 85%, rgba(168,85,247,0.08) 0%, transparent 42%) !important;
-    }
-    body.xuiv2-page .app-content-wrapper {
-        background: rgba(7,10,19,0.6) !important;
-        border-color: rgba(168,85,247,0.14) !important;
-    }
     /* Nagłówek strony ("Backlog" + Sprinty/Widok kart) żyje poza tym komponentem
        (renderowany przez x-app-layout), więc dociągamy go tą samą klasą na <body>.
        Tytuł ma już globalny gradient primary→accent (niebiesko-fioletowy, patrz
        "header h1..h6" w app.css) — zostawiamy go bez zmian, dokładamy tylko font. */
-    body.xuiv2-page header h2 {
-        font-family: 'Space Grotesk', 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        letter-spacing: -0.01em;
-    }
     body.xuiv2-page header h2::before {
         content: 'ZARZĄDZANIE ZADANIAMI';
         display: block;
@@ -73,41 +49,14 @@
         color: #c084fc !important;
         transform: translateY(-1px);
     }
-    .xuiv2-tasks, .xuiv2-tasks * {
-        font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    .xuiv2-tasks .bi::before { font-family: "bootstrap-icons" !important; }
 
-    /* Tło (siatka/ziarno/poświata) jest position:fixed — rozmiar = viewport, NIE rośnie
-       z długością tabeli. Wcześniej było position:absolute co do wysokości całej karty,
-       więc przy 50+ wierszach warstwa z mix-blend-mode miała tysiące pikseli wysokości
-       i była przemalowywana przy każdym ruchu myszy — stąd spadek płynności. */
-    .xuiv2-bg-grid {
-        position: fixed; inset: 0; z-index: -1; pointer-events: none;
-        background-image:
-            linear-gradient(to right, rgba(168,85,247,0.05) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(168,85,247,0.05) 1px, transparent 1px);
-        background-size: 46px 46px;
-        mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, black 30%, transparent 100%);
-        contain: strict;
-    }
-    .xuiv2-grain {
-        position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .03;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-        contain: strict;
-    }
-    .xuiv2-cursor-glow {
-        position: fixed; top: 0; left: 0; width: 460px; height: 460px; border-radius: 50%;
-        background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 70%);
-        pointer-events: none; z-index: -1; opacity: 0; will-change: transform;
-        contain: strict;
-    }
-    .xuiv2-cursor-glow { transition: opacity .3s ease; }
-    @media (pointer: coarse) { .xuiv2-cursor-glow { display: none; } }
-    @media (prefers-reduced-motion: reduce) { .xuiv2-cursor-glow, .xuiv2-magnetic { display: none !important; } }
-
-    /* Magnetyczne CTA (Filtry, Dodaj zadanie) */
+    /* Magnetyczne CTA (Filtry, Dodaj zadanie) — zostaje lokalne (opt-in przez klasę),
+       bo odpalanie tego na WSZYSTKICH .btn-primary w gęstych tabelach CRUD (dziesiątki
+       przycisków akcji per wiersz) odtworzyłoby ten sam problem z wydajnością, który
+       naprawiliśmy przy /tasks2 (patrz commit o N+1 / mousemove). Globalna poświata
+       kursora (.cl-cursor-glow) jest tania — jeden element — więc jest już globalna. */
     .xuiv2-magnetic { will-change: transform; transition: transform .15s cubic-bezier(.2,.8,.2,1); }
+    @media (prefers-reduced-motion: reduce) { .xuiv2-magnetic { display: none !important; } }
 
     /* Focus ring: fiolet (--accent) zamiast niebieskiego */
     .xuiv2-tasks .form-control:focus,
@@ -136,12 +85,6 @@
     .tg-filter-panel-teal .rp-filter-input:focus {
         border-color: rgba(168,85,247,0.55) !important;
         box-shadow: 0 0 0 2px rgba(168,85,247,0.2) !important;
-    }
-
-    /* ── Scope: override Bootstrap defaults inside the grid ── */
-    .tg-mono {
-        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace !important;
-        font-variant-numeric: tabular-nums;
     }
 
     /* All text inside any dropdown rendered by this component must be light */
@@ -430,11 +373,6 @@
     .tg-add-card { border: 2px solid var(--primary,#3b82f6); background: rgba(59,130,246,0.07); }
     .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
 </style>
-
-{{-- Tło (siatka + ziarno + poświata kursora), scoped .xuiv2-tasks --}}
-<div class="xuiv2-bg-grid"></div>
-<div class="xuiv2-grain"></div>
-<div class="xuiv2-cursor-glow" id="xuiv2TasksGlow"></div>
 
 {{-- Flash message --}}
 @if($flash)
@@ -976,12 +914,14 @@
         const root = document.getElementById('xuiv2Tasks');
         if (!root || root.dataset.xuiv2Bound) return;
         root.dataset.xuiv2Bound = '1';
+        // "ZARZĄDZANIE ZADANIAMI" kicker nad "Backlog" i mono-styl przycisków w
+        // headerze (patrz body.xuiv2-page w <style> wyżej) — tło/fonty/poświata
+        // kursora są już globalne (app.css + app.js), więc nic więcej tu nie trzeba.
         document.body.classList.add('xuiv2-page');
 
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
             || !window.matchMedia('(pointer: fine)').matches) return;
 
-        const glow = document.getElementById('xuiv2TasksGlow');
         // Cache buttons once; Livewire re-renders morph the DOM but the buttons
         // keep stable wire:key-less identity for this simple case, so a light
         // re-scan on click is enough — no need to query on every mousemove.
@@ -996,10 +936,6 @@
 
         function onFrame() {
             ticking = false;
-            if (glow) {
-                // position:fixed → coordinates are viewport-relative, no getBoundingClientRect() needed.
-                glow.style.transform = `translate(${mouseX - 230}px, ${mouseY - 230}px)`;
-            }
             for (const btn of magneticBtns) {
                 const r = btn.getBoundingClientRect();
                 const cx = r.left + r.width / 2;
@@ -1025,9 +961,6 @@
                 requestAnimationFrame(onFrame);
             }
         }, { passive: true });
-
-        root.addEventListener('mouseenter', () => { if (glow) glow.style.opacity = '1'; }, { passive: true });
-        root.addEventListener('mouseleave', () => { if (glow) glow.style.opacity = '0'; }, { passive: true });
     })();
 </script>
 </div>

@@ -3,6 +3,53 @@ import * as bootstrap from 'bootstrap'; // Bootstrap JS (dla modals, dropdowns, 
 window.bootstrap = bootstrap;
 
 /**
+ * ChronoLogic — globalna poświata podążająca za kursorem (ten sam ambient co na
+ * probce /2 i /tasks2). Throttlowana przez requestAnimationFrame i ogranicza się
+ * do przesuwania JEDNEGO elementu transformem — nie skanuje DOM przy każdym
+ * mousemove, więc koszt jest stały niezależnie od tego, jak ciężka jest strona
+ * (patrz wcześniejsza optymalizacja /tasks2, gdzie magnetyczne przyciski robione
+ * na wszystkich elementach potrafiły mulić długie tabele).
+ */
+(function initCursorGlow() {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+
+    let glow = null;
+    let mouseX = 0;
+    let mouseY = 0;
+    let rafPending = false;
+
+    const ensureGlow = () => {
+        if (glow) return glow;
+        glow = document.createElement('div');
+        glow.className = 'cl-cursor-glow';
+        document.body.appendChild(glow);
+        return glow;
+    };
+
+    const update = () => {
+        rafPending = false;
+        const el = ensureGlow();
+        el.style.opacity = '1';
+        el.style.transform = `translate(${mouseX - 230}px, ${mouseY - 230}px)`;
+    };
+
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        if (!rafPending) {
+            rafPending = true;
+            requestAnimationFrame(update);
+        }
+    }, { passive: true });
+
+    document.addEventListener('mouseleave', () => {
+        if (glow) glow.style.opacity = '0';
+    });
+})();
+
+/**
  * Livewire po morphowaniu DOM potrafi „zsunąć” stronę w dół (focus / przeliczenie layoutu).
  * Przywracamy scroll okna po udanym commicie tylko dla komponentów oznaczonych
  * `data-livewire-preserve-scroll` (np. planery wyjazdu — długie formularze).

@@ -199,6 +199,26 @@ body {
 .card:hover {
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
+/* Cichy akcent na górnej krawędzi karty pod kursorem — ten sam zabieg co na
+   probce /2 i /tasks2 (gradient primary→accent, czyli ten sam niebiesko-
+   -fioletowy przechodzenie kolorów co w tytułach stron). Bootstrap .card
+   ma domyślnie position:relative, więc nie musimy go dodawać. */
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .25s ease;
+    pointer-events: none;
+}
+.card:hover::before {
+    transform: scaleX(1);
+}
 /* Nadpisujemy Bootstrap .card-body */
 .card-body {
     background: transparent !important;
@@ -1124,9 +1144,15 @@ textarea.form-control {
    TYPOGRAPHY SYSTEM - Spójna koncepcja czcionek
    ============================================ */
 
-/* Font Family - Inter jako główna czcionka */
+/* Font Family — ChronoLogic: Space Grotesk (patrz probka na /2 i /tasks2),
+   Inter jako fallback. JetBrains Mono dla danych/liczb przez .font-mono. */
 * {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-mono, .tg-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace !important;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Typography Scale - Spójny system */
@@ -1697,6 +1723,62 @@ body.min-vh-100 {
     min-height: 100vh;
     padding: 0;
     margin: 0;
+}
+
+/* Ambient tło ChronoLogic — cichutka siatka + ziarno na całej stronie, ten sam
+   zabieg co na probce /2 i /tasks2, tylko globalnie i BEZ ruchu (position:fixed,
+   contain:strict — koszt renderowania niezależny od długości/złożoności strony,
+   patrz notatka o wydajności przy siatce zadań). Kolory dopasowane do istniejącego
+   fioletowo-niebieskiego gradientu body wyżej, nic nowego nie wprowadzamy. */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        linear-gradient(to right, rgba(168, 85, 247, 0.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(168, 85, 247, 0.035) 1px, transparent 1px);
+    background-size: 46px 46px;
+    mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, black 30%, transparent 100%);
+    contain: strict;
+}
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: .025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    contain: strict;
+}
+
+/* Poświata podążająca za kursorem — jeden element wstrzykiwany raz przez JS
+   (resources/js/app.js), pozycja aktualizowana transformem throttlowanym
+   przez requestAnimationFrame. To jedyny ruchowy element ambientu: tania
+   operacja niezależna od złożoności strony (żadnego querySelectorAll na
+   mousemove — patrz notatka o wydajności przy /tasks2). */
+.cl-cursor-glow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 460px;
+    height: 460px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.10) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0;
+    will-change: transform;
+    contain: strict;
+    transition: opacity .3s ease;
+}
+@media (pointer: coarse) {
+    .cl-cursor-glow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cl-cursor-glow { display: none !important; }
 }
 
 /* App background - wrapper dla całej aplikacji */
