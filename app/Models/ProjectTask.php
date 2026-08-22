@@ -61,6 +61,79 @@ class ProjectTask extends Model
         return $this->belongsTo(ProcedureRun::class, 'procedure_run_id');
     }
 
+    public function isProcedure(): bool
+    {
+        return $this->procedure_run_id !== null;
+    }
+
+    public function isMention(): bool
+    {
+        return $this->subject_type === 'comment';
+    }
+
+    public function isCallback(): bool
+    {
+        if ($this->isProcedure() || $this->isMention()) {
+            return false;
+        }
+
+        $name = (string) $this->name;
+        if ($this->category === 'Rekrutacja' && str_starts_with(mb_strtolower($name), 'oddzwonić')) {
+            return true;
+        }
+
+        return str_starts_with($name, 'Oddzwonić do ');
+    }
+
+    public function mentionSourceComment(): ?Comment
+    {
+        if (! $this->isMention()) {
+            return null;
+        }
+
+        $this->loadMissing(['subject.commentable']);
+
+        return $this->subject instanceof Comment ? $this->subject : null;
+    }
+
+    /**
+     * @return array{
+     *     author: string,
+     *     assignee: string,
+     *     isForYou: bool,
+     *     candidate: string,
+     *     contextLabel: string,
+     *     contextUrl: string|null,
+     *     note: string,
+     *     due: \Carbon\CarbonInterface|null
+     * }|null
+     */
+    public function callbackStory(): ?array
+    {
+        if (! $this->isCallback()) {
+            return null;
+        }
+
+        $this->loadMissing(['createdBy', 'assignedTo', 'recruitmentProcess.candidate']);
+        $card = $this->sourceCard();
+        $process = $this->recruitmentProcess;
+        $candidate = trim((string) ($process?->full_name ?? ''));
+        if ($candidate === '' && preg_match('/^oddzwonić do\s+(.+?)(?:\s+#\d+)?$/iu', (string) $this->name, $match)) {
+            $candidate = trim($match[1]);
+        }
+
+        return [
+            'author' => $this->createdBy?->name ?? 'Ktoś',
+            'assignee' => $this->assignedTo?->name ?? 'Ciebie',
+            'isForYou' => (int) $this->assigned_to === (int) auth()->id(),
+            'candidate' => $candidate !== '' ? $candidate : 'kandydata',
+            'contextLabel' => $card['label'] ?? 'Karta kandydata',
+            'contextUrl' => $card['url'] ?? null,
+            'note' => $this->plainDescription(),
+            'due' => $this->due_date,
+        ];
+    }
+
     /**
      * Get the recruitment process this follow-up task belongs to (if any).
      */

@@ -179,6 +179,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('tasks/{task}/mark-completed', [\App\Http\Controllers\TaskController::class, 'markCompleted'])
             ->name('tasks.mark-completed')
             ->defaults('resource', 'tasks');
+        Route::post('tasks/{task}/toggle-done', [\App\Http\Controllers\TaskController::class, 'toggleDone'])
+            ->name('tasks.toggle-done')
+            ->defaults('resource', 'tasks');
         Route::post('tasks/{task}/cancel', [\App\Http\Controllers\TaskController::class, 'cancel'])
             ->name('tasks.cancel')
             ->defaults('resource', 'tasks');

@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Contracts\TaskSubject;
 use App\Enums\CommentableType;
 use App\Enums\LogisticsEventType;
-use App\Enums\TaskStatus;
+use App\Enums\WorkItemStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +25,7 @@ class Comment extends Model implements TaskSubject
             foreach ($comment->replies()->get() as $reply) {
                 $reply->delete();
             }
+            $comment->mentions()->get()->each->delete();
             $comment->attachments->each->delete();
             $comment->likes()->delete();
         });
@@ -78,23 +79,65 @@ class Comment extends Model implements TaskSubject
         return $this->morphMany(ProjectTask::class, 'subject');
     }
 
-    public function mentionTaskFor(?int $userId): ?ProjectTask
+    public function mentions(): HasMany
+    {
+        return $this->hasMany(CommentMention::class);
+    }
+
+    public function mentionFor(?int $userId): ?CommentMention
     {
         if (! $userId) {
             return null;
         }
 
-        $match = fn (ProjectTask $task): bool => (int) $task->assigned_to === $userId
-            && $task->status !== TaskStatus::CANCELLED;
+        $match = fn (CommentMention $mention): bool => (int) $mention->assigned_to === $userId
+            && $mention->status !== WorkItemStatus::Cancelled;
 
-        if ($this->relationLoaded('tasks')) {
-            return $this->tasks->first($match);
+        if ($this->relationLoaded('mentions')) {
+            return $this->mentions->first($match);
         }
 
-        return $this->tasks()
+        return $this->mentions()
             ->where('assigned_to', $userId)
-            ->where('status', '!=', TaskStatus::CANCELLED)
+            ->where('status', '!=', WorkItemStatus::Cancelled)
             ->first();
+    }
+
+    /**
+     * Karta źródła (pojazd, projekt, …) — URL bez kotwicy komentarza.
+     *
+     * @return array{url: string, label: string, icon: string}|null
+     */
+    public function commentableCard(): ?array
+    {
+        $url = $this->commentableShowUrl();
+        if (! $url) {
+            return null;
+        }
+
+        return [
+            'url' => $url,
+            'label' => $this->notificationContextLabel(),
+            'icon' => $this->commentableIcon(),
+        ];
+    }
+
+    public function commentableIcon(): string
+    {
+        $morph = $this->resolvedCommentable();
+
+        return match (true) {
+            $morph instanceof Vehicle => 'bi-car-front',
+            $morph instanceof Project => 'bi-folder',
+            $morph instanceof ProjectTask => 'bi-check2-square',
+            $morph instanceof RecruitmentProcess, $morph instanceof RecruitmentCandidate => 'bi-person-badge',
+            $morph instanceof Employee => 'bi-person',
+            $morph instanceof Accommodation => 'bi-house',
+            $morph instanceof Location => 'bi-geo-alt',
+            $morph instanceof LogisticsEvent => 'bi-signpost-split',
+            $morph instanceof Sprint => 'bi-kanban',
+            default => 'bi-chat-dots',
+        };
     }
 
     public function taskCardUrl(): string
@@ -104,7 +147,7 @@ class Comment extends Model implements TaskSubject
 
     public function taskCardLabel(): string
     {
-        return 'Komentarz';
+        return $this->notificationContextLabel();
     }
 
     public function taskCardIcon(): string
@@ -190,6 +233,18 @@ class Comment extends Model implements TaskSubject
         }
 
         return mb_substr($body, 0, $max - 1).'…';
+    }
+
+    public function quoteLabel(): string
+    {
+        $excerpt = $this->bodyExcerpt(160);
+        if ($excerpt) {
+            return $excerpt;
+        }
+
+        $this->loadMissing('attachments');
+
+        return $this->attachments->isNotEmpty() ? 'załącznik' : '…';
     }
 
     public function resolvedCommentable(): ?Model

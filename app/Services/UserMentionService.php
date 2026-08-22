@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use App\Enums\TaskStatus;
+use App\Enums\WorkItemStatus;
 use App\Models\Comment;
+use App\Models\CommentMention;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
@@ -12,7 +13,7 @@ use App\Notifications\TaskAssigned;
 
 class UserMentionService
 {
-    /** Wzorce @Nazwa — obsługa emaili jako nazw (znak @ w środku). Opcjonalny `!` tworzy zadanie. */
+    /** Wzorce @Nazwa — obsługa emaili jako nazw (znak @ w środku). Opcjonalny `!` tworzy wzmiankę w backlogu. */
     public const MENTION_REGEX = '/@([\w\-\.@]+)(!)?/u';
 
     /**
@@ -36,7 +37,7 @@ class UserMentionService
     }
 
     /**
-     * @return list<string> unikalne handele z `@nazwa!` (zadanie, nie sama notyfikacja)
+     * @return list<string> unikalne handele z `@nazwa!` (wzmianka w backlogu, nie sama notyfikacja)
      */
     public static function extractTaskHandles(string $text): array
     {
@@ -192,15 +193,15 @@ class UserMentionService
                 });
         }
 
-        $this->createCommentMentionTasks($comment, $author);
+        $this->createCommentMentions($comment, $author);
 
         return $notifiedIds;
     }
 
     /**
-     * `@nazwa!` tworzy zadanie dla wskazanej osoby (także dla autora). Bez `@wszyscy!`.
+     * `@nazwa!` tworzy wzmiankę w backlogu dla wskazanej osoby (także dla autora). Bez `@wszyscy!`.
      */
-    public function createCommentMentionTasks(Comment $comment, User $author): void
+    public function createCommentMentions(Comment $comment, User $author): void
     {
         $handles = self::extractTaskHandles((string) ($comment->body ?? ''));
         if ($handles === []) {
@@ -208,7 +209,6 @@ class UserMentionService
         }
 
         $comment->loadMissing(['commentable', 'parent']);
-        $description = $this->mentionTaskDescription($comment);
         $assignedIds = [];
 
         foreach ($handles as $handle) {
@@ -226,46 +226,32 @@ class UserMentionService
             }
             $assignedIds[$user->id] = true;
 
-            if ($comment->tasks()->where('assigned_to', $user->id)->exists()) {
+            if ($comment->mentions()->where('assigned_to', $user->id)->exists()) {
                 continue;
             }
 
-            $task = ProjectTask::query()->create([
-                'name' => 'Wzmianka od '.$author->name,
-                'description' => $description,
-                'category' => 'Komentarz',
-                'status' => TaskStatus::PENDING,
+            $mention = CommentMention::query()->create([
+                'comment_id' => $comment->id,
                 'assigned_to' => $user->id,
                 'created_by' => $author->id,
-                'subject_type' => $comment->getMorphClass(),
-                'subject_id' => $comment->id,
+                'title' => $this->mentionTitle($comment, $author),
+                'status' => WorkItemStatus::Pending,
             ]);
 
             if ($user->id !== $author->id) {
-                $user->notify(new TaskAssigned($task, $author));
+                $user->notify(new TaskAssigned($mention, $author));
             }
         }
     }
 
-    private function mentionTaskDescription(Comment $comment): string
+    private function mentionTitle(Comment $comment, User $author): string
     {
-        $parts = [];
-        $body = trim((string) ($comment->body ?? ''));
-        if ($body !== '') {
-            $parts[] = $body;
+        $request = self::stripMentionTokens((string) ($comment->body ?? ''));
+        if ($request === '') {
+            return 'Wzmianka od '.$author->name;
         }
 
-        $parentBody = trim((string) ($comment->parent?->body ?? ''));
-        if ($parentBody !== '') {
-            $excerpt = mb_strlen($parentBody) > 200
-                ? mb_substr($parentBody, 0, 197).'…'
-                : $parentBody;
-            $parts[] = 'Odpowiedź na: '.$excerpt;
-        }
-
-        $parts[] = $comment->urlWithCommentAnchor();
-
-        return implode("\n\n", $parts);
+        return mb_substr($request, 0, 255);
     }
 
     /**

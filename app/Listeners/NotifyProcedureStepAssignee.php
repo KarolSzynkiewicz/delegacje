@@ -3,7 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\ProcedureRunStepEntered;
-use App\Models\ProjectTask;
+use App\Models\CommentMention;
 use App\Models\User;
 use App\Services\UserMentionService;
 use Illuminate\Support\Facades\Auth;
@@ -60,24 +60,23 @@ class NotifyProcedureStepAssignee
         $comment = $task->addComment($body, $author);
         $this->mentions->notifyCommentMentions($comment, $author);
 
-        $mentionTasks = ProjectTask::query()
-            ->where('subject_type', $comment->getMorphClass())
-            ->where('subject_id', $comment->id)
+        $mentions = CommentMention::query()
+            ->where('comment_id', $comment->id)
             ->get();
 
-        foreach ($mentionTasks as $mentionTask) {
-            $mentionTask->update(['name' => $stepName]);
+        foreach ($mentions as $mention) {
+            $mention->update(['title' => $stepName]);
         }
 
-        $ids = $mentionTasks->pluck('id')->all();
+        $ids = $mentions->pluck('id')->all();
         if ($ids === []) {
             return;
         }
 
         $variables = $event->run->variables ?? [];
         $key = (string) $assigneeId;
-        $variables['step_mention_tasks'][$key] = array_values(array_unique(array_merge(
-            $variables['step_mention_tasks'][$key] ?? [],
+        $variables['step_mentions'][$key] = array_values(array_unique(array_merge(
+            $variables['step_mentions'][$key] ?? [],
             $ids
         )));
         $event->run->update(['variables' => $variables]);

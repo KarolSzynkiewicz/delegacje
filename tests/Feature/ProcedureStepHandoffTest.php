@@ -2,7 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Enums\TaskStatus;
+use App\Enums\WorkItemStatus;
+use App\Models\CommentMention;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\User;
@@ -56,7 +57,7 @@ class ProcedureStepHandoffTest extends TestCase
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
         $this->assertSame(0, $procedureTask->comments()->count());
-        $this->assertSame(0, ProjectTask::query()->where('category', 'Komentarz')->count());
+        $this->assertSame(0, CommentMention::query()->count());
 
         $service->advance($run);
 
@@ -65,15 +66,14 @@ class ProcedureStepHandoffTest extends TestCase
         $this->assertSame($this->karol->id, $comment->user_id);
         $this->assertSame("@mirek! Krok: Odbiór auta\nZrób: Sprawdź stan opon i zatankuj.", $comment->body);
 
-        $mentionTask = ProjectTask::query()
-            ->where('category', 'Komentarz')
+        $mention = CommentMention::query()
             ->where('assigned_to', $this->mirek->id)
             ->first();
 
-        $this->assertNotNull($mentionTask);
-        $this->assertSame('Odbiór auta', $mentionTask->name);
-        $this->assertSame(TaskStatus::PENDING, $mentionTask->status);
-        $this->assertSame($comment->id, $mentionTask->subject_id);
+        $this->assertNotNull($mention);
+        $this->assertSame('Odbiór auta', $mention->title);
+        $this->assertSame(WorkItemStatus::Pending, $mention->status);
+        $this->assertSame($comment->id, $mention->comment_id);
         Notification::assertSentTo($this->mirek, CommentMentioned::class);
     }
 
@@ -98,15 +98,15 @@ class ProcedureStepHandoffTest extends TestCase
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
         $this->assertSame(1, $procedureTask->comments()->count());
-        $this->assertSame(1, ProjectTask::query()->where('category', 'Komentarz')->count());
+        $this->assertSame(1, CommentMention::query()->count());
         $this->assertSame("@mirek! Krok: Krok A\nZrób: Wykonaj ten krok w procedurze.", $procedureTask->comments()->first()->body);
 
-        $mentionTask = ProjectTask::query()->where('category', 'Komentarz')->first();
-        $this->assertSame(TaskStatus::PENDING, $mentionTask->status);
+        $mention = CommentMention::query()->first();
+        $this->assertSame(WorkItemStatus::Pending, $mention->status);
 
         $service->advance($run->fresh());
 
-        $this->assertSame(TaskStatus::COMPLETED, $mentionTask->fresh()->status);
+        $this->assertSame(WorkItemStatus::Completed, $mention->fresh()->status);
     }
 
     public function test_going_back_does_not_create_another_comment(): void
@@ -129,10 +129,10 @@ class ProcedureStepHandoffTest extends TestCase
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
         $this->assertSame(1, $procedureTask->comments()->count());
-        $this->assertSame(1, ProjectTask::query()->where('category', 'Komentarz')->count());
+        $this->assertSame(1, CommentMention::query()->count());
         $this->assertSame(
-            TaskStatus::PENDING,
-            ProjectTask::query()->where('category', 'Komentarz')->first()->status
+            WorkItemStatus::Pending,
+            CommentMention::query()->first()->status
         );
     }
 
@@ -155,7 +155,7 @@ class ProcedureStepHandoffTest extends TestCase
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
         $this->assertSame(0, $procedureTask->comments()->count());
-        $this->assertSame(0, ProjectTask::query()->where('category', 'Komentarz')->count());
+        $this->assertSame(0, CommentMention::query()->count());
         Notification::assertNothingSentTo($this->karol);
         Notification::assertNothingSentTo($this->mirek);
     }
@@ -181,13 +181,12 @@ class ProcedureStepHandoffTest extends TestCase
 
         $service->advance($run);
 
-        $mentionTask = ProjectTask::query()->where('category', 'Komentarz')->first();
-        $this->assertSame(TaskStatus::PENDING, $mentionTask->status);
+        $mention = CommentMention::query()->first();
+        $this->assertSame(WorkItemStatus::Pending, $mention->status);
 
         $service->advance($run->fresh());
 
-        $this->assertSame(TaskStatus::COMPLETED, $mentionTask->fresh()->status);
-        $this->assertNotNull($mentionTask->fresh()->completed_at);
+        $this->assertSame(WorkItemStatus::Completed, $mention->fresh()->status);
     }
 
     /**

@@ -143,9 +143,13 @@ class TaskController extends Controller
     /**
      * Display the specified task.
      */
-    public function show(ProjectTask $task): View
+    public function show(ProjectTask $task): View|RedirectResponse
     {
-        $task->load(['assignedTo', 'createdBy', 'sprint', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess', 'subject']);
+        if ($redirect = $this->redirectLegacyMention($task)) {
+            return $redirect;
+        }
+
+        $task->load(['assignedTo', 'createdBy', 'sprint', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess.candidate', 'subject.user', 'subject.commentable', 'subject.parent']);
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('tasks.show', compact('task', 'users'));
@@ -154,8 +158,12 @@ class TaskController extends Controller
     /**
      * Show the form for editing the specified task.
      */
-    public function edit(ProjectTask $task): View
+    public function edit(ProjectTask $task): View|RedirectResponse
     {
+        if ($redirect = $this->redirectLegacyMention($task)) {
+            return $redirect;
+        }
+
         $task->load(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
         $users = \App\Models\User::orderBy('name')->get();
 
@@ -254,6 +262,21 @@ class TaskController extends Controller
         return redirect()->back()->with('success', 'Zadanie zostało oznaczone jako zakończone.')->withFragment('task-'.$task->id);
     }
 
+    public function toggleDone(ProjectTask $task): RedirectResponse
+    {
+        $this->authorize('markCompleted', $task);
+
+        if ($task->status === TaskStatus::COMPLETED) {
+            $task->reopen();
+
+            return redirect()->back()->with('success', 'Ponownie otwarte.');
+        }
+
+        $task->markCompleted();
+
+        return redirect()->back()->with('success', 'Oznaczone jako zrobione.');
+    }
+
     /**
      * Cancel the task.
      */
@@ -265,5 +288,16 @@ class TaskController extends Controller
         $task->cancel();
 
         return redirect()->back()->with('success', 'Zadanie zostało anulowane.')->withFragment('task-'.$task->id);
+    }
+
+    private function redirectLegacyMention(ProjectTask $task): ?RedirectResponse
+    {
+        if (! $task->isMention()) {
+            return null;
+        }
+
+        $url = $task->mentionSourceComment()?->urlWithCommentAnchor();
+
+        return $url ? redirect()->to($url) : redirect()->to(url('/tasks2'));
     }
 }

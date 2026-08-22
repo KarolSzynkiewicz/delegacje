@@ -1,8 +1,15 @@
 @php
-    $isExpanded  = in_array($task->id, $expandedTasks);
-    $canEdit     = $this->canEditTask($task);
+    $isWorkItem   = $task instanceof \App\Models\WorkItem;
+    $openUrl      = $isWorkItem ? $task->openUrl() : route('tasks.show', $task);
+    $sprintUrl    = $task->sprint ? route('sprints.show', $task->sprint) : null;
+    $canAddSubtask = $this->rowSupports($task, 'subtasks');
+    $canExpand   = $this->rowExpandable($task);
+    $isExpanded  = $canExpand && in_array($task->id, $expandedTasks);
+    $canDrag     = $this->rowCanDrag($task);
     $isEditing   = $editingTaskId === $task->id;
     $groupValue  = $groupBy !== '' ? $this->groupValueFor($task) : '';
+    $statusWidget = $this->rowStatusWidget($task);
+    $statusLabel = $this->rowStatusLabel($task);
 
     $subtasksAll  = $task->subtasks->sortBy(['sort_order', 'created_at']);
     $subtaskTotal = $subtasksAll->count();
@@ -16,6 +23,7 @@
         'cancelled'   => ['cls' => 's-cancelled',  'icon' => '✗',  'label' => 'Anulowane',  'variant' => 'danger'],
     ];
     $sc = $statusMap[$task->status->value] ?? $statusMap['pending'];
+    $sc['label'] = $statusLabel;
 
     // Priority config
     $priorityMap = [
@@ -65,12 +73,14 @@
 
     {{-- Expand toggle --}}
     <td style="width:36px; padding:5px 4px !important; text-align:center">
+        @if($canExpand)
         <button wire:click="toggleExpand({{ $task->id }})"
                 class="btn btn-sm btn-link p-0"
                 style="color:rgba(255,255,255,0.4); line-height:1"
                 title="{{ $isExpanded ? 'Zwiń' : 'Rozwiń' }}">
             <i class="bi bi-chevron-{{ $isExpanded ? 'down' : 'right' }}" style="font-size:0.75rem"></i>
         </button>
+        @endif
     </td>
 
     {{-- ── Dynamic columns rendered in $visibleColumns order ── --}}
@@ -80,39 +90,26 @@
     {{-- ── Name ── --}}
     @case('name')
     <td style="min-width:200px; max-width:320px">
-        @if($isEditing && $editingField === 'name')
-            <input type="text" wire:model="editingValue"
-                   class="form-control form-control-sm"
-                   wire:keydown.enter="saveEdit"
-                   wire:keydown.escape="cancelEdit"
-                   wire:blur="saveEdit"
-                   x-data x-init="$el.focus(); $el.select()">
-        @else
-            <div class="d-flex align-items-center gap-1" style="min-width:0">
-                @if($groupBy !== '' && $canEdit)
+        <div class="d-flex align-items-center gap-1" style="min-width:0">
+                @if($canDrag)
                     <i class="bi bi-grip-vertical tg-task-grip flex-shrink-0"
                        draggable="true"
                        title="Przenieś do innej grupy"
                        @dragstart.stop="window._tgSubDrag = null; window._tgTaskDrag = { id: {{ $task->id }}, fromGroup: gv }; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', '{{ $task->id }}')"
                        @dragend="window._tgTaskDrag = null"></i>
                 @endif
-                @if($subtaskTotal > 0)
+                @if($canAddSubtask && $subtaskTotal > 0)
                     <span class="badge rounded-pill flex-shrink-0"
                           style="font-size:0.6rem; min-width:32px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)"
                           title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                         {{ $subtaskDone }}/{{ $subtaskTotal }}
                     </span>
                 @endif
-                @if($canEdit)
-                    <span wire:click="startEdit({{ $task->id }}, 'name')"
-                          class="tg-hover-edit"
-                          style="cursor:text; padding:2px 4px; border-radius:3px; display:block; min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main,#f1f5f9)"
-                          title="{{ $task->name }}">{{ $task->name }}</span>
-                @else
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; flex:1; color:var(--text-main,#f1f5f9)"
-                          title="{{ $task->name }}">{{ $task->name }}</span>
-                @endif
-                @if($sourceCard = $task->sourceCard())
+                <a href="{{ $openUrl }}"
+                   class="text-decoration-none"
+                   style="padding:2px 4px; border-radius:3px; display:block; min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main,#f1f5f9)"
+                   title="{{ $task->name }}">{{ $task->name }}</a>
+                @if(($sourceCard = $task->sourceCard()) && ($sourceCard['url'] ?? '') !== $openUrl)
                     <a href="{{ $sourceCard['url'] }}"
                        class="btn btn-link btn-sm p-0 flex-shrink-0"
                        style="color:#60a5fa; line-height:1"
@@ -122,14 +119,24 @@
                     </a>
                 @endif
             </div>
-        @endif
     </td>
     @break
 
-    {{-- ── Status — Alpine x-teleport (bypasses backdrop-filter stacking context) ── --}}
+    {{-- ── Type (not editable) ── --}}
+    @case('type')
+    <td style="white-space:nowrap; min-width:110px">
+        <span class="d-inline-flex align-items-center gap-1" style="font-size:0.82rem;color:var(--text-muted,#94a3b8)">
+            <i class="bi {{ $this->rowTypeIcon($task) }}"></i>
+            {{ $this->rowTypeLabel($task) }}
+        </span>
+    </td>
+    @break
+
+    {{-- ── Status ── --}}
     @case('status')
     <td style="white-space:nowrap; min-width:130px">
-        @if($canEdit)
+        @if(in_array($statusWidget, [\App\WorkItems\StatusWidget::TaskSelect, \App\WorkItems\StatusWidget::BinarySelect], true) && $this->rowWritable($task, 'status'))
+            @php $binaryStatus = $statusWidget === \App\WorkItems\StatusWidget::BinarySelect; @endphp
             <div x-data="{ open: false, top: 0, left: 0 }">
                 <button type="button"
                         @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
@@ -151,6 +158,7 @@
                                 ⏳ Oczekujące
                             </button>
                         </li>
+                        @unless($binaryStatus)
                         <li>
                             <button type="button"
                                     class="dropdown-item py-2 {{ $task->status->value === 'in_progress' ? 'active' : '' }}"
@@ -159,6 +167,7 @@
                                 ▶ W trakcie
                             </button>
                         </li>
+                        @endunless
                         <li>
                             <button type="button"
                                     class="dropdown-item py-2 {{ $task->status->value === 'completed' ? 'active' : '' }}"
@@ -167,6 +176,7 @@
                                 ✓ Ukończone
                             </button>
                         </li>
+                        @unless($binaryStatus)
                         <li>
                             <button type="button"
                                     class="dropdown-item py-2 {{ $task->status->value === 'cancelled' ? 'active' : '' }}"
@@ -175,11 +185,12 @@
                                 ✗ Anulowane
                             </button>
                         </li>
+                        @endunless
                     </ul>
                 </template>
             </div>
         @else
-            <x-ui.badge :variant="$sc['variant']">{{ $sc['icon'] }} {{ $sc['label'] }}</x-ui.badge>
+            <span class="tg-status-badge {{ $sc['cls'] }}">{{ $sc['icon'] }} {{ $statusLabel }}</span>
         @endif
     </td>
     @break
@@ -196,22 +207,14 @@
                     <option value="{{ $sprintOption->id }}">{{ $sprintOption->label() }}</option>
                 @endforeach
             </select>
+        @elseif($sprintUrl)
+            <a href="{{ $sprintUrl }}" class="text-decoration-none d-block" style="padding:2px 4px">
+                <x-ui.badge variant="accent" class="text-truncate" style="max-width:160px">{{ $task->sprint->name }}</x-ui.badge>
+            </a>
+        @elseif($this->rowWritable($task, 'sprint'))
+            <span wire:click="startEdit({{ $task->id }}, 'sprint')" class="tg-hover-edit d-block text-muted" style="cursor:pointer; padding:2px 4px; border-radius:3px; font-size:0.82rem">—</span>
         @else
-            @if($canEdit)
-                <span wire:click="startEdit({{ $task->id }}, 'sprint')" class="tg-hover-edit d-block" style="cursor:pointer; padding:2px 4px; border-radius:3px">
-                    @if($task->sprint)
-                        <x-ui.badge variant="accent" class="text-truncate" style="max-width:160px">{{ $task->sprint->name }}</x-ui.badge>
-                    @else
-                        <span class="text-muted" style="font-size:0.82rem">—</span>
-                    @endif
-                </span>
-            @else
-                @if($task->sprint)
-                    <x-ui.badge variant="accent" class="text-truncate" style="max-width:160px">{{ Str::limit($task->sprint->name, 22) }}</x-ui.badge>
-                @else
-                    <span class="text-muted" style="font-size:0.82rem">—</span>
-                @endif
-            @endif
+            <span class="text-muted" style="font-size:0.82rem">—</span>
         @endif
     </td>
     @break
@@ -224,7 +227,7 @@
                    wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                    x-data x-init="$el.focus(); $el.select()">
         @else
-            @if($canEdit)
+            @if($this->rowWritable($task, 'category'))
                 <span wire:click="startEdit({{ $task->id }}, 'category')" class="tg-hover-edit d-block" style="cursor:text; padding:2px 4px; border-radius:3px">
                     @if($task->category)
                         <x-ui.badge variant="info" class="text-truncate" style="max-width:120px">{{ $task->category }}</x-ui.badge>
@@ -256,7 +259,7 @@
                 @endforeach
             </select>
         @else
-            @if($canEdit)
+            @if($this->rowWritable($task, 'assigned_to'))
                 <span wire:click="startEdit({{ $task->id }}, 'assigned_to')"
                       class="tg-hover-edit d-block" style="cursor:pointer; padding:2px 4px; border-radius:3px">
                     @if($task->assignedTo)
@@ -291,7 +294,7 @@
                 <option value="5">5 – Krytyczny</option>
             </select>
         @else
-            @if($canEdit)
+            @if($this->rowWritable($task, 'priority'))
                 <span wire:click="startEdit({{ $task->id }}, 'priority')"
                       class="tg-hover-edit"
                       style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.82rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
@@ -314,7 +317,7 @@
                    wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                    x-data x-init="$el.focus()">
         @else
-            @if($canEdit)
+            @if($this->rowWritable($task, 'due_date'))
                 <span wire:click="startEdit({{ $task->id }}, 'due_date')"
                       class="tg-hover-edit"
                       style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.82rem; {{ $dueStyle }}">
@@ -349,7 +352,7 @@
     @case('comments')
     <td style="text-align:center; min-width:60px">
         @if($commentsCount > 0)
-            <a href="{{ route('tasks.show', $task) }}"
+            <a href="{{ $openUrl }}"
                class="text-decoration-none"
                style="font-size:0.75rem; color:var(--text-muted,#94a3b8)">
                 <i class="bi bi-chat-dots me-1"></i>{{ $commentsCount }}
@@ -376,30 +379,6 @@
 
     @endswitch
     @endforeach
-
-    {{-- ── Actions ── --}}
-    <td style="white-space:nowrap; text-align:right; padding-right:8px !important">
-        <x-ui.action-buttons gap="1" class="justify-content-end">
-            <a href="{{ route('tasks.show', $task) }}"
-               class="btn btn-sm btn-outline-secondary p-1"
-               style="line-height:1; min-width:28px"
-               title="Podgląd">
-                <i class="bi bi-eye"></i>
-            </a>
-            <a href="{{ route('tasks.edit', $task) }}"
-               class="btn btn-sm btn-outline-secondary p-1"
-               style="line-height:1; min-width:28px"
-               title="Edytuj">
-                <i class="bi bi-pencil"></i>
-            </a>
-            <button wire:click="startAddSubtask({{ $task->id }})"
-                    class="btn btn-sm btn-outline-success p-1"
-                    style="line-height:1; min-width:28px"
-                    title="Dodaj podzadanie">
-                <i class="bi bi-plus-square"></i>
-            </button>
-        </x-ui.action-buttons>
-    </td>
 </tr>
 
 {{-- ════════════════════════════════════════════════════════════ --}}
@@ -408,7 +387,7 @@
 @if($isExpanded)
 <tr wire:key="tg-expanded-{{ $task->id }}" class="tg-expand-row">
     <td style="width:36px; border-left:3px solid {{ $borderColor }}; padding:0 !important; background:rgba(10,15,29,0.6) !important"></td>
-    <td colspan="{{ count($visibleColumns) + 1 }}">
+    <td colspan="{{ count($visibleColumns) }}">
         <div class="row g-4">
 
             {{-- ── Description ── --}}
@@ -417,7 +396,7 @@
                     <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted,#94a3b8)">
                         <i class="bi bi-card-text me-1"></i>Opis
                     </span>
-                    @if($canEdit && !($isEditing && $editingField === 'description'))
+                    @if($this->rowWritable($task, 'description') && !($isEditing && $editingField === 'description'))
                     <button wire:click="startEdit({{ $task->id }}, 'description')"
                             class="btn btn-link btn-sm p-0"
                             style="font-size:0.72rem; color:rgba(255,255,255,0.3); text-decoration:none; line-height:1"
@@ -447,7 +426,7 @@
                     @else
                         <div style="font-size:0.82rem; font-style:italic; color:rgba(255,255,255,0.25)">
                             Brak opisu.
-                            @if($canEdit)
+                            @if($this->rowWritable($task, 'description'))
                                 <button wire:click="startEdit({{ $task->id }}, 'description')"
                                         class="btn btn-link btn-sm p-0 ms-1"
                                         style="font-size:0.8rem">Dodaj opis</button>
@@ -467,6 +446,7 @@
             </div>
 
             {{-- ── Subtasks ── --}}
+            @if($canAddSubtask || $subtaskTotal > 0)
             <div class="col-lg-7">
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted,#94a3b8)">
@@ -480,11 +460,13 @@
                             <div style="width:{{ round(($subtaskDone/$subtaskTotal)*100) }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#3b82f6' }}"></div>
                         </div>
                     @endif
+                    @if($canAddSubtask)
                     <button wire:click="startAddSubtask({{ $task->id }})"
                             class="btn btn-link btn-sm p-0 ms-1"
                             style="font-size:0.72rem; text-decoration:none; color:rgba(16,185,129,0.8)">
                         <i class="bi bi-plus-circle me-1"></i>Dodaj podzadanie
                     </button>
+                    @endif
                 </div>
 
                 @if($subtaskTotal > 0)
@@ -543,6 +525,7 @@
                 </div>
                 @endif
             </div>
+            @endif
 
         </div>
     </td>

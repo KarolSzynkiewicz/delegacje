@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Comment;
+use App\Models\CommentMention;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
@@ -14,7 +15,7 @@ class TaskAssigned extends Notification
     use Queueable;
 
     public function __construct(
-        public readonly ProjectTask|TaskSubtask $task,
+        public readonly ProjectTask|TaskSubtask|CommentMention $task,
         public readonly User $assignedBy,
     ) {}
 
@@ -25,6 +26,24 @@ class TaskAssigned extends Notification
 
     public function toDatabase(object $notifiable): array
     {
+        if ($this->task instanceof CommentMention) {
+            $this->task->loadMissing(['comment.commentable']);
+            $comment = $this->task->comment;
+            $card = $comment?->commentableCard();
+
+            return [
+                'type' => 'task_assigned',
+                'message' => $this->assignedBy->name.' przypisał(-a) Ci wzmiankę',
+                'task_id' => null,
+                'task_name' => $this->task->title,
+                'task_url' => $comment?->urlWithCommentAnchor() ?? url('/tasks2'),
+                'context_name' => $card['label'] ?? null,
+                'excerpt' => $comment?->bodyExcerpt(),
+                'assigned_by_id' => $this->assignedBy->id,
+                'assigned_by_name' => $this->assignedBy->name,
+            ];
+        }
+
         if ($this->task instanceof TaskSubtask) {
             $this->task->loadMissing('task');
             $parent = $this->task->task;

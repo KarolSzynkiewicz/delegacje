@@ -2,9 +2,9 @@
 
 namespace App\Listeners;
 
-use App\Enums\TaskStatus;
+use App\Enums\WorkItemStatus;
 use App\Events\ProcedureRunStepCompleted;
-use App\Models\ProjectTask;
+use App\Models\CommentMention;
 
 class CompleteProcedureStepMentionTasks
 {
@@ -30,15 +30,18 @@ class CompleteProcedureStepMentionTasks
             return;
         }
 
-        $ids = $event->run->variables['step_mention_tasks'][(string) $leavingAssigneeId] ?? [];
+        $key = (string) $leavingAssigneeId;
+        $ids = $event->run->variables['step_mentions'][$key]
+            ?? $event->run->variables['step_mention_tasks'][$key]
+            ?? [];
         if ($ids === []) {
             return;
         }
 
-        ProjectTask::query()
+        CommentMention::query()
             ->whereIn('id', $ids)
-            ->whereNotIn('status', [TaskStatus::COMPLETED, TaskStatus::CANCELLED])
+            ->where('status', '!=', WorkItemStatus::Completed)
             ->get()
-            ->each(fn (ProjectTask $task) => $task->markCompleted());
+            ->each(fn (CommentMention $mention) => $mention->markCompleted());
     }
 }

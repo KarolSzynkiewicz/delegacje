@@ -21,7 +21,13 @@
         </button>
     </td>
     <td colspan="{{ $colCount - 1 }}" style="padding:6px 10px">
-        <span>{{ $groupName }}</span>
+        <span>
+            @if($groupBy === 'sprint' && (string) $groupValue !== '')
+                <a href="{{ route('sprints.show', $groupValue) }}" class="text-decoration-none" style="color:inherit">{{ $groupName }}</a>
+            @else
+                {{ $groupName }}
+            @endif
+        </span>
         <span class="badge bg-secondary ms-1" style="font-size:0.68rem; border-radius:8px">{{ $groupItems->count() }}</span>
         @if(!empty($groupSubtitle))
             <div class="fw-normal mt-1" style="font-size:0.72rem; opacity:.7; font-weight:400">{{ $groupSubtitle }}</div>

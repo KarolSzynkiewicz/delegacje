@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 use App\Enums\ProcedureRunStatus;
 use App\Models\ProcedureRun;
-use App\Models\ProcedureRunComment;
 use App\Models\User;
 use App\Services\ProcedureRunService;
 use Livewire\Component;
@@ -13,18 +12,18 @@ class ProcedureRunStepper extends Component
 {
     public ProcedureRun $run;
 
+    /** When true, the parent page already shows title/status — stepper is only the current step. */
+    public bool $compact = false;
+
     // Checklist state: [node_id => [item_id => bool]]
     public array $checklistState = [];
 
     // Decision choice: edge_id selected
     public ?string $selectedEdgeId = null;
 
-    // Comment form
-    public string $newComment = '';
-
     public function mount(ProcedureRun $run): void
     {
-        $this->run = $run->load(['steps', 'comments.user', 'task', 'subject']);
+        $this->run = $run->load(['steps', 'task', 'subject']);
         $this->initChecklistState();
     }
 
@@ -84,7 +83,7 @@ class ProcedureRunStepper extends Component
 
         app(ProcedureRunService::class)->advance($this->run, $edgeId, $stepData);
 
-        $this->run->refresh()->load(['steps', 'comments.user', 'task', 'subject']);
+        $this->run->refresh()->load(['steps', 'task', 'subject']);
         $this->selectedEdgeId = null;
         $this->checklistState = [];
         $this->initChecklistState();
@@ -96,7 +95,7 @@ class ProcedureRunStepper extends Component
             return;
         }
         app(ProcedureRunService::class)->goBack($this->run);
-        $this->run->refresh()->load(['steps', 'comments.user', 'task', 'subject']);
+        $this->run->refresh()->load(['steps', 'task', 'subject']);
         $this->selectedEdgeId = null;
         $this->checklistState = [];
         $this->initChecklistState();
@@ -106,20 +105,6 @@ class ProcedureRunStepper extends Component
     {
         app(ProcedureRunService::class)->abandon($this->run);
         $this->run->refresh()->load(['steps', 'task', 'subject']);
-    }
-
-    public function addComment(): void
-    {
-        $this->validate(['newComment' => ['required', 'string', 'max:2000']], [], ['newComment' => 'komentarz']);
-
-        ProcedureRunComment::create([
-            'procedure_run_id' => $this->run->id,
-            'user_id' => auth()->id(),
-            'body' => $this->newComment,
-        ]);
-
-        $this->newComment = '';
-        $this->run->refresh()->load(['steps', 'comments.user', 'task', 'subject']);
     }
 
     public function nodeAssigneeName(?array $node): ?string

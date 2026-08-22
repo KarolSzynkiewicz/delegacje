@@ -6,6 +6,7 @@ use App\Enums\ProcedureRunStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
+use App\Models\CommentMention;
 use App\Models\ProcedureRun;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
@@ -28,13 +29,30 @@ class WorkItemSync
             return null;
         }
 
-        return WorkItem::query()->updateOrCreate(
+        $item = WorkItem::query()->updateOrCreate(
             [
                 'source_type' => $payload['source_type'],
                 'source_id' => $payload['source_id'],
             ],
             $payload,
         );
+
+        if ($model instanceof ProjectTask) {
+            $this->refreshAssignedSubtaskItems($model);
+        }
+
+        return $item;
+    }
+
+    /**
+     * Sprint i kategoria podzadania idą z rodzica — po zmianie zadania odśwież wiersze dzieci.
+     */
+    private function refreshAssignedSubtaskItems(ProjectTask $task): void
+    {
+        $task->subtasks()
+            ->whereNotNull('assigned_to')
+            ->get()
+            ->each(fn (TaskSubtask $subtask) => $this->sync($subtask));
     }
 
     public function forget(Model $model): void
@@ -55,6 +73,7 @@ class WorkItemSync
             $model instanceof TaskSubtask => $this->fromSubtask($model),
             $model instanceof ProcedureRun => $this->fromProcedureRun($model),
             $model instanceof WarehouseDispatch => $this->fromDispatch($model),
+            $model instanceof CommentMention => $this->fromMention($model),
             default => null,
         };
     }
@@ -64,8 +83,11 @@ class WorkItemSync
         $source = $item->source;
 
         return match ($item->type) {
-            WorkItemType::Task, WorkItemType::FollowUp, WorkItemType::Callback => $source instanceof ProjectTask
+            WorkItemType::Task, WorkItemType::Callback => $source instanceof ProjectTask
                 ? route('tasks.show', $source)
+                : url('/tasks2'),
+            WorkItemType::FollowUp => $source instanceof CommentMention
+                ? ($source->comment?->urlWithCommentAnchor() ?? url('/tasks2'))
                 : url('/tasks2'),
             WorkItemType::Subtask => $source instanceof TaskSubtask
                 ? ($source->task ? route('tasks.show', $source->task) : url('/tasks2'))
@@ -99,6 +121,12 @@ class WorkItemSync
             return;
         }
 
+        if ($source instanceof CommentMention && $item->status->isOpen()) {
+            $source->markCompleted();
+
+            return;
+        }
+
         if ($source instanceof TaskSubtask && ! $source->is_completed) {
             $source->markCompleted();
         }
@@ -109,6 +137,12 @@ class WorkItemSync
         $source = $item->source;
 
         if ($source instanceof ProjectTask && $source->status === TaskStatus::COMPLETED) {
+            $source->reopen();
+
+            return;
+        }
+
+        if ($source instanceof CommentMention && $source->isCompleted()) {
             $source->reopen();
 
             return;
@@ -157,6 +191,14 @@ class WorkItemSync
             }
         });
 
+        CommentMention::query()->orderBy('id')->chunkById(200, function ($mentions) use (&$count): void {
+            foreach ($mentions as $mention) {
+                if ($this->sync($mention)) {
+                    $count++;
+                }
+            }
+        });
+
         return $count;
     }
 
@@ -198,10 +240,14 @@ class WorkItemSync
             return null;
         }
 
-        $type = WorkItemType::Task;
         if ($subjectType === 'comment') {
-            $type = WorkItemType::FollowUp;
-        } elseif ($this->looksLikeCallback($task)) {
+            $this->forget($task);
+
+            return null;
+        }
+
+        $type = WorkItemType::Task;
+        if ($task->isCallback()) {
             $type = WorkItemType::Callback;
         }
 
@@ -210,6 +256,8 @@ class WorkItemSync
             'source_type' => $task->getMorphClass(),
             'source_id' => $task->id,
             'title' => $task->name,
+            'category' => $task->category,
+            'priority' => $task->priority,
             'status' => WorkItemStatus::fromTaskStatus($task->status),
             'assignee_id' => $task->assigned_to,
             'sprint_id' => $task->sprint_id,
@@ -235,6 +283,8 @@ class WorkItemSync
             'source_type' => $subtask->getMorphClass(),
             'source_id' => $subtask->id,
             'title' => $subtask->name,
+            'category' => $subtask->task?->category,
+            'priority' => null,
             'status' => $subtask->is_completed ? WorkItemStatus::Completed : WorkItemStatus::Pending,
             'assignee_id' => $subtask->assigned_to,
             'sprint_id' => $subtask->task?->sprint_id,
@@ -260,10 +310,30 @@ class WorkItemSync
             'source_type' => $run->getMorphClass(),
             'source_id' => $run->id,
             'title' => $task?->name ?? ($run->template?->name ?? 'Procedura #'.$run->id),
+            'category' => null,
+            'priority' => $task?->priority,
             'status' => $status,
             'assignee_id' => $task?->assigned_to,
             'sprint_id' => $task?->sprint_id,
             'due_at' => $task?->due_date,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fromMention(CommentMention $mention): array
+    {
+        $mention->loadMissing('comment.commentable');
+
+        return [
+            'type' => WorkItemType::FollowUp,
+            'source_type' => $mention->getMorphClass(),
+            'source_id' => $mention->id,
+            'title' => $mention->title,
+            'category' => null,
+            'status' => $mention->status,
+            'assignee_id' => $mention->assigned_to,
         ];
     }
 
@@ -282,20 +352,13 @@ class WorkItemSync
             'source_type' => $dispatch->getMorphClass(),
             'source_id' => $dispatch->id,
             'title' => $dispatch->taskName(),
+            'category' => null,
+            'priority' => null,
             'status' => $status,
             'assignee_id' => $wrapper?->assigned_to ?? $dispatch->created_by,
             'sprint_id' => $wrapper?->sprint_id,
             'due_at' => $dispatch->issue_date,
         ];
-    }
-
-    private function looksLikeCallback(ProjectTask $task): bool
-    {
-        if ($task->category === 'Rekrutacja' && str_starts_with(mb_strtolower($task->name), 'oddzwonić')) {
-            return true;
-        }
-
-        return str_starts_with($task->name, 'Oddzwonić do ');
     }
 
     private function backfillSubtaskAssigneesFromClones(): void

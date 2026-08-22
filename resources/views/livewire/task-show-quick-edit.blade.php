@@ -7,7 +7,8 @@
     @endif
 
     <div class="d-flex flex-column gap-2">
-        {{-- Status (tylko podgląd) --}}
+        {{-- Status (tylko podgląd, nie dla procedur / wzmianek / oddzwonień) --}}
+        @unless($task->isProcedure() || $task->isCallback())
         <div>
             <small class="text-muted d-block mb-1">
                 <i class="bi bi-flag me-1"></i>Status
@@ -22,6 +23,7 @@
             @endphp
             <x-ui.badge variant="{{ $badgeVariant }}">{{ $task->status->label() }}</x-ui.badge>
         </div>
+        @endunless
 
         {{-- Przypisany --}}
         <div>
@@ -78,6 +80,7 @@
         @endif
 
         {{-- Kategoria --}}
+        @unless($task->isProcedure() || $task->isCallback())
         <div>
             <small class="text-muted d-block mb-1">
                 <i class="bi bi-tag me-1"></i>Kategoria
@@ -104,6 +107,7 @@
                 @endif
             @endif
         </div>
+        @endunless
 
         {{-- Termin --}}
         <div>

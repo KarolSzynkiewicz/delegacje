@@ -2,8 +2,7 @@
     $commentAutocompletePayload = $commentAutocompletePayload ?? ['users' => [], 'subtasks' => []];
     $commentBodyForDisplay = preg_replace('/<br\s*\/?\s*>/i', "\n", (string) ($comment->body ?? ''));
     $commentBodyForEdit = $commentBodyForDisplay;
-    $children = ($childrenOf->get($comment->id) ?? collect())->sortBy('created_at');
-    $marginRem = min($depth * 1.0, 4.0);
+    $quoted = $comment->parent;
     $commentBodyHtml = \App\Services\UserMentionService::highlightMentions(
         nl2br(e($commentBodyForDisplay)),
         $knownUsersForHighlight
@@ -25,178 +24,135 @@
     $likeButtonTitle = $likersForTooltip->isNotEmpty()
         ? 'Polubili: '.$likersForTooltip->pluck('name')->implode(', ').' — '.$likeActionHint
         : $likeActionHint;
-    $mentionTask = $comment->mentionTaskFor(auth()->id());
-    $mentionTaskDone = $mentionTask?->status === \App\Enums\TaskStatus::COMPLETED;
+    $mention = $comment->mentionFor(auth()->id());
+    $mentionDone = $mention?->isCompleted() ?? false;
+    $canManage = $comment->user_id === auth()->id() || auth()->user()->isAdmin();
+    $liked = (bool) ($comment->liked_by_me ?? false);
 @endphp
 
-<div
-    class="card mb-2 border"
-    style="margin-left: {{ $marginRem }}rem;"
+<article
+    class="comment-item"
     id="comment-{{ $comment->id }}"
     x-data="{ replyOpen: false }"
 >
-    <div class="card-body py-3">
-        <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
-            <div class="d-flex align-items-center">
-                <x-ui.avatar :name="$comment->user->name" size="sm" class="me-2" />
-                <div>
-                    <strong>{{ $comment->user->name }}</strong>
-                    @if($comment->parent_id)
-                        <span class="text-muted small ms-1">· odpowiedź</span>
-                    @endif
-                    <br>
-                    <small class="text-muted">{{ $comment->created_at->format('d.m.Y H:i') }}</small>
-                </div>
+    <div class="comment-item__head">
+        <div class="comment-item__who">
+            <x-ui.avatar :initials="$comment->user->initials" size="28px" :border="false" />
+            <div class="comment-item__meta">
+                <span class="comment-item__name">{{ $comment->user->name }}</span>
+                <span class="comment-item__time">{{ $comment->created_at->format('d.m.Y H:i') }}</span>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                @if($mentionTask)
-                    <form
-                        action="{{ route('comments.mention-task.toggle', $comment) }}"
-                        method="POST"
-                        class="d-inline"
-                        id="comment-mention-task-{{ $comment->id }}"
-                    >
-                        @csrf
-                        <button
-                            type="submit"
-                            class="btn btn-sm btn-outline-secondary flex-shrink-0"
-                            style="padding:1px 8px;"
-                            title="{{ $mentionTaskDone ? 'Oznacz jako niewykonane' : 'Oznacz jako zrobione' }}"
-                            aria-label="{{ $mentionTaskDone ? 'Oznacz jako niewykonane' : 'Oznacz jako zrobione' }}"
-                        >
-                            <i class="bi bi-check2{{ $mentionTaskDone ? '-square-fill' : '-square' }}"></i>
-                        </button>
-                    </form>
-                @endif
-                <form action="{{ route('comments.like', $comment) }}" method="POST" class="d-inline">
+        </div>
+        <div class="comment-item__actions">
+            @if($mention)
+                <form action="{{ route('comments.mention-task.toggle', $comment) }}" method="POST" class="d-inline">
                     @csrf
                     <button
                         type="submit"
-                        class="btn btn-sm btn-outline-secondary border-0 px-2"
-                        title="{{ $likeButtonTitle }}"
+                        class="comments-icon-btn {{ $mentionDone ? 'is-done' : '' }}"
+                        title="{{ $mentionDone ? 'Oznacz jako niewykonane' : 'Oznacz jako zrobione' }}"
+                        aria-label="{{ $mentionDone ? 'Oznacz jako niewykonane' : 'Oznacz jako zrobione' }}"
                     >
-                        <i class="bi {{ ($comment->liked_by_me ?? false) ? 'bi-heart-fill text-danger' : 'bi-heart' }} me-1"></i>
-                        <span class="small">{{ (int) ($comment->likes_count ?? 0) }}</span>
+                        <i class="bi bi-check2{{ $mentionDone ? '-square-fill' : '-square' }}"></i>
                     </button>
                 </form>
-                <button type="button" class="btn btn-sm btn-outline-primary" @click="replyOpen = !replyOpen">
-                    <i class="bi bi-reply me-1"></i>Odpowiedz
-                </button>
-                @if($comment->user_id === auth()->id() || auth()->user()->isAdmin())
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editComment({{ $comment->id }})">
-                            Edytuj
-                        </button>
-                        <x-ui.delete-form
-                            :url="route('comments.destroy', $comment)"
-                            message="Czy na pewno chcesz usunąć ten komentarz wraz z odpowiedziami?"
-                            class="d-inline"
-                        />
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <div id="comment-body-{{ $comment->id }}">
-            @if(filled($comment->body))
-                <div class="mb-0 text-break comment-body {{ $mentionTaskDone ? 'text-decoration-line-through text-muted' : '' }}">{!! $commentBodyHtml !!}</div>
             @endif
-            <x-attachment-list :attachments="$comment->attachments" :class="filled($comment->body) ? 'mt-2' : ''" />
-        </div>
-
-        <div id="comment-edit-{{ $comment->id }}" class="d-none">
-            <form action="{{ route('comments.update', $comment) }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ route('comments.like', $comment) }}" method="POST" class="d-inline">
                 @csrf
-                @method('PUT')
-                <x-ui.input
-                    type="textarea"
-                    name="body"
-                    :value="$commentBodyForEdit"
-                    rows="3"
-                />
-                <div class="mt-2 mb-2">
-                    <label class="form-label small">Dodaj kolejne załączniki</label>
-                    <input type="file" name="attachments[]" class="form-control form-control-sm" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
-                </div>
-                <x-attachment-list :attachments="$comment->attachments" class="mt-1" />
-                <div class="mt-2">
-                    <x-ui.button variant="primary" type="submit" class="btn-sm">Zapisz</x-ui.button>
-                    <x-ui.button variant="ghost" type="button" class="btn-sm" onclick="cancelEdit({{ $comment->id }})">Anuluj</x-ui.button>
-                </div>
+                <button
+                    type="submit"
+                    class="comments-icon-btn {{ $liked ? 'is-on' : '' }} {{ (int) ($comment->likes_count ?? 0) > 0 ? 'has-count' : '' }}"
+                    title="{{ $likeButtonTitle }}"
+                    aria-label="{{ $likeActionHint }}"
+                >
+                    <i class="bi {{ $liked ? 'bi-heart-fill' : 'bi-heart' }}"></i>
+                    @if((int) ($comment->likes_count ?? 0) > 0)
+                        <span class="comment-like-count">{{ (int) $comment->likes_count }}</span>
+                    @endif
+                </button>
             </form>
-        </div>
-
-        <div x-show="replyOpen" x-cloak class="mt-3 pt-3 border-top">
-            <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                <input type="hidden" name="commentable_type" value="{{ $commentableTypeValue }}">
-                <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
-                <input type="hidden" name="parent_id" value="{{ $comment->id }}">
-
-                <div class="mb-2 position-relative" x-data="commentBodyAutocomplete(@js($commentAutocompletePayload))">
-                    <label class="form-label small">Twoja odpowiedź</label>
-                    <textarea
-                        name="body"
-                        rows="2"
-                        class="form-control form-control-sm"
-                        placeholder="{{ $commentable instanceof \App\Models\ProjectTask ? '@wzmianka, #1 … lub treść / załącznik' : '@wzmianka lub treść / załącznik' }}"
-                        x-ref="textarea"
-                        @input="onInput()"
-                        @keydown.escape="close()"
-                        @keydown.arrow-down="if (show && results.length) { $event.preventDefault(); moveActive(1); }"
-                        @keydown.arrow-up="if (show && results.length) { $event.preventDefault(); moveActive(-1); }"
-                        @keydown.enter="if (show && results.length) { $event.preventDefault(); pickActive(); }"
-                    ></textarea>
-                    <ul
-                        x-show="show && results.length > 0"
-                        x-cloak
-                        class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
-                        style="z-index:1090;min-width:14rem;max-height:12rem;overflow-y:auto;top:100%;left:0;"
-                    >
-                        <template x-for="(item, idx) in results" :key="item.kind === 'user' ? ('u-' + item.name) : ('s-' + item.num)">
-                            <li>
-                                <button
-                                    type="button"
-                                    class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
-                                    :class="idx === activeIdx ? 'active' : ''"
-                                    @click="selectItem(item)"
-                                    @mouseenter="activeIdx = idx"
-                                >
-                                    <span x-show="item.kind === 'user'" class="d-flex align-items-center gap-2 w-100 min-w-0">
-                                        <span
-                                            class="d-inline-flex align-items-center justify-content-center rounded-circle fw-semibold flex-shrink-0"
-                                            :class="item.isEveryone ? 'bg-warning bg-opacity-25 text-warning' : 'bg-primary bg-opacity-25 text-primary'"
-                                            style="width:1.5rem;height:1.5rem;font-size:.6rem;"
-                                            x-text="item.initials"
-                                        ></span>
-                                        <span class="small fw-medium text-truncate" x-text="item.isEveryone ? '@wszyscy — powiadomienie do wszystkich' : item.name"></span>
-                                    </span>
-                                    <span x-show="item.kind === 'subtask'" class="d-flex align-items-center gap-2 w-100 min-w-0">
-                                        <span class="badge bg-secondary bg-opacity-50 text-body flex-shrink-0" x-text="'#' + item.num"></span>
-                                        <span class="small text-truncate" style="max-width:12rem;" x-text="item.name"></span>
-                                    </span>
-                                </button>
-                            </li>
-                        </template>
-                    </ul>
-                </div>
-                <div class="mb-2">
-                    <input type="file" name="attachments[]" class="form-control form-control-sm" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
-                </div>
-                <x-ui.button variant="primary" type="submit" class="btn-sm">Wyślij odpowiedź</x-ui.button>
-            </form>
+            <button type="button" class="comments-icon-btn" title="Odpowiedz" aria-label="Odpowiedz" @click="replyOpen = !replyOpen">
+                <i class="bi bi-reply"></i>
+            </button>
+            @if($canManage)
+                <button type="button" class="comments-icon-btn" title="Edytuj" aria-label="Edytuj" onclick="editComment({{ $comment->id }})">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <form action="{{ route('comments.destroy', $comment) }}" method="POST" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz usunąć ten komentarz wraz z odpowiedziami?')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="comments-icon-btn is-danger" title="Usuń" aria-label="Usuń">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+            @endif
         </div>
     </div>
-</div>
 
-@foreach($children as $reply)
-    @include('components.comment-node', [
-        'comment' => $reply,
-        'depth' => $depth + 1,
-        'commentable' => $commentable,
-        'commentableTypeValue' => $commentableTypeValue,
-        'knownUsersForHighlight' => $knownUsersForHighlight,
-        'childrenOf' => $childrenOf,
-        'commentAutocompletePayload' => $commentAutocompletePayload,
-    ])
-@endforeach
+    <div id="comment-body-{{ $comment->id }}">
+        @if($comment->parent_id)
+            @if($quoted)
+                <a href="#comment-{{ $quoted->id }}" class="comment-quote">
+                    <span class="comment-quote__author">{{ $quoted->user?->name ?? 'Ktoś' }}</span>
+                    <span class="comment-quote__text">{{ $quoted->quoteLabel() }}</span>
+                </a>
+            @else
+                <div class="comment-quote comment-quote--gone">Komentarz usunięty</div>
+            @endif
+        @endif
+        @if(filled($comment->body))
+            <div class="comment-item__body comment-body {{ $mentionDone ? 'is-done' : '' }}">{!! $commentBodyHtml !!}</div>
+        @endif
+        @if($comment->attachments->count() > 0)
+            <div class="comment-item__body">
+                <x-attachment-list :attachments="$comment->attachments" />
+            </div>
+        @endif
+    </div>
+
+    <div id="comment-edit-{{ $comment->id }}" class="d-none comment-item__reply">
+        <form action="{{ route('comments.update', $comment) }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            @method('PUT')
+            <div class="comments-composer">
+                <textarea name="body" rows="2" class="comments-composer-input">{{ $commentBodyForEdit }}</textarea>
+                <div class="comments-composer-toolbar">
+                    <label class="comments-icon-btn" for="comment-edit-files-{{ $comment->id }}" title="Dodaj załączniki">
+                        <i class="bi bi-paperclip"></i>
+                    </label>
+                    <input
+                        id="comment-edit-files-{{ $comment->id }}"
+                        type="file"
+                        name="attachments[]"
+                        class="comments-file-input"
+                        multiple
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*"
+                    >
+                    <button type="submit" class="comments-icon-btn comments-send-btn" title="Zapisz" aria-label="Zapisz">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                    <button type="button" class="comments-icon-btn" title="Anuluj" aria-label="Anuluj" onclick="cancelEdit({{ $comment->id }})">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <x-attachment-list :attachments="$comment->attachments" class="mt-2" />
+        </form>
+    </div>
+
+    <div x-show="replyOpen" x-cloak class="comment-item__reply">
+        <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <input type="hidden" name="commentable_type" value="{{ $commentableTypeValue }}">
+            <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
+            <input type="hidden" name="parent_id" value="{{ $comment->id }}">
+            <x-comment-composer
+                :placeholder="$commentable instanceof \App\Models\ProjectTask ? '@osoba, #1 albo załącznik…' : 'Odpowiedź…'"
+                :rows="2"
+                :autocomplete-payload="$commentAutocompletePayload"
+                submit-title="Wyślij odpowiedź"
+                :file-input-id="'comment-reply-files-'.$comment->id"
+            />
+        </form>
+    </div>
+</article>

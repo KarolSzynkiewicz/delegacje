@@ -1,6 +1,24 @@
 <x-app-layout>
+    @php
+        $editTitle = match (true) {
+            $task->isProcedure() => 'Edytuj procedurę: '.$task->name,
+            $task->isCallback() => 'Edytuj oddzwonienie: '.$task->name,
+            default => 'Edytuj zadanie: '.$task->name,
+        };
+        $editCard = match (true) {
+            $task->isProcedure() => 'Edytuj procedurę',
+            $task->isCallback() => 'Edytuj oddzwonienie',
+            default => 'Edytuj zadanie',
+        };
+        $nameLabel = match (true) {
+            $task->isProcedure() => 'Nazwa procedury',
+            $task->isCallback() => 'Nazwa oddzwonienia',
+            default => 'Nazwa zadania',
+        };
+        $lockWorkflow = $task->isProcedure() || $task->isCallback();
+    @endphp
     <x-slot name="header">
-        <x-ui.page-header title="Edytuj Zadanie: {{ $task->name }}">
+        <x-ui.page-header title="{{ $editTitle }}">
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
@@ -15,7 +33,7 @@
 
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <x-ui.card label="Edytuj Zadanie">
+            <x-ui.card label="{{ $editCard }}">
                 <x-ui.errors />
 
                 <form action="{{ route('tasks.update', $task) }}" method="POST" enctype="multipart/form-data">
@@ -26,7 +44,7 @@
                         <x-ui.input 
                             type="text" 
                             name="name" 
-                            label="Nazwa zadania"
+                            label="{{ $nameLabel }}"
                             value="{{ old('name', $task->name) }}"
                             required
                         />
@@ -68,7 +86,7 @@
                                 value="{{ old('due_date', $task->due_date ? $task->due_date->format('Y-m-d') : '') }}"
                             />
                         </div>
-                        <div class="col-md-4 mb-3 mb-md-0">
+                        <div class="{{ $lockWorkflow ? 'col-md-8' : 'col-md-4 mb-3 mb-md-0' }}">
                             <x-ui.input 
                                 type="select" 
                                 name="priority" 
@@ -82,6 +100,7 @@
                                 <option value="5" {{ old('priority', $task->priority) == '5' ? 'selected' : '' }}>5 - Najwyższy</option>
                             </x-ui.input>
                         </div>
+                        @unless($lockWorkflow)
                         <div class="col-md-4">
                             <x-ui.input 
                                 type="select" 
@@ -94,6 +113,7 @@
                                 <option value="cancelled" {{ old('status', $task->status->value) === 'cancelled' ? 'selected' : '' }}>Anulowane</option>
                             </x-ui.input>
                         </div>
+                        @endunless
                     </div>
 
                     <div class="mb-3">
@@ -111,6 +131,7 @@
                         </x-ui.input>
                     </div>
                     
+                    @unless($lockWorkflow)
                     <div class="mb-3">
                         <x-ui.input 
                             type="text" 
@@ -120,6 +141,7 @@
                             placeholder="np. Bug, Feature, Dokumentacja..."
                         />
                     </div>
+                    @endunless
 
                     @if($task->attachments->count() > 0)
                         <div class="mb-3">
@@ -147,7 +169,7 @@
                             type="submit"
                             action="save"
                         >
-                            Zaktualizuj zadanie
+                            {{ $task->isCallback() ? 'Zapisz oddzwonienie' : ($task->isProcedure() ? 'Zapisz procedurę' : 'Zaktualizuj zadanie') }}
                         </x-ui.button>
                     </div>
                 </form>

@@ -4,6 +4,8 @@
     'gap' => '1',
     'class' => '',
     'isMineView' => false,
+    'showView' => true,
+    'showEdit' => true,
 ])
 
 @php
@@ -11,6 +13,7 @@
 @endphp
 
 <div class="d-flex gap-{{ $gap }} {{ $class }}" role="group">
+    @if($showView)
     <x-ui.button 
         variant="ghost" 
         href="{{ route('tasks.show', $task) }}"
@@ -18,7 +21,8 @@
         action="view"
         class="{{ $sizeClass }}"
     />
-    @if(!$isMineView)
+    @endif
+    @if($showEdit && ! $isMineView)
     <x-ui.button 
         variant="ghost" 
         href="{{ route('tasks.edit', $task) }}"
@@ -32,7 +36,7 @@
         <form action="{{ route('tasks.mark-in-progress', $task) }}" method="POST" class="d-inline">
             @csrf
             <x-ui.button variant="info" type="submit" class="{{ $sizeClass }}" title="Rozpocznij">
-                <i class="bi bi-play-circle"></i> Start progress
+                <i class="bi bi-play-circle"></i> Rozpocznij
             </x-ui.button>
         </form>
     @endif
@@ -41,7 +45,7 @@
         <form action="{{ route('tasks.mark-completed', $task) }}" method="POST" class="d-inline">
             @csrf
             <x-ui.button variant="success" type="submit" class="{{ $sizeClass }}" title="Zakończ">
-                <i class="bi bi-check-circle"></i> Complete
+                <i class="bi bi-check-circle"></i> Zakończ
             </x-ui.button>
         </form>
     @endif
@@ -50,7 +54,7 @@
         <form action="{{ route('tasks.cancel', $task) }}" method="POST" class="d-inline">
             @csrf
             <x-ui.button variant="danger" type="submit" class="{{ $sizeClass }}" title="Anuluj zadanie">
-                <i class="bi bi-x-circle"></i> Cancel
+                <i class="bi bi-x-circle"></i> Anuluj
             </x-ui.button>
         </form>
     @endif

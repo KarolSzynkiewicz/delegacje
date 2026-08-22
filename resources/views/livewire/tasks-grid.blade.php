@@ -17,6 +17,28 @@
     .tg-toolbar .btn-group .btn:first-child { border-radius: 8px 0 0 8px !important; }
     .tg-toolbar .btn-group .btn:last-child  { border-radius: 0 8px 8px 0 !important; }
 
+    .rp-active-filters__chip-remove {
+        appearance: none;
+        -webkit-appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1rem;
+        height: 1rem;
+        padding: 0;
+        margin: 0 0 0 .05rem;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #64748b;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .rp-active-filters__chip-remove:hover {
+        color: #e2e8f0;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
     /* Input-group in dark theme */
     .tg-toolbar .input-group-text {
         background: var(--bg-input, rgba(15,23,42,.8)) !important;
@@ -246,6 +268,14 @@
                 <i class="bi bi-person-check"></i>Moje
             </button>
 
+            @if($this->usesWorkItems())
+            <button wire:click="$toggle('hideCallbacks')"
+                    class="btn {{ $hideCallbacks ? 'btn-outline-secondary' : 'btn-primary' }}"
+                    title="{{ $hideCallbacks ? 'Pokaż oddzwonienia rekrutacji' : 'Ukryj oddzwonienia rekrutacji' }}">
+                <i class="bi bi-telephone"></i>Oddzwonienia
+            </button>
+            @endif
+
             {{-- Clear --}}
             @if($searchTask || $searchCategory || $searchAssignedTo || $myTasksOnly || $groupBy || $sortField !== 'created_at')
             <button wire:click="clearFilters"
@@ -286,7 +316,19 @@
                             </button>
                         </li>
                         <li><hr class="dropdown-divider my-1"></li>
-                        @foreach(['status'=>'Status','sprint'=>'Sprint','category'=>'Kategoria','assigned_to'=>'Przypisany','priority'=>'Priorytet'] as $gf=>$gl)
+                        @php
+                            $groupFields = ['status' => 'Status'];
+                            if ($this->usesWorkItems()) {
+                                $groupFields['type'] = 'Typ';
+                            }
+                            $groupFields += [
+                                'sprint' => 'Sprint',
+                                'category' => 'Kategoria',
+                                'assigned_to' => 'Przypisany',
+                                'priority' => 'Priorytet',
+                            ];
+                        @endphp
+                        @foreach($groupFields as $gf => $gl)
                         @if($this->isLockedToSprint() && $gf === 'sprint')
                             @continue
                         @endif
@@ -321,6 +363,9 @@
                         @if($this->isLockedToSprint() && $colKey === 'sprint')
                             @continue
                         @endif
+                        @if(! $this->usesWorkItems() && $colKey === 'type')
+                            @continue
+                        @endif
                         @php
                             $colLockedByGroup = $groupBy !== '' && $colKey === $groupBy;
                             $colChecked = in_array($colKey, $visibleColumns) && ! $colLockedByGroup;
@@ -346,77 +391,82 @@
                 </template>
             </div>
 
-            {{-- ── Widoki ── --}}
+            {{-- ── Zapisane widoki (jak w rekrutacji) ── --}}
             @unless($this->isLockedToSprint())
-            <div x-data="{ open: false, top: 0, left: 0 }">
-                <button type="button"
-                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
-                        class="btn btn-sm {{ $view ? 'btn-info' : 'btn-outline-secondary' }}">
-                    <i class="bi bi-bookmark me-1"></i>Widoki
-                    @if($activeViewName)
-                        <span class="opacity-75">: {{ $activeViewName }}</span>
-                    @elseif(!empty($savedViews))
-                        <span class="badge bg-primary ms-1" style="font-size:0.6rem;border-radius:8px">{{ count($savedViews) }}</span>
-                    @endif
-                    <i class="bi bi-chevron-down ms-1" style="font-size:0.6rem"></i>
-                </button>
-                <template x-teleport="body">
-                    <div x-show="open" x-cloak
-                         @click.outside="open = false"
-                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:260px`"
-                         class="dropdown-menu show p-3 shadow-lg">
-                        @if($view && $activeViewName)
-                            <div class="mb-2 p-2 rounded" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2)">
-                                <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:4px">
-                                    Aktywny widok
+                @foreach($savedViews as $savedView)
+                    <button type="button" wire:click="loadView('{{ $savedView->slug }}')"
+                            class="btn btn-sm rp-topbar-btn {{ $view === $savedView->slug ? 'btn-info' : 'btn-outline-secondary' }}">
+                        <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"></i>{{ $savedView->name }}
+                        <span class="rp-view-count">{{ $viewCounts[$savedView->slug] ?? 0 }}</span>
+                    </button>
+                @endforeach
+
+                <div x-data="{ open: false, top: 0, left: 0 }">
+                    <button type="button"
+                            @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
+                            class="btn btn-sm btn-outline-secondary"
+                            title="Zapisz i zarządzaj widokami">
+                        <i class="bi bi-bookmark{{ $view ? '-fill' : '' }} me-1"></i>
+                        <i class="bi bi-chevron-down" style="font-size:0.6rem"></i>
+                    </button>
+                    <template x-teleport="body">
+                        <div x-show="open" x-cloak
+                             @click.outside="open = false"
+                             :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:260px`"
+                             class="dropdown-menu show p-3 shadow-lg">
+                            @if($view && $activeViewName)
+                                <div class="mb-2 p-2 rounded" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2)">
+                                    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:4px">
+                                        Aktywny widok
+                                    </div>
+                                    <div class="fw-semibold small mb-2">{{ $activeViewName }}</div>
+                                    <button type="button" wire:click="clearView" @click="open=false"
+                                            class="btn btn-sm btn-outline-secondary w-100">
+                                        Widok domyślny
+                                    </button>
                                 </div>
-                                <div class="fw-semibold small mb-2">{{ $activeViewName }}</div>
-                                <button type="button" wire:click="clearView" @click="open=false"
-                                        class="btn btn-sm btn-outline-secondary mt-2 w-100">
-                                    Widok domyślny
-                                </button>
-                            </div>
-                            <hr class="my-2">
-                        @endif
-                        @if(!empty($savedViews))
+                                <hr class="my-2">
+                            @endif
+                            @if($savedViews->isNotEmpty())
+                                <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
+                                    Zapisane
+                                </div>
+                                @foreach($savedViews as $savedView)
+                                <div class="d-flex align-items-center gap-1 mb-1">
+                                    <button type="button" wire:click="loadView('{{ $savedView->slug }}')" @click="open=false"
+                                            class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $view === $savedView->slug ? 'fw-bold' : '' }}"
+                                            style="font-size:0.83rem">
+                                        <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"
+                                           style="color:var(--primary,#3b82f6);font-size:0.75rem"></i>{{ $savedView->name }}
+                                        <span class="text-muted ms-1" style="font-size:.75rem">({{ $viewCounts[$savedView->slug] ?? 0 }})</span>
+                                    </button>
+                                    <button type="button" wire:click="deleteView('{{ $savedView->slug }}')" @click="open=false"
+                                            class="btn btn-sm btn-link p-1 flex-shrink-0"
+                                            style="color:var(--danger,#ef4444)" title="Usuń">
+                                        <i class="bi bi-trash" style="font-size:0.78rem"></i>
+                                    </button>
+                                </div>
+                                @endforeach
+                                <hr class="my-2">
+                            @endif
                             <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
-                                Zapisane widoki
+                                {{ $view ? 'Nadpisz aktywny widok' : 'Zapisz bieżący widok' }}
                             </div>
-                            @foreach($savedViews as $savedView)
-                            <div class="d-flex align-items-center gap-1 mb-1">
-                                <button wire:click="loadView('{{ $savedView->slug }}')" @click="open=false"
-                                        class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $view === $savedView->slug ? 'fw-bold' : '' }}"
-                                        style="font-size:0.83rem">
-                                    <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"
-                                       style="color:var(--primary,#3b82f6);font-size:0.75rem"></i>{{ $savedView->name }}
-                                </button>
-                                <button wire:click="deleteView('{{ $savedView->slug }}')" @click="open=false"
-                                        class="btn btn-sm btn-link p-1 flex-shrink-0"
-                                        style="color:var(--danger,#ef4444)" title="Usuń">
-                                    <i class="bi bi-trash" style="font-size:0.78rem"></i>
+                            <div class="d-flex gap-2">
+                                <input wire:model="saveViewName" type="text"
+                                       class="form-control form-control-sm flex-grow-1"
+                                       placeholder="Nazwa widoku…"
+                                       wire:keydown.enter="saveView"
+                                       @click.stop>
+                                <button type="button" wire:click="saveView" @click="open=false"
+                                        class="btn btn-sm btn-primary flex-shrink-0"
+                                        title="Zapisz">
+                                    <i class="bi bi-floppy"></i>
                                 </button>
                             </div>
-                            @endforeach
-                            <hr class="my-2">
-                        @endif
-                        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
-                            {{ $view ? 'Nadpisz aktywny widok' : 'Zapisz bieżący widok' }}
                         </div>
-                        <div class="d-flex gap-2">
-                            <input wire:model="saveViewName" type="text"
-                                   class="form-control form-control-sm flex-grow-1"
-                                   placeholder="Nazwa widoku…"
-                                   wire:keydown.enter="saveView"
-                                   @click.stop>
-                            <button wire:click="saveView" @click="open=false"
-                                    class="btn btn-sm btn-primary flex-shrink-0"
-                                    title="Zapisz">
-                                <i class="bi bi-floppy"></i>
-                            </button>
-                        </div>
-                    </div>
-                </template>
-            </div>
+                    </template>
+                </div>
             @endunless
 
             {{-- Domyślny widok menu --}}
@@ -446,11 +496,29 @@
     </div>
 </div>
 
+@if(count($this->activeFilterChips()) > 0)
+    <div class="rp-active-filters mb-2 px-1">
+        <span class="rp-active-filters__label">Filtry:</span>
+        @foreach($this->activeFilterChips() as $chip)
+            <span class="rp-active-filters__chip">
+                {{ $chip['label'] }}
+                <button type="button"
+                        wire:click="clearFilter('{{ $chip['key'] }}')"
+                        class="rp-active-filters__chip-remove"
+                        title="Usuń filtr">
+                    <i class="bi bi-x"></i>
+                </button>
+            </span>
+        @endforeach
+        <button type="button" wire:click="clearFilters" class="rp-active-filters__clear">Wyczyść</button>
+    </div>
+@endif
+
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- GRID TABLE                                                  --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
 @php
-    $colCount = count($visibleColumns) + 2; // expand col + actions col
+    $colCount = count($visibleColumns) + 1; // expand col
 @endphp
 
 <div class="card border-0 shadow-sm"
@@ -490,7 +558,6 @@
                 @foreach($visibleColumns as $colKey)
                 <col :style="colWidths['{{ $colKey }}'] ? `width:${colWidths['{{ $colKey }}']}px;min-width:${colWidths['{{ $colKey }}']}px` : ''">
                 @endforeach
-                <col style="width:90px; min-width:90px">
             </colgroup>
 
             {{-- ── Header ── --}}
@@ -525,8 +592,6 @@
                     </th>
                     @endif
                     @endforeach
-
-                    <th style="width:90px; padding:8px 8px; border-bottom:none; text-align:right">Akcje</th>
                 </tr>
             </thead>
 
@@ -581,17 +646,26 @@
                     {{-- Name (always) --}}
                     @if(in_array('name', $visibleColumns))
                     <td style="padding:4px 6px; min-width:220px">
-                        <input type="text"
-                               wire:model="newTaskName"
-                               class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                               placeholder="Nazwa zadania *"
-                               wire:keydown.enter="addTask"
-                               wire:keydown.escape="$set('showAddRow', false)"
-                               x-data x-init="$el.focus()">
+                        <div class="d-flex gap-1 align-items-start">
+                            <input type="text"
+                                   wire:model="newTaskName"
+                                   class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
+                                   placeholder="Nazwa zadania *"
+                                   wire:keydown.enter="addTask"
+                                   wire:keydown.escape="$set('showAddRow', false)"
+                                   x-data x-init="$el.focus()">
+                            <button wire:click="addTask" class="btn btn-sm btn-primary flex-shrink-0">
+                                <i class="bi bi-plus-lg me-1"></i>Dodaj
+                            </button>
+                        </div>
                         @error('newTaskName')
                             <div class="invalid-feedback" style="font-size:0.72rem">{{ $message }}</div>
                         @enderror
                     </td>
+                    @endif
+
+                    @if(in_array('type', $visibleColumns))
+                    <td></td>
                     @endif
 
                     @if(in_array('status', $visibleColumns))
@@ -652,12 +726,6 @@
                     @foreach(['subtasks','comments','created_at','updated_at'] as $_ec)
                         @if(in_array($_ec, $visibleColumns))<td></td>@endif
                     @endforeach
-
-                    <td style="padding:4px 6px; text-align:right">
-                        <button wire:click="addTask" class="btn btn-sm btn-primary">
-                            <i class="bi bi-plus-lg me-1"></i>Dodaj
-                        </button>
-                    </td>
                 </tr>
                 @endif
 

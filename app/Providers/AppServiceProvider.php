@@ -8,6 +8,7 @@ use App\Models\AccommodationAssignment;
 use App\Models\Adjustment;
 use App\Models\Attachment;
 use App\Models\Comment;
+use App\Models\CommentMention;
 use App\Models\Employee;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
@@ -88,6 +89,7 @@ class AppServiceProvider extends ServiceProvider
         TaskSubtask::observe(SyncsWorkItems::class);
         ProcedureRun::observe(SyncsWorkItems::class);
         WarehouseDispatch::observe(SyncsWorkItems::class);
+        CommentMention::observe(SyncsWorkItems::class);
 
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,
@@ -107,6 +109,7 @@ class AppServiceProvider extends ServiceProvider
             'recruitment_candidate' => \App\Models\RecruitmentCandidate::class,
             'warehouse_dispatch' => \App\Models\WarehouseDispatch::class,
             'comment' => \App\Models\Comment::class,
+            'comment_mention' => \App\Models\CommentMention::class,
             'task_subtask' => \App\Models\TaskSubtask::class,
             'sprint' => \App\Models\Sprint::class,
             'procedure_run' => \App\Models\ProcedureRun::class,

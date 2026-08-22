@@ -52,7 +52,7 @@ class TaskSourceCardTest extends TestCase
         $card = $task->sourceCard();
 
         $this->assertSame(route('projects.show', $project).'#comment-21', $card['url']);
-        $this->assertSame('Komentarz', $card['label']);
+        $this->assertSame('Projekt #9', $card['label']);
         $this->assertSame('bi-chat-dots', $card['icon']);
     }
 

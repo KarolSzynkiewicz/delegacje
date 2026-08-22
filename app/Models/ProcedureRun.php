@@ -110,6 +110,20 @@ class ProcedureRun extends Model
         ));
     }
 
+    public static function nodeTypeLabel(?string $type): string
+    {
+        return match ($type) {
+            'start' => 'Start',
+            'end' => 'Koniec',
+            'task' => 'Krok',
+            'checklist' => 'Checklista',
+            'decision' => 'Decyzja',
+            'wait' => 'Oczekiwanie',
+            'note' => 'Notatka',
+            default => $type ?: '—',
+        };
+    }
+
     /** 0.0–1.0 progress fraction. */
     public function progress(): float
     {

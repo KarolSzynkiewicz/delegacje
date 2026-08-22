@@ -8,8 +8,9 @@
 @php
     $commentableType = \App\Enums\CommentableType::fromModel($commentable);
     
-    // Dla ProjectTask używamy innych tekstów
-    $isTask = $commentable instanceof \App\Models\ProjectTask;
+    $isTask = $commentable instanceof \App\Models\ProjectTask
+        && ! $commentable->procedure_run_id
+        && ! $commentable->isCallback();
     
     $cardLabel = $label ?? ($isTask ? 'Dziennik operacyjny' : 'Komentarze');
     $inputLabelText = $inputLabel ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');
@@ -38,79 +39,23 @@
     ];
 @endphp
 
-<x-ui.card>
+<x-ui.card class="comments-card">
     <span class="card-label">
         @if($isTask && !$label)
             <i class="bi bi-briefcase me-1"></i>
         @endif
         {{ $cardLabel }}
     </span>
-    <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data" class="mb-4">
+    <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <input type="hidden" name="commentable_type" value="{{ $commentableType->value }}">
         <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
-
-        <div class="mb-3 position-relative" x-data="commentBodyAutocomplete(@js($commentAutocompletePayload))">
-            <label class="form-label">{{ $inputLabelText }}</label>
-            <textarea
-                name="body"
-                rows="3"
-                class="form-control"
-                placeholder="{{ $isTask ? 'Możesz użyć @NazwaUzytkownika oraz #1, #2 … (odwołanie do podzadania). Treść lub załącznik — wymagane jest przynajmniej jedno' : 'Możesz wspomnieć o użytkowniku pisząc @NazwaUzytkownika (treść lub załącznik — wymagane jest przynajmniej jedno)' }}"
-                x-ref="textarea"
-                @input="onInput()"
-                @keydown.escape="close()"
-                @keydown.arrow-down="if (show && results.length) { $event.preventDefault(); moveActive(1); }"
-                @keydown.arrow-up="if (show && results.length) { $event.preventDefault(); moveActive(-1); }"
-                @keydown.enter="if (show && results.length) { $event.preventDefault(); pickActive(); }"
-            ></textarea>
-
-            {{-- Dropdown z podpowiedziami --}}
-            <ul
-                x-show="show && results.length > 0"
-                x-cloak
-                class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
-                style="z-index:1090;min-width:16rem;max-height:14rem;overflow-y:auto;top:100%;left:0;right:auto;"
-            >
-                <template x-for="(item, idx) in results" :key="item.kind === 'user' ? ('u-' + item.name) : ('s-' + item.num)">
-                    <li>
-                        <button
-                            type="button"
-                            class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
-                            :class="idx === activeIdx ? 'active' : ''"
-                            @click="selectItem(item)"
-                            @mouseenter="activeIdx = idx"
-                        >
-                            <span x-show="item.kind === 'user'" class="d-flex align-items-center gap-2 w-100 min-w-0">
-                                <span
-                                    class="d-inline-flex align-items-center justify-content-center rounded-circle fw-semibold flex-shrink-0"
-                                    :class="item.isEveryone ? 'bg-warning bg-opacity-25 text-warning' : 'bg-primary bg-opacity-25 text-primary'"
-                                    style="width:1.75rem;height:1.75rem;font-size:.65rem;"
-                                    x-text="item.initials"
-                                ></span>
-                                <span class="small fw-medium text-truncate" x-text="item.isEveryone ? '@wszyscy — powiadomienie do wszystkich' : item.name"></span>
-                            </span>
-                            <span x-show="item.kind === 'subtask'" class="d-flex align-items-center gap-2 w-100 min-w-0">
-                                <span class="badge bg-secondary bg-opacity-50 text-body flex-shrink-0" x-text="'#' + item.num"></span>
-                                <span class="small text-truncate" style="max-width:14rem;" x-text="item.name"></span>
-                            </span>
-                        </button>
-                    </li>
-                </template>
-            </ul>
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Załączniki (opcjonalnie)</label>
-            <input type="file" name="attachments[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
-            <small class="text-muted d-block mt-1">Do 15 plików, każdy max. 15 MB.</small>
-        </div>
-
-        <div class="mt-1">
-            <x-ui.button variant="primary" type="submit" action="save">
-                {{ $buttonTextValue }}
-            </x-ui.button>
-        </div>
+        <x-comment-composer
+            :placeholder="$isTask ? '@osoba, #1 albo załącznik…' : '@osoba albo załącznik…'"
+            :autocomplete-payload="$commentAutocompletePayload"
+            :submit-title="$buttonTextValue"
+            :file-input-id="'comment-files-'.$commentableType->value.'-'.$commentable->id"
+        />
     </form>
 
     @php
@@ -119,14 +64,15 @@
                 'user',
                 'attachments',
                 'likes.user',
-                'tasks' => fn ($q) => $q->where('assigned_to', auth()->id()),
+                'parent.user',
+                'parent.attachments',
+                'mentions' => fn ($q) => $q->where('assigned_to', auth()->id()),
             ])
             ->withCount('likes')
             ->withExists(['likes as liked_by_me' => fn ($q) => $q->where('user_id', auth()->id())])
             ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->get();
-        $commentRoots = $allCommentsFlat->whereNull('parent_id')->values();
-        $childrenOf = $allCommentsFlat->whereNotNull('parent_id')->groupBy('parent_id');
         $knownUsersForHighlight = $commentAutocompleteUsers;
         if ($commentable instanceof \App\Models\ProjectTask) {
             $commentable->loadMissing('subtasks');
@@ -134,23 +80,22 @@
     @endphp
 
     @if($allCommentsFlat->count() > 0)
-        <div class="comments-list">
-            @foreach($commentRoots as $comment)
+        <div class="comments-thread">
+            @foreach($allCommentsFlat as $comment)
                 @include('components.comment-node', [
                     'comment' => $comment,
-                    'depth' => 0,
                     'commentable' => $commentable,
                     'commentableTypeValue' => $commentableType->value,
                     'knownUsersForHighlight' => $knownUsersForHighlight,
-                    'childrenOf' => $childrenOf,
                     'commentAutocompletePayload' => $commentAutocompletePayload,
                 ])
             @endforeach
         </div>
     @else
-        <x-ui.empty-state 
+        <x-ui.empty-state
             icon="chat-dots"
             :message="$isTask ? 'Brak raportów z działania' : 'Brak komentarzy'"
+            class="py-3"
         />
     @endif
 </x-ui.card>
@@ -181,6 +126,23 @@
             results: [],
             activeIdx: 0,
             triggerStart: -1,
+            files: [],
+
+            onFiles(event) {
+                this.files = Array.from(event.target.files || []);
+            },
+
+            fileSummary() {
+                if (this.files.length === 0) {
+                    return '';
+                }
+                if (this.files.length === 1) {
+                    return this.files[0].name;
+                }
+                const n = this.files.length;
+
+                return n + (n < 5 ? ' pliki' : ' plików');
+            },
 
             onInput() {
                 const ta = this.$refs.textarea;

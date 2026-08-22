@@ -83,4 +83,53 @@ class TasksGridGroupColumnTest extends TestCase
 
         $this->assertNotContains('status', $component->get('visibleColumns'));
     }
+
+    public function test_grouping_by_type_hides_type_column(): void
+    {
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('setGroupBy', 'type');
+
+        $this->assertSame('type', $component->get('groupBy'));
+        $this->assertNotContains('type', $component->get('visibleColumns'));
+    }
+
+    public function test_active_filter_chips_show_and_can_be_removed(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->set('searchTask', 'DR')
+            ->set('status', 'closed')
+            ->assertSee('Filtry:')
+            ->assertSee('Szukaj: DR')
+            ->assertSee('Status: Zamknięte')
+            ->assertSee('Wyczyść')
+            ->call('clearFilter', 'status')
+            ->assertDontSee('Status: Zamknięte')
+            ->assertSee('Szukaj: DR')
+            ->call('clearFilters')
+            ->assertDontSee('Szukaj: DR')
+            ->assertDontSee('Filtry:');
+    }
+
+    public function test_saved_views_render_as_topbar_pills(): void
+    {
+        \App\Models\TaskGridView::query()->create([
+            'user_id' => $this->user->id,
+            'name' => 'not all cols',
+            'slug' => 'not-all-cols',
+            'visible_columns' => ['name', 'status'],
+            'column_widths' => [],
+            'status' => 'all',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml('rp-topbar-btn')
+            ->assertSee('not all cols')
+            ->assertDontSee('Widoki :')
+            ->call('loadView', 'not-all-cols')
+            ->assertSet('view', 'not-all-cols')
+            ->assertSet('status', 'all');
+    }
 }

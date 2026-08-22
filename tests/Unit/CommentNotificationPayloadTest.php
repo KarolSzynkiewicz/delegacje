@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Enums\LogisticsEventType;
 use App\Models\Comment;
+use App\Models\CommentMention;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectTask;
@@ -73,16 +74,16 @@ class CommentNotificationPayloadTest extends TestCase
         $comment->id = 21;
         $comment->setRelation('commentable', $project);
 
-        $mentionTask = new ProjectTask(['name' => 'Wzmianka od someone']);
-        $mentionTask->id = 55;
-        $mentionTask->setRelation('subject', $comment);
+        $mention = new CommentMention(['title' => 'weź to']);
+        $mention->id = 55;
+        $mention->setRelation('comment', $comment);
 
         $author = new User(['name' => 'someone']);
         $author->id = 1;
         $robert = new User(['name' => 'robert']);
         $robert->id = 2;
 
-        $payload = (new TaskAssigned($mentionTask, $author))->toDatabase($robert);
+        $payload = (new TaskAssigned($mention, $author))->toDatabase($robert);
 
         $this->assertSame($comment->urlWithCommentAnchor(), $payload['task_url']);
         $this->assertSame('@robert! weź to', $payload['excerpt']);
