@@ -400,7 +400,7 @@
             </div>
 
             {{-- Filtry: jeden przycisk, panel z pogrupowanymi sekcjami (SharePoint-style, jak w rekrutacji) --}}
-            <div x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openSearch: false, openGroup: false, openColumns: false }">
+            <div x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openType: false, openSearch: false, openGroup: false, openColumns: false }">
                 <button type="button"
                         @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); const pw=Math.min(600, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.left, window.innerWidth-pw-4)); open=true"
                         class="btn btn-sm xuiv2-magnetic {{ count($this->activeFilterChips()) > 0 ? 'btn-primary' : 'btn-outline-secondary' }}">

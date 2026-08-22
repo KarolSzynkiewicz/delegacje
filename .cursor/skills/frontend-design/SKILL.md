@@ -167,6 +167,35 @@ a stale constant like `window.innerWidth - 620`, on a narrow phone that goes
 deeply negative and shoves most of the panel off-screen. Compute the same
 formula in JS (`Math.min(600, window.innerWidth - 24)`) before clamping.
 
+## Filter-panel UX rule: no silent default filters
+
+A grouped filter panel (pattern 4 above) is only trustworthy if the active-filter
+chip strip never lies. Two failure modes to avoid, both hit in `TasksGrid`
+(`/tasks2`) and fixed once — don't reintroduce them elsewhere:
+
+1. **A default value that narrows results must still show a chip.** It's
+   tempting to treat the "normal"/default filter state (e.g. status defaults
+   to "active only", hiding completed/cancelled rows) as "no filter" and skip
+   its chip — but the user has no way to tell "15 of 129 shown" from "15
+   total, nothing hidden". Rule: a chip's visibility must be driven by
+   *whether that dimension currently excludes any possible value*, not by
+   *whether the property differs from its PHP default*. In `TasksGrid`,
+   `status` shows a chip for every value except `'all'` (the one value that
+   truly excludes nothing) — not "every value except the default `''`".
+2. **"Clear filters" must reset to the maximally-permissive state, not back
+   to the app's smart default.** If the default on page load already narrows
+   results (sensible — e.g. hide closed tasks, hide recruitment-callback
+   noise by default), clicking "Wyczyść" has to land on "show literally
+   everything" (`status = 'all'`, all type checkboxes checked, etc.), not
+   silently bounce back to that same narrowed default. Otherwise the escape
+   hatch the user is explicitly asking for doesn't exist.
+
+Prefer one generic multi-select/dropdown per *dimension* (type, assignee,
+status) over a pile of single-purpose booleans named after one specific value
+(`hideCallbacks`, `myTasksOnly`) — a checkbox list of `WorkItemType::cases()`
+scales to new types for free and is self-documenting in the UI; a boolean
+named after the one type someone wanted to hide first doesn't.
+
 ## Performance checklist before shipping a visual change
 
 1. Never scale a `position: absolute` background layer with page content

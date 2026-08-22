@@ -22,12 +22,15 @@ class TaskGridView extends Model
         'search_assigned_to',
         'status',
         'my_tasks_only',
+        'assigned_filter',
+        'type_filter',
     ];
 
     protected $casts = [
         'visible_columns' => 'array',
         'column_widths' => 'array',
         'my_tasks_only' => 'boolean',
+        'type_filter' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -38,7 +41,7 @@ class TaskGridView extends Model
     /**
      * Parametry query string do bookmarków / przekierowania z menu.
      *
-     * @return array<string, string|bool>
+     * @return array<string, string|bool|list<string>>
      */
     public function queryStringParams(): array
     {
@@ -56,8 +59,14 @@ class TaskGridView extends Model
         if ($this->status !== '') {
             $params['status'] = $this->status;
         }
-        if ($this->my_tasks_only) {
-            $params['myTasksOnly'] = 'true';
+        if ($this->assigned_filter !== '' && $this->assigned_filter !== null) {
+            $params['assignedFilter'] = $this->assigned_filter;
+        } elseif ($this->my_tasks_only) {
+            // Kompatybilność wsteczna: widoki zapisane przed dodaniem kolumny assigned_filter.
+            $params['assignedFilter'] = 'me';
+        }
+        if (! empty($this->type_filter)) {
+            $params['types'] = $this->type_filter;
         }
         if (($this->group_by ?? '') !== '' && $this->group_by !== 'project') {
             $params['groupBy'] = $this->group_by;

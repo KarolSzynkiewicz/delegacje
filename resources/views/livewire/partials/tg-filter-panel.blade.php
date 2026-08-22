@@ -24,29 +24,49 @@
         </div>
     </div>
 
-    {{-- 2. Widoczność --}}
+    {{-- 2. Przypisanie --}}
     <div class="rp-filter-section">
         <button type="button" @click="openVisibility = !openVisibility" class="rp-filter-section__head">
-            <span><i class="bi bi-eye me-1 opacity-75"></i>Widoczność</span>
+            <span><i class="bi bi-person-check me-1 opacity-75"></i>Przypisanie</span>
             <i class="bi" :class="openVisibility ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
         </button>
         <div x-show="openVisibility" class="rp-filter-section__body">
-            <button type="button" wire:click="$toggle('myTasksOnly')"
-                    class="rp-filter-option {{ $myTasksOnly ? 'is-active' : '' }}">
-                <span class="rp-filter-check {{ $myTasksOnly ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
-                <span class="rp-filter-option__label">Tylko moje zadania</span>
-            </button>
-            @if($this->usesWorkItems())
-            <button type="button" wire:click="$toggle('hideCallbacks')"
-                    class="rp-filter-option {{ ! $hideCallbacks ? 'is-active' : '' }}">
-                <span class="rp-filter-check {{ ! $hideCallbacks ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
-                <span class="rp-filter-option__label">Pokaż oddzwonienia rekrutacji</span>
-            </button>
-            @endif
+            <span class="rp-filter-hint">Przypisany do</span>
+            <select wire:model.live="assignedFilter" class="form-select form-select-sm rp-filter-input" @click.stop>
+                <option value="">Wszyscy</option>
+                <option value="me">Ja ({{ auth()->user()->name }})</option>
+                @foreach($allUsers as $u)
+                    @if($u->id !== auth()->id())
+                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                    @endif
+                @endforeach
+            </select>
         </div>
     </div>
 
-    {{-- 3. Szukaj szczegółowo --}}
+    {{-- 3. Typ pracy — checkboxy zamiast pojedynczego przełącznika "oddzwonienia
+         rekrutacji"; działa jednakowo dla każdego typu work itemu. --}}
+    @if($this->usesWorkItems())
+    <div class="rp-filter-section">
+        <button type="button" @click="openType = !openType" class="rp-filter-section__head">
+            <span><i class="bi bi-tags me-1 opacity-75"></i>Typ pracy</span>
+            <i class="bi" :class="openType ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+        </button>
+        <div x-show="openType" class="rp-filter-section__body">
+            <div class="rp-filter-chips">
+                @foreach(\App\Enums\WorkItemType::cases() as $wt)
+                    <button type="button" wire:click="toggleType('{{ $wt->value }}')"
+                            class="rp-filter-option {{ in_array($wt->value, $selectedTypes, true) ? 'is-active' : '' }}">
+                        <span class="rp-filter-check {{ in_array($wt->value, $selectedTypes, true) ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
+                        <span class="rp-filter-option__label"><i class="bi {{ $wt->icon() }} me-1 opacity-75"></i>{{ $wt->label() }}</span>
+                    </button>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- 4. Szukaj szczegółowo --}}
     <div class="rp-filter-section">
         <button type="button" @click="openSearch = !openSearch" class="rp-filter-section__head">
             <span><i class="bi bi-search me-1 opacity-75"></i>Szukaj szczegółowo</span>
@@ -68,7 +88,7 @@
         </div>
     </div>
 
-    {{-- 4. Grupowanie --}}
+    {{-- 5. Grupowanie --}}
     <div class="rp-filter-section">
         <button type="button" @click="openGroup = !openGroup" class="rp-filter-section__head">
             <span><i class="bi bi-collection me-1 opacity-75"></i>Grupowanie</span>
@@ -101,7 +121,7 @@
         </div>
     </div>
 
-    {{-- 5. Kolumny --}}
+    {{-- 6. Kolumny --}}
     <div class="rp-filter-section">
         <button type="button" @click="openColumns = !openColumns" class="rp-filter-section__head">
             <span><i class="bi bi-layout-three-columns me-1 opacity-75"></i>Widoczne kolumny</span>

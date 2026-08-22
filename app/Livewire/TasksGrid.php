@@ -39,9 +39,19 @@ class TasksGrid extends Component
 
     public string $status = ''; // '' = active (pending+in_progress), 'closed', 'all'
 
-    public bool $myTasksOnly = false;
+    /** '' = wszyscy, 'me' = zalogowany użytkownik, w innym wypadku ID użytkownika jako string. */
+    public string $assignedFilter = '';
 
-    public bool $hideCallbacks = true;
+    /**
+     * Zaznaczone typy work itemów (checkboxy „Typ pracy” w panelu filtrów,
+     * zastępują dawny pojedynczy przełącznik „pokaż oddzwonienia rekrutacji”).
+     * Domyślnie bez Oddzwonień (WorkItemType::Callback) — to automatyczne
+     * przypomnienia z rekrutacji, osobny workflow, nie mają zaśmiecać backlogu.
+     * Pusta tablica = świadomie odznaczone wszystko = brak wyników.
+     *
+     * @var list<string>
+     */
+    public array $selectedTypes = ['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up'];
 
     // Sorting
     public string $sortField = 'created_at';
@@ -115,8 +125,8 @@ class TasksGrid extends Component
             'searchCategory' => ['except' => '', 'history' => true],
             'searchAssignedTo' => ['except' => '', 'history' => true],
             'status' => ['except' => '', 'history' => true],
-            'myTasksOnly' => ['except' => false, 'history' => true],
-            'hideCallbacks' => ['except' => true, 'history' => true],
+            'assignedFilter' => ['except' => '', 'history' => true],
+            'selectedTypes' => ['except' => $this->defaultSelectedTypes(), 'as' => 'types', 'history' => true],
             'sortField' => ['except' => 'created_at', 'history' => true],
             'sortDirection' => ['except' => 'desc', 'history' => true],
             'groupBy' => ['except' => '', 'history' => true],
@@ -130,7 +140,8 @@ class TasksGrid extends Component
         'searchCategory',
         'searchAssignedTo',
         'status',
-        'myTasksOnly',
+        'assignedFilter',
+        'selectedTypes',
         'groupBy',
         'sortField',
         'sortDirection',
@@ -180,6 +191,37 @@ class TasksGrid extends Component
         return $exists ??= Schema::hasTable('work_items');
     }
 
+    /** @return list<string> */
+    public function allWorkItemTypeValues(): array
+    {
+        return array_map(fn ($case) => $case->value, WorkItemType::cases());
+    }
+
+    /** @return list<string> */
+    protected function defaultSelectedTypes(): array
+    {
+        return array_values(array_filter(
+            $this->allWorkItemTypeValues(),
+            fn ($value) => $value !== WorkItemType::Callback->value
+        ));
+    }
+
+    /** Checkbox „Typ pracy” w panelu filtrów — dodaje/usuwa typ z zaznaczenia. */
+    public function toggleType(string $type): void
+    {
+        if (! in_array($type, $this->allWorkItemTypeValues(), true)) {
+            return;
+        }
+
+        if (in_array($type, $this->selectedTypes, true)) {
+            $this->selectedTypes = array_values(array_diff($this->selectedTypes, [$type]));
+        } else {
+            $this->selectedTypes[] = $type;
+        }
+
+        $this->resetPage();
+    }
+
     public function getAvailableColumnsProperty(): array
     {
         return [
@@ -200,7 +242,7 @@ class TasksGrid extends Component
 
     public function updating(string $name, mixed $value): void
     {
-        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'myTasksOnly', 'hideCallbacks'], true)) {
+        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'assignedFilter', 'selectedTypes'], true)) {
             $this->resetPage();
         }
     }
@@ -214,22 +256,27 @@ class TasksGrid extends Component
         $this->persistActiveView();
     }
 
+    /**
+     * „Wyczyść” w panelu filtrów: w przeciwieństwie do domyślnego stanu po
+     * wejściu na widok (status aktywne, bez oddzwonień — sensowny punkt
+     * startowy), to ma naprawdę pokazać WSZYSTKO, bez żadnego ukrytego
+     * zawężenia — inaczej user klika „Wyczyść” i dalej nie widzi połowy zadań.
+     */
     public function clearFilters(): void
     {
         $this->batchingViewPersist = true;
         $this->searchTask = '';
         $this->searchCategory = '';
         $this->searchAssignedTo = '';
-        $this->status = '';
-        $this->myTasksOnly = false;
-        $this->hideCallbacks = true;
+        $this->status = 'all';
+        $this->assignedFilter = '';
+        $this->selectedTypes = $this->allWorkItemTypeValues();
         $this->sortField = 'created_at';
         $this->sortDirection = 'desc';
         $previousGroup = $this->groupBy;
         $this->groupBy = '';
         $this->syncColumnsAfterGroupChange($previousGroup);
         if ($this->isLockedToSprint()) {
-            $this->status = 'all';
             $this->sortField = 'sprint_position';
             $this->sortDirection = 'asc';
         }
@@ -265,8 +312,13 @@ class TasksGrid extends Component
             $chips[] = ['key' => 'searchAssignedTo', 'label' => 'Osoba: '.$this->searchAssignedTo];
         }
 
-        $defaultStatus = $this->isLockedToSprint() ? 'all' : '';
-        if ($this->status !== $defaultStatus) {
+        // "all" to jedyna wartość statusu, która niczego nie odfiltrowuje —
+        // chip pokazujemy dla każdej innej wartości, ŁĄCZNIE z domyślnym ""
+        // (aktywne), bo to i tak realnie ukrywa zamknięte/anulowane zadania.
+        // Wcześniej domyślne "" było traktowane jak "brak filtra" i chip się
+        // nie pokazywał — stąd user widział np. 15 z 129 zadań bez żadnej
+        // wskazówki, że coś jest odfiltrowane.
+        if ($this->status !== 'all') {
             $statusLabel = match ($this->status) {
                 '' => 'Aktywne',
                 'closed' => 'Zamknięte',
@@ -276,12 +328,29 @@ class TasksGrid extends Component
             $chips[] = ['key' => 'status', 'label' => 'Status: '.$statusLabel];
         }
 
-        if ($this->myTasksOnly) {
-            $chips[] = ['key' => 'myTasksOnly', 'label' => 'Moje'];
+        if ($this->assignedFilter === 'me') {
+            $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: Ja'];
+        } elseif ($this->assignedFilter !== '') {
+            $name = User::query()->whereKey((int) $this->assignedFilter)->value('name');
+            $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: '.($name ?: '#'.$this->assignedFilter)];
         }
 
-        if ($this->usesWorkItems() && ! $this->hideCallbacks) {
-            $chips[] = ['key' => 'hideCallbacks', 'label' => 'Oddzwonienia'];
+        if ($this->usesWorkItems()) {
+            $allTypes = $this->allWorkItemTypeValues();
+            $selected = $this->selectedTypes;
+            $missing = array_values(array_diff($allTypes, $selected));
+
+            if ($missing !== []) {
+                if ($selected === []) {
+                    $chips[] = ['key' => 'selectedTypes', 'label' => 'Typ pracy: żaden (0 wyników)'];
+                } elseif (count($missing) <= count($selected)) {
+                    $labels = array_map(fn ($v) => WorkItemType::from($v)->label(), $missing);
+                    $chips[] = ['key' => 'selectedTypes', 'label' => 'Typ pracy: bez '.implode(', ', $labels)];
+                } else {
+                    $labels = array_map(fn ($v) => WorkItemType::from($v)->label(), $selected);
+                    $chips[] = ['key' => 'selectedTypes', 'label' => 'Typ pracy: '.implode(', ', $labels)];
+                }
+            }
         }
 
         if ($this->groupBy !== '') {
@@ -307,21 +376,24 @@ class TasksGrid extends Component
         }
 
         if ($key === 'status') {
-            $this->status = $this->isLockedToSprint() ? 'all' : '';
+            // Usunięcie chipa = "przestań zawężać", czyli pokaż wszystko —
+            // nie wracaj do domyślnego "Aktywne", bo to by wyglądało jak nic
+            // się nie zmieniło (patrz komentarz przy activeFilterChips()).
+            $this->status = 'all';
             $this->resetPage();
 
             return;
         }
 
-        if ($key === 'hideCallbacks') {
-            $this->hideCallbacks = true;
+        if ($key === 'selectedTypes') {
+            $this->selectedTypes = $this->allWorkItemTypeValues();
             $this->resetPage();
 
             return;
         }
 
-        if ($key === 'myTasksOnly') {
-            $this->myTasksOnly = false;
+        if ($key === 'assignedFilter') {
+            $this->assignedFilter = '';
             $this->resetPage();
 
             return;
@@ -821,7 +893,8 @@ class TasksGrid extends Component
             'searchCategory' => $this->searchCategory,
             'searchAssignedTo' => $this->searchAssignedTo,
             'status' => $this->status,
-            'myTasksOnly' => $this->myTasksOnly,
+            'assignedFilter' => $this->assignedFilter,
+            'types' => $this->selectedTypes,
             'groupBy' => $this->groupBy,
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
@@ -842,14 +915,16 @@ class TasksGrid extends Component
             'searchCategory' => $this->searchCategory,
             'searchAssignedTo' => $this->searchAssignedTo,
             'status' => $this->status,
-            'myTasksOnly' => $this->myTasksOnly,
+            'assignedFilter' => $this->assignedFilter,
+            'selectedTypes' => $this->selectedTypes,
         ];
 
         $this->searchTask = $view->search_task ?? '';
         $this->searchCategory = $view->search_category ?? '';
         $this->searchAssignedTo = $view->search_assigned_to ?? '';
         $this->status = $view->status ?? '';
-        $this->myTasksOnly = (bool) ($view->my_tasks_only ?? false);
+        $this->assignedFilter = $view->assigned_filter ?? ($view->my_tasks_only ? 'me' : '');
+        $this->selectedTypes = $view->type_filter ?: $this->defaultSelectedTypes();
 
         try {
             return $this->filteredTasksQuery()->count();
@@ -858,7 +933,8 @@ class TasksGrid extends Component
             $this->searchCategory = $previous['searchCategory'];
             $this->searchAssignedTo = $previous['searchAssignedTo'];
             $this->status = $previous['status'];
-            $this->myTasksOnly = $previous['myTasksOnly'];
+            $this->assignedFilter = $previous['assignedFilter'];
+            $this->selectedTypes = $previous['selectedTypes'];
         }
     }
 
@@ -898,7 +974,8 @@ class TasksGrid extends Component
         $this->searchCategory = $record->search_category ?? '';
         $this->searchAssignedTo = $record->search_assigned_to ?? '';
         $this->status = $record->status ?? '';
-        $this->myTasksOnly = (bool) ($record->my_tasks_only ?? false);
+        $this->assignedFilter = $record->assigned_filter ?? ($record->my_tasks_only ? 'me' : '');
+        $this->selectedTypes = $record->type_filter ?: $this->defaultSelectedTypes();
         $this->sanitizeRemovedProjectField();
         $this->hideGroupedColumn();
         $this->batchingViewPersist = false;
@@ -1017,7 +1094,9 @@ class TasksGrid extends Component
             'search_category' => $this->searchCategory,
             'search_assigned_to' => $this->searchAssignedTo,
             'status' => $this->status,
-            'my_tasks_only' => $this->myTasksOnly,
+            'my_tasks_only' => $this->assignedFilter === 'me',
+            'assigned_filter' => $this->assignedFilter,
+            'type_filter' => $this->selectedTypes,
         ];
     }
 
@@ -1599,8 +1678,10 @@ class TasksGrid extends Component
             $query->where('project_tasks.sprint_id', $this->lockedSprintId);
         }
 
-        if ($this->myTasksOnly) {
+        if ($this->assignedFilter === 'me') {
             $query->where('project_tasks.assigned_to', auth()->id());
+        } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
+            $query->where('project_tasks.assigned_to', (int) $this->assignedFilter);
         }
 
         if ($this->searchTask) {
@@ -1632,12 +1713,15 @@ class TasksGrid extends Component
     {
         $query = WorkItem::query();
 
-        if ($this->hideCallbacks) {
-            $query->where('work_items.type', '!=', WorkItemType::Callback);
-        }
+        // Checkboxy "Typ pracy" w panelu filtrów — pusta tablica jest świadomym
+        // wyborem usera (odznaczył wszystko) i celowo zwraca zero wyników,
+        // whereIn Laravela sam skompiluje to jako zawsze-fałszywy warunek.
+        $query->whereIn('work_items.type', $this->selectedTypes);
 
-        if ($this->myTasksOnly) {
+        if ($this->assignedFilter === 'me') {
             $query->where('work_items.assignee_id', auth()->id());
+        } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
+            $query->where('work_items.assignee_id', (int) $this->assignedFilter);
         }
 
         if ($this->searchTask) {

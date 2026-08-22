@@ -197,7 +197,7 @@ class WorkItemBacklogTest extends TestCase
         $html = Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
             ->assertDontSee('Oddzwonić do Jan Kowalski #12')
-            ->set('hideCallbacks', false)
+            ->call('toggleType', WorkItemType::Callback->value)
             ->assertSee('Oddzwonić do Jan Kowalski #12')
             ->assertSee('Oddzwonienie')
             ->assertSee('Oczekujące')

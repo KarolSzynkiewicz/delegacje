@@ -11,7 +11,8 @@ class TasksGridUrlParams
         'searchCategory',
         'searchAssignedTo',
         'status',
-        'myTasksOnly',
+        'assignedFilter',
+        'types',
         'groupBy',
         'sortField',
         'sortDirection',
@@ -19,7 +20,7 @@ class TasksGridUrlParams
 
     /**
      * @param  array<string, mixed>  $params
-     * @return array<string, string>
+     * @return array<string, string|list<string>>
      */
     public static function normalize(array $params): array
     {
@@ -32,15 +33,22 @@ class TasksGridUrlParams
 
             $value = $params[$key];
 
-            if ($value === null || $value === '' || $value === false) {
+            if ($key === 'types') {
+                $types = is_array($value)
+                    ? array_values(array_unique(array_filter($value, fn ($v) => $v !== '' && $v !== null)))
+                    : [];
+                sort($types);
+
+                if ($types === []) {
+                    continue;
+                }
+
+                $normalized[$key] = $types;
+
                 continue;
             }
 
-            if ($key === 'myTasksOnly') {
-                if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
-                    $normalized[$key] = 'true';
-                }
-
+            if ($value === null || $value === '' || $value === false) {
                 continue;
             }
 
