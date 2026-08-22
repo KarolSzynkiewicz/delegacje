@@ -5,6 +5,304 @@
     </x-slot>
 
     <div class="container-fluid">
+
+        {{-- ══════════════════════════════════════════════════════════════
+             🧪 PROBE — teal2 / xuiv2
+             Testowy wariant stylu zainspirowany "chronologic-landing.html":
+             tło (siatka + ziarno + poświata kursora), animacje hover
+             (magnetyczne przyciski, tilt kart) i czcionki (Space Grotesk +
+             JetBrains Mono). W pełni odizolowany od reszty /2 i aplikacji —
+             nic poza tą sekcją się nie zmienia. Traktuj jak próbkę do oceny.
+             ══════════════════════════════════════════════════════════════ --}}
+        <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
+            <h3 class="mb-1">🧪 Probe — <code>teal2</code> / <code>xuiv2</code> <span class="text-muted small fw-normal">(izolowana próbka, nie wpływa na resztę appki)</span></h3>
+            <p class="text-muted small mb-3">
+                Wariant komponentów <code>x-ui.*</code> „podwędzony” z Twojego <code>chronologic-landing.html</code>: tło (siatka + ziarno + poświata kursora podążająca za myszką), czcionki (<code>Space Grotesk</code> + <code>JetBrains Mono</code>), akcent teal/amber/cyan zamiast niebieskiego, magnetyczne przyciski i tilt kart pod kursorem. Wszystko zamknięte w klasie <code>.xuiv2-probe</code> — jeśli się spodoba, przeniesiemy to realnie do <code>x-ui.*</code>.
+            </p>
+
+            <div class="xuiv2-probe" id="xuiv2Probe">
+                <div class="xuiv2-bg-grid"></div>
+                <div class="xuiv2-grain"></div>
+                <div class="xuiv2-cursor-glow" id="xuiv2CursorGlow"></div>
+
+                <div class="xuiv2-stage">
+                    <span class="xuiv2-eyebrow">Design probe · v2</span>
+                    <h2 class="xuiv2-h2">Ten sam system, <span class="xuiv2-accent">inny nastrój.</span></h2>
+                    <p class="xuiv2-sub">Teal zamiast niebieskiego, mono zamiast grotesque'u w danych, siatka i ziarno w tle zamiast płaskiej czerni. Poniżej te same komponenty <code>x-ui.*</code> w nowej skórce.</p>
+
+                    {{-- Przyciski (magnetyczne) --}}
+                    <div class="xuiv2-row">
+                        <button type="button" class="xuiv2-btn xuiv2-btn--primary xuiv2-magnetic">Zobacz jak to działa</button>
+                        <button type="button" class="xuiv2-btn xuiv2-btn--ghost xuiv2-magnetic">x-ui.button ghost</button>
+                        <button type="button" class="xuiv2-btn xuiv2-btn--ghost xuiv2-magnetic" disabled>Wyłączony</button>
+                    </div>
+
+                    {{-- Badge'e --}}
+                    <div class="xuiv2-row mt-3">
+                        <span class="xuiv2-badge xuiv2-badge--teal">Aktywne</span>
+                        <span class="xuiv2-badge xuiv2-badge--amber">Uwaga</span>
+                        <span class="xuiv2-badge xuiv2-badge--cyan">Info</span>
+                        <span class="xuiv2-badge xuiv2-badge--muted">Zamknięte</span>
+                    </div>
+
+                    {{-- Karty (tilt pod kursorem) --}}
+                    <div class="xuiv2-grid mt-4">
+                        <div class="xuiv2-card xuiv2-tilt">
+                            <span class="xuiv2-card-num">01</span>
+                            <h3>x-ui.card</h3>
+                            <p>Ta sama treść co dziś, ale hairline-grid obwódka i akcent na górnej krawędzi zamiast glassmorphic blura.</p>
+                        </div>
+                        <div class="xuiv2-card xuiv2-tilt xuiv2-card--featured">
+                            <span class="xuiv2-featured-badge">Wyróżniona</span>
+                            <span class="xuiv2-card-num">02</span>
+                            <h3>x-ui.page-header</h3>
+                            <p>Kicker + tytuł w Space Grotesk, dane poniżej w JetBrains Mono — ta sama hierarchia co w landingu.</p>
+                        </div>
+                        <div class="xuiv2-card xuiv2-tilt">
+                            <span class="xuiv2-card-num">03</span>
+                            <h3>x-ui.badge / input</h3>
+                            <p>Formularze i etykiety zachowują dark theme, ale z cieńszą, bardziej „redakcyjną” obwódką.</p>
+                        </div>
+                    </div>
+
+                    {{-- Stat band (mono) --}}
+                    <div class="xuiv2-stats mt-4">
+                        <div class="xuiv2-stat"><div class="xuiv2-stat-num" data-xuiv2-count="24">0</div><div class="xuiv2-stat-label">aktywne zadania</div></div>
+                        <div class="xuiv2-stat"><div class="xuiv2-stat-num" data-xuiv2-count="6">0</div><div class="xuiv2-stat-label">moduły systemu</div></div>
+                        <div class="xuiv2-stat"><div class="xuiv2-stat-num" data-xuiv2-count="3">0</div><div class="xuiv2-stat-label">sprinty w toku</div></div>
+                        <div class="xuiv2-stat"><div class="xuiv2-stat-num" data-xuiv2-count="0">0</div><div class="xuiv2-stat-label">arkuszy potrzebnych</div></div>
+                    </div>
+
+                    {{-- Mono data-plate (tabela) --}}
+                    <div class="xuiv2-plate mt-4">
+                        <div class="xuiv2-plate-row xuiv2-plate-head">
+                            <span>Zadanie</span><span>Status</span><span>Termin</span>
+                        </div>
+                        <div class="xuiv2-plate-row">
+                            <span>Rozliczenie delegacji #482</span><span class="xuiv2-mono xuiv2-dot xuiv2-dot--teal">Ukończone</span><span class="xuiv2-mono">18.08.2026</span>
+                        </div>
+                        <div class="xuiv2-plate-row">
+                            <span>Przegląd floty — Q3</span><span class="xuiv2-mono xuiv2-dot xuiv2-dot--amber">W trakcie</span><span class="xuiv2-mono">25.08.2026</span>
+                        </div>
+                        <div class="xuiv2-plate-row">
+                            <span>Onboarding: 3 kandydatów</span><span class="xuiv2-mono xuiv2-dot xuiv2-dot--cyan">Oczekujące</span><span class="xuiv2-mono">02.09.2026</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                #xuiv2Probe.xuiv2-probe { --xv2-anim: 1; }
+                @media (prefers-reduced-motion: reduce) {
+                    #xuiv2Probe.xuiv2-probe { --xv2-anim: 0; }
+                }
+
+                @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+                .xuiv2-probe {
+                    --xv2-bg: #070a13;
+                    --xv2-surface: #0e1421;
+                    --xv2-surface-2: #131b2c;
+                    --xv2-line: #1e2740;
+                    --xv2-teal: #2dd4bf;
+                    --xv2-teal-dim: #1a3d38;
+                    --xv2-amber: #fbbf24;
+                    --xv2-cyan: #22d3ee;
+                    --xv2-text: #e8ecf5;
+                    --xv2-muted: #7c869e;
+                    --xv2-faint: #4a5268;
+                    --xv2-display: 'Space Grotesk', sans-serif;
+                    --xv2-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+                    position: relative;
+                    isolation: isolate;
+                    overflow: hidden;
+                    border-radius: 16px;
+                    border: 1px solid var(--xv2-line);
+                    background: var(--xv2-bg);
+                    padding: 48px 40px;
+                }
+                .xuiv2-probe *,
+                .xuiv2-probe *::before,
+                .xuiv2-probe *::after {
+                    box-sizing: border-box;
+                    font-family: var(--xv2-display);
+                    color: var(--xv2-text);
+                }
+                .xuiv2-probe code { font-family: var(--xv2-mono); }
+
+                .xuiv2-bg-grid {
+                    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+                    background-image:
+                        linear-gradient(to right, rgba(45,212,191,0.06) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(45,212,191,0.06) 1px, transparent 1px);
+                    background-size: 42px 42px;
+                    mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 40%, transparent 100%);
+                }
+                .xuiv2-grain {
+                    position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .05; mix-blend-mode: overlay;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+                }
+                .xuiv2-cursor-glow {
+                    position: absolute; top: 0; left: 0; width: 380px; height: 380px; border-radius: 50%;
+                    background: radial-gradient(circle, rgba(45,212,191,0.16) 0%, transparent 70%);
+                    pointer-events: none; z-index: 1; transform: translate(-50%,-50%);
+                    mix-blend-mode: screen; opacity: 0; transition: opacity .3s ease;
+                }
+                .xuiv2-probe:hover .xuiv2-cursor-glow { opacity: 1; }
+                @media (pointer: coarse) { .xuiv2-cursor-glow { display: none; } }
+
+                .xuiv2-stage { position: relative; z-index: 2; max-width: 760px; }
+                .xuiv2-eyebrow {
+                    font-family: var(--xv2-mono); font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+                    color: var(--xv2-teal); display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px;
+                }
+                .xuiv2-eyebrow::before { content: ''; width: 22px; height: 1px; background: var(--xv2-teal); }
+                .xuiv2-h2 { font-size: clamp(26px, 3vw, 36px); font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; margin: 0 0 14px; }
+                .xuiv2-accent { color: var(--xv2-teal); font-style: italic; font-weight: 400; }
+                .xuiv2-sub { font-size: 15px; line-height: 1.6; color: var(--xv2-muted) !important; max-width: 560px; margin: 0 0 28px; }
+                .xuiv2-sub code { color: var(--xv2-cyan) !important; }
+
+                .xuiv2-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+                .xuiv2-btn {
+                    font-family: var(--xv2-mono) !important; font-size: 13px; font-weight: 500;
+                    padding: 11px 22px; border-radius: 7px; cursor: pointer; border: 1px solid transparent;
+                    will-change: transform; transition: box-shadow .2s ease, border-color .2s ease, opacity .2s ease;
+                }
+                .xuiv2-btn--primary { background: var(--xv2-teal); color: #04110f !important; }
+                .xuiv2-btn--primary:hover { box-shadow: 0 8px 24px rgba(45,212,191,0.32); }
+                .xuiv2-btn--ghost { background: transparent; border-color: var(--xv2-line); }
+                .xuiv2-btn--ghost:hover { border-color: var(--xv2-teal); color: var(--xv2-teal) !important; }
+                .xuiv2-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+                .xuiv2-badge {
+                    font-family: var(--xv2-mono) !important; font-size: 11px; font-weight: 600; letter-spacing: .02em;
+                    padding: 5px 12px; border-radius: 20px; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 6px;
+                }
+                .xuiv2-badge--teal  { background: rgba(45,212,191,.12); color: var(--xv2-teal) !important; border-color: rgba(45,212,191,.3); }
+                .xuiv2-badge--amber { background: rgba(251,191,36,.12); color: var(--xv2-amber) !important; border-color: rgba(251,191,36,.3); }
+                .xuiv2-badge--cyan  { background: rgba(34,211,238,.12); color: var(--xv2-cyan) !important; border-color: rgba(34,211,238,.3); }
+                .xuiv2-badge--muted { background: rgba(124,134,158,.12); color: var(--xv2-muted) !important; border-color: rgba(124,134,158,.3); }
+
+                .xuiv2-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--xv2-line); border: 1px solid var(--xv2-line); border-radius: 12px; overflow: hidden; }
+                @media (max-width: 900px) { .xuiv2-grid { grid-template-columns: 1fr; } }
+                .xuiv2-card {
+                    background: var(--xv2-surface); padding: 26px 22px; position: relative; overflow: hidden;
+                    transition: background .3s ease, transform .12s ease; transform-style: preserve-3d; will-change: transform;
+                }
+                .xuiv2-card:hover { background: var(--xv2-surface-2); }
+                .xuiv2-card::before {
+                    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--xv2-teal);
+                    transform: scaleX(0); transform-origin: left; transition: transform .4s ease;
+                }
+                .xuiv2-card:hover::before { transform: scaleX(1); }
+                .xuiv2-card--featured { background: var(--xv2-surface-2); }
+                .xuiv2-card--featured::before { transform: scaleX(1); }
+                .xuiv2-featured-badge {
+                    position: absolute; top: 12px; right: 14px; background: var(--xv2-teal); color: #04110f !important;
+                    font-family: var(--xv2-mono) !important; font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+                    padding: 4px 9px; border-radius: 20px;
+                }
+                .xuiv2-card-num { font-family: var(--xv2-mono) !important; font-size: 11px; color: var(--xv2-faint) !important; }
+                .xuiv2-card h3 { font-size: 17px; font-weight: 600; margin: 14px 0 8px; }
+                .xuiv2-card p { font-size: 13px; color: var(--xv2-muted) !important; line-height: 1.55; margin: 0; }
+
+                .xuiv2-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; border-top: 1px solid var(--xv2-line); border-bottom: 1px solid var(--xv2-line); padding: 26px 0; }
+                @media (max-width: 700px) { .xuiv2-stats { grid-template-columns: repeat(2, 1fr); row-gap: 20px; } }
+                .xuiv2-stat-num { font-family: var(--xv2-mono) !important; font-size: clamp(26px, 3vw, 34px); font-weight: 700; color: var(--xv2-teal) !important; line-height: 1; }
+                .xuiv2-stat-label { margin-top: 8px; font-size: 12.5px; color: var(--xv2-muted) !important; }
+
+                .xuiv2-plate { border: 1px solid var(--xv2-line); border-radius: 10px; overflow: hidden; }
+                .xuiv2-plate-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--xv2-line); font-size: 13px; }
+                .xuiv2-plate-row:last-child { border-bottom: none; }
+                .xuiv2-plate-head { background: var(--xv2-surface-2); font-family: var(--xv2-mono) !important; font-size: 10.5px !important; text-transform: uppercase; letter-spacing: .08em; color: var(--xv2-faint) !important; }
+                .xuiv2-mono { font-family: var(--xv2-mono) !important; font-size: 12.5px; }
+                .xuiv2-dot { display: inline-flex; align-items: center; gap: 6px; }
+                .xuiv2-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+                .xuiv2-dot--teal::before  { background: var(--xv2-teal); }
+                .xuiv2-dot--amber::before { background: var(--xv2-amber); }
+                .xuiv2-dot--cyan::before  { background: var(--xv2-cyan); }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .xuiv2-card, .xuiv2-btn { transition: none !important; }
+                }
+            </style>
+
+            <script>
+                (function () {
+                    var root = document.getElementById('xuiv2Probe');
+                    if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+                    // ── Poświata kursora ──
+                    var glow = document.getElementById('xuiv2CursorGlow');
+                    root.addEventListener('mousemove', function (e) {
+                        var r = root.getBoundingClientRect();
+                        glow.style.transform = 'translate(' + (e.clientX - r.left - 190) + 'px, ' + (e.clientY - r.top - 190) + 'px)';
+                    });
+
+                    // ── Magnetyczne przyciski ──
+                    if (window.matchMedia('(pointer: fine)').matches) {
+                        root.querySelectorAll('.xuiv2-magnetic').forEach(function (btn) {
+                            btn.addEventListener('mousemove', function (e) {
+                                var r = btn.getBoundingClientRect();
+                                var x = (e.clientX - r.left - r.width / 2) * 0.35;
+                                var y = (e.clientY - r.top - r.height / 2) * 0.35;
+                                btn.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+                            });
+                            btn.addEventListener('mouseleave', function () {
+                                btn.style.transform = 'translate(0, 0)';
+                                btn.style.transition = 'transform .4s cubic-bezier(.16,1,.3,1)';
+                                setTimeout(function () { btn.style.transition = ''; }, 400);
+                            });
+                        });
+
+                        // ── Tilt kart ──
+                        root.querySelectorAll('.xuiv2-tilt').forEach(function (card) {
+                            card.addEventListener('mousemove', function (e) {
+                                var r = card.getBoundingClientRect();
+                                var px = (e.clientX - r.left) / r.width - 0.5;
+                                var py = (e.clientY - r.top) / r.height - 0.5;
+                                card.style.transform = 'perspective(800px) rotateY(' + (px * 6) + 'deg) rotateX(' + (-py * 6) + 'deg)';
+                            });
+                            card.addEventListener('mouseleave', function () {
+                                card.style.transform = 'perspective(800px) rotateY(0) rotateX(0)';
+                                card.style.transition = 'transform .5s ease';
+                                setTimeout(function () { card.style.transition = ''; }, 500);
+                            });
+                        });
+                    }
+
+                    // ── Liczniki statystyk (odpalane raz, na wejście w viewport) ──
+                    var counted = false;
+                    function runCounters() {
+                        if (counted) return;
+                        counted = true;
+                        root.querySelectorAll('[data-xuiv2-count]').forEach(function (el) {
+                            var target = parseInt(el.dataset.xuiv2Count, 10) || 0;
+                            var start = null;
+                            var duration = 900;
+                            function step(ts) {
+                                if (!start) start = ts;
+                                var progress = Math.min((ts - start) / duration, 1);
+                                el.textContent = Math.round(progress * target);
+                                if (progress < 1) requestAnimationFrame(step);
+                            }
+                            requestAnimationFrame(step);
+                        });
+                    }
+                    if ('IntersectionObserver' in window) {
+                        var io = new IntersectionObserver(function (entries) {
+                            entries.forEach(function (entry) { if (entry.isIntersecting) runCounters(); });
+                        }, { threshold: .4 });
+                        io.observe(root);
+                    } else {
+                        runCounters();
+                    }
+                })();
+            </script>
+        </div>
+
         {{-- Logistyka (DRY): wspólne widoki z planerami wyjazdu / zjazdu — źródło: resources/views/components/logistics/ --}}
         <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
             <h3 class="mb-2">Komponenty logistyki <span class="text-muted small fw-normal">(<code>x-logistics.*</code>)</span></h3>

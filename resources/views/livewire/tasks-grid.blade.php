@@ -1,6 +1,148 @@
-<div>
+<div class="xuiv2-tasks" id="xuiv2Tasks">
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    /* ══════════════════════════════════════════════════════════
+       xuiv2 — probka z /2 przeniesiona na /tasks2: Space Grotesk +
+       JetBrains Mono, cichutkie tło (siatka/ziarno/poświata). --primary/
+       --accent to DOKŁADNIE te same dwa kolory co gradient nagłówka
+       "Backlog" (patrz "header h1..h6" w app.css) — dzięki temu przyciski
+       typu .btn-primary, aktywna strona paginacji itd. mają to samo
+       niebiesko-fioletowe przejście, a nie płaski jeden kolor.
+       Nadpisujemy TYLKO w obrębie tego komponentu (nic globalnego).
+       ══════════════════════════════════════════════════════════ */
+    .xuiv2-tasks {
+        --primary: #3b82f6;
+        --accent: #a855f7;
+        --bs-primary: #3b82f6;
+        position: relative;
+        isolation: isolate;
+        background: #070a13;
+        border: 1px solid #1e2740;
+        border-radius: 14px;
+        padding: 12px;
+    }
+    /* Pigułka aktywnego zapisanego widoku używała Bootstrapowego .btn-info
+       (jaskrawy cyjan) — kolidowało to z resztą fioletowej palety. */
+    .xuiv2-tasks .rp-topbar-btn.btn-info {
+        background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
+        border-color: transparent !important;
+        color: #fff !important;
+    }
+    /* Tło całej strony /tasks2 (nawigacja + nagłówek + karta) — czarne jak we wzorcu.
+       Klasa na <body> jest dopisywana przez mały JS niżej (taniej niż CSS :has(),
+       które przy częstych morphach Livewire potrafi realnie mulić). */
+    body.xuiv2-page {
+        background-color: #070a13 !important;
+        background-image:
+            radial-gradient(circle at 12% 15%, rgba(168,85,247,0.10) 0%, transparent 42%),
+            radial-gradient(circle at 88% 85%, rgba(168,85,247,0.08) 0%, transparent 42%) !important;
+    }
+    body.xuiv2-page .app-content-wrapper {
+        background: rgba(7,10,19,0.6) !important;
+        border-color: rgba(168,85,247,0.14) !important;
+    }
+    /* Nagłówek strony ("Backlog" + Sprinty/Widok kart) żyje poza tym komponentem
+       (renderowany przez x-app-layout), więc dociągamy go tą samą klasą na <body>.
+       Tytuł ma już globalny gradient primary→accent (niebiesko-fioletowy, patrz
+       "header h1..h6" w app.css) — zostawiamy go bez zmian, dokładamy tylko font. */
+    body.xuiv2-page header h2 {
+        font-family: 'Space Grotesk', 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.01em;
+    }
+    body.xuiv2-page header h2::before {
+        content: 'ZARZĄDZANIE ZADANIAMI';
+        display: block;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        color: #a855f7;
+        margin-bottom: 7px;
+    }
+    body.xuiv2-page header .btn-outline-secondary {
+        font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+        font-size: .78rem !important;
+        border-color: #1e2740 !important;
+        transition: border-color .15s ease, color .15s ease, transform .15s ease;
+    }
+    body.xuiv2-page header .btn-outline-secondary:hover {
+        border-color: #a855f7 !important;
+        color: #c084fc !important;
+        transform: translateY(-1px);
+    }
+    .xuiv2-tasks, .xuiv2-tasks * {
+        font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .xuiv2-tasks .bi::before { font-family: "bootstrap-icons" !important; }
+
+    /* Tło (siatka/ziarno/poświata) jest position:fixed — rozmiar = viewport, NIE rośnie
+       z długością tabeli. Wcześniej było position:absolute co do wysokości całej karty,
+       więc przy 50+ wierszach warstwa z mix-blend-mode miała tysiące pikseli wysokości
+       i była przemalowywana przy każdym ruchu myszy — stąd spadek płynności. */
+    .xuiv2-bg-grid {
+        position: fixed; inset: 0; z-index: -1; pointer-events: none;
+        background-image:
+            linear-gradient(to right, rgba(168,85,247,0.05) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(168,85,247,0.05) 1px, transparent 1px);
+        background-size: 46px 46px;
+        mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, black 30%, transparent 100%);
+        contain: strict;
+    }
+    .xuiv2-grain {
+        position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .03;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        contain: strict;
+    }
+    .xuiv2-cursor-glow {
+        position: fixed; top: 0; left: 0; width: 460px; height: 460px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 70%);
+        pointer-events: none; z-index: -1; opacity: 0; will-change: transform;
+        contain: strict;
+    }
+    .xuiv2-cursor-glow { transition: opacity .3s ease; }
+    @media (pointer: coarse) { .xuiv2-cursor-glow { display: none; } }
+    @media (prefers-reduced-motion: reduce) { .xuiv2-cursor-glow, .xuiv2-magnetic { display: none !important; } }
+
+    /* Magnetyczne CTA (Filtry, Dodaj zadanie) */
+    .xuiv2-magnetic { will-change: transform; transition: transform .15s cubic-bezier(.2,.8,.2,1); }
+
+    /* Focus ring: fiolet (--accent) zamiast niebieskiego */
+    .xuiv2-tasks .form-control:focus,
+    .xuiv2-tasks .form-select:focus {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 4px rgba(168,85,247,0.2) !important;
+    }
+
+    /* Trochę więcej oddechu w chipach aktywnych filtrów (globalna klasa .rp-active-filters__chip
+       ma za ciasny padding — nadpisujemy tylko w obrębie tego widoku) */
+    .xuiv2-tasks .rp-active-filters { gap: .4rem .55rem; padding: .3rem 0 .2rem; }
+    .xuiv2-tasks .rp-active-filters__chip { padding: .3rem .65rem; font-size: .78rem; }
+    .xuiv2-tasks .rp-active-filters__clear { padding: .3rem .5rem; font-size: .78rem; }
+
+    /* Panel „Filtry” (teleportowany do body — scoped przez klasę, nie DOM ancestry) */
+    .tg-filter-panel-teal button.rp-filter-chip.is-active {
+        background: rgba(168,85,247,0.2) !important;
+        border-color: rgba(168,85,247,0.45) !important;
+    }
+    .tg-filter-panel-teal button.rp-filter-option.is-active {
+        background: rgba(168,85,247,0.12) !important;
+    }
+    .tg-filter-panel-teal .rp-filter-check.is-checked {
+        background: #a855f7 !important; border-color: #a855f7 !important; color: #fff !important;
+    }
+    .tg-filter-panel-teal .rp-filter-input:focus {
+        border-color: rgba(168,85,247,0.55) !important;
+        box-shadow: 0 0 0 2px rgba(168,85,247,0.2) !important;
+    }
+
     /* ── Scope: override Bootstrap defaults inside the grid ── */
+    .tg-mono {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace !important;
+        font-variant-numeric: tabular-nums;
+    }
 
     /* All text inside any dropdown rendered by this component must be light */
     .dropdown-menu { color: var(--text-main, #f1f5f9) !important; }
@@ -8,10 +150,10 @@
 
     /* Compact btn-sm — app.css hardcodes 10px 24px on .btn, killing Bootstrap's btn-sm vars */
     .tg-toolbar .btn {
-        padding: 5px 12px !important;
+        padding: 7px 15px !important;
         font-size: 0.8rem !important;
         border-radius: 8px !important;
-        gap: 4px !important;
+        gap: 5px !important;
     }
     .tg-toolbar .btn-group .btn { border-radius: 0 !important; }
     .tg-toolbar .btn-group .btn:first-child { border-radius: 8px 0 0 8px !important; }
@@ -62,6 +204,20 @@
         vertical-align: middle !important;
     }
 
+    /* Karta tabeli: cieńsze, bardziej „editorial” obramowanie zamiast domyślnego .card 20px */
+    .tg-table-wrap {
+        border-radius: 12px !important;
+        border-color: rgba(255,255,255,0.08) !important;
+        overflow: hidden;
+        position: relative;
+    }
+    .tg-table-wrap::before {
+        content: '';
+        position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, var(--primary,#3b82f6), transparent 70%);
+        opacity: .6; z-index: 6; pointer-events: none;
+    }
+
     /* ── Sticky header ── */
     .tg-table > thead > tr > th {
         position: sticky;
@@ -69,16 +225,17 @@
         z-index: 5;
         background: rgba(10, 15, 29, 0.97) !important;
         backdrop-filter: blur(12px);
-        border-bottom: 2px solid rgba(255,255,255,0.12) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.12) !important;
         border-top: none !important;
         color: var(--text-muted, #94a3b8) !important;
-        font-size: 0.7rem;
-        font-weight: 700;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.66rem;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.7px;
         white-space: nowrap;
-        padding: 10px 10px;
-        box-shadow: 0 2px 12px rgba(0,0,0,.4);
+        padding: 11px 10px;
+        transition: color .15s ease;
     }
     .tg-table > thead > tr > th.sortable { cursor: pointer; }
     .tg-table > thead > tr > th.sortable:hover { color: var(--primary, #3b82f6) !important; }
@@ -89,18 +246,19 @@
         border-bottom: 1px solid rgba(255,255,255,0.05) !important;
         background: transparent !important;
         font-size: 0.84rem;
+        transition: background .12s ease;
     }
     .tg-table > tbody > tr.tg-task-row:hover > td {
         background: rgba(255,255,255,0.035) !important;
     }
     .tg-expanded > td {
-        background: rgba(59,130,246,0.06) !important;
+        background: rgba(168,85,247,0.06) !important;
     }
 
     /* ── Hover-edit cells ── */
     .tg-hover-edit:hover {
-        background: rgba(59,130,246,0.12) !important;
-        outline: 1px dashed rgba(59,130,246,0.5);
+        background: rgba(168,85,247,0.12) !important;
+        outline: 1px dashed rgba(168,85,247,0.5);
         border-radius: 4px;
     }
 
@@ -114,7 +272,7 @@
     }
     button.tg-status-badge:hover { filter: brightness(1.18); cursor: pointer; }
     .tg-status-badge.s-pending    { background: rgba(245,158,11,.18); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
-    .tg-status-badge.s-in_progress{ background: rgba(59,130,246,.18); color: #60a5fa; border: 1px solid rgba(59,130,246,.35); }
+    .tg-status-badge.s-in_progress{ background: rgba(168,85,247,.18); color: #c084fc; border: 1px solid rgba(168,85,247,.35); }
     .tg-status-badge.s-completed  { background: rgba(16,185,129,.18); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
     .tg-status-badge.s-cancelled  { background: rgba(239,68,68,.18);  color: #f87171; border: 1px solid rgba(239,68,68,.35); }
 
@@ -126,21 +284,28 @@
         background: var(--primary, #3b82f6); flex-shrink: 0;
     }
 
-    /* ── Group header ── */
+    /* ── Group header (editorial kicker) ── */
     .tg-group-header > td {
         background: rgba(255,255,255,0.04) !important;
-        border-top: 2px solid rgba(255,255,255,0.1) !important;
-        padding: 6px 12px !important;
-        font-size: 0.78rem; font-weight: 600;
+        border-top: 1px solid rgba(255,255,255,0.1) !important;
+        padding: 7px 12px !important;
+        font-size: 0.72rem; font-weight: 700;
+        text-transform: uppercase;
         color: var(--text-muted, #94a3b8) !important;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.6px;
     }
+    .tg-group-header .tg-group-bullet { color: var(--primary,#3b82f6); font-size: 0.6rem; margin-right: 7px; }
     .tg-group-collapsed > td { opacity: .85; }
+    .tg-group-count {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.66rem !important; font-weight: 500 !important;
+        background: rgba(255,255,255,0.08) !important; color: var(--text-muted,#94a3b8) !important;
+    }
 
     /* ── Expanded detail panel ── */
     .tg-expand-row > td {
         background: rgba(10,15,29,0.6) !important;
-        border-bottom: 2px solid rgba(59,130,246,0.3) !important;
+        border-bottom: 2px solid rgba(168,85,247,0.3) !important;
         padding: 14px 16px 18px !important;
     }
 
@@ -183,8 +348,8 @@
     .tg-table th[draggable="true"] { cursor: grab; }
     .tg-table th[draggable="true"]:active { cursor: grabbing; }
     .tg-col-drag-over {
-        background: rgba(59,130,246,.18) !important;
-        outline: 2px dashed rgba(59,130,246,.6) !important;
+        background: rgba(168,85,247,.18) !important;
+        outline: 2px dashed rgba(168,85,247,.6) !important;
         outline-offset: -2px;
     }
 
@@ -201,9 +366,75 @@
         transition: border-color .15s;
     }
     .tg-resize-handle:hover,
-    .tg-resizing .tg-resize-handle { border-right-color: rgba(59,130,246,.7); }
+    .tg-resizing .tg-resize-handle { border-right-color: rgba(168,85,247,.7); }
     .tg-resizing * { cursor: col-resize !important; user-select: none !important; }
+
+    /* ══════════════════════════════════════════════════════════
+       MOBILE (< 768px): karty zamiast tabeli
+       ══════════════════════════════════════════════════════════ */
+    .tg-cards { display: none; }
+
+    @media (max-width: 767.98px) {
+        .tg-search-task { width: 100% !important; flex: 1 1 auto; }
+
+        /* Tabela znika, karty przejmują ── */
+        .tg-table-wrap { display: none !important; }
+        .tg-cards { display: block !important; }
+    }
+
+    /* ── Karty zadań (mobile) ── */
+    .tg-card {
+        position: relative;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-left: 3px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.02);
+        padding: 9px 10px;
+        margin-bottom: 7px;
+    }
+    .tg-card-top { display: flex; align-items: center; gap: 6px; }
+    .tg-card-expand-btn {
+        appearance: none; border: none; background: transparent; padding: 2px;
+        color: rgba(255,255,255,0.4); line-height: 1; flex-shrink: 0;
+    }
+    .tg-card-subtask-badge {
+        flex-shrink: 0; font-size: 0.6rem; min-width: 30px; text-align: center;
+        border-radius: 999px; padding: 1px 6px;
+        background: rgba(255,255,255,0.1); color: var(--text-muted,#94a3b8);
+    }
+    .tg-card-name {
+        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        color: var(--text-main,#f1f5f9); text-decoration: none; font-size: 0.88rem; font-weight: 500;
+        padding: 2px 0;
+    }
+    .tg-card-source-link { flex-shrink: 0; color: #c084fc; line-height: 1; }
+    .tg-card-meta {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px;
+        margin-top: 7px; font-size: 0.74rem; color: var(--text-muted,#94a3b8);
+    }
+    .tg-card-meta .tg-meta-item { display: inline-flex; align-items: center; gap: 3px; line-height: 1.3; }
+    .tg-card-expand {
+        margin-top: 9px; padding-top: 9px; border-top: 1px dashed rgba(255,255,255,0.08);
+    }
+
+    /* ── Nagłówek grupy (mobile) ── */
+    .tg-group-card-header {
+        display: flex; align-items: center; gap: 8px;
+        padding: 9px 4px 6px; margin-top: 4px;
+        font-size: 0.78rem; font-weight: 600;
+        color: var(--text-muted,#94a3b8); letter-spacing: 0.3px;
+    }
+    .tg-group-card-header:first-child { margin-top: 0; }
+
+    /* ── Add-task (mobile) ── */
+    .tg-add-card { border: 2px solid var(--primary,#3b82f6); background: rgba(59,130,246,0.07); }
+    .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
 </style>
+
+{{-- Tło (siatka + ziarno + poświata kursora), scoped .xuiv2-tasks --}}
+<div class="xuiv2-bg-grid"></div>
+<div class="xuiv2-grain"></div>
+<div class="xuiv2-cursor-glow" id="xuiv2TasksGlow"></div>
 
 {{-- Flash message --}}
 @if($flash)
@@ -216,14 +447,15 @@
 @endif
 
 {{-- ═══════════════════════════════════════════════════════════ --}}
-{{-- TOOLBAR                                                     --}}
+{{-- TOOLBAR — jeden rząd, jak w /recruitment-processes:          --}}
+{{-- Szukaj + jeden przycisk „Filtry” (pogrupowany panel) zamiast --}}
+{{-- rzędu osobnych przełączników.                                --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
 <div class="card mb-2 border-0 shadow-sm">
     <div class="card-body py-2 px-3 tg-toolbar">
-        {{-- Row 1: Search + Status filter + My tasks --}}
-        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             {{-- Search: Task --}}
-            <div class="input-group" style="width:175px">
+            <div class="input-group tg-search-task" style="width:175px">
                 <span class="input-group-text px-2">
                     <i class="bi bi-search" style="font-size:0.72rem"></i>
                 </span>
@@ -233,165 +465,28 @@
                        class="form-control">
             </div>
 
-            {{-- Search: Category --}}
-            <input wire:model.live.debounce.300ms="searchCategory"
-                   type="text" placeholder="Kategoria…"
-                   class="form-control" style="width:110px">
-
-            {{-- Search: Assignee --}}
-            <input wire:model.live.debounce.300ms="searchAssignedTo"
-                   type="text" placeholder="Osoba…"
-                   class="form-control" style="width:95px">
-
-            <div class="vr mx-1" style="background:rgba(255,255,255,.12)"></div>
-
-            {{-- Status filter --}}
-            <div class="btn-group">
-                <button wire:click="$set('status', '')"
-                        class="btn {{ $status === '' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                    Aktywne
-                </button>
-                <button wire:click="$set('status', 'closed')"
-                        class="btn {{ $status === 'closed' ? 'btn-secondary' : 'btn-outline-secondary' }}">
-                    Zamknięte
-                </button>
-                <button wire:click="$set('status', 'all')"
-                        class="btn {{ $status === 'all' ? 'btn-secondary' : 'btn-outline-secondary' }}">
-                    Wszystkie
-                </button>
-            </div>
-
-            {{-- My tasks --}}
-            <button wire:click="$toggle('myTasksOnly')"
-                    class="btn {{ $myTasksOnly ? 'btn-primary' : 'btn-outline-secondary' }}"
-                    title="Tylko moje zadania">
-                <i class="bi bi-person-check"></i>Moje
-            </button>
-
-            @if($this->usesWorkItems())
-            <button wire:click="$toggle('hideCallbacks')"
-                    class="btn {{ $hideCallbacks ? 'btn-outline-secondary' : 'btn-primary' }}"
-                    title="{{ $hideCallbacks ? 'Pokaż oddzwonienia rekrutacji' : 'Ukryj oddzwonienia rekrutacji' }}">
-                <i class="bi bi-telephone"></i>Oddzwonienia
-            </button>
-            @endif
-
-            {{-- Clear --}}
-            @if($searchTask || $searchCategory || $searchAssignedTo || $myTasksOnly || $groupBy || $sortField !== 'created_at')
-            <button wire:click="clearFilters"
-                    class="btn btn-outline-danger"
-                    title="Wyczyść filtry">
-                <i class="bi bi-x-lg"></i>
-            </button>
-            @endif
-
-            {{-- Loading spinner --}}
-            <div wire:loading class="ms-1">
-                <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:14px;height:14px">
-                    <span class="visually-hidden">Ładowanie…</span>
-                </div>
-            </div>
-        </div>
-
-        {{-- Row 2: View controls — dropdowny przez x-teleport żeby ominąć backdrop-filter stacking context --}}
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-
-            {{-- ── Grupuj ── --}}
-            <div x-data="{ open: false, top: 0, left: 0 }">
+            {{-- Filtry: jeden przycisk, panel z pogrupowanymi sekcjami (SharePoint-style, jak w rekrutacji) --}}
+            <div x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openSearch: false, openGroup: false, openColumns: false }">
                 <button type="button"
-                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
-                        class="btn btn-sm {{ $groupBy ? 'btn-info' : 'btn-outline-secondary' }}">
-                    <i class="bi bi-collection me-1"></i>Grupuj{{ $groupBy ? ': '.$availableColumns[$groupBy]['label'] : '' }}
-                    <i class="bi bi-chevron-down ms-1" style="font-size:0.6rem"></i>
-                </button>
-                <template x-teleport="body">
-                    <ul x-show="open" x-cloak
-                        @click.outside="open = false"
-                        :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:195px`"
-                        class="dropdown-menu show py-1 shadow-lg">
-                        <li>
-                            <button class="dropdown-item small py-2 {{ $groupBy === '' ? 'active' : '' }}"
-                                    wire:click="setGroupBy('')" @click="open=false">
-                                <i class="bi bi-x-circle me-2"></i>Bez grupowania
-                            </button>
-                        </li>
-                        <li><hr class="dropdown-divider my-1"></li>
-                        @php
-                            $groupFields = ['status' => 'Status'];
-                            if ($this->usesWorkItems()) {
-                                $groupFields['type'] = 'Typ';
-                            }
-                            $groupFields += [
-                                'sprint' => 'Sprint',
-                                'category' => 'Kategoria',
-                                'assigned_to' => 'Przypisany',
-                                'priority' => 'Priorytet',
-                            ];
-                        @endphp
-                        @foreach($groupFields as $gf => $gl)
-                        @if($this->isLockedToSprint() && $gf === 'sprint')
-                            @continue
-                        @endif
-                        <li>
-                            <button class="dropdown-item small py-2 {{ $groupBy===$gf ? 'active' : '' }}"
-                                    wire:click="setGroupBy('{{ $gf }}')" @click="open=false">
-                                <i class="bi bi-tag me-2"></i>{{ $gl }}
-                            </button>
-                        </li>
-                        @endforeach
-                    </ul>
-                </template>
-            </div>
-
-            {{-- ── Kolumny ── --}}
-            <div x-data="{ open: false, top: 0, left: 0 }">
-                <button type="button"
-                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
-                        class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-layout-three-columns me-1"></i>Kolumny
-                    <i class="bi bi-chevron-down ms-1" style="font-size:0.6rem"></i>
+                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.min(r.left, window.innerWidth-620); open=true"
+                        class="btn btn-sm xuiv2-magnetic {{ count($this->activeFilterChips()) > 0 ? 'btn-primary' : 'btn-outline-secondary' }}">
+                    <i class="bi bi-sliders me-1"></i>Filtry
+                    @if(count($this->activeFilterChips()) > 0)
+                        <span class="badge tg-mono bg-light text-dark ms-1" style="font-size:.6rem">{{ count($this->activeFilterChips()) }}</span>
+                    @endif
+                    <i class="bi bi-chevron-down ms-1" style="font-size:.6rem"></i>
                 </button>
                 <template x-teleport="body">
                     <div x-show="open" x-cloak
                          @click.outside="open = false"
-                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:215px`"
-                         class="dropdown-menu show p-3 shadow-lg">
-                        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:10px">
-                            Widoczne kolumny
-                        </div>
-                        @foreach($availableColumns as $colKey => $col)
-                        @if($this->isLockedToSprint() && $colKey === 'sprint')
-                            @continue
-                        @endif
-                        @if(! $this->usesWorkItems() && $colKey === 'type')
-                            @continue
-                        @endif
-                        @php
-                            $colLockedByGroup = $groupBy !== '' && $colKey === $groupBy;
-                            $colChecked = in_array($colKey, $visibleColumns) && ! $colLockedByGroup;
-                            $colDisabled = ($col['always'] ?? false) || $colLockedByGroup;
-                        @endphp
-                        <div class="d-flex align-items-center gap-2 py-1">
-                            <button type="button"
-                                    wire:click="toggleColumn('{{ $colKey }}')"
-                                    @click.stop
-                                    {{ $colDisabled ? 'disabled' : '' }}
-                                    style="width:18px;height:18px;border-radius:4px;border:2px solid;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s;
-                                        {{ $colChecked ? 'background:var(--primary,#3b82f6);border-color:var(--primary,#3b82f6);color:#fff' : 'background:transparent;border-color:rgba(255,255,255,0.25);color:transparent' }};
-                                        {{ $colDisabled ? 'opacity:.4;cursor:not-allowed' : 'cursor:pointer' }}">
-                                <i class="bi bi-check" style="font-size:0.65rem"></i>
-                            </button>
-                            <span style="font-size:0.84rem;cursor:{{ $colDisabled ? 'default' : 'pointer' }};opacity:{{ $colDisabled ? '.5' : '1' }}"
-                                  @if(! $colDisabled) wire:click="toggleColumn('{{ $colKey }}')" @click.stop @endif>
-                                {{ $col['label'] }}@if($colLockedByGroup)<span class="text-muted"> · grupowanie</span>@endif
-                            </span>
-                        </div>
-                        @endforeach
+                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;`"
+                         class="rp-filter-panel tg-filter-panel-teal">
+                        @include('livewire.partials.tg-filter-panel')
                     </div>
                 </template>
             </div>
 
-            {{-- ── Zapisane widoki (jak w rekrutacji) ── --}}
+            {{-- Zapisane widoki (pigułki, jak w rekrutacji) --}}
             @unless($this->isLockedToSprint())
                 @foreach($savedViews as $savedView)
                     <button type="button" wire:click="loadView('{{ $savedView->slug }}')"
@@ -400,97 +495,106 @@
                         <span class="rp-view-count">{{ $viewCounts[$savedView->slug] ?? 0 }}</span>
                     </button>
                 @endforeach
+            @endunless
 
-                <div x-data="{ open: false, top: 0, left: 0 }">
-                    <button type="button"
-                            @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
-                            class="btn btn-sm btn-outline-secondary"
-                            title="Zapisz i zarządzaj widokami">
-                        <i class="bi bi-bookmark{{ $view ? '-fill' : '' }} me-1"></i>
-                        <i class="bi bi-chevron-down" style="font-size:0.6rem"></i>
-                    </button>
-                    <template x-teleport="body">
-                        <div x-show="open" x-cloak
-                             @click.outside="open = false"
-                             :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:260px`"
-                             class="dropdown-menu show p-3 shadow-lg">
-                            @if($view && $activeViewName)
-                                <div class="mb-2 p-2 rounded" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2)">
-                                    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:4px">
-                                        Aktywny widok
-                                    </div>
-                                    <div class="fw-semibold small mb-2">{{ $activeViewName }}</div>
-                                    <button type="button" wire:click="clearView" @click="open=false"
-                                            class="btn btn-sm btn-outline-secondary w-100">
-                                        Widok domyślny
-                                    </button>
-                                </div>
-                                <hr class="my-2">
-                            @endif
-                            @if($savedViews->isNotEmpty())
-                                <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
-                                    Zapisane
-                                </div>
-                                @foreach($savedViews as $savedView)
-                                <div class="d-flex align-items-center gap-1 mb-1">
-                                    <button type="button" wire:click="loadView('{{ $savedView->slug }}')" @click="open=false"
-                                            class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $view === $savedView->slug ? 'fw-bold' : '' }}"
-                                            style="font-size:0.83rem">
-                                        <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"
-                                           style="color:var(--primary,#3b82f6);font-size:0.75rem"></i>{{ $savedView->name }}
-                                        <span class="text-muted ms-1" style="font-size:.75rem">({{ $viewCounts[$savedView->slug] ?? 0 }})</span>
-                                    </button>
-                                    <button type="button" wire:click="deleteView('{{ $savedView->slug }}')" @click="open=false"
-                                            class="btn btn-sm btn-link p-1 flex-shrink-0"
-                                            style="color:var(--danger,#ef4444)" title="Usuń">
-                                        <i class="bi bi-trash" style="font-size:0.78rem"></i>
-                                    </button>
-                                </div>
-                                @endforeach
-                                <hr class="my-2">
-                            @endif
-                            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
-                                {{ $view ? 'Nadpisz aktywny widok' : 'Zapisz bieżący widok' }}
-                            </div>
-                            <div class="d-flex gap-2">
-                                <input wire:model="saveViewName" type="text"
-                                       class="form-control form-control-sm flex-grow-1"
-                                       placeholder="Nazwa widoku…"
-                                       wire:keydown.enter="saveView"
-                                       @click.stop>
-                                <button type="button" wire:click="saveView" @click="open=false"
-                                        class="btn btn-sm btn-primary flex-shrink-0"
-                                        title="Zapisz">
-                                    <i class="bi bi-floppy"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </template>
+            {{-- Loading spinner --}}
+            <div wire:loading>
+                <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:14px;height:14px">
+                    <span class="visually-hidden">Ładowanie…</span>
                 </div>
-            @endunless
+            </div>
 
-            {{-- Domyślny widok menu --}}
-            @unless($this->isLockedToSprint())
-            <button type="button"
-                    wire:click="setAsMenuDefaultView"
-                    class="btn btn-sm {{ $isMenuDefaultView ? 'btn-primary' : 'btn-outline-secondary' }}"
-                    title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
-                <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }} me-1"></i>Domyślny
-            </button>
-            @endunless
+            <div class="ms-auto d-flex align-items-center gap-2">
+                @unless($this->isLockedToSprint())
+                    {{-- Zapisz / zarządzaj widokami ── --}}
+                    <div x-data="{ open: false, top: 0, left: 0 }">
+                        <button type="button"
+                                @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.max(4, r.right-260); open=true"
+                                class="btn btn-sm btn-outline-secondary"
+                                title="Zapisz i zarządzaj widokami">
+                            <i class="bi bi-bookmark{{ $view ? '-fill' : '' }}"></i>
+                        </button>
+                        <template x-teleport="body">
+                            <div x-show="open" x-cloak
+                                 @click.outside="open = false"
+                                 :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:260px`"
+                                 class="dropdown-menu show p-3 shadow-lg">
+                                @if($view && $activeViewName)
+                                    <div class="mb-2 p-2 rounded" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2)">
+                                        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:4px">
+                                            Aktywny widok
+                                        </div>
+                                        <div class="fw-semibold small mb-2">{{ $activeViewName }}</div>
+                                        <button type="button" wire:click="clearView" @click="open=false"
+                                                class="btn btn-sm btn-outline-secondary w-100">
+                                            Widok domyślny
+                                        </button>
+                                    </div>
+                                    <hr class="my-2">
+                                @endif
+                                @if($savedViews->isNotEmpty())
+                                    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
+                                        Zapisane
+                                    </div>
+                                    @foreach($savedViews as $savedView)
+                                    <div class="d-flex align-items-center gap-1 mb-1">
+                                        <button type="button" wire:click="loadView('{{ $savedView->slug }}')" @click="open=false"
+                                                class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $view === $savedView->slug ? 'fw-bold' : '' }}"
+                                                style="font-size:0.83rem">
+                                            <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"
+                                               style="color:var(--primary,#3b82f6);font-size:0.75rem"></i>{{ $savedView->name }}
+                                            <span class="text-muted ms-1" style="font-size:.75rem">({{ $viewCounts[$savedView->slug] ?? 0 }})</span>
+                                        </button>
+                                        <button type="button" wire:click="deleteView('{{ $savedView->slug }}')" @click="open=false"
+                                                class="btn btn-sm btn-link p-1 flex-shrink-0"
+                                                style="color:var(--danger,#ef4444)" title="Usuń">
+                                            <i class="bi bi-trash" style="font-size:0.78rem"></i>
+                                        </button>
+                                    </div>
+                                    @endforeach
+                                    <hr class="my-2">
+                                @endif
+                                <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
+                                    {{ $view ? 'Nadpisz aktywny widok' : 'Zapisz bieżący widok' }}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <input wire:model="saveViewName" type="text"
+                                           class="form-control form-control-sm flex-grow-1"
+                                           placeholder="Nazwa widoku…"
+                                           wire:keydown.enter="saveView"
+                                           @click.stop>
+                                    <button type="button" wire:click="saveView" @click="open=false"
+                                            class="btn btn-sm btn-primary flex-shrink-0"
+                                            title="Zapisz">
+                                        <i class="bi bi-floppy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
 
-            {{-- Task count --}}
-            <div class="ms-auto" style="font-size:0.78rem;color:var(--text-muted,#94a3b8)">
-                @if($tasks)
-                    {{ $tasks->total() }} zadań
-                @elseif($groupedTasks)
-                    {{ $groupedTasks->flatten()->count() }} zadań
-                @endif
-                @if($groupBy)
-                    <span class="ms-2 badge"
-                          title="Przeciągnij zadanie (uchwyt ⋮⋮) na inną grupę, żeby zmienić: {{ $availableColumns[$groupBy]['label'] ?? '' }}"
-                          style="font-size:0.65rem;background:rgba(6,182,212,.15);color:#67e8f9;border:1px solid rgba(6,182,212,.25)">grupowanie</span>
-                @endif
+                    {{-- Domyślny widok w menu --}}
+                    <button type="button"
+                            wire:click="setAsMenuDefaultView"
+                            class="btn btn-sm {{ $isMenuDefaultView ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
+                        <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }}"></i>
+                    </button>
+                @endunless
+
+                {{-- Task count --}}
+                <span class="tg-mono" style="font-size:0.76rem;color:var(--text-muted,#94a3b8);white-space:nowrap">
+                    @if($tasks)
+                        {{ $tasks->total() }} zadań
+                    @elseif($groupedTasks)
+                        {{ $groupedTasks->flatten()->count() }} zadań
+                    @endif
+                    @if($groupBy)
+                        <span class="ms-1 badge"
+                              title="Przeciągnij zadanie (uchwyt ⋮⋮) na inną grupę, żeby zmienić: {{ $availableColumns[$groupBy]['label'] ?? '' }}"
+                              style="font-size:0.65rem;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.25)">grupowanie</span>
+                    @endif
+                </span>
             </div>
         </div>
     </div>
@@ -521,7 +625,7 @@
     $colCount = count($visibleColumns) + 1; // expand col
 @endphp
 
-<div class="card border-0 shadow-sm"
+<div class="card border-0 shadow-sm tg-table-wrap d-none d-md-block"
      x-data="{
          dragFrom: null,
          dragOver: null,
@@ -622,11 +726,12 @@
                 @else
                     {{-- EMPTY STATE --}}
                     <tr>
-                        <td colspan="{{ $colCount }}" class="text-center text-muted py-5">
-                            <i class="bi bi-inbox display-5 d-block mb-2 opacity-30"></i>
-                            <div>Brak zadań spełniających kryteria</div>
+                        <td colspan="{{ $colCount }}" class="text-center py-5">
+                            <i class="bi bi-inbox d-block mb-2 opacity-25" style="font-size:2.2rem"></i>
+                            <div class="tg-mono" style="font-size:0.68rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted,#94a3b8)">Brak wyników</div>
+                            <div class="mt-1" style="font-size:0.86rem; color:rgba(255,255,255,0.4)">Żadne zadanie nie spełnia obecnych kryteriów</div>
                             @if($searchTask || $searchCategory || $searchAssignedTo)
-                                <button wire:click="clearFilters" class="btn btn-sm btn-link mt-1">Wyczyść filtry</button>
+                                <button wire:click="clearFilters" class="btn btn-sm btn-link mt-2">Wyczyść filtry</button>
                             @endif
                         </td>
                     </tr>
@@ -654,7 +759,7 @@
                                    wire:keydown.enter="addTask"
                                    wire:keydown.escape="$set('showAddRow', false)"
                                    x-data x-init="$el.focus()">
-                            <button wire:click="addTask" class="btn btn-sm btn-primary flex-shrink-0">
+                            <button wire:click="addTask" class="btn btn-sm btn-primary xuiv2-magnetic flex-shrink-0">
                                 <i class="bi bi-plus-lg me-1"></i>Dodaj
                             </button>
                         </div>
@@ -753,4 +858,176 @@
     </div>
     @endif
 </div>
+
+{{-- ═══════════════════════════════════════════════════════════ --}}
+{{-- MOBILE CARD LIST (< 768px) — zastępuje tabelę powyżej        --}}
+{{-- ═══════════════════════════════════════════════════════════ --}}
+<div class="tg-cards d-md-none">
+    @if($groupedTasks)
+        @foreach($groupedTasks as $groupValue => $groupItems)
+            @include('livewire.partials.tasks-grid-group-header-card', [
+                'groupName' => $this->groupKeyFor($groupItems->first()),
+                'groupValue' => (string) $groupValue,
+                'groupItems' => $groupItems,
+            ])
+            @unless($this->isGroupCollapsed((string) $groupValue))
+                @foreach($groupItems as $task)
+                    @include('livewire.partials.tasks-grid-row-card', compact('task'))
+                @endforeach
+            @endunless
+        @endforeach
+    @elseif($tasks && $tasks->count() > 0)
+        @foreach($tasks as $task)
+            @include('livewire.partials.tasks-grid-row-card', compact('task'))
+        @endforeach
+    @else
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-inbox display-5 d-block mb-2 opacity-30"></i>
+            <div>Brak zadań spełniających kryteria</div>
+            @if($searchTask || $searchCategory || $searchAssignedTo)
+                <button wire:click="clearFilters" class="btn btn-sm btn-link mt-1">Wyczyść filtry</button>
+            @endif
+        </div>
+    @endif
+
+    {{-- ── Inline add-task card ── --}}
+    @if($showAddRow)
+    <div class="tg-card tg-add-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold small">Nowe zadanie</span>
+            <button wire:click="$set('showAddRow', false)" class="btn btn-sm btn-link text-muted p-0" title="Anuluj">
+                <i class="bi bi-x-lg" style="font-size:0.8rem"></i>
+            </button>
+        </div>
+        <div class="d-flex flex-column gap-2">
+            @if(in_array('name', $visibleColumns))
+            <div>
+                <input type="text"
+                       wire:model="newTaskName"
+                       class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
+                       placeholder="Nazwa zadania *"
+                       wire:keydown.enter="addTask"
+                       wire:keydown.escape="$set('showAddRow', false)">
+                @error('newTaskName')
+                    <div class="invalid-feedback" style="font-size:0.72rem">{{ $message }}</div>
+                @enderror
+            </div>
+            @endif
+
+            @if(in_array('sprint', $visibleColumns))
+            <select wire:model="newTaskSprint" class="form-select form-select-sm">
+                <option value="">Poza sprintem</option>
+                @foreach($allSprints as $sprintOption)
+                    <option value="{{ $sprintOption->id }}">{{ $sprintOption->name }}</option>
+                @endforeach
+            </select>
+            @endif
+
+            @if(in_array('category', $visibleColumns))
+            <input type="text" wire:model="newTaskCategory" class="form-control form-control-sm" placeholder="Kategoria…">
+            @endif
+
+            @if(in_array('assigned_to', $visibleColumns))
+            <select wire:model="newTaskAssignedTo" class="form-select form-select-sm">
+                <option value="">Nieprzypisane</option>
+                @foreach($allUsers as $u)
+                    <option value="{{ $u->id }}">{{ $u->name }}</option>
+                @endforeach
+            </select>
+            @endif
+
+            @if(in_array('priority', $visibleColumns))
+            <select wire:model="newTaskPriority" class="form-select form-select-sm">
+                <option value="">Priorytet: brak</option>
+                <option value="1">1 – Najniższy</option>
+                <option value="2">2 – Niski</option>
+                <option value="3">3 – Średni</option>
+                <option value="4">4 – Wysoki</option>
+                <option value="5">5 – Krytyczny</option>
+            </select>
+            @endif
+
+            @if(in_array('due_date', $visibleColumns))
+            <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
+            @endif
+
+            <button wire:click="addTask" class="btn btn-sm btn-primary w-100">
+                <i class="bi bi-plus-lg me-1"></i>Dodaj zadanie
+            </button>
+        </div>
+    </div>
+    @else
+    <button wire:click="$set('showAddRow', true)"
+            class="btn btn-sm btn-link text-primary text-decoration-none p-0 mt-1">
+        <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
+    </button>
+    @endif
+
+    {{-- Pagination (only in flat view) --}}
+    @if($tasks?->hasPages())
+    <div class="mt-2">
+        {{ $tasks->links() }}
+    </div>
+    @endif
+</div>
+
+<script>
+    (function () {
+        const root = document.getElementById('xuiv2Tasks');
+        if (!root || root.dataset.xuiv2Bound) return;
+        root.dataset.xuiv2Bound = '1';
+        document.body.classList.add('xuiv2-page');
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            || !window.matchMedia('(pointer: fine)').matches) return;
+
+        const glow = document.getElementById('xuiv2TasksGlow');
+        // Cache buttons once; Livewire re-renders morph the DOM but the buttons
+        // keep stable wire:key-less identity for this simple case, so a light
+        // re-scan on click is enough — no need to query on every mousemove.
+        let magneticBtns = Array.from(document.querySelectorAll('.xuiv2-magnetic'));
+        const rescan = () => { magneticBtns = Array.from(document.querySelectorAll('.xuiv2-magnetic')); };
+        document.addEventListener('click', rescan, { passive: true, capture: true });
+        document.addEventListener('livewire:morphed', rescan, { passive: true });
+
+        let mouseX = 0;
+        let mouseY = 0;
+        let ticking = false;
+
+        function onFrame() {
+            ticking = false;
+            if (glow) {
+                // position:fixed → coordinates are viewport-relative, no getBoundingClientRect() needed.
+                glow.style.transform = `translate(${mouseX - 230}px, ${mouseY - 230}px)`;
+            }
+            for (const btn of magneticBtns) {
+                const r = btn.getBoundingClientRect();
+                const cx = r.left + r.width / 2;
+                const cy = r.top + r.height / 2;
+                const dx = mouseX - cx;
+                const dy = mouseY - cy;
+                const dist = Math.hypot(dx, dy);
+                const radius = 70;
+                if (dist < radius) {
+                    const pull = (1 - dist / radius) * 0.35;
+                    btn.style.transform = `translate(${dx * pull}px, ${dy * pull}px)`;
+                } else if (btn.style.transform) {
+                    btn.style.transform = '';
+                }
+            }
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (!ticking) {
+                ticking = true;
+                requestAnimationFrame(onFrame);
+            }
+        }, { passive: true });
+
+        root.addEventListener('mouseenter', () => { if (glow) glow.style.opacity = '1'; }, { passive: true });
+        root.addEventListener('mouseleave', () => { if (glow) glow.style.opacity = '0'; }, { passive: true });
+    })();
+</script>
 </div>

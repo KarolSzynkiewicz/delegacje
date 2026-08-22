@@ -1,27 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 300 300"
-     width="240"
-     height="64"
-     aria-label="MK Technic logo">
+     viewBox="0 0 40 40"
+     width="40"
+     height="40"
+     aria-label="ChronoLogic logo">
+  {{-- Znak marki ChronoLogic: tarcza zegara ze wskazówkami w tym samym
+       niebiesko-fioletowym przejściu kolorów co gradient tytułów stron
+       (--primary #3b82f6 → --accent #a855f7 w app.css), żeby całość
+       (logo, tytuł, akcenty w tabelach) trzymała się jednej palety. --}}
   <defs>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <!-- Gradient jak w nagłówkach strony (.app-header) -->
+    <linearGradient id="chronoLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b82f6"/>
       <stop offset="100%" stop-color="#a855f7"/>
     </linearGradient>
   </defs>
-
-  <!-- Text-only logo -->
-  <text
-    x="150"
-    y="228"
-    text-anchor="middle"
-    font-family="'Albert Sans', sans-serif"
-    font-size="84"
-    font-weight="700"
-    letter-spacing="1.6"
-    fill="url(#accent)">
-    MK TECHNIC
-    <tspan font-size="32" dy="-44">®</tspan>
-  </text>
+  <circle cx="20" cy="20" r="17" fill="none" stroke="#1e2740" stroke-width="2"/>
+  <path d="M20 20 L20 6" stroke="url(#chronoLogoGrad)" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M20 20 L29 25" stroke="url(#chronoLogoGrad)" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="20" cy="20" r="2.4" fill="#a855f7"/>
 </svg>

@@ -3,6 +3,7 @@
         <!-- Logo -->
         <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('dashboard') }}">
             <x-application-logo class="d-block navbar-logo" />
+            <span style="font-family:'Space Grotesk','Inter',sans-serif; font-weight:600; font-size:1.5rem; letter-spacing:-0.01em; line-height:1;">Chrono<span style="color:#a855f7">Logic</span></span>
             @if(config('app.env') !== 'production')
                 <span class="badge bg-danger-white fw-semibold">
                     {{ strtoupper(config('app.env')) }}

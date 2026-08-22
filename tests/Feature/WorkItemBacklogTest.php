@@ -374,6 +374,47 @@ class WorkItemBacklogTest extends TestCase
             ->assertDontSeeHtml('>Akcje</th>');
     }
 
+    public function test_tasks2_render_query_count_does_not_scale_with_row_count(): void
+    {
+        // Regression guard for the N+1 where every writable/relocatable check on a row
+        // re-fetched the WorkItem from the DB by id instead of reusing the already
+        // eager-loaded row object (canEditRow() called once per editable column, per row).
+        $this->actingAs($this->user);
+
+        $makeTasks = function (int $count, string $prefix): void {
+            for ($i = 0; $i < $count; $i++) {
+                ProjectTask::query()->create([
+                    'name' => "{$prefix} {$i}",
+                    'status' => TaskStatus::PENDING,
+                    'assigned_to' => $this->user->id,
+                    'created_by' => $this->user->id,
+                ]);
+            }
+        };
+
+        $makeTasks(3, 'Small batch');
+
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        Livewire::actingAs($this->user)->test(TasksGrid::class);
+        $smallRenderQueries = count(\Illuminate\Support\Facades\DB::getQueryLog());
+
+        // Row creation triggers its own observers/queries (audit log, WorkItem sync, …) —
+        // flush those out so only the render() call itself is measured below.
+        $makeTasks(15, 'Big batch');
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+
+        Livewire::actingAs($this->user)->test(TasksGrid::class);
+        $bigRenderQueries = count(\Illuminate\Support\Facades\DB::getQueryLog());
+        \Illuminate\Support\Facades\DB::disableQueryLog();
+
+        $this->assertLessThan(
+            5,
+            abs($bigRenderQueries - $smallRenderQueries),
+            "Rendering with 18 rows used {$bigRenderQueries} queries vs {$smallRenderQueries} for 3 rows — looks like an N+1 regression in TasksGrid::render()."
+        );
+    }
+
     public function test_sprint_name_in_the_grid_links_to_the_sprint(): void
     {
         $sprint = Sprint::factory()->create(['name' => 'Sprint HQ', 'created_by' => $this->user->id]);

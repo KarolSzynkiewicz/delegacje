@@ -20,7 +20,8 @@
             <i class="bi bi-chevron-{{ $isCollapsed ? 'right' : 'down' }}" style="font-size:0.75rem"></i>
         </button>
     </td>
-    <td colspan="{{ $colCount - 1 }}" style="padding:6px 10px">
+    <td colspan="{{ $colCount - 1 }}" style="padding:7px 10px">
+        <span class="tg-group-bullet">◆</span>
         <span>
             @if($groupBy === 'sprint' && (string) $groupValue !== '')
                 <a href="{{ route('sprints.show', $groupValue) }}" class="text-decoration-none" style="color:inherit">{{ $groupName }}</a>
@@ -28,9 +29,9 @@
                 {{ $groupName }}
             @endif
         </span>
-        <span class="badge bg-secondary ms-1" style="font-size:0.68rem; border-radius:8px">{{ $groupItems->count() }}</span>
+        <span class="badge tg-group-count ms-1" style="border-radius:8px">{{ $groupItems->count() }}</span>
         @if(!empty($groupSubtitle))
-            <div class="fw-normal mt-1" style="font-size:0.72rem; opacity:.7; font-weight:400">{{ $groupSubtitle }}</div>
+            <div class="fw-normal mt-1" style="font-size:0.72rem; opacity:.7; font-weight:400; text-transform:none; letter-spacing:normal">{{ $groupSubtitle }}</div>
         @endif
     </td>
 </tr>

@@ -245,6 +245,14 @@ class TasksGrid extends Component
     {
         $chips = [];
 
+        if ($this->view !== '') {
+            $viewName = TaskGridView::query()
+                ->where('user_id', auth()->id())
+                ->where('slug', $this->view)
+                ->value('name') ?? $this->view;
+            $chips[] = ['key' => 'view', 'label' => 'Widok: '.$viewName];
+        }
+
         if ($this->searchTask !== '') {
             $chips[] = ['key' => 'searchTask', 'label' => 'Szukaj: '.$this->searchTask];
         }
@@ -288,6 +296,12 @@ class TasksGrid extends Component
     {
         if ($key === 'groupBy') {
             $this->setGroupBy('');
+
+            return;
+        }
+
+        if ($key === 'view') {
+            $this->clearView();
 
             return;
         }
@@ -1039,7 +1053,7 @@ class TasksGrid extends Component
     public function canEditTask(ProjectTask|WorkItem $task): bool
     {
         if ($task instanceof WorkItem) {
-            return $this->canEditRow($task->id);
+            return $this->canEditWorkItem($task);
         }
 
         $user = auth()->user();
@@ -1050,21 +1064,44 @@ class TasksGrid extends Component
         return app(ProjectTaskPolicy::class)->updateStatus($user, $task);
     }
 
-    public function canEditRow(int $rowId): bool
+    /**
+     * Uprawnienia dla WorkItemu, który mamy już w pamięci (np. wiersz z grida,
+     * wczytany raz w render() z pełnym eager-loadem). W przeciwieństwie do
+     * canEditRow() NIE odpytuje bazy ponownie — stąd trzeba go wołać zawsze,
+     * gdy obiekt WorkItem jest już dostępny (patrz rowWritable/rowRelocatable),
+     * inaczej każde wywołanie na wiersz to dodatkowe zapytanie (klasyczny N+1
+     * przy tabeli z wieloma wierszami i kolumnami do edycji).
+     */
+    protected function canEditWorkItem(WorkItem $item): bool
     {
         $user = auth()->user();
         if (! $user) {
             return false;
         }
 
+        $task = $item->editableProjectTask();
+        if ($task) {
+            return app(ProjectTaskPolicy::class)->updateStatus($user, $task);
+        }
+
+        return $user->isAdmin() || $user->hasPermission('tasks.update');
+    }
+
+    /**
+     * Wariant canEditWorkItem() dla wywołań, w których mamy tylko ID (np. z JS/Alpine
+     * albo akcji dotyczącej jednego konkretnego wiersza) — tu doczytanie z bazy jest
+     * uzasadnione, bo dotyczy pojedynczego wiersza, nie całej listy.
+     */
+    public function canEditRow(int $rowId): bool
+    {
         $item = $this->resolveWorkItem($rowId);
         if ($item) {
-            $task = $item->editableProjectTask();
-            if ($task) {
-                return app(ProjectTaskPolicy::class)->updateStatus($user, $task);
-            }
+            return $this->canEditWorkItem($item);
+        }
 
-            return $user->isAdmin() || $user->hasPermission('tasks.update');
+        $user = auth()->user();
+        if (! $user) {
+            return false;
         }
 
         $task = ProjectTask::query()->find($rowId);
@@ -1086,7 +1123,7 @@ class TasksGrid extends Component
         if (is_int($row)) {
             $item = $this->resolveWorkItem($row);
             if ($item) {
-                return $item->writable($field) && $this->canEditRow($row);
+                return $item->writable($field) && $this->canEditWorkItem($item);
             }
             $task = $this->resolveProjectTask($row);
 
@@ -1094,7 +1131,7 @@ class TasksGrid extends Component
         }
 
         if ($row instanceof WorkItem) {
-            return $row->writable($field) && $this->canEditRow($row->id);
+            return $row->writable($field) && $this->canEditWorkItem($row);
         }
 
         return $this->canEditTask($row) && $field !== 'type';
@@ -1114,7 +1151,7 @@ class TasksGrid extends Component
         if (is_int($row)) {
             $item = $this->resolveWorkItem($row);
             if ($item) {
-                return $item->relocatable($field) && $this->canEditRow($row);
+                return $item->relocatable($field) && $this->canEditWorkItem($item);
             }
             $task = $this->resolveProjectTask($row);
 
@@ -1122,7 +1159,7 @@ class TasksGrid extends Component
         }
 
         if ($row instanceof WorkItem) {
-            return $row->relocatable($field) && $this->canEditRow($row->id);
+            return $row->relocatable($field) && $this->canEditWorkItem($row);
         }
 
         return $this->canEditTask($row) && $field !== 'type';
@@ -1230,7 +1267,7 @@ class TasksGrid extends Component
             if ($this->groupValueFor($item) === $groupValue) {
                 return;
             }
-            if (! $this->canEditRow($taskId)) {
+            if (! $this->canEditWorkItem($item)) {
                 return;
             }
 

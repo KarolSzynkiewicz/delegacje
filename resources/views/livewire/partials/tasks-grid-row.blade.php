@@ -38,7 +38,7 @@
     // Status → left border color
     $borderColor = [
         'pending'     => '#f59e0b',
-        'in_progress' => '#3b82f6',
+        'in_progress' => '#a855f7',
         'completed'   => '#10b981',
         'cancelled'   => '#ef4444',
     ][$task->status->value] ?? 'rgba(255,255,255,0.1)';
@@ -99,7 +99,7 @@
                        @dragend="window._tgTaskDrag = null"></i>
                 @endif
                 @if($canAddSubtask && $subtaskTotal > 0)
-                    <span class="badge rounded-pill flex-shrink-0"
+                    <span class="badge rounded-pill tg-mono flex-shrink-0"
                           style="font-size:0.6rem; min-width:32px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)"
                           title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                         {{ $subtaskDone }}/{{ $subtaskTotal }}
@@ -140,7 +140,7 @@
             <div x-data="{ open: false, top: 0, left: 0 }">
                 <button type="button"
                         @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=r.left; open=true"
-                        class="tg-status-badge {{ $sc['cls'] }}"
+                        class="tg-status-badge tg-mono {{ $sc['cls'] }}"
                         style="cursor:pointer">
                     {{ $sc['icon'] }} {{ $sc['label'] }}
                     <i class="bi bi-chevron-down" style="font-size:0.5rem;opacity:.6;margin-left:3px"></i>
@@ -190,7 +190,7 @@
                 </template>
             </div>
         @else
-            <span class="tg-status-badge {{ $sc['cls'] }}">{{ $sc['icon'] }} {{ $statusLabel }}</span>
+            <span class="tg-status-badge tg-mono {{ $sc['cls'] }}">{{ $sc['icon'] }} {{ $statusLabel }}</span>
         @endif
     </td>
     @break
@@ -296,12 +296,12 @@
         @else
             @if($this->rowWritable($task, 'priority'))
                 <span wire:click="startEdit({{ $task->id }}, 'priority')"
-                      class="tg-hover-edit"
-                      style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.82rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
+                      class="tg-hover-edit tg-mono"
+                      style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.78rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
                     {{ $pc ? $pc['label'] : '—' }}
                 </span>
             @else
-                <span style="font-size:0.82rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
+                <span class="tg-mono" style="font-size:0.78rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
                     {{ $pc ? $pc['label'] : '—' }}
                 </span>
             @endif
@@ -319,12 +319,12 @@
         @else
             @if($this->rowWritable($task, 'due_date'))
                 <span wire:click="startEdit({{ $task->id }}, 'due_date')"
-                      class="tg-hover-edit"
-                      style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.82rem; {{ $dueStyle }}">
+                      class="tg-hover-edit tg-mono"
+                      style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.78rem; {{ $dueStyle }}">
                     {{ $task->due_date ? $task->due_date->format('d.m.Y') : '—' }}
                 </span>
             @else
-                <span style="font-size:0.82rem; {{ $dueStyle }}">
+                <span class="tg-mono" style="font-size:0.78rem; {{ $dueStyle }}">
                     {{ $task->due_date ? $task->due_date->format('d.m.Y') : '—' }}
                 </span>
             @endif
@@ -338,9 +338,9 @@
         @if($subtaskTotal > 0)
             <div class="d-flex align-items-center gap-1">
                 <div class="progress flex-shrink-0" style="width:46px; height:4px; border-radius:2px; background:rgba(255,255,255,0.1)">
-                    <div style="width:{{ $subtaskTotal > 0 ? round(($subtaskDone/$subtaskTotal)*100) : 0 }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#3b82f6' }}"></div>
+                    <div style="width:{{ $subtaskTotal > 0 ? round(($subtaskDone/$subtaskTotal)*100) : 0 }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#a855f7' }}"></div>
                 </div>
-                <span style="font-size:0.72rem; color:var(--text-muted,#94a3b8)">{{ $subtaskDone }}/{{ $subtaskTotal }}</span>
+                <span class="tg-mono" style="font-size:0.7rem; color:var(--text-muted,#94a3b8)">{{ $subtaskDone }}/{{ $subtaskTotal }}</span>
             </div>
         @else
             <span style="color:rgba(255,255,255,0.2); font-size:0.82rem">—</span>
@@ -353,8 +353,8 @@
     <td style="text-align:center; min-width:60px">
         @if($commentsCount > 0)
             <a href="{{ $openUrl }}"
-               class="text-decoration-none"
-               style="font-size:0.75rem; color:var(--text-muted,#94a3b8)">
+               class="text-decoration-none tg-mono"
+               style="font-size:0.72rem; color:var(--text-muted,#94a3b8)">
                 <i class="bi bi-chat-dots me-1"></i>{{ $commentsCount }}
             </a>
         @else
@@ -365,14 +365,14 @@
 
     {{-- ── Created at ── --}}
     @case('created_at')
-    <td style="white-space:nowrap; font-size:0.76rem; color:rgba(255,255,255,0.35)">
+    <td class="tg-mono" style="white-space:nowrap; font-size:0.72rem; color:rgba(255,255,255,0.35)">
         {{ $task->created_at->format('d.m.Y') }}
     </td>
     @break
 
     {{-- ── Updated at ── --}}
     @case('updated_at')
-    <td style="white-space:nowrap; font-size:0.76rem; color:rgba(255,255,255,0.35)">
+    <td class="tg-mono" style="white-space:nowrap; font-size:0.72rem; color:rgba(255,255,255,0.35)">
         {{ $task->updated_at->format('d.m.Y') }}
     </td>
     @break
@@ -393,7 +393,7 @@
             {{-- ── Description ── --}}
             <div class="col-lg-5">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted,#94a3b8)">
+                    <span class="tg-mono" style="font-size:0.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted,#94a3b8)">
                         <i class="bi bi-card-text me-1"></i>Opis
                     </span>
                     @if($this->rowWritable($task, 'description') && !($isEditing && $editingField === 'description'))
@@ -449,15 +449,15 @@
             @if($canAddSubtask || $subtaskTotal > 0)
             <div class="col-lg-7">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted,#94a3b8)">
+                    <span class="tg-mono" style="font-size:0.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted,#94a3b8)">
                         <i class="bi bi-list-check me-1"></i>Podzadania
                     </span>
                     @if($subtaskTotal > 0)
-                        <span class="badge" style="font-size:0.62rem; border-radius:8px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)">
+                        <span class="badge tg-mono" style="font-size:0.62rem; border-radius:8px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)">
                             {{ $subtaskDone }}/{{ $subtaskTotal }}
                         </span>
                         <div class="progress flex-grow-1" style="height:4px; max-width:70px; border-radius:2px; background:rgba(255,255,255,0.08)">
-                            <div style="width:{{ round(($subtaskDone/$subtaskTotal)*100) }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#3b82f6' }}"></div>
+                            <div style="width:{{ round(($subtaskDone/$subtaskTotal)*100) }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#a855f7' }}"></div>
                         </div>
                     @endif
                     @if($canAddSubtask)
