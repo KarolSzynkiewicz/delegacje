@@ -196,6 +196,42 @@ status) over a pile of single-purpose booleans named after one specific value
 scales to new types for free and is self-documenting in the UI; a boolean
 named after the one type someone wanted to hide first doesn't.
 
+## Shared Blade components are the highest-leverage fix
+
+Before styling a "one-off" element, check whether it's actually a shared
+`x-ui.*` component used across several unrelated pages — fixing the component
+once is far cheaper than patching N pages, and is what the user explicitly
+expects when they say "this is a component, fixing it in one place should fix
+the whole system." Example: `x-ui.period-nav` (prev/title/next row) is reused
+in 6 places (`weekly-overview` index + planner2, `dashboard/profitability`,
+`recruitment/analytics`, `time-logs/analytics` + `monthly-grid`) — it was a
+bare Bootstrap grid with no background, so it looked "disconnected" from the
+glass-card aesthetic everywhere it appeared. Wrapping it in `.ui-period-nav`
+(glass background, border, top gradient accent bar) and adding a
+`.ui-period-nav__title` class around the slot (for scoped gradient-text /
+mono-date styling) fixed the look on all 6 pages from one file. Only touch a
+page's own slot content (e.g. add a missing `bi-chevron-right` icon) when it's
+a page-specific inconsistency, not a component-wide one.
+
+Same idea for raw-Bootstrap badges (`bg-secondary-subtle text-secondary-emphasis`
+etc.): those are Bootstrap's *light-theme* "subtle" classes and look washed out
+against this app's dark cards. Always use `<x-ui.badge variant="...">` instead
+— its `.badge-*` classes are already themed for the dark palette.
+
+## Adding a read-only "preview" page for a resource that only has an editor
+
+Pattern (see `ProcedureTemplateController::show()` / `procedures/show.blade.php`,
+added because `procedure-templates` only had an editor, no lightweight preview
+with run counts/details): if the resource route was registered with
+`Route::resource(...)->except([...])` omitting `show`, check the `except()`
+list before adding a controller `show()` method + view — you must remove
+`'show'` from it (and drop `'edit'` too if there's no real `edit` view, or the
+auto-generated `.../{id}/edit` route will 404/500 on the missing method). Link
+to the preview from the index cards (make the title a `stretched-link` so the
+whole card is clickable, keep the dropdown/footer actions clickable above it
+via `position: relative; z-index: 2`) and from inside the editor's toolbar
+(a "Podgląd" button) so the two views can be reached from each other.
+
 ## Performance checklist before shipping a visual change
 
 1. Never scale a `position: absolute` background layer with page content

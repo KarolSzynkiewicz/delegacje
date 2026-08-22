@@ -18,6 +18,31 @@ class ProcedureTemplateController extends Controller
         return view('procedures.index');
     }
 
+    public function show(ProcedureTemplate $procedureTemplate): View
+    {
+        $procedureTemplate->loadCount('runs');
+        $procedureTemplate->load('createdBy');
+
+        $runs = $procedureTemplate->runs()
+            ->with(['startedBy', 'subject'])
+            ->latest('started_at')
+            ->paginate(10);
+
+        $runsByStatus = $procedureTemplate->runs()
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                $row->status instanceof \App\Enums\ProcedureRunStatus ? $row->status->value : (string) $row->status => $row->aggregate,
+            ]);
+
+        return view('procedures.show', [
+            'template' => $procedureTemplate,
+            'runs' => $runs,
+            'runsByStatus' => $runsByStatus,
+        ]);
+    }
+
     public function editor(ProcedureTemplate $procedureTemplate): View
     {
         return view('procedures.editor', [

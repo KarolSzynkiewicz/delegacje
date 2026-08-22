@@ -49,8 +49,9 @@
     <!-- Nawigacja między tygodniami -->
     <x-ui.period-nav>
         <x-slot name="prev">
-            <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" action="back" class="w-100">
-                Poprzedni tydzień
+            <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" class="w-100">
+                <i class="bi bi-chevron-left"></i>
+                <span>Poprzedni tydzień</span>
             </x-ui.button>
         </x-slot>
         <div>
@@ -63,7 +64,8 @@
         </div>
         <x-slot name="next">
             <x-ui.button variant="primary" href="{{ $navigation['nextUrl'] }}" class="w-100">
-                Następny tydzień
+                <span>Następny tydzień</span>
+                <i class="bi bi-chevron-right"></i>
             </x-ui.button>
         </x-slot>
     </x-ui.period-nav>

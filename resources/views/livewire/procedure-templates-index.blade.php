@@ -49,19 +49,30 @@
                             <div class="card-body d-flex flex-column gap-2">
                                 <div class="d-flex align-items-start justify-content-between gap-2">
                                     <div class="min-w-0">
-                                        <h5 class="card-title fw-semibold mb-1 text-truncate">{{ $template->name }}</h5>
-                                        @if($template->category)
-                                            <span class="badge bg-secondary-subtle text-secondary-emphasis small">{{ $template->category }}</span>
-                                        @endif
-                                        @if($template->subjectType())
-                                            <span class="badge bg-info-subtle text-info-emphasis small">{{ $template->subjectType()->label() }}</span>
-                                        @endif
+                                        <h5 class="card-title fw-semibold mb-1 text-truncate">
+                                            <a href="{{ route('procedure-templates.show', $template) }}" class="text-reset text-decoration-none stretched-link">
+                                                {{ $template->name }}
+                                            </a>
+                                        </h5>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @if($template->category)
+                                                <x-ui.badge variant="secondary">{{ $template->category }}</x-ui.badge>
+                                            @endif
+                                            @if($template->subjectType())
+                                                <x-ui.badge variant="info">{{ $template->subjectType()->label() }}</x-ui.badge>
+                                            @endif
+                                        </div>
                                     </div>
-                                    <div class="dropdown flex-shrink-0">
+                                    <div class="dropdown flex-shrink-0" style="z-index: 2; position: relative;">
                                         <button class="btn btn-sm btn-outline-secondary px-2 py-1" data-bs-toggle="dropdown" aria-expanded="false">
                                             <i class="bi bi-three-dots"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item" href="{{ route('procedure-templates.show', $template) }}">
+                                                    <i class="bi bi-eye me-2"></i> Podgląd
+                                                </a>
+                                            </li>
                                             <li>
                                                 <a class="dropdown-item" href="{{ route('procedure-templates.editor', $template) }}">
                                                     <i class="bi bi-pencil me-2"></i> Edytuj
@@ -96,13 +107,13 @@
                                     <span><i class="bi bi-person me-1"></i>{{ $template->createdBy?->name }}</span>
                                 </div>
                             </div>
-                            <div class="card-footer bg-transparent border-top d-flex gap-2">
+                            <div class="card-footer bg-transparent border-top d-flex gap-2" style="z-index: 2; position: relative;">
                                 <x-ui.button variant="primary" class="btn-sm flex-grow-1"
                                     wire:click="openStartModal({{ $template->id }})">
                                     <i class="bi bi-play-fill me-1"></i> Uruchom
                                 </x-ui.button>
                                 <a href="{{ route('procedure-templates.editor', $template) }}"
-                                   class="btn btn-sm btn-outline-secondary">
+                                   class="btn btn-sm btn-outline-secondary" title="Edytuj">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                             </div>

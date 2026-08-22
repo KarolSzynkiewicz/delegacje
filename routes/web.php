@@ -211,7 +211,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         // Procedures (SOP)
         Route::group(['defaults' => ['resource' => 'procedure-templates']], function () {
             Route::resource('procedure-templates', \App\Http\Controllers\ProcedureTemplateController::class)
-                ->except(['create', 'show']);
+                ->except(['create', 'edit']);
             Route::get('procedure-templates/{procedureTemplate}/editor',
                 [\App\Http\Controllers\ProcedureTemplateController::class, 'editor'])
                 ->name('procedure-templates.editor');

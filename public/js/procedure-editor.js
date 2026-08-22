@@ -162,7 +162,7 @@ async function saveToServer(){
 
   const btnSave = document.getElementById('btnSave');
   btnSave.disabled = true;
-  btnSave.textContent = '⏳ Zapisywanie…';
+  btnSave.innerHTML = '<i class="bi bi-hourglass-split"></i> Zapisywanie…';
 
   try{
     const body = {
@@ -195,7 +195,7 @@ async function saveToServer(){
     plog('Błąd zapisu: ' + e.message, 'error');
   } finally {
     btnSave.disabled = false;
-    btnSave.textContent = '💾 Zapisz';
+    btnSave.innerHTML = '<i class="bi bi-save"></i> Zapisz';
   }
 }
 
@@ -651,8 +651,8 @@ function renderValidation(){
   const issues=validateProcess(state.currentProcess);
   const errCount=issues.filter(i=>i.level==='error').length; const warnCount=issues.filter(i=>i.level==='warning').length;
   const countEl=document.getElementById('validationCount'); countEl.textContent=issues.length; countEl.className='pe-count'+(errCount?' pe-err':warnCount?' pe-warn':'');
-  if(!issues.length){ pane.innerHTML='<div class="pe-validation-ok">✓ Brak błędów i ostrzeżeń.</div>'; return; }
-  pane.innerHTML=issues.map(i=>`<div class="pe-validation-item"><span class="pe-vi-icon">${i.level==='error'?'🔴':'🟡'}</span><span>${esc(i.msg)}</span></div>`).join('');
+  if(!issues.length){ pane.innerHTML='<div class="pe-validation-ok"><i class="bi bi-check-circle-fill"></i> Brak błędów i ostrzeżeń.</div>'; return; }
+  pane.innerHTML=issues.map(i=>`<div class="pe-validation-item"><span class="pe-vi-icon">${i.level==='error'?'<i class="bi bi-x-circle-fill" style="color:var(--pe-danger)"></i>':'<i class="bi bi-exclamation-triangle-fill" style="color:var(--pe-warn)"></i>'}</span><span>${esc(i.msg)}</span></div>`).join('');
 }
 function renderLogs(){
   const pane=document.getElementById('paneLogs'); const countEl=document.getElementById('logsCount'); countEl.textContent=state.logs.length;

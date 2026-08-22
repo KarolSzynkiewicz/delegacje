@@ -5,16 +5,21 @@
 
         {{-- ── TOOLBAR ──────────────────────────────────────────────── --}}
         <div class="pe-toolbar">
-            <a id="btnBack" href="{{ route('procedure-templates.index') }}" class="pe-btn pe-btn-ghost" title="Powrót do listy procedur">← Procedury</a>
+            <a id="btnBack" href="{{ route('procedure-templates.index') }}" class="pe-btn pe-btn-ghost" title="Powrót do listy procedur">
+                <i class="bi bi-arrow-left"></i> Procedury
+            </a>
+            <a href="{{ route('procedure-templates.show', $template) }}" class="pe-btn pe-btn-ghost" title="Podgląd szablonu">
+                <i class="bi bi-eye"></i> Podgląd
+            </a>
             <div class="pe-sep"></div>
             <input type="text" id="procNameInput" class="pe-procname" value="{{ $template->name }}" placeholder="Nazwa procedury">
             <span class="pe-dirty-dot" id="dirtyDot" title="Niezapisane zmiany"></span>
             <div class="pe-sep"></div>
-            <button class="pe-btn" id="btnUndo" title="Cofnij (Ctrl+Z)" disabled>↶</button>
-            <button class="pe-btn" id="btnRedo" title="Ponów (Ctrl+Y)" disabled>↷</button>
+            <button class="pe-btn" id="btnUndo" title="Cofnij (Ctrl+Z)" disabled><i class="bi bi-arrow-counterclockwise"></i></button>
+            <button class="pe-btn" id="btnRedo" title="Ponów (Ctrl+Y)" disabled><i class="bi bi-arrow-clockwise"></i></button>
             <div class="pe-toolbar-spacer"></div>
             <span class="pe-zoom-indicator" id="zoomIndicator">100%</span>
-            <button class="pe-btn pe-btn-primary" id="btnSave" title="Zapisz (Ctrl+S)">💾 Zapisz</button>
+            <button class="pe-btn pe-btn-primary" id="btnSave" title="Zapisz (Ctrl+S)"><i class="bi bi-save"></i> Zapisz</button>
         </div>
 
         {{-- ── CONTENT GRID ─────────────────────────────────────────── --}}
@@ -36,9 +41,9 @@
                 </div>
 
                 <div class="pe-zoom-controls">
-                    <button class="pe-btn pe-btn-icon" id="btnZoomOut" title="Oddalenie">－</button>
-                    <button class="pe-btn pe-btn-icon" id="btnZoomReset" title="Resetuj zoom">⤢</button>
-                    <button class="pe-btn pe-btn-icon" id="btnZoomIn" title="Przybliżenie">＋</button>
+                    <button class="pe-btn pe-btn-icon" id="btnZoomOut" title="Oddalenie"><i class="bi bi-dash-lg"></i></button>
+                    <button class="pe-btn pe-btn-icon" id="btnZoomReset" title="Resetuj zoom"><i class="bi bi-aspect-ratio"></i></button>
+                    <button class="pe-btn pe-btn-icon" id="btnZoomIn" title="Przybliżenie"><i class="bi bi-plus-lg"></i></button>
                 </div>
             </div>
 
@@ -101,7 +106,7 @@
     flex-direction: column;
     height: calc(100vh - 56px); /* minus navbar height */
     overflow: hidden;
-    --pe-bg: #0a0d14;
+    --pe-bg: #070a13;
     --pe-panel: #10141d;
     --pe-panel2: #151b26;
     --pe-panel3: #1a2130;
@@ -110,12 +115,16 @@
     --pe-text-hi: #eef1f8;
     --pe-text-lo: #8b96b3;
     --pe-text-dim: #5b6478;
-    --pe-accent: #5b8def;
-    --pe-accent2: #3ecf8e;
-    --pe-warn: #f0a84e;
-    --pe-danger: #ef5a6f;
-    --pe-mono: 'SF Mono','Fira Code',Consolas,monospace;
-    --pe-sans: 'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    /* Dociągnięte do ChronoLogic — ten sam niebiesko-fioletowy co --primary/
+       --accent w app.css, żeby edytor procedur nie wyglądał jak osobna apka.
+       --pe-accent2 zostaje "sukcesowo" zielony (var(--success) z app.css),
+       bo tu ma znaczenie semantyczne (poprawne połączenie/brak błędów). */
+    --pe-accent: #3b82f6;
+    --pe-accent2: #10b981;
+    --pe-warn: #f59e0b;
+    --pe-danger: #ef4444;
+    --pe-mono: 'JetBrains Mono','SF Mono','Fira Code',Consolas,monospace;
+    --pe-sans: 'Space Grotesk','Inter',-apple-system,BlinkMacSystemFont,sans-serif;
     font-family: var(--pe-sans);
     font-size: 13px;
     color: var(--pe-text-hi);
@@ -154,7 +163,7 @@
 .pe-btn:hover { background: #212a3d; border-color: var(--pe-border-strong); }
 .pe-btn:active { transform: translateY(1px); }
 .pe-btn:disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
-.pe-btn-primary { background: linear-gradient(135deg,var(--pe-accent),#4a7de0); border-color: transparent; color: #fff; font-weight: 600; }
+.pe-btn-primary { background: linear-gradient(135deg,var(--pe-accent),#a855f7); border-color: transparent; color: #fff; font-weight: 600; }
 .pe-btn-primary:hover { filter: brightness(1.08); }
 .pe-btn-ghost { background: transparent; border-color: transparent; color: var(--pe-text-lo); }
 .pe-btn-ghost:hover { background: var(--pe-panel3); color: var(--pe-text-hi); }
