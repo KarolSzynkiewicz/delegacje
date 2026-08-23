@@ -407,7 +407,7 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Magazyn Gdańsk')
             ->assertSee($dispatch->number)
             ->assertSee(route('warehouse-dispatches.show', $dispatch), false)
-            ->assertSee('data-warehouse-id="*"', false)
+            ->assertDontSee('data-warehouse-id="*"', false)
             ->assertSee('eq-wh-card is-active', false)
             ->assertSee('Wszystkie magazyny')
             ->assertSee('data-warehouse-id="'.$this->warehouse->id.'"', false)

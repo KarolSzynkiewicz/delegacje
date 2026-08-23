@@ -3,10 +3,11 @@ name: frontend-design
 description: >-
   ChronoLogic design system and responsive-UI conventions for this Laravel +
   Livewire + Bootstrap app. Use whenever styling, theming, or improving
-  responsiveness/density of any Blade view, Livewire component, or the
-  x-ui.* component library — not generic frontend advice, this is specific
-  to this codebase's established look (dark ambient, Space Grotesk/JetBrains
-  Mono, blue→purple gradient) and its known performance traps.
+  responsiveness/density of any Blade view, Livewire component, the x-ui.*
+  library, the public landing (`/`), or guest auth (`/login` and related) —
+  not generic frontend advice. Specific to this codebase's dark ambient,
+  Space Grotesk/JetBrains Mono, blue→purple gradient, and known performance
+  traps.
 ---
 
 # ChronoLogic frontend design system
@@ -44,7 +45,13 @@ Defined in `resources/css/app.css` `:root` (~line 8):
 Where headers already get the gradient automatically: any `<h1>`–`<h6>`
 inside a `<header>` element gets `background: linear-gradient(135deg, var(--primary), var(--accent))`
 text-clip styling for free (`app.css` "header h1..h6" rule) — don't re-add
-gradient text manually on page titles, it's already global.
+gradient text manually on **in-app** page titles, it's already global.
+
+**Trap — never put landing/auth titles in `<header>`.** That same rule is
+`font-size: 2.5rem !important` + full-heading gradient clip. The public
+hero needs a large display `h1` with only the italic `<em>` in gradient
+(`.cl-landing h1 em`). Use `<nav class="cl-landing-nav">` + `<section>`
+for hero/auth copy, not `<header>`.
 
 ## Ambient background (global, already applied everywhere)
 
@@ -82,6 +89,70 @@ globally because it's O(1) — one element, no DOM scanning.
 - `.app-header .btn-outline-secondary` — mono font + purple
   border/text on hover (`app.css`, "Przyciski w nagłówku strony"). Applies to
   every page header automatically; don't re-add this per view.
+
+## Public landing + guest auth (must stay on the app theme)
+
+`/` (`welcome.blade.php`) and all guest auth screens live in
+`<x-guest-layout>` so they get `app.css` + `app.js` (ambient grid/grain +
+cursor glow). Never go back to a standalone HTML page with its own CDN
+CSS (that was the old MK TECHNIC welcome). Guest layout has no
+`.app-content-wrapper` — don't duplicate global ambient layers on these
+pages.
+
+**Reference file, not a source of identity color:** the sample
+`chronologic-landing.html` (structure, sections, marquee, module grid) was
+teal/cyan. Recolor to primary→accent. Do **not** port GSAP preloader,
+scroll-pinned data-flow, or per-mousemove magnetic on many elements.
+
+Scoped styles live under `.cl-landing` in `app.css`. Shared Blade:
+
+- `x-landing.nav` — fixed glass nav, logo + Chrono/`Logic` gradient
+  wordmark, optional slot (module links + live clock), CTA button.
+  On `< 860px` hide `.cl-landing-nav__menu`, keep the CTA.
+- `x-landing.footer` — same logo row, used only on the landing.
+- `x-landing.auth-shell` — same nav + split copy/form. Used by
+  `login`, `register`, `forgot-password`, `reset-password`,
+  `confirm-password`, `verify-email`. Form in `<x-ui.card>` + `x-ui.input`
+  / `x-ui.button`, Polish labels. Login passes `cta-label=""` so the nav
+  doesn't repeat „Zaloguj się”.
+
+Clock: one tiny `setInterval` in `layouts/guest.blade.php` for
+`[data-cl-clock]` — not a GSAP timeline. Marquee is CSS-only
+(`@keyframes cl-marquee`); respect `prefers-reduced-motion`.
+
+Local landing surfaces (`--cl-line`, `--cl-surface`) are dark layout
+tokens for 1px-gap grids, not a second identity palette. Module/tile
+hover top-bar uses the same primary→accent gradient as `.card::before`.
+
+## Logo (clock at 4:00)
+
+`resources/views/components/application-logo.blade.php` + `public/favicon.svg`:
+long hand at 12 = brand gradient, short hand at 4 = `--warning` (`#f59e0b`).
+Each render gets a unique `<linearGradient id>` so nav + footer on the
+landing don't clash. Navbar wordmark: `Chrono` +
+`<span class="navbar-brand-name__accent">Logic</span>` (same gradient as
+page titles), never flat `#a855f7`. Don't merge `class="navbar-logo"`
+onto the SVG root — that 5rem rule is for the in-app navbar wrapper and
+would blow up the landing mark; size landing SVGs with
+`.cl-landing-logo svg`.
+
+## `x-ui.tabs` — strip that wraps, not a row of cards
+
+User rejected card-like tabs (they competed with warehouse picker cards
+and wrapped badly on employee profile). `.nav-tabs-ui` is a **tab strip**:
+baseline, gradient underline/label on `.active`, small icons, badges.
+`flex-wrap: wrap` — never horizontal scroll. `compact-mobile` keeps the
+existing dropdown on `< md` (`ui-compact-nav`); pass `mobile-label`
+when the control isn't a profile section (warehouse uses „Zakładka”).
+
+## Warehouse picker cards (`/equipment/tab/stock` and issues)
+
+`.eq-wh-card` — icon + label, primary→accent active state (not teal).
+There is **no** fake „Wszystkie magazyny” card with
+`data-warehouse-id="*"`. `highlightAll` lights up every real warehouse
+card. Mobile: the same compact dropdown as tabs. On `< md`, stock/issues
+also render duplicate **cards** (`_stock-item-card.blade.php`,
+`_qty-tile.blade.php`) like `/tasks2`; the desktop table stays.
 
 ## Responsive / mobile patterns — pick based on row complexity
 

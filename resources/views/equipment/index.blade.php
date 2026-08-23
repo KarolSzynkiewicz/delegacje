@@ -55,13 +55,16 @@
         'keep' => $cardKeep,
     ])
 
+    @include('equipment._tabs', ['activeTab' => $activeTab ?? 'stock'])
+
     <x-ui.card class="mb-4">
-        @include('equipment._tabs', ['activeTab' => $activeTab ?? 'stock'])
         <form method="GET" action="{{ route('equipment.tab.stock') }}" id="filter-form" class="js-auto-submit eq-stock-filters">
             <input type="hidden" name="warehouse_id" value="{{ $warehouse->id }}">
             <div class="eq-stock-filters__grid">
                 <div>
-                    <label class="form-label small" for="stock-filter-search">Szukaj</label>
+                    <label class="form-label small" for="stock-filter-search">
+                        <i class="bi bi-search" aria-hidden="true"></i> Szukaj
+                    </label>
                     <input
                         id="stock-filter-search"
                         type="search"
@@ -73,7 +76,9 @@
                     >
                 </div>
                 <div>
-                    <label class="form-label small" for="stock-filter-category">Kategoria</label>
+                    <label class="form-label small" for="stock-filter-category">
+                        <i class="bi bi-tag" aria-hidden="true"></i> Kategoria
+                    </label>
                     <select
                         id="stock-filter-category"
                         name="category"
@@ -118,7 +123,7 @@
 
     <x-ui.card class="p-0">
         @if($sections->isNotEmpty())
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table mb-0 align-middle eq-stock-table">
                     <thead>
                         <tr>
@@ -157,6 +162,23 @@
                     </tbody>
                 </table>
             </div>
+
+            <div class="eq-stock-cards d-md-none">
+                @foreach ($sections as $section)
+                    <div class="eq-stock-cards__section">{{ $section['title'] }}</div>
+                    @foreach ($section['groups'] as $group)
+                        @if($group['title'])
+                            <div class="eq-stock-cards__group">{{ $group['title'] }}</div>
+                        @endif
+                        @foreach ($group['items'] as $item)
+                            @include('equipment._stock-item-card', [
+                                'item' => $item,
+                                'warehouse' => $warehouse,
+                            ])
+                        @endforeach
+                    @endforeach
+                @endforeach
+            </div>
         @else
             <div class="p-4">
             <x-ui.empty-state
@@ -193,8 +215,10 @@
                 button.addEventListener('click', () => {
                     const id = button.getAttribute('data-eq-stock-toggle');
                     const open = button.getAttribute('aria-expanded') !== 'true';
-                    button.setAttribute('aria-expanded', open ? 'true' : 'false');
-                    button.closest('.eq-stock-item')?.classList.toggle('is-open', open);
+                    document.querySelectorAll('[data-eq-stock-toggle="' + id + '"]').forEach((toggle) => {
+                        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                        toggle.closest('.eq-stock-item, .eq-stock-card')?.classList.toggle('is-open', open);
+                    });
                     document.querySelectorAll('[data-eq-stock-parent="' + id + '"]').forEach((row) => {
                         row.hidden = !open;
                     });

@@ -89,7 +89,7 @@
                                 @if($editingSubtaskId === $subtask->id)
                                     <div class="d-flex align-items-start gap-2 w-100">
                                         <span
-                                            class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold flex-shrink-0 mt-1"
+                                            class="badge badge-secondary subtask-num fw-semibold flex-shrink-0 mt-1"
                                             style="min-width: 2.35rem;"
                                             title="Numer podzadania w tym zadaniu"
                                         >#{{ $subtaskNumbers[$subtask->id] }}</span>
@@ -145,7 +145,7 @@
                                         >
                                         <label class="form-check-label" for="subtask-{{ $subtask->id }}">
                                             <span
-                                                class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold me-1"
+                                                class="badge badge-secondary subtask-num fw-semibold me-1"
                                                 title="Numer podzadania w tym zadaniu"
                                             >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                             {!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}
@@ -208,7 +208,7 @@
                                 @if($editingSubtaskId === $subtask->id)
                                     <div class="d-flex align-items-start gap-2 w-100">
                                         <span
-                                            class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold flex-shrink-0 mt-1"
+                                            class="badge badge-secondary subtask-num fw-semibold flex-shrink-0 mt-1"
                                             style="min-width: 2.35rem;"
                                             title="Numer podzadania w tym zadaniu"
                                         >#{{ $subtaskNumbers[$subtask->id] }}</span>
@@ -265,7 +265,7 @@
                                         >
                                         <label class="form-check-label text-muted" for="subtask-{{ $subtask->id }}">
                                             <span
-                                                class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold me-1"
+                                                class="badge badge-secondary subtask-num fw-semibold me-1"
                                                 title="Numer podzadania w tym zadaniu"
                                             >#{{ $subtaskNumbers[$subtask->id] }}</span>
                                             <span class="text-decoration-line-through">{!! \App\Services\UserMentionService::highlightMentions(e($subtask->name), $mentionUsersForAutocomplete) !!}</span>

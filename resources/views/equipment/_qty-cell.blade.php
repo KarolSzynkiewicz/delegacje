@@ -2,7 +2,7 @@
     $value = (int) ($value ?? 0);
     $compact = (bool) ($compact ?? false);
     $tone = $tone ?? null;
-    $classes = 'text-end eq-qty';
+    $classes = 'text-end eq-qty font-mono';
     if ($compact) {
         $classes .= ' eq-qty--compact';
     }

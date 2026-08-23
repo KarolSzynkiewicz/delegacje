@@ -144,7 +144,7 @@ class UserMentionService
 
                 return '<div class="card subtask-ref-card mb-2">'
                     .'<div class="subtask-ref-card-inner d-flex align-items-start gap-2">'
-                    .'<span class="badge bg-secondary bg-opacity-25 text-body-secondary fw-semibold flex-shrink-0" title="Podzadanie #'.$n.' w tym zadaniu">#'
+                    .'<span class="badge badge-secondary subtask-num fw-semibold flex-shrink-0" title="Podzadanie #'.$n.' w tym zadaniu">#'
                     .$n
                     .'</span>'
                     .'<span class="small text-break flex-grow-1 subtask-ref-card-title" style="min-width:0">'.$title.'</span>'

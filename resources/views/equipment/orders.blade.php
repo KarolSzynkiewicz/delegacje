@@ -27,9 +27,7 @@
         'routeName' => 'equipment.tab.orders',
     ])
 
-    <x-ui.card class="mb-4">
-        @include('equipment._tabs', ['activeTab' => $activeTab ?? 'orders'])
-    </x-ui.card>
+    @include('equipment._tabs', ['activeTab' => $activeTab ?? 'orders'])
 
     @include('equipment._pending-dispatches', [
         'pendingDispatches' => $pendingDispatches,

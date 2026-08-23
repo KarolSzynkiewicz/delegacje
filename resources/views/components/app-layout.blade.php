@@ -41,7 +41,13 @@
 
                 <!-- Page Content -->
                 <main class="{{ $edgeToEdge ? 'w-100 py-3 px-0' : ($fullWidth ? 'container-fluid py-3 px-2 px-md-3' : 'container-xxl py-4 px-3 px-md-4 px-lg-5') }}">
-                    {{ $slot }}
+                    @if($edgeToEdge)
+                        {{ $slot }}
+                    @else
+                        <div class="app-page-shell">
+                            {{ $slot }}
+                        </div>
+                    @endif
                 </main>
             </div>
         </div>

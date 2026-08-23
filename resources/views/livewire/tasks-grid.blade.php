@@ -11,10 +11,8 @@
     .xuiv2-tasks {
         position: relative;
         isolation: isolate;
-        background: #070a13;
-        border: 1px solid #1e2740;
-        border-radius: 14px;
-        padding: 12px;
+        /* Chrome (tło/obramowanie) jest już na .app-page-shell w layoucie —
+           tu zostaje tylko scoping CSS, bez drugiej „karty w karcie”. */
     }
     /* Pigułka aktywnego zapisanego widoku używała Bootstrapowego .btn-info
        (jaskrawy cyjan) — kolidowało to z resztą fioletowej palety. */

@@ -1,39 +1,69 @@
 <x-guest-layout>
-    <form method="POST" action="{{ route('password.store') }}">
-        @csrf
+    <x-landing.auth-shell>
+        <x-slot:eyebrow>Nowe hasło</x-slot>
+        <x-slot:title>
+            Ustaw hasło<br>
+            <em>i wróć do systemu.</em>
+        </x-slot>
+        <x-slot:subtitle>
+            Wpisz adres e-mail konta oraz dwukrotnie nowe hasło.
+        </x-slot>
 
-        <!-- Password Reset Token -->
-        <input type="hidden" name="token" value="{{ $request->route('token') }}">
+        <x-ui.card>
+            @if ($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
 
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email', $request->email)" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+            <form method="POST" action="{{ route('password.store') }}">
+                @csrf
+                <input type="hidden" name="token" value="{{ $request->route('token') }}">
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-            <x-text-input id="password" class="block mt-1 w-full" type="password" name="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
+                <div class="mb-3">
+                    <x-ui.input
+                        type="email"
+                        name="email"
+                        id="email"
+                        label="E-mail"
+                        value="{{ old('email', $request->email) }}"
+                        required="true"
+                        autofocus
+                        autocomplete="username"
+                    />
+                </div>
 
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+                <div class="mb-3">
+                    <x-ui.input
+                        type="password"
+                        name="password"
+                        id="password"
+                        label="Nowe hasło"
+                        required="true"
+                        autocomplete="new-password"
+                    />
+                </div>
 
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                                type="password"
-                                name="password_confirmation" required autocomplete="new-password" />
+                <div class="mb-4">
+                    <x-ui.input
+                        type="password"
+                        name="password_confirmation"
+                        id="password_confirmation"
+                        label="Powtórz hasło"
+                        required="true"
+                        autocomplete="new-password"
+                    />
+                </div>
 
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Reset Password') }}
-            </x-primary-button>
-        </div>
-    </form>
+                <x-ui.button variant="primary" type="submit" class="w-100">
+                    Zapisz hasło
+                </x-ui.button>
+            </form>
+        </x-ui.card>
+    </x-landing.auth-shell>
 </x-guest-layout>

@@ -3,6 +3,8 @@
     'activeTab' => null, // Key of active tab
     'id' => 'tabs', // ID for the tabs container
     'compactMobile' => false, // Na < md: jeden wiersz + dropdown zamiast wielu rzędów tabów
+    'mobileLabel' => 'Sekcja',
+    'mobileAriaLabel' => 'Wybierz sekcję profilu',
 ])
 
 @php
@@ -13,8 +15,8 @@
 @endphp
 
 @if($compactMobile && count($tabs) > 0)
-    <div class="d-md-none mb-4 employee-tabs-mobile-nav" data-employee-tabs-mobile>
-        <label class="form-label small text-muted mb-1" for="{{ $id }}-mobile-trigger">Sekcja</label>
+    <div class="d-md-none mb-4 ui-compact-nav employee-tabs-mobile-nav" data-employee-tabs-mobile>
+        <label class="form-label small text-muted mb-1" for="{{ $id }}-mobile-trigger">{{ $mobileLabel }}</label>
         <div class="dropdown w-100">
             <button
                 class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-between gap-2 text-start"
@@ -24,12 +26,13 @@
                 data-bs-display="static"
                 aria-expanded="false"
                 aria-haspopup="true"
-                aria-label="Wybierz sekcję profilu"
-                style="min-height: 3rem;"
+                aria-label="{{ $mobileAriaLabel }}"
             >
                 <span class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
                     @if(! empty($activeConfig['icon']))
-                        <i class="{{ $activeConfig['icon'] }} flex-shrink-0" aria-hidden="true"></i>
+                        <span class="ui-compact-nav__icon" aria-hidden="true">
+                            <i class="{{ $activeConfig['icon'] }}"></i>
+                        </span>
                     @endif
                     @if(! empty($activeConfig['warning']))
                         <i class="bi bi-exclamation-lg ui-tab-warn-icon flex-shrink-0" title="Brakuje danych w tej sekcji" aria-hidden="true"></i>

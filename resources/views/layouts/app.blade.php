@@ -34,10 +34,12 @@
 
                 <!-- Page Content -->
                 <main class="flex-grow-1 container-xxl py-4 px-3 px-md-4 px-lg-5">
-                    @yield('content')
-                    @isset($slot)
-                        {{ $slot }}
-                    @endisset
+                    <div class="app-page-shell">
+                        @yield('content')
+                        @isset($slot)
+                            {{ $slot }}
+                        @endisset
+                    </div>
                 </main>
             </div>
         </div>

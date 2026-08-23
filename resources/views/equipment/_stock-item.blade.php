@@ -21,7 +21,7 @@
                     <i class="bi bi-box-seam"></i>
                 </span>
             @endif
-            <div>
+            <div class="eq-stock-item__text">
                 <div class="eq-stock-item__title">
                     <span class="eq-stock-item__name">{{ $item->name }}</span>
                     @if($item->description)
@@ -30,7 +30,7 @@
                 </div>
                 <div class="eq-stock-item__meta">
                     @if($withdrawn)
-                        <span class="badge badge-secondary">Wycofane</span>
+                        <x-ui.badge variant="secondary">Wycofane</x-ui.badge>
                     @endif
                     @if($item->category)
                         <span class="eq-stock-item__category">{{ $item->category }}</span>

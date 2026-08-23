@@ -1,25 +1,57 @@
 <x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
-    </div>
+    <x-landing.auth-shell>
+        <x-slot:eyebrow>Odzyskiwanie dostępu</x-slot>
+        <x-slot:title>
+            Nie pamiętasz hasła?<br>
+            <em>Wyślemy link.</em>
+        </x-slot>
+        <x-slot:subtitle>
+            Podaj adres e-mail konta. Jeśli istnieje w systemie, wyślemy na niego link do ustawienia nowego hasła.
+        </x-slot>
 
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+        <x-ui.card>
+            @if (session('status'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ session('status') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
 
-    <form method="POST" action="{{ route('password.email') }}">
-        @csrf
+            @if ($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
 
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+            <form method="POST" action="{{ route('password.email') }}">
+                @csrf
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Email Password Reset Link') }}
-            </x-primary-button>
-        </div>
-    </form>
+                <div class="mb-4">
+                    <x-ui.input
+                        type="email"
+                        name="email"
+                        id="email"
+                        label="E-mail"
+                        value="{{ old('email') }}"
+                        required="true"
+                        autofocus
+                        autocomplete="username"
+                    />
+                </div>
+
+                <x-ui.button variant="primary" type="submit" class="w-100 mb-4">
+                    Wyślij link resetujący
+                </x-ui.button>
+
+                <p class="mb-0 text-center cl-landing-auth__meta">
+                    <a href="{{ route('login') }}" class="cl-landing-auth__link">Wróć do logowania</a>
+                </p>
+            </form>
+        </x-ui.card>
+    </x-landing.auth-shell>
 </x-guest-layout>

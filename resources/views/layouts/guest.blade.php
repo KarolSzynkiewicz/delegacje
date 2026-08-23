@@ -19,5 +19,17 @@
     </head>
     <body style="background-color: var(--bg-body); color: var(--text-main);">
         {{ $slot }}
+        <script>
+            (function () {
+                const nodes = document.querySelectorAll('[data-cl-clock]');
+                if (!nodes.length) return;
+                const tick = () => {
+                    const t = new Date().toLocaleTimeString('pl-PL', { hour12: false });
+                    nodes.forEach((el) => { el.textContent = t; });
+                };
+                tick();
+                setInterval(tick, 1000);
+            })();
+        </script>
     </body>
 </html>

@@ -30,4 +30,7 @@
     :tabs="$tabsForComponent"
     :activeTab="$activeTab"
     id="warehouseTabs"
+    :compact-mobile="true"
+    mobile-label="Zakładka"
+    mobile-aria-label="Wybierz zakładkę magazynu"
 />

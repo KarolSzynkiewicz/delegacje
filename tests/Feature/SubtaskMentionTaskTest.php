@@ -110,6 +110,25 @@ class SubtaskMentionTaskTest extends TestCase
         $this->assertSame($robert->id, $subtask->fresh()->assigned_to);
     }
 
+    public function test_task_show_page_shell_and_themed_subtask_numbers(): void
+    {
+        $parent = $this->parentTask();
+        TaskSubtask::query()->create([
+            'task_id' => $parent->id,
+            'name' => 'Spakować auto',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('tasks.show', $parent))
+            ->assertOk()
+            ->assertSee('app-page-shell', false)
+            ->assertSee('subtask-num', false)
+            ->assertSee('#1')
+            ->assertSee('Spakować auto')
+            ->assertDontSee('text-body-secondary', false);
+    }
+
     private function parentTask(): ProjectTask
     {
         return ProjectTask::query()->create([

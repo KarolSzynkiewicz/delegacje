@@ -36,8 +36,9 @@
         'highlightAll' => true,
     ])
 
+    @include('equipment._tabs', ['activeTab' => $activeTab ?? 'issues'])
+
     <x-ui.card class="mb-4">
-        @include('equipment._tabs', ['activeTab' => $activeTab ?? 'issues'])
         <form method="GET" action="{{ route('equipment.tab.issues') }}" id="filter-form" class="js-auto-submit">
             <div class="row g-3">
                 <div class="col-md-3">
@@ -104,7 +105,7 @@
 
     <x-ui.card class="p-0">
         @if($entries->count() > 0)
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table mb-0 align-middle">
                     <thead>
                         <tr>
@@ -203,6 +204,106 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+
+            <div class="eq-stock-cards d-md-none">
+                @foreach($entries as $entry)
+                    @if($entry['kind'] === 'issue')
+                        @php $issue = $entry['issue']; @endphp
+                        <article class="eq-stock-card">
+                            <div class="eq-stock-card__top">
+                                <div class="eq-stock-item__text">
+                                    <a href="{{ route('equipment-issues.show', $issue) }}" class="eq-stock-card__name">
+                                        {{ $issue->equipment?->name ?? '—' }}
+                                    </a>
+                                    <div class="eq-stock-card__meta">
+                                        <x-ui.badge variant="{{ $issue->statusBadgeVariant() }}">{{ $issue->statusLabel() }}</x-ui.badge>
+                                        <span class="text-muted">{{ $issue->eventLabel() }}</span>
+                                        @if($issue->variant?->kind_label)
+                                            <span class="text-muted">{{ $issue->variant->kind_label }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="eq-stock-card__actions">
+                                    <x-view-button href="{{ route('equipment-issues.show', $issue) }}" />
+                                    @if($issue->isReturnableIssue() && $issue->equipment?->issuable && $issue->equipment?->returnable)
+                                        <x-ui.button variant="success" href="{{ route('equipment-issues.return', $issue) }}" class="btn-sm" title="Zwróć/Zgłoś">
+                                            <i class="bi bi-arrow-return-left"></i>
+                                        </x-ui.button>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="eq-stock-card__tiles">
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Data</span>
+                                    <span class="eq-stock-tile__value">{{ $issue->issue_date?->format('d.m.Y') ?? '—' }}</span>
+                                </div>
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Ilość</span>
+                                    <span class="eq-stock-tile__value font-mono">{{ $issue->quantity_issued }}</span>
+                                </div>
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Magazyn</span>
+                                    <span class="eq-stock-tile__value">{{ $issue->warehouse?->name ?? '—' }}</span>
+                                </div>
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Dla kogo</span>
+                                    <span class="eq-stock-tile__value">{{ $issue->employee?->full_name ?? '—' }}</span>
+                                </div>
+                                @if($issue->dispatch)
+                                    <div class="eq-stock-tile">
+                                        <span class="eq-stock-tile__label">ZW</span>
+                                        <span class="eq-stock-tile__value">
+                                            <a href="{{ route('warehouse-dispatches.show', $issue->dispatch) }}" class="text-decoration-none">
+                                                {{ $issue->dispatch->number }}
+                                            </a>
+                                        </span>
+                                    </div>
+                                @endif
+                            </div>
+                        </article>
+                    @else
+                        @php $movement = $entry['movement']; @endphp
+                        <article class="eq-stock-card">
+                            <div class="eq-stock-card__top">
+                                <div class="eq-stock-item__text">
+                                    <span class="eq-stock-card__name">{{ $movement->equipment?->name ?? '—' }}</span>
+                                    <div class="eq-stock-card__meta">
+                                        <x-ui.badge variant="accent">Zdjęto ze stanu</x-ui.badge>
+                                        <span class="text-muted">Rozchód</span>
+                                        @if($movement->variant?->kind_label)
+                                            <span class="text-muted">{{ $movement->variant->kind_label }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="eq-stock-card__tiles">
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Data</span>
+                                    <span class="eq-stock-tile__value">{{ $movement->created_at?->format('d.m.Y H:i') ?? '—' }}</span>
+                                </div>
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Ilość</span>
+                                    <span class="eq-stock-tile__value font-mono">−{{ $movement->quantity }}</span>
+                                </div>
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Magazyn</span>
+                                    <span class="eq-stock-tile__value">{{ $movement->warehouse?->name ?? '—' }}</span>
+                                </div>
+                                <div class="eq-stock-tile">
+                                    <span class="eq-stock-tile__label">Przeznaczenie</span>
+                                    <span class="eq-stock-tile__value">
+                                        @if($movement->destinationHref())
+                                            <a href="{{ $movement->destinationHref() }}" class="text-decoration-none">{{ $movement->destinationMeta() }}</a>
+                                        @else
+                                            {{ $movement->destinationMeta() ?: '—' }}
+                                        @endif
+                                    </span>
+                                </div>
+                            </div>
+                        </article>
+                    @endif
+                @endforeach
             </div>
 
             @if($entries->hasPages())
