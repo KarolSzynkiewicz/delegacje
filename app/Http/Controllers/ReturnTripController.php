@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\LogisticsEventType;
 use App\Http\Requests\PrepareReturnTripRequest;
 use App\Http\Requests\StoreReturnTripRequest;
 use App\Http\Requests\UpdateReturnTripRequest;
@@ -27,59 +26,9 @@ class ReturnTripController extends Controller
     /**
      * Display a listing of return trips.
      */
-    public function index(Request $request): View
+    public function index(): View
     {
-        $sort = (string) $request->query('sort', 'id');
-        $dir = strtolower((string) $request->query('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
-        $employeeSearch = trim((string) $request->query('employee_search', ''));
-        $vehicleFilter = $request->query('vehicle_id'); // int|string|null; supports "none"
-        $transport = $request->query('transport'); // "vehicle"|"no_vehicle"|null
-
-        $allowedSorts = ['id', 'event_date', 'created_at'];
-        if (! in_array($sort, $allowedSorts, true)) {
-            $sort = 'id';
-        }
-
-        $query = LogisticsEvent::where('type', LogisticsEventType::RETURN)
-            ->with([
-                'vehicle',
-                'fromLocation',
-                'toLocation',
-                'creator',
-                'participants.employee',
-                'participants.assignment' => function ($morphTo) {
-                    $morphTo->morphWith([
-                        \App\Models\VehicleAssignment::class => ['vehicle'],
-                        \App\Models\ProjectAssignment::class => ['project'],
-                        \App\Models\AccommodationAssignment::class => ['accommodation.location'],
-                    ]);
-                },
-            ])
-            ->when($employeeSearch !== '', function ($q) use ($employeeSearch) {
-                $s = mb_strtolower($employeeSearch);
-                $q->whereHas('participants.employee', function ($e) use ($s) {
-                    $e->whereRaw('LOWER(CONCAT(first_name, " ", last_name)) LIKE ?', ['%'.$s.'%'])
-                        ->orWhereRaw('LOWER(CONCAT(last_name, " ", first_name)) LIKE ?', ['%'.$s.'%'])
-                        ->orWhereRaw('LOWER(first_name) LIKE ?', ['%'.$s.'%'])
-                        ->orWhereRaw('LOWER(last_name) LIKE ?', ['%'.$s.'%'])
-                        ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$s.'%']);
-                });
-            })
-            ->when($transport === 'vehicle', fn ($q) => $q->whereNotNull('vehicle_id'))
-            ->when($transport === 'no_vehicle', fn ($q) => $q->whereNull('vehicle_id'))
-            ->when($vehicleFilter === 'none', fn ($q) => $q->whereNull('vehicle_id'))
-            ->when(is_numeric($vehicleFilter), fn ($q) => $q->where('vehicle_id', (int) $vehicleFilter))
-            ->orderBy($sort, $dir);
-
-        if ($sort !== 'id') {
-            $query->orderBy('id', 'desc');
-        }
-
-        $returnTrips = $query->paginate(20)->withQueryString();
-
-        $vehicles = Vehicle::where('type', 'company_vehicle')->orderBy('registration_number')->get();
-
-        return view('return-trips.index', compact('returnTrips', 'sort', 'dir', 'vehicles', 'employeeSearch', 'vehicleFilter', 'transport'));
+        return view('return-trips.index');
     }
 
     /**

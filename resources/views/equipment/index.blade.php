@@ -133,20 +133,19 @@
                             <th class="text-end">W innych magazynach</th>
                             <th class="text-end">Do zwrotu tutaj</th>
                             <th class="text-end">Do zwrotu w innych magazynach</th>
-                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($sections as $section)
                             <tr class="eq-stock-section">
-                                <td colspan="7">
+                                <td colspan="6">
                                     <span class="eq-stock-section__label">{{ $section['title'] }}</span>
                                 </td>
                             </tr>
                             @foreach ($section['groups'] as $group)
                                 @if($group['title'])
                                     <tr class="eq-stock-group">
-                                        <td colspan="7">
+                                        <td colspan="6">
                                             <span class="eq-stock-group__label">{{ $group['title'] }}</span>
                                         </td>
                                     </tr>
@@ -212,7 +211,9 @@
     <script>
         (function () {
             document.querySelectorAll('[data-eq-stock-toggle]').forEach((button) => {
-                button.addEventListener('click', () => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                     const id = button.getAttribute('data-eq-stock-toggle');
                     const open = button.getAttribute('aria-expanded') !== 'true';
                     document.querySelectorAll('[data-eq-stock-toggle="' + id + '"]').forEach((toggle) => {
@@ -222,6 +223,14 @@
                     document.querySelectorAll('[data-eq-stock-parent="' + id + '"]').forEach((row) => {
                         row.hidden = !open;
                     });
+                });
+            });
+            document.querySelectorAll('[data-eq-stock-href]').forEach((el) => {
+                el.addEventListener('click', (event) => {
+                    if (event.target.closest('a, button, [data-eq-stock-toggle]')) {
+                        return;
+                    }
+                    window.location.assign(el.getAttribute('data-eq-stock-href'));
                 });
             });
         })();

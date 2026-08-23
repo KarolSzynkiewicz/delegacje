@@ -1,119 +1,71 @@
 <div>
-    <x-ui.card>
-        @if(session('success'))
-            <x-ui.alert variant="success" dismissible>
-                {{ session('success') }}
-            </x-ui.alert>
-        @endif
+    @if(session('success'))
+        <x-ui.alert variant="success" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
 
-        <!-- Statystyki i Filtry -->
-        <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center justify-content-between gap-3 mb-3">
-                <div class="text-center text-md-start min-w-0">
-                    <h3 class="fs-5 fw-semibold mb-1">Payroll</h3>
-                    <p class="small text-muted mb-0">
-                        @if(!empty($search) || !empty($statusFilter) || !empty($companyFilter) || !empty($dateFrom) || !empty($dateTo))
-                            Znaleziono: <span class="fw-semibold">{{ $payrolls->total() }}</span> payrolli
-                        @else
-                            Łącznie: <span class="fw-semibold">{{ $payrolls->total() }}</span> payrolli
-                        @endif
-                    </p>
-                </div>
-                <div class="d-flex flex-column flex-md-row gap-2 flex-md-wrap justify-content-center justify-content-md-end flex-shrink-0">
-                    <x-ui.button
-                        variant="{{ $bulkMode ? 'warning' : 'ghost' }}"
-                        wire:click="toggleBulkMode"
-                        class="btn-sm w-100 w-md-auto"
-                    >
-                        <i class="bi bi-check2-square me-1"></i> {{ $bulkMode ? 'Tryb wyboru: WŁ.' : 'Rozliczenie zbiorowe' }}
-                    </x-ui.button>
+    <x-data-table-filters
+        :count="$payrolls->total()"
+        :has-filters="(bool) (!empty($search) || !empty($statusFilter) || !empty($companyFilter) || !empty($dateFrom) || !empty($dateTo))"
+        item-label="payrolli"
+    >
+        <x-slot:actions>
+            <x-ui.button
+                variant="{{ $bulkMode ? 'warning' : 'ghost' }}"
+                wire:click="toggleBulkMode"
+                class="btn-sm"
+            >
+                <i class="bi bi-check2-square me-1"></i> {{ $bulkMode ? 'Tryb wyboru: WŁ.' : 'Rozliczenie zbiorowe' }}
+            </x-ui.button>
+        </x-slot:actions>
 
-                    <x-ui.button
-                        variant="ghost"
-                        wire:click="clearFilters"
-                        class="btn-sm w-100 w-md-auto"
-                        :disabled="empty($search) && empty($statusFilter) && empty($companyFilter) && empty($dateFrom) && empty($dateTo)"
-                    >
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                </div>
-            </div>
-
-            <!-- Filtry -->
-            <div class="row g-2 align-items-end">
-                <!-- Wyszukiwanie po pracowniku -->
-                <div class="col-md-3">
-                    <label for="search" class="form-label small fw-semibold mb-1">
-                        <i class="bi bi-search me-1"></i> Szukaj pracownika
-                    </label>
-                    <input type="text" 
-                           id="search"
-                           wire:model.live.debounce.300ms="search" 
-                           class="form-control form-control-sm" 
-                           placeholder="Imię lub nazwisko...">
-                </div>
-
-                <!-- Filtrowanie po spółce -->
-                <div class="col-md-3">
-                    <label for="companyFilter" class="form-label small fw-semibold mb-1">
-                        <i class="bi bi-building me-1"></i> Spółka
-                    </label>
-                    <select id="companyFilter"
-                            wire:model.live="companyFilter"
-                            class="form-select form-select-sm">
-                        <option value="">Wszystkie spółki</option>
-                        @foreach($companies as $company)
-                            <option value="{{ $company->id }}">{{ $company->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Filtrowanie po statusie -->
-                <div class="col-md-2">
-                    <label for="statusFilter" class="form-label small fw-semibold mb-1">
-                        Status
-                    </label>
-                    <select id="statusFilter" 
-                            wire:model.live="statusFilter" 
-                            class="form-select form-select-sm">
-                        <option value="">Wszystkie</option>
-                        <option value="draft">Szkic</option>
-                        <option value="issued">Wystawiony</option>
-                        <option value="approved">Zatwierdzony</option>
-                        <option value="paid">Wypłacony</option>
-                    </select>
-                </div>
-
-                <!-- Data od -->
-                <div class="col-md-2">
-                    <label for="dateFrom" class="form-label small fw-semibold mb-1">
-                        <i class="bi bi-calendar-event me-1"></i> Data od
-                    </label>
-                    <input
-                        type="date"
-                        id="dateFrom"
-                        wire:model.live="dateFrom"
-                        class="form-control form-control-sm"
-                        max="{{ $dateTo ? $dateTo : '' }}"
-                    >
-                </div>
-
-                <!-- Data do -->
-                <div class="col-md-2">
-                    <label for="dateTo" class="form-label small fw-semibold mb-1">
-                        <i class="bi bi-calendar-check me-1"></i> Data do
-                    </label>
-                    <input
-                        type="date"
-                        id="dateTo"
-                        wire:model.live="dateTo"
-                        class="form-control form-control-sm"
-                        min="{{ $dateFrom ? $dateFrom : '' }}"
-                    >
-                </div>
-            </div>
+        <div class="dt-filter-field">
+            <label for="search" class="form-label small">
+                <i class="bi bi-search me-1"></i> Szukaj pracownika
+            </label>
+            <input type="text" id="search" wire:model.live.debounce.300ms="search" class="form-control" placeholder="Imię lub nazwisko...">
         </div>
 
+        <div class="dt-filter-field">
+            <label for="companyFilter" class="form-label small">
+                <i class="bi bi-building me-1"></i> Spółka
+            </label>
+            <select id="companyFilter" wire:model.live="companyFilter" class="form-select">
+                <option value="">Wszystkie spółki</option>
+                @foreach($companies as $company)
+                    <option value="{{ $company->id }}">{{ $company->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="dt-filter-field">
+            <label for="statusFilter" class="form-label small">Status</label>
+            <select id="statusFilter" wire:model.live="statusFilter" class="form-select">
+                <option value="">Wszystkie</option>
+                <option value="draft">Szkic</option>
+                <option value="issued">Wystawiony</option>
+                <option value="approved">Zatwierdzony</option>
+                <option value="paid">Wypłacony</option>
+            </select>
+        </div>
+
+        <div class="dt-filter-field">
+            <label for="dateFrom" class="form-label small">
+                <i class="bi bi-calendar-event me-1"></i> Data od
+            </label>
+            <input type="date" id="dateFrom" wire:model.live="dateFrom" class="form-control" max="{{ $dateTo ? $dateTo : '' }}">
+        </div>
+
+        <div class="dt-filter-field">
+            <label for="dateTo" class="form-label small">
+                <i class="bi bi-calendar-check me-1"></i> Data do
+            </label>
+            <input type="date" id="dateTo" wire:model.live="dateTo" class="form-control" min="{{ $dateFrom ? $dateFrom : '' }}">
+        </div>
+    </x-data-table-filters>
+
+    <x-ui.card>
         @if($bulkMode)
             <div class="mb-3 d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-2">
                 <div class="small text-muted text-center text-sm-start">

@@ -2,19 +2,23 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\InteractsWithSortableTable;
 use App\Models\Rotation;
-use App\Models\Employee;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Database\Eloquent\Builder;
 
 class RotationsTable extends Component
 {
+    use InteractsWithSortableTable;
     use WithPagination;
 
     public $search = '';
+
     public $statusFilter = '';
+
     public $sortField = 'end_date';
+
     public $sortDirection = 'asc';
 
     protected $queryString = [
@@ -24,17 +28,17 @@ class RotationsTable extends Component
         'sortDirection' => ['except' => 'asc'],
     ];
 
-    public function updatingSearch()
+    public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function updatingStatusFilter()
+    public function updatingStatusFilter(): void
     {
         $this->resetPage();
     }
 
-    public function clearFilters()
+    public function clearFilters(): void
     {
         $this->search = '';
         $this->statusFilter = '';
@@ -43,60 +47,45 @@ class RotationsTable extends Component
         $this->resetPage();
     }
 
-    public function paginationView()
+    public function paginationView(): string
     {
         return 'vendor.livewire.simple-pagination';
     }
 
-    public function sortBy($field)
+    protected function sortableFields(): array
     {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-        $this->resetPage();
+        return ['employee_id', 'start_date', 'end_date'];
     }
 
     public function render()
     {
         $query = Rotation::with('employee');
 
-        // Wyszukiwanie po pracowniku
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $searchTerm = trim($this->search);
             $query->whereHas('employee', function (Builder $q) use ($searchTerm) {
                 $q->where(function ($query) use ($searchTerm) {
-                    $query->where('first_name', 'like', '%' . $searchTerm . '%')
-                          ->orWhere('last_name', 'like', '%' . $searchTerm . '%')
-                          ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $searchTerm . '%']);
+                    $query->where('first_name', 'like', '%'.$searchTerm.'%')
+                        ->orWhere('last_name', 'like', '%'.$searchTerm.'%')
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%'.$searchTerm.'%']);
                 });
             });
         }
 
-        // Filtrowanie po statusie
-        if (!empty($this->statusFilter)) {
-            switch ($this->statusFilter) {
-                case 'scheduled':
-                    $query->scheduled();
-                    break;
-                case 'active':
-                    $query->active();
-                    break;
-                case 'completed':
-                    $query->completed();
-                    break;
-            }
+        if (! empty($this->statusFilter)) {
+            match ($this->statusFilter) {
+                'scheduled' => $query->scheduled(),
+                'active' => $query->active(),
+                'completed' => $query->completed(),
+                'cancelled' => $query->where('status', 'cancelled'),
+                default => null,
+            };
         }
 
-        // Sortowanie
-        $query->orderBy($this->sortField, $this->sortDirection);
-
-        $rotations = $query->paginate(20);
+        $this->applySortToQuery($query);
 
         return view('livewire.rotations-table', [
-            'rotations' => $rotations,
+            'rotations' => $query->paginate(20),
         ]);
     }
 }

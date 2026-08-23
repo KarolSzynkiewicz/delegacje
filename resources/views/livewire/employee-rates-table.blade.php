@@ -1,59 +1,34 @@
 <div>
-    <x-ui.card>
-        @if(session('success'))
-            <x-ui.alert variant="success" dismissible>
-                {{ session('success') }}
-            </x-ui.alert>
-        @endif
+    @if(session('success'))
+        <x-ui.alert variant="success" dismissible class="mb-3">
+            {{ session('success') }}
+        </x-ui.alert>
+    @endif
 
-        <!-- Filtry -->
-        <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="row g-2 align-items-end">
-                <!-- Wyszukiwanie po pracowniku -->
-                <div class="col-md-4">
-                    <label for="search" class="form-label small fw-semibold mb-1">
-                        <i class="bi bi-search me-1"></i> Szukaj pracownika
-                    </label>
-                    <input type="text" 
-                           id="search"
-                           wire:model.live.debounce.300ms="search" 
-                           class="form-control form-control-sm" 
-                           placeholder="Imię lub nazwisko...">
-                </div>
-
-                <!-- Filtrowanie po walucie -->
-                <div class="col-md-3">
-                    <label for="currencyFilter" class="form-label small fw-semibold mb-1">
-                        Waluta
-                    </label>
-                    <select id="currencyFilter" 
-                            wire:model.live="currencyFilter" 
-                            class="form-select form-select-sm">
-                        <option value="">Wszystkie</option>
-                        <option value="PLN">PLN</option>
-                        <option value="EUR">EUR</option>
-                        <option value="USD">USD</option>
-                    </select>
-                </div>
-
-                <!-- Przycisk wyczyść -->
-                <div class="col-md-2">
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="w-100 btn-sm">
-                        <i class="bi bi-x-circle"></i> Wyczyść
-                    </x-ui.button>
-                </div>
-
-                <!-- Informacja o liczbie wyników -->
-                <div class="col-md-1 text-end">
-                    @if($rates->total() > 0)
-                        <small class="text-muted">
-                            <strong>{{ $rates->total() }}</strong>
-                        </small>
-                    @endif
-                </div>
-            </div>
+    <x-data-table-filters
+        :count="$rates->total()"
+        :has-filters="(bool) (!empty($search) || !empty($currencyFilter))"
+        item-label="stawek"
+    >
+        <div class="dt-filter-field dt-filter-field--wide">
+            <label for="search" class="form-label small">
+                <i class="bi bi-search me-1"></i> Szukaj pracownika
+            </label>
+            <input type="text" id="search" wire:model.live.debounce.300ms="search" class="form-control" placeholder="Imię lub nazwisko...">
         </div>
 
+        <div class="dt-filter-field">
+            <label for="currencyFilter" class="form-label small">Waluta</label>
+            <select id="currencyFilter" wire:model.live="currencyFilter" class="form-select">
+                <option value="">Wszystkie</option>
+                <option value="PLN">PLN</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+            </select>
+        </div>
+    </x-data-table-filters>
+
+    <x-ui.card>
         @if($rates->count() > 0)
             <div class="table-responsive">
                 <table class="table align-middle">

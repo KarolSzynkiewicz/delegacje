@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\InteractsWithSortableTable;
 use App\Models\Location;
 use App\Models\Project;
 use Livewire\Component;
@@ -9,6 +10,7 @@ use Livewire\WithPagination;
 
 class ProjectsTable extends Component
 {
+    use InteractsWithSortableTable;
     use WithPagination;
 
     public $search = '';
@@ -21,10 +23,9 @@ class ProjectsTable extends Component
 
     public $sortDirection = 'asc';
 
-    // Optional filter for /mine/* routes
     public $filterProjectIds = null;
 
-    public $isMineView = false; // Flag to use /mine/* routes
+    public $isMineView = false;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -34,22 +35,22 @@ class ProjectsTable extends Component
         'sortDirection' => ['except' => 'asc'],
     ];
 
-    public function updatingSearch()
+    public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function updatingStatusFilter()
+    public function updatingStatusFilter(): void
     {
         $this->resetPage();
     }
 
-    public function updatingLocationFilter()
+    public function updatingLocationFilter(): void
     {
         $this->resetPage();
     }
 
-    public function clearFilters()
+    public function clearFilters(): void
     {
         $this->search = '';
         $this->statusFilter = '';
@@ -59,37 +60,28 @@ class ProjectsTable extends Component
         $this->resetPage();
     }
 
-    public function paginationView()
+    public function paginationView(): string
     {
         return 'vendor.livewire.simple-pagination';
     }
 
-    public function sortBy($field)
+    protected function sortableFields(): array
     {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-
-        $this->resetPage();
+        return ['name', 'status', 'type', 'start_date', 'end_date'];
     }
 
     public function render()
     {
         $query = Project::with('location');
 
-        // Filtrowanie po zarządzanych projektach (dla /mine/*)
         if ($this->filterProjectIds && is_array($this->filterProjectIds) && ! empty($this->filterProjectIds)) {
             $query->whereIn('id', $this->filterProjectIds);
-            $this->isMineView = true; // Ustaw flagę jeśli filtrujemy
+            $this->isMineView = true;
         }
 
-        // Filtrowanie po nazwie/kliencie
         if ($this->search) {
             $searchTerm = trim($this->search);
-            if (strlen($searchTerm) >= 2) { // Minimum 2 znaki dla wyszukiwania
+            if (strlen($searchTerm) >= 2) {
                 $query->where(function ($q) use ($searchTerm) {
                     $q->where('name', 'like', '%'.$searchTerm.'%')
                         ->orWhere('client_name', 'like', '%'.$searchTerm.'%');
@@ -97,34 +89,23 @@ class ProjectsTable extends Component
             }
         }
 
-        // Filtrowanie po statusie
         if ($this->statusFilter) {
             $query->where('status', $this->statusFilter);
         }
 
-        // Filtrowanie po lokalizacji
         if ($this->locationFilter) {
             $query->where('location_id', $this->locationFilter);
         }
 
-        // Sortowanie
-        $allowedSortFields = ['name', 'status', 'type', 'start_date', 'end_date'];
-        $sortField = in_array($this->sortField, $allowedSortFields, true) ? $this->sortField : 'name';
-        $query->orderBy($sortField, $this->sortDirection);
+        $this->applySortToQuery($query);
 
-        $projects = $query->paginate(15);
-
-        // Cache locations - zmieniają się rzadko
-        $locations = cache()->remember('locations_list', 3600, function () {
-            return Location::orderBy('name')->get();
-        });
-
-        $statuses = \App\Enums\ProjectStatus::cases();
+        $locations = cache()->remember('locations_list', 3600, fn () => Location::orderBy('name')->get());
 
         return view('livewire.projects-table', [
-            'projects' => $projects,
+            'projects' => $query->paginate(15),
             'locations' => $locations,
-            'statuses' => $statuses,
+            'statuses' => \App\Enums\ProjectStatus::cases(),
+            'isMineView' => $this->isMineView,
         ]);
     }
 }

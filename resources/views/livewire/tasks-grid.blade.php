@@ -14,12 +14,46 @@
         /* Chrome (tło/obramowanie) jest już na .app-page-shell w layoucie —
            tu zostaje tylko scoping CSS, bez drugiej „karty w karcie”. */
     }
-    /* Pigułka aktywnego zapisanego widoku używała Bootstrapowego .btn-info
-       (jaskrawy cyjan) — kolidowało to z resztą fioletowej palety. */
-    .xuiv2-tasks .rp-topbar-btn.btn-info {
-        background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
-        border-color: transparent !important;
-        color: #fff !important;
+    /* Toolbar: zero gradientu — tytuł Backlog ma być jedynym mocnym akcentem.
+       Aktywny stan to cichy tint, nie CTA. */
+    .xuiv2-tasks .tg-quiet-btn,
+    .xuiv2-tasks .rp-topbar-btn {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        color: var(--text-muted, #94a3b8) !important;
+        box-shadow: none !important;
+        filter: none !important;
+        transform: none !important;
+    }
+    .xuiv2-tasks .tg-quiet-btn:hover,
+    .xuiv2-tasks .rp-topbar-btn:hover {
+        background: rgba(255, 255, 255, 0.07) !important;
+        border-color: rgba(255, 255, 255, 0.14) !important;
+        color: var(--text-main, #f1f5f9) !important;
+        filter: none !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+    .xuiv2-tasks .tg-quiet-btn.is-on,
+    .xuiv2-tasks .rp-topbar-btn.is-on {
+        background: rgba(168, 85, 247, 0.10) !important;
+        border-color: rgba(168, 85, 247, 0.28) !important;
+        color: #e2e8f0 !important;
+    }
+    .xuiv2-tasks .tg-quiet-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.2em;
+        padding: 0 .3rem;
+        margin-left: .3rem;
+        border-radius: 999px;
+        font-size: .62rem;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        opacity: .85;
     }
     /* Nagłówek strony ("Backlog" + Sprinty/Widok kart) żyje poza tym komponentem
        (renderowany przez x-app-layout), więc dociągamy go tą samą klasą na <body>.
@@ -81,10 +115,13 @@
 
     /* Compact btn-sm — app.css hardcodes 10px 24px on .btn, killing Bootstrap's btn-sm vars */
     .tg-toolbar .btn {
-        padding: 7px 15px !important;
-        font-size: 0.8rem !important;
+        padding: 5px 11px !important;
+        font-size: 0.78rem !important;
         border-radius: 8px !important;
         gap: 5px !important;
+        box-shadow: none !important;
+        transform: none !important;
+        filter: none !important;
     }
     .tg-toolbar .btn-group .btn { border-radius: 0 !important; }
     .tg-toolbar .btn-group .btn:first-child { border-radius: 8px 0 0 8px !important; }
@@ -254,9 +291,47 @@
         color: var(--text-muted, #94a3b8) !important;
     }
     .tg-add-row > td {
-        border-top: 2px solid var(--primary, #3b82f6) !important;
-        background: rgba(59,130,246,0.07) !important;
+        border-top: 1px dashed rgba(255, 255, 255, 0.1) !important;
+        background: rgba(255, 255, 255, 0.02) !important;
         padding: 5px 6px !important;
+    }
+    .tg-add-row .form-control,
+    .tg-add-row .form-select {
+        background: rgba(15, 23, 42, 0.45) !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        color: var(--text-main, #f1f5f9) !important;
+        font-size: 0.8rem !important;
+        box-shadow: none !important;
+    }
+    .tg-add-row .form-control:focus,
+    .tg-add-row .form-select:focus {
+        border-color: rgba(168, 85, 247, 0.35) !important;
+        box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.12) !important;
+    }
+    .tg-add-row .tg-add-submit,
+    .tg-add-card .tg-add-submit {
+        background: rgba(168, 85, 247, 0.12) !important;
+        border: 1px solid rgba(168, 85, 247, 0.28) !important;
+        color: #d8b4fe !important;
+        box-shadow: none !important;
+        filter: none !important;
+        transform: none !important;
+    }
+    .tg-add-row .tg-add-submit:hover,
+    .tg-add-card .tg-add-submit:hover {
+        background: rgba(168, 85, 247, 0.2) !important;
+        color: #f1e8ff !important;
+        filter: none !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+    .tg-add-row .tg-add-status {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 0.68rem;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: var(--text-muted, #94a3b8);
+        white-space: nowrap;
     }
 
     /* ── Subtask drag-and-drop ── */
@@ -364,7 +439,10 @@
     .tg-group-card-header:first-child { margin-top: 0; }
 
     /* ── Add-task (mobile) ── */
-    .tg-add-card { border: 2px solid var(--primary,#3b82f6); background: rgba(59,130,246,0.07); }
+    .tg-add-card {
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.02);
+    }
     .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
 </style>
 
@@ -401,10 +479,10 @@
             <div x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openType: false, openSearch: false, openGroup: false, openColumns: false }">
                 <button type="button"
                         @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); const pw=Math.min(600, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.left, window.innerWidth-pw-4)); open=true"
-                        class="btn btn-sm xuiv2-magnetic {{ count($this->activeFilterChips()) > 0 ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ count($this->activeFilterChips()) > 0 ? 'is-on' : '' }}">
                     <i class="bi bi-sliders me-1"></i>Filtry
                     @if(count($this->activeFilterChips()) > 0)
-                        <span class="badge tg-mono bg-light text-dark ms-1" style="font-size:.6rem">{{ count($this->activeFilterChips()) }}</span>
+                        <span class="tg-quiet-count">{{ count($this->activeFilterChips()) }}</span>
                     @endif
                     <i class="bi bi-chevron-down ms-1" style="font-size:.6rem"></i>
                 </button>
@@ -422,9 +500,9 @@
             @unless($this->isLockedToSprint())
                 @foreach($savedViews as $savedView)
                     <button type="button" wire:click="loadView('{{ $savedView->slug }}')"
-                            class="btn btn-sm rp-topbar-btn {{ $view === $savedView->slug ? 'btn-info' : 'btn-outline-secondary' }}">
+                            class="btn btn-sm btn-outline-secondary rp-topbar-btn {{ $view === $savedView->slug ? 'is-on' : '' }}">
                         <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"></i>{{ $savedView->name }}
-                        <span class="rp-view-count">{{ $viewCounts[$savedView->slug] ?? 0 }}</span>
+                        <span class="tg-quiet-count">{{ $viewCounts[$savedView->slug] ?? 0 }}</span>
                     </button>
                 @endforeach
             @endunless
@@ -442,7 +520,7 @@
                     <div x-data="{ open: false, top: 0, left: 0 }">
                         <button type="button"
                                 @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.max(4, r.right-260); open=true"
-                                class="btn btn-sm btn-outline-secondary"
+                                class="btn btn-sm btn-outline-secondary tg-quiet-btn"
                                 title="Zapisz i zarządzaj widokami">
                             <i class="bi bi-bookmark{{ $view ? '-fill' : '' }}"></i>
                         </button>
@@ -508,7 +586,7 @@
                     {{-- Domyślny widok w menu --}}
                     <button type="button"
                             wire:click="setAsMenuDefaultView"
-                            class="btn btn-sm {{ $isMenuDefaultView ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ $isMenuDefaultView ? 'is-on' : '' }}"
                             title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
                         <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }}"></i>
                     </button>
@@ -691,7 +769,7 @@
                                    wire:keydown.enter="addTask"
                                    wire:keydown.escape="$set('showAddRow', false)"
                                    x-data x-init="$el.focus()">
-                            <button wire:click="addTask" class="btn btn-sm btn-primary xuiv2-magnetic flex-shrink-0">
+                            <button wire:click="addTask" class="btn btn-sm tg-add-submit flex-shrink-0">
                                 <i class="bi bi-plus-lg me-1"></i>Dodaj
                             </button>
                         </div>
@@ -707,7 +785,7 @@
 
                     @if(in_array('status', $visibleColumns))
                     <td style="padding:4px 6px">
-                        <span class="badge bg-warning text-dark" style="font-size:0.72rem">⏳ Oczekujące</span>
+                        <span class="tg-add-status">Oczekujące</span>
                     </td>
                     @endif
 
@@ -883,7 +961,7 @@
             <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
             @endif
 
-            <button wire:click="addTask" class="btn btn-sm btn-primary w-100">
+            <button wire:click="addTask" class="btn btn-sm tg-add-submit w-100">
                 <i class="bi bi-plus-lg me-1"></i>Dodaj zadanie
             </button>
         </div>

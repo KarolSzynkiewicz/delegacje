@@ -1,53 +1,28 @@
 <div>
-    <!-- Statystyki i Filtry -->
-    <x-ui.card class="mb-4">
-        <!-- Statystyki -->
-        <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <div>
-                    <h3 class="fs-5 fw-semibold mb-1">Oceny Pracowników</h3>
-                    <p class="small text-muted mb-0">
-                        @if($search || $employeeFilter)
-                            Znaleziono: <span class="fw-semibold">{{ $evaluations->total() }}</span> ocen
-                        @else
-                            Łącznie: <span class="fw-semibold">{{ $evaluations->total() }}</span> ocen
-                        @endif
-                    </p>
-                </div>
-                @if($search || $employeeFilter)
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                @endif
-            </div>
+    <x-data-table-filters
+        :count="$evaluations->total()"
+        :has-filters="(bool) ($search || $employeeFilter)"
+        item-label="ocen"
+    >
+        <div class="dt-filter-field">
+            <label class="form-label small">
+                <i class="bi bi-person me-1"></i> Pracownik
+            </label>
+            <select wire:model.live="employeeFilter" class="form-select">
+                <option value="">Wszyscy pracownicy</option>
+                @foreach($employees as $employee)
+                    <option value="{{ $employee->id }}">{{ $employee->full_name }}</option>
+                @endforeach
+            </select>
         </div>
 
-        <!-- Filtry -->
-        <div class="row g-3">
-            <!-- Pracownik -->
-            <div class="col-md-6">
-                <label class="form-label small">
-                    <i class="bi bi-person me-1"></i> Pracownik
-                </label>
-                <select wire:model.live="employeeFilter" class="form-control">
-                    <option value="">Wszyscy pracownicy</option>
-                    @foreach($employees as $employee)
-                        <option value="{{ $employee->id }}">{{ $employee->full_name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Wyszukiwanie -->
-            <div class="col-md-6">
-                <label class="form-label small">
-                    <i class="bi bi-search me-1"></i> Szukaj w uwagach
-                </label>
-                <input type="text" wire:model.live.debounce.300ms="search"
-                    placeholder="Szukaj w uwagach..."
-                    class="form-control">
-            </div>
+        <div class="dt-filter-field dt-filter-field--wide">
+            <label class="form-label small">
+                <i class="bi bi-search me-1"></i> Szukaj w uwagach
+            </label>
+            <input type="text" wire:model.live.debounce.300ms="search" placeholder="Szukaj w uwagach..." class="form-control">
         </div>
-    </x-ui.card>
+    </x-data-table-filters>
 
     <!-- Tabela -->
     <x-ui.card>

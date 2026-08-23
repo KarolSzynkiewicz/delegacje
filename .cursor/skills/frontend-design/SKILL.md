@@ -30,11 +30,14 @@ Defined in `resources/css/app.css` `:root` (~line 8):
   never a flat single color, never a different hue (no teal/cyan — that was
   the original `chronologic-landing.html` reference but was deliberately
   recolored to this blue→purple pair to match the rest of the app).
-- `--bg-body: #070a13`, `--bg-card: rgba(13, 18, 30, 0.72)` (darkened/less
-  transparent on purpose — the original `rgba(30,41,59,0.5)` let too much
-  light bleed through `backdrop-filter` from bright content behind the card,
-  making cards elsewhere look noticeably lighter than `/tasks2`'s own
-  `.xuiv2-tasks` wrapper, which sits on a near-solid `#070a13`),
+- `--bg-body: #070a13`, `--bg-card: rgba(13, 18, 30, 0.52)` (glass: dark
+  enough that badges don't blow the fill out, open enough that the page
+  grid and `.cl-cursor-glow` show through). Do **not** drop an opaque
+  `#070a13` panel behind cards (`.app-page-shell` used to, matching `/tasks2`,
+  and it killed the flashlight). Keep `.app-content-wrapper` as a light tint,
+  not an `rgba(..., 0.8)` slab, and don't put `backdrop-filter` on that
+  full-viewport wrapper — it frosts the glow before any `.card` can pick it
+  up. Card blur stays modest (`8px`).
   `--text-main: #f1f5f9`, `--text-muted: #94a3b8`, `--glass-border: rgba(255,255,255,0.1)`.
 - Fonts: **Space Grotesk** is the global body/display font (loaded via
   `<link>` in `layouts/app.blade.php` + `layouts/guest.blade.php`, applied via
@@ -63,14 +66,14 @@ Three layers, all in `app.css`, none of them animate anything expensive:
 3. `.cl-cursor-glow` — one JS-injected div (`resources/js/app.js`), position
    driven by a single `requestAnimationFrame`-throttled `mousemove` listener.
 
-**Known trap — don't repeat it**: `.app-content-wrapper::before` also does
-`backdrop-filter: blur(12px)` to blur whatever is *behind* it (needed so
-fixed-position modals don't get trapped by it as a containing block). Since
-`.app-content-wrapper` covers ~the whole viewport on every page, anything
-relying on being visible *behind* a blurred/translucent container will look
-like it "disappeared" globally. Fix: draw texture/pattern *on* the blurring
-element's own `background-image` (painted on top of its own blur, stays
-crisp), not on an ancestor further back.
+**Known trap — don't repeat it**: `backdrop-filter` on an element that covers
+the viewport (`.app-content-wrapper` or its `::before`) frosts the cursor
+glow *and* becomes a containing block for `position: fixed` descendants
+(modals jump to the middle of a long page). Grid/grain belong on that
+layer as `background-image` (stays crisp). Leave frosting to the cards
+themselves. Never paint an opaque panel (`.app-page-shell { background:
+#070a13 }`) between the glow (`z-index: -1` on `body`) and `.card` —
+cards then sample a solid slab, not the flashlight.
 
 **Perf trap — don't repeat it**: never `querySelectorAll` + `getBoundingClientRect()`
 on every `mousemove` for more than a handful of elements. A magnetic-button
@@ -154,6 +157,16 @@ card. Mobile: the same compact dropdown as tabs. On `< md`, stock/issues
 also render duplicate **cards** (`_stock-item-card.blade.php`,
 `_qty-tile.blade.php`) like `/tasks2`; the desktop table stays.
 
+Stock list has **no action icons**. The whole card / table row is the hit
+target (`stretched-link` on the name, `data-eq-stock-href` on the `<tr>`).
+The only control that must stay above that overlay is the variant toggle
+(`.eq-stock-item__toggle` — `position: relative; z-index: 2` +
+`stopPropagation`). Edit, withdraw and restore live on `equipment/show`.
+Mobile card header is a left-aligned photo slot (same box for
+with/without variants) + name + compact meta (category as text, small
+toggle — not fat `x-ui.badge`s). Photos `align-items: flex-start` so a
+taller variant row does not drop the thumbnail.
+
 ## Responsive / mobile patterns — pick based on row complexity
 
 The app is desktop-first with many dense `<table>`s. Four established
@@ -202,15 +215,67 @@ data source (see `resources/views/livewire/tasks-grid.blade.php` and
 twice — loop the same collection twice, computing per-row `@php` values in
 each loop body (cheap, no extra queries).
 
-**4. Collapsible filter panel behind one button** (when a toolbar has more
+**Preferred shell for new list tables:** `<x-data-table>` (`resources/views/components/data-table.blade.php`) + per-entity partials `livewire/partials/{entity}-row.blade.php` and `{entity}-row-card.blade.php`. Desktop table in `head`/`body` slots; mobile cards in `cards` slot. Each mobile card is `<x-ui.card class="dt-card">` with title link `class="stretched-link"` (whole card clickable — no separate "Zobacz" eye button). Label/value rows use `.dt-card__row` / `.dt-card__label` / `.dt-card__value` (grid + separator in `app.css` `.dt-*`). Sort/filter Livewire: trait `InteractsWithSortableTable`; logistics lists share `FiltersLogisticsEvents` + `logistics-events-filters` partial. Reference: `locations-table`, `projects-table`, `departures-table`.
+
+**4. Filter toolbar above a list table:** use `<x-data-table>` with three
+slots: `filters`, `activeFilters`, and table slots (`head`/`body`/…).
+`<x-data-table-filters>` goes inside the `filters` slot — compact row of
+`form-control-sm` / `form-select-sm` fields side by side (`.dt-toolbar`,
+no labels above fields), count on the right as generic **„Rekordów: N"**
+(never repeat entity name — page header already says „Lokalizacje" etc.).
+`<x-data-table-active-filters>` + `<x-data-table-filter-chip>` go in the
+`activeFilters` slot — shown only when `:has-filters="true"` on
+`<x-data-table>`; renders „Filtry:" + removable chips + „Wyczyść" between
+the two cards (same `.rp-active-filters` as `/tasks2`). Layout:
+**karta filtrów → pasek aktywnych filtrów → karta tabeli** (`.dt-shell`).
+Never repeat page title in filter card. Requires `clearFilters()` on the
+Livewire component. Reference: `rotations-table.blade.php`,
+`logistics-events-filters.blade.php` + `logistics-events-active-filters.blade.php`.
+
+**5. Collapsible filter panel behind one button** (when a toolbar has more
 than ~3 filter controls, they must NOT all stack full-width on mobile by
-default). Alpine `x-data="{ filtersOpen: window.innerWidth >= 768 }"` on the
-wrapper, `x-show="filtersOpen"` on the filter grid, a `d-md-none` toggle
-button showing an active-filter-count badge. See `employees-table.blade.php`
-and the more elaborate grouped version in `tg-filter-panel.blade.php` /
-`/recruitment-processes` (grouped sections instead of a flat wall of toggles
-— prefer this over one-checkbox-per-concept when there are many filter
-*types*, not just many filter *values*).
+default). This behavior is built into `<x-data-table-filters>` (see above)
+for standard list-table toolbars; for anything not using that component,
+replicate the same Alpine pattern manually: `x-data="{ filtersOpen:
+window.innerWidth >= 768 }"` on the wrapper, `x-show="filtersOpen"` on the
+filter grid, a `d-md-none` toggle button showing an active-filter-count
+badge. See `employees-table.blade.php` and the more elaborate grouped
+version in `tg-filter-panel.blade.php` / `/recruitment-processes` (grouped
+sections instead of a flat wall of toggles — prefer this over
+one-checkbox-per-concept when there are many filter *types*, not just many
+filter *values*).
+
+**6. Overlapping avatars for a "participants" column:** when a table row
+has multiple related people (departures/return-trips/transfers
+"Uczestnicy" column) and full `x-employee-cell` rows per person would be
+too tall, use `<x-ui.avatar-stack :employees="$collection" size="30px"
+:max="4" />` (`resources/views/components/ui/avatar-stack.blade.php`).
+Renders overlapping circular avatars (negative margin + ring via
+box-shadow, `.avatar-stack` in `app.css`) with a native `title` tooltip
+per avatar (no extra JS/tooltip component — keep it cheap since it renders
+per row) and a `+N` overflow bubble past `max`. Pass any collection of
+`Employee` models (or nullable — falsy entries are filtered).
+
+## Three more traps worth knowing about
+
+**Livewire silently breaks `@endif` glued directly to a word character**:
+Livewire 3's `ExtendBlade` mechanism rewrites every top-level `@if`/`@endif`
+pair (it wraps them in `<!--[if BLOCK]>`/`<!--[if ENDBLOCK]>` HTML comment
+markers for DOM diffing). Its parser fails to recognize `@endif` as a
+directive — leaving it as literal, uncompiled text — when the character
+immediately before it in the source is a word character (letter/digit/`_`)
+with **no space or newline**, e.g. `@if($x)some text@endif`. This blows up
+at runtime as `syntax error, unexpected end of file, expecting "elseif" or
+"else" or "endif"`, pointing at some unrelated later line (because the
+compiled PHP is now missing one `endif;`), which makes it confusing to
+debug — the real bug is the *first* glued `@endif` in the file, not the
+line the error reports. It only manifests inside Livewire components, not
+plain Blade views. `@endif` preceded by `}}`, `)`, `,`, or any other
+non-word character compiles fine. Fix: always put a space (or newline)
+before `@endif`/`@endforeach`/`@endunless` when they immediately follow
+inline text, e.g. `@if($x)some text @endif`. If something like this ever
+breaks again, dump the compiled view (`Blade::compileString(...)`) and
+`php -l` it to see exactly which `@endif` stayed as literal text.
 
 ## Two more traps worth knowing about
 

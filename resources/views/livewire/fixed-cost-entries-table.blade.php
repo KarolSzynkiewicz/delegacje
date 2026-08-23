@@ -1,59 +1,47 @@
 <div>
-    <div class="mb-4 pb-3 border-top border-bottom">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-            <div>
-                <h3 class="fs-5 fw-semibold mb-1 d-flex align-items-center gap-1">
-                    Koszty Księgowe
-                    <x-tooltip title="Koszty księgowe to faktyczne wpisy kosztów ogólnofirmowych w systemie. Mogą być generowane automatycznie z szablonów (przy użyciu funkcji 'Generuj Koszty Ogólnofirmowe') lub dodawane ręcznie jako koszty niestandardowe. Każdy wpis zawiera kwotę, okres obowiązywania, datę księgowania i opcjonalnie powiązanie z szablonem. Te wpisy są używane do obliczania rzeczywistych kosztów w raportach zysków i strat." direction="bottom">
-                        <i class="bi bi-info-circle text-primary fs-6"></i>
-                    </x-tooltip>
-                </h3>
-                <p class="small text-muted mb-0">
-                    @if($hasFilters)
-                        Znaleziono: <span class="fw-semibold">{{ $entries->total() }}</span> kosztów księgowych
-                    @else
-                        Łącznie: <span class="fw-semibold">{{ $entries->total() }}</span> kosztów księgowych
-                    @endif
-                </p>
-            </div>
-            @if($hasFilters)
-                <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm">
-                    <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                </x-ui.button>
-            @endif
-        </div>
-
-        <div class="row g-2 align-items-end">
-            <div class="col-md-6">
-                <label for="fixed-cost-entries-search" class="form-label small fw-semibold mb-1">
-                    <i class="bi bi-search me-1"></i> Szukaj
-                </label>
-                <input
-                    type="text"
-                    id="fixed-cost-entries-search"
-                    wire:model.live.debounce.300ms="search"
-                    class="form-control form-control-sm"
-                    placeholder="Nazwa, kategoria, szablon, notatki…"
-                    autocomplete="off"
-                >
-            </div>
-            <div class="col-md-4">
-                <label for="fixed-cost-entries-category" class="form-label small fw-semibold mb-1">
-                    <i class="bi bi-tags me-1"></i> Kategoria
-                </label>
-                <select
-                    id="fixed-cost-entries-category"
-                    wire:model.live="categoryFilter"
-                    class="form-select form-select-sm"
-                >
-                    <option value="">Wszystkie kategorie</option>
-                    @foreach($categoryOptions as $key => $label)
-                        <option value="{{ $key }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
-        </div>
+    <div class="d-flex align-items-center gap-1 mb-3">
+        <h3 class="fs-6 fw-semibold text-muted mb-0">
+            Koszty Księgowe
+        </h3>
+        <x-tooltip title="Koszty księgowe to faktyczne wpisy kosztów ogólnofirmowych w systemie. Mogą być generowane automatycznie z szablonów (przy użyciu funkcji 'Generuj Koszty Ogólnofirmowe') lub dodawane ręcznie jako koszty niestandardowe. Każdy wpis zawiera kwotę, okres obowiązywania, datę księgowania i opcjonalnie powiązanie z szablonem. Te wpisy są używane do obliczania rzeczywistych kosztów w raportach zysków i strat." direction="bottom">
+            <i class="bi bi-info-circle text-primary fs-6"></i>
+        </x-tooltip>
     </div>
+
+    <x-data-table-filters
+        :count="$entries->total()"
+        :has-filters="$hasFilters"
+        item-label="kosztów księgowych"
+    >
+        <div class="dt-filter-field dt-filter-field--wide">
+            <label for="fixed-cost-entries-search" class="form-label small">
+                <i class="bi bi-search me-1"></i> Szukaj
+            </label>
+            <input
+                type="text"
+                id="fixed-cost-entries-search"
+                wire:model.live.debounce.300ms="search"
+                class="form-control"
+                placeholder="Nazwa, kategoria, szablon, notatki…"
+                autocomplete="off"
+            >
+        </div>
+        <div class="dt-filter-field">
+            <label for="fixed-cost-entries-category" class="form-label small">
+                <i class="bi bi-tags me-1"></i> Kategoria
+            </label>
+            <select
+                id="fixed-cost-entries-category"
+                wire:model.live="categoryFilter"
+                class="form-select"
+            >
+                <option value="">Wszystkie kategorie</option>
+                @foreach($categoryOptions as $key => $label)
+                    <option value="{{ $key }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+    </x-data-table-filters>
 
     @if($entries->count() > 0)
         <div class="table-responsive">

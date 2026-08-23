@@ -19,21 +19,34 @@
         @livewireStyles
     </head>
     <body class="min-vh-100">
+        @php
+            $edgeToEdge = $edgeToEdge ?? false;
+            $fullWidth = $fullWidth ?? false;
+        @endphp
         <div class="min-vh-100 d-flex flex-column position-relative">
             @include('layouts.navigation')
 
             <div class="flex-grow-1 position-relative app-content-wrapper">
-                <!-- Page Heading -->
                 @if (isset($header))
                     <header class="app-header">
-                        <div class="container-xxl py-3 px-3 px-md-4 px-lg-5">
+                        <div @class([
+                            'py-3',
+                            'w-100 px-2 px-md-3' => $edgeToEdge,
+                            'container-fluid px-2 px-md-3' => ! $edgeToEdge && $fullWidth,
+                            'container-xxl px-3 px-md-4 px-lg-5' => ! $edgeToEdge && ! $fullWidth,
+                        ])>
                             {{ $header }}
                         </div>
                     </header>
                 @endif
 
                 <!-- Page Content -->
-                <main class="flex-grow-1 container-xxl py-4 px-3 px-md-4 px-lg-5">
+                <main @class([
+                    'flex-grow-1 py-4',
+                    'w-100 px-2 px-md-3' => $edgeToEdge,
+                    'container-fluid px-2 px-md-3' => ! $edgeToEdge && $fullWidth,
+                    'container-xxl px-3 px-md-4 px-lg-5' => ! $edgeToEdge && ! $fullWidth,
+                ])>
                     <div class="app-page-shell">
                         @yield('content')
                         @isset($slot)

@@ -1,152 +1,74 @@
-<div x-data="{ filtersOpen: window.innerWidth >= 768 }" @resize.window="if (window.innerWidth >= 768) filtersOpen = true">
-    <!-- Statystyki i Filtry -->
-    <x-ui.card class="mb-4">
-        <!-- Statystyki -->
-        <div class="mb-0 mb-md-4 pb-3 border-top border-bottom">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <div>
-                    <h3 class="fs-5 fw-semibold mb-1">Pracownicy</h3>
-                <p class="small text-muted mb-0">
-                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
-                        Znaleziono: <span class="fw-semibold font-mono">{{ $employees->total() }}</span> pracowników
-                        @if($statusDate)
-                            <span class="text-primary">(stan na {{ \Carbon\Carbon::parse($statusDate)->format('d.m.Y') }})</span>
-                        @endif
-                        @if($showTerminated)
-                            <span class="text-muted">(z uwzględnieniem zwolnionych)</span>
-                        @endif
-                    @else
-                        Łącznie: <span class="fw-semibold font-mono">{{ $employees->total() }}</span> pracowników
-                    @endif
-                </p>
-                </div>
-                <div class="d-flex flex-wrap align-items-center gap-3">
-                    <div class="form-check mb-0 d-none d-md-flex">
-                        <input
-                            type="checkbox"
-                            class="form-check-input"
-                            id="showTerminated"
-                            wire:model.live="showTerminated"
-                        >
-                        <label class="form-check-label small" for="showTerminated">
-                            Pokaż zwolnionych
-                        </label>
-                    </div>
-                    @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
-                        <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm d-none d-md-inline-flex">
-                            <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                        </x-ui.button>
-                    @endif
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary btn-sm d-md-none"
-                        @click="filtersOpen = !filtersOpen"
-                        :aria-expanded="filtersOpen"
-                    >
-                        <i class="bi bi-funnel me-1"></i> Filtry
-                        @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
-                            <span class="badge badge-accent ms-1">{{ collect([$search, $roleFilter, $locationFilter, $rotationFilter, $statusDate, $companyFilter, $showTerminated ?: null])->filter()->count() }}</span>
-                        @endif
-                    </button>
-                </div>
+<div>
+    <x-data-table-filters
+        :count="$employees->total()"
+        :has-filters="(bool) ($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)"
+        item-label="pracowników"
+    >
+        @if($statusDate || $showTerminated)
+            <x-slot:note>
+                @if($statusDate){{ 'stan na '.\Carbon\Carbon::parse($statusDate)->format('d.m.Y') }}@endif
+                @if($statusDate && $showTerminated), @endif
+                @if($showTerminated)z uwzględnieniem zwolnionych @endif
+            </x-slot:note>
+        @endif
+
+        <x-slot:actions>
+            <div class="form-check mb-0 d-none d-md-flex">
+                <input type="checkbox" class="form-check-input" id="showTerminated" wire:model.live="showTerminated">
+                <label class="form-check-label small" for="showTerminated">Pokaż zwolnionych</label>
+            </div>
+        </x-slot:actions>
+
+        <div class="dt-filter-field d-md-none">
+            <div class="form-check mb-0">
+                <input type="checkbox" class="form-check-input" id="showTerminatedMobile" wire:model.live="showTerminated">
+                <label class="form-check-label small" for="showTerminatedMobile">Pokaż zwolnionych</label>
             </div>
         </div>
-
-        <!-- Filtry: zwijane na mobile pod przyciskiem "Filtry" (6 pól naraz zajmowało cały ekran) -->
-        <div x-show="filtersOpen" x-transition class="row g-3 mt-3 mt-md-0">
-            <div class="col-12 d-md-none">
-                <div class="form-check mb-0">
-                    <input
-                        type="checkbox"
-                        class="form-check-input"
-                        id="showTerminatedMobile"
-                        wire:model.live="showTerminated"
-                    >
-                    <label class="form-check-label small" for="showTerminatedMobile">
-                        Pokaż zwolnionych
-                    </label>
-                </div>
-            </div>
-            <!-- Wyszukiwanie -->
-            <div class="col-md-2">
-                <label class="form-label small">
-                    <i class="bi bi-search me-1"></i> Szukaj
-                </label>
-                <input type="text" wire:model.live.debounce.300ms="search" 
-                    placeholder="Imię, nazwisko, telefon..."
-                    class="form-control">
-            </div>
-
-            <!-- Data sprawdzenia statusu -->
-            <div class="col-md-2">
-                <label class="form-label small">
-                    <i class="bi bi-calendar me-1"></i> Stan na dzień
-                </label>
-                <input type="date" wire:model.live="statusDate" 
-                    placeholder="Dzisiaj"
-                    class="form-control">
-            </div>
-
-            <!-- Rola -->
-            <div class="col-md-2">
-                <label class="form-label small">
-                    <i class="bi bi-person-badge me-1"></i> Rola
-                </label>
-                <select wire:model.live="roleFilter" class="form-control">
-                    <option value="">Wszystkie role</option>
-                    @foreach($roles as $role)
-                        <option value="{{ $role->id }}">{{ $role->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Lokalizacja -->
-            <div class="col-md-2">
-                <label class="form-label small">
-                    <i class="bi bi-geo-alt me-1"></i> Lokalizacja
-                </label>
-                <select wire:model.live="locationFilter" class="form-control">
-                    <option value="">Wszystkie</option>
-                    <option value="base">Baza</option>
-                    <option value="field">W terenie</option>
-                    <option value="transit">W podróży</option>
-                </select>
-            </div>
-
-            <!-- Rotacja -->
-            <div class="col-md-2">
-                <label class="form-label small">
-                    <i class="bi bi-arrow-repeat me-1"></i> Rotacja
-                </label>
-                <select wire:model.live="rotationFilter" class="form-control">
-                    <option value="">Wszystkie</option>
-                    <option value="active">Aktywna</option>
-                    <option value="inactive">Nieaktywna</option>
-                </select>
-            </div>
-
-            <!-- Spółka -->
-            <div class="col-md-2">
-                <label class="form-label small">
-                    <i class="bi bi-building me-1"></i> Spółka
-                </label>
-                <select wire:model.live="companyFilter" class="form-control">
-                    <option value="">Wszystkie spółki</option>
-                    @foreach($companies as $company)
-                        <option value="{{ $company->id }}">{{ $company->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            @if($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)
-                <div class="col-12 d-md-none">
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="btn-sm w-100">
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                </div>
-            @endif
+        <div class="dt-filter-field dt-filter-field--wide">
+            <label class="form-label small"><i class="bi bi-search me-1"></i> Szukaj</label>
+            <input type="text" wire:model.live.debounce.300ms="search" placeholder="Imię, nazwisko, telefon..." class="form-control">
         </div>
-    </x-ui.card>
+        <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-calendar me-1"></i> Stan na dzień</label>
+            <input type="date" wire:model.live="statusDate" placeholder="Dzisiaj" class="form-control">
+        </div>
+        <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-person-badge me-1"></i> Rola</label>
+            <select wire:model.live="roleFilter" class="form-select">
+                <option value="">Wszystkie role</option>
+                @foreach($roles as $role)
+                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-geo-alt me-1"></i> Lokalizacja</label>
+            <select wire:model.live="locationFilter" class="form-select">
+                <option value="">Wszystkie</option>
+                <option value="base">Baza</option>
+                <option value="field">W terenie</option>
+                <option value="transit">W podróży</option>
+            </select>
+        </div>
+        <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-arrow-repeat me-1"></i> Rotacja</label>
+            <select wire:model.live="rotationFilter" class="form-select">
+                <option value="">Wszystkie</option>
+                <option value="active">Aktywna</option>
+                <option value="inactive">Nieaktywna</option>
+            </select>
+        </div>
+        <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-building me-1"></i> Spółka</label>
+            <select wire:model.live="companyFilter" class="form-select">
+                <option value="">Wszystkie spółki</option>
+                @foreach($companies as $company)
+                    <option value="{{ $company->id }}">{{ $company->name }}</option>
+                @endforeach
+            </select>
+        </div>
+    </x-data-table-filters>
 
     <!-- Karty na mobile: 8 kolumn tabeli (status/dom/auto/projekt/rotacja/spółka) nie
          mieszczą się na wąskim ekranie nawet ze scrollem — czytelniejszy jest jeden

@@ -20,12 +20,9 @@
     
     /* Nasze własne zmienne */
     --bg-body: #070a13;
-    /* Dociągnięte do ciemniejszego, mniej przezroczystego wzornika z /tasks2
-       (tam karty żyją na własnym, niemal jednolitym tle .xuiv2-tasks #070a13
-       i wypadają wyraźnie ciemniej/bardziej "matowo" niż gdzie indziej, gdzie
-       jasne badge/ikony/gradienty prześwitywały przez lekkie 0.5 rgba(30,41,59)
-       i backdrop-filter, robiąc karty zauważalnie jaśniejszymi). */
-    --bg-card: rgba(13, 18, 30, 0.72);
+    /* Szkło: dość ciemne, żeby badge/ikony nie rozjaśniały karty, ale
+       na tyle otwarte, żeby siatka i poświata kursora prześwitywały. */
+    --bg-card: rgba(13, 18, 30, 0.52);
     --bg-input: rgba(15, 23, 42, 0.8);
     --primary: #3b82f6;
     --accent: #a855f7;
@@ -279,8 +276,8 @@ body {
 /* Nadpisujemy Bootstrap .card */
 .card {
     background: var(--bg-card) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--glass-border) !important;
     border-radius: 20px;
     padding: 24px;
@@ -2008,7 +2005,7 @@ body::after {
     width: 460px;
     height: 460px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.10) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.16) 0%, rgba(59, 130, 246, 0.08) 42%, transparent 70%);
     pointer-events: none;
     z-index: -1;
     opacity: 0;
@@ -2048,14 +2045,19 @@ body::after {
    ZA elementem, a jego własne background-image rysuje się już ostro NA tym
    rozmyciu — więc siatka zostaje wyraźna niezależnie od reszty strony. */
 .app-content-wrapper {
+    /* Lekki tint, nie płyta — inaczej latarka (.cl-cursor-glow, z-index:-1)
+       i siatka z body giną zanim dotrą do szklanych kart.
+       z-index:0 trzyma siatkę z ::before w tej warstwie (bez isolation,
+       które by spłaszczyło backdrop-filter kart i ucięło poświatę). */
+    position: relative;
+    z-index: 0;
     background:
         radial-gradient(circle at 15% 0%, rgba(168, 85, 247, 0.09) 0%, transparent 45%),
         radial-gradient(circle at 85% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 45%),
-        rgba(7, 10, 19, 0.8) !important;
+        rgba(7, 10, 19, 0.28) !important;
     border-radius: 20px 20px 0 0;
     margin-top: 0;
     border: 1px solid var(--glass-border) !important;
-    isolation: isolate;
 }
 .app-content-wrapper::before {
     content: '';
@@ -2064,8 +2066,8 @@ body::after {
     z-index: -1;
     pointer-events: none;
     border-radius: inherit;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    /* Bez backdrop-filter: rozmywałby poświatę kursora na całym viewportcie
+       zanim karty zdążą ją zebrać własnym szkłem. Siatka zostaje ostra. */
     background-image:
         linear-gradient(to right, rgba(168, 85, 247, 0.05) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(168, 85, 247, 0.05) 1px, transparent 1px);
@@ -2081,18 +2083,18 @@ body::after {
     color: var(--text-muted) !important;
 }
 
-/* Skorupa strony — ten sam nieprzezroczysty panel co .xuiv2-tasks na /tasks2.
-   Karty wewnątrz siedzą NA nim, więc poświata kursora (.cl-cursor-glow, z-index:-1)
-   podświetla obrzeża wokół skorupy, a nie prześwituje przez półprzezroczyste
-   .card wiszące luzem na tle. isolation:isolate zamyka stacking, żeby glow
-   z body nie malował się „wewnątrz” zawartości. */
+/* Skorupa strony — szklana karta layoutu (jak /tasks2): widoczna ramka i tło,
+   ale wciąż półprzezroczysta, żeby siatka i latarka przeświecały. */
 .app-page-shell {
     position: relative;
-    isolation: isolate;
-    background: #070a13;
-    border: 1px solid #1e2740;
-    border-radius: 14px;
-    padding: 12px;
+    background: var(--bg-card) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 20px;
+    padding: 1.25rem 1.5rem;
+    min-height: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
 
 /* Subtelny efekt glassmorphism dla headerów */
@@ -2105,8 +2107,8 @@ body::after {
 /* Karty z lekkim efektem glass - używają .card z Bootstrap */
 .card {
     background: var(--bg-card) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--glass-border) !important;
     border-radius: 20px;
     transition: transform 0.2s, box-shadow 0.2s;
@@ -5417,9 +5419,6 @@ span.eq-wh-card {
 .eq-stock-table thead th:nth-child(6) {
     width: 11rem;
 }
-.eq-stock-table thead th:last-child {
-    width: 8.5rem;
-}
 
 .eq-stock-section td {
     padding: 1.15rem 1.25rem 0.55rem;
@@ -5454,11 +5453,17 @@ span.eq-wh-card {
     color: var(--text-muted);
 }
 
+.eq-stock-item {
+    cursor: pointer;
+}
 .eq-stock-item td {
     padding: 0.95rem 1rem;
     background: rgba(255, 255, 255, 0.025);
     border-top: 1px solid var(--glass-border);
     vertical-align: middle;
+}
+.eq-stock-item:hover td {
+    background: rgba(255, 255, 255, 0.045);
 }
 .eq-stock-item td:first-child {
     padding-left: 1.25rem;
@@ -5468,21 +5473,29 @@ span.eq-wh-card {
 }
 .eq-stock-item__main {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.9rem;
     min-width: 0;
 }
-.eq-stock-item__photo {
-    width: 3.35rem;
-    height: 3.35rem;
-    object-fit: cover;
+.eq-stock-item__photo-slot {
+    width: 3.25rem;
+    height: 3.25rem;
+    flex-shrink: 0;
+    display: block;
+    overflow: hidden;
     border-radius: 12px;
     border: 1px solid var(--glass-border);
-    flex-shrink: 0;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.06);
+}
+.eq-stock-item__photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
 }
 .eq-stock-item__photo.is-placeholder {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-muted);
@@ -5501,6 +5514,11 @@ span.eq-wh-card {
     font-weight: 650;
     font-size: 1.02rem;
     line-height: 1.3;
+    color: var(--text-main);
+    text-decoration: none;
+}
+.eq-stock-item__name:hover {
+    color: var(--text-main);
 }
 .eq-stock-item__desc {
     font-size: 0.88rem;
@@ -5521,16 +5539,18 @@ span.eq-wh-card {
     color: var(--text-muted);
 }
 .eq-stock-item__toggle {
+    position: relative;
+    z-index: 2;
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.28rem;
     margin: 0;
-    padding: 0.28rem 0.65rem 0.28rem 0.45rem;
+    padding: 0.1rem 0.4rem 0.1rem 0.28rem;
     border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.04);
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     line-height: 1.2;
     cursor: pointer;
 }
@@ -5544,16 +5564,18 @@ span.eq-wh-card {
     font-size: 0.85rem;
     transition: transform 0.15s ease;
 }
-.eq-stock-item.is-open .eq-stock-item__toggle i {
+.eq-stock-item.is-open .eq-stock-item__toggle i,
+.eq-stock-card.is-open .eq-stock-item__toggle i {
     transform: rotate(90deg);
 }
 .eq-stock-item__toggle-count {
-    min-width: 1.15rem;
-    padding: 0.05rem 0.35rem;
+    min-width: 1rem;
+    padding: 0 0.28rem;
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.18);
     font-variant-numeric: tabular-nums;
     text-align: center;
+    font-size: 0.68rem;
 }
 .eq-stock-item__actions {
     padding-right: 1rem;
@@ -5569,6 +5591,9 @@ span.eq-wh-card {
     margin: 0;
 }
 
+.eq-stock-variant[data-eq-stock-href] {
+    cursor: pointer;
+}
 .eq-stock-variant td {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
@@ -5578,12 +5603,12 @@ span.eq-wh-card {
 }
 .eq-stock-variant td:first-child {
     position: relative;
-    padding-left: 3.35rem;
+    padding-left: 5.4rem;
     white-space: nowrap;
 }
 .eq-stock-variant__branch {
     position: absolute;
-    left: 1.85rem;
+    left: 2.85rem;
     top: 0;
     width: 0.95rem;
     height: 50%;
@@ -5593,7 +5618,7 @@ span.eq-wh-card {
 .eq-stock-variant:not(.is-last) td:first-child::after {
     content: '';
     position: absolute;
-    left: 1.85rem;
+    left: 2.85rem;
     top: 50%;
     bottom: 0;
     border-left: 1px solid rgba(148, 163, 184, 0.45);
@@ -5653,24 +5678,42 @@ span.eq-wh-card {
 .eq-stock-card {
     position: relative;
     overflow: hidden;
-    border-radius: 14px;
+    border-radius: 16px;
     border: 1px solid var(--glass-border);
     background: rgba(255, 255, 255, 0.03);
-    padding: 0.85rem 0.9rem;
-    margin-bottom: 0.65rem;
+    padding: 0.85rem 0.9rem 0.9rem;
+    margin-bottom: 0.7rem;
+    cursor: pointer;
+}
+.eq-stock-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.16);
 }
 .eq-stock-card.is-withdrawn {
     opacity: 0.72;
 }
+.eq-stock-card__top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+}
+.eq-stock-card__top .eq-stock-item__photo-slot {
+    width: 5.5rem;
+    height: 5.5rem;
+    border-radius: 14px;
+}
+.eq-stock-card__top .eq-stock-item__photo.is-placeholder {
+    font-size: 2rem;
+}
 .eq-stock-card__top .eq-stock-item__text {
     min-width: 0;
-    flex: 1;
+    padding-top: 0.1rem;
 }
 .eq-stock-card__name {
     display: block;
     font-weight: 650;
-    font-size: 1.02rem;
-    line-height: 1.3;
+    font-size: 1.08rem;
+    line-height: 1.25;
     color: var(--text-main);
     text-decoration: none;
 }
@@ -5681,49 +5724,41 @@ span.eq-wh-card {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem 0.5rem;
+    gap: 0.28rem 0.5rem;
     margin-top: 0.35rem;
 }
-.eq-stock-card__actions {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.2rem;
-    margin-left: auto;
-    flex-shrink: 0;
+.eq-stock-card__flag {
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
-.eq-stock-card__actions .btn {
-    min-width: 2.35rem;
-    min-height: 2.35rem;
-    justify-content: center;
-    padding: 0.35rem;
-}
-.eq-stock-card__actions .btn i {
-    font-size: 1.05rem;
-    margin: 0;
+.eq-stock-card__meta .eq-stock-item__toggle {
+    min-height: 0;
+    padding: 0.08rem 0.38rem 0.08rem 0.25rem;
+    font-size: 0.7rem;
 }
 .eq-stock-card__tiles {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.45rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
     margin-top: 0.75rem;
-}
-.eq-stock-card__tiles > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
 }
 .eq-stock-tile {
     border-radius: 10px;
     border: 1px solid var(--glass-border);
     background: rgba(255, 255, 255, 0.03);
-    padding: 0.45rem 0.55rem 0.4rem;
+    padding: 0.4rem 0.45rem 0.35rem;
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
     min-width: 0;
 }
 .eq-stock-tile__label {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 650;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--text-muted);
     line-height: 1.2;
@@ -5731,7 +5766,7 @@ span.eq-wh-card {
 .eq-stock-tile__value {
     font-size: 1.05rem;
     font-weight: 650;
-    line-height: 1.2;
+    line-height: 1.15;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -5754,6 +5789,250 @@ span.eq-wh-card {
 }
 .eq-stock-card__tiles--compact .eq-stock-tile__value {
     font-size: 0.95rem;
+}
+
+/* ── x-data-table: mobile cards + desktop table shell ── */
+.dt-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+/* Wewnątrz używamy <x-ui.card class="dt-card"> — glass jak reszta aplikacji.
+   Cała karta jest klikalna przez .stretched-link na tytule (position:relative
+   na .dt-card + Bootstrap's .stretched-link ::after rozciągnięty na kartę),
+   dlatego dodatkowy przycisk "Zobacz" jest zbędny — patrz *-row-card.blade.php. */
+.dt-card.card {
+    position: relative;
+    padding: 1.1rem 1.25rem !important;
+    margin-bottom: 0;
+    border-radius: 16px !important;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dt-card.card:has(.stretched-link):hover {
+    border-color: rgba(96, 165, 250, 0.35) !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+}
+.dt-card__title {
+    font-weight: 700;
+    font-size: 1.2rem;
+    line-height: 1.3;
+    color: var(--text-main);
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.dt-card__title a {
+    color: inherit;
+    text-decoration: none;
+    /* z-index nad .stretched-link::after (z-index:1), żeby link "drugorzędny"
+       (np. pracownik w karcie rotacji) zostawał klikalny mimo że cała karta
+       też jest linkiem. */
+    position: relative;
+    z-index: 2;
+}
+.dt-card__title a:hover {
+    color: #93c5fd;
+}
+/* Siatka label/wartość: kolumna etykiety o stałej szerokości + pionowy
+   separator, żeby rozbicie było jednoznaczne niezależnie od długości treści. */
+.dt-card__row {
+    display: grid;
+    grid-template-columns: 6.4rem 1fr;
+    column-gap: 0.9rem;
+    align-items: baseline;
+    padding: 0.5rem 0;
+    font-size: 0.88rem;
+}
+.dt-card__row + .dt-card__row {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.dt-card__label {
+    font-size: 0.66rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1.4;
+    padding-right: 0.75rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+}
+.dt-card__value {
+    min-width: 0;
+    text-align: left;
+    color: var(--text-main);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+}
+.dt-card__actions {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin-top: 0.85rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── x-data-table shell: 2 karty (filtry + tabela) + pasek aktywnych filtrów ──
+   Karta 1: kompaktowy toolbar (pola w jednym rzędzie flex, licznik po prawej).
+   Między kartami: „Filtry:” + chipy zaaplikowanych filtrów (.rp-active-filters).
+   Karta 2: sama tabela. Bez powtórki nazwy encji w liczniku — „Rekordów: N”. */
+.dt-shell {
+    display: flex;
+    flex-direction: column;
+}
+.dt-filters-card {
+    padding: 1rem 1.25rem !important;
+}
+.dt-filters-card__body {
+    padding: 0.5rem 0.75rem !important;
+}
+.dt-table-card {
+    padding: 1rem 1.25rem !important;
+}
+.dt-active-filters {
+    gap: 0.4rem 0.55rem;
+    padding: 0.3rem 0.5rem 0.2rem;
+}
+.dt-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+}
+.dt-toolbar__fields {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.65rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.dt-toolbar__fields .form-control,
+.dt-toolbar__fields .form-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 130px;
+    max-width: 220px;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.65rem;
+}
+.dt-toolbar__fields .form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    margin: 0;
+    flex-shrink: 0;
+}
+.dt-search-field {
+    flex-shrink: 0;
+    width: auto;
+    min-width: 200px;
+    max-width: 280px;
+}
+.dt-search-field--wide {
+    min-width: 240px;
+    max-width: 320px;
+}
+.dt-search-field .input-group-text {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+}
+.dt-search-field .form-control {
+    min-width: 0;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.82rem;
+}
+.dt-active-filters .rp-active-filters__chip {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+}
+.dt-active-filters .rp-active-filters__clear {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+}
+.dt-toolbar__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.dt-toolbar__count {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.dt-toolbar__count strong {
+    color: var(--text-main);
+    font-weight: 700;
+}
+.dt-toolbar__note {
+    margin-left: 0.35rem;
+    color: var(--primary);
+}
+@media (max-width: 767.98px) {
+    .dt-toolbar {
+        flex-wrap: wrap;
+    }
+    .dt-toolbar__fields {
+        flex-wrap: wrap;
+        width: 100%;
+        overflow-x: visible;
+    }
+    .dt-toolbar__fields .form-control,
+    .dt-toolbar__fields .form-select,
+    .dt-search-field {
+        min-width: 0 !important;
+        max-width: none !important;
+        width: 100%;
+    }
+    .dt-toolbar__meta {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* ── Avatar stack: nachodzące na siebie awatary uczestników w tabeli ── */
+.avatar-stack {
+    display: inline-flex;
+    align-items: center;
+}
+.avatar-stack__item {
+    display: block;
+    margin-left: -0.65rem;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--bg-card, #16182a);
+    flex-shrink: 0;
+}
+.avatar-stack__item:first-child {
+    margin-left: 0;
+}
+.avatar-stack__more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -0.65rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px var(--bg-card, #16182a);
+    flex-shrink: 0;
 }
 
 /* ── Komentarze: kompaktowy composer + wątek ── */

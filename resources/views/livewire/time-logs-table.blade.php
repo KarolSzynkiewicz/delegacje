@@ -1,105 +1,67 @@
 <div>
-    <!-- Statystyki i Filtry -->
-    <x-ui.card class="mb-4">
-        <!-- Statystyki -->
-        <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="d-flex flex-column flex-sm-row flex-wrap align-items-stretch align-items-sm-center justify-content-between gap-3">
-                <div class="text-center text-sm-start">
-                    <h3 class="fs-5 fw-semibold mb-1">Ewidencja Godzin</h3>
-                    <p class="small text-muted mb-0">
-                        @if($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)
-                            Znaleziono: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
-                            <span class="mx-1">•</span>
-                            Suma godzin: <span class="fw-semibold">{{ number_format((float) ($totalHours ?? 0), 2, ',', ' ') }}h</span>
-                        @else
-                            Łącznie: <span class="fw-semibold">{{ $timeLogs->total() }}</span> wpisów
-                            <span class="mx-1">•</span>
-                            Suma godzin: <span class="fw-semibold">{{ number_format((float) ($totalHours ?? 0), 2, ',', ' ') }}h</span>
-                        @endif
-                    </p>
-                </div>
-                <div class="d-flex gap-2 align-self-center align-self-sm-end flex-wrap w-100 w-sm-auto justify-content-center justify-content-sm-end">
-                    @php
-                        $csvParams = array_filter([
-                            'employee_id' => $employeeFilter ?: null,
-                            'project_id'  => (!$isMineView && $projectFilter) ? $projectFilter : null,
-                            'date_from'   => $dateFrom ?: null,
-                            'date_to'     => $dateTo   ?: null,
-                        ]);
-                        $csvUrl = route('time-logs.export-csv', $csvParams);
-                    @endphp
-                    <a href="{{ $csvUrl }}" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-download me-1"></i> Eksport CSV
-                    </a>
-                    <x-ui.button 
-                        variant="ghost" 
-                        wire:click="clearFilters" 
-                        class="btn-sm"
-                        :disabled="!($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)"
-                    >
-                        <i class="bi bi-x-circle me-1"></i> Wyczyść filtry
-                    </x-ui.button>
-                </div>
-            </div>
+    <x-data-table-filters
+        :count="$timeLogs->total()"
+        :has-filters="(bool) ($employeeFilter || (!$isMineView && $projectFilter) || $dateFrom || $dateTo)"
+        item-label="wpisów"
+    >
+        <x-slot:note>
+            suma godzin: {{ number_format((float) ($totalHours ?? 0), 2, ',', ' ') }}h
+        </x-slot:note>
+
+        <x-slot:actions>
+            @php
+                $csvParams = array_filter([
+                    'employee_id' => $employeeFilter ?: null,
+                    'project_id'  => (!$isMineView && $projectFilter) ? $projectFilter : null,
+                    'date_from'   => $dateFrom ?: null,
+                    'date_to'     => $dateTo   ?: null,
+                ]);
+            @endphp
+            <a href="{{ route('time-logs.export-csv', $csvParams) }}" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-download me-1"></i> Eksport CSV
+            </a>
+        </x-slot:actions>
+
+        <div class="dt-filter-field">
+            <label class="form-label small">
+                <i class="bi bi-person me-1"></i> Pracownik
+            </label>
+            <select wire:model.live="employeeFilter" class="form-select">
+                <option value="">Wszyscy pracownicy</option>
+                @foreach($employees as $employee)
+                    <option value="{{ $employee->id }}">{{ $employee->full_name }}</option>
+                @endforeach
+            </select>
         </div>
 
-        <!-- Filtry -->
-        <div class="row g-3">
-            <!-- Pracownik -->
-            <div class="col-md-6 col-lg-3">
+        @if(!$isMineView)
+            <div class="dt-filter-field">
                 <label class="form-label small">
-                    <i class="bi bi-person me-1"></i> Pracownik
+                    <i class="bi bi-folder me-1"></i> Projekt
                 </label>
-                <select wire:model.live="employeeFilter" class="form-control">
-                    <option value="">Wszyscy pracownicy</option>
-                    @foreach($employees as $employee)
-                        <option value="{{ $employee->id }}">{{ $employee->full_name }}</option>
+                <select wire:model.live="projectFilter" class="form-select">
+                    <option value="">Wszystkie projekty</option>
+                    @foreach($projects as $project)
+                        <option value="{{ $project->id }}">{{ $project->name }}</option>
                     @endforeach
                 </select>
             </div>
+        @endif
 
-            <!-- Projekt (ukryty w widoku /mine/*) -->
-            @if(!$isMineView)
-                <div class="col-md-6 col-lg-3">
-                    <label class="form-label small">
-                        <i class="bi bi-folder me-1"></i> Projekt
-                    </label>
-                    <select wire:model.live="projectFilter" class="form-control">
-                        <option value="">Wszystkie projekty</option>
-                        @foreach($projects as $project)
-                            <option value="{{ $project->id }}">{{ $project->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            @endif
-
-            <!-- Data od -->
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label small">
-                    <i class="bi bi-calendar-event me-1"></i> Data od
-                </label>
-                <input 
-                    type="date" 
-                    wire:model.live="dateFrom" 
-                    class="form-control"
-                    max="{{ $dateTo ? $dateTo : '' }}"
-                >
-            </div>
-
-            <!-- Data do -->
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label small">
-                    <i class="bi bi-calendar-event me-1"></i> Data do
-                </label>
-                <input 
-                    type="date" 
-                    wire:model.live="dateTo" 
-                    class="form-control"
-                    min="{{ $dateFrom ? $dateFrom : '' }}"
-                >
-            </div>
+        <div class="dt-filter-field">
+            <label class="form-label small">
+                <i class="bi bi-calendar-event me-1"></i> Data od
+            </label>
+            <input type="date" wire:model.live="dateFrom" class="form-control" max="{{ $dateTo ? $dateTo : '' }}">
         </div>
-    </x-ui.card>
+
+        <div class="dt-filter-field">
+            <label class="form-label small">
+                <i class="bi bi-calendar-event me-1"></i> Data do
+            </label>
+            <input type="date" wire:model.live="dateTo" class="form-control" min="{{ $dateFrom ? $dateFrom : '' }}">
+        </div>
+    </x-data-table-filters>
 
     <!-- Tabela -->
     <x-ui.card>

@@ -3,12 +3,14 @@
 namespace App\Livewire;
 
 use App\Enums\LocationPurposeType;
+use App\Livewire\Concerns\InteractsWithSortableTable;
 use App\Models\Location;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class LocationsTable extends Component
 {
+    use InteractsWithSortableTable;
     use WithPagination;
 
     public string $search = '';
@@ -21,9 +23,9 @@ class LocationsTable extends Component
     public string $sortDirection = 'asc';
 
     protected $queryString = [
-        'search'        => ['except' => ''],
+        'search' => ['except' => ''],
         'purposeFilter' => ['except' => ''],
-        'sortField'     => ['except' => 'name'],
+        'sortField' => ['except' => 'name'],
         'sortDirection' => ['except' => 'asc'],
     ];
 
@@ -39,9 +41,9 @@ class LocationsTable extends Component
 
     public function clearFilters(): void
     {
-        $this->search        = '';
+        $this->search = '';
         $this->purposeFilter = '';
-        $this->sortField     = 'name';
+        $this->sortField = 'name';
         $this->sortDirection = 'asc';
         $this->resetPage();
     }
@@ -51,16 +53,9 @@ class LocationsTable extends Component
         return 'vendor.livewire.simple-pagination';
     }
 
-    public function sortBy(string $field): void
+    protected function sortableFields(): array
     {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField     = $field;
-            $this->sortDirection = 'asc';
-        }
-
-        $this->resetPage();
+        return ['name', 'city', 'address'];
     }
 
     public function render()
@@ -70,10 +65,10 @@ class LocationsTable extends Component
         if ($this->search !== '') {
             $term = $this->search;
             $query->where(function ($q) use ($term) {
-                $q->where('name', 'like', '%' . $term . '%')
-                    ->orWhere('address', 'like', '%' . $term . '%')
-                    ->orWhere('city', 'like', '%' . $term . '%')
-                    ->orWhere('postal_code', 'like', '%' . $term . '%');
+                $q->where('name', 'like', '%'.$term.'%')
+                    ->orWhere('address', 'like', '%'.$term.'%')
+                    ->orWhere('city', 'like', '%'.$term.'%')
+                    ->orWhere('postal_code', 'like', '%'.$term.'%');
             });
         }
 
@@ -83,17 +78,13 @@ class LocationsTable extends Component
             });
         }
 
-        $allowedSort = ['name', 'city', 'address'];
-        $field       = in_array($this->sortField, $allowedSort, true) ? $this->sortField : 'name';
-        $dir         = $this->sortDirection === 'desc' ? 'desc' : 'asc';
-
-        $query->orderBy($field, $dir);
+        $this->applySortToQuery($query);
 
         $locations = $query->paginate(15);
 
         return view('livewire.locations-table', [
-            'locations'     => $locations,
-            'purposeTypes'  => LocationPurposeType::cases(),
+            'locations' => $locations,
+            'purposeTypes' => LocationPurposeType::cases(),
         ]);
     }
 }

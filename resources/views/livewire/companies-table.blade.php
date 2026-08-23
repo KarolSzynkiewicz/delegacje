@@ -1,30 +1,22 @@
 <div>
-    <x-ui.card>
-        @if(session('success'))
-            <x-ui.alert variant="success" dismissible>{{ session('success') }}</x-ui.alert>
-        @endif
+    @if(session('success'))
+        <x-ui.alert variant="success" dismissible class="mb-3">{{ session('success') }}</x-ui.alert>
+    @endif
 
-        <div class="mb-4 pb-3 border-top border-bottom">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-4">
-                    <label for="search" class="form-label small fw-semibold mb-1">
-                        <i class="bi bi-search me-1"></i> Szukaj
-                    </label>
-                    <input type="text" id="search" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" placeholder="Nazwa, NIP, miasto, prezes...">
-                </div>
-                <div class="col-md-2">
-                    <x-ui.button variant="ghost" wire:click="clearFilters" class="w-100 btn-sm">
-                        <i class="bi bi-x-circle"></i> Wyczyść
-                    </x-ui.button>
-                </div>
-                @if($companies->total() > 0)
-                    <div class="col-md-6 text-end">
-                        <small class="text-muted"><strong>{{ $companies->total() }}</strong> spółek</small>
-                    </div>
-                @endif
-            </div>
+    <x-data-table-filters
+        :count="$companies->total()"
+        :has-filters="(bool) !empty($search)"
+        item-label="spółek"
+    >
+        <div class="dt-filter-field dt-filter-field--wide">
+            <label for="search" class="form-label small">
+                <i class="bi bi-search me-1"></i> Szukaj
+            </label>
+            <input type="text" id="search" wire:model.live.debounce.300ms="search" class="form-control" placeholder="Nazwa, NIP, miasto, prezes...">
         </div>
+    </x-data-table-filters>
 
+    <x-ui.card>
         @if($companies->count() > 0)
             <div class="table-responsive">
                 <table class="table align-middle">

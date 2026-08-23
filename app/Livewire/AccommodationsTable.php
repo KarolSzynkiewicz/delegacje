@@ -2,12 +2,14 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\InteractsWithSortableTable;
 use App\Models\Accommodation;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class AccommodationsTable extends Component
 {
+    use InteractsWithSortableTable;
     use WithPagination;
 
     public $search = '';
@@ -25,17 +27,17 @@ class AccommodationsTable extends Component
         'sortDirection' => ['except' => 'asc'],
     ];
 
-    public function updatingSearch()
+    public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function updatingStatusFilter()
+    public function updatingStatusFilter(): void
     {
         $this->resetPage();
     }
 
-    public function clearFilters()
+    public function clearFilters(): void
     {
         $this->search = '';
         $this->statusFilter = '';
@@ -44,28 +46,20 @@ class AccommodationsTable extends Component
         $this->resetPage();
     }
 
-    public function paginationView()
+    public function paginationView(): string
     {
         return 'vendor.livewire.simple-pagination';
     }
 
-    public function sortBy($field)
+    protected function sortableFields(): array
     {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-
-        $this->resetPage();
+        return ['name'];
     }
 
     public function render()
     {
         $query = Accommodation::with(['location', 'activeLease']);
 
-        // Filtrowanie po nazwie/adresie (własny adres lub przez lokalizację)
         if ($this->search) {
             $search = $this->search;
             $query->where(function ($q) use ($search) {
@@ -80,22 +74,16 @@ class AccommodationsTable extends Component
             });
         }
 
-        // Filtrowanie po statusie (pełne/wolne miejsca)
-        if ($this->statusFilter) {
-            if ($this->statusFilter === 'full') {
-                $query->whereRaw('capacity <= (SELECT COUNT(*) FROM accommodation_assignments WHERE accommodation_id = accommodations.id AND status = "active")');
-            } elseif ($this->statusFilter === 'available') {
-                $query->whereRaw('capacity > (SELECT COUNT(*) FROM accommodation_assignments WHERE accommodation_id = accommodations.id AND status = "active")');
-            }
+        if ($this->statusFilter === 'full') {
+            $query->whereRaw('capacity <= (SELECT COUNT(*) FROM accommodation_assignments WHERE accommodation_id = accommodations.id AND status = "active")');
+        } elseif ($this->statusFilter === 'available') {
+            $query->whereRaw('capacity > (SELECT COUNT(*) FROM accommodation_assignments WHERE accommodation_id = accommodations.id AND status = "active")');
         }
 
-        // Sortowanie
-        $query->orderBy($this->sortField, $this->sortDirection);
-
-        $accommodations = $query->paginate(10);
+        $this->applySortToQuery($query);
 
         return view('livewire.accommodations-table', [
-            'accommodations' => $accommodations,
+            'accommodations' => $query->paginate(10),
         ]);
     }
 }

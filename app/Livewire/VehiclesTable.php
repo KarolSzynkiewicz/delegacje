@@ -2,20 +2,31 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\InteractsWithSortableTable;
 use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class VehiclesTable extends Component
 {
+    use InteractsWithSortableTable;
     use WithPagination;
 
     public $search = '';
+
     public $conditionFilter = '';
+
     public $statusFilter = '';
+
     public $locationFilter = '';
-    public $statusDate = ''; // Filtr daty
+
+    public $statusDate = '';
+
     public $sortField = 'registration_number';
+
     public $sortDirection = 'asc';
 
     protected $queryString = [
@@ -28,32 +39,32 @@ class VehiclesTable extends Component
         'sortDirection' => ['except' => 'asc'],
     ];
 
-    public function updatingSearch()
+    public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function updatingConditionFilter()
+    public function updatingConditionFilter(): void
     {
         $this->resetPage();
     }
 
-    public function updatingStatusFilter()
+    public function updatingStatusFilter(): void
     {
         $this->resetPage();
     }
 
-    public function updatingLocationFilter()
+    public function updatingLocationFilter(): void
     {
         $this->resetPage();
     }
 
-    public function updatingStatusDate()
+    public function updatingStatusDate(): void
     {
         $this->resetPage();
     }
 
-    public function clearFilters()
+    public function clearFilters(): void
     {
         $this->search = '';
         $this->conditionFilter = '';
@@ -65,114 +76,80 @@ class VehiclesTable extends Component
         $this->resetPage();
     }
 
-    public function paginationView()
+    public function paginationView(): string
     {
         return 'vendor.livewire.simple-pagination';
     }
 
-    public function sortBy($field)
+    protected function sortableFields(): array
     {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-        
-        $this->resetPage();
+        return ['registration_number', 'brand', 'model'];
     }
 
     public function render()
     {
         $query = Vehicle::query();
+        $checkDate = $this->statusDate ? \Carbon\Carbon::parse($this->statusDate) : now();
 
-        // Filtrowanie po numerze rejestracyjnym/marce/modelu
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('registration_number', 'like', '%' . $this->search . '%')
-                  ->orWhere('brand', 'like', '%' . $this->search . '%')
-                  ->orWhere('model', 'like', '%' . $this->search . '%');
+                $q->where('registration_number', 'like', '%'.$this->search.'%')
+                    ->orWhere('brand', 'like', '%'.$this->search.'%')
+                    ->orWhere('model', 'like', '%'.$this->search.'%');
             });
         }
 
-        // Filtrowanie po stanie technicznym
         if ($this->conditionFilter) {
             $query->where('technical_condition', $this->conditionFilter);
         }
 
-        // Determine date for status check
-        $checkDate = $this->statusDate ? \Carbon\Carbon::parse($this->statusDate) : now();
-
-        // Filtrowanie po statusie (zajęty/wolny) - używa checkDate
-        if ($this->statusFilter) {
-            if ($this->statusFilter === 'occupied') {
-                $query->whereHas('assignments', function ($q) use ($checkDate) {
-                    $q->where('start_date', '<=', $checkDate)
-                      ->where(function ($q2) use ($checkDate) {
-                          $q2->whereNull('end_date')
-                            ->orWhere('end_date', '>=', $checkDate);
-                      });
-                });
-            } else {
-                $query->whereDoesntHave('assignments', function ($q) use ($checkDate) {
-                    $q->where('start_date', '<=', $checkDate)
-                      ->where(function ($q2) use ($checkDate) {
-                          $q2->whereNull('end_date')
-                            ->orWhere('end_date', '>=', $checkDate);
-                      });
-                });
-            }
+        if ($this->statusFilter === 'occupied') {
+            $query->whereHas('assignments', function ($q) use ($checkDate) {
+                $q->where('start_date', '<=', $checkDate)
+                    ->where(fn ($q2) => $q2->whereNull('end_date')->orWhere('end_date', '>=', $checkDate));
+            });
+        } elseif ($this->statusFilter === 'available') {
+            $query->whereDoesntHave('assignments', function ($q) use ($checkDate) {
+                $q->where('start_date', '<=', $checkDate)
+                    ->where(fn ($q2) => $q2->whereNull('end_date')->orWhere('end_date', '>=', $checkDate));
+            });
         }
 
-        // Sortowanie
-        $query->orderBy($this->sortField, $this->sortDirection);
+        $this->applySortToQuery($query);
 
-        // Filtrowanie po lokalizacji (wymaga sprawdzenia statusu dla każdego pojazdu)
         if ($this->locationFilter) {
             $allVehicles = $query->get();
             $locationTracker = app(\App\Services\LocationTrackingService::class);
-            
+
             $filteredVehicles = $allVehicles->filter(function ($vehicle) use ($locationTracker, $checkDate) {
                 $status = $locationTracker->getVehicleLocationStatus($vehicle, $checkDate);
-                
-                $locationMatch = false;
-                if ($this->locationFilter === 'base') {
-                    $locationMatch = !$status['outside_base'] && !$status['in_transit'];
-                } elseif ($this->locationFilter === 'transit') {
-                    $locationMatch = $status['in_transit'];
-                } elseif ($this->locationFilter === 'field') {
-                    $locationMatch = $status['outside_base'] && !$status['in_transit'];
-                }
-                
-                return $locationMatch;
+
+                return match ($this->locationFilter) {
+                    'base' => ! $status['outside_base'] && ! $status['in_transit'],
+                    'transit' => $status['in_transit'],
+                    'field' => $status['outside_base'] && ! $status['in_transit'],
+                    default => true,
+                };
             });
-            
-            // Paginate manually
+
             $currentPage = $this->getPage();
             $perPage = 10;
-            $currentPageItems = $filteredVehicles->slice(($currentPage - 1) * $perPage, $perPage)->values();
-            
-            $vehicles = new \Illuminate\Pagination\LengthAwarePaginator(
-                $currentPageItems,
+            $vehicles = new LengthAwarePaginator(
+                $filteredVehicles->slice(($currentPage - 1) * $perPage, $perPage)->values(),
                 $filteredVehicles->count(),
                 $perPage,
                 $currentPage,
                 ['path' => request()->url(), 'query' => request()->query()]
             );
         } else {
-        // Załaduj liczbę unikalnych pracowników (dla wyświetlenia X/Y)
-        // Liczymy unikalnych pracowników, nie przypisania (jeden pracownik może mieć wiele przypisań)
-        $query->addSelect([
-            'unique_employees_count' => \App\Models\VehicleAssignment::select(\Illuminate\Support\Facades\DB::raw('count(distinct employee_id)'))
-                ->whereColumn('vehicle_id', 'vehicles.id')
+            $query->addSelect([
+                'unique_employees_count' => VehicleAssignment::select(DB::raw('count(distinct employee_id)'))
+                    ->whereColumn('vehicle_id', 'vehicles.id')
                     ->where('start_date', '<=', $checkDate)
-                    ->where(function ($q) use ($checkDate) {
-                    $q->whereNull('end_date')
-                          ->orWhere('end_date', '>=', $checkDate);
-                })
-        ]);
+                    ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $checkDate)),
+            ]);
 
-        $vehicles = $query->paginate(10);
+            $vehicles = $query->paginate(10);
         }
 
         return view('livewire.vehicles-table', [
