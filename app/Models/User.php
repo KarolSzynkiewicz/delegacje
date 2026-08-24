@@ -300,10 +300,7 @@ class User extends Authenticatable
             }
 
             if ($this->default_tasks_grid_view_slug) {
-                $record = TaskGridView::query()
-                    ->where('user_id', $this->id)
-                    ->where('slug', $this->default_tasks_grid_view_slug)
-                    ->first();
+                $record = TaskGridView::findVisibleTo($this, $this->default_tasks_grid_view_slug);
 
                 if ($record) {
                     return route('tasks.grid', $record->queryStringParams());

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -9,6 +10,7 @@ class TaskGridView extends Model
 {
     protected $fillable = [
         'user_id',
+        'is_global',
         'name',
         'slug',
         'visible_columns',
@@ -30,12 +32,53 @@ class TaskGridView extends Model
         'visible_columns' => 'array',
         'column_widths' => 'array',
         'my_tasks_only' => 'boolean',
+        'is_global' => 'boolean',
         'type_filter' => 'array',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Widoki własne użytkownika oraz globalne (dla wszystkich).
+     *
+     * @param  Builder<static>  $query
+     */
+    public function scopeVisibleTo(Builder $query, ?User $user): void
+    {
+        if (! $user) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where(function (Builder $inner) use ($user) {
+            $inner->where('user_id', $user->id)->orWhere('is_global', true);
+        });
+    }
+
+    public static function findVisibleTo(User $user, string $slug): ?self
+    {
+        return static::query()
+            ->visibleTo($user)
+            ->where('slug', $slug)
+            ->orderByRaw('CASE WHEN user_id = ? THEN 0 ELSE 1 END', [$user->id])
+            ->first();
+    }
+
+    public function canBeManagedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ((int) $this->user_id === (int) $user->id) {
+            return true;
+        }
+
+        return $this->is_global && $user->isAdmin();
     }
 
     /**

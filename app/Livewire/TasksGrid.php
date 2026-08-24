@@ -74,6 +74,10 @@ class TasksGrid extends Component
 
     public string $saveViewName = '';
 
+    public bool $saveViewAsGlobal = false;
+
+    public ?int $activeViewId = null;
+
     /** Gdy ustawione, siatka pokazuje tylko zadania tego sprintu (np. na stronie sprintu). */
     public ?int $lockedSprintId = null;
 
@@ -134,8 +138,9 @@ class TasksGrid extends Component
         ];
     }
 
+    /** Zmiana tych pól odłącza aktywny zapisany widok (zamiast go nadpisywać). */
     /** @var list<string> */
-    protected array $persistableViewProperties = [
+    protected array $viewDetachingProperties = [
         'searchTask',
         'searchCategory',
         'searchAssignedTo',
@@ -146,7 +151,6 @@ class TasksGrid extends Component
         'sortField',
         'sortDirection',
         'visibleColumns',
-        'columnWidths',
     ];
 
     public function mount(): void
@@ -157,6 +161,7 @@ class TasksGrid extends Component
             $this->sortDirection = 'asc';
             $this->groupBy = '';
             $this->view = '';
+            $this->activeViewId = null;
             $this->newTaskSprint = (string) $this->lockedSprintId;
             $this->visibleColumns = array_values(array_filter(
                 $this->visibleColumns,
@@ -220,6 +225,7 @@ class TasksGrid extends Component
         }
 
         $this->resetPage();
+        $this->detachActiveView();
     }
 
     public function getAvailableColumnsProperty(): array
@@ -249,11 +255,11 @@ class TasksGrid extends Component
 
     public function updated(string $property): void
     {
-        if ($this->batchingViewPersist || ! in_array($property, $this->persistableViewProperties, true)) {
+        if ($this->batchingViewPersist || ! in_array($property, $this->viewDetachingProperties, true)) {
             return;
         }
 
-        $this->persistActiveView();
+        $this->detachActiveView();
     }
 
     /**
@@ -282,7 +288,7 @@ class TasksGrid extends Component
         }
         $this->batchingViewPersist = false;
         $this->resetPage();
-        $this->persistActiveView();
+        $this->detachActiveView();
     }
 
     /**
@@ -293,10 +299,9 @@ class TasksGrid extends Component
         $chips = [];
 
         if ($this->view !== '') {
-            $viewName = TaskGridView::query()
-                ->where('user_id', auth()->id())
-                ->where('slug', $this->view)
-                ->value('name') ?? $this->view;
+            $viewName = $this->activeViewId
+                ? (TaskGridView::query()->visibleTo(auth()->user())->whereKey($this->activeViewId)->value('name') ?? $this->view)
+                : (TaskGridView::findVisibleTo(auth()->user(), $this->view)?->name ?? $this->view);
             $chips[] = ['key' => 'view', 'label' => 'Widok: '.$viewName];
         }
 
@@ -381,6 +386,7 @@ class TasksGrid extends Component
             // się nie zmieniło (patrz komentarz przy activeFilterChips()).
             $this->status = 'all';
             $this->resetPage();
+            $this->detachActiveView();
 
             return;
         }
@@ -388,6 +394,7 @@ class TasksGrid extends Component
         if ($key === 'selectedTypes') {
             $this->selectedTypes = $this->allWorkItemTypeValues();
             $this->resetPage();
+            $this->detachActiveView();
 
             return;
         }
@@ -395,6 +402,7 @@ class TasksGrid extends Component
         if ($key === 'assignedFilter') {
             $this->assignedFilter = '';
             $this->resetPage();
+            $this->detachActiveView();
 
             return;
         }
@@ -402,6 +410,7 @@ class TasksGrid extends Component
         if (in_array($key, ['searchTask', 'searchCategory', 'searchAssignedTo'], true)) {
             $this->{$key} = '';
             $this->resetPage();
+            $this->detachActiveView();
         }
     }
 
@@ -414,6 +423,7 @@ class TasksGrid extends Component
             $this->sortDirection = 'asc';
         }
         $this->resetPage();
+        $this->detachActiveView();
     }
 
     public function setGroupBy(string $field): void
@@ -431,6 +441,7 @@ class TasksGrid extends Component
         $this->syncColumnsAfterGroupChange($previous);
         $this->collapsedGroups = [];
         $this->resetPage();
+        $this->detachActiveView();
     }
 
     public function updatingGroupBy(mixed $value): void
@@ -504,6 +515,8 @@ class TasksGrid extends Component
         } else {
             $this->visibleColumns[] = $key;
         }
+
+        $this->detachActiveView();
     }
 
     public function toggleExpand(int $taskId): void
@@ -816,18 +829,30 @@ class TasksGrid extends Component
 
         if ($existing) {
             $slug = $existing->slug;
-        } elseif (TaskGridView::query()->where('user_id', auth()->id())->where('slug', $slug)->exists()) {
+            if ($this->saveViewAsGlobal && $this->visibleSlugTaken($slug, $existing->id)) {
+                $this->flash = 'Widok globalny o tej nazwie już istnieje. Wybierz inną.';
+
+                return;
+            }
+        } elseif ($this->visibleSlugTaken($slug)) {
             $slug = $this->uniqueSlug($name);
         }
 
-        TaskGridView::updateOrCreate(
+        $record = TaskGridView::updateOrCreate(
             ['user_id' => auth()->id(), 'slug' => $slug],
-            array_merge(['name' => $name], $this->viewPayload()),
+            array_merge([
+                'name' => $name,
+                'is_global' => $this->saveViewAsGlobal,
+            ], $this->viewPayload()),
         );
 
-        $this->view = $slug;
+        $this->view = $record->slug;
+        $this->activeViewId = $record->id;
         $this->saveViewName = '';
-        $this->flash = "Widok „{$name}” zapisany.";
+        $this->saveViewAsGlobal = false;
+        $this->flash = $record->is_global
+            ? "Widok globalny „{$name}” zapisany."
+            : "Widok „{$name}” zapisany.";
     }
 
     public function loadView(string $slug): void
@@ -835,21 +860,59 @@ class TasksGrid extends Component
         $this->loadViewFromSlug($slug);
     }
 
-    public function deleteView(string $slug): void
+    public function loadSavedView(int $id): void
     {
-        TaskGridView::query()
-            ->where('user_id', auth()->id())
-            ->where('slug', $slug)
-            ->delete();
-
-        if ($this->view === $slug) {
+        $record = $this->findVisibleView($id);
+        if (! $record) {
+            $this->flash = 'Nie znaleziono widoku.';
             $this->view = '';
+            $this->activeViewId = null;
+
+            return;
+        }
+
+        $this->activateView($record);
+        $this->flash = "Załadowano „{$record->name}”.";
+    }
+
+    public function overwriteView(int $id): void
+    {
+        $record = $this->findVisibleView($id);
+        if (! $record || ! $record->canBeManagedBy(auth()->user())) {
+            $this->flash = 'Nie możesz nadpisać tego widoku.';
+
+            return;
+        }
+
+        $record->update($this->viewPayload());
+        $this->view = $record->slug;
+        $this->activeViewId = $record->id;
+        $this->flash = "Widok „{$record->name}” zaktualizowany.";
+    }
+
+    public function deleteView(int $id): void
+    {
+        $record = $this->findVisibleView($id);
+        if (! $record || ! $record->canBeManagedBy(auth()->user())) {
+            $this->flash = 'Nie możesz usunąć tego widoku.';
+
+            return;
+        }
+
+        $slug = $record->slug;
+        $deletedId = $record->id;
+        $record->delete();
+
+        if ($this->view === $slug || $this->activeViewId === $deletedId) {
+            $this->view = '';
+            $this->activeViewId = null;
         }
     }
 
     public function clearView(): void
     {
         $this->view = '';
+        $this->activeViewId = null;
         $this->flash = 'Widok domyślny.';
     }
 
@@ -863,10 +926,7 @@ class TasksGrid extends Component
         $query = $this->currentQueryParams();
 
         if (isset($query['view'])) {
-            $validSlug = TaskGridView::query()
-                ->where('user_id', $user->id)
-                ->where('slug', $query['view'])
-                ->exists();
+            $validSlug = TaskGridView::findVisibleTo($user, $query['view']) !== null;
 
             if (! $validSlug) {
                 unset($query['view']);
@@ -940,26 +1000,30 @@ class TasksGrid extends Component
 
     protected function loadViewFromSlug(string $slug, bool $flash = true): void
     {
-        $record = TaskGridView::query()
-            ->where('user_id', auth()->id())
-            ->where('slug', $slug)
-            ->first();
+        $record = TaskGridView::findVisibleTo(auth()->user(), $slug);
 
         if (! $record) {
             if ($flash) {
                 $this->flash = 'Nie znaleziono widoku.';
             }
             $this->view = '';
+            $this->activeViewId = null;
 
             return;
         }
 
-        $this->view = $slug;
-        $this->applyViewRecord($record);
+        $this->activateView($record);
 
         if ($flash) {
             $this->flash = "Załadowano „{$record->name}”.";
         }
+    }
+
+    protected function activateView(TaskGridView $record): void
+    {
+        $this->view = $record->slug;
+        $this->activeViewId = $record->id;
+        $this->applyViewRecord($record);
     }
 
     protected function applyViewRecord(TaskGridView $record): void
@@ -1100,16 +1164,31 @@ class TasksGrid extends Component
         ];
     }
 
-    protected function persistActiveView(): void
+    protected function detachActiveView(): void
     {
-        if ($this->isLockedToSprint() || $this->view === '' || ! $this->gridViewsTableExists()) {
+        if ($this->view === '' && $this->activeViewId === null) {
             return;
         }
 
-        TaskGridView::query()
-            ->where('user_id', auth()->id())
-            ->where('slug', $this->view)
-            ->update($this->viewPayload());
+        $this->view = '';
+        $this->activeViewId = null;
+    }
+
+    protected function findVisibleView(int $id): ?TaskGridView
+    {
+        return TaskGridView::query()
+            ->visibleTo(auth()->user())
+            ->whereKey($id)
+            ->first();
+    }
+
+    protected function visibleSlugTaken(string $slug, ?int $exceptId = null): bool
+    {
+        return TaskGridView::query()
+            ->visibleTo(auth()->user())
+            ->where('slug', $slug)
+            ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
+            ->exists();
     }
 
     protected function uniqueSlug(string $name): string
@@ -1118,10 +1197,7 @@ class TasksGrid extends Component
         $slug = $base;
         $i = 2;
 
-        while (TaskGridView::query()
-            ->where('user_id', auth()->id())
-            ->where('slug', $slug)
-            ->exists()) {
+        while ($this->visibleSlugTaken($slug)) {
             $slug = "{$base}-{$i}";
             $i++;
         }
@@ -1623,6 +1699,7 @@ class TasksGrid extends Component
         array_splice($order, $fromIdx, 1);
         array_splice($order, $toIdx, 0, [$from]);
         $this->visibleColumns = array_values($order);
+        $this->detachActiveView();
     }
 
     public function setColumnWidth(string $col, int $width): void
@@ -1753,14 +1830,15 @@ class TasksGrid extends Component
 
         $savedViews = $this->gridViewsTableExists()
             ? TaskGridView::query()
-                ->where('user_id', auth()->id())
+                ->visibleTo(auth()->user())
+                ->orderByDesc('is_global')
                 ->orderBy('name')
                 ->get()
             : collect();
 
         $viewCounts = [];
         foreach ($savedViews as $savedView) {
-            $viewCounts[$savedView->slug] = $this->countForSavedView($savedView);
+            $viewCounts[$savedView->id] = $this->countForSavedView($savedView);
         }
 
         $query = $this->filteredTasksQuery();
@@ -1826,8 +1904,8 @@ class TasksGrid extends Component
             'availableColumns' => $this->availableColumns,
             'savedViews' => $savedViews,
             'viewCounts' => $viewCounts,
-            'activeViewName' => $this->view !== ''
-                ? ($savedViews->firstWhere('slug', $this->view)?->name ?? $this->view)
+            'activeViewName' => $this->activeViewId
+                ? ($savedViews->firstWhere('id', $this->activeViewId)?->name ?? $this->view)
                 : null,
             'isMenuDefaultView' => auth()->user()?->usesGridAsDefaultTasksView($this->currentQueryParams()) ?? false,
         ]);

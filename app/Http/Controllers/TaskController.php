@@ -56,10 +56,7 @@ class TaskController extends Controller
         $query = TasksGridUrlParams::fromRequestQuery($validated['grid_query'] ?? $request->query());
 
         $slug = isset($query['view'])
-            ? TaskGridView::query()
-                ->where('user_id', $user->id)
-                ->where('slug', $query['view'])
-                ->value('slug')
+            ? TaskGridView::findVisibleTo($user, $query['view'])?->slug
             : null;
 
         if ($slug === null && isset($query['view'])) {

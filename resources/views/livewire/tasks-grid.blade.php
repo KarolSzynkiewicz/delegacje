@@ -499,10 +499,12 @@
             {{-- Zapisane widoki (pigułki, jak w rekrutacji) --}}
             @unless($this->isLockedToSprint())
                 @foreach($savedViews as $savedView)
-                    <button type="button" wire:click="loadView('{{ $savedView->slug }}')"
-                            class="btn btn-sm btn-outline-secondary rp-topbar-btn {{ $view === $savedView->slug ? 'is-on' : '' }}">
-                        <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"></i>{{ $savedView->name }}
-                        <span class="tg-quiet-count">{{ $viewCounts[$savedView->slug] ?? 0 }}</span>
+                    @php $isActiveView = $activeViewId === $savedView->id; @endphp
+                    <button type="button" wire:click="loadSavedView({{ $savedView->id }})"
+                            class="btn btn-sm btn-outline-secondary rp-topbar-btn {{ $isActiveView ? 'is-on' : '' }}"
+                            title="{{ $savedView->is_global ? 'Widok globalny (dla wszystkich)' : 'Twój zapisany widok' }}">
+                        <i class="bi bi-{{ $savedView->is_global ? 'globe' : 'bookmark'.($isActiveView ? '-fill' : '') }} me-1"></i>{{ $savedView->name }}
+                        <span class="tg-quiet-count">{{ $viewCounts[$savedView->id] ?? 0 }}</span>
                     </button>
                 @endforeach
             @endunless
@@ -519,7 +521,7 @@
                     {{-- Zapisz / zarządzaj widokami ── --}}
                     <div x-data="{ open: false, top: 0, left: 0 }">
                         <button type="button"
-                                @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.max(4, r.right-260); open=true"
+                                @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.max(4, r.right-300); open=true"
                                 class="btn btn-sm btn-outline-secondary tg-quiet-btn"
                                 title="Zapisz i zarządzaj widokami">
                             <i class="bi bi-bookmark{{ $view ? '-fill' : '' }}"></i>
@@ -527,9 +529,9 @@
                         <template x-teleport="body">
                             <div x-show="open" x-cloak
                                  @click.outside="open = false"
-                                 :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:260px`"
+                                 :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:300px`"
                                  class="dropdown-menu show p-3 shadow-lg">
-                                @if($view && $activeViewName)
+                                @if($activeViewId && $activeViewName)
                                     <div class="mb-2 p-2 rounded" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2)">
                                         <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:4px">
                                             Aktywny widok
@@ -547,25 +549,37 @@
                                         Zapisane
                                     </div>
                                     @foreach($savedViews as $savedView)
+                                    @php $isActiveView = $activeViewId === $savedView->id; @endphp
                                     <div class="d-flex align-items-center gap-1 mb-1">
-                                        <button type="button" wire:click="loadView('{{ $savedView->slug }}')" @click="open=false"
-                                                class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $view === $savedView->slug ? 'fw-bold' : '' }}"
+                                        <button type="button" wire:click="loadSavedView({{ $savedView->id }})" @click="open=false"
+                                                class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $isActiveView ? 'fw-bold' : '' }}"
                                                 style="font-size:0.83rem">
-                                            <i class="bi bi-bookmark{{ $view === $savedView->slug ? '-fill' : '' }} me-1"
+                                            <i class="bi bi-{{ $savedView->is_global ? 'globe' : 'bookmark'.($isActiveView ? '-fill' : '') }} me-1"
                                                style="color:var(--primary,#3b82f6);font-size:0.75rem"></i>{{ $savedView->name }}
-                                            <span class="text-muted ms-1" style="font-size:.75rem">({{ $viewCounts[$savedView->slug] ?? 0 }})</span>
+                                            @if($savedView->is_global)
+                                                <span class="text-muted" style="font-size:.68rem">globalny</span>
+                                            @endif
+                                            <span class="text-muted ms-1" style="font-size:.75rem">({{ $viewCounts[$savedView->id] ?? 0 }})</span>
                                         </button>
-                                        <button type="button" wire:click="deleteView('{{ $savedView->slug }}')" @click="open=false"
-                                                class="btn btn-sm btn-link p-1 flex-shrink-0"
-                                                style="color:var(--danger,#ef4444)" title="Usuń">
-                                            <i class="bi bi-trash" style="font-size:0.78rem"></i>
-                                        </button>
+                                        @if($savedView->canBeManagedBy(auth()->user()))
+                                            <button type="button" wire:click="overwriteView({{ $savedView->id }})" @click="open=false"
+                                                    class="btn btn-sm btn-link p-1 flex-shrink-0"
+                                                    style="color:var(--text-muted,#94a3b8)"
+                                                    title="Nadpisz ten widok bieżącymi filtrami">
+                                                <i class="bi bi-floppy" style="font-size:0.78rem"></i>
+                                            </button>
+                                            <button type="button" wire:click="deleteView({{ $savedView->id }})" @click="open=false"
+                                                    class="btn btn-sm btn-link p-1 flex-shrink-0"
+                                                    style="color:var(--danger,#ef4444)" title="Usuń">
+                                                <i class="bi bi-trash" style="font-size:0.78rem"></i>
+                                            </button>
+                                        @endif
                                     </div>
                                     @endforeach
                                     <hr class="my-2">
                                 @endif
                                 <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.6;margin-bottom:8px">
-                                    {{ $view ? 'Nadpisz aktywny widok' : 'Zapisz bieżący widok' }}
+                                    Zapisz jako nowy widok
                                 </div>
                                 <div class="d-flex gap-2">
                                     <input wire:model="saveViewName" type="text"
@@ -579,6 +593,10 @@
                                         <i class="bi bi-floppy"></i>
                                     </button>
                                 </div>
+                                <label class="form-check form-check-compact mt-2 mb-0" @click.stop>
+                                    <input type="checkbox" class="form-check-input" wire:model="saveViewAsGlobal">
+                                    <span class="small">Widok globalny (dla wszystkich)</span>
+                                </label>
                             </div>
                         </template>
                     </div>
