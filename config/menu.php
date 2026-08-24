@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'calendar',
     'weekly_overview',
     'tasks',
     'procedures',

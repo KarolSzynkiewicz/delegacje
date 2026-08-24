@@ -7,6 +7,12 @@ return [
         'label' => 'Dashboard',
     ],
 
+    'calendar' => [
+        'route' => 'calendar.index',
+        'icon' => 'bi bi-calendar3',
+        'label' => 'Kalendarz',
+    ],
+
     'weekly_overview' => [
         'route' => 'weekly-overview.index',
         'icon' => 'bi bi-calendar-week',

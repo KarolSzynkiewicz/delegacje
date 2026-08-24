@@ -630,6 +630,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('profitability.export-csv')
             ->defaults('resource', 'profitability');
 
+        Route::get('/kalendarz', [\App\Http\Controllers\CalendarController::class, 'index'])
+            ->name('calendar.index')
+            ->defaults('resource', 'calendar');
+
         Route::get('/weekly-overview', [WeeklyOverviewController::class, 'index'])
             ->name('weekly-overview.index');
 
