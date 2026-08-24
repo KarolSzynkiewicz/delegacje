@@ -17,7 +17,7 @@ class TaskSourceCardTest extends TestCase
 
         $card = $task->sourceCard();
 
-        $this->assertSame(route('recruitment-processes.index', ['process' => 7]), $card['url']);
+        $this->assertSame(route('recruitment-processes.show', 7), $card['url']);
         $this->assertSame('Karta kandydata', $card['label']);
         $this->assertSame('bi-person-badge', $card['icon']);
     }

@@ -12,6 +12,7 @@ use App\Models\Employee;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentConsent;
+use App\Models\RecruitmentContactAttempt;
 use App\Models\RecruitmentGridView;
 use App\Models\RecruitmentProcess;
 use App\Models\Role;
@@ -177,6 +178,9 @@ class RecruitmentProcessesTable extends Component
 
     public ?int $selectedId = null;
 
+    /** Set from the show page (`/recruitment-processes/{id}`). */
+    public ?int $processId = null;
+
     public string $newOutcome = '';
 
     public string $newComment = '';
@@ -236,6 +240,8 @@ class RecruitmentProcessesTable extends Component
 
     public string $blacklistNote = '';
 
+    public bool $showContactModal = false;
+
     // Follow-up task modal (opened automatically after "Prosi o oddzwonienie")
     public bool $showTaskModal = false;
 
@@ -251,6 +257,11 @@ class RecruitmentProcessesTable extends Component
     public bool $showCommentModal = false;
 
     public string $commentModalTarget = ''; // 'process' | 'candidate'
+
+    // Inline edit of a single contact attempt (own attempts only)
+    public ?int $editingAttemptId = null;
+
+    public string $editAttemptComment = '';
 
     protected $queryString = [
         'status' => ['except' => '', 'history' => true],
@@ -278,7 +289,6 @@ class RecruitmentProcessesTable extends Component
         'sortField' => ['except' => 'created_at', 'as' => 'sort', 'history' => true],
         'sortDirection' => ['except' => 'desc', 'as' => 'dir', 'history' => true],
         'view' => ['except' => '', 'history' => true],
-        'selectedId' => ['except' => null, 'as' => 'process'],
     ];
 
     public function updatingSearch(): void
@@ -358,13 +368,45 @@ class RecruitmentProcessesTable extends Component
 
         $this->syncDraftFilters();
 
-        // When the page loads from a shared URL (?process=X) or after a full-page
-        // redirect (e.g. after saving a comment via the standard POST form), Livewire
-        // hydrates selectedId from the query string but never calls selectProcess().
-        // We must populate the edit fields here so they reflect the actual DB values.
+        if ($this->processId) {
+            $this->selectedId = $this->processId;
+        }
+
         if ($this->selectedId) {
             $this->loadCandidateEditFields();
         }
+    }
+
+    /**
+     * @return array<string, scalar>
+     */
+    public function currentFilterQuery(): array
+    {
+        $query = [];
+
+        foreach ($this->queryString as $property => $config) {
+            $as = $config['as'] ?? $property;
+            $except = $config['except'] ?? null;
+            $value = $this->{$property};
+
+            if ($value === $except) {
+                continue;
+            }
+
+            $query[$as] = is_bool($value) ? (int) $value : $value;
+        }
+
+        return $query;
+    }
+
+    public function processUrl(int $id): string
+    {
+        return route('recruitment-processes.show', ['recruitmentProcess' => $id] + $this->currentFilterQuery());
+    }
+
+    public function listUrl(): string
+    {
+        return route('recruitment-processes.index', $this->currentFilterQuery());
     }
 
     public function syncDraftFilters(): void
@@ -1134,17 +1176,10 @@ class RecruitmentProcessesTable extends Component
     public function selectProcess(int $id): void
     {
         if ($this->selectedId === $id) {
-            $this->closeDrawer();
-
             return;
         }
 
-        $this->selectedId = $id;
-        $this->resetDraft();
-        $this->editingCandidateIdentity = false;
-        $this->skillsetSaved = false;
-        $this->contactSaved = false;
-        $this->loadCandidateEditFields();
+        $this->redirect($this->processUrl($id), navigate: false);
     }
 
     protected function loadCandidateEditFields(): void
@@ -1173,11 +1208,7 @@ class RecruitmentProcessesTable extends Component
 
     public function closeDrawer(): void
     {
-        $this->selectedId = null;
-        $this->resetDraft();
-        $this->cancelRejection();
-        $this->cancelBlacklist();
-        $this->closeTaskModal();
+        $this->redirect($this->listUrl(), navigate: false);
     }
 
     protected function resetDraft(): void
@@ -1481,10 +1512,67 @@ class RecruitmentProcessesTable extends Component
 
         $this->resetDraft();
         $this->contactSaved = true;
+        $this->showContactModal = false;
 
         if ($shouldOpenTaskModal) {
             $this->openTaskModal($process);
         }
+    }
+
+    public function openContactModal(): void
+    {
+        $this->showContactModal = true;
+        $this->newOutcome = '';
+        $this->newComment = '';
+        $this->contactSaved = false;
+    }
+
+    public function closeContactModal(): void
+    {
+        $this->showContactModal = false;
+    }
+
+    public function startEditAttempt(int $attemptId): void
+    {
+        $attempt = RecruitmentContactAttempt::find($attemptId);
+        if (! $attempt || ($attempt->user_id !== auth()->id() && ! auth()->user()->isAdmin())) {
+            return;
+        }
+
+        $this->editingAttemptId = $attempt->id;
+        $this->editAttemptComment = $attempt->comment ?? '';
+    }
+
+    public function cancelEditAttempt(): void
+    {
+        $this->editingAttemptId = null;
+        $this->editAttemptComment = '';
+    }
+
+    public function saveEditAttempt(): void
+    {
+        $attempt = RecruitmentContactAttempt::find($this->editingAttemptId);
+        if (! $attempt || ($attempt->user_id !== auth()->id() && ! auth()->user()->isAdmin())) {
+            $this->cancelEditAttempt();
+
+            return;
+        }
+
+        $this->validate(['editAttemptComment' => 'nullable|string|max:2000']);
+
+        $attempt->update(['comment' => $this->editAttemptComment ?: null]);
+
+        $this->cancelEditAttempt();
+    }
+
+    public function deleteAttempt(int $attemptId): void
+    {
+        $attempt = RecruitmentContactAttempt::find($attemptId);
+        if (! $attempt || ($attempt->user_id !== auth()->id() && ! auth()->user()->isAdmin())) {
+            return;
+        }
+
+        $attempt->delete();
     }
 
     protected function openTaskModal(RecruitmentProcess $process): void

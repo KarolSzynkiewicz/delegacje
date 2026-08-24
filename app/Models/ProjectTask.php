@@ -203,7 +203,7 @@ class ProjectTask extends Model
         $processId = $this->linkedRecruitmentProcessId();
 
         return $processId
-            ? route('recruitment-processes.index', ['process' => $processId])
+            ? route('recruitment-processes.show', $processId)
             : null;
     }
 

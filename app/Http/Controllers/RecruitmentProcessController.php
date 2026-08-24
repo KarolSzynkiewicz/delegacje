@@ -7,7 +7,6 @@ use App\Enums\RecruitmentStatus;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Models\Employee;
 use App\Models\RecruitmentProcess;
-use App\Models\Role;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,20 +15,24 @@ class RecruitmentProcessController extends Controller
 {
     use HandlesImageUpload;
 
-    public function index(): View
+    public function index(Request $request): View|RedirectResponse
     {
+        if ($request->filled('process')) {
+            return redirect()->route(
+                'recruitment-processes.show',
+                ['recruitmentProcess' => $request->integer('process')] + $request->except('process')
+            );
+        }
+
         return view('recruitment.index');
     }
 
     public function show(RecruitmentProcess $recruitmentProcess): View
     {
-        $recruitmentProcess->load(['candidate.consents', 'candidate.roles', 'lead', 'employee', 'contactAttempts.user', 'statusHistory.changedBy']);
-
-        $roles = Role::orderBy('name')->get();
+        $recruitmentProcess->loadMissing('candidate');
 
         return view('recruitment.show', [
             'application' => $recruitmentProcess,
-            'roles' => $roles,
         ]);
     }
 

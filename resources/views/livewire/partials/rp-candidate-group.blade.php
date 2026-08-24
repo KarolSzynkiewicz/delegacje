@@ -15,8 +15,8 @@
             @endif
         </div>
         <div class="flex-grow-1 min-width-0">
-            <div class="fw-semibold" style="font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $cand->full_name }}</div>
-            <div style="font-size:.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $cand->phone ?? $cand->email }}</div>
+            <div class="rp-cand-group__name">{{ $cand->full_name }}</div>
+            <div class="rp-cand-group__meta">{{ $cand->phone ?? $cand->email }}</div>
         </div>
         @if($isPinned)
             <i class="bi bi-pin-angle-fill flex-shrink-0" style="font-size:.62rem;color:var(--primary);" title="Aktualnie otwarty"></i>
@@ -28,14 +28,16 @@
     @foreach($cand->processes as $proc)
         @php
             $matchesFilter = ! $status || $proc->status?->value === $status;
-            $sBadge = match($proc->status?->variant()) { 'success'=>'badge-success','danger'=>'badge-danger','warning'=>'badge-warning',default=>'badge-info' };
+            $variant = $proc->status?->variant() ?? 'secondary';
         @endphp
         <button type="button"
                 wire:click="selectProcess({{ $proc->id }})"
                 wire:key="li-{{ $proc->id }}"
                 class="rp-cand-proc {{ $selectedId===$proc->id ? 'rp-cand-proc--active' : '' }} {{ $matchesFilter ? '' : 'rp-cand-proc--muted' }}">
-            <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right me-1"></i>#{{ $proc->id }}</span>
-            <span class="badge {{ $sBadge }} rp-cand-proc__status">{{ $proc->status?->label() ?? '—' }}</span>
+            <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
+            <span class="rp-cand-proc__status is-{{ $variant }}">
+                <span class="rp-status-dot"></span>{{ $proc->status?->label() ?? '—' }}
+            </span>
         </button>
     @endforeach
 </div>

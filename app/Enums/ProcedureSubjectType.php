@@ -137,7 +137,7 @@ enum ProcedureSubjectType: string
         }
 
         return $processId
-            ? route('recruitment-processes.index', ['process' => $processId])
+            ? route('recruitment-processes.show', $processId)
             : route('recruitment-processes.index');
     }
 

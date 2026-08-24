@@ -3,8 +3,8 @@
 namespace Tests\Unit;
 
 use App\Enums\RecruitmentStatus;
-use App\Models\ProjectTask;
 use App\Models\ProcedureRun;
+use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentProcess;
 use App\Services\ProcedureSlotService;
@@ -38,7 +38,7 @@ class ProcedureSlotRecruitmentTaskContextTest extends TestCase
         $this->assertStringContainsString('Telefon: 48123456789', $description);
         $this->assertStringContainsString('E-mail: jan.kowalski@example.com', $description);
         $this->assertStringContainsString(
-            route('recruitment-processes.index', ['process' => 5]),
+            route('recruitment-processes.show', 5),
             $description,
         );
     }
@@ -75,7 +75,7 @@ class ProcedureSlotRecruitmentTaskContextTest extends TestCase
 
         $this->assertSame(7, $task->linkedRecruitmentProcessId());
         $this->assertSame(
-            route('recruitment-processes.index', ['process' => 7]),
+            route('recruitment-processes.show', 7),
             $task->recruitmentCardUrl(),
         );
     }
@@ -92,7 +92,7 @@ class ProcedureSlotRecruitmentTaskContextTest extends TestCase
 
         $this->assertSame(12, $task->linkedRecruitmentProcessId());
         $this->assertSame(
-            route('recruitment-processes.index', ['process' => 12]),
+            route('recruitment-processes.show', 12),
             $task->recruitmentCardUrl(),
         );
     }

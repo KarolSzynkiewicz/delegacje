@@ -20,9 +20,7 @@ use RuntimeException;
  */
 class ProcedureSlotService
 {
-    public function __construct(private ProcedureRunService $runs)
-    {
-    }
+    public function __construct(private ProcedureRunService $runs) {}
 
     public function binding(string $slotKey): ?ProcedureSlotBinding
     {
@@ -89,13 +87,13 @@ class ProcedureSlotService
 
         try {
             return $this->runs->startRun($binding->template, array_merge([
-                'task_name'    => $taskName ?: $binding->template->name,
-                'assigned_to'  => null,
-                'due_date'     => null,
+                'task_name' => $taskName ?: $binding->template->name,
+                'assigned_to' => null,
+                'due_date' => null,
                 'subject_type' => $subject->getMorphClass(),
-                'subject_id'   => $subject->getKey(),
-                'slot_key'     => $slotKey,
-                'variables'    => $variables ?: null,
+                'subject_id' => $subject->getKey(),
+                'slot_key' => $slotKey,
+                'variables' => $variables ?: null,
             ], $this->taskContextFromSubject($subject)));
         } catch (QueryException $e) {
             // Lost a race against a concurrent request for the same (slot, subject) —
@@ -123,10 +121,10 @@ class ProcedureSlotService
         $subject->loadMissing('candidate');
 
         return [
-            'description'            => $this->recruitmentTaskDescription($subject),
-            'category'               => 'Rekrutacja',
+            'description' => $this->recruitmentTaskDescription($subject),
+            'category' => 'Rekrutacja',
             'recruitment_process_id' => $subject->id,
-            'assigned_to'            => $subject->assigned_recruiter_id,
+            'assigned_to' => $subject->assigned_recruiter_id,
         ];
     }
 
@@ -150,7 +148,7 @@ class ProcedureSlotService
             $lines[] = 'E-mail: '.$email;
         }
 
-        $lines[] = 'Karta kandydata: '.route('recruitment-processes.index', ['process' => $process->id]);
+        $lines[] = 'Karta kandydata: '.route('recruitment-processes.show', $process);
 
         return implode("\n", $lines);
     }
