@@ -1,5 +1,5 @@
 @props([
-    'placeholder' => '@osoba albo załącznik…',
+    'placeholder' => '@osoba, @osoba! albo @osoba?…',
     'rows' => 2,
     'autocompletePayload' => ['users' => [], 'subtasks' => []],
     'submitTitle' => 'Wyślij',

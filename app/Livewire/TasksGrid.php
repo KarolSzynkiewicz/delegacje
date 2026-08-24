@@ -4,8 +4,10 @@ namespace App\Livewire;
 
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemType;
+use App\Models\ApprovalRequest;
 use App\Models\Comment;
 use App\Models\CommentMention;
+use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
 use App\Models\TaskGridView;
@@ -15,6 +17,7 @@ use App\Models\User;
 use App\Models\WorkItem;
 use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
+use App\Services\ProcedureRunService;
 use App\Services\UserMentionService;
 use App\Support\TasksGridUrlParams;
 use App\WorkItems\GridField;
@@ -42,6 +45,9 @@ class TasksGrid extends Component
     /** '' = wszyscy, 'me' = zalogowany użytkownik, w innym wypadku ID użytkownika jako string. */
     public string $assignedFilter = '';
 
+    /** '' = wszyscy, 'me' = zalogowany, inaczej ID twórcy. */
+    public string $createdByFilter = '';
+
     /**
      * Zaznaczone typy work itemów (checkboxy „Typ pracy” w panelu filtrów,
      * zastępują dawny pojedynczy przełącznik „pokaż oddzwonienia rekrutacji”).
@@ -51,7 +57,7 @@ class TasksGrid extends Component
      *
      * @var list<string>
      */
-    public array $selectedTypes = ['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up'];
+    public array $selectedTypes = ['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up', 'approval'];
 
     // Sorting
     public string $sortField = 'created_at';
@@ -65,7 +71,7 @@ class TasksGrid extends Component
     public array $collapsedGroups = [];
 
     // Column management
-    public array $visibleColumns = ['name', 'type', 'status', 'sprint', 'category', 'assigned_to', 'priority', 'due_date', 'subtasks'];
+    public array $visibleColumns = ['name', 'type', 'status', 'sprint', 'category', 'assigned_to', 'created_by', 'priority', 'due_date', 'subtasks'];
 
     public array $columnWidths = [];
 
@@ -91,8 +97,10 @@ class TasksGrid extends Component
 
     public string $editingValue = '';
 
-    // Inline add task
+    // Inline add task / procedure / approval
     public bool $showAddRow = false;
+
+    public string $addKind = 'task';
 
     public string $newTaskName = '';
 
@@ -105,6 +113,8 @@ class TasksGrid extends Component
     public string $newTaskPriority = '';
 
     public string $newTaskDueDate = '';
+
+    public string $newProcedureTemplateId = '';
 
     // Inline add subtask
     public ?int $addingSubtaskForTask = null;
@@ -130,6 +140,7 @@ class TasksGrid extends Component
             'searchAssignedTo' => ['except' => '', 'history' => true],
             'status' => ['except' => '', 'history' => true],
             'assignedFilter' => ['except' => '', 'history' => true],
+            'createdByFilter' => ['except' => '', 'history' => true],
             'selectedTypes' => ['except' => $this->defaultSelectedTypes(), 'as' => 'types', 'history' => true],
             'sortField' => ['except' => 'created_at', 'history' => true],
             'sortDirection' => ['except' => 'desc', 'history' => true],
@@ -146,6 +157,7 @@ class TasksGrid extends Component
         'searchAssignedTo',
         'status',
         'assignedFilter',
+        'createdByFilter',
         'selectedTypes',
         'groupBy',
         'sortField',
@@ -237,6 +249,7 @@ class TasksGrid extends Component
             'sprint' => ['label' => 'Sprint', 'sortable' => true],
             'category' => ['label' => 'Kategoria', 'sortable' => true],
             'assigned_to' => ['label' => 'Przypisany', 'sortable' => false],
+            'created_by' => ['label' => 'Utworzono przez', 'sortable' => false],
             'priority' => ['label' => 'Priorytet', 'sortable' => true],
             'due_date' => ['label' => 'Termin', 'sortable' => true],
             'subtasks' => ['label' => 'Podzadania', 'sortable' => false],
@@ -248,7 +261,7 @@ class TasksGrid extends Component
 
     public function updating(string $name, mixed $value): void
     {
-        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'assignedFilter', 'selectedTypes'], true)) {
+        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'assignedFilter', 'createdByFilter', 'selectedTypes'], true)) {
             $this->resetPage();
         }
     }
@@ -276,6 +289,7 @@ class TasksGrid extends Component
         $this->searchAssignedTo = '';
         $this->status = 'all';
         $this->assignedFilter = '';
+        $this->createdByFilter = '';
         $this->selectedTypes = $this->allWorkItemTypeValues();
         $this->sortField = 'created_at';
         $this->sortDirection = 'desc';
@@ -340,6 +354,13 @@ class TasksGrid extends Component
             $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: '.($name ?: '#'.$this->assignedFilter)];
         }
 
+        if ($this->createdByFilter === 'me') {
+            $chips[] = ['key' => 'createdByFilter', 'label' => 'Utworzono przez: Ja'];
+        } elseif ($this->createdByFilter !== '') {
+            $name = User::query()->whereKey((int) $this->createdByFilter)->value('name');
+            $chips[] = ['key' => 'createdByFilter', 'label' => 'Utworzono przez: '.($name ?: '#'.$this->createdByFilter)];
+        }
+
         if ($this->usesWorkItems()) {
             $allTypes = $this->allWorkItemTypeValues();
             $selected = $this->selectedTypes;
@@ -401,6 +422,14 @@ class TasksGrid extends Component
 
         if ($key === 'assignedFilter') {
             $this->assignedFilter = '';
+            $this->resetPage();
+            $this->detachActiveView();
+
+            return;
+        }
+
+        if ($key === 'createdByFilter') {
+            $this->createdByFilter = '';
             $this->resetPage();
             $this->detachActiveView();
 
@@ -702,7 +731,7 @@ class TasksGrid extends Component
             ? $this->lockedSprintId
             : ($this->newTaskSprint ?: null);
 
-        ProjectTask::create([
+        $task = ProjectTask::create([
             'name' => $this->newTaskName,
             'sprint_id' => $sprintId,
             'sprint_position' => $sprintId
@@ -716,12 +745,138 @@ class TasksGrid extends Component
             'created_by' => auth()->id(),
         ]);
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate']);
+        if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
+            $assignee = User::find($task->assigned_to);
+            $assignee?->notify(new TaskAssigned($task, auth()->user()));
+        }
+
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }
         $this->showAddRow = false;
+        $this->addKind = 'task';
         $this->flash = 'Zadanie dodane.';
+    }
+
+    public function startAdd(string $kind): void
+    {
+        if (! in_array($kind, ['task', 'procedure', 'approval'], true)) {
+            return;
+        }
+
+        if (in_array($kind, ['procedure', 'approval'], true) && ! $this->usesWorkItems()) {
+            return;
+        }
+
+        $this->addKind = $kind;
+        $this->showAddRow = true;
+        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        if ($this->isLockedToSprint()) {
+            $this->newTaskSprint = (string) $this->lockedSprintId;
+        }
+        $this->resetErrorBag();
+    }
+
+    public function cancelAdd(): void
+    {
+        $this->showAddRow = false;
+        $this->addKind = 'task';
+        $this->resetErrorBag();
+    }
+
+    public function updatedNewProcedureTemplateId(string $value): void
+    {
+        $template = ProcedureTemplate::query()->find((int) $value);
+        if ($template) {
+            $this->newTaskName = $template->name;
+        }
+    }
+
+    public function submitAdd(): void
+    {
+        match ($this->addKind) {
+            'procedure' => $this->startProcedureFromGrid(),
+            'approval' => $this->addApproval(),
+            default => $this->addTask(),
+        };
+    }
+
+    public function startProcedureFromGrid(): void
+    {
+        if (! $this->usesWorkItems()) {
+            return;
+        }
+
+        $this->validate([
+            'newProcedureTemplateId' => 'required|exists:procedure_templates,id',
+            'newTaskName' => 'required|string|max:255',
+            'newTaskAssignedTo' => 'nullable|exists:users,id',
+            'newTaskDueDate' => 'nullable|date',
+        ], [], [
+            'newProcedureTemplateId' => 'szablon procedury',
+            'newTaskName' => 'nazwa',
+        ]);
+
+        $template = ProcedureTemplate::query()->findOrFail((int) $this->newProcedureTemplateId);
+
+        try {
+            app(ProcedureRunService::class)->startRun($template, [
+                'task_name' => $this->newTaskName,
+                'assigned_to' => $this->newTaskAssignedTo ?: null,
+                'due_date' => $this->newTaskDueDate ?: null,
+            ]);
+        } catch (\RuntimeException $e) {
+            $this->flash = $e->getMessage();
+
+            return;
+        }
+
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        $this->showAddRow = false;
+        $this->addKind = 'task';
+        $this->flash = 'Procedura uruchomiona.';
+    }
+
+    public function addApproval(): void
+    {
+        if (! $this->usesWorkItems()) {
+            return;
+        }
+
+        $this->validate([
+            'newTaskName' => 'required|string|max:255',
+            'newTaskAssignedTo' => 'required|exists:users,id',
+            'newTaskSprint' => 'nullable|exists:sprints,id',
+            'newTaskPriority' => 'nullable|integer|min:1|max:5',
+            'newTaskDueDate' => 'nullable|date',
+            'newTaskCategory' => 'nullable|string|max:255',
+        ], [], [
+            'newTaskName' => 'nazwa',
+            'newTaskAssignedTo' => 'zatwierdzający',
+        ]);
+
+        $sprintId = $this->isLockedToSprint()
+            ? $this->lockedSprintId
+            : ($this->newTaskSprint ?: null);
+
+        ApprovalRequest::query()->create([
+            'name' => $this->newTaskName,
+            'approver_id' => (int) $this->newTaskAssignedTo,
+            'created_by' => auth()->id(),
+            'sprint_id' => $sprintId,
+            'category' => $this->newTaskCategory ?: null,
+            'priority' => $this->newTaskPriority ?: null,
+            'due_at' => $this->newTaskDueDate ?: null,
+        ]);
+
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        if ($this->isLockedToSprint()) {
+            $this->newTaskSprint = (string) $this->lockedSprintId;
+        }
+        $this->showAddRow = false;
+        $this->addKind = 'task';
+        $this->flash = 'Prośba o zatwierdzenie wysłana.';
     }
 
     public function startAddSubtask(int $taskId): void
@@ -954,6 +1109,7 @@ class TasksGrid extends Component
             'searchAssignedTo' => $this->searchAssignedTo,
             'status' => $this->status,
             'assignedFilter' => $this->assignedFilter,
+            'createdByFilter' => $this->createdByFilter,
             'types' => $this->selectedTypes,
             'groupBy' => $this->groupBy,
             'sortField' => $this->sortField,
@@ -976,6 +1132,7 @@ class TasksGrid extends Component
             'searchAssignedTo' => $this->searchAssignedTo,
             'status' => $this->status,
             'assignedFilter' => $this->assignedFilter,
+            'createdByFilter' => $this->createdByFilter,
             'selectedTypes' => $this->selectedTypes,
         ];
 
@@ -984,6 +1141,7 @@ class TasksGrid extends Component
         $this->searchAssignedTo = $view->search_assigned_to ?? '';
         $this->status = $view->status ?? '';
         $this->assignedFilter = $view->assigned_filter ?? ($view->my_tasks_only ? 'me' : '');
+        $this->createdByFilter = $view->created_by_filter ?? '';
         $this->selectedTypes = $view->type_filter ?: $this->defaultSelectedTypes();
 
         try {
@@ -994,6 +1152,7 @@ class TasksGrid extends Component
             $this->searchAssignedTo = $previous['searchAssignedTo'];
             $this->status = $previous['status'];
             $this->assignedFilter = $previous['assignedFilter'];
+            $this->createdByFilter = $previous['createdByFilter'];
             $this->selectedTypes = $previous['selectedTypes'];
         }
     }
@@ -1039,6 +1198,7 @@ class TasksGrid extends Component
         $this->searchAssignedTo = $record->search_assigned_to ?? '';
         $this->status = $record->status ?? '';
         $this->assignedFilter = $record->assigned_filter ?? ($record->my_tasks_only ? 'me' : '');
+        $this->createdByFilter = $record->created_by_filter ?? '';
         $this->selectedTypes = $record->type_filter ?: $this->defaultSelectedTypes();
         $this->sanitizeRemovedProjectField();
         $this->hideGroupedColumn();
@@ -1071,7 +1231,7 @@ class TasksGrid extends Component
         }
 
         if ($this->visibleColumns === []) {
-            $this->visibleColumns = ['name', 'status', 'sprint', 'category', 'assigned_to', 'priority', 'due_date', 'subtasks'];
+            $this->visibleColumns = ['name', 'status', 'sprint', 'category', 'assigned_to', 'created_by', 'priority', 'due_date', 'subtasks'];
             if ($this->usesWorkItems()) {
                 $this->insertVisibleColumn('type');
             }
@@ -1160,6 +1320,7 @@ class TasksGrid extends Component
             'status' => $this->status,
             'my_tasks_only' => $this->assignedFilter === 'me',
             'assigned_filter' => $this->assignedFilter,
+            'created_by_filter' => $this->createdByFilter,
             'type_filter' => $this->selectedTypes,
         ];
     }
@@ -1761,6 +1922,12 @@ class TasksGrid extends Component
             $query->where('project_tasks.assigned_to', (int) $this->assignedFilter);
         }
 
+        if ($this->createdByFilter === 'me') {
+            $query->where('project_tasks.created_by', auth()->id());
+        } elseif ($this->createdByFilter !== '' && ctype_digit($this->createdByFilter)) {
+            $query->where('project_tasks.created_by', (int) $this->createdByFilter);
+        }
+
         if ($this->searchTask) {
             $query->where(fn ($q) => $q
                 ->where('project_tasks.name', 'like', '%'.$this->searchTask.'%')
@@ -1799,6 +1966,12 @@ class TasksGrid extends Component
             $query->where('work_items.assignee_id', auth()->id());
         } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
             $query->where('work_items.assignee_id', (int) $this->assignedFilter);
+        }
+
+        if ($this->createdByFilter === 'me') {
+            $query->where('work_items.created_by_id', auth()->id());
+        } elseif ($this->createdByFilter !== '' && ctype_digit($this->createdByFilter)) {
+            $query->where('work_items.created_by_id', (int) $this->createdByFilter);
         }
 
         if ($this->searchTask) {
@@ -1847,6 +2020,7 @@ class TasksGrid extends Component
             $this->applyWorkItemSorting($query);
             $query->with([
                 'assignedTo',
+                'createdBy',
                 'sprint',
                 'source' => function (MorphTo $morphTo) {
                     $morphTo->morphWith([
@@ -1855,6 +2029,7 @@ class TasksGrid extends Component
                         CommentMention::class => ['comment.commentable', 'assignedTo'],
                         \App\Models\ProcedureRun::class => ['task', 'template'],
                         \App\Models\WarehouseDispatch::class => ['tasks'],
+                        \App\Models\ApprovalRequest::class => ['approver', 'decidedBy'],
                     ])->morphWithCount([
                         ProjectTask::class => ['comments'],
                     ]);
@@ -1901,6 +2076,9 @@ class TasksGrid extends Component
                 ? collect()
                 : Sprint::query()->orderByDesc('start_date')->get(),
             'allUsers' => User::orderedDirectory(),
+            'procedureTemplates' => $this->usesWorkItems()
+                ? ProcedureTemplate::query()->orderBy('name')->get(['id', 'name'])
+                : collect(),
             'availableColumns' => $this->availableColumns,
             'savedViews' => $savedViews,
             'viewCounts' => $viewCounts,

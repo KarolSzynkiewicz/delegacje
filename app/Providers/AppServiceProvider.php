@@ -6,6 +6,7 @@ use App\Livewire\Pulse\UserRouteUsage;
 use App\Livewire\Pulse\UserRouteVisits;
 use App\Models\AccommodationAssignment;
 use App\Models\Adjustment;
+use App\Models\ApprovalRequest;
 use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\CommentMention;
@@ -25,6 +26,7 @@ use App\Models\User;
 use App\Models\VehicleAssignment;
 use App\Models\WarehouseDispatch;
 use App\Observers\AuditableModelObserver;
+use App\Observers\NotifiesApprovalAssignee;
 use App\Observers\ProcedureTemplateObserver;
 use App\Observers\SyncsWorkItems;
 use App\Services\SystemBootstrapService;
@@ -90,6 +92,8 @@ class AppServiceProvider extends ServiceProvider
         ProcedureRun::observe(SyncsWorkItems::class);
         WarehouseDispatch::observe(SyncsWorkItems::class);
         CommentMention::observe(SyncsWorkItems::class);
+        ApprovalRequest::observe(SyncsWorkItems::class);
+        ApprovalRequest::observe(NotifiesApprovalAssignee::class);
 
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,
@@ -114,6 +118,7 @@ class AppServiceProvider extends ServiceProvider
             'sprint' => \App\Models\Sprint::class,
             'procedure_run' => \App\Models\ProcedureRun::class,
             'work_item' => \App\Models\WorkItem::class,
+            'approval_request' => \App\Models\ApprovalRequest::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

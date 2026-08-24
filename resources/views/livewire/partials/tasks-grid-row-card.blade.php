@@ -21,6 +21,7 @@
         'cancelled'   => ['cls' => 's-cancelled',  'icon' => '✗'],
     ];
     $sc = $statusMap[$task->status->value] ?? $statusMap['pending'];
+    $approvalDecision = $isWorkItem ? $task->approvalDecision() : null;
 
     $priorityMap = [
         1 => ['color' => '#94a3b8', 'label' => '↓ Najniższy'],
@@ -37,6 +38,19 @@
         'completed'   => '#10b981',
         'cancelled'   => '#ef4444',
     ][$task->status->value] ?? 'rgba(255,255,255,0.15)';
+
+    if ($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval) {
+        if ($approvalDecision === \App\Enums\ApprovalDecision::Approved) {
+            $sc = ['cls' => 's-completed', 'icon' => '✓'];
+            $borderColor = '#10b981';
+        } elseif ($approvalDecision === \App\Enums\ApprovalDecision::Rejected) {
+            $sc = ['cls' => 's-cancelled', 'icon' => '✗'];
+            $borderColor = '#ef4444';
+        } else {
+            $sc = ['cls' => 's-pending', 'icon' => '⏳'];
+            $borderColor = '#f59e0b';
+        }
+    }
 
     $dueStyle = 'color:rgba(255,255,255,0.4)';
     if ($task->due_date) {
@@ -69,6 +83,9 @@
             </span>
         @endif
         <a href="{{ $openUrl }}" class="tg-card-name" title="{{ $task->name }}">{{ $task->name }}</a>
+        @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
+            <x-ui.approval-decision :decision="$approvalDecision" size="sm" />
+        @endif
         @if($sourceCard && ($sourceCard['url'] ?? '') !== $openUrl)
             <a href="{{ $sourceCard['url'] }}"
                class="tg-card-source-link"
@@ -162,6 +179,13 @@
         {{-- Assigned to --}}
         @if(in_array('assigned_to', $visibleColumns) && $task->assignedTo)
             <span class="tg-meta-item"><x-ui.person :user="$task->assignedTo" avatar-size="18px" :show-email="false" name-class="small" /></span>
+        @endif
+
+        @if(in_array('created_by', $visibleColumns) && $task->createdBy)
+            <span class="tg-meta-item" title="Utworzono przez">
+                <i class="bi bi-pencil-square me-1 opacity-50"></i>
+                <x-ui.person :user="$task->createdBy" avatar-size="18px" :show-email="false" name-class="small" />
+            </span>
         @endif
 
         {{-- Priority --}}

@@ -24,6 +24,16 @@
     ];
     $sc = $statusMap[$task->status->value] ?? $statusMap['pending'];
     $sc['label'] = $statusLabel;
+    $approvalDecision = $isWorkItem ? $task->approvalDecision() : null;
+    if ($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval) {
+        if ($approvalDecision === \App\Enums\ApprovalDecision::Approved) {
+            $sc = ['cls' => 's-completed', 'icon' => '✓', 'label' => $statusLabel];
+        } elseif ($approvalDecision === \App\Enums\ApprovalDecision::Rejected) {
+            $sc = ['cls' => 's-cancelled', 'icon' => '✗', 'label' => $statusLabel];
+        } else {
+            $sc = ['cls' => 's-pending', 'icon' => '⏳', 'label' => $statusLabel];
+        }
+    }
 
     // Priority config
     $priorityMap = [
@@ -109,6 +119,9 @@
                    class="text-decoration-none"
                    style="padding:2px 4px; border-radius:3px; display:block; min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main,#f1f5f9)"
                    title="{{ $task->name }}">{{ $task->name }}</a>
+                @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
+                    <x-ui.approval-decision :decision="$approvalDecision" size="sm" />
+                @endif
                 @if(($sourceCard = $task->sourceCard()) && ($sourceCard['url'] ?? '') !== $openUrl)
                     <a href="{{ $sourceCard['url'] }}"
                        class="btn btn-link btn-sm p-0 flex-shrink-0"
@@ -275,6 +288,17 @@
                     <span class="text-muted" style="font-size:0.82rem">—</span>
                 @endif
             @endif
+        @endif
+    </td>
+    @break
+
+    {{-- ── Created by ── --}}
+    @case('created_by')
+    <td style="min-width:130px">
+        @if($task->createdBy)
+            <x-ui.person :user="$task->createdBy" avatar-size="22px" :show-email="false" name-class="small" />
+        @else
+            <span class="text-muted" style="font-size:0.82rem">—</span>
         @endif
     </td>
     @break

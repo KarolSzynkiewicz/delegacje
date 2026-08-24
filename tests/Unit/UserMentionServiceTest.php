@@ -77,5 +77,52 @@ class UserMentionServiceTest extends TestCase
             UserMentionService::stripMentionTokens('@robert! weź klucze')
         );
         $this->assertSame('', UserMentionService::stripMentionTokens('@robert'));
+        $this->assertSame(
+            'podpisz',
+            UserMentionService::stripMentionTokens('@robert? podpisz')
+        );
+    }
+
+    public function test_extract_approval_handles_only_takes_question_suffix(): void
+    {
+        $handles = UserMentionService::extractApprovalHandles('Cześć @robert? i @anna oraz @wszyscy? i @robert!');
+
+        $this->assertSame(['robert', 'wszyscy'], $handles);
+    }
+
+    public function test_highlight_includes_question_for_known_users(): void
+    {
+        $html = UserMentionService::highlightMentions(
+            e('@robert? i @anna'),
+            [
+                ['name' => 'robert', 'initials' => 'R'],
+                ['name' => 'anna', 'initials' => 'A'],
+            ]
+        );
+
+        $this->assertStringContainsString('<strong class="text-warning">@robert?</strong>', $html);
+        $this->assertStringContainsString('<strong class="text-primary">@anna</strong>', $html);
+    }
+
+    public function test_approval_fields_split_title_and_description_on_double_slash(): void
+    {
+        $fields = UserMentionService::approvalFieldsFromBody(
+            '@robert? czy zgadzasz się na kota?? //plis zgodzisz się? kocham kotki bardzo są takie słodkie',
+            'Wniosek'
+        );
+
+        $this->assertSame('czy zgadzasz się na kota??', $fields['title']);
+        $this->assertSame('plis zgodzisz się? kocham kotki bardzo są takie słodkie', $fields['description']);
+    }
+
+    public function test_approval_fields_do_not_split_on_https(): void
+    {
+        $fields = UserMentionService::approvalFieldsFromBody(
+            '@robert? zobacz https://kotki.pl/foto',
+            'Wniosek'
+        );
+
+        $this->assertSame('zobacz https://kotki.pl/foto', $fields['title']);
+        $this->assertNull($fields['description']);
     }
 }

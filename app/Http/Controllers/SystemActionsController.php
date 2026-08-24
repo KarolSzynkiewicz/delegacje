@@ -191,7 +191,7 @@ class SystemActionsController extends Controller
             $count = $sync->backfill();
 
             return redirect()->route('system-actions.index')
-                ->with('success', "Fix tasków — backfill zakończony. Zapisano {$count} wierszy backlogu. Odśwież /tasks2.");
+                ->with('success', "Backfill «Utworzono przez» zakończony. Zapisano {$count} wierszy backlogu. Odśwież /tasks2.");
         } catch (\Exception $e) {
             return redirect()->route('system-actions.index')
                 ->with('error', 'Błąd backfillu zadań: '.$e->getMessage());

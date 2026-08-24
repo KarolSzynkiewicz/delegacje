@@ -16,6 +16,32 @@
             </x-ui.alert>
         @endif
 
+        <x-ui.card class="mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+                <div>
+                    <h5 class="mb-2">
+                        <i class="bi bi-person-badge text-warning"></i>
+                        Backfill «Utworzono przez»
+                    </h5>
+                    <p class="text-muted mb-0 small">
+                        Przebudowuje indeks backlogu (<code>work_items</code>) i uzupełnia kolumnę
+                        <strong>Utworzono przez</strong> ze źródeł: zadań, podzadań, procedur, kompletacji, wzmianek i zatwierdzeń.
+                        Idempotentna — można odpalać ponownie.
+                    </p>
+                </div>
+                <form method="POST" action="{{ route('system-actions.sync-work-items') }}" class="flex-shrink-0">
+                    @csrf
+                    <x-ui.button
+                        variant="warning"
+                        type="submit"
+                        onclick="return confirm('Uzupełnić «Utworzono przez» i przebudować indeks backlogu? Może chwilę potrwać.')"
+                    >
+                        <i class="bi bi-arrow-repeat"></i> Uzupełnij utworzono przez
+                    </x-ui.button>
+                </form>
+            </div>
+        </x-ui.card>
+
         <div class="row">
             <div class="col-lg-8">
                 <x-ui.card label="Cache i Optymalizacja">
@@ -280,35 +306,6 @@
                     <p class="text-muted mb-4 small">
                         Jednorazowe akcje naprawcze dla danych w bazie.
                     </p>
-
-                    <!-- Fix tasków — backfill work_items (jednorazowo po deployu /tasks2) -->
-                    <div class="border rounded p-3 mb-3 bg-warning bg-opacity-10">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h5 class="mb-2">
-                                    <i class="bi bi-list-check text-warning"></i>
-                                    Fix tasków — backfill
-                                </h5>
-                                <p class="text-muted mb-0 small">
-                                    Przebudowuje indeks backlogu (<code>work_items</code>) ze starych zadań,
-                                    podzadań, procedur, kompletacji i wzmianek.
-                                    <strong>Użyj raz</strong>, gdy /tasks2 pokazuje tylko nowe pozycje,
-                                    a w kartach widać całą historię. Idempotentna.
-                                </p>
-                            </div>
-                        </div>
-                        <form method="POST" action="{{ route('system-actions.sync-work-items') }}" class="mt-3">
-                            @csrf
-                            <x-ui.button
-                                variant="warning"
-                                type="submit"
-                                class="w-100"
-                                onclick="return confirm('Przebudować indeks backlogu z istniejących zadań? Może chwilę potrwać.')"
-                            >
-                                <i class="bi bi-arrow-repeat"></i> Backfill tasków
-                            </x-ui.button>
-                        </form>
-                    </div>
 
                     <!-- Sync typów lokalizacji -->
                     <div class="border rounded p-3 mb-3">

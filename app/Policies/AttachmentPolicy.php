@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Enums\LogisticsEventType;
 use App\Models\Accommodation;
+use App\Models\ApprovalRequest;
 use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\Employee;
@@ -29,6 +30,10 @@ class AttachmentPolicy
             return $user->hasPermission('tasks.view');
         }
 
+        if ($parent instanceof ApprovalRequest) {
+            return $user->can('view', $parent);
+        }
+
         if ($parent instanceof Sprint) {
             return $user->hasPermission('tasks.view');
         }
@@ -50,6 +55,10 @@ class AttachmentPolicy
 
         if ($parent instanceof ProjectTask) {
             return $user->hasPermission('tasks.update');
+        }
+
+        if ($parent instanceof ApprovalRequest) {
+            return $parent->isCreator($user) || $parent->isApprover($user) || $user->hasPermission('tasks.update');
         }
 
         if ($parent instanceof Sprint) {

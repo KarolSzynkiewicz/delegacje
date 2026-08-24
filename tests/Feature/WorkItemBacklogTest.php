@@ -58,7 +58,51 @@ class WorkItemBacklogTest extends TestCase
         $this->assertSame(WorkItemType::Task, $item->type);
         $this->assertSame('DR do Berlina', $item->title);
         $this->assertSame($this->user->id, $item->assignee_id);
+        $this->assertSame($this->user->id, $item->created_by_id);
         $this->assertSame(WorkItemStatus::Pending, $item->status);
+    }
+
+    public function test_grid_shows_created_by_and_filters_to_items_i_initiated(): void
+    {
+        $other = User::factory()->create(['name' => 'Ola Kowalska']);
+
+        ProjectTask::query()->create([
+            'name' => 'Moja inicjatywa XYZ',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $other->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Ich inicjatywa XYZ',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $other->id,
+        ]);
+
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSee('Moja inicjatywa XYZ')
+            ->assertSee('Ich inicjatywa XYZ')
+            ->assertSee('Ola Kowalska')
+            ->assertSee('Utworzono przez');
+
+        $this->assertContains('created_by', $component->get('visibleColumns'));
+
+        $component->set('createdByFilter', 'me')
+            ->assertSee('Utworzono przez: Ja')
+            ->assertSee('Moja inicjatywa XYZ')
+            ->assertDontSee('Ich inicjatywa XYZ');
+
+        $component->call('toggleColumn', 'created_by');
+        $this->assertNotContains('created_by', $component->get('visibleColumns'));
+
+        $component->call('toggleColumn', 'created_by');
+        $this->assertContains('created_by', $component->get('visibleColumns'));
+
+        $component->call('clearFilter', 'createdByFilter')
+            ->assertSet('createdByFilter', '')
+            ->assertSee('Ich inicjatywa XYZ');
     }
 
     public function test_procedure_run_indexes_as_procedure_not_as_task(): void
@@ -87,6 +131,7 @@ class WorkItemBacklogTest extends TestCase
         $item = WorkItem::query()->where('type', WorkItemType::ProcedureRun)->first();
         $this->assertSame('Onboarding Jan', $item->title);
         $this->assertSame($this->user->id, $item->assignee_id);
+        $this->assertSame($this->user->id, $item->created_by_id);
         $this->assertSame($run->id, $item->source_id);
         $this->assertFalse($item->expandable());
         $this->assertSame('W trakcie', $item->statusLabel());

@@ -769,7 +769,7 @@
                 @if($showAddRow)
                 <tr class="tg-add-row">
                     <td style="padding:6px 4px; text-align:center">
-                        <button wire:click="$set('showAddRow', false)"
+                        <button wire:click="cancelAdd"
                                 class="btn btn-sm btn-link text-muted p-0"
                                 title="Anuluj">
                             <i class="bi bi-x-lg" style="font-size:0.8rem"></i>
@@ -779,31 +779,56 @@
                     {{-- Name (always) --}}
                     @if(in_array('name', $visibleColumns))
                     <td style="padding:4px 6px; min-width:220px">
-                        <div class="d-flex gap-1 align-items-start">
-                            <input type="text"
-                                   wire:model="newTaskName"
-                                   class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                                   placeholder="Nazwa zadania *"
-                                   wire:keydown.enter="addTask"
-                                   wire:keydown.escape="$set('showAddRow', false)"
-                                   x-data x-init="$el.focus()">
-                            <button wire:click="addTask" class="btn btn-sm tg-add-submit flex-shrink-0">
-                                <i class="bi bi-plus-lg me-1"></i>Dodaj
-                            </button>
+                        <div class="d-flex flex-column gap-1">
+                            @if($addKind === 'procedure')
+                                <select wire:model.live="newProcedureTemplateId"
+                                        class="form-select form-select-sm @error('newProcedureTemplateId') is-invalid @enderror">
+                                    <option value="">Szablon procedury *</option>
+                                    @foreach($procedureTemplates as $tpl)
+                                        <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('newProcedureTemplateId')
+                                    <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
+                                @enderror
+                            @endif
+                            <div class="d-flex gap-1 align-items-start">
+                                <input type="text"
+                                       wire:model="newTaskName"
+                                       class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
+                                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : ($addKind === 'procedure' ? 'Nazwa procedury *' : 'Nazwa zadania *') }}"
+                                       wire:keydown.enter="submitAdd"
+                                       wire:keydown.escape="cancelAdd"
+                                       x-data x-init="$el.focus()">
+                                <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
+                                    @if($addKind === 'procedure')
+                                        <i class="bi bi-play-fill me-1"></i>Uruchom
+                                    @elseif($addKind === 'approval')
+                                        <i class="bi bi-check2-circle me-1"></i>Poproś
+                                    @else
+                                        <i class="bi bi-plus-lg me-1"></i>Dodaj
+                                    @endif
+                                </button>
+                            </div>
+                            @error('newTaskName')
+                                <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
+                            @enderror
                         </div>
-                        @error('newTaskName')
-                            <div class="invalid-feedback" style="font-size:0.72rem">{{ $message }}</div>
-                        @enderror
                     </td>
                     @endif
 
                     @if(in_array('type', $visibleColumns))
-                    <td></td>
+                    <td class="small text-muted" style="white-space:nowrap">
+                        @if($addKind === 'procedure') Procedura
+                        @elseif($addKind === 'approval') Zatwierdzenie
+                        @else Zadanie
+                        @endif
+                    </td>
                     @endif
 
                     @if(in_array('status', $visibleColumns))
                     <td style="padding:4px 6px">
-                        <span class="tg-add-status">Oczekujące</span>
+                        <span class="tg-add-status">{{ $addKind === 'procedure' ? 'W trakcie' : ($addKind === 'approval' ? 'Oczekuje' : 'Oczekujące') }}</span>
                     </td>
                     @endif
 
@@ -828,7 +853,7 @@
                     @if(in_array('assigned_to', $visibleColumns))
                     <td style="padding:4px 6px">
                         <select wire:model="newTaskAssignedTo" class="form-select form-select-sm" style="min-width:110px">
-                            <option value="">Nieprzypisane</option>
+                            <option value="">{{ $addKind === 'approval' ? 'Zatwierdzający *' : 'Nieprzypisane' }}</option>
                             @foreach($allUsers as $u)
                                 <option value="{{ $u->id }}">{{ $u->name }}</option>
                             @endforeach
@@ -856,7 +881,7 @@
                     @endif
 
                     {{-- Empty cells for read-only columns --}}
-                    @foreach(['subtasks','comments','created_at','updated_at'] as $_ec)
+                    @foreach(['subtasks','comments','created_by','created_at','updated_at'] as $_ec)
                         @if(in_array($_ec, $visibleColumns))<td></td>@endif
                     @endforeach
                 </tr>
@@ -866,10 +891,22 @@
                 <tr class="tg-footer-row">
                     <td colspan="{{ $colCount }}" style="padding:7px 12px">
                         @if(!$showAddRow)
-                        <button wire:click="$set('showAddRow', true)"
-                                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-                            <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
-                        </button>
+                        <div class="d-flex flex-wrap gap-3 align-items-center">
+                            <button type="button" wire:click="startAdd('task')"
+                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+                                <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
+                            </button>
+                            @if($this->usesWorkItems())
+                            <button type="button" wire:click="startAdd('procedure')"
+                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+                                <i class="bi bi-play-circle me-1"></i>Uruchom procedurę
+                            </button>
+                            <button type="button" wire:click="startAdd('approval')"
+                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+                                <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
+                            </button>
+                            @endif
+                        </div>
                         @else
                         <span class="text-muted small">Naciśnij <kbd>Enter</kbd> aby dodać lub <kbd>Esc</kbd> aby anulować</span>
                         @endif
@@ -922,27 +959,45 @@
     @if($showAddRow)
     <div class="tg-card tg-add-card">
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-semibold small">Nowe zadanie</span>
-            <button wire:click="$set('showAddRow', false)" class="btn btn-sm btn-link text-muted p-0" title="Anuluj">
+            <span class="fw-semibold small">
+                @if($addKind === 'procedure') Uruchom procedurę
+                @elseif($addKind === 'approval') Poproś o zatwierdzenie
+                @else Nowe zadanie
+                @endif
+            </span>
+            <button wire:click="cancelAdd" class="btn btn-sm btn-link text-muted p-0" title="Anuluj">
                 <i class="bi bi-x-lg" style="font-size:0.8rem"></i>
             </button>
         </div>
         <div class="d-flex flex-column gap-2">
+            @if($addKind === 'procedure')
+            <select wire:model.live="newProcedureTemplateId"
+                    class="form-select form-select-sm @error('newProcedureTemplateId') is-invalid @enderror">
+                <option value="">Szablon procedury *</option>
+                @foreach($procedureTemplates as $tpl)
+                    <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
+                @endforeach
+            </select>
+            @error('newProcedureTemplateId')
+                <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
+            @enderror
+            @endif
+
             @if(in_array('name', $visibleColumns))
             <div>
                 <input type="text"
                        wire:model="newTaskName"
                        class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                       placeholder="Nazwa zadania *"
-                       wire:keydown.enter="addTask"
-                       wire:keydown.escape="$set('showAddRow', false)">
+                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : ($addKind === 'procedure' ? 'Nazwa procedury *' : 'Nazwa zadania *') }}"
+                       wire:keydown.enter="submitAdd"
+                       wire:keydown.escape="cancelAdd">
                 @error('newTaskName')
                     <div class="invalid-feedback" style="font-size:0.72rem">{{ $message }}</div>
                 @enderror
             </div>
             @endif
 
-            @if(in_array('sprint', $visibleColumns))
+            @if(in_array('sprint', $visibleColumns) && $addKind !== 'procedure')
             <select wire:model="newTaskSprint" class="form-select form-select-sm">
                 <option value="">Poza sprintem</option>
                 @foreach($allSprints as $sprintOption)
@@ -951,20 +1006,23 @@
             </select>
             @endif
 
-            @if(in_array('category', $visibleColumns))
+            @if(in_array('category', $visibleColumns) && $addKind !== 'procedure')
             <input type="text" wire:model="newTaskCategory" class="form-control form-control-sm" placeholder="Kategoria…">
             @endif
 
-            @if(in_array('assigned_to', $visibleColumns))
-            <select wire:model="newTaskAssignedTo" class="form-select form-select-sm">
-                <option value="">Nieprzypisane</option>
+            @if(in_array('assigned_to', $visibleColumns) || $addKind === 'approval')
+            <select wire:model="newTaskAssignedTo" class="form-select form-select-sm @error('newTaskAssignedTo') is-invalid @enderror">
+                <option value="">{{ $addKind === 'approval' ? 'Zatwierdzający *' : 'Nieprzypisane' }}</option>
                 @foreach($allUsers as $u)
                     <option value="{{ $u->id }}">{{ $u->name }}</option>
                 @endforeach
             </select>
+            @error('newTaskAssignedTo')
+                <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
+            @enderror
             @endif
 
-            @if(in_array('priority', $visibleColumns))
+            @if(in_array('priority', $visibleColumns) && $addKind !== 'procedure')
             <select wire:model="newTaskPriority" class="form-select form-select-sm">
                 <option value="">Priorytet: brak</option>
                 <option value="1">1 – Najniższy</option>
@@ -979,16 +1037,34 @@
             <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
             @endif
 
-            <button wire:click="addTask" class="btn btn-sm tg-add-submit w-100">
-                <i class="bi bi-plus-lg me-1"></i>Dodaj zadanie
+            <button wire:click="submitAdd" class="btn btn-sm tg-add-submit w-100">
+                @if($addKind === 'procedure')
+                    <i class="bi bi-play-fill me-1"></i>Uruchom procedurę
+                @elseif($addKind === 'approval')
+                    <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
+                @else
+                    <i class="bi bi-plus-lg me-1"></i>Dodaj zadanie
+                @endif
             </button>
         </div>
     </div>
     @else
-    <button wire:click="$set('showAddRow', true)"
-            class="btn btn-sm btn-link text-primary text-decoration-none p-0 mt-1">
-        <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
-    </button>
+    <div class="d-flex flex-column gap-1 mt-1">
+        <button type="button" wire:click="startAdd('task')"
+                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+            <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
+        </button>
+        @if($this->usesWorkItems())
+        <button type="button" wire:click="startAdd('procedure')"
+                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+            <i class="bi bi-play-circle me-1"></i>Uruchom procedurę
+        </button>
+        <button type="button" wire:click="startAdd('approval')"
+                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+            <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
+        </button>
+        @endif
+    </div>
     @endif
 
     {{-- Pagination (only in flat view) --}}

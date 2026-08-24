@@ -84,6 +84,11 @@ class Comment extends Model implements TaskSubject
         return $this->hasMany(CommentMention::class);
     }
 
+    public function approvalRequests(): HasMany
+    {
+        return $this->hasMany(ApprovalRequest::class);
+    }
+
     public function mentionFor(?int $userId): ?CommentMention
     {
         if (! $userId) {
@@ -100,6 +105,23 @@ class Comment extends Model implements TaskSubject
         return $this->mentions()
             ->where('assigned_to', $userId)
             ->where('status', '!=', WorkItemStatus::Cancelled)
+            ->first();
+    }
+
+    public function approvalFor(?int $userId): ?ApprovalRequest
+    {
+        if (! $userId) {
+            return null;
+        }
+
+        $match = fn (ApprovalRequest $approval): bool => (int) $approval->approver_id === $userId;
+
+        if ($this->relationLoaded('approvalRequests')) {
+            return $this->approvalRequests->first($match);
+        }
+
+        return $this->approvalRequests()
+            ->where('approver_id', $userId)
             ->first();
     }
 

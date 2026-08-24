@@ -249,6 +249,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
                 ->name('tasks.grid');
             Route::get('tasks/grid', [\App\Http\Controllers\TaskController::class, 'grid'])
                 ->name('tasks.grid.alias');
+            Route::get('approval-requests/{approvalRequest}', [\App\Http\Controllers\ApprovalRequestController::class, 'show'])
+                ->name('approval-requests.show')
+                ->defaults('permission_type', 'view');
+            Route::post('approval-requests/{approvalRequest}/decide', [\App\Http\Controllers\ApprovalRequestController::class, 'decide'])
+                ->name('approval-requests.decide')
+                ->defaults('permission_type', 'view');
         });
 
         Route::group(['defaults' => ['resource' => 'tasks']], function () {

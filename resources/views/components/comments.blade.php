@@ -52,7 +52,7 @@
         <input type="hidden" name="commentable_type" value="{{ $commentableType->value }}">
         <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
         <x-comment-composer
-            :placeholder="$isTask ? '@osoba, #1 albo załącznik…' : '@osoba albo załącznik…'"
+            :placeholder="$isTask ? '@osoba, @osoba! , @osoba? , #1 albo załącznik…' : '@osoba, @osoba! albo @osoba?…'"
             :autocomplete-payload="$commentAutocompletePayload"
             :submit-title="$buttonTextValue"
             :file-input-id="'comment-files-'.$commentableType->value.'-'.$commentable->id"
@@ -68,6 +68,7 @@
                 'parent.user',
                 'parent.attachments',
                 'mentions' => fn ($q) => $q->where('assigned_to', auth()->id()),
+                'approvalRequests' => fn ($q) => $q->where('approver_id', auth()->id()),
             ])
             ->withCount('likes')
             ->withExists(['likes as liked_by_me' => fn ($q) => $q->where('user_id', auth()->id())])

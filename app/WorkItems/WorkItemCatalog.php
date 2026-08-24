@@ -15,6 +15,7 @@ class WorkItemCatalog
             WorkItemType::Subtask => app(SubtaskHandler::class),
             WorkItemType::ProcedureRun => app(ProcedureRunHandler::class),
             WorkItemType::Dispatch => app(DispatchHandler::class),
+            WorkItemType::Approval => app(ApprovalHandler::class),
         };
     }
 }

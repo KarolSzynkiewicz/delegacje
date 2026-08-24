@@ -25,6 +25,7 @@ class TaskGridView extends Model
         'status',
         'my_tasks_only',
         'assigned_filter',
+        'created_by_filter',
         'type_filter',
     ];
 
@@ -107,6 +108,9 @@ class TaskGridView extends Model
         } elseif ($this->my_tasks_only) {
             // Kompatybilność wsteczna: widoki zapisane przed dodaniem kolumny assigned_filter.
             $params['assignedFilter'] = 'me';
+        }
+        if ($this->created_by_filter !== '' && $this->created_by_filter !== null) {
+            $params['createdByFilter'] = $this->created_by_filter;
         }
         if (! empty($this->type_filter)) {
             $params['types'] = $this->type_filter;

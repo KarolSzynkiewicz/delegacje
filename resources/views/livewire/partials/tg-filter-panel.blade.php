@@ -41,6 +41,16 @@
                     @endif
                 @endforeach
             </select>
+            <span class="rp-filter-hint mt-2 d-block">Utworzono przez</span>
+            <select wire:model.live="createdByFilter" class="form-select form-select-sm rp-filter-input" @click.stop>
+                <option value="">Wszyscy</option>
+                <option value="me">Ja ({{ auth()->user()->name }})</option>
+                @foreach($allUsers as $u)
+                    @if($u->id !== auth()->id())
+                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                    @endif
+                @endforeach
+            </select>
         </div>
     </div>
 

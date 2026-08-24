@@ -103,12 +103,14 @@ class TasksGridFilterTransparencyTest extends TestCase
         // ale to jest widoczne jako chip, a nie cichy, niewzruszalny domyślny stan.
         $component->assertSee('Typ pracy: bez Oddzwonienie');
 
-        $component->call('toggleType', WorkItemType::Callback->value)
-            ->assertSet('selectedTypes', array_map(
-                fn ($t) => $t->value,
-                WorkItemType::cases()
-            ))
-            ->assertDontSee('Typ pracy:');
+        $component->call('toggleType', WorkItemType::Callback->value);
+
+        $expected = array_map(fn ($t) => $t->value, WorkItemType::cases());
+        sort($expected);
+        $actual = $component->get('selectedTypes');
+        sort($actual);
+        $this->assertSame($expected, $actual);
+        $component->assertDontSee('Typ pracy:');
     }
 
     public function test_assigned_filter_dropdown_replaces_my_tasks_only_boolean(): void
@@ -145,5 +147,34 @@ class TasksGridFilterTransparencyTest extends TestCase
             ->assertSet('assignedFilter', '')
             ->assertSee('Moje zadanie')
             ->assertSee('Zadanie kolegi');
+    }
+
+    public function test_created_by_filter_narrows_to_items_i_initiated(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Zainicjowane przeze mnie',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->other->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Zainicjowane przez kolegę',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->other->id,
+        ]);
+
+        Livewire::actingAs($this->user)->test(TasksGrid::class)
+            ->assertSee('Zainicjowane przeze mnie')
+            ->assertSee('Zainicjowane przez kolegę')
+            ->set('createdByFilter', 'me')
+            ->assertSee('Utworzono przez: Ja')
+            ->assertSee('Zainicjowane przeze mnie')
+            ->assertDontSee('Zainicjowane przez kolegę')
+            ->set('createdByFilter', (string) $this->other->id)
+            ->assertSee('Utworzono przez: Kolega')
+            ->assertDontSee('Zainicjowane przeze mnie')
+            ->assertSee('Zainicjowane przez kolegę');
     }
 }

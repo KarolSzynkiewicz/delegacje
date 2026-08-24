@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ApprovalDecision;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
 use App\Services\WorkItemSync;
@@ -25,6 +26,7 @@ class WorkItem extends Model
         'priority',
         'status',
         'assignee_id',
+        'created_by_id',
         'sprint_id',
         'due_at',
     ];
@@ -49,6 +51,11 @@ class WorkItem extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
     }
 
     public function sprint(): BelongsTo
@@ -83,6 +90,17 @@ class WorkItem extends Model
     public function statusLabel(): string
     {
         return $this->handler()->statusLabel($this);
+    }
+
+    public function approvalDecision(): ?ApprovalDecision
+    {
+        if ($this->type !== WorkItemType::Approval) {
+            return null;
+        }
+
+        $source = $this->source;
+
+        return $source instanceof ApprovalRequest ? $source->decision : null;
     }
 
     public function expandable(): bool
@@ -162,6 +180,12 @@ class WorkItem extends Model
             return $this->source->comment?->commentableCard();
         }
 
+        if ($this->type === WorkItemType::Approval && $this->source instanceof ApprovalRequest) {
+            $this->source->loadMissing('comment.commentable');
+
+            return $this->source->comment?->commentableCard();
+        }
+
         return [
             'url' => $this->openUrl(),
             'label' => $this->type->label(),
@@ -179,6 +203,9 @@ class WorkItem extends Model
             $source->loadMissing('comment');
 
             return trim((string) ($source->comment?->body ?? ''));
+        }
+        if ($source instanceof ApprovalRequest) {
+            return trim((string) ($source->description ?? ''));
         }
         if ($source instanceof TaskSubtask && $source->task) {
             return 'W zadaniu: '.$source->task->name;

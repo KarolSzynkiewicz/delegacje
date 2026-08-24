@@ -36,7 +36,8 @@ class SyncWorkItemsSystemActionTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('system-actions.index'))
             ->assertOk()
-            ->assertSee('Fix tasków — backfill')
+            ->assertSee('Backfill «Utworzono przez»')
+            ->assertSee('Uzupełnij utworzono przez')
             ->assertSee(route('system-actions.sync-work-items'), false);
     }
 

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enums\WorkItemStatus;
+use App\Models\ApprovalRequest;
+use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\CommentMention;
 use App\Models\ProjectTask;
@@ -13,8 +15,8 @@ use App\Notifications\TaskAssigned;
 
 class UserMentionService
 {
-    /** Wzorce @Nazwa — obsługa emaili jako nazw (znak @ w środku). Opcjonalny `!` tworzy wzmiankę w backlogu. */
-    public const MENTION_REGEX = '/@([\w\-\.@]+)(!)?/u';
+    /** Wzorce @Nazwa — opcjonalny `!` (wzmianka) albo `?` (wniosek o zatwierdzenie). */
+    public const MENTION_REGEX = '/@([\w\-\.@]+)([!?])?/u';
 
     /**
      * Dopasowanie użytkownika po fragmencie po @ — bez rozróżniania wielkości liter (user1 = User1).
@@ -54,6 +56,23 @@ class UserMentionService
     }
 
     /**
+     * @return list<string> unikalne handele z `@nazwa?` (wniosek o zatwierdzenie)
+     */
+    public static function extractApprovalHandles(string $text): array
+    {
+        preg_match_all(self::MENTION_REGEX, $text, $matches, PREG_SET_ORDER);
+
+        $handles = [];
+        foreach ($matches as $match) {
+            if (($match[2] ?? '') === '?') {
+                $handles[] = $match[1];
+            }
+        }
+
+        return array_values(array_unique($handles));
+    }
+
+    /**
      * Usuwa @wzmianki z tekstu (osoba jest już w assigned_to).
      */
     public static function stripMentionTokens(string $text): string
@@ -78,8 +97,9 @@ class UserMentionService
             self::MENTION_REGEX,
             static function (array $m) use ($knownUsers, $selfName): string {
                 $handle = $m[1]; // część po @ (już po e() źródła)
-                $bang = ($m[2] ?? '') === '!';
-                $suffix = $bang ? '!' : '';
+                $suffixChar = $m[2] ?? '';
+                $work = $suffixChar === '!' || $suffixChar === '?';
+                $suffix = $work ? $suffixChar : '';
 
                 if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
                     return '<strong class="text-warning">@wszyscy'.$suffix.'</strong>';
@@ -103,7 +123,7 @@ class UserMentionService
                             .'@'.e($canonical).$suffix.'</strong>';
                     }
 
-                    $class = $bang ? 'text-warning' : 'text-primary';
+                    $class = $work ? 'text-warning' : 'text-primary';
 
                     return '<strong class="'.$class.'">@'.e($canonical).$suffix.'</strong>';
                 }
@@ -163,16 +183,28 @@ class UserMentionService
     {
         $notifiedIds = [];
         $notifyEveryone = false;
+        $notifyHandles = [];
 
         $comment->loadMissing('commentable');
 
-        foreach (self::extractHandles((string) ($comment->body ?? '')) as $name) {
-            if (mb_strtolower($name, 'UTF-8') === 'wszyscy') {
-                $notifyEveryone = true;
+        preg_match_all(self::MENTION_REGEX, (string) ($comment->body ?? ''), $matches, PREG_SET_ORDER);
+        foreach ($matches as $match) {
+            $handle = $match[1];
+            $suffix = $match[2] ?? '';
+            if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
+                if ($suffix !== '?') {
+                    $notifyEveryone = true;
+                }
 
                 continue;
             }
+            if ($suffix === '?') {
+                continue;
+            }
+            $notifyHandles[] = $handle;
+        }
 
+        foreach (array_values(array_unique($notifyHandles)) as $name) {
             $user = self::resolveUserByMentionHandle($name);
 
             if (! $user) {
@@ -194,6 +226,7 @@ class UserMentionService
         }
 
         $this->createCommentMentions($comment, $author);
+        $this->createApprovalRequests($comment, $author);
 
         return $notifiedIds;
     }
@@ -244,6 +277,55 @@ class UserMentionService
         }
     }
 
+    /**
+     * `@nazwa?` tworzy wniosek o zatwierdzenie. Bez `@wszyscy?`.
+     * Tekst przed `//` to tytuł, po `//` opis.
+     */
+    public function createApprovalRequests(Comment $comment, User $author): void
+    {
+        $handles = self::extractApprovalHandles((string) ($comment->body ?? ''));
+        if ($handles === []) {
+            return;
+        }
+
+        $comment->loadMissing(['attachments', 'commentable']);
+        $assignedIds = [];
+
+        foreach ($handles as $handle) {
+            if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
+                continue;
+            }
+
+            $user = self::resolveUserByMentionHandle($handle);
+            if (! $user) {
+                continue;
+            }
+
+            if (isset($assignedIds[$user->id])) {
+                continue;
+            }
+            $assignedIds[$user->id] = true;
+
+            if (ApprovalRequest::query()
+                ->where('comment_id', $comment->id)
+                ->where('approver_id', $user->id)
+                ->exists()) {
+                continue;
+            }
+
+            $fields = $this->approvalFields($comment, $author);
+            $approval = ApprovalRequest::query()->create([
+                'name' => $fields['title'],
+                'description' => $fields['description'],
+                'approver_id' => $user->id,
+                'created_by' => $author->id,
+                'comment_id' => $comment->id,
+            ]);
+
+            Attachment::copyAllTo($comment, $approval, 'approvals');
+        }
+    }
+
     private function mentionTitle(Comment $comment, User $author): string
     {
         $request = self::stripMentionTokens((string) ($comment->body ?? ''));
@@ -252,6 +334,39 @@ class UserMentionService
         }
 
         return mb_substr($request, 0, 255);
+    }
+
+    /**
+     * Tytuł = treść przed `//` (bez @wzmianek). Opis = treść po `//`.
+     * `https://` nie rozdziela (unika się `:` przed `//`).
+     *
+     * @return array{title: string, description: string|null}
+     */
+    public static function approvalFieldsFromBody(string $body, string $fallbackTitle): array
+    {
+        $parts = preg_split('/(?<!:)\/\//u', $body, 2) ?: [$body];
+        $title = self::stripMentionTokens((string) ($parts[0] ?? ''));
+        $description = isset($parts[1]) ? trim((string) $parts[1]) : '';
+
+        if ($title === '') {
+            $title = $fallbackTitle;
+        }
+
+        return [
+            'title' => mb_substr($title, 0, 255),
+            'description' => $description === '' ? null : $description,
+        ];
+    }
+
+    /**
+     * @return array{title: string, description: string|null}
+     */
+    private function approvalFields(Comment $comment, User $author): array
+    {
+        return self::approvalFieldsFromBody(
+            (string) ($comment->body ?? ''),
+            'Wniosek od '.$author->name
+        );
     }
 
     /**

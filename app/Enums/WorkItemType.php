@@ -10,6 +10,7 @@ enum WorkItemType: string
     case Dispatch = 'dispatch';
     case FollowUp = 'follow_up';
     case Callback = 'callback';
+    case Approval = 'approval';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum WorkItemType: string
             self::Dispatch => 'Kompletacja',
             self::FollowUp => 'Wzmianka',
             self::Callback => 'Oddzwonienie',
+            self::Approval => 'Zatwierdzenie',
         };
     }
 
@@ -32,6 +34,7 @@ enum WorkItemType: string
             self::Dispatch => 'bi-box-seam',
             self::FollowUp => 'bi-at',
             self::Callback => 'bi-telephone',
+            self::Approval => 'bi-check2-circle',
         };
     }
 

@@ -49,6 +49,29 @@ class Attachment extends Model
         }
     }
 
+    public static function copyAllTo(Model $from, Model $to, string $subfolder): void
+    {
+        if (! method_exists($from, 'attachments')) {
+            return;
+        }
+
+        $from->loadMissing('attachments');
+        foreach ($from->attachments as $attachment) {
+            if (! $attachment->file_path || ! Storage::disk('public')->exists($attachment->file_path)) {
+                continue;
+            }
+
+            $extension = pathinfo($attachment->file_path, PATHINFO_EXTENSION);
+            $newPath = 'attachments/'.$subfolder.'/'.uniqid('', true).($extension !== '' ? '.'.$extension : '');
+            Storage::disk('public')->copy($attachment->file_path, $newPath);
+            $to->attachments()->create([
+                'file_path' => $newPath,
+                'original_name' => $attachment->original_name,
+                'uploaded_by' => $attachment->uploaded_by,
+            ]);
+        }
+    }
+
     protected static function booted(): void
     {
         static::deleting(function (Attachment $attachment) {

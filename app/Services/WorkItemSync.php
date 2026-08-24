@@ -6,6 +6,7 @@ use App\Enums\ProcedureRunStatus;
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
+use App\Models\ApprovalRequest;
 use App\Models\CommentMention;
 use App\Models\ProcedureRun;
 use App\Models\ProjectTask;
@@ -74,6 +75,7 @@ class WorkItemSync
             $model instanceof ProcedureRun => $this->fromProcedureRun($model),
             $model instanceof WarehouseDispatch => $this->fromDispatch($model),
             $model instanceof CommentMention => $this->fromMention($model),
+            $model instanceof ApprovalRequest => $this->fromApproval($model),
             default => null,
         };
     }
@@ -97,6 +99,9 @@ class WorkItemSync
                 : url('/tasks2'),
             WorkItemType::Dispatch => $source instanceof WarehouseDispatch
                 ? route('warehouse-dispatches.show', $source)
+                : url('/tasks2'),
+            WorkItemType::Approval => $source instanceof ApprovalRequest
+                ? route('approval-requests.show', $source)
                 : url('/tasks2'),
         };
     }
@@ -199,6 +204,14 @@ class WorkItemSync
             }
         });
 
+        ApprovalRequest::query()->orderBy('id')->chunkById(200, function ($approvals) use (&$count): void {
+            foreach ($approvals as $approval) {
+                if ($this->sync($approval)) {
+                    $count++;
+                }
+            }
+        });
+
         return $count;
     }
 
@@ -260,6 +273,7 @@ class WorkItemSync
             'priority' => $task->priority,
             'status' => WorkItemStatus::fromTaskStatus($task->status),
             'assignee_id' => $task->assigned_to,
+            'created_by_id' => $task->created_by,
             'sprint_id' => $task->sprint_id,
             'due_at' => $task->due_date,
         ];
@@ -287,6 +301,7 @@ class WorkItemSync
             'priority' => null,
             'status' => $subtask->is_completed ? WorkItemStatus::Completed : WorkItemStatus::Pending,
             'assignee_id' => $subtask->assigned_to,
+            'created_by_id' => $subtask->created_by ?: $subtask->task?->created_by,
             'sprint_id' => $subtask->task?->sprint_id,
             'due_at' => $subtask->task?->due_date,
         ];
@@ -314,6 +329,7 @@ class WorkItemSync
             'priority' => $task?->priority,
             'status' => $status,
             'assignee_id' => $task?->assigned_to,
+            'created_by_id' => $task?->created_by ?? $run->started_by,
             'sprint_id' => $task?->sprint_id,
             'due_at' => $task?->due_date,
         ];
@@ -334,6 +350,27 @@ class WorkItemSync
             'category' => null,
             'status' => $mention->status,
             'assignee_id' => $mention->assigned_to,
+            'created_by_id' => $mention->created_by,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fromApproval(ApprovalRequest $approval): array
+    {
+        return [
+            'type' => WorkItemType::Approval,
+            'source_type' => $approval->getMorphClass(),
+            'source_id' => $approval->id,
+            'title' => $approval->name,
+            'category' => $approval->category,
+            'priority' => $approval->priority,
+            'status' => $approval->isDecided() ? WorkItemStatus::Completed : WorkItemStatus::Pending,
+            'assignee_id' => $approval->approver_id,
+            'created_by_id' => $approval->created_by,
+            'sprint_id' => $approval->sprint_id,
+            'due_at' => $approval->due_at,
         ];
     }
 
@@ -356,6 +393,7 @@ class WorkItemSync
             'priority' => null,
             'status' => $status,
             'assignee_id' => $wrapper?->assigned_to ?? $dispatch->created_by,
+            'created_by_id' => $dispatch->created_by,
             'sprint_id' => $wrapper?->sprint_id,
             'due_at' => $dispatch->issue_date,
         ];

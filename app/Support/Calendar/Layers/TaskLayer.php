@@ -3,7 +3,6 @@
 namespace App\Support\Calendar\Layers;
 
 use App\Enums\WorkItemStatus;
-use App\Models\ProjectTask;
 use App\Models\WorkItem;
 use App\Support\Calendar\CalendarEvent;
 use App\Support\Calendar\CalendarLayer;
@@ -73,10 +72,6 @@ class TaskLayer extends CalendarLayer
 
     protected function urlFor(WorkItem $item): string
     {
-        if ($item->source_type === ProjectTask::class && $item->source_id) {
-            return route('tasks.show', $item->source_id);
-        }
-
-        return route('tasks.grid');
+        return $item->openUrl();
     }
 }

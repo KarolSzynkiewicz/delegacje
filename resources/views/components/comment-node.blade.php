@@ -26,6 +26,7 @@
         : $likeActionHint;
     $mention = $comment->mentionFor(auth()->id());
     $mentionDone = $mention?->isCompleted() ?? false;
+    $approval = $comment->approvalFor(auth()->id());
     $canEdit = $comment->user_id === auth()->id();
     $canDelete = $canEdit || auth()->user()->isAdmin();
     $liked = (bool) ($comment->liked_by_me ?? false);
@@ -57,6 +58,16 @@
                         <i class="bi bi-check2{{ $mentionDone ? '-square-fill' : '-square' }}"></i>
                     </button>
                 </form>
+            @endif
+            @if($approval)
+                <a
+                    href="{{ route('approval-requests.show', $approval) }}"
+                    class="comments-icon-btn {{ $approval->isDecided() ? 'is-done' : '' }}"
+                    title="Wniosek o zatwierdzenie"
+                    aria-label="Wniosek o zatwierdzenie"
+                >
+                    <i class="bi bi-check2-circle"></i>
+                </a>
             @endif
             <form action="{{ route('comments.like', $comment) }}" method="POST" class="d-inline">
                 @csrf

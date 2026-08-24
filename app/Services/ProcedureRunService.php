@@ -10,6 +10,8 @@ use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
+use App\Models\User;
+use App\Notifications\TaskAssigned;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -41,7 +43,8 @@ class ProcedureRunService
             throw new RuntimeException('Procedura nie ma węzła startowego.');
         }
 
-        $run = DB::transaction(function () use ($template, $definition, $startNode, $params) {
+        $createdTask = null;
+        $run = DB::transaction(function () use ($template, $definition, $startNode, $params, &$createdTask) {
             $now = now();
 
             $run = ProcedureRun::create([
@@ -74,7 +77,7 @@ class ProcedureRunService
                     ? ($params['subject_id'] ?? null)
                     : null);
 
-            ProjectTask::create([
+            $createdTask = ProjectTask::create([
                 'name' => $params['task_name'],
                 'description' => $params['description'] ?? null,
                 'category' => ($params['category'] ?? null) ?: 'Procedura',
@@ -88,6 +91,12 @@ class ProcedureRunService
 
             return $run;
         });
+
+        $actor = Auth::user();
+        $assigneeId = $createdTask?->assigned_to;
+        if ($createdTask && $assigneeId && $actor && (int) $assigneeId !== (int) $actor->id) {
+            User::query()->find($assigneeId)?->notify(new TaskAssigned($createdTask, $actor));
+        }
 
         $this->dispatchStepEntered($run->load('task'), $startNode, null);
 
