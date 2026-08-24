@@ -3664,7 +3664,11 @@ html .text-muted,
    Pełna strona /recruitment-processes/{id} — ten sam układ
    co dawny modal (lista | karta | kontakt), bez overlay.
 ────────────────────────────────────────────────────── */
-body:has(.rp-modal-wrap) {
+/* Lock page scroll only when a dialog is actually open.
+   `.rp-modal-wrap` also lives inside the always-mounted tools teleport,
+   so a bare `:has(.rp-modal-wrap)` froze `/recruitment-processes`. */
+body:has(.rp-modal-wrap[role="dialog"]),
+body:has(.rp-tools-shell[data-open="true"]) {
     overflow: hidden;
 }
 .rp-modal-backdrop {
@@ -4076,6 +4080,22 @@ a.rp-profile__contact-row:hover {
     display: flex;
     flex-direction: column;
     min-width: 0;
+}
+.rp-profile__comments {
+    flex: 1;
+    min-width: 0;
+    margin-top: .75rem;
+}
+.rp-profile__comments .comments-thread {
+    max-height: min(22rem, 42vh);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--glass-border) transparent;
+    padding-right: .15rem;
+}
+.rp-profile__comments .comments-composer-input {
+    min-height: 2.1rem;
+    font-size: .82rem;
 }
 .rp-profile__actions {
     display: grid;
@@ -6885,6 +6905,19 @@ span.eq-wh-card {
 }
 
 /* ── Komentarze: kompaktowy composer + wątek ── */
+.comments-card--embed.card {
+    background: transparent !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none !important;
+    padding: 0;
+}
+.comments-card--embed.card:hover {
+    box-shadow: none !important;
+    transform: none;
+}
 .comments-card .card-label {
     margin-bottom: 0.65rem;
 }

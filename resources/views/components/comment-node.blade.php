@@ -26,7 +26,8 @@
         : $likeActionHint;
     $mention = $comment->mentionFor(auth()->id());
     $mentionDone = $mention?->isCompleted() ?? false;
-    $canManage = $comment->user_id === auth()->id() || auth()->user()->isAdmin();
+    $canEdit = $comment->user_id === auth()->id();
+    $canDelete = $canEdit || auth()->user()->isAdmin();
     $liked = (bool) ($comment->liked_by_me ?? false);
 @endphp
 
@@ -74,10 +75,12 @@
             <button type="button" class="comments-icon-btn" title="Odpowiedz" aria-label="Odpowiedz" @click="replyOpen = !replyOpen">
                 <i class="bi bi-reply"></i>
             </button>
-            @if($canManage)
+            @if($canEdit)
                 <button type="button" class="comments-icon-btn" title="Edytuj" aria-label="Edytuj" onclick="editComment({{ $comment->id }})">
                     <i class="bi bi-pencil"></i>
                 </button>
+            @endif
+            @if($canDelete)
                 <form action="{{ route('comments.destroy', $comment) }}" method="POST" class="d-inline" onsubmit="return confirm('Czy na pewno chcesz usunąć ten komentarz wraz z odpowiedziami?')">
                     @csrf
                     @method('DELETE')
@@ -110,6 +113,7 @@
         @endif
     </div>
 
+    @if($canEdit)
     <div id="comment-edit-{{ $comment->id }}" class="d-none comment-item__reply">
         <form action="{{ route('comments.update', $comment) }}" method="POST" enctype="multipart/form-data">
             @csrf
@@ -139,6 +143,7 @@
             <x-attachment-list :attachments="$comment->attachments" class="mt-2" />
         </form>
     </div>
+    @endif
 
     <div x-show="replyOpen" x-cloak class="comment-item__reply">
         <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data">

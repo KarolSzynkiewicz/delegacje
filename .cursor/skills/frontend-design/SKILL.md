@@ -256,6 +256,16 @@ per avatar (no extra JS/tooltip component — keep it cheap since it renders
 per row) and a `+N` overflow bubble past `max`. Pass any collection of
 `Employee` models (or nullable — falsy entries are filtered).
 
+## Recruitment process UI (`/recruitment-processes`)
+
+Workspace for a single process is `/recruitment-processes/{id}` (`.rp-modal.rp-modal--page` in flow, not an overlay). List stays at `/recruitment-processes`.
+
+**Comments:** never rebuild a mini note list (avatars + truncated body + custom modal). Use `<x-comments>` — likes, `@` mentions, replies, attachments, author-only edit. On the candidate card they sit in `.rp-profile__aside` **under** Edytuj / Ulubiony / Oznacz / Zadzwoń (`<x-comments embedded>`). Process-level comments stay as a full `<x-comments>` further down the page. Pass `embedded` so the component gets `.comments-card--embed` (transparent, no nested glass card inside `.rp-card`). Thread in the aside scrolls (`.rp-profile__comments .comments-thread`); don't grow the profile card without a max-height.
+
+Contact-attempt notes are a different model (`RecruitmentContactAttempt.comment`) — only the author may edit/delete, including admins.
+
+**`:has()` must not lock the list page:** `body:has(.rp-modal-wrap) { overflow: hidden }` froze `/recruitment-processes` because Narzędzia teleports an always-mounted `.rp-modal-wrap` (hidden with Alpine `x-show`, still in the DOM — `:has()` still matches). Lock only when a dialog is actually open: `body:has(.rp-modal-wrap[role="dialog"])` (contact/task `@if` wrappers) and `body:has(.rp-tools-shell[data-open="true"])`. Don't reuse `.rp-modal-wrap` inside an always-present teleport without a second, open-only selector.
+
 ## Three more traps worth knowing about
 
 **Livewire silently breaks `@endif` glued directly to a word character**:

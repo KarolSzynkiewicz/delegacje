@@ -253,11 +253,6 @@ class RecruitmentProcessesTable extends Component
 
     public string $taskDescription = '';
 
-    // Comment modal (process-level or candidate-level)
-    public bool $showCommentModal = false;
-
-    public string $commentModalTarget = ''; // 'process' | 'candidate'
-
     // Inline edit of a single contact attempt (own attempts only)
     public ?int $editingAttemptId = null;
 
@@ -1535,7 +1530,7 @@ class RecruitmentProcessesTable extends Component
     public function startEditAttempt(int $attemptId): void
     {
         $attempt = RecruitmentContactAttempt::find($attemptId);
-        if (! $attempt || ($attempt->user_id !== auth()->id() && ! auth()->user()->isAdmin())) {
+        if (! $attempt || $attempt->user_id !== auth()->id()) {
             return;
         }
 
@@ -1552,7 +1547,7 @@ class RecruitmentProcessesTable extends Component
     public function saveEditAttempt(): void
     {
         $attempt = RecruitmentContactAttempt::find($this->editingAttemptId);
-        if (! $attempt || ($attempt->user_id !== auth()->id() && ! auth()->user()->isAdmin())) {
+        if (! $attempt || $attempt->user_id !== auth()->id()) {
             $this->cancelEditAttempt();
 
             return;
@@ -1568,7 +1563,7 @@ class RecruitmentProcessesTable extends Component
     public function deleteAttempt(int $attemptId): void
     {
         $attempt = RecruitmentContactAttempt::find($attemptId);
-        if (! $attempt || ($attempt->user_id !== auth()->id() && ! auth()->user()->isAdmin())) {
+        if (! $attempt || $attempt->user_id !== auth()->id()) {
             return;
         }
 
@@ -1639,18 +1634,6 @@ class RecruitmentProcessesTable extends Component
         $this->taskDueDate = '';
         $this->taskAssignedTo = null;
         $this->taskDescription = '';
-    }
-
-    public function openCommentModal(string $target): void
-    {
-        $this->commentModalTarget = $target;
-        $this->showCommentModal = true;
-    }
-
-    public function closeCommentModal(): void
-    {
-        $this->showCommentModal = false;
-        $this->commentModalTarget = '';
     }
 
     public function withdrawConsent(int $consentId): void
@@ -1733,7 +1716,6 @@ class RecruitmentProcessesTable extends Component
             'candidate.allContactAttempts.recruitmentProcess',
             'candidate.processes.lead',
             'candidate.processes.assignedRecruiter',
-            'candidate.comments.user',
             'lead',
             'employee',
             'assignedRecruiter',
@@ -1742,7 +1724,6 @@ class RecruitmentProcessesTable extends Component
             'assignmentHistory.toRecruiter',
             'assignmentHistory.changedBy',
             'tasks.assignedTo',
-            'comments.user',
         ])->find($this->selectedId);
     }
 

@@ -3,6 +3,7 @@
     'label' => null,
     'inputLabel' => null,
     'buttonText' => null,
+    'embedded' => false,
 ])
 
 @php
@@ -39,7 +40,7 @@
     ];
 @endphp
 
-<x-ui.card class="comments-card">
+<x-ui.card @class(['comments-card', 'comments-card--embed' => $embedded])>
     <span class="card-label">
         @if($isTask && !$label)
             <i class="bi bi-briefcase me-1"></i>
@@ -100,6 +101,7 @@
     @endif
 </x-ui.card>
 
+@once
 @push('scripts')
 <script>
     function editComment(commentId) {
@@ -227,3 +229,4 @@
     }
 </script>
 @endpush
+@endonce

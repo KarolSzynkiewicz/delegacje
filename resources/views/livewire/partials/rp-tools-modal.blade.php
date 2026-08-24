@@ -2,6 +2,7 @@
 <template x-teleport="body">
     <div x-show="open"
          x-cloak
+         :data-open="open"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"

@@ -10,7 +10,12 @@
             <h2 class="fw-semibold mb-2">Dziękujemy za zgłoszenie!</h2>
             <p class="text-muted mb-4" style="max-width:480px;margin:0 auto;">
                 Twoje zgłoszenie zostało pomyślnie przesłane. Skontaktujemy się z Tobą
-                pod adresem <strong>{{ $email }}</strong> po zapoznaniu się z aplikacją.
+                @if($email)
+                    pod adresem <strong>{{ $email }}</strong>
+                @else
+                    pod podanym numerem telefonu
+                @endif
+                po zapoznaniu się z aplikacją.
             </p>
             <a href="/rekrutacja" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> Wróć do strony rekrutacji
@@ -69,7 +74,7 @@
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label" for="email">
-                        Adres e-mail <span class="text-danger">*</span>
+                        Adres e-mail
                     </label>
                     <input
                         type="email"

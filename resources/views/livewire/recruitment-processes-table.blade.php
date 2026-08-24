@@ -326,12 +326,6 @@
                                 @php
                                     $linkedEmployee = $selected->employee ?? $candidate?->employee;
                                     $isFormerEmployee = $linkedEmployee?->isTerminated() ?? false;
-                                    $candidateComments = $candidate?->comments?->sortByDesc('created_at') ?? collect();
-                                    $cmUsers = $candidate
-                                        ? \App\Models\User::orderBy('name')->get()
-                                            ->map(fn ($u) => ['name' => $u->name, 'initials' => $u->initials])
-                                            ->values()->all()
-                                        : [];
                                     $langBits = collect([
                                         $candidate?->speaks_english ? '🇬🇧 EN' : null,
                                         $candidate?->speaks_french ? '🇫🇷 FR' : null,
@@ -597,74 +591,21 @@
                                     @endif
 
                                     @if($candidate)
-                                        <div class="rp-note">
-                                            <div class="rp-note__head">
-                                                <i class="bi bi-journal-text"></i>Notatka
-                                                @if($candidateComments->count())
-                                                    <span class="badge badge-secondary">{{ $candidateComments->count() }}</span>
-                                                @endif
-                                            </div>
-                                            @if($candidateComments->count())
-                                                <div class="rp-comments__list">
-                                                    @foreach($candidateComments->take(20) as $cm)
-                                                        @php $canManageCm = $cm->user_id === auth()->id() || auth()->user()->isAdmin(); @endphp
-                                                        <div class="rp-comment" wire:key="cand-cm-{{ $cm->id }}">
-                                                            <span class="rp-comment__avatar">{{ mb_strtoupper(mb_substr($cm->user->name ?? '?',0,2)) }}</span>
-                                                            <div class="flex-grow-1 min-width-0">
-                                                                <div class="d-flex align-items-start justify-content-between gap-2">
-                                                                    <div class="rp-comment__meta">
-                                                                        <strong>{{ $cm->user->name ?? '—' }}</strong>
-                                                                        · {{ $cm->created_at->diffForHumans() }}
-                                                                    </div>
-                                                                    @if($canManageCm)
-                                                                        <div class="rp-comment__actions">
-                                                                            <button type="button" class="comments-icon-btn" title="Edytuj" onclick="editComment({{ $cm->id }})"><i class="bi bi-pencil"></i></button>
-                                                                            <form action="{{ route('comments.destroy', $cm) }}" method="POST" class="d-inline" onsubmit="return confirm('Usunąć ten komentarz?')">
-                                                                                @csrf
-                                                                                @method('DELETE')
-                                                                                <button type="submit" class="comments-icon-btn is-danger" title="Usuń"><i class="bi bi-trash"></i></button>
-                                                                            </form>
-                                                                        </div>
-                                                                    @endif
-                                                                </div>
-                                                                <div id="comment-body-{{ $cm->id }}" class="rp-comment__body">{{ $cm->body }}</div>
-                                                                @if($canManageCm)
-                                                                    <div id="comment-edit-{{ $cm->id }}" class="d-none mt-2">
-                                                                        <form action="{{ route('comments.update', $cm) }}" method="POST" enctype="multipart/form-data">
-                                                                            @csrf
-                                                                            @method('PUT')
-                                                                            <textarea name="body" rows="2" class="form-control form-control-sm mb-2">{{ $cm->body }}</textarea>
-                                                                            <div class="d-flex gap-2">
-                                                                                <button type="submit" class="btn btn-sm btn-primary">Zapisz</button>
-                                                                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelEdit({{ $cm->id }})">Anuluj</button>
-                                                                            </div>
-                                                                        </form>
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                            @else
-                                                <p class="rp-note__empty">Brak notatek o tej osobie.</p>
-                                            @endif
-                                            <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data" class="rp-comments__composer">
-                                                @csrf
-                                                <input type="hidden" name="commentable_type" value="recruitment_candidate">
-                                                <input type="hidden" name="commentable_id" value="{{ $candidate->id }}">
-                                                <x-comment-composer
-                                                    placeholder="Dodaj notatkę…"
-                                                    :autocomplete-payload="['users' => $cmUsers, 'subtasks' => []]"
-                                                    submit-title="Dodaj komentarz"
-                                                    :file-input-id="'cand-comment-files-'.$candidate->id"
-                                                />
-                                            </form>
-                                            <div class="rp-note__foot">
-                                                <i class="bi bi-calendar3"></i>
-                                                Profil utworzony: {{ ($candidate->created_at ?? $selected->created_at)?->format('d.m.Y') }}
-                                            </div>
+                                        <div class="rp-profile__comments">
+                                            <x-comments
+                                                embedded
+                                                :commentable="$candidate"
+                                                label="Komentarze"
+                                                input-label="Dodaj komentarz"
+                                                button-text="Dodaj komentarz"
+                                            />
                                         </div>
                                     @endif
+
+                                    <div class="rp-note__foot mt-auto">
+                                        <i class="bi bi-calendar3"></i>
+                                        Profil utworzony: {{ ($candidate->created_at ?? $selected->created_at)?->format('d.m.Y') }}
+                                    </div>
                                 </div>{{-- /aside --}}
                                 </div>{{-- /rp-profile --}}
 
@@ -702,7 +643,7 @@
                                 @foreach($allAttempts as $attempt)
                                     @php
                                         $variant = $attempt->outcome->variant();
-                                        $canManageAttempt = $attempt->user_id === auth()->id() || auth()->user()->isAdmin();
+                                        $canManageAttempt = $attempt->user_id === auth()->id();
                                     @endphp
                                     <div class="rp-timeline-item" wire:key="att-{{ $attempt->id }}">
                                         <span class="rp-status-dot rp-outcome is-{{ $variant }}"></span>
@@ -956,32 +897,11 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-4 pt-4" style="border-top:1px solid var(--glass-border);">
-                                    @php $processComments = $selected->comments->sortByDesc('created_at'); @endphp
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <div class="rp-field-label mb-0">
-                                            <i class="bi bi-chat-dots me-1"></i>Komentarze procesu
-                                            @if($processComments->count()) <span class="badge badge-secondary" style="font-size:.65rem;">{{ $processComments->count() }}</span> @endif
-                                        </div>
-                                        <button type="button" wire:click="openCommentModal('process')" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-plus me-1"></i>Dodaj
-                                        </button>
-                                    </div>
-                                    @if($processComments->count())
-                                        <div class="rp-comments__list" style="max-height:140px;">
-                                            @foreach($processComments->take(20) as $cm)
-                                                <div class="rp-comment" wire:key="proc-cm-{{ $cm->id }}">
-                                                    <span class="rp-comment__avatar">{{ mb_strtoupper(mb_substr($cm->user->name ?? '?',0,2)) }}</span>
-                                                    <div class="flex-grow-1 min-width-0">
-                                                        <div class="rp-comment__meta"><strong>{{ $cm->user->name ?? '—' }}</strong> · {{ $cm->created_at->diffForHumans() }}</div>
-                                                        <div class="rp-comment__body" style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">{{ $cm->body }}</div>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Brak komentarzy.</p>
-                                    @endif
+                                <div class="mt-4">
+                                    <x-comments
+                                        :commentable="$selected"
+                                        label="Komentarze procesu"
+                                    />
                                 </div>
 
                                 @if(! $selected->employee_id && $selected->status === RecruitmentStatus::Onboarding)
@@ -1150,175 +1070,4 @@
         </div>
     @endif
 
-    @if($showCommentModal)
-        <div class="rp-modal-backdrop" style="z-index:1070;" wire:click="closeCommentModal"></div>
-        <div class="rp-modal-wrap" style="z-index:1071;align-items:center;justify-content:center;" role="dialog">
-            <div class="rp-modal" style="max-width:520px;width:100%;height:auto;">
-                <div class="rp-modal-topbar">
-                    <strong style="font-size:.9rem;">
-                        <i class="bi bi-chat-dots me-1"></i>
-                        @if($commentModalTarget === 'candidate')
-                            Komentarz o kandydacie
-                        @else
-                            Komentarz do procesu #{{ $selected?->id }}
-                        @endif
-                    </strong>
-                    <button type="button" wire:click="closeCommentModal" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-x-lg"></i></button>
-                </div>
-                <div class="p-3">
-                    {{-- Previous comments (compact scroll) --}}
-                    @php
-                        $modalComments = $commentModalTarget === 'candidate'
-                            ? ($selected?->candidate?->comments?->sortByDesc('created_at') ?? collect())
-                            : ($selected?->comments?->sortByDesc('created_at') ?? collect());
-                    @endphp
-                    @if($modalComments->count())
-                        <div class="mb-3" style="max-height:180px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:8px;padding:.5rem .75rem;">
-                            @foreach($modalComments as $cm)
-                                <div class="d-flex align-items-start gap-2 py-1" style="{{ !$loop->last ? 'border-bottom:1px solid rgba(255,255,255,.05);' : '' }}">
-                                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-25 text-primary flex-shrink-0" style="width:1.5rem;height:1.5rem;font-size:.58rem;font-weight:700;">{{ mb_strtoupper(mb_substr($cm->user->name ?? '?',0,2)) }}</span>
-                                    <div class="flex-grow-1 min-width-0" style="font-size:.74rem;">
-                                        <span class="fw-semibold" style="color:var(--text-body);">{{ $cm->user->name ?? '—' }}</span>
-                                        <span style="color:var(--text-muted);"> · {{ $cm->created_at->diffForHumans() }}</span>
-                                        <div style="color:var(--text-muted);white-space:pre-line;">{{ $cm->body }}</div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    {{-- Full comment form (standard POST → CommentController → redirect back) --}}
-                    @php
-                        $cmTarget   = $commentModalTarget === 'candidate' ? $selected?->candidate : $selected;
-                        $cmType     = $commentModalTarget === 'candidate' ? 'recruitment_candidate' : 'recruitment_process';
-                        $cmId       = $cmTarget?->id;
-                        $cmUsers    = \App\Models\User::orderBy('name')->get()
-                                        ->map(fn($u) => ['name' => $u->name, 'initials' => $u->initials])
-                                        ->values()->all();
-                        $cmPayload  = ['users' => $cmUsers, 'subtasks' => []];
-                    @endphp
-                    <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data">
-                        @csrf
-                        <input type="hidden" name="commentable_type" value="{{ $cmType }}">
-                        <input type="hidden" name="commentable_id" value="{{ $cmId }}">
-
-                        <div class="mb-2 position-relative" x-data="commentBodyAutocomplete(@js($cmPayload))">
-                            <textarea
-                                name="body"
-                                rows="3"
-                                class="form-control form-control-sm"
-                                placeholder="Możesz użyć @NazwaUzytkownika (treść lub załącznik — wymagane jest przynajmniej jedno)"
-                                x-ref="textarea"
-                                @input="onInput()"
-                                @keydown.escape="close()"
-                                @keydown.arrow-down="if (show && results.length) { $event.preventDefault(); moveActive(1); }"
-                                @keydown.arrow-up="if (show && results.length) { $event.preventDefault(); moveActive(-1); }"
-                                @keydown.enter="if (show && results.length) { $event.preventDefault(); pickActive(); }"
-                            ></textarea>
-                            <ul
-                                x-show="show && results.length > 0"
-                                x-cloak
-                                class="dropdown-menu show list-unstyled position-absolute mb-0 py-1"
-                                style="z-index:1090;min-width:16rem;max-height:14rem;overflow-y:auto;top:100%;left:0;"
-                            >
-                                <template x-for="(item, idx) in results" :key="'u-' + item.name">
-                                    <li>
-                                        <button type="button"
-                                            class="dropdown-item d-flex align-items-center gap-2 py-2 px-3 text-start w-100"
-                                            :class="idx === activeIdx ? 'active' : ''"
-                                            @click="selectItem(item)"
-                                            @mouseenter="activeIdx = idx">
-                                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
-                                                :class="item.isEveryone ? 'bg-warning bg-opacity-25 text-warning' : 'bg-primary bg-opacity-25 text-primary'"
-                                                style="width:1.75rem;height:1.75rem;font-size:.65rem;"
-                                                x-text="item.initials"></span>
-                                            <span class="small fw-medium text-truncate" x-text="item.isEveryone ? '@wszyscy — powiadomienie do wszystkich' : item.name"></span>
-                                        </button>
-                                    </li>
-                                </template>
-                            </ul>
-                        </div>
-
-                        <div class="mb-3">
-                            <input type="file" name="attachments[]" class="form-control form-control-sm" multiple
-                                   accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*">
-                            <small class="text-muted d-block mt-1" style="font-size:.7rem;">Do 15 plików, każdy max. 15 MB.</small>
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Dodaj komentarz</button>
-                            <button type="button" wire:click="closeCommentModal" class="btn btn-outline-secondary btn-sm">Anuluj</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
-
 </div>
-
-@once
-@push('scripts')
-<script>
-    if (typeof editComment === 'undefined') {
-        function editComment(commentId) {
-            const body = document.getElementById('comment-body-' + commentId);
-            const edit = document.getElementById('comment-edit-' + commentId);
-            if (body) body.classList.add('d-none');
-            if (edit) edit.classList.remove('d-none');
-        }
-        function cancelEdit(commentId) {
-            const body = document.getElementById('comment-body-' + commentId);
-            const edit = document.getElementById('comment-edit-' + commentId);
-            if (body) body.classList.remove('d-none');
-            if (edit) edit.classList.add('d-none');
-        }
-    }
-    if (typeof commentBodyAutocomplete === 'undefined') {
-        function commentBodyAutocomplete(payload) {
-            const allUsers = payload.users || [];
-            const subtasks = payload.subtasks || [];
-            return {
-                show: false, results: [], activeIdx: 0, triggerStart: -1, files: [],
-                onFiles(event) { this.files = Array.from(event.target.files || []); },
-                fileSummary() {
-                    if (this.files.length === 0) return '';
-                    if (this.files.length === 1) return this.files[0].name;
-                    const n = this.files.length;
-                    return n + (n < 5 ? ' pliki' : ' plików');
-                },
-                onInput() {
-                    const ta = this.$refs.textarea;
-                    const pos = ta.selectionStart;
-                    const text = ta.value.substring(0, pos);
-                    const atMatch = text.match(/(^|(?<=\s))@(\S*)$/u);
-                    if (atMatch) {
-                        const fragment = atMatch[2];
-                        if (fragment.length > 0) {
-                            this.triggerStart = pos - fragment.length - 1;
-                            const q = fragment.toLowerCase();
-                            const userResults = allUsers.filter(u => u.name.toLowerCase().includes(q)).slice(0, 7).map(u => ({ kind: 'user', name: u.name, initials: u.initials }));
-                            const wszyscyResults = 'wszyscy'.startsWith(q) ? [{ kind: 'user', name: 'wszyscy', initials: '★', isEveryone: true }] : [];
-                            this.results = [...wszyscyResults, ...userResults];
-                            this.activeIdx = 0; this.show = this.results.length > 0; return;
-                        }
-                    }
-                    this.close();
-                },
-                moveActive(delta) { if (!this.show || !this.results.length) return; const n = this.results.length; this.activeIdx = (this.activeIdx + delta + n) % n; },
-                pickActive() { if (!this.show || !this.results.length) return; this.selectItem(this.results[this.activeIdx]); },
-                selectItem(item) {
-                    const ta = this.$refs.textarea;
-                    const before = ta.value.substring(0, this.triggerStart);
-                    const after = ta.value.substring(ta.selectionStart);
-                    ta.value = before + '@' + item.name + ' ' + after;
-                    const newPos = before.length + item.name.length + 2;
-                    ta.setSelectionRange(newPos, newPos); ta.focus(); this.close();
-                },
-                close() { this.show = false; this.results = []; this.triggerStart = -1; },
-            };
-        }
-    }
-</script>
-@endpush
-@endonce
