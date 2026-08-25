@@ -11,7 +11,7 @@
                     routeName="sprints.create"
                     action="create"
                 >
-                    <i class="bi bi-plus-circle me-1"></i>Nowy sprint
+                    Nowy sprint
                 </x-ui.button>
             </x-slot>
         </x-ui.page-header>

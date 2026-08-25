@@ -6,6 +6,14 @@
         </button>
     </div>
 
+    <div class="d-md-none mb-2">
+        <input type="text"
+               wire:model.live.debounce.300ms="searchTask"
+               class="form-control form-control-sm rp-filter-input"
+               placeholder="Szukaj zadania…"
+               @click.stop>
+    </div>
+
     {{-- 1. Status --}}
     <div class="rp-filter-section">
         <button type="button" @click="openStatus = !openStatus" class="rp-filter-section__head">

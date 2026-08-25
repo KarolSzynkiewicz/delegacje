@@ -56,23 +56,9 @@
         opacity: .85;
     }
     /* Nagłówek strony ("Backlog" + Sprinty/Widok kart) żyje poza tym komponentem
-       (renderowany przez x-app-layout), więc dociągamy go tą samą klasą na <body>.
-       Tytuł ma już globalny gradient primary→accent, a mono-font na przyciskach
-       w headerze jest już globalny (".app-header .btn-outline-secondary" w
-       app.css) — tu zostaje już tylko treść specyficzna dla /tasks2: kicker. */
-    body.xuiv2-page header h2::before {
-        content: 'ZARZĄDZANIE ZADANIAMI';
-        display: block;
-        font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 10.5px;
-        font-weight: 600;
-        letter-spacing: .14em;
-        text-transform: uppercase;
-        color: #a855f7;
-        margin-bottom: 7px;
-    }
+       (x-app-layout). Mono-font na przyciskach w headerze jest globalny. */
 
-    /* Magnetyczne CTA (Filtry, Dodaj zadanie) — zostaje lokalne (opt-in przez klasę),
+    /* Magnetyczne CTA — zostaje lokalne (opt-in przez klasę),
        bo odpalanie tego na WSZYSTKICH .btn-primary w gęstych tabelach CRUD (dziesiątki
        przycisków akcji per wiersz) odtworzyłoby ten sam problem z wydajnością, który
        naprawiliśmy przy /tasks2 (patrz commit o N+1 / mousemove). Globalna poświata
@@ -387,11 +373,38 @@
     .tg-cards { display: none; }
 
     @media (max-width: 767.98px) {
-        .tg-search-task { width: 100% !important; flex: 1 1 auto; }
-
         /* Tabela znika, karty przejmują ── */
         .tg-table-wrap { display: none !important; }
         .tg-cards { display: block !important; }
+
+        /* Jeden zwarty rząd: widok + filtry + liczba + grupowanie. */
+        .tg-toolbar__row {
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .tg-toolbar__search,
+        .tg-toolbar__views,
+        .tg-toolbar__home {
+            display: none !important;
+        }
+        .tg-toolbar__meta {
+            margin-left: 0 !important;
+            flex: 1 1 auto;
+            min-width: 0;
+            justify-content: flex-end;
+        }
+        .tg-toolbar__view-label {
+            display: inline !important;
+            max-width: 38vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
+        }
+        .tg-toolbar__view-icon { display: none !important; }
+        .tg-toolbar .btn { padding: 4px 8px !important; font-size: 0.72rem !important; }
+        .tg-active-filters { display: none !important; }
     }
 
     /* ── Karty zadań (mobile) ── */
@@ -443,7 +456,30 @@
         border: 1px dashed rgba(255, 255, 255, 0.12);
         background: rgba(255, 255, 255, 0.02);
     }
-    .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
+        .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
+
+        .tg-add-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.3rem;
+            margin-top: 0.35rem;
+        }
+        .tg-add-actions .btn {
+            padding: 0.14rem 0.55rem !important;
+            font-size: 0.68rem !important;
+            font-weight: 500 !important;
+            line-height: 1.3 !important;
+            border-radius: 999px !important;
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid var(--glass-border, rgba(255,255,255,0.1)) !important;
+            color: var(--text-muted, #94a3b8) !important;
+            text-decoration: none !important;
+            box-shadow: none !important;
+            width: auto !important;
+            gap: 0.25rem !important;
+        }
+        .tg-add-actions .btn i { font-size: 0.72rem; }
 </style>
 
 {{-- Flash message --}}
@@ -463,9 +499,9 @@
 {{-- ═══════════════════════════════════════════════════════════ --}}
 <div class="card mb-2 border-0 shadow-sm">
     <div class="card-body py-2 px-3 tg-toolbar">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-2 flex-wrap tg-toolbar__row">
             {{-- Search: Task --}}
-            <div class="input-group tg-search-task" style="width:175px">
+            <div class="input-group tg-search-task tg-toolbar__search" style="width:175px">
                 <span class="input-group-text px-2">
                     <i class="bi bi-search" style="font-size:0.72rem"></i>
                 </span>
@@ -476,7 +512,7 @@
             </div>
 
             {{-- Filtry: jeden przycisk, panel z pogrupowanymi sekcjami (SharePoint-style, jak w rekrutacji) --}}
-            <div x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openType: false, openSearch: false, openGroup: false, openColumns: false }">
+            <div class="tg-toolbar__filters" x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openType: false, openSearch: false, openGroup: false, openColumns: false }">
                 <button type="button"
                         @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); const pw=Math.min(600, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.left, window.innerWidth-pw-4)); open=true"
                         class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ count($this->activeFilterChips()) > 0 ? 'is-on' : '' }}">
@@ -484,7 +520,7 @@
                     @if(count($this->activeFilterChips()) > 0)
                         <span class="tg-quiet-count">{{ count($this->activeFilterChips()) }}</span>
                     @endif
-                    <i class="bi bi-chevron-down ms-1" style="font-size:.6rem"></i>
+                    <i class="bi bi-chevron-down ms-1 d-none d-md-inline" style="font-size:.6rem"></i>
                 </button>
                 <template x-teleport="body">
                     <div x-show="open" x-cloak
@@ -496,17 +532,19 @@
                 </template>
             </div>
 
-            {{-- Zapisane widoki (pigułki, jak w rekrutacji) --}}
+            {{-- Zapisane widoki (pigułki) — na mobile tylko aktualny, w menu zakładki --}}
             @unless($this->isLockedToSprint())
-                @foreach($savedViews as $savedView)
-                    @php $isActiveView = $activeViewId === $savedView->id; @endphp
-                    <button type="button" wire:click="loadSavedView({{ $savedView->id }})"
-                            class="btn btn-sm btn-outline-secondary rp-topbar-btn {{ $isActiveView ? 'is-on' : '' }}"
-                            title="{{ $savedView->is_global ? 'Widok globalny (dla wszystkich)' : 'Twój zapisany widok' }}">
-                        <i class="bi bi-{{ $savedView->is_global ? 'globe' : 'bookmark'.($isActiveView ? '-fill' : '') }} me-1"></i>{{ $savedView->name }}
-                        <span class="tg-quiet-count">{{ $viewCounts[$savedView->id] ?? 0 }}</span>
-                    </button>
-                @endforeach
+                <div class="tg-toolbar__views d-flex align-items-center gap-2 flex-wrap">
+                    @foreach($savedViews as $savedView)
+                        @php $isActiveView = $activeViewId === $savedView->id; @endphp
+                        <button type="button" wire:click="loadSavedView({{ $savedView->id }})"
+                                class="btn btn-sm btn-outline-secondary rp-topbar-btn {{ $isActiveView ? 'is-on' : '' }}"
+                                title="{{ $savedView->is_global ? 'Widok globalny (dla wszystkich)' : 'Twój zapisany widok' }}">
+                            <i class="bi bi-{{ $savedView->is_global ? 'globe' : 'bookmark'.($isActiveView ? '-fill' : '') }} me-1"></i>{{ $savedView->name }}
+                            <span class="tg-quiet-count">{{ $viewCounts[$savedView->id] ?? 0 }}</span>
+                        </button>
+                    @endforeach
+                </div>
             @endunless
 
             {{-- Loading spinner --}}
@@ -516,20 +554,21 @@
                 </div>
             </div>
 
-            <div class="ms-auto d-flex align-items-center gap-2">
+            <div class="ms-auto d-flex align-items-center gap-2 tg-toolbar__meta">
                 @unless($this->isLockedToSprint())
-                    {{-- Zapisz / zarządzaj widokami ── --}}
-                    <div x-data="{ open: false, top: 0, left: 0 }">
+                    {{-- Zapisz / zarządzaj widokami — na mobile pokazuje nazwę aktualnego widoku --}}
+                    <div class="tg-toolbar__view-menu" x-data="{ open: false, top: 0, left: 0, pw: 300 }">
                         <button type="button"
-                                @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.max(4, r.right-300); open=true"
-                                class="btn btn-sm btn-outline-secondary tg-quiet-btn"
+                                @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); pw=Math.min(300, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.right-pw, window.innerWidth-pw-4)); open=true"
+                                class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ $activeViewId ? 'is-on' : '' }}"
                                 title="Zapisz i zarządzaj widokami">
-                            <i class="bi bi-bookmark{{ $view ? '-fill' : '' }}"></i>
+                            <i class="bi bi-bookmark{{ $view ? '-fill' : '' }} tg-toolbar__view-icon"></i>
+                            <span class="tg-toolbar__view-label d-none">{{ $activeViewName ?: 'Domyślny' }}</span>
                         </button>
                         <template x-teleport="body">
                             <div x-show="open" x-cloak
                                  @click.outside="open = false"
-                                 :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:300px`"
+                                 :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;width:${pw}px;max-width:calc(100vw - 24px)`"
                                  class="dropdown-menu show p-3 shadow-lg">
                                 @if($activeViewId && $activeViewName)
                                     <div class="mb-2 p-2 rounded" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2)">
@@ -604,7 +643,7 @@
                     {{-- Domyślny widok w menu --}}
                     <button type="button"
                             wire:click="setAsMenuDefaultView"
-                            class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ $isMenuDefaultView ? 'is-on' : '' }}"
+                            class="btn btn-sm btn-outline-secondary tg-quiet-btn tg-toolbar__home {{ $isMenuDefaultView ? 'is-on' : '' }}"
                             title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
                         <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }}"></i>
                     </button>
@@ -629,7 +668,7 @@
 </div>
 
 @if(count($this->activeFilterChips()) > 0)
-    <div class="rp-active-filters mb-2 px-1">
+    <div class="rp-active-filters tg-active-filters mb-2 px-1">
         <span class="rp-active-filters__label">Filtry:</span>
         @foreach($this->activeFilterChips() as $chip)
             <span class="rp-active-filters__chip">
@@ -1049,19 +1088,16 @@
         </div>
     </div>
     @else
-    <div class="d-flex flex-column gap-1 mt-1">
-        <button type="button" wire:click="startAdd('task')"
-                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-            <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
+    <div class="tg-add-actions">
+        <button type="button" wire:click="startAdd('task')" class="btn btn-sm">
+            <i class="bi bi-plus-circle"></i>Dodaj zadanie
         </button>
         @if($this->usesWorkItems())
-        <button type="button" wire:click="startAdd('procedure')"
-                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-            <i class="bi bi-play-circle me-1"></i>Uruchom procedurę
+        <button type="button" wire:click="startAdd('procedure')" class="btn btn-sm">
+            <i class="bi bi-play-circle"></i>Uruchom procedurę
         </button>
-        <button type="button" wire:click="startAdd('approval')"
-                class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-            <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
+        <button type="button" wire:click="startAdd('approval')" class="btn btn-sm">
+            <i class="bi bi-check2-circle"></i>Poproś o zatwierdzenie
         </button>
         @endif
     </div>
@@ -1080,10 +1116,6 @@
         const root = document.getElementById('xuiv2Tasks');
         if (!root || root.dataset.xuiv2Bound) return;
         root.dataset.xuiv2Bound = '1';
-        // "ZARZĄDZANIE ZADANIAMI" kicker nad "Backlog" i mono-styl przycisków w
-        // headerze (patrz body.xuiv2-page w <style> wyżej) — tło/fonty/poświata
-        // kursora są już globalne (app.css + app.js), więc nic więcej tu nie trzeba.
-        document.body.classList.add('xuiv2-page');
 
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
             || !window.matchMedia('(pointer: fine)').matches) return;
