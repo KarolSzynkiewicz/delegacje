@@ -1,5 +1,30 @@
 <div>
     <x-ui.card label="Podzadania">
+        @if($canSuggestWithAi && $llmConfigured)
+            <div class="d-flex justify-content-end mb-3">
+                <button
+                    type="button"
+                    class="ac-trigger"
+                    wire:click="openAiModal"
+                    wire:loading.attr="disabled"
+                    wire:target="openAiModal"
+                >
+                    <x-ask-chrono-bot
+                        :size="40"
+                        wire:loading.class="ac-bot--thinking"
+                        wire:target="openAiModal"
+                    />
+                    <span class="ac-trigger__text">
+                        <span class="ac-trigger__name">AskChrono</span>
+                        <span class="ac-trigger__hint">
+                            <span wire:loading.remove wire:target="openAiModal">Rozbij na podzadania</span>
+                            <span wire:loading wire:target="openAiModal">Budzę bota… </span>
+                        </span>
+                    </span>
+                </button>
+            </div>
+        @endif
+
         <!-- Progress bar -->
         @if($totalSubtasks > 0)
             <div class="mb-4">
@@ -322,5 +347,132 @@
             />
         @endif
     </x-ui.card>
+
+    @if($showAiModal)
+        @teleport('body')
+        <div
+            class="modal fade show d-block"
+            tabindex="-1"
+            role="dialog"
+            aria-modal="true"
+            style="background:rgba(0,0,0,.75);z-index:2000;"
+            wire:click.self="closeAiModal"
+            wire:key="task-subtasks-ai-modal"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content" style="background:var(--bg-card,#1e2535);border:1px solid var(--glass-border,rgba(255,255,255,.1));color:var(--text-main,#f1f5f9);">
+                    <div class="modal-header" style="border-color:var(--glass-border);">
+                        <div class="d-flex align-items-center gap-3">
+                            <x-ask-chrono-bot
+                                :size="54"
+                                :state="$aiLoading ? 'thinking' : ($aiProposals !== [] ? 'done' : 'idle')"
+                            />
+                            <div>
+                                <h5 class="modal-title ac-modal__title mb-0">AskChrono</h5>
+                                <span class="ac-modal__status">
+                                    @if($aiLoading)
+                                        Czytam zadanie i układam kroki…
+                                    @elseif($aiError)
+                                        Nie udało się przygotować propozycji
+                                    @elseif($aiProposals !== [])
+                                        Mam {{ count($aiProposals) }} propozycji — sprawdź i zatwierdź
+                                    @else
+                                        Gotowy do pracy
+                                    @endif
+                                </span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" wire:click="closeAiModal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        @if($aiLoading)
+                            <div class="ac-thinking" wire:key="ai-thinking" x-data="{}" x-init="$wire.fetchAiProposals()">
+                                <div class="ac-thinking__bars">
+                                    <span></span><span></span><span></span>
+                                </div>
+                                <p class="ac-thinking__text mb-0">
+                                    Chrono analizuje nazwę i opis zadania, a potem proponuje kroki.
+                                </p>
+                            </div>
+                        @endif
+
+                        @if(! $aiLoading)
+                            <p class="text-muted small mb-3">
+                                Propozycje powstały na podstawie nazwy i opisu zadania.
+                                Możesz je poprawić przed zatwierdzeniem — nic nie trafi do bazy bez Twojej decyzji.
+                            </p>
+                        @endif
+
+                        @if($aiError)
+                            <x-ui.alert variant="danger" class="mb-3">{{ $aiError }}</x-ui.alert>
+                        @endif
+
+                        @if(! $aiLoading && $aiProposals !== [])
+                            <h6 class="small fw-semibold text-muted mb-2">
+                                <i class="bi bi-circle me-1"></i>Do zatwierdzenia ({{ count($aiProposals) }})
+                            </h6>
+
+                            <div>
+                                @foreach($aiProposals as $index => $proposal)
+                                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2" wire:key="ai-proposal-{{ $index }}">
+                                        <div class="flex-grow-1 d-flex align-items-center gap-2">
+                                            <span
+                                                class="badge badge-secondary subtask-num fw-semibold flex-shrink-0"
+                                                style="min-width: 2.35rem;"
+                                            >#{{ $index + 1 }}</span>
+                                            <input
+                                                type="text"
+                                                class="form-control form-control-sm"
+                                                wire:model.defer="aiProposals.{{ $index }}"
+                                            >
+                                        </div>
+
+                                        <div class="flex-shrink-0">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-success"
+                                                wire:click="confirmAiProposal({{ $index }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="confirmAiProposal({{ $index }})"
+                                            >
+                                                Zatwierdź
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @elseif(! $aiLoading && ! $aiError)
+                            <x-ui.empty-state icon="robot" message="Brak propozycji do wyświetlenia." />
+                        @endif
+                    </div>
+
+                    @if(! $aiLoading && $aiProposals !== [])
+                        <div class="modal-footer" style="border-color:var(--glass-border);">
+                            <button type="button" class="btn btn-outline-secondary" wire:click="closeAiModal">
+                                Anuluj
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary"
+                                wire:click="confirmAllAiProposals"
+                                wire:loading.attr="disabled"
+                                wire:target="confirmAllAiProposals"
+                            >
+                                Zatwierdź wszystkie
+                            </button>
+                        </div>
+                    @else
+                        <div class="modal-footer" style="border-color:var(--glass-border);">
+                            <button type="button" class="btn btn-outline-secondary" wire:click="closeAiModal">
+                                Zamknij
+                            </button>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+        @endteleport
+    @endif
 
 </div>

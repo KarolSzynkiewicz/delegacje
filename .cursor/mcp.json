@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "chrono-tasks": {
+      "command": "docker",
+      "args": [
+        "compose",
+        "exec",
+        "-T",
+        "laravel.test",
+        "php",
+        "artisan",
+        "mcp:start",
+        "chrono-tasks"
+      ],
+      "cwd": "/home/karol/delegacje"
+    }
+  }
+}

@@ -15,6 +15,7 @@ class LlmRequest
      * @param  string|null  $model  Nadpisanie modelu; null = model z konfiguracji dostawcy.
      * @param  float  $temperature  0.0 = deterministycznie, 1.0 = kreatywnie.
      * @param  int|null  $maxTokens  Limit tokenów odpowiedzi.
+     * @param  bool  $jsonMode  Wymuś odpowiedź w JSON (tam, gdzie dostawca to wspiera).
      */
     public function __construct(
         public readonly string $prompt,
@@ -22,6 +23,7 @@ class LlmRequest
         public readonly ?string $model = null,
         public readonly float $temperature = 0.2,
         public readonly ?int $maxTokens = null,
+        public readonly bool $jsonMode = false,
     ) {}
 
     public function withModel(?string $model): self
@@ -32,6 +34,7 @@ class LlmRequest
             model: $model,
             temperature: $this->temperature,
             maxTokens: $this->maxTokens,
+            jsonMode: $this->jsonMode,
         );
     }
 }

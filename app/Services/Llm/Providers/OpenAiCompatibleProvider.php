@@ -31,14 +31,20 @@ class OpenAiCompatibleProvider extends AbstractHttpProvider
         $messages[] = ['role' => 'user', 'content' => $request->prompt];
 
         try {
+            $body = [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => $request->temperature,
+                'max_tokens' => $this->maxTokens($request->maxTokens),
+            ];
+
+            if ($request->jsonMode) {
+                $body['response_format'] = ['type' => 'json_object'];
+            }
+
             $response = Http::withToken($credentials->apiKey)
                 ->timeout($this->timeout())
-                ->post($this->baseUrl().'/chat/completions', [
-                    'model' => $model,
-                    'messages' => $messages,
-                    'temperature' => $request->temperature,
-                    'max_tokens' => $this->maxTokens($request->maxTokens),
-                ]);
+                ->post($this->baseUrl().'/chat/completions', $body);
         } catch (ConnectionException $e) {
             throw LlmException::transportError($this->key(), $e->getMessage());
         }

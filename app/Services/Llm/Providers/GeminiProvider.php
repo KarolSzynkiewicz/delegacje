@@ -42,7 +42,12 @@ class GeminiProvider extends AbstractHttpProvider
         // maxOutputTokens. Budżet 0 wyłącza myślenie tam, gdzie liczy się koszt.
         $thinkingBudget = $this->config['thinking_budget'] ?? null;
 
-        if ($thinkingBudget !== null) {
+        if ($request->jsonMode) {
+            $payload['generationConfig']['responseMimeType'] = 'application/json';
+            // Modele 2.x „myślą” w ramach maxOutputTokens — przy JSON potrafią
+            // zużyć cały budżet zanim napiszą choć otwierający nawias.
+            $payload['generationConfig']['thinkingConfig'] = ['thinkingBudget' => 0];
+        } elseif ($thinkingBudget !== null) {
             $payload['generationConfig']['thinkingConfig'] = ['thinkingBudget' => (int) $thinkingBudget];
         }
 

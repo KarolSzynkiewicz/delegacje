@@ -2,10 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Contracts\Llm\LlmClient;
+use App\Exceptions\LlmException;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
 use App\Models\User;
+use App\Services\Llm\SubtaskSuggestionService;
 use App\Services\UserMentionService;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -19,6 +22,15 @@ class TaskSubtasks extends Component
     public ?int $editingSubtaskId = null;
 
     public string $editingSubtaskName = '';
+
+    public bool $showAiModal = false;
+
+    public bool $aiLoading = false;
+
+    public ?string $aiError = null;
+
+    /** @var list<string> */
+    public array $aiProposals = [];
 
     public function mount(ProjectTask $task): void
     {
@@ -54,6 +66,126 @@ class TaskSubtasks extends Component
 
         $this->newSubtaskName = '';
         $this->refreshTask();
+    }
+
+    /**
+     * Otwiera okno od razu, jeszcze przed odpytaniem modelu — dzięki temu
+     * użytkownik widzi pracującego bota zamiast zamrożonego przycisku.
+     */
+    public function openAiModal(): void
+    {
+        $this->authorizeTaskUpdate();
+        $this->reset(['aiError', 'aiProposals']);
+        $this->showAiModal = true;
+        $this->aiLoading = true;
+    }
+
+    public function fetchAiProposals(): void
+    {
+        $this->authorizeTaskUpdate();
+
+        // Alpine odpala to raz po wyrenderowaniu okna; flaga chroni przed
+        // powtórnym strzałem, gdyby Livewire przemorfował ten węzeł.
+        if (! $this->aiLoading) {
+            return;
+        }
+
+        try {
+            $this->aiProposals = app(SubtaskSuggestionService::class)
+                ->suggest(ProjectTask::query()->with('subtasks')->findOrFail($this->task->id));
+        } catch (LlmException $e) {
+            $this->aiError = $e->getMessage();
+            $this->aiProposals = [];
+        } catch (\Throwable $e) {
+            $this->aiError = 'Nie udało się uzyskać propozycji od modelu: '.$e->getMessage();
+            $this->aiProposals = [];
+        } finally {
+            $this->aiLoading = false;
+        }
+    }
+
+    public function closeAiModal(): void
+    {
+        $this->showAiModal = false;
+        $this->reset(['aiError', 'aiProposals', 'aiLoading']);
+    }
+
+    public function confirmAiProposal(int $index): void
+    {
+        $this->authorizeTaskUpdate();
+
+        if (! isset($this->aiProposals[$index])) {
+            return;
+        }
+
+        $name = trim($this->aiProposals[$index]);
+
+        if ($name === '') {
+            $this->aiError = 'Podzadanie nie może być puste.';
+
+            return;
+        }
+
+        $this->createSubtaskFromAi($name);
+        unset($this->aiProposals[$index]);
+        $this->aiProposals = array_values($this->aiProposals);
+        $this->aiError = null;
+
+        if ($this->aiProposals === []) {
+            $this->closeAiModal();
+        }
+    }
+
+    public function confirmAllAiProposals(): void
+    {
+        $this->authorizeTaskUpdate();
+
+        $names = collect($this->aiProposals)
+            ->map(fn (string $name) => trim($name))
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($names === []) {
+            $this->aiError = 'Brak podzadań do zatwierdzenia.';
+
+            return;
+        }
+
+        foreach ($names as $name) {
+            $this->createSubtaskFromAi($name);
+        }
+
+        $this->closeAiModal();
+    }
+
+    private function createSubtaskFromAi(string $name): void
+    {
+        $subtask = TaskSubtask::create([
+            'task_id' => $this->task->id,
+            'name' => $name,
+            'is_completed' => false,
+            'created_by' => auth()->id(),
+        ]);
+
+        TaskSubtaskEvent::log($subtask, 'created', auth()->id());
+
+        app(UserMentionService::class)->notifySubtaskMentions(
+            $this->task,
+            $subtask,
+            $name,
+            auth()->user()
+        );
+    }
+
+    private function authorizeTaskUpdate(): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user instanceof User && ($user->isAdmin() || $user->hasPermission('tasks.update')),
+            403,
+        );
     }
 
     public function toggleSubtask($subtaskId): void
@@ -238,6 +370,8 @@ class TaskSubtasks extends Component
                 ])
                 ->values()
                 ->all(),
+            'llmConfigured' => app(LlmClient::class)->isConfigured(),
+            'canSuggestWithAi' => auth()->user()?->isAdmin() || auth()->user()?->hasPermission('tasks.update'),
         ]);
     }
 }
