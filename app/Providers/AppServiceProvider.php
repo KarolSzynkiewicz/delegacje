@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\Llm\LlmClient;
+use App\Contracts\Llm\LlmCredentialRepository;
 use App\Livewire\Pulse\UserRouteUsage;
 use App\Livewire\Pulse\UserRouteVisits;
 use App\Models\AccommodationAssignment;
@@ -29,6 +31,8 @@ use App\Observers\AuditableModelObserver;
 use App\Observers\NotifiesApprovalAssignee;
 use App\Observers\ProcedureTemplateObserver;
 use App\Observers\SyncsWorkItems;
+use App\Repositories\Llm\DatabaseLlmCredentialRepository;
+use App\Services\Llm\LlmManager;
 use App\Services\SystemBootstrapService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
@@ -42,7 +46,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Warstwa AI: aplikacja zależy tylko od interfejsów, konkretny dostawca
+        // wynika z config/llm.php i klucza zapisanego w Akcjach systemowych.
+        $this->app->singleton(LlmCredentialRepository::class, DatabaseLlmCredentialRepository::class);
+        $this->app->singleton(LlmManager::class);
+        $this->app->singleton(LlmClient::class, fn ($app) => $app->make(LlmManager::class));
     }
 
     /**

@@ -273,6 +273,24 @@
             </div>
 
             <div class="col-lg-8 mt-4">
+                <x-ui.card label="Integracja AI">
+                    <p class="text-muted mb-4">
+                        Klucz API dostawcy modelu językowego. Aplikacja rozmawia z modelem przez wspólny
+                        interfejs (<code>LlmClient</code>), więc zmiana dostawcy to wybór z listy poniżej —
+                        bez zmian w kodzie. Klucz zapisujemy zaszyfrowany i nigdy nie pokazujemy w całości.
+                    </p>
+
+                    <div class="border rounded p-3 mb-0 bg-primary bg-opacity-10">
+                        <h5 class="mb-3">
+                            <i class="bi bi-robot text-primary"></i>
+                            Dostawca modelu językowego
+                        </h5>
+                        <livewire:llm-provider-settings wire:key="llm-provider-settings" />
+                    </div>
+                </x-ui.card>
+            </div>
+
+            <div class="col-lg-8 mt-4">
                 <x-ui.card label="Backup danych">
                     <p class="text-muted mb-4">
                         Pobierz pełny backup wszystkich danych z bazy danych jako plik JSON. Backup zawiera wszystkie rekordy ze wszystkich tabel — bez plików graficznych przechowywanych na dysku.
