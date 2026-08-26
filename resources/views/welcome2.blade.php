@@ -7,6 +7,191 @@
     <div class="container-fluid">
 
         {{-- ══════════════════════════════════════════════════════════════
+             ⏱ Logo systemu — warianty do wyboru + ekran inicjalizacji
+             ══════════════════════════════════════════════════════════════ --}}
+        @php
+            $clMarks = [
+                'dial' => ['Dial (obecny)', 'Pełny pierścień i wskazówki na 4:00. Neutralny, ale najmniej wyróżniający się — taki zegar ma pół rynku.'],
+                'aperture' => ['Aperture', 'Pierścień pocięty na cztery segmenty, jak przysłona. Ten sam zegar, ale znak wygląda na „systemowy”, nie na ikonę budzika.'],
+                'bot' => ['Bot', 'Chrono wpisany w znak: dolna połowa tarczy jest uśmiechem, minutówka nosem, oczy nad cyferblatem. Spina markę z AskChrono.'],
+                'monogram' => ['Monogram C', 'Litera C zbudowana z tarczy, wskazówka godzinowa celuje w wycięcie. Najmocniej skaluje się w dół.'],
+                'pulse' => ['Pulse', 'Tarcza przecięta linią pulsu — dosłowne „System czasu rzeczywistego” ze stopki landingu.'],
+                'timer' => ['Timer (minutnik)', 'Pokrętło na górze i gradientowy łuk odliczania od 12 do 4:00. Czyta się jako „czas, który leci”, nie jako godzina — najbliżej tego, co system faktycznie robi.'],
+            ];
+        @endphp
+
+        <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25" x-data="{ mark: 'dial' }">
+            <h3 class="mb-1">
+                ⏱ Logo systemu
+                <span class="text-muted small fw-normal">(pięć propozycji — wybierz, podmienimy w jednym miejscu)</span>
+            </h3>
+            <p class="text-muted small mb-4">
+                Komponent <code>&lt;x-brand-mark variant="…" /&gt;</code>. Każdy wariant trzyma się palety marki:
+                gradient <code>primary→accent</code> na wskazówce minutowej, <code>--warning</code> na godzinowej,
+                godzina zawsze 4:00. Najedź na znak w pasku poniżej — wskazówka robi jeden obrót.
+            </p>
+
+            <div class="row g-3 mb-4">
+                @foreach($clMarks as $markKey => $markMeta)
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <x-ui.card class="h-100 text-center" :variant="'hover'">
+                            <div class="d-flex justify-content-center align-items-center gap-3 mb-3" style="min-height:96px">
+                                <x-brand-mark :variant="$markKey" :size="72" />
+                            </div>
+                            <h6 class="mb-1">{{ $markMeta[0] }}</h6>
+                            <p class="text-muted small mb-2">{{ $markMeta[1] }}</p>
+                            <code class="small">variant="{{ $markKey }}"</code>
+                        </x-ui.card>
+                    </div>
+                @endforeach
+            </div>
+
+            <p class="text-muted small mb-2">
+                W realnych rozmiarach — 16 px (favicon), 32 px (landing), 40 px (navbar) — oraz obok wordmarku:
+            </p>
+            <div class="d-flex flex-column gap-2 mb-4">
+                @foreach(array_keys($clMarks) as $markKey)
+                    <div class="d-flex align-items-center gap-3 p-2 rounded border border-secondary border-opacity-25">
+                        <span class="navbar-brand d-flex align-items-center gap-2 m-0 p-0">
+                            <x-brand-mark :variant="$markKey" :size="40" />
+                            <span class="navbar-brand-name">Chrono<span class="navbar-brand-name__accent">Logic</span></span>
+                        </span>
+                        <span class="ms-auto d-flex align-items-center gap-3">
+                            <x-brand-mark :variant="$markKey" :size="32" />
+                            <x-brand-mark :variant="$markKey" :size="24" />
+                            <x-brand-mark :variant="$markKey" :size="16" />
+                            <span class="small text-muted font-mono" style="min-width:5.5rem">{{ $markKey }}</span>
+                        </span>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="p-3 rounded border border-secondary border-opacity-25">
+                <h6 class="mb-1">Inicjalizacja systemu</h6>
+                <p class="text-muted small mb-3">
+                    Pełnoekranowa animacja startu. Przy wysyłce formularza logowania
+                    (<code>data-boot-screen</code>) ekran wchodzi od razu, żeby nie było białej przerwy na czas POST-a,
+                    ale całą sekwencję odgrywa dopiero pulpit — dzięki temu przeładowanie nie ucina jej w połowie.
+                    Minutnik odlicza, wskazówka wiruje, kroki zapalają się po kolei na zielono,
+                    pasek dobija do 100% i ekran gaśnie sam (~4 s, czystym CSS-em).
+                </p>
+                <button type="button" class="btn btn-sm btn-primary"
+                        x-on:click="window.clShowBootScreen(true); setTimeout(() => window.clHideBootScreen(), 4400)">
+                    <i class="bi bi-play-fill"></i> Pokaż pełną inicjalizację
+                </button>
+                <span class="text-muted small ms-2">Zamknie się sama.</span>
+            </div>
+        </div>
+
+        {{-- ══════════════════════════════════════════════════════════════
+             🤖 AskChrono — bot AI
+             Podgląd komponentu <x-ask-chrono-bot />. Stany przełączamy
+             ręcznie, żeby dopracowywać animację bez palenia tokenów API.
+             ══════════════════════════════════════════════════════════════ --}}
+        <div
+            class="mb-5 pb-4 border-bottom border-secondary border-opacity-25"
+            x-data="{
+                state: 'idle',
+                size: 110,
+                timer: null,
+                simulate() {
+                    clearTimeout(this.timer);
+                    this.state = 'thinking';
+                    this.timer = setTimeout(() => this.state = 'done', 2200);
+                },
+            }"
+        >
+            <h3 class="mb-1">
+                🤖 AskChrono — bot AI
+                <span class="text-muted small fw-normal">(podgląd, żadne zapytanie do API nie leci)</span>
+            </h3>
+            <p class="text-muted small mb-3">
+                Reużywalny komponent <code>&lt;x-ask-chrono-bot /&gt;</code>. Animacja jest w całości na CSS —
+                zero JS, zero nasłuchów na <code>mousemove</code>. Stany przełączasz przyciskami poniżej,
+                a w aplikacji sterują nimi propsy <code>state</code> / klasa <code>.ac-bot--thinking</code>.
+            </p>
+
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary"
+                            :class="state === 'idle' ? 'active' : ''"
+                            x-on:click="state = 'idle'">Spoczynek</button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            :class="state === 'thinking' ? 'active' : ''"
+                            x-on:click="state = 'thinking'">Myśli</button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            :class="state === 'done' ? 'active' : ''"
+                            x-on:click="state = 'done'">Gotowe</button>
+                </div>
+
+                <button type="button" class="btn btn-sm btn-primary" x-on:click="simulate()">
+                    <i class="bi bi-play-fill"></i> Symuluj zapytanie (2,2 s)
+                </button>
+
+                <label class="d-flex align-items-center gap-2 small text-muted mb-0">
+                    Rozmiar
+                    <input type="range" class="form-range" style="width:150px"
+                           min="24" max="180" step="2" x-model.number="size">
+                    <span class="font-mono" x-text="size + ' px'"></span>
+                </label>
+            </div>
+
+            @php
+                $acVariants = [
+                    'clock' => ['Zegar-twarz', 'Pełny robot: tarcza jest twarzą, oczy siedzą na cyferblacie, do tego antena i tułów. Najbardziej maskotkowy.'],
+                    'visor' => ['Wizjer', 'Smuklejszy android — oczy świecą w ciemnym wizjerze, zegar przeniesiony na klatkę piersiową. Bardziej „tech”.'],
+                    'orb' => ['Orb', 'Sama głowa-kula, bez tułowia. Cały zegar jest obwódką twarzy, więc czyta się też w małych rozmiarach.'],
+                    'spark' => ['Znacznik', 'Sam zegar, bez twarzy. Do miejsc, gdzie pełny bot byłby zbyt zabawkowy — tabele, paski narzędzi, inline.'],
+                ];
+            @endphp
+
+            <div class="row g-3" :style="'--ac-size: ' + size + 'px'">
+                @foreach($acVariants as $acKey => $acMeta)
+                    <div class="col-6 col-lg-3">
+                        <x-ui.card class="h-100 text-center">
+                            <div class="d-flex justify-content-center align-items-end mb-3" style="min-height:200px">
+                                <x-ask-chrono-bot
+                                    :variant="$acKey"
+                                    ::class="state === 'idle' ? '' : 'ac-bot--' + state"
+                                />
+                            </div>
+                            <h6 class="mb-1">{{ $acMeta[0] }}</h6>
+                            <p class="text-muted small mb-2">{{ $acMeta[1] }}</p>
+                            <code class="small">variant="{{ $acKey }}"</code>
+                        </x-ui.card>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="mt-4">
+                <p class="text-muted small mb-2">
+                    Czytelność w realnych rozmiarach UI — 24 px (ikona w tabeli), 40 px (przycisk), 64 px (nagłówek okna):
+                </p>
+                <div class="d-flex flex-wrap align-items-end gap-4">
+                    @foreach(array_keys($acVariants) as $acKey)
+                        <div class="d-flex align-items-end gap-2 p-2 rounded border border-secondary border-opacity-25">
+                            <x-ask-chrono-bot :variant="$acKey" :size="24" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
+                            <x-ask-chrono-bot :variant="$acKey" :size="40" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
+                            <x-ask-chrono-bot :variant="$acKey" :size="64" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
+                            <span class="small text-muted ms-1 align-self-center font-mono">{{ $acKey }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <p class="text-muted small mb-2">Tak wygląda przycisk używany dziś na karcie zadania:</p>
+                <button type="button" class="ac-trigger" x-on:click="simulate()">
+                    <x-ask-chrono-bot :size="40" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
+                    <span class="ac-trigger__text">
+                        <span class="ac-trigger__name">AskChrono</span>
+                        <span class="ac-trigger__hint">Rozbij na podzadania</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        {{-- ══════════════════════════════════════════════════════════════
              🧪 PROBE — teal2 / xuiv2
              Testowy wariant stylu zainspirowany "chronologic-landing.html":
              tło (siatka + ziarno + poświata kursora), animacje hover
@@ -1466,5 +1651,8 @@
         <hr>
 
     </div>
+
+    {{-- Tu tylko na potrzeby podglądu — w aplikacji siedzi w layoucie gościa. --}}
+    <x-boot-screen />
 
 </x-app-layout>

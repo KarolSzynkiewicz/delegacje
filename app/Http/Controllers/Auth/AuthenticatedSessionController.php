@@ -29,7 +29,9 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(RouteServiceProvider::HOME);
+        // Ekran inicjalizacji odgrywa się dopiero po stronie docelowej — inaczej
+        // przeładowanie po POST ucinałoby animację w połowie.
+        return redirect()->intended(RouteServiceProvider::HOME)->with('cl_boot', true);
     }
 
     /**

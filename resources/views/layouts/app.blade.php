@@ -56,6 +56,9 @@
                 </main>
             </div>
         </div>
+        @if (session('cl_boot'))
+            <x-boot-screen auto />
+        @endif
         @livewireScripts
         @stack('scripts')
     </body>

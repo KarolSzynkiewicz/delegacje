@@ -245,3 +245,57 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
         true
     );
 };
+
+/**
+ * Ekran inicjalizacji systemu (x-boot-screen).
+ *
+ * Pokazuje się przy wysyłce formularza oznaczonego data-boot-screen (logowanie)
+ * i zostaje na ekranie aż przeglądarka przejdzie na kolejną stronę.
+ */
+(function () {
+    const boot = document.getElementById('clBootScreen');
+
+    if (!boot) {
+        return;
+    }
+
+    /**
+     * @param {boolean} auto Odegraj pełną sekwencję i zgaś ekran samym CSS-em.
+     */
+    const show = (auto = false) => {
+        boot.classList.remove('cl-boot--on', 'cl-boot--auto');
+        void boot.offsetWidth; // wymuszony reflow — inaczej animacja nie ruszy od nowa
+        boot.classList.add('cl-boot--on');
+
+        if (auto) {
+            boot.classList.add('cl-boot--auto');
+        }
+
+        boot.setAttribute('aria-hidden', 'false');
+    };
+
+    const hide = () => {
+        boot.classList.remove('cl-boot--on', 'cl-boot--auto');
+        boot.setAttribute('aria-hidden', 'true');
+    };
+
+    document.querySelectorAll('form[data-boot-screen]').forEach((form) => {
+        form.addEventListener('submit', () => {
+            // Formularz z błędem walidacji nie wychodzi — nie zasłaniaj go.
+            if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                return;
+            }
+            show();
+        });
+    });
+
+    // Powrót „wstecz” z bfcache pokazałby zamrożony ekran startowy.
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            hide();
+        }
+    });
+
+    window.clShowBootScreen = show;
+    window.clHideBootScreen = hide;
+})();

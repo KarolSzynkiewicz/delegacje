@@ -23,6 +23,10 @@ class TaskSubtasks extends Component
 
     public string $editingSubtaskName = '';
 
+    public ?int $assigningSubtaskId = null;
+
+    public string $assignSubtaskUserId = '';
+
     public bool $showAiModal = false;
 
     public bool $aiLoading = false;
@@ -207,6 +211,53 @@ class TaskSubtasks extends Component
         $this->refreshTask();
     }
 
+    public function startAssignSubtask(int $subtaskId): void
+    {
+        $subtask = TaskSubtask::findOrFail($subtaskId);
+
+        if ($subtask->task_id !== $this->task->id) {
+            abort(403, 'Nieprawidłowe podzadanie.');
+        }
+
+        $this->cancelEditSubtask();
+        $this->assigningSubtaskId = $subtask->id;
+        $this->assignSubtaskUserId = $subtask->assigned_to ? (string) $subtask->assigned_to : '';
+    }
+
+    public function cancelAssignSubtask(): void
+    {
+        $this->assigningSubtaskId = null;
+        $this->assignSubtaskUserId = '';
+    }
+
+    public function saveSubtaskAssignment(int $subtaskId): void
+    {
+        $this->validate([
+            'assignSubtaskUserId' => 'nullable|integer|exists:users,id',
+        ], [
+            'assignSubtaskUserId.exists' => 'Wybrany użytkownik nie istnieje.',
+        ]);
+
+        $subtask = TaskSubtask::findOrFail($subtaskId);
+
+        if ($subtask->task_id !== $this->task->id) {
+            abort(403, 'Nieprawidłowe podzadanie.');
+        }
+
+        $previous = $subtask->assigned_to;
+        $newAssignee = $this->assignSubtaskUserId === '' ? null : (int) $this->assignSubtaskUserId;
+
+        $subtask->update(['assigned_to' => $newAssignee]);
+
+        if ($newAssignee && $newAssignee !== $previous && $newAssignee !== auth()->id()) {
+            $assignee = User::find($newAssignee);
+            $assignee?->notify(new \App\Notifications\TaskAssigned($subtask->fresh() ?? $subtask, auth()->user()));
+        }
+
+        $this->cancelAssignSubtask();
+        $this->refreshTask();
+    }
+
     public function startEditSubtask(int $subtaskId): void
     {
         $subtask = TaskSubtask::findOrFail($subtaskId);
@@ -215,6 +266,7 @@ class TaskSubtasks extends Component
             abort(403, 'Nieprawidłowe podzadanie.');
         }
 
+        $this->cancelAssignSubtask();
         $this->editingSubtaskId = $subtask->id;
         $this->editingSubtaskName = $subtask->name;
     }
@@ -273,6 +325,10 @@ class TaskSubtasks extends Component
 
         if ($this->editingSubtaskId === $subtaskId) {
             $this->cancelEditSubtask();
+        }
+
+        if ($this->assigningSubtaskId === $subtaskId) {
+            $this->cancelAssignSubtask();
         }
 
         $this->refreshTask();
@@ -352,6 +408,8 @@ class TaskSubtasks extends Component
             $subtaskNumbers[$st->id] = $i + 1;
         }
 
+        $directoryUsers = User::orderBy('name')->get();
+
         return view('livewire.task-subtasks', [
             'pendingSubtasks' => $pendingSubtasks,
             'completedSubtasks' => $completedSubtasks,
@@ -362,14 +420,14 @@ class TaskSubtasks extends Component
             'progressVariant' => $progressPercentage == 100 ? 'success' : ($progressPercentage > 0 ? 'warning' : 'default'),
             'subtaskNumbers' => $subtaskNumbers,
             'subtaskMeta' => $this->buildSubtaskMeta($subtasks),
-            'mentionUsersForAutocomplete' => User::orderBy('name')
-                ->get()
+            'mentionUsersForAutocomplete' => $directoryUsers
                 ->map(fn (User $u) => [
                     'name' => $u->name,
                     'initials' => $u->initials,
                 ])
                 ->values()
                 ->all(),
+            'assignUsers' => $directoryUsers,
             'llmConfigured' => app(LlmClient::class)->isConfigured(),
             'canSuggestWithAi' => auth()->user()?->isAdmin() || auth()->user()?->hasPermission('tasks.update'),
         ]);

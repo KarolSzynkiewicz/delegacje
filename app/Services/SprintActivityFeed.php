@@ -122,6 +122,272 @@ final class SprintActivityFeed
     }
 
     /**
+     * Ta sama linia czasu co w sprincie, ale zawężona do jednego zadania
+     * (podzadania, komentarze, załączniki, przeniesienia).
+     *
+     * @return Collection<int, ActivityEntry>
+     */
+    public function forTask(ProjectTask $task, int $limit = 80): Collection
+    {
+        $this->auditKeys = [];
+        $this->userNames = [];
+        $this->taskNames = [$task->id => $task->name];
+        $this->subtaskNames = [];
+        $this->subtaskTaskIds = [];
+        $this->sprintNames = [];
+        $this->relatedTasks = collect([$task]);
+        $this->relatedSubtasks = collect();
+        $this->relatedComments = collect();
+        $this->relatedMilestones = collect();
+
+        $task->loadMissing('sprint:id,name');
+        if ($task->sprint) {
+            $this->sprintNames[$task->sprint->id] = $task->sprint->name;
+        }
+
+        $related = $this->gatherRelatedForTask($task);
+        $logs = $this->auditLogsForTask($task, $related);
+
+        foreach ($logs as $log) {
+            $this->rememberSnapshotNames($log);
+            $this->auditKeys[$this->key($log->auditable_type, (int) $log->auditable_id, $log->event)] = true;
+        }
+        $this->preloadLookupsFromLogs($logs);
+
+        $sprint = $task->sprint;
+        $entries = $logs
+            ->map(fn (AuditLog $log) => $this->fromAudit($log, $sprint))
+            ->filter()
+            ->concat($this->syntheticsForTask($task, $related));
+
+        return $entries
+            ->sortByDesc(fn (array $entry) => $entry['at']->getTimestamp())
+            ->values()
+            ->take($limit)
+            ->values();
+    }
+
+    /**
+     * @return array{taskIds: list<int>, subtaskIds: list<int>, commentIds: list<int>, milestoneIds: list<int>, attachmentIds: list<int>}
+     */
+    private function gatherRelatedForTask(ProjectTask $task): array
+    {
+        $taskIds = [$task->id];
+
+        $this->relatedSubtasks = TaskSubtask::query()->where('task_id', $task->id)->get();
+        foreach ($this->relatedSubtasks as $subtask) {
+            $this->subtaskNames[$subtask->id] = $subtask->name;
+            $this->subtaskTaskIds[$subtask->id] = (int) $subtask->task_id;
+        }
+
+        $this->relatedComments = Comment::withTrashed()
+            ->with('user:id,name')
+            ->where('commentable_type', 'project_task')
+            ->where('commentable_id', $task->id)
+            ->get();
+
+        $commentIds = $this->relatedComments->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $subtaskIds = $this->relatedSubtasks->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $attachmentIds = Attachment::query()
+            ->where(function ($query) use ($task, $commentIds) {
+                $query->where(function ($inner) use ($task) {
+                    $inner->where('attachable_type', 'project_task')
+                        ->where('attachable_id', $task->id);
+                });
+
+                if ($commentIds !== []) {
+                    $query->orWhere(function ($inner) use ($commentIds) {
+                        $inner->where('attachable_type', 'comment')
+                            ->whereIn('attachable_id', $commentIds);
+                    });
+                }
+            })
+            ->pluck('id')
+            ->all();
+
+        $userIds = collect([$task->assigned_to, $task->created_by])
+            ->merge($this->relatedSubtasks->pluck('created_by'))
+            ->merge($this->relatedComments->pluck('user_id'))
+            ->filter()
+            ->unique()
+            ->all();
+
+        $this->rememberUsers($userIds);
+
+        return [
+            'taskIds' => $taskIds,
+            'subtaskIds' => $subtaskIds,
+            'commentIds' => $commentIds,
+            'milestoneIds' => [],
+            'attachmentIds' => array_map('intval', $attachmentIds),
+        ];
+    }
+
+    /**
+     * @param  array{taskIds: list<int>, subtaskIds: list<int>, commentIds: list<int>, milestoneIds: list<int>, attachmentIds: list<int>}  $related
+     * @return Collection<int, AuditLog>
+     */
+    private function auditLogsForTask(ProjectTask $task, array $related): Collection
+    {
+        return AuditLog::query()
+            ->where(function ($query) use ($task, $related) {
+                $query->where(function ($inner) use ($task) {
+                    $inner->where('auditable_type', ProjectTask::class)
+                        ->where('auditable_id', $task->id);
+                });
+
+                if ($related['subtaskIds'] !== []) {
+                    $query->orWhere(function ($inner) use ($related) {
+                        $inner->where('auditable_type', TaskSubtask::class)
+                            ->whereIn('auditable_id', $related['subtaskIds']);
+                    });
+                }
+
+                if ($related['commentIds'] !== []) {
+                    $query->orWhere(function ($inner) use ($related) {
+                        $inner->where('auditable_type', Comment::class)
+                            ->whereIn('auditable_id', $related['commentIds']);
+                    });
+                }
+
+                if ($related['attachmentIds'] !== []) {
+                    $query->orWhere(function ($inner) use ($related) {
+                        $inner->where('auditable_type', Attachment::class)
+                            ->whereIn('auditable_id', $related['attachmentIds']);
+                    });
+                }
+            })
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
+     * @param  array{taskIds: list<int>, subtaskIds: list<int>, commentIds: list<int>, milestoneIds: list<int>, attachmentIds: list<int>}  $related
+     * @return Collection<int, ActivityEntry>
+     */
+    private function syntheticsForTask(ProjectTask $task, array $related): Collection
+    {
+        $entries = collect();
+
+        if (! $this->hasAudit(ProjectTask::class, $task->id, 'created') && $task->created_at) {
+            $entries->push($this->entry(
+                $task->created_at,
+                $this->userName($task->created_by),
+                'dodał zadanie',
+                $task->name,
+                $this->taskUrl($task->id),
+                null,
+                'plus-lg',
+                'primary',
+                'task.created'
+            ));
+        }
+
+        if (
+            $task->status === TaskStatus::COMPLETED
+            && $task->completed_at
+            && ! $this->hasAudit(ProjectTask::class, $task->id, 'updated')
+        ) {
+            $entries->push($this->entry(
+                $task->completed_at,
+                'System',
+                'zakończył zadanie',
+                $task->name,
+                $this->taskUrl($task->id),
+                null,
+                'check-circle',
+                'success',
+                'task.completed'
+            ));
+        }
+
+        foreach ($this->relatedComments as $comment) {
+            if ($this->hasAudit(Comment::class, $comment->id, 'created') || ! $comment->created_at) {
+                continue;
+            }
+
+            $type = $comment->commentable_type instanceof \BackedEnum
+                ? $comment->commentable_type->value
+                : (string) $comment->commentable_type;
+            $isReply = $comment->parent_id !== null;
+            $entries->push($this->entry(
+                $comment->created_at,
+                $comment->user?->name ?: 'System',
+                $isReply ? 'odpowiedział przy' : 'dodał komentarz do',
+                $this->commentTarget($type, (int) $comment->commentable_id, $task->sprint),
+                $this->commentUrl($type, (int) $comment->commentable_id),
+                $this->excerpt($comment->body),
+                'chat-dots',
+                'info',
+                'comment.created'
+            ));
+        }
+
+        foreach ($this->relatedSubtasks as $subtask) {
+            $url = $this->taskUrl((int) $subtask->task_id);
+
+            if (! $this->hasAudit(TaskSubtask::class, $subtask->id, 'created') && $subtask->created_at) {
+                $entries->push($this->entry(
+                    $subtask->created_at,
+                    $this->userName($subtask->created_by),
+                    'dodał podzadanie',
+                    $subtask->name,
+                    $url,
+                    null,
+                    'plus-lg',
+                    'primary',
+                    'subtask.created'
+                ));
+            }
+        }
+
+        if ($related['subtaskIds'] !== []) {
+            $events = TaskSubtaskEvent::query()
+                ->with('user:id,name')
+                ->whereIn('subtask_id', $related['subtaskIds'])
+                ->whereIn('event', ['completed', 'reopened', 'moved', 'renamed', 'deleted'])
+                ->get();
+
+            foreach ($events as $event) {
+                if ($this->hasAudit(TaskSubtask::class, (int) $event->subtask_id, 'updated')
+                    || $this->hasAudit(TaskSubtask::class, (int) $event->subtask_id, 'deleted')) {
+                    continue;
+                }
+
+                $name = $this->subtaskNames[$event->subtask_id] ?? 'podzadanie';
+                $mapped = match ($event->event) {
+                    'completed' => ['zakończył podzadanie', 'check-circle', 'success'],
+                    'reopened' => ['wznowił podzadanie', 'arrow-counterclockwise', 'warning'],
+                    'moved' => ['przeniósł podzadanie', 'arrow-left-right', 'warning'],
+                    'renamed' => ['zmienił nazwę podzadania', 'pencil', 'muted'],
+                    'deleted' => ['usunął podzadanie', 'trash', 'danger'],
+                    default => null,
+                };
+
+                if ($mapped === null || ! $event->created_at) {
+                    continue;
+                }
+
+                $entries->push($this->entry(
+                    $event->created_at,
+                    $event->user?->name ?: 'System',
+                    $mapped[0],
+                    $name,
+                    $this->taskUrl($task->id),
+                    null,
+                    $mapped[1],
+                    $mapped[2],
+                    'subtask.'.$event->event
+                ));
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
      * @return array{taskIds: list<int>, subtaskIds: list<int>, commentIds: list<int>, milestoneIds: list<int>, attachmentIds: list<int>}
      */
     private function gatherRelated(Sprint $sprint): array
@@ -279,7 +545,7 @@ final class SprintActivityFeed
     /**
      * @return ActivityEntry|null
      */
-    private function fromAudit(AuditLog $log, Sprint $sprint): ?array
+    private function fromAudit(AuditLog $log, ?Sprint $sprint): ?array
     {
         $actor = $this->actor($log);
         $at = $log->created_at ?? now();
@@ -288,7 +554,9 @@ final class SprintActivityFeed
             ProjectTask::class => $this->fromTaskAudit($log, $actor, $at, $sprint),
             TaskSubtask::class => $this->fromSubtaskAudit($log, $actor, $at),
             Comment::class => $this->fromCommentAudit($log, $actor, $at, $sprint),
-            Sprint::class => $this->fromSprintAudit($log, $actor, $at, $sprint),
+            Sprint::class => $sprint
+                ? $this->fromSprintAudit($log, $actor, $at, $sprint)
+                : null,
             SprintMilestone::class => $this->fromMilestoneAudit($log, $actor, $at),
             Attachment::class => $this->fromAttachmentAudit($log, $actor, $at),
             default => null,
@@ -298,7 +566,7 @@ final class SprintActivityFeed
     /**
      * @return ActivityEntry|null
      */
-    private function fromTaskAudit(AuditLog $log, string $actor, Carbon $at, Sprint $sprint): ?array
+    private function fromTaskAudit(AuditLog $log, string $actor, Carbon $at, ?Sprint $sprint): ?array
     {
         $name = $this->stringVal($log->new_values['name'] ?? $log->old_values['name'] ?? null)
             ?? $this->taskNames[$log->auditable_id] ?? 'zadanie';
@@ -353,16 +621,23 @@ final class SprintActivityFeed
             $fromId = $this->intOrNull($changes['sprint_id']['before']);
             $toId = $this->intOrNull($changes['sprint_id']['after']);
 
-            if ($toId === $sprint->id && $fromId !== $sprint->id) {
+            if ($sprint) {
+                if ($toId === $sprint->id && $fromId !== $sprint->id) {
+                    $fromLabel = $fromId ? $this->sprintName($fromId) : 'backlogu';
+
+                    return $this->entry($at, $actor, 'przeniósł zadanie do sprintu', $name, $url, 'z '.$fromLabel, 'box-arrow-in-right', 'primary', 'task.moved_in');
+                }
+
+                if ($fromId === $sprint->id && $toId !== $sprint->id) {
+                    $toLabel = $toId ? $this->sprintName($toId) : 'backlogu';
+
+                    return $this->entry($at, $actor, 'przeniósł zadanie ze sprintu', $name, $url, 'do '.$toLabel, 'box-arrow-right', 'warning', 'task.moved_out');
+                }
+            } else {
                 $fromLabel = $fromId ? $this->sprintName($fromId) : 'backlogu';
-
-                return $this->entry($at, $actor, 'przeniósł zadanie do sprintu', $name, $url, 'z '.$fromLabel, 'box-arrow-in-right', 'primary', 'task.moved_in');
-            }
-
-            if ($fromId === $sprint->id && $toId !== $sprint->id) {
                 $toLabel = $toId ? $this->sprintName($toId) : 'backlogu';
 
-                return $this->entry($at, $actor, 'przeniósł zadanie ze sprintu', $name, $url, 'do '.$toLabel, 'box-arrow-right', 'warning', 'task.moved_out');
+                return $this->entry($at, $actor, 'przeniósł zadanie', $name, $url, $fromLabel.' → '.$toLabel, 'arrow-left-right', 'warning', 'task.moved');
             }
         }
 
@@ -460,7 +735,7 @@ final class SprintActivityFeed
     /**
      * @return ActivityEntry|null
      */
-    private function fromCommentAudit(AuditLog $log, string $actor, Carbon $at, Sprint $sprint): ?array
+    private function fromCommentAudit(AuditLog $log, string $actor, Carbon $at, ?Sprint $sprint): ?array
     {
         $values = $log->event === 'deleted' ? ($log->old_values ?? []) : ($log->new_values ?? []);
         $body = $this->excerpt($this->stringVal($values['body'] ?? null));
@@ -566,7 +841,7 @@ final class SprintActivityFeed
     {
         $entries = collect();
 
-        if (! $this->hasAudit(Sprint::class, $sprint->id, 'created') && $sprint->created_at) {
+        if ($sprint->id && ! $this->hasAudit(Sprint::class, (int) $sprint->id, 'created') && $sprint->created_at) {
             $entries->push($this->entry(
                 $sprint->created_at,
                 $this->userName($sprint->created_by),
@@ -844,13 +1119,17 @@ final class SprintActivityFeed
         return mb_strlen($text) > 80 ? mb_substr($text, 0, 77).'…' : $text;
     }
 
-    private function commentTarget(string $type, ?int $id, Sprint $sprint): string
+    private function commentTarget(string $type, ?int $id, ?Sprint $sprint): string
     {
         if ($type === 'project_task' && $id) {
             return 'zadania '.($this->taskNames[$id] ?? '#'.$id);
         }
 
-        return 'sprintu '.$sprint->name;
+        if ($sprint && $sprint->id) {
+            return 'sprintu '.$sprint->name;
+        }
+
+        return 'wpisu';
     }
 
     private function commentUrl(string $type, ?int $id): ?string

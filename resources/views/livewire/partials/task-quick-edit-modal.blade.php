@@ -1,15 +1,18 @@
 @if($quickEditTaskId)
+    {{-- Teleport poza .card: backdrop-filter na karcie więzi position:fixed
+         i okno ląduje pod kolejnymi sekcjami zamiast na viewportcie. --}}
+    @teleport('body')
     <div
-        class="position-fixed top-0 start-0 w-100 h-100"
-        style="background: rgba(0, 0, 0, 0.4); z-index: 1050;"
+        class="task-qe-overlay"
         wire:click="closeQuickEdit"
+        wire:key="qe-{{ $quickEditTaskId }}-{{ $quickEditField }}-{{ (int) ($quickEditClientX ?? -1) }}-{{ (int) ($quickEditClientY ?? -1) }}"
         x-data="{
             placePanel(el) {
                 if (!el) return;
                 const x = @js($quickEditClientX);
                 const y = @js($quickEditClientY);
                 el.style.position = 'fixed';
-                el.style.zIndex = '1051';
+                el.style.zIndex = '100001';
                 el.style.maxWidth = 'min(420px, calc(100vw - 24px))';
                 if (x === null || y === null) {
                     el.style.left = '50%';
@@ -44,12 +47,12 @@
             }
         }"
         x-init="$nextTick(() => { placePanel($refs.qePanel); focusField($refs.qePanel); })"
-        wire:key="qe-{{ $quickEditTaskId }}-{{ $quickEditField }}-{{ (int) ($quickEditClientX ?? -1) }}-{{ (int) ($quickEditClientY ?? -1) }}"
         x-on:keydown.escape.window="$wire.closeQuickEdit()"
+        role="dialog"
+        aria-modal="true"
     >
         <div
-            class="bg-white rounded shadow p-3"
-            style="width: min(420px, calc(100vw - 24px));"
+            class="task-qe-panel"
             wire:click.stop
             x-ref="qePanel"
         >
@@ -58,6 +61,8 @@
                     Kategoria
                 @elseif($quickEditField === 'assigned_to')
                     Przypisany
+                @elseif($quickEditField === 'sprint_id')
+                    Sprint
                 @else
                     Termin wykonania
                 @endif
@@ -79,6 +84,17 @@
                     </select>
                     @error('qeAssignedTo') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
+            @elseif($quickEditField === 'sprint_id')
+                <div class="mb-3">
+                    <label class="form-label small text-muted mb-1">Wybierz sprint</label>
+                    <select class="form-select form-select-sm" wire:model="qeSprintId" data-quick-focus>
+                        <option value="">Poza sprintem</option>
+                        @foreach(($sprints ?? []) as $sprint)
+                            <option value="{{ $sprint->id }}">{{ $sprint->label() }}</option>
+                        @endforeach
+                    </select>
+                    @error('qeSprintId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                </div>
             @else
                 <div class="mb-3">
                     <label class="form-label small text-muted mb-1">Data</label>
@@ -92,4 +108,5 @@
             </div>
         </div>
     </div>
+    @endteleport
 @endif

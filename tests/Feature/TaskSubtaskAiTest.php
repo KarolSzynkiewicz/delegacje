@@ -45,6 +45,31 @@ class TaskSubtaskAiTest extends TestCase
             ->assertSee('Rozbij na podzadania');
     }
 
+    public function test_subtask_rows_render_quiet_icon_actions(): void
+    {
+        $user = $this->admin();
+        $task = ProjectTask::query()->create([
+            'name' => 'Rekrutacja malarzy',
+            'status' => \App\Enums\TaskStatus::PENDING,
+            'created_by' => $user->id,
+        ]);
+        TaskSubtask::query()->create([
+            'task_id' => $task->id,
+            'name' => 'Rozesłać ogłoszenia',
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TaskSubtasks::class, ['task' => $task])
+            ->assertSee('st-item', false)
+            ->assertSee('st-action', false)
+            ->assertSee('Edytuj podzadanie')
+            ->assertSee('Przypisz osobę')
+            ->assertSee('Usuń podzadanie')
+            ->assertDontSee('form-check-input', false)
+            ->assertDontSee('btn-outline-danger', false);
+    }
+
     public function test_opening_modal_shows_thinking_state_before_the_model_answers(): void
     {
         app(LlmCredentialRepository::class)->store('gemini', 'AIzaTESTKEY1234567890', 'gemini-2.5-flash');

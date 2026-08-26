@@ -13,6 +13,8 @@
                 </x-ui.button>
             </x-slot>
             <x-slot name="right">
+                {{-- Status zwykłego zadania jest w karcie szczegółów — w headerze
+                     tylko typ (procedura / oddzwonienie), żeby nie dublować badge'a. --}}
                 @if($isProcedure && $run)
                     <x-ui.badge variant="accent">Procedura</x-ui.badge>
                     <x-ui.badge variant="{{ $run->status->badgeVariant() }}">{{ $run->status->label() }}</x-ui.badge>
@@ -21,26 +23,18 @@
                     <x-ui.badge variant="{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'success' : 'warning' }}">
                         {{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'Zrobione' : 'Do zrobienia' }}
                     </x-ui.badge>
-                @else
-                    @php
-                        $headerStatusVariant = match($task->status) {
-                            \App\Enums\TaskStatus::PENDING => 'warning',
-                            \App\Enums\TaskStatus::IN_PROGRESS => 'info',
-                            \App\Enums\TaskStatus::COMPLETED => 'success',
-                            \App\Enums\TaskStatus::CANCELLED => 'danger',
-                        };
-                    @endphp
-                    <x-ui.badge variant="{{ $headerStatusVariant }}">{{ $task->status->label() }}</x-ui.badge>
                 @endif
 
-                <x-ui.button
-                    variant="ghost"
-                    href="{{ route('tasks.edit', $task) }}"
-                    routeName="tasks.edit"
-                    action="edit"
-                >
-                    Edytuj
-                </x-ui.button>
+                @if($isProcedure || $isCallback)
+                    <x-ui.button
+                        variant="ghost"
+                        href="{{ route('tasks.edit', $task) }}"
+                        routeName="tasks.edit"
+                        action="edit"
+                    >
+                        Edytuj
+                    </x-ui.button>
+                @endif
 
                 @if($isProcedure && $run && $run->status === \App\Enums\ProcedureRunStatus::IN_PROGRESS)
                     <form action="{{ route('procedure-runs.abandon', $run) }}" method="POST" class="d-inline">

@@ -127,17 +127,48 @@ Local landing surfaces (`--cl-line`, `--cl-surface`) are dark layout
 tokens for 1px-gap grids, not a second identity palette. Module/tile
 hover top-bar uses the same primary→accent gradient as `.card::before`.
 
-## Logo (clock at 4:00)
+## Logo (clock at 4:00) — `x-brand-mark`
 
-`resources/views/components/application-logo.blade.php` + `public/favicon.svg`:
-long hand at 12 = brand gradient, short hand at 4 = `--warning` (`#f59e0b`).
-Each render gets a unique `<linearGradient id>` so nav + footer on the
-landing don't clash. Navbar wordmark: `Chrono` +
-`<span class="navbar-brand-name__accent">Logic</span>` (same gradient as
-page titles), never flat `#a855f7`. Don't merge `class="navbar-logo"`
-onto the SVG root — that 5rem rule is for the in-app navbar wrapper and
-would blow up the landing mark; size landing SVGs with
-`.cl-landing-logo svg`.
+All marks live in one component: `resources/views/components/brand-mark.blade.php`
++ per-variant partials in `resources/views/partials/brand-mark/`. Variants:
+`dial` (plain clock), `aperture` (segmented ring), `bot` (Chrono's face —
+bottom half of the dial doubles as a smile), `monogram` (**current app
+default** — letter C built from the dial, hour hand pointing into the
+opening), `pulse` (dial crossed by an ECG line), `timer` (kitchen-timer knob
++ countdown arc, used by the boot screen). All share a `0 0 40 40` viewBox,
+the brand gradient on the minute hand, `--warning` (`#f59e0b`) on the hour
+hand, and 4:00 as the time. Every render gets a unique `<linearGradient id>`
+so nav + footer on the landing don't clash. Preview grid: `/2`.
+
+Variants whose dial isn't centered (`bot`, `timer`) set their own rotation
+origin via `--cl-mark-pivot`; `.cl-mark__hand` reads it. Add the variable to
+any new off-center variant or its hands will spin around a point next to the
+dial.
+
+`x-application-logo` is a thin wrapper picking the app-wide variant — change
+it there and navbar, landing nav and footer follow. It deliberately does
+**not** pass `$attributes` through: callers hand it `class="navbar-logo"`
+(`height: 5rem`), which would blow the mark up to 80px. Size landing SVGs
+with `.cl-landing-logo svg`. Keep `public/favicon.svg` redrawn to match
+whatever variant is current. Navbar wordmark: `Chrono` +
+`<span class="navbar-brand-name__accent">Logic</span>` (same gradient as page
+titles), never flat `#a855f7`.
+
+## Boot screen (`x-boot-screen`)
+
+Full-screen "Inicjalizacja systemu": breathing mark, orbiting arc, progress
+bar, four steps lighting up green in sequence (~3.5s, CSS-only).
+
+**Trap that caused a visible "reload"**: it originally fired on the login
+form's `submit`, so the POST navigation killed the animation mid-way and the
+destination restarted it. A full-page navigation always destroys a running
+animation — so the sequence plays on the **destination**:
+`AuthenticatedSessionController::store()` flashes `cl_boot`,
+`layouts/app.blade.php` then renders `<x-boot-screen auto />` already visible,
+and `.cl-boot--auto` fades itself out with a delayed CSS animation (not a
+`setTimeout`, which a slow first paint could desync). `window.clShowBootScreen(auto)`
+in `app.js` exists for the `/2` demo; it forces a reflow before re-adding the
+class so the animation can restart.
 
 ## `x-ui.tabs` — strip that wraps, not a row of cards
 

@@ -7989,11 +7989,12 @@ a.rc-chip:hover {
     animation: ac-float 4.5s ease-in-out infinite;
 }
 
-/* Obrót wskazówek liczymy względem osi tarczy w układzie viewBox. */
+/* Obrót wskazówek liczymy względem osi tarczy w układzie viewBox.
+   Każdy wariant ma zegar gdzie indziej, więc oś wjeżdża z --ac-pivot. */
 .ac-bot__hand,
 .ac-bot__scan {
     transform-box: view-box;
-    transform-origin: 36px 36px;
+    transform-origin: var(--ac-pivot, 36px 36px);
 }
 
 .ac-bot__hand--min {
@@ -8254,4 +8255,647 @@ a.rc-chip:hover {
         opacity: 1;
         transform: scale(1);
     }
+}
+
+/* ============================================================
+   Znak marki (x-brand-mark) + ekran inicjalizacji (x-boot-screen)
+   ============================================================ */
+
+.cl-mark {
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.cl-mark__hand {
+    transform-box: view-box;
+    transform-origin: var(--cl-mark-pivot, 20px 20px);
+}
+
+/* Znak w nawigacji budzi się pod kursorem — jeden obrót wskazówki. */
+.cl-landing-logo:hover .cl-mark__hand--min,
+.navbar-brand:hover .cl-mark__hand--min {
+    animation: cl-mark-spin 1.6s cubic-bezier(.5, 0, .2, 1);
+}
+
+.cl-landing-logo:hover .cl-mark__countdown,
+.navbar-brand:hover .cl-mark__countdown {
+    stroke-dasharray: 32.5;
+    animation: cl-boot-count 1.6s cubic-bezier(.5, 0, .2, 1);
+}
+
+@keyframes cl-mark-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes cl-boot-count {
+    from { stroke-dashoffset: 32.5; }
+    to   { stroke-dashoffset: 0; }
+}
+
+/* ── Ekran inicjalizacji ─────────────────────────────────── */
+
+.cl-boot {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: none;
+    background:
+        radial-gradient(circle at 50% 38%, rgba(59, 130, 246, .14), transparent 55%),
+        radial-gradient(circle at 50% 95%, rgba(168, 85, 247, .12), transparent 60%),
+        var(--bg-body, #070a13);
+}
+
+.cl-boot--on {
+    display: grid;
+    place-items: center;
+    animation: cl-boot-in .28s ease both;
+}
+
+/* Tryb auto — cała sekwencja dogrywa się do końca i gaśnie sama.
+   Wygaszanie siedzi w CSS, a nie w setTimeout, więc nic jej nie ucina. */
+.cl-boot--auto {
+    animation:
+        cl-boot-in .28s ease both,
+        cl-boot-out .5s ease 3.5s forwards;
+}
+
+/* Skoro animacja faktycznie dobiega końca, pasek ma prawo dojść do 100%. */
+.cl-boot--auto .cl-boot__bar span {
+    animation: cl-boot-fill-done 3.3s cubic-bezier(.2, .8, .2, 1) forwards;
+}
+
+/* Siatka jako background-image (nie backdrop-filter) — tanie i nie tworzy
+   containing blocka dla elementów fixed pod spodem. */
+.cl-boot__grid {
+    position: absolute;
+    inset: 0;
+    contain: strict;
+    pointer-events: none;
+    opacity: .5;
+    background-image:
+        linear-gradient(rgba(148, 163, 184, .06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, .06) 1px, transparent 1px);
+    background-size: 44px 44px;
+}
+
+.cl-boot__inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem;
+    width: min(420px, calc(100vw - 32px));
+    text-align: center;
+}
+
+.cl-boot__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 132px;
+    height: 132px;
+    margin-bottom: .85rem;
+}
+
+.cl-boot__mark .cl-mark {
+    animation: cl-boot-breathe 2.6s ease-in-out infinite;
+}
+
+.cl-boot__mark .cl-mark__hand--min {
+    animation: cl-mark-spin 1.15s linear infinite;
+}
+
+.cl-boot__mark .cl-mark__hand--hour {
+    animation: cl-mark-spin 7s linear infinite;
+}
+
+.cl-boot__mark .cl-mark__pulse {
+    stroke-dasharray: 18 60;
+    animation: cl-boot-trace 1.4s linear infinite;
+}
+
+/* Łuk minutnika ma długość ~32.5 px (r 15.5 × 120°). */
+.cl-boot__mark .cl-mark__countdown {
+    stroke-dasharray: 32.5;
+    animation: cl-boot-count 1.15s linear infinite;
+}
+
+/* Orbita: jeden gradientowy łuk krążący wokół znaku. */
+.cl-boot__orbit {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--primary, #3b82f6);
+    border-right-color: var(--accent, #a855f7);
+    animation: cl-mark-spin 1.5s linear infinite;
+}
+
+.cl-boot__word {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+}
+
+.cl-boot__word span {
+    background: linear-gradient(135deg, var(--primary, #3b82f6), var(--accent, #a855f7));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.cl-boot__tagline {
+    margin: .15rem 0 1.35rem;
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-muted, #94a3b8);
+}
+
+.cl-boot__bar {
+    width: 100%;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, .14);
+    overflow: hidden;
+}
+
+.cl-boot__bar span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--primary, #3b82f6), var(--accent, #a855f7));
+    animation: cl-boot-fill 3.2s cubic-bezier(.2, .8, .2, 1) forwards;
+}
+
+.cl-boot__steps {
+    list-style: none;
+    margin: 1.1rem 0 0;
+    padding: 0;
+    width: 100%;
+    font-size: .76rem;
+    text-align: left;
+}
+
+.cl-boot__steps li {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .22rem 0;
+    color: var(--text-muted, #94a3b8);
+    opacity: 0;
+    transform: translateY(4px);
+    animation: cl-boot-step .4s ease forwards;
+}
+
+.cl-boot__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(148, 163, 184, .35);
+    animation: cl-boot-dot .5s ease forwards;
+}
+
+.cl-boot__steps li:nth-child(1),
+.cl-boot__steps li:nth-child(1) .cl-boot__dot { animation-delay: .2s; }
+.cl-boot__steps li:nth-child(2),
+.cl-boot__steps li:nth-child(2) .cl-boot__dot { animation-delay: .85s; }
+.cl-boot__steps li:nth-child(3),
+.cl-boot__steps li:nth-child(3) .cl-boot__dot { animation-delay: 1.6s; }
+.cl-boot__steps li:nth-child(4),
+.cl-boot__steps li:nth-child(4) .cl-boot__dot { animation-delay: 2.35s; }
+
+@keyframes cl-boot-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes cl-boot-breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.05); }
+}
+
+@keyframes cl-boot-trace {
+    to { stroke-dashoffset: -78; }
+}
+
+@keyframes cl-boot-fill {
+    0%   { width: 0; }
+    55%  { width: 68%; }
+    100% { width: 93%; }
+}
+
+@keyframes cl-boot-fill-done {
+    0%   { width: 0; }
+    55%  { width: 68%; }
+    100% { width: 100%; }
+}
+
+@keyframes cl-boot-out {
+    to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes cl-boot-step {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cl-boot-dot {
+    to {
+        background: var(--success, #10b981);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, .16);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-boot *,
+    .cl-boot__orbit,
+    .cl-boot__mark .cl-mark {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    .cl-boot__bar span { width: 93%; }
+    .cl-boot__steps li { opacity: 1; transform: none; }
+
+    /* Nie ma czego oglądać — pokaż stan końcowy i zejdź z drogi. */
+    .cl-boot--auto {
+        animation: cl-boot-out .01ms linear .8s forwards !important;
+    }
+}
+
+/* ============================================================
+   Karta podzadań (livewire/task-subtasks)
+   ============================================================ */
+
+.st-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .85rem;
+}
+
+.st-head__title {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-width: 0;
+}
+
+.st-head__title .card-label {
+    margin-bottom: 0;
+}
+
+.st-head__count {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: .72rem;
+    color: var(--text-muted);
+    padding: .1rem .5rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+}
+
+.st-hint {
+    padding: 0;
+    border: 0;
+    background: none;
+    line-height: 1;
+    font-size: .82rem;
+    color: var(--text-muted);
+    cursor: help;
+}
+
+.st-hint:hover {
+    color: var(--primary);
+}
+
+.st-progress {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    margin-bottom: 1.15rem;
+}
+
+.st-progress .progress-ui {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.st-progress__pct {
+    flex-shrink: 0;
+    min-width: 2.75rem;
+    text-align: right;
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.st-add {
+    margin-bottom: 1.35rem;
+}
+
+.st-section + .st-section {
+    margin-top: 1.35rem;
+}
+
+.st-section__head {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    margin: 0 0 .2rem;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.st-section__count {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.st-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.st-item {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .5rem .6rem;
+    margin: 0 -.6rem;
+    border-radius: 10px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.st-item:last-child {
+    border-bottom: 0;
+}
+
+.st-item:hover {
+    background: rgba(148, 163, 184, .06);
+}
+
+.st-item--done {
+    opacity: .62;
+}
+
+.st-item__num,
+.st-item__meta {
+    flex-shrink: 0;
+}
+
+/* Treść wiersza: nazwa + przypisany zawsze pod spodem (nie obok). */
+.st-item__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .25rem;
+}
+
+.st-item__assignee {
+    max-width: 100%;
+}
+
+.st-item__assignee .fw-semibold,
+.st-item__assignee .small {
+    font-size: .78rem;
+}
+
+/* Nazwa podzadania = klik = toggle (bez checkboxa) */
+.st-item__name {
+    flex: 0 1 auto;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    line-height: 1.4;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.st-item--done .st-item__name {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.st-item__name:hover {
+    color: var(--primary);
+}
+
+.st-item__name:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.st-item__meta {
+    font-size: .8rem;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: help;
+}
+
+/* Edycja i usuwanie są tak samo ciche jak ikonka informacji — treść wiersza
+   ma być głośniejsza niż jego obsługa. Na dotyku brak :hover, więc widoczne.
+   pointer-events:none gdy ukryte — inaczej niewidoczne ikony łapały klik
+   i jednocześnie „przebijał” do toggle nazwy. */
+.st-item__actions {
+    display: flex;
+    align-items: center;
+    gap: .15rem;
+    flex-shrink: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
+}
+
+.st-item:hover .st-item__actions,
+.st-item:focus-within .st-item__actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: none) {
+    .st-item__actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+.st-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: .85rem;
+    line-height: 1;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.st-action:hover {
+    background: rgba(59, 130, 246, .16);
+    color: var(--primary);
+}
+
+.st-action--danger:hover {
+    background: rgba(239, 68, 68, .16);
+    color: var(--danger);
+}
+
+.st-action:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+}
+
+/* Wiersz z polem tekstowym — edycja podzadania i propozycje AskChrono.
+   Tu przyciski to decyzja do podjęcia, więc mają prawo być głośne. */
+.st-item--editing,
+.st-item--input {
+    align-items: flex-start;
+}
+
+/* Podświetlenie tylko przy edycji istniejącego wiersza — w modalu AskChrono
+   wszystkie wiersze są polami, więc tło na każdym byłoby ścianą koloru. */
+.st-item--editing {
+    background: rgba(59, 130, 246, .07);
+}
+
+.st-item--editing .st-item__num,
+.st-item--input .st-item__num {
+    margin-top: .3rem;
+}
+
+.st-item--editing .st-item__actions,
+.st-item--input .st-item__actions {
+    opacity: 1;
+    pointer-events: auto;
+    gap: .4rem;
+    margin-top: .05rem;
+}
+
+.st-item__editor {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 575.98px) {
+    .st-item--editing,
+    .st-item--input {
+        flex-wrap: wrap;
+    }
+
+    .st-item--editing .st-item__editor,
+    .st-item--input .st-item__editor {
+        flex-basis: 100%;
+    }
+}
+
+/* Narzędzia w nagłówku podzadań: akcje + AskChrono w jednej linii */
+.st-head__tools {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.st-head__actions .task-actions__btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+.st-head__actions .task-actions__btn i {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* AskChrono i akcje w jednym rytmie wysokości */
+.st-head .ac-trigger {
+    min-height: 36px;
+}
+
+/* AskChrono na wąskim ekranie: sam bot, bez podpisu */
+@media (max-width: 767.98px) {
+    .st-head .ac-trigger {
+        padding: .3rem;
+        border-radius: 999px;
+        width: 36px;
+        height: 36px;
+        justify-content: center;
+    }
+}
+
+/* Podgląd zadania: szersza kolumna etykiet („Przypisany” nie wychodzi poza linię) */
+.task-show-meta .dt-card__row {
+    grid-template-columns: 7.75rem 1fr;
+}
+
+/* Ikony meta (kategoria, sprint, puste stany) = ten sam gabaryt co avatar 28px */
+.task-meta-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 1.15rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Opis zadania — ten sam composer co dziennik, trochę wyższy */
+.task-desc-composer .comments-composer-input {
+    min-height: 7.5rem;
+}
+.task-desc-composer .comments-composer-files {
+    color: var(--text-muted);
+}
+
+/* Szybka edycja zadania — overlay poza kartą (teleport body) */
+.task-qe-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.task-qe-panel {
+    width: min(420px, calc(100vw - 24px));
+    padding: 1rem;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-card, #0d1424);
+    color: var(--text-main);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.task-qe-panel .form-label,
+.task-qe-panel h6 {
+    color: var(--text-main);
 }
