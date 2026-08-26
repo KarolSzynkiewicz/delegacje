@@ -17,6 +17,12 @@
             <div class="pe-sep"></div>
             <button class="pe-btn" id="btnUndo" title="Cofnij (Ctrl+Z)" disabled><i class="bi bi-arrow-counterclockwise"></i></button>
             <button class="pe-btn" id="btnRedo" title="Ponów (Ctrl+Y)" disabled><i class="bi bi-arrow-clockwise"></i></button>
+            @if($chronoEnabled)
+                <div class="pe-sep"></div>
+                <button class="pe-btn" id="btnChrono" title="AskChrono — zaproponuj przepływ na podstawie nazwy, kategorii i opisu">
+                    <x-ask-chrono-bot :size="20" /> Chrono
+                </button>
+            @endif
             <div class="pe-toolbar-spacer"></div>
             <span class="pe-zoom-indicator" id="zoomIndicator">100%</span>
             <button class="pe-btn pe-btn-primary" id="btnSave" title="Zapisz (Ctrl+S)"><i class="bi bi-save"></i> Zapisz</button>
@@ -83,6 +89,8 @@
         saveUrl:  "{{ route('procedure-templates.update', $template) }}",
         csrfToken: "{{ csrf_token() }}",
         indexUrl: "{{ route('procedure-templates.index') }}",
+        chronoUrl: @json($chronoEnabled ? route('procedure-templates.chrono-flow', $template) : null),
+        chronoProposal: @json($chronoProposal),
     };
     </script>
     <script src="{{ asset('js/procedure-editor.js') }}"></script>

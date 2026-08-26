@@ -199,6 +199,56 @@ async function saveToServer(){
   }
 }
 
+/* ── 7b. ASKCHRONO — propozycja przepływu jako niezapisany szkic ───── */
+function applyProposal(definition, note){
+  if(!definition || !Array.isArray(definition.nodes) || !definition.nodes.length) return false;
+
+  pushUndo();
+  state.currentProcess.nodes = definition.nodes;
+  state.currentProcess.edges = Array.isArray(definition.edges) ? definition.edges : [];
+  state.selection = null;
+  markDirty();
+  renderCanvas(); renderProperties(); renderBottomPanel(); updateUndoRedoButtons();
+  plog(note, 'success');
+  toast(note, 'success');
+  return true;
+}
+
+function proposalIsUnsavedDraft(){
+  // Świeżo utworzony szablon ma tylko domyślny Start → Koniec.
+  return state.currentProcess.nodes.every(n => n.type === 'start' || n.type === 'end');
+}
+
+async function requestChronoFlow(){
+  const cfg = window.ProcedureEditorData;
+  if(!cfg || !cfg.chronoUrl) return;
+
+  if(!proposalIsUnsavedDraft() && !confirm('Chrono zastąpi bieżący przepływ nową propozycją. Kontynuować? (możesz cofnąć przez Ctrl+Z)')) return;
+
+  const btn = document.getElementById('btnChrono');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Myślę…';
+
+  try{
+    const res = await fetch(cfg.chronoUrl, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': cfg.csrfToken, 'Accept':'application/json' },
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if(!res.ok) throw new Error(data.message || 'Model nie zwrócił propozycji.');
+
+    applyProposal(data.definition, `Chrono zaproponował ${data.steps} kroków — sprawdź i zapisz.`);
+  } catch(e){
+    toast('✕ ' + e.message, 'danger');
+    plog('AskChrono: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
 /* ── 8. RENDER: TOOLBAR ────────────────────────────────────────────── */
 function renderToolbar(){
   const input = document.getElementById('procNameInput');
@@ -712,6 +762,7 @@ function initEditor(){
     state.currentProcess.name = this.value; markDirty();
   });
   document.getElementById('btnSave').addEventListener('click', saveToServer);
+  document.getElementById('btnChrono')?.addEventListener('click', requestChronoFlow);
   document.getElementById('btnUndo').addEventListener('click', undo);
   document.getElementById('btnRedo').addEventListener('click', redo);
   document.getElementById('btnBack').addEventListener('click', ()=>{
@@ -735,6 +786,11 @@ function initEditor(){
 
   plog('Edytor procedury załadowany.', 'success');
   clearDirty();
+
+  // Propozycja z „Stwórz z Chrono": leży na canvasie, do bazy trafia dopiero po Zapisz.
+  if(cfg.chronoProposal){
+    applyProposal(cfg.chronoProposal, 'Propozycja Chrono — sprawdź przepływ i kliknij Zapisz.');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initEditor);

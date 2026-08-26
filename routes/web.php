@@ -219,6 +219,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             Route::get('procedure-templates/{procedureTemplate}/editor',
                 [\App\Http\Controllers\ProcedureTemplateController::class, 'editor'])
                 ->name('procedure-templates.editor');
+            Route::post('procedure-templates/{procedureTemplate}/chrono-flow',
+                [\App\Http\Controllers\ProcedureTemplateController::class, 'chronoFlow'])
+                ->name('procedure-templates.chrono-flow');
         });
         Route::group(['defaults' => ['resource' => 'procedure-runs']], function () {
             Route::post('procedure-templates/{procedureTemplate}/runs',

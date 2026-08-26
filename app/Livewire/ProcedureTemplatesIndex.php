@@ -2,9 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Contracts\Llm\LlmClient;
 use App\Enums\ProcedureSubjectType;
+use App\Exceptions\LlmException;
 use App\Models\ProcedureTemplate;
 use App\Models\User;
+use App\Services\Llm\ProcedureFlowSuggestionService;
 use App\Services\ProcedureRunService;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -43,6 +46,13 @@ class ProcedureTemplatesIndex extends Component
     public string $newSubjectType = '';
 
     public string $newDescription = '';
+
+    // Chrono: ekran pracy bota; propozycja ląduje w edytorze jako niezapisany szkic
+    public bool $showChronoModal = false;
+
+    public bool $chronoLoading = false;
+
+    public ?string $chronoError = null;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -156,10 +166,84 @@ class ProcedureTemplatesIndex extends Component
         $this->newSubjectType = '';
         $this->newDescription = '';
         $this->showNewModal = true;
+        $this->showChronoModal = false;
+        $this->chronoLoading = false;
+        $this->chronoError = null;
         $this->resetErrorBag();
     }
 
     public function createTemplate(): mixed
+    {
+        $this->validateNewTemplate();
+
+        return $this->storeTemplate(['nodes' => [], 'edges' => []], 'Szablon "%s" został utworzony.');
+    }
+
+    /**
+     * Otwiera okno Chrono od razu, jeszcze przed odpytaniem modelu —
+     * użytkownik widzi pracującego bota zamiast zamrożonego przycisku.
+     */
+    public function openChronoModal(): void
+    {
+        $this->validateNewTemplate();
+
+        $this->chronoError = null;
+        $this->showNewModal = false;
+        $this->showChronoModal = true;
+        $this->chronoLoading = true;
+    }
+
+    /**
+     * Tworzy szablon i przekazuje propozycję do edytora jako niezapisany szkic —
+     * zatwierdzeniem jest kliknięcie „Zapisz" na canvasie, odrzuceniem wyjście z edytora.
+     */
+    public function fetchChronoFlow(ProcedureFlowSuggestionService $service): mixed
+    {
+        // Alpine odpala to raz po wyrenderowaniu okna; flaga chroni przed
+        // powtórnym strzałem, gdyby Livewire przemorfował ten węzeł.
+        if (! $this->chronoLoading) {
+            return null;
+        }
+
+        try {
+            $steps = $service->suggest([
+                'name' => $this->newName,
+                'category' => $this->newCategory ?: null,
+                'subject_type' => $this->newSubjectType ?: null,
+                'description' => $this->newDescription ?: null,
+            ]);
+        } catch (LlmException $e) {
+            $this->chronoError = $e->getMessage();
+            $this->chronoLoading = false;
+
+            return null;
+        } catch (\Throwable $e) {
+            $this->chronoError = 'Nie udało się uzyskać propozycji od modelu: '.$e->getMessage();
+            $this->chronoLoading = false;
+
+            return null;
+        }
+
+        $this->chronoLoading = false;
+        $this->showChronoModal = false;
+
+        return $this->storeTemplate(
+            ['nodes' => [], 'edges' => []],
+            'Chrono zaproponował przepływ dla "%s" — sprawdź go i kliknij Zapisz.',
+            $service->buildDefinition($steps),
+        );
+    }
+
+    /** Zamknięcie okna wraca do formularza — dane z modalu nie znikają. */
+    public function closeChronoModal(): void
+    {
+        $this->showChronoModal = false;
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->showNewModal = true;
+    }
+
+    private function validateNewTemplate(): void
     {
         $this->validate([
             'newName' => ['required', 'string', 'max:255'],
@@ -172,20 +256,29 @@ class ProcedureTemplatesIndex extends Component
             'newSubjectType' => 'dotyczy',
             'newDescription' => 'opis',
         ]);
+    }
 
+    /**
+     * @param  array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>}  $definition
+     * @param  array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>}|null  $proposal  szkic wrzucany na canvas bez zapisu
+     */
+    private function storeTemplate(array $definition, string $message, ?array $proposal = null): mixed
+    {
         $template = ProcedureTemplate::create([
             'name' => $this->newName,
             'category' => $this->newCategory ?: null,
             'subject_type' => $this->newSubjectType ?: null,
             'description' => $this->newDescription ?: null,
-            'definition' => ['nodes' => [], 'edges' => []],
+            'definition' => $definition,
             'created_by' => auth()->id(),
         ]);
 
         $this->showNewModal = false;
 
-        return redirect()->route('procedure-templates.editor', $template)
-            ->with('success', 'Szablon "'.$template->name.'" został utworzony.');
+        $redirect = redirect()->route('procedure-templates.editor', $template)
+            ->with('success', sprintf($message, $template->name));
+
+        return $proposal === null ? $redirect : $redirect->with('chrono_proposal', $proposal);
     }
 
     public function deleteTemplate(int $templateId): void
@@ -238,6 +331,7 @@ class ProcedureTemplatesIndex extends Component
             'categories' => $categories,
             'users' => $users,
             'subjectTypes' => ProcedureSubjectType::formOptions(),
+            'llmConfigured' => app(LlmClient::class)->isConfigured(),
             'startSubjectOptions' => $this->startSubjectOptions(),
             'startSubjectTypeLabel' => $this->startSubjectTypeLabel(),
         ]);

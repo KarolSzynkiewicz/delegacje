@@ -31,27 +31,7 @@
                 @endif
 
                 @if($canSuggestWithAi && $llmConfigured)
-                    <button
-                        type="button"
-                        class="ac-trigger"
-                        wire:click="openAiModal"
-                        wire:loading.attr="disabled"
-                        wire:target="openAiModal"
-                        title="AskChrono — rozbij na podzadania"
-                    >
-                        <x-ask-chrono-bot
-                            :size="36"
-                            wire:loading.class="ac-bot--thinking"
-                            wire:target="openAiModal"
-                        />
-                        <span class="ac-trigger__text d-none d-md-flex">
-                            <span class="ac-trigger__name">AskChrono</span>
-                            <span class="ac-trigger__hint">
-                                <span wire:loading.remove wire:target="openAiModal">Rozbij na podzadania</span>
-                                <span wire:loading wire:target="openAiModal">Budzę bota… </span>
-                            </span>
-                        </span>
-                    </button>
+                    <x-chrono.trigger target="openAiModal" hint="Rozbij na podzadania" />
                 @endif
             </div>
         </div>
@@ -131,141 +111,80 @@
     </x-ui.card>
 
     @if($showAiModal)
-        @teleport('body')
-        <div
-            class="modal fade show d-block"
-            tabindex="-1"
-            role="dialog"
-            aria-modal="true"
-            style="background:rgba(0,0,0,.75);z-index:2000;"
-            wire:click.self="closeAiModal"
-            wire:key="task-subtasks-ai-modal"
+        <x-chrono.modal
+            key="task-subtasks-ai"
+            close="closeAiModal"
+            fetch="fetchAiProposals"
+            :loading="$aiLoading"
+            :error="$aiError"
+            :ready="$aiProposals !== []"
+            status-loading="Czytam zadanie i układam kroki…"
+            :status-ready="'Mam '.count($aiProposals).' propozycji — sprawdź i zatwierdź'"
+            thinking="Chrono analizuje nazwę i opis zadania, a potem proponuje kroki."
+            lead="Propozycje powstały na podstawie nazwy i opisu zadania. Możesz je poprawić przed zatwierdzeniem — nic nie trafi do bazy bez Twojej decyzji."
         >
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content" style="background:var(--bg-card,#1e2535);border:1px solid var(--glass-border,rgba(255,255,255,.1));color:var(--text-main,#f1f5f9);">
-                    <div class="modal-header" style="border-color:var(--glass-border);">
-                        <div class="d-flex align-items-center gap-3">
-                            <x-ask-chrono-bot
-                                :size="54"
-                                :state="$aiLoading ? 'thinking' : ($aiProposals !== [] ? 'done' : 'idle')"
-                            />
-                            <div>
-                                <h5 class="modal-title ac-modal__title mb-0">AskChrono</h5>
-                                <span class="ac-modal__status">
-                                    @if($aiLoading)
-                                        Czytam zadanie i układam kroki…
-                                    @elseif($aiError)
-                                        Nie udało się przygotować propozycji
-                                    @elseif($aiProposals !== [])
-                                        Mam {{ count($aiProposals) }} propozycji — sprawdź i zatwierdź
-                                    @else
-                                        Gotowy do pracy
-                                    @endif
-                                </span>
-                            </div>
+            <h6 class="st-section__head">
+                <i class="bi bi-circle"></i>
+                <span>Do zatwierdzenia</span>
+                <span class="st-section__count">{{ count($aiProposals) }}</span>
+            </h6>
+
+            <ul class="st-list">
+                @foreach($aiProposals as $index => $proposal)
+                    <li class="st-item st-item--input" wire:key="ai-proposal-{{ $index }}">
+                        <input
+                            type="checkbox"
+                            class="form-check-input st-item__check flex-shrink-0"
+                            value="{{ $index }}"
+                            wire:model="aiSelected"
+                            title="Zaznacz do zatwierdzenia"
+                            aria-label="Zaznacz propozycję #{{ $index + 1 }}"
+                        >
+
+                        <span class="badge badge-secondary subtask-num st-item__num">#{{ $index + 1 }}</span>
+
+                        <div class="st-item__editor">
+                            <input
+                                type="text"
+                                class="form-control form-control-sm"
+                                wire:model.defer="aiProposals.{{ $index }}"
+                            >
                         </div>
-                        <button type="button" class="btn-close btn-close-white" wire:click="closeAiModal"></button>
-                    </div>
 
-                    <div class="modal-body">
-                        @if($aiLoading)
-                            <div class="ac-thinking" wire:key="ai-thinking" x-data="{}" x-init="$wire.fetchAiProposals()">
-                                <div class="ac-thinking__bars">
-                                    <span></span><span></span><span></span>
-                                </div>
-                                <p class="ac-thinking__text mb-0">
-                                    Chrono analizuje nazwę i opis zadania, a potem proponuje kroki.
-                                </p>
-                            </div>
-                        @endif
-
-                        @if(! $aiLoading)
-                            <p class="text-muted small mb-3">
-                                Propozycje powstały na podstawie nazwy i opisu zadania.
-                                Możesz je poprawić przed zatwierdzeniem — nic nie trafi do bazy bez Twojej decyzji.
-                            </p>
-                        @endif
-
-                        @if($aiError)
-                            <x-ui.alert variant="danger" class="mb-3">{{ $aiError }}</x-ui.alert>
-                        @endif
-
-                        @if(! $aiLoading && $aiProposals !== [])
-                            <h6 class="st-section__head">
-                                <i class="bi bi-circle"></i>
-                                <span>Do zatwierdzenia</span>
-                                <span class="st-section__count">{{ count($aiProposals) }}</span>
-                            </h6>
-
-                            <ul class="st-list">
-                                @foreach($aiProposals as $index => $proposal)
-                                    <li class="st-item st-item--input" wire:key="ai-proposal-{{ $index }}">
-                                        <input
-                                            type="checkbox"
-                                            class="form-check-input st-item__check flex-shrink-0"
-                                            value="{{ $index }}"
-                                            wire:model="aiSelected"
-                                            title="Zaznacz do zatwierdzenia"
-                                            aria-label="Zaznacz propozycję #{{ $index + 1 }}"
-                                        >
-
-                                        <span class="badge badge-secondary subtask-num st-item__num">#{{ $index + 1 }}</span>
-
-                                        <div class="st-item__editor">
-                                            <input
-                                                type="text"
-                                                class="form-control form-control-sm"
-                                                wire:model.defer="aiProposals.{{ $index }}"
-                                            >
-                                        </div>
-
-                                        <div class="st-item__actions">
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-success"
-                                                wire:click="confirmAiProposal({{ $index }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="confirmAiProposal({{ $index }})"
-                                            >
-                                                Zatwierdź
-                                            </button>
-                                        </div>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @elseif(! $aiLoading && ! $aiError)
-                            <x-ui.empty-state icon="robot" message="Brak propozycji do wyświetlenia." />
-                        @endif
-                    </div>
-
-                    <div class="modal-footer" style="border-color:var(--glass-border);">
-                        @if(! $aiLoading && $aiProposals !== [])
-                            <button type="button" class="btn btn-outline-secondary" wire:click="closeAiModal">
-                                Anuluj
-                            </button>
+                        <div class="st-item__actions">
                             <button
                                 type="button"
-                                class="btn btn-primary"
-                                wire:click="confirmSelectedAiProposals"
+                                class="btn btn-sm btn-outline-success"
+                                wire:click="confirmAiProposal({{ $index }})"
                                 wire:loading.attr="disabled"
-                                wire:target="confirmSelectedAiProposals"
-                                @disabled(count($aiSelected) === 0)
+                                wire:target="confirmAiProposal({{ $index }})"
                             >
-                                Zatwierdź wybrane
-                                @if(count($aiSelected) > 0)
-                                    ({{ count($aiSelected) }})
-                                @endif
+                                Zatwierdź
                             </button>
-                        @else
-                            <button type="button" class="btn btn-outline-secondary" wire:click="closeAiModal">
-                                Zamknij
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-        @endteleport
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+
+            <x-slot:footer>
+                <button type="button" class="btn btn-outline-secondary" wire:click="closeAiModal">
+                    Anuluj
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    wire:click="confirmSelectedAiProposals"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmSelectedAiProposals"
+                    @disabled(count($aiSelected) === 0)
+                >
+                    Zatwierdź wybrane
+                    @if(count($aiSelected) > 0)
+                        ({{ count($aiSelected) }})
+                    @endif
+                </button>
+            </x-slot:footer>
+        </x-chrono.modal>
     @endif
 
 </div>

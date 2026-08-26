@@ -8238,6 +8238,76 @@ a.rc-chip:hover {
     100% { background-position: 0 50%; }
 }
 
+/* ── Propozycje kroków do zatwierdzenia ──────────────────── */
+
+.ac-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.ac-step {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+    padding: .65rem .75rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    background: rgba(148, 163, 184, .04);
+}
+
+.ac-step__body {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.ac-step__head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .7rem;
+    color: var(--text-muted);
+}
+
+.ac-step__num {
+    font-weight: 600;
+}
+
+.ac-step__type {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .1rem .45rem;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.ac-step__desc {
+    font-size: .78rem;
+    color: var(--text-muted);
+}
+
+.ac-step__points {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: .76rem;
+    color: var(--text-muted);
+}
+
+.ac-step__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .ac-bot__svg,
     .ac-bot__svg *,

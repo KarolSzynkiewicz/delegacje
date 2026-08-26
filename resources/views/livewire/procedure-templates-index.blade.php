@@ -245,14 +245,42 @@
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer" style="border-color:var(--glass-border)!important;">
-                        <x-ui.button variant="ghost" class="btn-sm" wire:click="$set('showNewModal',false)">Anuluj</x-ui.button>
-                        <x-ui.button variant="primary" class="btn-sm" wire:click="createTemplate">
-                            <i class="bi bi-pencil-square me-1"></i> Utwórz i otwórz edytor
-                        </x-ui.button>
+                    <div class="modal-footer d-flex flex-wrap justify-content-between gap-2" style="border-color:var(--glass-border)!important;">
+                        @if($llmConfigured)
+                            <x-chrono.trigger
+                                target="openChronoModal"
+                                hint="Zaproponuj przepływ"
+                                hint-loading="Budzę bota…"
+                            />
+                        @else
+                            <span></span>
+                        @endif
+
+                        <div class="d-flex gap-2">
+                            <x-ui.button variant="ghost" class="btn-sm" wire:click="$set('showNewModal',false)">Anuluj</x-ui.button>
+                            <x-ui.button variant="primary" class="btn-sm" wire:click="createTemplate">
+                                <i class="bi bi-pencil-square me-1"></i> Utwórz i otwórz edytor
+                            </x-ui.button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+    @endif
+
+    {{-- ===== Chrono projektuje przepływ; zatwierdzenie dzieje się w edytorze ===== --}}
+    @if($showChronoModal)
+        <x-chrono.modal
+            key="procedure-chrono"
+            close="closeChronoModal"
+            fetch="fetchChronoFlow"
+            :loading="$chronoLoading"
+            :error="$chronoError"
+            title="AskChrono — przepływ procedury"
+            status-loading="Projektuję kroki procedury…"
+            thinking="Chrono czyta nazwę, kategorię, typ encji i opis, a potem układa kroki. Za chwilę zobaczysz je na canvasie — nic nie zapisze się bez Twojego kliknięcia."
+            empty-message="Wróć do formularza i doprecyzuj opis procedury."
+            dialog-class="modal-dialog-centered"
+        />
     @endif
 </div>

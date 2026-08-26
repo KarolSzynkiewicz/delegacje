@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\Llm\LlmClient;
 use App\Enums\ProcedureSubjectType;
+use App\Exceptions\LlmException;
 use App\Models\ProcedureTemplate;
 use App\Models\User;
+use App\Services\Llm\ProcedureFlowSuggestionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,6 +55,28 @@ class ProcedureTemplateController extends Controller
                 ->get(['id', 'name'])
                 ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
                 ->values(),
+            'chronoProposal' => session('chrono_proposal'),
+            'chronoEnabled' => app(LlmClient::class)->isConfigured(),
+        ]);
+    }
+
+    /** Propozycja przepływu dla otwartego szablonu — trafia na canvas jako niezapisany szkic. */
+    public function chronoFlow(ProcedureTemplate $procedureTemplate, ProcedureFlowSuggestionService $service): JsonResponse
+    {
+        try {
+            $steps = $service->suggest([
+                'name' => $procedureTemplate->name,
+                'category' => $procedureTemplate->category,
+                'subject_type' => $procedureTemplate->subject_type,
+                'description' => $procedureTemplate->description,
+            ]);
+        } catch (LlmException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'definition' => $service->buildDefinition($steps),
+            'steps' => count($steps),
         ]);
     }
 
