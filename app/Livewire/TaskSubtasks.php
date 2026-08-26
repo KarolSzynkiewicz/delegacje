@@ -36,6 +36,9 @@ class TaskSubtasks extends Component
     /** @var list<string> */
     public array $aiProposals = [];
 
+    /** Indeksy zaznaczonych propozycji (domyślnie wszystkie). @var list<int|string> */
+    public array $aiSelected = [];
+
     public function mount(ProjectTask $task): void
     {
         $this->task = ProjectTask::with('subtasks')->findOrFail($task->id);
@@ -79,7 +82,7 @@ class TaskSubtasks extends Component
     public function openAiModal(): void
     {
         $this->authorizeTaskUpdate();
-        $this->reset(['aiError', 'aiProposals']);
+        $this->reset(['aiError', 'aiProposals', 'aiSelected']);
         $this->showAiModal = true;
         $this->aiLoading = true;
     }
@@ -97,12 +100,15 @@ class TaskSubtasks extends Component
         try {
             $this->aiProposals = app(SubtaskSuggestionService::class)
                 ->suggest(ProjectTask::query()->with('subtasks')->findOrFail($this->task->id));
+            $this->aiSelected = array_keys($this->aiProposals);
         } catch (LlmException $e) {
             $this->aiError = $e->getMessage();
             $this->aiProposals = [];
+            $this->aiSelected = [];
         } catch (\Throwable $e) {
             $this->aiError = 'Nie udało się uzyskać propozycji od modelu: '.$e->getMessage();
             $this->aiProposals = [];
+            $this->aiSelected = [];
         } finally {
             $this->aiLoading = false;
         }
@@ -111,7 +117,7 @@ class TaskSubtasks extends Component
     public function closeAiModal(): void
     {
         $this->showAiModal = false;
-        $this->reset(['aiError', 'aiProposals', 'aiLoading']);
+        $this->reset(['aiError', 'aiProposals', 'aiSelected', 'aiLoading']);
     }
 
     public function confirmAiProposal(int $index): void
@@ -133,6 +139,7 @@ class TaskSubtasks extends Component
         $this->createSubtaskFromAi($name);
         unset($this->aiProposals[$index]);
         $this->aiProposals = array_values($this->aiProposals);
+        $this->aiSelected = array_keys($this->aiProposals);
         $this->aiError = null;
 
         if ($this->aiProposals === []) {
@@ -140,18 +147,25 @@ class TaskSubtasks extends Component
         }
     }
 
-    public function confirmAllAiProposals(): void
+    public function confirmSelectedAiProposals(): void
     {
         $this->authorizeTaskUpdate();
 
-        $names = collect($this->aiProposals)
-            ->map(fn (string $name) => trim($name))
+        $selectedIndexes = collect($this->aiSelected)
+            ->map(fn ($index) => (int) $index)
+            ->unique()
+            ->filter(fn (int $index) => isset($this->aiProposals[$index]))
+            ->sort()
+            ->values();
+
+        $names = $selectedIndexes
+            ->map(fn (int $index) => trim($this->aiProposals[$index]))
             ->filter()
             ->values()
             ->all();
 
         if ($names === []) {
-            $this->aiError = 'Brak podzadań do zatwierdzenia.';
+            $this->aiError = 'Zaznacz co najmniej jedno podzadanie do zatwierdzenia.';
 
             return;
         }
@@ -160,7 +174,18 @@ class TaskSubtasks extends Component
             $this->createSubtaskFromAi($name);
         }
 
-        $this->closeAiModal();
+        $remaining = collect($this->aiProposals)
+            ->reject(fn ($name, $index) => $selectedIndexes->contains((int) $index))
+            ->values()
+            ->all();
+
+        $this->aiProposals = $remaining;
+        $this->aiSelected = array_keys($remaining);
+        $this->aiError = null;
+
+        if ($this->aiProposals === []) {
+            $this->closeAiModal();
+        }
     }
 
     private function createSubtaskFromAi(string $name): void

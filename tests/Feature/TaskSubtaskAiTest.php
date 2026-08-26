@@ -131,7 +131,28 @@ class TaskSubtaskAiTest extends TestCase
             ->assertSee('ac-bot--done', false);
     }
 
-    public function test_confirm_all_ai_proposals_creates_subtasks(): void
+    public function test_confirm_selected_ai_proposals_creates_only_checked_subtasks(): void
+    {
+        $user = $this->admin();
+        $task = ProjectTask::query()->create([
+            'name' => 'Rekrutacja malarzy',
+            'status' => \App\Enums\TaskStatus::PENDING,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TaskSubtasks::class, ['task' => $task])
+            ->set('showAiModal', true)
+            ->set('aiProposals', ['Krok A', 'Krok B', 'Krok C'])
+            ->set('aiSelected', [0, 2])
+            ->call('confirmSelectedAiProposals')
+            ->assertSet('showAiModal', true)
+            ->assertSet('aiProposals', ['Krok B']);
+
+        $this->assertSame(['Krok A', 'Krok C'], TaskSubtask::query()->orderBy('id')->pluck('name')->all());
+    }
+
+    public function test_confirm_selected_with_all_checked_closes_the_modal(): void
     {
         $user = $this->admin();
         $task = ProjectTask::query()->create([
@@ -144,7 +165,8 @@ class TaskSubtaskAiTest extends TestCase
             ->test(TaskSubtasks::class, ['task' => $task])
             ->set('showAiModal', true)
             ->set('aiProposals', ['Krok A', 'Krok B'])
-            ->call('confirmAllAiProposals')
+            ->set('aiSelected', [0, 1])
+            ->call('confirmSelectedAiProposals')
             ->assertSet('showAiModal', false);
 
         $this->assertSame(['Krok A', 'Krok B'], TaskSubtask::query()->orderBy('id')->pluck('name')->all());

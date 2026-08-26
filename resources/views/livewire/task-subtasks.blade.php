@@ -200,6 +200,15 @@
                             <ul class="st-list">
                                 @foreach($aiProposals as $index => $proposal)
                                     <li class="st-item st-item--input" wire:key="ai-proposal-{{ $index }}">
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input st-item__check flex-shrink-0"
+                                            value="{{ $index }}"
+                                            wire:model="aiSelected"
+                                            title="Zaznacz do zatwierdzenia"
+                                            aria-label="Zaznacz propozycję #{{ $index + 1 }}"
+                                        >
+
                                         <span class="badge badge-secondary subtask-num st-item__num">#{{ $index + 1 }}</span>
 
                                         <div class="st-item__editor">
@@ -237,11 +246,15 @@
                             <button
                                 type="button"
                                 class="btn btn-primary"
-                                wire:click="confirmAllAiProposals"
+                                wire:click="confirmSelectedAiProposals"
                                 wire:loading.attr="disabled"
-                                wire:target="confirmAllAiProposals"
+                                wire:target="confirmSelectedAiProposals"
+                                @disabled(count($aiSelected) === 0)
                             >
-                                Zatwierdź wszystkie
+                                Zatwierdź wybrane
+                                @if(count($aiSelected) > 0)
+                                    ({{ count($aiSelected) }})
+                                @endif
                             </button>
                         @else
                             <button type="button" class="btn btn-outline-secondary" wire:click="closeAiModal">
