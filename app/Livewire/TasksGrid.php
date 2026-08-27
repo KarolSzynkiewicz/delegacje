@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\TaskStatus;
+use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
 use App\Models\ApprovalRequest;
 use App\Models\Comment;
@@ -15,9 +16,14 @@ use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
 use App\Models\User;
 use App\Models\WorkItem;
+use App\Contracts\Llm\LlmClient;
+use App\Exceptions\LlmException;
 use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
+use App\Services\Llm\TasksFilterImportService;
+use App\Services\Llm\TasksFilterSummaryService;
 use App\Services\ProcedureRunService;
+use App\Services\TaskCreationService;
 use App\Services\UserMentionService;
 use App\Support\TasksGridUrlParams;
 use App\WorkItems\GridField;
@@ -89,6 +95,33 @@ class TasksGrid extends Component
 
     // Expanded rows (task IDs)
     public array $expandedTasks = [];
+
+    // Chrono: podsumowanie filtra / import zadań w kontekście widoku
+    public bool $showChronoModal = false;
+
+    /** menu | summary | import */
+    public string $chronoMode = 'menu';
+
+    public bool $chronoLoading = false;
+
+    public ?string $chronoError = null;
+
+    /** @var array{headline: string, summary: string, highlights: list<string>, risks: list<string>}|null */
+    public ?array $chronoSummary = null;
+
+    public string $importText = '';
+
+    /** @var list<array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>}> */
+    public array $importProposals = [];
+
+    /** @var list<int> */
+    public array $importSelected = [];
+
+    public string $exportJson = '';
+
+    public int $exportCount = 0;
+
+    public int $exportTotal = 0;
 
     // Inline editing
     public ?int $editingTaskId = null;
@@ -1097,6 +1130,389 @@ class TasksGrid extends Component
         $this->flash = 'Domyślny widok z menu zapisany (wraz z filtrami).';
     }
 
+    public function openChronoModal(): void
+    {
+        $this->showChronoModal = true;
+        $this->chronoMode = 'menu';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->chronoSummary = null;
+        $this->importText = '';
+        $this->importProposals = [];
+        $this->importSelected = [];
+        $this->exportJson = '';
+        $this->exportCount = 0;
+        $this->exportTotal = 0;
+    }
+
+    public function closeChronoModal(): void
+    {
+        $this->showChronoModal = false;
+        $this->chronoMode = 'menu';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->chronoSummary = null;
+        $this->importText = '';
+        $this->importProposals = [];
+        $this->importSelected = [];
+        $this->exportJson = '';
+        $this->exportCount = 0;
+        $this->exportTotal = 0;
+    }
+
+    public function chronoChooseSummary(): void
+    {
+        $this->chronoMode = 'summary';
+        $this->chronoError = null;
+        $this->chronoSummary = null;
+        $this->chronoLoading = true;
+    }
+
+    public function chronoChooseImport(): void
+    {
+        $this->chronoMode = 'import';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->importProposals = [];
+        $this->importSelected = [];
+    }
+
+    public function chronoChooseExport(): void
+    {
+        $this->chronoMode = 'export';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->buildChronoExport();
+    }
+
+    public function chronoBackToMenu(): void
+    {
+        $this->chronoMode = 'menu';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->chronoSummary = null;
+        $this->importProposals = [];
+        $this->importSelected = [];
+        $this->exportJson = '';
+        $this->exportCount = 0;
+        $this->exportTotal = 0;
+    }
+
+    public function fetchChronoSummary(TasksFilterSummaryService $service): void
+    {
+        if (! $this->chronoLoading || $this->chronoMode !== 'summary') {
+            return;
+        }
+
+        try {
+            [$labels, $sample, $total] = $this->chronoFilterSnapshot();
+            $this->chronoSummary = $service->summarize($labels, $sample, $total);
+            $this->chronoError = null;
+        } catch (LlmException $e) {
+            $this->chronoError = $e->getMessage();
+            $this->chronoSummary = null;
+        } catch (\Throwable $e) {
+            $this->chronoError = 'Nie udało się przygotować podsumowania: '.$e->getMessage();
+            $this->chronoSummary = null;
+        } finally {
+            $this->chronoLoading = false;
+        }
+    }
+
+    public function parseImportText(TasksFilterImportService $service): void
+    {
+        $this->chronoError = null;
+
+        try {
+            $defaults = $this->chronoImportDefaults();
+            $this->importProposals = $service->parse($this->importText, $defaults);
+            $this->importProposals = array_map(function (array $proposal) {
+                $bits = [];
+                if (! empty($proposal['category'])) {
+                    $bits[] = $proposal['category'];
+                }
+                if (! empty($proposal['priority'])) {
+                    $bits[] = 'P'.$proposal['priority'];
+                }
+                if (($proposal['subtasks'] ?? []) !== []) {
+                    $bits[] = count($proposal['subtasks']).' podzadań';
+                }
+                $proposal['meta'] = implode(' · ', $bits);
+
+                return $proposal;
+            }, $this->importProposals);
+            $this->importSelected = array_keys($this->importProposals);
+
+            if ($this->importProposals === []) {
+                $this->chronoError = 'Nie znaleziono zadań w wklejonym tekście.';
+            }
+        } catch (LlmException $e) {
+            $this->chronoError = $e->getMessage();
+            $this->importProposals = [];
+            $this->importSelected = [];
+        } catch (\Throwable $e) {
+            $this->chronoError = 'Nie udało się wczytać zadań: '.$e->getMessage();
+            $this->importProposals = [];
+            $this->importSelected = [];
+        }
+    }
+
+    public function confirmImportProposals(TaskCreationService $tasks): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        $selected = collect($this->importSelected)
+            ->map(fn ($index) => (int) $index)
+            ->unique()
+            ->filter(fn (int $index) => isset($this->importProposals[$index]))
+            ->sort()
+            ->values();
+
+        if ($selected->isEmpty()) {
+            $this->chronoError = 'Zaznacz co najmniej jedno zadanie do utworzenia.';
+
+            return;
+        }
+
+        $defaults = $this->chronoImportDefaults();
+        $created = 0;
+
+        foreach ($selected as $index) {
+            $proposal = $this->importProposals[$index];
+            $name = trim((string) ($proposal['name'] ?? ''));
+
+            if ($name === '') {
+                continue;
+            }
+
+            $tasks->create([
+                'name' => $name,
+                'description' => ($proposal['description'] ?? '') ?: null,
+                'category' => ($proposal['category'] ?? null) ?: ($defaults['category'] ?? null),
+                'priority' => isset($proposal['priority']) ? (int) $proposal['priority'] : null,
+                'assigned_to' => $defaults['assigned_to'] ?? null,
+                'sprint_id' => $defaults['sprint_id'] ?? null,
+                'subtasks' => $proposal['subtasks'] ?? [],
+            ], $user);
+
+            $created++;
+        }
+
+        $this->closeChronoModal();
+        $this->flash = $created === 1
+            ? 'Utworzono 1 zadanie z importu.'
+            : "Utworzono {$created} zadań z importu.";
+    }
+
+    /**
+     * @return array{0: list<string>, 1: list<array<string, mixed>>, 2: int}
+     */
+    protected function chronoFilterSnapshot(): array
+    {
+        $labels = array_map(
+            fn (array $chip) => $chip['label'],
+            $this->activeFilterChips(),
+        );
+
+        if ($labels === []) {
+            $labels = ['Bez dodatkowych filtrów (domyślny widok)'];
+        }
+
+        if ($this->isLockedToSprint()) {
+            $sprintName = Sprint::query()->whereKey($this->lockedSprintId)->value('name');
+            array_unshift($labels, 'Sprint: '.($sprintName ?: '#'.$this->lockedSprintId));
+        }
+
+        $query = $this->filteredTasksQuery();
+        $total = (clone $query)->count();
+
+        $rows = (clone $query)
+            ->with(['assignedTo'])
+            ->limit(40)
+            ->get()
+            ->map(function ($item) {
+                if ($item instanceof WorkItem) {
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->title,
+                        'status' => $this->chronoStatusValue($item->status),
+                        'category' => $item->category,
+                        'assignee' => $item->assignedTo?->name,
+                        'priority' => $item->priority,
+                        'due_date' => $item->due_at?->toDateString(),
+                        'type' => $item->type instanceof WorkItemType ? $item->type->value : (string) $item->type,
+                    ];
+                }
+
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'status' => $this->chronoStatusValue($item->status),
+                    'category' => $item->category,
+                    'assignee' => $item->assignedTo?->name,
+                    'priority' => $item->priority,
+                    'due_date' => $item->due_date?->toDateString(),
+                    'type' => 'task',
+                ];
+            })
+            ->all();
+
+        return [$labels, $rows, $total];
+    }
+
+    protected function chronoStatusValue(mixed $status): string
+    {
+        if ($status instanceof WorkItemStatus || $status instanceof TaskStatus) {
+            return $status->value;
+        }
+
+        if ($status instanceof \BackedEnum) {
+            return (string) $status->value;
+        }
+
+        return $status === null ? '' : (string) $status;
+    }
+
+    /**
+     * @return array{category: ?string, assigned_to: ?int, sprint_id: ?int, assignee_label: ?string}
+     */
+    protected function chronoImportDefaults(): array
+    {
+        $assignedTo = null;
+        $assigneeLabel = null;
+
+        if ($this->assignedFilter === 'me') {
+            $assignedTo = auth()->id();
+            $assigneeLabel = auth()->user()?->name;
+        } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
+            $assignedTo = (int) $this->assignedFilter;
+            $assigneeLabel = User::query()->whereKey($assignedTo)->value('name');
+        }
+
+        $category = trim($this->searchCategory) !== '' ? trim($this->searchCategory) : null;
+
+        return [
+            'category' => $category,
+            'assigned_to' => $assignedTo,
+            'sprint_id' => $this->isLockedToSprint() ? $this->lockedSprintId : null,
+            'assignee_label' => $assigneeLabel,
+        ];
+    }
+
+    protected function buildChronoExport(): void
+    {
+        $max = 200;
+        $query = $this->filteredTasksQuery();
+        $this->exportTotal = (clone $query)->count();
+
+        $items = (clone $query)
+            ->with(['assignedTo'])
+            ->limit($max)
+            ->get();
+
+        if ($this->usesWorkItems()) {
+            $items->loadMissing([
+                'source' => function (MorphTo $morphTo) {
+                    $morphTo->morphWith([
+                        ProjectTask::class => ['subtasks'],
+                    ]);
+                },
+            ]);
+        } else {
+            $items->loadMissing('subtasks');
+        }
+
+        $tasks = [];
+        foreach ($items as $item) {
+            $tasks[] = $this->chronoExportRow($item);
+        }
+
+        $labels = array_map(
+            fn (array $chip) => $chip['label'],
+            $this->activeFilterChips(),
+        );
+
+        $payload = [
+            'format' => 'tasks-filter-export',
+            'version' => 1,
+            'exported_at' => now()->toIso8601String(),
+            'filters' => $labels,
+            'count' => count($tasks),
+            'total_in_filter' => $this->exportTotal,
+            'truncated' => $this->exportTotal > $max,
+            'tasks' => $tasks,
+        ];
+
+        $this->exportCount = count($tasks);
+        $this->exportJson = json_encode(
+            $payload,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        ) ?: '';
+
+        if ($this->exportCount === 0) {
+            $this->chronoError = 'Filtr nie zwraca żadnych zadań do eksportu.';
+        }
+    }
+
+    /** @return array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>} */
+    protected function chronoExportRow(mixed $item): array
+    {
+        if ($item instanceof WorkItem) {
+            $source = $item->source;
+            $subtasks = [];
+
+            if ($source instanceof ProjectTask) {
+                $source->loadMissing('subtasks');
+                $subtasks = $source->subtasks->pluck('name')->filter()->values()->all();
+            }
+
+            return [
+                'name' => (string) $item->title,
+                'description' => $item->plainDescription(),
+                'category' => $item->category,
+                'priority' => $item->priority,
+                'subtasks' => array_values(array_map('strval', $subtasks)),
+            ];
+        }
+
+        /** @var ProjectTask $item */
+        $item->loadMissing('subtasks');
+
+        return [
+            'name' => (string) $item->name,
+            'description' => method_exists($item, 'plainDescription') ? $item->plainDescription() : (string) ($item->description ?? ''),
+            'category' => $item->category,
+            'priority' => $item->priority,
+            'subtasks' => $item->subtasks->pluck('name')->filter()->values()->all(),
+        ];
+    }
+
+    public function downloadChronoExport()
+    {
+        if ($this->exportJson === '') {
+            $this->buildChronoExport();
+        }
+
+        if ($this->exportJson === '') {
+            $this->chronoError = 'Brak danych do pobrania.';
+
+            return null;
+        }
+
+        $filename = 'zadania-filtr-'.now()->format('Y-m-d-His').'.json';
+
+        return response()->streamDownload(
+            function () {
+                echo $this->exportJson;
+            },
+            $filename,
+            ['Content-Type' => 'application/json; charset=UTF-8'],
+        );
+    }
+
     /**
      * @return array<string, string>
      */
@@ -2086,7 +2502,36 @@ class TasksGrid extends Component
                 ? ($savedViews->firstWhere('id', $this->activeViewId)?->name ?? $this->view)
                 : null,
             'isMenuDefaultView' => auth()->user()?->usesGridAsDefaultTasksView($this->currentQueryParams()) ?? false,
+            'llmConfigured' => app(LlmClient::class)->isConfigured(),
+            'importFormatExample' => json_encode(
+                TasksFilterImportService::importFormatExample(),
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+            ),
+            'chronoFilterLabels' => array_map(
+                fn (array $chip) => $chip['label'],
+                $this->activeFilterChips(),
+            ),
+            'chronoImportDefaults' => $this->chronoImportDefaults(),
+            'chronoImportDefaultsHint' => $this->chronoImportDefaultsHint(),
         ]);
+    }
+
+    protected function chronoImportDefaultsHint(): string
+    {
+        $defaults = $this->chronoImportDefaults();
+        $bits = [];
+
+        if ($defaults['category']) {
+            $bits[] = 'kategoria: '.$defaults['category'];
+        }
+        if ($defaults['assignee_label']) {
+            $bits[] = 'osoba: '.$defaults['assignee_label'];
+        }
+        if ($defaults['sprint_id']) {
+            $bits[] = 'ten sprint';
+        }
+
+        return implode(', ', $bits);
     }
 
     protected function applyWorkItemSorting(Builder $query): void

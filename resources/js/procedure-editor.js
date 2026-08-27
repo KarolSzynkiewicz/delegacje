@@ -223,7 +223,7 @@ async function requestChronoFlow(){
   const cfg = window.ProcedureEditorData;
   if(!cfg || !cfg.chronoUrl) return;
 
-  if(!proposalIsUnsavedDraft() && !confirm('Chrono zastąpi bieżący przepływ nową propozycją. Kontynuować? (możesz cofnąć przez Ctrl+Z)')) return;
+  if(!confirmOverwriteFlow()) return;
 
   const btn = document.getElementById('btnChrono');
   const original = btn.innerHTML;
@@ -247,6 +247,167 @@ async function requestChronoFlow(){
     btn.disabled = false;
     btn.innerHTML = original;
   }
+}
+
+/* ── 7c. IMPORT / EXPORT ───────────────────────────────────────────── */
+function confirmOverwriteFlow(){
+  if(proposalIsUnsavedDraft()) return true;
+  return confirm('Import zastąpi bieżący przepływ na canvasie. Kontynuować? (możesz cofnąć przez Ctrl+Z)');
+}
+
+function decodeImportJson(text){
+  let raw = String(text ?? '').trim();
+  if(!raw) throw new Error('Wklej tekst z krokami procedury.');
+
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if(fence) raw = fence[1].trim();
+
+  let data = JSON.parse(raw);
+  if(typeof data === 'string'){
+    data = JSON.parse(data);
+  }
+
+  if(!data || typeof data !== 'object') throw new Error('Oczekiwany obiekt JSON.');
+  return data;
+}
+
+function definitionFromImportData(data){
+  if(Array.isArray(data.nodes)){
+    return {
+      nodes: data.nodes,
+      edges: Array.isArray(data.edges) ? data.edges : [],
+    };
+  }
+
+  if(data.definition && Array.isArray(data.definition.nodes)){
+    return {
+      nodes: data.definition.nodes,
+      edges: Array.isArray(data.definition.edges) ? data.definition.edges : [],
+    };
+  }
+
+  return null;
+}
+
+function showImportError(message){
+  const el = document.getElementById('importError');
+  if(!el) return;
+  if(!message){
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = message;
+}
+
+function openImportModal(){
+  const modal = document.getElementById('importModal');
+  const textarea = document.getElementById('importTextarea');
+  if(!modal || !textarea) return;
+  showImportError(null);
+  modal.hidden = false;
+  textarea.focus();
+}
+
+function closeImportModal(){
+  const modal = document.getElementById('importModal');
+  if(modal) modal.hidden = true;
+  showImportError(null);
+}
+
+async function confirmImportFlow(){
+  const cfg = window.ProcedureEditorData;
+  const textarea = document.getElementById('importTextarea');
+  const btn = document.getElementById('btnImportConfirm');
+  if(!textarea || !btn) return;
+
+  if(!confirmOverwriteFlow()) return;
+
+  const text = textarea.value;
+  showImportError(null);
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wczytuję…';
+
+  try{
+    let definition = null;
+    let note = 'Zaimportowano przepływ — sprawdź i zapisz.';
+
+    try{
+      const data = decodeImportJson(text);
+      definition = definitionFromImportData(data);
+
+      if(!definition && (data.steps || Array.isArray(data))){
+        if(!cfg?.importFlowUrl) throw new Error('Brak endpointu importu.');
+        const res = await fetch(cfg.importFlowUrl, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN': cfg.csrfToken, 'Accept':'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if(!res.ok) throw new Error(payload.message || 'Nie udało się wczytać kroków.');
+        definition = payload.definition;
+        note = `Zaimportowano ${payload.steps} kroków — sprawdź i zapisz.`;
+      }
+    } catch(e){
+      if(e instanceof SyntaxError){
+        throw new Error('Niepoprawny JSON — sprawdź format i spróbuj ponownie.');
+      }
+      throw e;
+    }
+
+    if(!definition?.nodes?.length){
+      throw new Error('Nie znaleziono węzłów. Użyj formatu steps albo nodes + edges.');
+    }
+
+    applyProposal(definition, note);
+    closeImportModal();
+    textarea.value = '';
+  } catch(e){
+    showImportError(e.message);
+    toast('✕ ' + e.message, 'danger');
+    plog('Import: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
+function exportCurrentFlow(){
+  if(!state.currentProcess) return;
+
+  const payload = {
+    format: 'procedure-definition',
+    version: 1,
+    exported_at: new Date().toISOString(),
+    name: state.currentProcess.name,
+    nodes: state.currentProcess.nodes,
+    edges: state.currentProcess.edges,
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const slug = (state.currentProcess.name || 'procedura').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'procedura';
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${slug}-przeplyw.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+
+  toast('✓ Wyeksportowano przepływ', 'success');
+  plog('Wyeksportowano przepływ do pliku JSON.', 'success');
+}
+
+function initImportExport(){
+  document.getElementById('btnImport')?.addEventListener('click', openImportModal);
+  document.getElementById('btnExport')?.addEventListener('click', exportCurrentFlow);
+  document.getElementById('btnImportClose')?.addEventListener('click', closeImportModal);
+  document.getElementById('btnImportCancel')?.addEventListener('click', closeImportModal);
+  document.getElementById('btnImportConfirm')?.addEventListener('click', confirmImportFlow);
+  document.getElementById('importModal')?.addEventListener('click', e=>{
+    if(e.target.id === 'importModal') closeImportModal();
+  });
 }
 
 /* ── 8. RENDER: TOOLBAR ────────────────────────────────────────────── */
@@ -763,6 +924,7 @@ function initEditor(){
   });
   document.getElementById('btnSave').addEventListener('click', saveToServer);
   document.getElementById('btnChrono')?.addEventListener('click', requestChronoFlow);
+  initImportExport();
   document.getElementById('btnUndo').addEventListener('click', undo);
   document.getElementById('btnRedo').addEventListener('click', redo);
   document.getElementById('btnBack').addEventListener('click', ()=>{

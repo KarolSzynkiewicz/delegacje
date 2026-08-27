@@ -138,10 +138,10 @@
 
             @php
                 $acVariants = [
-                    'clock' => ['Zegar-twarz', 'Pełny robot: tarcza jest twarzą, oczy siedzą na cyferblacie, do tego antena i tułów. Najbardziej maskotkowy.'],
-                    'visor' => ['Wizjer', 'Smuklejszy android — oczy świecą w ciemnym wizjerze, zegar przeniesiony na klatkę piersiową. Bardziej „tech”.'],
-                    'orb' => ['Orb', 'Sama głowa-kula, bez tułowia. Cały zegar jest obwódką twarzy, więc czyta się też w małych rozmiarach.'],
-                    'spark' => ['Znacznik', 'Sam zegar, bez twarzy. Do miejsc, gdzie pełny bot byłby zbyt zabawkowy — tabele, paski narzędzi, inline.'],
+                    'clock' => ['Chrono', 'Twórca', 'Zaczynam od zera — zadania, sprinty, procedury.'],
+                    'visor' => ['Wizjer', 'Analityk', 'Podsumowuję filtr: brief, standup, ryzyka.'],
+                    'orb' => ['Orbi', 'Kurier', 'Importuję i eksportuję dane z widoku.'],
+                    'spark' => ['Iskra', 'Redaktor', 'Mutuję to, co już jest — kategorie, opisy, przypisania.'],
                 ];
             @endphp
 
@@ -155,8 +155,9 @@
                                     ::class="state === 'idle' ? '' : 'ac-bot--' + state"
                                 />
                             </div>
-                            <h6 class="mb-1">{{ $acMeta[0] }}</h6>
-                            <p class="text-muted small mb-2">{{ $acMeta[1] }}</p>
+                            <h6 class="mb-0">{{ $acMeta[0] }}</h6>
+                            <div class="small mb-2" style="color:#c4b5fd;font-weight:650;letter-spacing:.04em;text-transform:uppercase;font-size:.68rem">{{ $acMeta[1] }}</div>
+                            <p class="text-muted small mb-2">{{ $acMeta[2] }}</p>
                             <code class="small">variant="{{ $acKey }}"</code>
                         </x-ui.card>
                     </div>
@@ -188,6 +189,221 @@
                         <span class="ac-trigger__hint">Rozbij na podzadania</span>
                     </span>
                 </button>
+            </div>
+        </div>
+
+        {{-- ══════════════════════════════════════════════════════════════
+             Chrono Assist — „Jak mogę Ci pomóc?”
+             Koncept UI: menu akcji z podopcjami (mobile-first).
+             ══════════════════════════════════════════════════════════════ --}}
+        <div
+            class="mb-5 pb-4 border-bottom border-secondary border-opacity-25"
+            x-data="{
+                path: [],
+                picked: null,
+                toast: null,
+                go(key) {
+                    this.path = [...this.path, key];
+                    this.picked = null;
+                    this.toast = null;
+                },
+                jump(key) {
+                    this.path = [key];
+                    this.picked = null;
+                    this.toast = null;
+                },
+                back() {
+                    this.path = this.path.slice(0, -1);
+                    this.picked = null;
+                    this.toast = null;
+                },
+                reset() {
+                    this.path = [];
+                    this.picked = null;
+                    this.toast = null;
+                },
+                pick(label) {
+                    this.picked = label;
+                    this.toast = 'Wybrane (demo): ' + label + ' — tu wejdzie flow HITL.';
+                },
+                handleAssistClick(event) {
+                    if (event.target.closest('[data-back]')) {
+                        this.back();
+                        return;
+                    }
+                    const root = event.target.closest('[data-root]');
+                    if (root) {
+                        this.jump(root.dataset.root);
+                        return;
+                    }
+                    const go = event.target.closest('[data-go]');
+                    if (go) {
+                        this.go(go.dataset.go);
+                        return;
+                    }
+                    const leaf = event.target.closest('[data-leaf]');
+                    if (leaf) {
+                        const label = leaf.querySelector('.ac-assist__option-label, .ac-assist__tile-label')?.textContent?.trim();
+                        this.pick(label || leaf.dataset.leaf);
+                    }
+                },
+            }"
+        >
+            <h3 class="mb-1">
+                Chrono Assist
+                <span class="text-muted small fw-normal">(koncept UI · stepper · bez API)</span>
+            </h3>
+            <p class="text-muted small mb-3">
+                Komponent <code>&lt;x-chrono.assist /&gt;</code> — zespół person: każda twarz = specjalizacja.
+                <strong>Wizjer</strong> podsumowuje, <strong>Orbi</strong> wozi dane (import/export w jednej ścieżce),
+                <strong>Chrono</strong> tworzy, <strong>Iskra</strong> mutuje. Klik zamienia UI (stepper), bez dropdownów.
+            </p>
+
+            @php
+                $assistActions = [
+                    [
+                        'key' => 'summarize',
+                        'persona' => 'visor',
+                        'label' => 'Podsumuj',
+                        'hint' => 'Brief, standup, ryzyka',
+                        'children' => [
+                            ['key' => 'summary-brief', 'label' => 'Krótki brief', 'hint' => '3–5 zdań + ryzyka', 'icon' => 'bi-lightning'],
+                            ['key' => 'summary-standup', 'label' => 'Standup', 'hint' => 'Punkty do omówienia dziś', 'icon' => 'bi-people'],
+                            ['key' => 'summary-risks', 'label' => 'Same ryzyka', 'hint' => 'Przeterminowane, blokery', 'icon' => 'bi-exclamation-triangle'],
+                        ],
+                    ],
+                    [
+                        'key' => 'transfer',
+                        'persona' => 'orb',
+                        'label' => 'Import / Export',
+                        'hint' => 'Wnoszę i wynoszę dane',
+                        'children' => [
+                            [
+                                'key' => 'import',
+                                'label' => 'Importuj',
+                                'hint' => 'JSON, lista, opis',
+                                'icon' => 'bi-box-arrow-in-down',
+                                'children' => [
+                                    ['key' => 'import-json', 'label' => 'Wklej JSON', 'hint' => 'Format Chrono tasks[]', 'icon' => 'bi-braces'],
+                                    ['key' => 'import-list', 'label' => 'Lista linii', 'hint' => 'Każda linia = zadanie', 'icon' => 'bi-list-ul'],
+                                    ['key' => 'import-prose', 'label' => 'Luźny opis', 'hint' => 'AI wyodrębni taski', 'icon' => 'bi-chat-dots'],
+                                ],
+                            ],
+                            [
+                                'key' => 'export',
+                                'label' => 'Eksportuj',
+                                'hint' => 'Bieżący filtr',
+                                'icon' => 'bi-box-arrow-up',
+                                'children' => [
+                                    ['key' => 'export-json', 'label' => 'JSON (reimport)', 'hint' => 'Pełny kontekst + podzadania', 'icon' => 'bi-filetype-json'],
+                                    ['key' => 'export-csv', 'label' => 'CSV', 'hint' => 'Do arkusza', 'icon' => 'bi-filetype-csv'],
+                                    ['key' => 'export-md', 'label' => 'Markdown', 'hint' => 'Do notatki / PR', 'icon' => 'bi-markdown'],
+                                ],
+                            ],
+                        ],
+                    ],
+                    [
+                        'key' => 'create',
+                        'persona' => 'clock',
+                        'label' => 'Twórz',
+                        'hint' => 'Task, sprint, SOP',
+                        'children' => [
+                            ['key' => 'create-task', 'label' => 'Zadanie + podzadania', 'hint' => 'Z kontekstu filtra', 'icon' => 'bi-check2-square'],
+                            ['key' => 'create-sprint', 'label' => 'Sprint', 'hint' => 'Cel, DoD, scope', 'icon' => 'bi-flag'],
+                            ['key' => 'create-procedure', 'label' => 'Procedura', 'hint' => 'Flow z kroków', 'icon' => 'bi-diagram-3'],
+                        ],
+                    ],
+                    [
+                        'key' => 'mutate',
+                        'persona' => 'spark',
+                        'label' => 'Mutuj',
+                        'hint' => 'Kategorie, osoby, opisy',
+                        'children' => [
+                            ['key' => 'mutate-category', 'label' => 'Kategorie', 'hint' => 'Uzupełnij / ujednolić', 'icon' => 'bi-tags'],
+                            ['key' => 'mutate-assign', 'label' => 'Przypisz', 'hint' => 'Do osoby / sprintu', 'icon' => 'bi-person-plus'],
+                            ['key' => 'mutate-refine', 'label' => 'Doprecyzuj', 'hint' => 'Opis, AC, priorytet', 'icon' => 'bi-magic'],
+                        ],
+                    ],
+                ];
+            @endphp
+
+            <div class="row g-4 align-items-start">
+                <div class="col-12 col-md-5 col-lg-4">
+                    <div class="small text-muted text-uppercase fw-semibold mb-2" style="letter-spacing:.06em">Mobile · ~390px</div>
+                    <div class="mx-auto" style="max-width:390px">
+                        <div
+                            class="rounded-4 p-2"
+                            style="border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25)"
+                        >
+                            <div class="d-flex justify-content-center mb-2">
+                                <span style="width:72px;height:5px;border-radius:999px;background:rgba(255,255,255,.15)"></span>
+                            </div>
+
+                            <div @click="handleAssistClick($event)">
+                                <x-chrono.assist
+                                    class="ac-assist--phone"
+                                    title="Jak mogę Ci pomóc?"
+                                    status="Wybierz akcję dla bieżącego filtra"
+                                    :context-chips="['Status: Aktywne', 'Typ: bez Oddzwonienie']"
+                                    :item-count="47"
+                                    :actions="$assistActions"
+                                >
+                                    <x-slot:footer>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="reset()">
+                                            Zamknij
+                                        </button>
+                                    </x-slot:footer>
+                                </x-chrono.assist>
+                            </div>
+
+                            <template x-if="toast">
+                                <p class="ac-assist__toast mt-2 mb-1" x-text="toast"></p>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-7 col-lg-8">
+                    <div class="small text-muted text-uppercase fw-semibold mb-2" style="letter-spacing:.06em">Desktop · w modalu</div>
+                    <div
+                        class="rounded-4 p-3 p-lg-4"
+                        style="border:1px solid var(--glass-border); background:rgba(13,18,30,.45); max-width:36rem"
+                        @click="handleAssistClick($event)"
+                    >
+                        <x-chrono.assist
+                            title="Jak mogę Ci pomóc?"
+                            status="Wybierz akcję dla bieżącego filtra"
+                            :context-chips="['Status: Aktywne', 'Typ: bez Oddzwonienie', 'Kategoria: AI / Sprint']"
+                            :item-count="47"
+                            :actions="$assistActions"
+                        >
+                            <x-slot:footer>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="reset()">
+                                    Zamknij
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-primary"
+                                    x-bind:disabled="!picked"
+                                    x-on:click="toast = picked ? ('Kontynuuj: ' + picked) : null"
+                                >
+                                    Dalej
+                                </button>
+                            </x-slot:footer>
+                        </x-chrono.assist>
+
+                        <template x-if="toast">
+                            <p class="ac-assist__toast mt-3 mb-0" x-text="toast"></p>
+                        </template>
+                    </div>
+
+                    <ul class="small text-muted mt-3 mb-0 ps-3">
+                        <li>Kontekst zostaje na kolejnych krokach: „Filtry [N]” + chip liczby elementów.</li>
+                        <li>Mobile: pełna szerokość, dropdown = 1 filtr na linię.</li>
+                        <li>Stepper: klik zamienia sekcję akcji (root → opcje → liść).</li>
+                        <li>Orbi: „Import / Export” → Importuj|Eksportuj → format.</li>
+                    </ul>
+                </div>
             </div>
         </div>
 

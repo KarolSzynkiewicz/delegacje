@@ -127,16 +127,134 @@ class ProcedureRun extends Model
     /** 0.0–1.0 progress fraction. */
     public function progress(): float
     {
-        $nodes = array_filter(
-            $this->definition_snapshot['nodes'] ?? [],
-            fn ($n) => ($n['type'] ?? '') !== 'note'
-        );
-        $total = count($nodes);
-        if ($total === 0) {
-            return 0.0;
-        }
-        $completed = $this->steps()->whereNotNull('completed_at')->count();
+        return $this->progressMetrics()['fraction'];
+    }
 
-        return round(min($completed / $total, 1.0), 2);
+    /**
+     * Metryki postępu uwzględniające gałęzie — liczy wzdłuż bieżącej ścieżki,
+     * nie wszystkich węzłów w definicji procedury.
+     *
+     * @return array{fraction: float, percent: int, completed: int, total: int, label: string}
+     */
+    public function progressMetrics(): array
+    {
+        $completed = $this->completedStepCount();
+
+        if ($this->status === ProcedureRunStatus::FINISHED) {
+            return [
+                'fraction' => 1.0,
+                'percent' => 100,
+                'completed' => $completed,
+                'total' => max($completed, 1),
+                'label' => $completed > 0 ? "krok {$completed} · ukończono" : 'ukończono',
+            ];
+        }
+
+        if ($this->status === ProcedureRunStatus::ABANDONED) {
+            $total = max($completed, 1);
+            $fraction = min($completed / $total, 1.0);
+
+            return [
+                'fraction' => round($fraction, 2),
+                'percent' => (int) round($fraction * 100),
+                'completed' => $completed,
+                'total' => $total,
+                'label' => "krok {$completed} · porzucono",
+            ];
+        }
+
+        $remaining = $this->estimateStepsToEndFromCurrent();
+        $hasOpenStep = $this->hasOpenStepOnCurrentNode();
+        $total = max($completed + ($hasOpenStep ? 1 : 0) + $remaining, $completed, 1);
+        $fraction = min($completed / $total, 0.99);
+
+        return [
+            'fraction' => round($fraction, 2),
+            'percent' => (int) round($fraction * 100),
+            'completed' => $completed,
+            'total' => $total,
+            'label' => "krok {$completed} z ~{$total}",
+        ];
+    }
+
+    protected function completedStepCount(): int
+    {
+        if ($this->relationLoaded('steps')) {
+            return $this->steps->whereNotNull('completed_at')->count();
+        }
+
+        return $this->steps()->whereNotNull('completed_at')->count();
+    }
+
+    protected function hasOpenStepOnCurrentNode(): bool
+    {
+        if (! $this->current_node_id) {
+            return false;
+        }
+
+        if ($this->relationLoaded('steps')) {
+            return $this->steps
+                ->where('node_id', $this->current_node_id)
+                ->whereNull('completed_at')
+                ->isNotEmpty();
+        }
+
+        return $this->steps()
+            ->where('node_id', $this->current_node_id)
+            ->whereNull('completed_at')
+            ->exists();
+    }
+
+    /** Minimalna liczba węzłów od bieżącego (bez niego) do najbliższego końca. */
+    protected function estimateStepsToEndFromCurrent(): int
+    {
+        $currentId = $this->current_node_id;
+
+        if (! $currentId) {
+            return 1;
+        }
+
+        $nodes = collect($this->definition_snapshot['nodes'] ?? [])
+            ->keyBy(fn (array $node) => (string) ($node['id'] ?? ''));
+
+        $current = $nodes->get($currentId);
+
+        if ($current && ($current['type'] ?? '') === 'end') {
+            return 0;
+        }
+
+        $edges = $this->definition_snapshot['edges'] ?? [];
+        $queue = [[$currentId, 0]];
+        $visited = [];
+
+        while ($queue !== []) {
+            [$nodeId, $depth] = array_shift($queue);
+
+            if (isset($visited[$nodeId])) {
+                continue;
+            }
+
+            $visited[$nodeId] = true;
+
+            $node = $nodes->get($nodeId);
+
+            if ($node && ($node['type'] ?? '') === 'end') {
+                return $depth;
+            }
+
+            foreach ($edges as $edge) {
+                if (($edge['from'] ?? null) !== $nodeId) {
+                    continue;
+                }
+
+                $to = (string) ($edge['to'] ?? '');
+
+                if ($to !== '' && ! isset($visited[$to])) {
+                    $queue[] = [$to, $depth + 1];
+                }
+            }
+        }
+
+        return 1;
     }
 }

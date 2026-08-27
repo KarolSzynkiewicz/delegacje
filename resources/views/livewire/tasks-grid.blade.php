@@ -388,6 +388,12 @@
         .tg-toolbar__home {
             display: none !important;
         }
+        .tg-toolbar__chrono .ac-trigger__text {
+            display: none !important;
+        }
+        .tg-toolbar__chrono {
+            padding: 4px 6px !important;
+        }
         .tg-toolbar__meta {
             margin-left: 0 !important;
             flex: 1 1 auto;
@@ -648,6 +654,16 @@
                         <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }}"></i>
                     </button>
                 @endunless
+
+                <x-chrono.trigger
+                    target="openChronoModal"
+                    class="tg-toolbar__chrono"
+                    :size="28"
+                    label="Chrono"
+                    hint="Filtr"
+                    hint-loading="Otwieram…"
+                    title="AskChrono — podsumuj filtr albo zaimportuj zadania"
+                />
 
                 {{-- Task count --}}
                 <span class="tg-mono" style="font-size:0.76rem;color:var(--text-muted,#94a3b8);white-space:nowrap">
@@ -1161,4 +1177,177 @@
         }, { passive: true });
     })();
 </script>
+
+@if($showChronoModal)
+    <x-chrono.modal
+        key="tasks-grid-chrono"
+        close="closeChronoModal"
+        :fetch="$chronoMode === 'summary' && $chronoLoading ? 'fetchChronoSummary' : null"
+        :loading="$chronoLoading"
+        :error="$chronoError"
+        :ready="$chronoMode === 'menu' || $chronoMode === 'import' || $chronoMode === 'export' || $chronoSummary !== null"
+        title="AskChrono — lista zadań"
+        :status-ready="match ($chronoMode) {
+            'menu' => 'Wybierz akcję dla bieżącego filtra',
+            'summary' => 'Podsumowanie gotowe',
+            'import' => 'Mam '.count($importProposals).' propozycji — sprawdź i zatwierdź',
+            'export' => 'Eksport: '.$exportCount.($exportTotal > $exportCount ? ' z '.$exportTotal : '').' zadań',
+            default => 'Sprawdź i zatwierdź',
+        }"
+        :thinking="$chronoMode === 'summary'
+            ? 'Chrono czyta aktywne filtry i próbkę zadań z listy…'
+            : 'Chrono przygotowuje propozycję.'"
+        empty-message="Wybierz podsumowanie, import albo eksport."
+        dialog-class="modal-lg modal-dialog-scrollable"
+    >
+        @if($chronoMode === 'menu')
+            <p class="text-muted small mb-3">
+                Działam na <strong>bieżącym filtrze</strong> listy — te same chipy, które widzisz nad tabelą.
+                @if(count($chronoFilterLabels) > 0)
+                    <span class="d-block mt-1">{{ implode(' · ', $chronoFilterLabels) }}</span>
+                @endif
+            </p>
+            <div class="d-grid gap-2">
+                <button type="button"
+                        class="btn btn-outline-primary text-start"
+                        wire:click="chronoChooseSummary"
+                        @disabled(! $llmConfigured)>
+                    <i class="bi bi-journal-text me-2"></i>
+                    <span class="fw-semibold">Podsumuj widok</span>
+                    <span class="d-block small text-muted ms-4">Narracja z ryzyka i wyróżnień na podstawie przefiltrowanych zadań</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary text-start" wire:click="chronoChooseImport">
+                    <i class="bi bi-box-arrow-in-down me-2"></i>
+                    <span class="fw-semibold">Importuj zadania</span>
+                    <span class="d-block small text-muted ms-4">
+                        Wklej JSON / listę — nowe taski dostaną kontekst filtra
+                        @if($chronoImportDefaultsHint !== '')
+                            ({{ $chronoImportDefaultsHint }})
+                        @endif
+                    </span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary text-start" wire:click="chronoChooseExport">
+                    <i class="bi bi-box-arrow-up me-2"></i>
+                    <span class="fw-semibold">Eksportuj zadania</span>
+                    <span class="d-block small text-muted ms-4">Pobierz JSON z bieżącego filtra — ten sam format co import</span>
+                </button>
+            </div>
+            @unless($llmConfigured)
+                <p class="small text-muted mt-3 mb-0">Podsumowanie wymaga skonfigurowanego AI w Akcjach systemowych. Import JSON / listy działa bez modelu.</p>
+            @endunless
+        @elseif($chronoMode === 'summary' && $chronoSummary)
+            <h6 class="fw-semibold mb-2">{{ $chronoSummary['headline'] }}</h6>
+            <p class="mb-3" style="line-height:1.55">{{ $chronoSummary['summary'] }}</p>
+            @if(($chronoSummary['highlights'] ?? []) !== [])
+                <div class="mb-3">
+                    <div class="small text-muted text-uppercase fw-semibold mb-1">Wyróżnienia</div>
+                    <ul class="mb-0 ps-3">
+                        @foreach($chronoSummary['highlights'] as $item)
+                            <li class="small mb-1">{{ $item }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+            @if(($chronoSummary['risks'] ?? []) !== [])
+                <div>
+                    <div class="small text-warning text-uppercase fw-semibold mb-1">Ryzyka</div>
+                    <ul class="mb-0 ps-3">
+                        @foreach($chronoSummary['risks'] as $item)
+                            <li class="small mb-1">{{ $item }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        @elseif($chronoMode === 'import')
+            @if($importProposals === [])
+                <p class="text-muted small mb-3">
+                    Wklej JSON z tablicą <code>tasks</code>, listę linii albo luźny opis.
+                    Import nadaje domyślne pola z filtra — nic nie trafi do bazy bez zatwierdzenia.
+                </p>
+                <details class="mb-3">
+                    <summary class="small fw-semibold" style="cursor:pointer">Oczekiwany format JSON</summary>
+                    <pre class="small mb-0 mt-2 p-3 rounded" style="background:rgba(0,0,0,.25);border:1px solid var(--glass-border);max-height:180px;overflow:auto"><code>{{ $importFormatExample }}</code></pre>
+                </details>
+                <label class="form-label small fw-semibold">Wklej tekst</label>
+                <textarea rows="9" class="form-control font-monospace" wire:model.defer="importText"
+                          placeholder='{"tasks":[{"name":"Pierwsze zadanie","subtasks":["Krok 1"]}]}'
+                          spellcheck="false"></textarea>
+            @else
+                <p class="text-muted small mb-3">
+                    Propozycje z kontekstem filtra. Możesz poprawić nazwę przed zapisem.
+                </p>
+                <ul class="list-unstyled mb-0">
+                    @foreach($importProposals as $index => $proposal)
+                        <li class="d-flex align-items-start gap-2 mb-2 p-2 rounded"
+                            style="background:rgba(255,255,255,.03);border:1px solid var(--glass-border)"
+                            wire:key="import-proposal-{{ $index }}">
+                            <input type="checkbox" class="form-check-input mt-1" value="{{ $index }}" wire:model="importSelected">
+                            <div class="flex-grow-1">
+                                <input type="text" class="form-control form-control-sm mb-1"
+                                       wire:model.defer="importProposals.{{ $index }}.name">
+                                @if(($proposal['meta'] ?? '') !== '')
+                                    <div class="small text-muted">{{ $proposal['meta'] }}</div>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        @elseif($chronoMode === 'export')
+            <p class="text-muted small mb-3">
+                Eksport z bieżącego filtra
+                @if($exportTotal > $exportCount)
+                    (pierwsze {{ $exportCount }} z {{ $exportTotal }})
+                @else
+                    ({{ $exportCount }} {{ $exportCount === 1 ? 'zadanie' : 'zadań' }})
+                @endif
+                — format kompatybilny z importem.
+            </p>
+            <textarea
+                id="chronoExportJson"
+                rows="12"
+                class="form-control font-monospace"
+                readonly
+                spellcheck="false"
+            >{{ $exportJson }}</textarea>
+        @endif
+
+        <x-slot:footer>
+            @if($chronoMode !== 'menu')
+                <button type="button" class="btn btn-outline-secondary" wire:click="chronoBackToMenu">Wstecz</button>
+            @endif
+            <button type="button" class="btn btn-outline-secondary" wire:click="closeChronoModal">Zamknij</button>
+            @if($chronoMode === 'import' && $importProposals === [])
+                <button type="button" class="btn btn-primary" wire:click="parseImportText"
+                        wire:loading.attr="disabled" wire:target="parseImportText">
+                    <span wire:loading.remove wire:target="parseImportText">Wczytaj propozycje</span>
+                    <span wire:loading wire:target="parseImportText">Parsuję…</span>
+                </button>
+            @elseif($chronoMode === 'import')
+                <button type="button" class="btn btn-primary" wire:click="confirmImportProposals"
+                        wire:loading.attr="disabled" wire:target="confirmImportProposals"
+                        @disabled(count($importSelected) === 0)>
+                    Utwórz zaznaczone ({{ count($importSelected) }})
+                </button>
+            @elseif($chronoMode === 'export' && $exportJson !== '')
+                <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    x-data
+                    @click="
+                        navigator.clipboard.writeText(document.getElementById('chronoExportJson').value);
+                        $el.textContent = 'Skopiowano';
+                        setTimeout(() => $el.textContent = 'Kopiuj JSON', 1500);
+                    "
+                >
+                    Kopiuj JSON
+                </button>
+                <button type="button" class="btn btn-primary" wire:click="downloadChronoExport"
+                        wire:loading.attr="disabled" wire:target="downloadChronoExport">
+                    <i class="bi bi-download me-1"></i> Pobierz plik
+                </button>
+            @endif
+        </x-slot:footer>
+    </x-chrono.modal>
+@endif
 </div>

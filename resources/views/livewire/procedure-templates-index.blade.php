@@ -246,15 +246,25 @@
                         </div>
                     </div>
                     <div class="modal-footer d-flex flex-wrap justify-content-between gap-2" style="border-color:var(--glass-border)!important;">
-                        @if($llmConfigured)
-                            <x-chrono.trigger
-                                target="openChronoModal"
-                                hint="Zaproponuj przepływ"
-                                hint-loading="Budzę bota…"
-                            />
-                        @else
-                            <span></span>
-                        @endif
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            @if($llmConfigured)
+                                <x-chrono.trigger
+                                    target="openChronoModal"
+                                    hint="Zaproponuj przepływ"
+                                    hint-loading="Budzę bota…"
+                                />
+                            @endif
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                wire:click="openImportModal"
+                                wire:loading.attr="disabled"
+                                wire:target="openImportModal"
+                            >
+                                <i class="bi bi-clipboard2-pulse me-1"></i>
+                                Importuj z tekstu
+                            </button>
+                        </div>
 
                         <div class="d-flex gap-2">
                             <x-ui.button variant="ghost" class="btn-sm" wire:click="$set('showNewModal',false)">Anuluj</x-ui.button>
@@ -262,6 +272,70 @@
                                 <i class="bi bi-pencil-square me-1"></i> Utwórz i otwórz edytor
                             </x-ui.button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ===== Import wklejonego JSON (np. z ChatGPT) ===== --}}
+    @if($showImportModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.75);z-index:2000;"
+             wire:click.self="closeImportModal">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+                <div class="modal-content" style="background:var(--bg-card,#1e2535);border:1px solid var(--glass-border);color:var(--text-main,#f1f5f9);">
+                    <div class="modal-header" style="border-color:var(--glass-border)!important;">
+                        <h5 class="modal-title mb-0">
+                            <i class="bi bi-clipboard2-pulse me-2"></i>Importuj przepływ z tekstu
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" wire:click="closeImportModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            Wklej JSON z krokami procedury — ten sam format co odpowiedź Chrono.
+                            Możesz poprosić zewnętrzny chat o wygenerowanie kroków w tym formacie i skopiować wynik tutaj.
+                            Nic nie zapisze się bez Twojego kliknięcia „Zapisz” w edytorze.
+                        </p>
+
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                <label class="form-label small fw-semibold mb-0">Oczekiwany format</label>
+                                <span class="text-muted small">type: task · checklist · decision · wait</span>
+                            </div>
+                            <pre class="small mb-0 p-3 rounded" style="background:rgba(0,0,0,.25);border:1px solid var(--glass-border);max-height:220px;overflow:auto;"><code>{{ $importFormatExample }}</code></pre>
+                        </div>
+
+                        <div>
+                            <label class="form-label small fw-semibold">Wklej tekst</label>
+                            <textarea
+                                rows="10"
+                                class="form-control font-monospace"
+                                wire:model.defer="importText"
+                                placeholder='{"steps":[{"type":"task","name":"Pierwszy krok"}]}'
+                                spellcheck="false"
+                            ></textarea>
+                        </div>
+
+                        @if($importError)
+                            <x-ui.alert variant="danger" class="mt-3 mb-0">{{ $importError }}</x-ui.alert>
+                        @endif
+                    </div>
+                    <div class="modal-footer" style="border-color:var(--glass-border)!important;">
+                        <button type="button" class="btn btn-outline-secondary" wire:click="closeImportModal">
+                            Anuluj
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            wire:click="importFromText"
+                            wire:loading.attr="disabled"
+                            wire:target="importFromText"
+                        >
+                            <span wire:loading.remove wire:target="importFromText">
+                                <i class="bi bi-box-arrow-in-down me-1"></i> Importuj i otwórz edytor
+                            </span>
+                            <span wire:loading wire:target="importFromText">Wczytuję…</span>
+                        </button>
                     </div>
                 </div>
             </div>

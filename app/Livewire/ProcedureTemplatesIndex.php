@@ -54,6 +54,13 @@ class ProcedureTemplatesIndex extends Component
 
     public ?string $chronoError = null;
 
+    // Import z wklejonego tekstu (np. odpowiedź z ChatGPT)
+    public bool $showImportModal = false;
+
+    public string $importText = '';
+
+    public ?string $importError = null;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'categoryFilter' => ['except' => ''],
@@ -167,8 +174,11 @@ class ProcedureTemplatesIndex extends Component
         $this->newDescription = '';
         $this->showNewModal = true;
         $this->showChronoModal = false;
+        $this->showImportModal = false;
         $this->chronoLoading = false;
         $this->chronoError = null;
+        $this->importText = '';
+        $this->importError = null;
         $this->resetErrorBag();
     }
 
@@ -241,6 +251,49 @@ class ProcedureTemplatesIndex extends Component
         $this->chronoLoading = false;
         $this->chronoError = null;
         $this->showNewModal = true;
+    }
+
+    public function openImportModal(): void
+    {
+        $this->validateNewTemplate();
+
+        $this->importError = null;
+        $this->showNewModal = false;
+        $this->showImportModal = true;
+    }
+
+    public function closeImportModal(): void
+    {
+        $this->showImportModal = false;
+        $this->importError = null;
+        $this->showNewModal = true;
+    }
+
+    /** Import wklejonego JSON → szkic na canvasie (jak Chrono, bez zapisu przepływu). */
+    public function importFromText(ProcedureFlowSuggestionService $service): mixed
+    {
+        $this->validateNewTemplate();
+
+        try {
+            $steps = $service->importStepsFromText($this->importText);
+        } catch (LlmException $e) {
+            $this->importError = $e->getMessage();
+
+            return null;
+        } catch (\Throwable $e) {
+            $this->importError = 'Nie udało się wczytać kroków: '.$e->getMessage();
+
+            return null;
+        }
+
+        $this->showImportModal = false;
+        $this->importError = null;
+
+        return $this->storeTemplate(
+            ['nodes' => [], 'edges' => []],
+            'Zaimportowano przepływ dla "%s" — sprawdź go i kliknij Zapisz.',
+            $service->buildDefinition($steps),
+        );
     }
 
     private function validateNewTemplate(): void
@@ -332,6 +385,10 @@ class ProcedureTemplatesIndex extends Component
             'users' => $users,
             'subjectTypes' => ProcedureSubjectType::formOptions(),
             'llmConfigured' => app(LlmClient::class)->isConfigured(),
+            'importFormatExample' => json_encode(
+                ProcedureFlowSuggestionService::importFormatExample(),
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+            ),
             'startSubjectOptions' => $this->startSubjectOptions(),
             'startSubjectTypeLabel' => $this->startSubjectTypeLabel(),
         ]);

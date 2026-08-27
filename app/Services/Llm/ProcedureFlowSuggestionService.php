@@ -33,6 +33,65 @@ class ProcedureFlowSuggestionService extends StructuredSuggestionService
      * @param  array{name: string, category?: ?string, subject_type?: ?string, description?: ?string}  $input
      * @return list<array{type: string, name: string, description: string, instructions: string, checklist: list<string>, options: list<string>, wait: array{duration: int, unit: string}|null}>
      */
+    /**
+     * Przykładowy JSON do wklejenia z zewnętrznego chatu (ChatGPT itd.).
+     *
+     * @return array<string, mixed>
+     */
+    public static function importFormatExample(): array
+    {
+        return [
+            'steps' => [
+                [
+                    'type' => 'task',
+                    'name' => 'Przygotuj dokumenty',
+                    'description' => 'Po co ten krok',
+                    'instructions' => 'Co dokładnie zrobić',
+                ],
+                [
+                    'type' => 'checklist',
+                    'name' => 'Sprawdź komplet',
+                    'checklist' => ['Umowa', 'Badania', 'Szkolenie BHP'],
+                ],
+                [
+                    'type' => 'decision',
+                    'name' => 'Czy wszystko kompletne?',
+                    'options' => ['Tak', 'Nie'],
+                ],
+                [
+                    'type' => 'wait',
+                    'name' => 'Czekaj na akceptację',
+                    'wait' => ['duration' => 2, 'unit' => 'dni'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Parsuje wklejony tekst (JSON) do znormalizowanych kroków — ten sam format co odpowiedź modelu.
+     *
+     * @return list<array{type: string, name: string, description: string, instructions: string, checklist: list<string>, options: list<string>, wait: array{duration: int, unit: string}|null}>
+     *
+     * @throws LlmException
+     */
+    public function importStepsFromText(string $text, int $maxSteps = 8): array
+    {
+        $text = trim($text);
+
+        if ($text === '') {
+            throw new LlmException('Wklej tekst z krokami procedury.');
+        }
+
+        $data = $this->decodeJson($text);
+        $steps = $this->normalizeSteps($data['steps'] ?? $data, $maxSteps);
+
+        if ($steps === []) {
+            throw new LlmException('Nie znaleziono kroków. Użyj JSON z tablicą steps (patrz przykład formatu).');
+        }
+
+        return $steps;
+    }
+
     public function suggest(array $input, int $maxSteps = 8): array
     {
         $subjectLabel = ProcedureSubjectType::tryFrom((string) ($input['subject_type'] ?? ''))?->label();

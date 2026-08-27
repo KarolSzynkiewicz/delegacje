@@ -57,6 +57,29 @@ class ProcedureTemplateController extends Controller
                 ->values(),
             'chronoProposal' => session('chrono_proposal'),
             'chronoEnabled' => app(LlmClient::class)->isConfigured(),
+            'importFormatExample' => json_encode(
+                ProcedureFlowSuggestionService::importFormatExample(),
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+            ),
+        ]);
+    }
+
+    /** Parsuje wklejony JSON (format steps) → definicja grafu na canvas. */
+    public function importFlow(Request $request, ProcedureFlowSuggestionService $service): JsonResponse
+    {
+        $validated = $request->validate([
+            'text' => ['required', 'string', 'max:50000'],
+        ]);
+
+        try {
+            $steps = $service->importStepsFromText($validated['text']);
+        } catch (LlmException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'definition' => $service->buildDefinition($steps),
+            'steps' => count($steps),
         ]);
     }
 

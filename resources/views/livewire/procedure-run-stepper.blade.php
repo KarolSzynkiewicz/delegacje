@@ -1,10 +1,8 @@
 @php
     $node        = $run->currentNode();
     $nodeType    = $node['type'] ?? 'task';
-    $progress    = $run->progress();
-    $progressPct = round($progress * 100);
-    $stepCount   = count($run->path ?? []);
-    $totalNodes  = count(array_filter($run->definition_snapshot['nodes'] ?? [], fn ($n) => ($n['type'] ?? '') !== 'note'));
+    $metrics     = $run->progressMetrics();
+    $progressPct = $metrics['percent'];
     $isFinished  = $run->status->value === 'finished';
     $isAbandoned = $run->status->value === 'abandoned';
     $isDone      = $isFinished || $isAbandoned;
@@ -52,7 +50,7 @@
         <div class="mb-3">
             <div class="d-flex justify-content-between small text-muted mb-1">
                 <span>Postęp</span>
-                <span>{{ $progressPct }}% · krok {{ $stepCount }} z ~{{ $totalNodes }}</span>
+                <span>{{ $progressPct }}% · {{ $metrics['label'] }}</span>
             </div>
             <x-ui.progress :value="$progressPct" />
         </div>
