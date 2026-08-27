@@ -2802,6 +2802,10 @@ html:has(.cl-landing) {
     grid-template-columns: repeat(3, 1fr);
 }
 
+.cl-landing-grid--bots {
+    grid-template-columns: repeat(2, 1fr);
+}
+
 .cl-landing-tile,
 .cl-landing-module {
     background: var(--cl-surface);
@@ -2820,6 +2824,7 @@ html:has(.cl-landing) {
 .cl-landing h3,
 .cl-landing-tile h3,
 .cl-landing-module h3,
+.cl-landing-bot h3,
 .cl-landing-steps h3 {
     font-size: 20px;
     font-weight: 500;
@@ -2829,6 +2834,7 @@ html:has(.cl-landing) {
 
 .cl-landing-tile p,
 .cl-landing-module p,
+.cl-landing-bot p,
 .cl-landing-steps p {
     font-size: 14px;
     color: var(--text-muted);
@@ -2888,6 +2894,77 @@ html:has(.cl-landing) {
 .cl-landing-module p {
     margin-top: 10px;
     font-size: 13.5px;
+}
+
+.cl-landing-bot {
+    background: var(--cl-surface);
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s ease;
+}
+
+.cl-landing-bot:hover {
+    background: var(--cl-surface-2);
+}
+
+.cl-landing-bot::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+}
+
+.cl-landing-bot:hover::before {
+    transform: scaleX(1);
+}
+
+.cl-landing-bot__figure {
+    margin-bottom: 8px;
+}
+
+.cl-landing-bot__role {
+    font-size: 11px;
+    color: var(--cl-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+}
+
+.cl-landing-bot h3 {
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.cl-landing-bot p {
+    margin-top: 0;
+}
+
+.cl-landing-bot ul {
+    list-style: none;
+    margin: 18px 0 0;
+    padding: 0;
+}
+
+.cl-landing-bot li {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.45;
+    padding: 7px 0;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-landing-bot li::before {
+    content: '→ ';
+    color: var(--cl-faint);
 }
 
 .cl-landing-stats {
@@ -3069,6 +3146,7 @@ html:has(.cl-landing) {
     }
 
     .cl-landing-grid--3,
+    .cl-landing-grid--bots,
     .cl-landing-stats__grid {
         grid-template-columns: 1fr;
     }
@@ -3104,7 +3182,10 @@ html:has(.cl-landing) {
 
 @media (prefers-reduced-motion: reduce) {
     .cl-landing-marquee__track,
-    .cl-landing-clock__dot {
+    .cl-landing-clock__dot,
+    .cl-landing-bot .ac-bot__svg,
+    .cl-landing-bot .ac-bot__hand--min,
+    .cl-landing-bot .ac-bot__eye {
         animation: none !important;
     }
 }
@@ -8010,9 +8091,27 @@ a.rc-chip:hover {
 .ac-bot__aura,
 .ac-bot__scan,
 .ac-bot__think,
-.ac-bot__eyes-happy {
+.ac-bot__eyes-happy,
+.ac-bot__beam {
     opacity: 0;
     transition: opacity .25s ease;
+}
+
+/* Wiązka radaru (Argus/Analityk): świeci w dół z oka, pivot u wierzchołka stożka. */
+.ac-bot__beam {
+    transform-box: fill-box;
+    transform-origin: 50% 0%;
+}
+
+/* Chrono/Twórca (Kuźnia): iskry-pomysły wylatujące znad blueprintu, gdy myśli. */
+.ac-bot__ideas {
+    opacity: 0;
+}
+
+.ac-bot__idea {
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
 }
 
 .ac-bot__check {
@@ -8036,6 +8135,26 @@ a.rc-chip:hover {
     opacity: 1;
 }
 
+.ac-bot--thinking .ac-bot__beam {
+    animation: ac-beam-sweep-blink 1.6s ease-in-out infinite;
+}
+
+.ac-bot--thinking .ac-bot__ideas {
+    opacity: 1;
+}
+
+.ac-bot--thinking .ac-bot__idea {
+    animation: ac-idea-pop 1.15s ease-out infinite;
+}
+
+.ac-bot--thinking .ac-bot__idea:nth-child(2) {
+    animation-delay: .28s;
+}
+
+.ac-bot--thinking .ac-bot__idea:nth-child(3) {
+    animation-delay: .56s;
+}
+
 .ac-bot--thinking .ac-bot__svg {
     animation-duration: 1.8s;
 }
@@ -8054,6 +8173,12 @@ a.rc-chip:hover {
 
 .ac-bot--thinking .ac-bot__eye {
     animation: ac-scan 1.6s ease-in-out infinite;
+}
+
+/* Argus (Analityk): oko patrzy w bok, wiązka radaru macha w tę samą stronę
+   i gaśnie na moment mrugnięcia — jeden wspólny rytm 1.6s. */
+.ac-bot--v-lens.ac-bot--thinking .ac-bot__eye {
+    animation: ac-scan-blink 1.6s ease-in-out infinite;
 }
 
 .ac-bot--thinking .ac-bot__spark,
@@ -8115,6 +8240,37 @@ a.rc-chip:hover {
     50%      { transform: translateX(1.6px); }
 }
 
+/* Argus: oko jedzie w bok i mruga dokładnie w momencie zwrotu (50%) —
+   ten sam procentowy rozkład co ac-beam-sweep-blink, żeby oko i wiązka
+   patrzyły w tę samą stronę i gasły razem. */
+@keyframes ac-scan-blink {
+    0%   { transform: translateX(-1.6px) scaleY(1); }
+    44%  { transform: translateX(1.3px) scaleY(1); }
+    50%  { transform: translateX(1.6px) scaleY(.12); }
+    56%  { transform: translateX(1.3px) scaleY(1); }
+    100% { transform: translateX(-1.6px) scaleY(1); }
+}
+
+@keyframes ac-beam-sweep-blink {
+    0%   { opacity: 1; transform: rotate(-16deg); }
+    44%  { opacity: 1; transform: rotate(13deg); }
+    50%  { opacity: 0; transform: rotate(16deg); }
+    56%  { opacity: 1; transform: rotate(13deg); }
+    100% { opacity: 1; transform: rotate(-16deg); }
+}
+
+@keyframes ac-avatar-ping {
+    0%   { box-shadow: 0 0 0 0 rgba(168, 85, 247, .45); }
+    70%  { box-shadow: 0 0 0 7px rgba(168, 85, 247, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+}
+
+@keyframes ac-idea-pop {
+    0%   { transform: translate(0, 0) scale(.35); opacity: 0; }
+    22%  { opacity: 1; }
+    100% { transform: translate(var(--dx, 12px), var(--dy, -12px)) scale(1.1); opacity: 0; }
+}
+
 @keyframes ac-pulse {
     0%, 100% { transform: scale(1);   opacity: 1; }
     50%      { transform: scale(1.3); opacity: .6; }
@@ -8136,6 +8292,26 @@ a.rc-chip:hover {
     to   { transform: scale(1) rotate(0); }
 }
 
+/* ── Ikonka warsztatu (4 boty w jednym znaczku) ────────────── */
+
+.ac-workshop {
+    display: inline-block;
+    width: var(--ac-size, 36px);
+    line-height: 0;
+    flex-shrink: 0;
+}
+
+.ac-workshop__svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.ac-workshop__back {
+    opacity: .72;
+}
+
 /* ── Przycisk uruchamiający bota ─────────────────────────── */
 
 .ac-trigger {
@@ -8148,13 +8324,17 @@ a.rc-chip:hover {
     background: linear-gradient(135deg, rgba(59, 130, 246, .12), rgba(168, 85, 247, .12));
     color: var(--text-main);
     text-align: left;
-    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    transform: none;
+    transition: filter .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
 }
 
+/* Bez translateY: przycisk siedzi w rzędzie obok innych kontrolek (toolbar,
+   nagłówek karty) — przesunięcie na hover rozjeżdżało sąsiednie napisy. */
 .ac-trigger:hover:not(:disabled) {
-    transform: translateY(-1px);
     border-color: rgba(168, 85, 247, .55);
+    background: linear-gradient(135deg, rgba(59, 130, 246, .2), rgba(168, 85, 247, .2));
     box-shadow: 0 8px 22px rgba(59, 130, 246, .18);
+    filter: brightness(1.08);
 }
 
 .ac-trigger:disabled {
@@ -8360,7 +8540,7 @@ a.rc-chip:hover {
     gap: .65rem;
 }
 
-@media (min-width: 420px) {
+@media (min-width: 576px) {
     .ac-assist__header {
         flex-direction: row;
         align-items: center;
@@ -8379,10 +8559,12 @@ a.rc-chip:hover {
 
 .ac-assist__title {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: clamp(0.92rem, 3.6vw, 1.2rem);
     font-weight: 650;
     letter-spacing: -.01em;
     line-height: 1.25;
+    overflow-wrap: anywhere;
+    hyphens: auto;
     background: linear-gradient(135deg, var(--primary), var(--accent));
     -webkit-background-clip: text;
     background-clip: text;
@@ -8405,12 +8587,84 @@ a.rc-chip:hover {
     width: 100%;
 }
 
-@media (min-width: 420px) {
+@media (min-width: 576px) {
     .ac-assist__roster {
         width: auto;
-        min-width: 11.5rem;
-        max-width: 14.5rem;
+        min-width: 12rem;
+        max-width: 15rem;
         flex: 0 0 13.5rem;
+    }
+}
+
+/* Flush (modal-xl): tytuł nad pełnym rzędem botów — zero pustej dziury */
+.ac-assist--flush .ac-assist__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: .85rem;
+}
+
+.ac-assist--flush .ac-assist__roster {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    flex: none;
+    gap: .45rem;
+}
+
+.ac-assist--flush .ac-assist__avatar {
+    padding: .55rem .35rem .45rem;
+    gap: .3rem;
+}
+
+.ac-assist--flush .ac-assist__avatar-bot {
+    width: 56px;
+    height: 60px;
+}
+
+.ac-assist--flush .ac-assist__avatar-bot .ac-bot {
+    --ac-size: 56px;
+    width: var(--ac-size);
+}
+
+.ac-assist--flush .ac-assist__avatar-name {
+    font-size: .72rem;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.ac-assist--flush .ac-assist__avatar-role {
+    font-size: .58rem;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+@media (min-width: 768px) {
+    .ac-assist--flush .ac-assist__roster {
+        gap: .65rem;
+    }
+
+    .ac-assist--flush .ac-assist__avatar {
+        padding: .7rem .5rem .55rem;
+    }
+
+    .ac-assist--flush .ac-assist__avatar-bot {
+        width: 72px;
+        height: 78px;
+    }
+
+    .ac-assist--flush .ac-assist__avatar-bot .ac-bot {
+        --ac-size: 72px;
+    }
+
+    .ac-assist--flush .ac-assist__avatar-name {
+        font-size: .8rem;
+    }
+
+    .ac-assist--flush .ac-assist__avatar-role {
+        font-size: .62rem;
+        letter-spacing: .05em;
     }
 }
 
@@ -8429,28 +8683,119 @@ a.rc-chip:hover {
     color: inherit;
     cursor: pointer;
     text-align: center;
+    transform: none;
     transition:
         opacity .3s ease,
         filter .3s ease,
-        transform .3s ease,
         border-color .3s ease,
         background .3s ease;
     transition-delay: 0ms;
 }
 
 .ac-assist__avatar:hover:not(.is-dim) {
-    background: rgba(255, 255, 255, .04);
-    border-color: rgba(255, 255, 255, .08);
+    background: rgba(255, 255, 255, .05);
+    border-color: rgba(255, 255, 255, .1);
+    filter: brightness(1.12);
 }
 
 .ac-assist__avatar-bot {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    transition: transform .3s ease, filter .3s ease, opacity .3s ease;
+    width: 48px;
+    height: 52px;
+    overflow: visible;
+    border-radius: 10px;
+    transform: none;
+    transition: filter .3s ease, opacity .3s ease;
     transition-delay: inherit;
+}
+
+.ac-assist__avatar-bot .ac-bot,
+.ac-assist__avatar-bot .ac-bot__svg {
+    transform: none;
+}
+
+.ac-assist__avatar-bot .ac-bot__svg {
+    /* W ramce rosteru wyłączamy float — inaczej SVG „ucieka” z kadru. */
+    animation: none;
+}
+
+/* Myślenie w rzędzie 4 botów: klasa ląduje na przycisku (.is-busy), nie na SVG.
+   Te same klatki co .ac-bot--thinking w galerii wyżej. */
+.ac-assist__avatar.is-busy .ac-assist__avatar-bot .ac-bot__svg {
+    animation: ac-float 1.6s ease-in-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__aura,
+.ac-assist__avatar.is-busy .ac-bot__scan,
+.ac-assist__avatar.is-busy .ac-bot__think,
+.ac-assist__avatar.is-busy .ac-bot__beam,
+.ac-assist__avatar.is-busy .ac-bot__ideas {
+    opacity: 1;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__hand--min {
+    animation-duration: .9s;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__hand--hour {
+    animation: ac-spin 5.5s linear infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__scan {
+    animation: ac-spin 1.6s linear infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__eye {
+    animation: ac-scan 1.6s ease-in-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot--v-lens .ac-bot__eye {
+    animation: ac-scan-blink 1.6s ease-in-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__beam {
+    animation: ac-beam-sweep-blink 1.6s ease-in-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__spark,
+.ac-assist__avatar.is-busy .ac-bot__core {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ac-pulse .75s ease-in-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__think circle {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ac-think 1.4s ease-in-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__think circle:nth-child(2) { animation-delay: .18s; }
+.ac-assist__avatar.is-busy .ac-bot__think circle:nth-child(3) { animation-delay: .36s; }
+
+.ac-assist__avatar.is-busy .ac-bot__idea {
+    animation: ac-idea-pop 1.15s ease-out infinite;
+}
+
+.ac-assist__avatar.is-busy .ac-bot__idea:nth-child(2) { animation-delay: .28s; }
+.ac-assist__avatar.is-busy .ac-bot__idea:nth-child(3) { animation-delay: .56s; }
+
+.ac-assist__avatar.is-done .ac-bot__svg {
+    animation: ac-pop .55s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+.ac-assist__avatar.is-done .ac-bot__eyes { opacity: 0; }
+.ac-assist__avatar.is-done .ac-bot__eyes-happy { opacity: 1; }
+
+.ac-assist__avatar.is-done .ac-bot__hand--min {
+    animation: none;
+}
+
+.ac-assist__avatar.is-done .ac-bot__check {
+    opacity: 1;
+    animation: ac-badge .45s cubic-bezier(.34, 1.56, .64, 1) .12s forwards;
 }
 
 .ac-assist__avatar-name {
@@ -8477,18 +8822,16 @@ a.rc-chip:hover {
     white-space: nowrap;
 }
 
-/* Wybrany — rozjaśnia się od razu (bez delay) */
+/* Wybrany — rozjaśnienie, bez przesuwania / skalowania */
 .ac-assist__avatar.is-on {
     opacity: 1;
-    filter: none;
-    transform: translateY(-2px);
+    filter: brightness(1.08);
     border-color: rgba(168, 85, 247, .4);
     background: linear-gradient(160deg, rgba(59, 130, 246, .14), rgba(168, 85, 247, .1));
     transition-delay: 0ms;
 }
 
 .ac-assist__avatar.is-on .ac-assist__avatar-bot {
-    transform: scale(1.08);
     filter: none;
     opacity: 1;
 }
@@ -8497,11 +8840,16 @@ a.rc-chip:hover {
     color: #c4b5fd;
 }
 
+/* Aktywny bot myśli: ping wokół kafelka + animacje SVG (wiązka, iskry…). */
+.ac-assist__avatar.is-busy {
+    overflow: visible;
+    animation: ac-avatar-ping 1.2s ease-out infinite;
+}
+
 /* Pozostali — gasną falą (0 / 100 / 200 / 300 ms) */
 .ac-assist__avatar.is-dim {
     opacity: .28;
     filter: grayscale(1) brightness(.72);
-    transform: scale(.92);
     pointer-events: auto;
     transition-delay: var(--ac-dim-delay);
 }
@@ -8512,23 +8860,49 @@ a.rc-chip:hover {
 }
 
 .ac-assist__avatar.is-dim:hover {
-    opacity: .45;
-    filter: grayscale(.8) brightness(.85);
+    opacity: .48;
+    filter: grayscale(.75) brightness(.9);
+}
+
+/* W budowie — widoczne, ale nieaktywne (w kontekście tego widoku). */
+.ac-assist__avatar.is-wip,
+.ac-assist__tile.is-wip,
+.ac-assist__option.is-wip {
+    opacity: .38;
+    filter: grayscale(1) brightness(.7);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.ac-assist__avatar.is-wip {
+    border-color: transparent;
+    background: transparent;
 }
 
 .ac-assist__tile-face {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.35rem;
-    height: 2.35rem;
-    border-radius: 12px;
-    background: rgba(59, 130, 246, .12);
+    width: 100%;
+    min-height: 3.75rem;
+    padding: .15rem 0;
+    border-radius: 14px;
+    background: transparent;
     flex-shrink: 0;
+    overflow: visible;
+}
+
+.ac-assist__tile-face .ac-bot {
+    --ac-size: 56px;
+    width: var(--ac-size);
+}
+
+.ac-assist__tile-face .ac-bot__svg {
+    animation: none;
 }
 
 .ac-assist__tile.is-active .ac-assist__tile-face {
-    background: linear-gradient(135deg, rgba(59, 130, 246, .28), rgba(168, 85, 247, .28));
+    background: transparent;
 }
 
 .ac-assist__tile.is-dim {
@@ -8714,15 +9088,16 @@ a.rc-chip:hover {
 .ac-assist__tile {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: flex-start;
     gap: .55rem;
-    min-height: 5.6rem;
-    padding: .85rem .8rem .8rem;
+    min-height: 8.75rem;
+    padding: 1rem .75rem .9rem;
     border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, .1);
     background: rgba(255, 255, 255, .03);
     color: inherit;
-    text-align: left;
+    text-align: center;
     cursor: pointer;
     transition: border-color .15s ease, background .15s ease, transform .15s ease;
     position: relative;
@@ -8764,10 +9139,12 @@ a.rc-chip:hover {
 .ac-assist__tile-body {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: .2rem;
     min-width: 0;
     width: 100%;
-    padding-right: 1rem;
+    padding-right: 0;
+    text-align: center;
 }
 
 .ac-assist__tile-label {
@@ -8781,12 +9158,13 @@ a.rc-chip:hover {
     font-size: .7rem;
     color: var(--text-muted);
     line-height: 1.35;
+    max-width: 16rem;
 }
 
 .ac-assist__tile-chevron {
     position: absolute;
-    top: .75rem;
-    right: .7rem;
+    top: .65rem;
+    right: .55rem;
     font-size: .7rem;
     color: var(--text-muted);
 }
@@ -8824,62 +9202,6 @@ a.rc-chip:hover {
 .ac-assist-fade--out {
     opacity: 0;
     transform: translateX(-8px);
-}
-
-.ac-assist__crumb {
-    display: flex;
-    align-items: center;
-    gap: .65rem;
-    min-width: 0;
-}
-
-.ac-assist__back {
-    appearance: none;
-    display: inline-flex;
-    align-items: center;
-    gap: .2rem;
-    padding: .35rem .55rem .35rem .4rem;
-    margin: 0;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, .12);
-    background: rgba(255, 255, 255, .04);
-    color: var(--text-muted);
-    font-size: .72rem;
-    font-weight: 600;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: border-color .15s ease, background .15s ease, color .15s ease;
-}
-
-.ac-assist__back:hover {
-    border-color: rgba(168, 85, 247, .4);
-    background: rgba(59, 130, 246, .1);
-    color: var(--text-main);
-}
-
-.ac-assist__crumb-text {
-    display: flex;
-    flex-direction: column;
-    gap: .05rem;
-    min-width: 0;
-}
-
-.ac-assist__crumb-eyebrow {
-    font-size: .62rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: #c4b5fd;
-    line-height: 1.2;
-}
-
-.ac-assist__crumb-title {
-    font-size: .9rem;
-    font-weight: 650;
-    line-height: 1.25;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .ac-assist__options {
@@ -8970,6 +9292,57 @@ a.rc-chip:hover {
     margin-top: .15rem;
 }
 
+/* Przyciski stopki nie "podskakują" na hover — sąsiadują z chipami/labelkami,
+   a translateY(-2px) z globalnego .btn rozjeżdżał układ w modalu/mobile. */
+.ac-assist__foot .btn:hover {
+    transform: none;
+}
+
+.ac-assist__busy,
+.ac-assist__ready {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+    padding: 1.1rem .5rem 1.25rem;
+    text-align: center;
+    min-height: 11rem;
+    overflow: visible;
+}
+
+.ac-assist__busy .ac-bot,
+.ac-assist__ready .ac-bot {
+    overflow: visible;
+}
+
+.ac-assist__busy-label,
+.ac-assist__ready-label {
+    margin: 0;
+    font-size: .88rem;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    color: var(--text-main);
+}
+
+.ac-assist__ready-hint {
+    margin: 0;
+    font-size: .74rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    max-width: 16rem;
+}
+
+.ac-assist__busy .ac-thinking__bars {
+    width: 100%;
+    max-width: 14rem;
+    margin-bottom: 0;
+}
+
+.ac-assist__busy .ac-thinking__bars span {
+    height: 1.15rem;
+}
+
 .ac-assist__toast {
     margin: 0;
     padding: .65rem .8rem;
@@ -8979,6 +9352,62 @@ a.rc-chip:hover {
     color: #6ee7b7;
     font-size: .8rem;
     line-height: 1.4;
+}
+
+.ac-assist.ac-assist--flush {
+    max-width: none;
+    width: 100%;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+/* Wide modal: bigger bots + 4-up so desktop width is used */
+.ac-assist--flush .ac-assist__tile {
+    min-height: 10.5rem;
+    padding: 1.15rem .85rem 1rem;
+    gap: .65rem;
+}
+
+.ac-assist--flush .ac-assist__tile-face {
+    min-height: 5rem;
+}
+
+.ac-assist--flush .ac-assist__tile-face .ac-bot {
+    --ac-size: 72px;
+}
+
+@media (min-width: 768px) {
+    .ac-assist--flush .ac-assist__grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .75rem;
+    }
+
+    .ac-assist--flush .ac-assist__grid > .ac-assist__tile:last-child:nth-child(odd) {
+        grid-column: auto;
+    }
+
+    .ac-assist--flush .ac-assist__tile {
+        min-height: 12.5rem;
+        padding: 1.35rem 1rem 1.15rem;
+    }
+
+    .ac-assist--flush .ac-assist__tile-face {
+        min-height: 6rem;
+    }
+
+    .ac-assist--flush .ac-assist__tile-face .ac-bot {
+        --ac-size: 92px;
+    }
+
+    .ac-assist--flush .ac-assist__tile-label {
+        font-size: .95rem;
+    }
+
+    .ac-assist--flush .ac-assist__title {
+        font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+    }
 }
 
 .ac-assist--phone {
@@ -9010,6 +9439,12 @@ a.rc-chip:hover {
 
     .ac-assist__avatar.is-dim {
         transition-delay: 0ms;
+    }
+
+    .ac-assist__avatar.is-busy,
+    .ac-assist__avatar.is-busy .ac-bot__svg,
+    .ac-assist__avatar-bot .ac-bot--thinking .ac-bot__svg {
+        animation: none;
     }
 
     .ac-assist-fade--in,
@@ -9659,4 +10094,128 @@ a.rc-chip:hover {
 .task-qe-panel .form-label,
 .task-qe-panel h6 {
     color: var(--text-main);
+}
+
+/* Edi: diff w komórce tabeli /tasks2 — add / change / remove */
+.tg-edi-bar {
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid rgba(168, 85, 247, 0.28);
+    background: rgba(168, 85, 247, 0.08);
+    color: var(--text-main, #f1f5f9);
+}
+
+td.tg-edi,
+.tg-edi {
+    border-radius: 4px;
+}
+
+td.tg-edi--add,
+.tg-edi--add {
+    background: rgba(59, 130, 246, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.45);
+}
+
+td.tg-edi--change,
+.tg-edi--change {
+    background: rgba(234, 179, 8, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.45);
+}
+
+td.tg-edi--remove,
+.tg-edi--remove {
+    background: rgba(239, 68, 68, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.45);
+}
+
+.tg-edi__pair {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    background: transparent;
+}
+
+button.tg-edi__pair:hover {
+    filter: brightness(1.12);
+}
+
+.tg-edi__pair--add {
+    background: rgba(59, 130, 246, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.65);
+}
+
+.tg-edi__pair--change {
+    background: rgba(234, 179, 8, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.7);
+}
+
+.tg-edi__pair--remove {
+    background: rgba(239, 68, 68, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.65);
+}
+
+.tg-edi__from {
+    color: var(--text-muted, #94a3b8);
+    text-decoration: line-through;
+    opacity: 0.9;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tg-edi__to {
+    font-weight: 700;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tg-edi__pair--add .tg-edi__to { color: #bfdbfe; }
+.tg-edi__pair--change .tg-edi__to { color: #fde047; }
+.tg-edi__pair--remove .tg-edi__to { color: #fca5a5; }
+
+.tg-edi__arrow {
+    color: var(--text-muted, #94a3b8);
+    flex-shrink: 0;
+}
+
+.tg-edi__cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 100%;
+}
+
+.tg-edi__skip {
+    flex-shrink: 0;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-muted, #94a3b8);
+    line-height: 1;
+    font-size: 0.7rem;
+}
+
+.tg-edi__skip:hover {
+    background: rgba(239, 68, 68, 0.45);
+    color: #fff;
+}
+
+body:has(.xuiv2-tasks.is-edi-review) .ui-page-header__right {
+    display: none !important;
 }

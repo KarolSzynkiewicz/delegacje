@@ -1,4 +1,4 @@
-<div class="xuiv2-tasks" id="xuiv2Tasks">
+<div class="xuiv2-tasks{{ $this->isEdiReviewing() ? ' is-edi-review' : '' }}" id="xuiv2Tasks">
 <style>
     /* ══════════════════════════════════════════════════════════
        xuiv2 — probka z /2, oryginalnie testowana na /tasks2. Fonty
@@ -211,6 +211,57 @@
     .tg-table > tbody > tr.tg-task-row:hover > td {
         background: rgba(255,255,255,0.035) !important;
     }
+    .xuiv2-tasks .tg-table > tbody > tr.tg-task-row > td.tg-edi--add {
+        background: rgba(59, 130, 246, 0.22) !important;
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.55);
+    }
+    .xuiv2-tasks .tg-table > tbody > tr.tg-task-row > td.tg-edi--change {
+        background: rgba(234, 179, 8, 0.22) !important;
+        box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.6);
+    }
+    .xuiv2-tasks .tg-table > tbody > tr.tg-task-row > td.tg-edi--remove {
+        background: rgba(239, 68, 68, 0.22) !important;
+        box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.55);
+    }
+    .xuiv2-tasks .tg-table > tbody > tr.tg-task-row:hover > td.tg-edi--add {
+        background: rgba(59, 130, 246, 0.3) !important;
+    }
+    .xuiv2-tasks .tg-table > tbody > tr.tg-task-row:hover > td.tg-edi--change {
+        background: rgba(234, 179, 8, 0.3) !important;
+    }
+    .xuiv2-tasks .tg-table > tbody > tr.tg-task-row:hover > td.tg-edi--remove {
+        background: rgba(239, 68, 68, 0.3) !important;
+    }
+    .xuiv2-tasks.is-edi-review .tg-expanded > td {
+        background: rgba(15, 23, 42, 0.35) !important;
+    }
+    .tg-edi__cell { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; }
+    .tg-edi__pair {
+        display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0; max-width: 100%;
+        padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.78rem; line-height: 1.3;
+        border: 0; cursor: pointer; text-align: left; color: inherit;
+    }
+    .tg-edi__pair--add { background: rgba(59, 130, 246, 0.32); box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.7); }
+    .tg-edi__pair--change { background: rgba(234, 179, 8, 0.32); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.75); }
+    .tg-edi__pair--remove { background: rgba(239, 68, 68, 0.32); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.7); }
+    .tg-edi__from { color: #94a3b8; text-decoration: line-through; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tg-edi__to { font-weight: 700; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; }
+    .tg-edi__pair--add .tg-edi__to { color: #bfdbfe; }
+    .tg-edi__pair--change .tg-edi__to { color: #fde047; }
+    .tg-edi__pair--remove .tg-edi__to { color: #fca5a5; }
+    .tg-edi__skip {
+        flex-shrink: 0; width: 1.15rem; height: 1.15rem; padding: 0; border: 0; border-radius: 999px;
+        background: rgba(0,0,0,.35); color: #94a3b8; line-height: 1; font-size: 0.7rem;
+    }
+    .tg-edi__skip:hover { background: rgba(239,68,68,.45); color: #fff; }
+    .tg-edi__input {
+        min-width: 7rem; max-width: 14rem; width: 100%;
+        padding: 0.1rem 0.35rem; border-radius: 4px;
+        border: 1px solid rgba(168,85,247,.55);
+        background: rgba(7,10,19,.75); color: #f1f5f9;
+        font-size: 0.78rem; font-family: inherit;
+    }
+    .tg-edi__input--wide { min-width: 12rem; max-width: 100%; }
     .tg-expanded > td {
         background: rgba(168,85,247,0.06) !important;
     }
@@ -486,10 +537,14 @@
             gap: 0.25rem !important;
         }
         .tg-add-actions .btn i { font-size: 0.72rem; }
+    .xuiv2-tasks.is-edi-review .tg-add-actions { display: none !important; }
+    body:has(.xuiv2-tasks.is-edi-review) .ui-page-header__right {
+        display: none !important;
+    }
 </style>
 
 {{-- Flash message --}}
-@if($flash)
+@if($flash && ! $this->isEdiReviewing())
 <div class="alert alert-success alert-dismissible py-2 mb-2 d-flex align-items-center gap-2 small" role="alert"
      style="border-radius: 6px">
     <i class="bi bi-check-circle-fill text-success"></i>
@@ -498,6 +553,41 @@
 </div>
 @endif
 
+@if($ediLoading || $ediChanges !== [] || $ediError)
+<div class="tg-edi-bar mb-2" @if($ediLoading) wire:init="fetchEdiProposals" @endif>
+    @if($ediLoading)
+        <div class="d-flex align-items-center gap-2 small">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span>Edi czyta eksport bieżącego filtra…</span>
+        </div>
+    @else
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="flex-grow-1 small">
+                <strong>Zatwierdzanie zmian Ediego</strong>
+                @if($ediError && $ediChanges === [])
+                    — {{ $ediError }}
+                @else
+                    — kliknij podświetloną komórkę, żeby zastosować (znika z listy). × odrzuca bez zapisu.
+                    Zostało {{ count($ediChanges) }}.
+                    <span class="d-block mt-1" style="opacity:.8">
+                        🟦 dodano · 🟨 zmieniono · 🟥 usunięto · kliknij nową wartość, żeby poprawić (bez zapisu)
+                    </span>
+                @endif
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="chronoChooseEdiExport">Eksport JSON</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="discardEdiChanges">Zamknij bez zmian</button>
+            @if($ediChanges !== [])
+                <button type="button" class="btn btn-sm btn-primary" wire:click="applyEdiChanges"
+                        wire:loading.attr="disabled" wire:target="applyEdiChanges">
+                    Zastosuj pozostałe ({{ count($ediChanges) }})
+                </button>
+            @endif
+        </div>
+    @endif
+</div>
+@endif
+
+@unless($this->isEdiReviewing())
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- TOOLBAR — jeden rząd, jak w /recruitment-processes:          --}}
 {{-- Szukaj + jeden przycisk „Filtry” (pogrupowany panel) zamiast --}}
@@ -659,10 +749,10 @@
                     target="openChronoModal"
                     class="tg-toolbar__chrono"
                     :size="28"
-                    label="Chrono"
+                    label="Chrono Assist"
                     hint="Filtr"
                     hint-loading="Otwieram…"
-                    title="AskChrono — podsumuj filtr albo zaimportuj zadania"
+                    title="Chrono Assist — Argus podsumuje, Impek zaimportuje, Chrono utworzy, Edi poprawi"
                 />
 
                 {{-- Task count --}}
@@ -700,6 +790,7 @@
         <button type="button" wire:click="clearFilters" class="rp-active-filters__clear">Wyczyść</button>
     </div>
 @endif
+@endunless
 
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- GRID TABLE                                                  --}}
@@ -821,7 +912,7 @@
                 @endif
 
                 {{-- ── Inline add-task row ── --}}
-                @if($showAddRow)
+                @if($showAddRow && ! $this->isEdiReviewing())
                 <tr class="tg-add-row">
                     <td style="padding:6px 4px; text-align:center">
                         <button wire:click="cancelAdd"
@@ -943,6 +1034,7 @@
                 @endif
 
                 {{-- ── Add-task footer row ── --}}
+                @unless($this->isEdiReviewing())
                 <tr class="tg-footer-row">
                     <td colspan="{{ $colCount }}" style="padding:7px 12px">
                         @if(!$showAddRow)
@@ -967,12 +1059,13 @@
                         @endif
                     </td>
                 </tr>
+                @endunless
             </tbody>
         </table>
     </div>
 
     {{-- Pagination (only in flat view) --}}
-    @if($tasks?->hasPages())
+    @if($tasks instanceof \Illuminate\Contracts\Pagination\Paginator && $tasks->hasPages())
     <div class="card-footer border-top py-2 px-3 bg-white">
         {{ $tasks->links() }}
     </div>
@@ -1120,7 +1213,7 @@
     @endif
 
     {{-- Pagination (only in flat view) --}}
-    @if($tasks?->hasPages())
+    @if($tasks instanceof \Illuminate\Contracts\Pagination\Paginator && $tasks->hasPages())
     <div class="mt-2">
         {{ $tasks->links() }}
     </div>
@@ -1179,19 +1272,33 @@
 </script>
 
 @if($showChronoModal)
+    @if($chronoMode === 'menu')
+        <livewire:chrono-assist
+            context="grid"
+            :context-chips="$chronoFilterLabels"
+            :item-count="$chronoItemCount"
+            wire:key="tasks-grid-chrono-assist"
+        />
+    @else
     <x-chrono.modal
         key="tasks-grid-chrono"
         close="closeChronoModal"
         :fetch="$chronoMode === 'summary' && $chronoLoading ? 'fetchChronoSummary' : null"
         :loading="$chronoLoading"
         :error="$chronoError"
-        :ready="$chronoMode === 'menu' || $chronoMode === 'import' || $chronoMode === 'export' || $chronoSummary !== null"
-        title="AskChrono — lista zadań"
+        :ready="$chronoMode === 'menu' || $chronoMode === 'import' || $chronoMode === 'export' || $chronoMode === 'edi-import' || $chronoMode === 'edi-export' || $chronoSummary !== null"
+        :title="match ($chronoMode) {
+            'edi-import' => 'Edi — wklej JSON',
+            'edi-export' => 'Edi — eksport JSON',
+            default => 'AskChrono — lista zadań',
+        }"
         :status-ready="match ($chronoMode) {
             'menu' => 'Wybierz akcję dla bieżącego filtra',
             'summary' => 'Podsumowanie gotowe',
             'import' => 'Mam '.count($importProposals).' propozycji — sprawdź i zatwierdź',
             'export' => 'Eksport: '.$exportCount.($exportTotal > $exportCount ? ' z '.$exportTotal : '').' zadań',
+            'edi-import' => 'Wklej changes[] z ChatGPT albo tasks[] z Impki',
+            'edi-export' => 'Paczka dla promptu: '.$exportCount.($exportTotal > $exportCount ? ' z '.$exportTotal : '').' zadań',
             default => 'Sprawdź i zatwierdź',
         }"
         :thinking="$chronoMode === 'summary'
@@ -1260,18 +1367,31 @@
             @endif
         @elseif($chronoMode === 'import')
             @if($importProposals === [])
-                <p class="text-muted small mb-3">
-                    Wklej JSON z tablicą <code>tasks</code>, listę linii albo luźny opis.
-                    Import nadaje domyślne pola z filtra — nic nie trafi do bazy bez zatwierdzenia.
-                </p>
-                <details class="mb-3">
-                    <summary class="small fw-semibold" style="cursor:pointer">Oczekiwany format JSON</summary>
-                    <pre class="small mb-0 mt-2 p-3 rounded" style="background:rgba(0,0,0,.25);border:1px solid var(--glass-border);max-height:180px;overflow:auto"><code>{{ $importFormatExample }}</code></pre>
-                </details>
-                <label class="form-label small fw-semibold">Wklej tekst</label>
-                <textarea rows="9" class="form-control font-monospace" wire:model.defer="importText"
-                          placeholder='{"tasks":[{"name":"Pierwsze zadanie","subtasks":["Krok 1"]}]}'
-                          spellcheck="false"></textarea>
+                @if($importMode === 'list')
+                    <p class="text-muted small mb-3">
+                        Jedna linia = jedno zadanie. Notacja jak w komentarzach:
+                        <code>zrób kolacje@karol -//ma być smaczna</code>
+                        — tytuł, <code>@osoba</code> i opis po <code>//</code>.
+                        Nic nie trafi do bazy bez zatwierdzenia.
+                    </p>
+                    <label class="form-label small fw-semibold">Lista linii</label>
+                    <textarea rows="9" class="form-control font-monospace" wire:model.defer="importText"
+                              placeholder="zrób kolacje@karol -//ma być smaczna"
+                              spellcheck="false"></textarea>
+                @else
+                    <p class="text-muted small mb-3">
+                        Wklej JSON z tablicą <code>tasks</code>. Impka <strong>tylko tworzy nowe</strong> rekordy — id z eksportu są ignorowane. Edycja istniejących to Edi, nie import.
+                        Brakujące pola biorą się z filtra. Nic nie trafi do bazy bez zatwierdzenia.
+                    </p>
+                    <details class="mb-3">
+                        <summary class="small fw-semibold" style="cursor:pointer">Oczekiwany format JSON</summary>
+                        <pre class="small mb-0 mt-2 p-3 rounded" style="background:rgba(0,0,0,.25);border:1px solid var(--glass-border);max-height:180px;overflow:auto"><code>{{ $importFormatExample }}</code></pre>
+                    </details>
+                    <label class="form-label small fw-semibold">Wklej JSON</label>
+                    <textarea rows="9" class="form-control font-monospace" wire:model.defer="importText"
+                              placeholder='{"tasks":[{"name":"Pierwsze zadanie","subtasks":["Krok 1"]}]}'
+                              spellcheck="false"></textarea>
+                @endif
             @else
                 <p class="text-muted small mb-3">
                     Propozycje z kontekstem filtra. Możesz poprawić nazwę przed zapisem.
@@ -1301,7 +1421,43 @@
                 @else
                     ({{ $exportCount }} {{ $exportCount === 1 ? 'zadanie' : 'zadań' }})
                 @endif
-                — format kompatybilny z importem.
+                — zrzut filtra dla Ediego: typy, kolumny siatki i podzadania. Import JSON nie aktualizuje po id.
+            </p>
+            <textarea
+                id="chronoExportJson"
+                rows="12"
+                class="form-control font-monospace"
+                readonly
+                spellcheck="false"
+            >{{ $exportJson }}</textarea>
+        @elseif($chronoMode === 'edi-import')
+            <p class="text-muted small mb-3">
+                Bez tokenów — PHP robi DIFF względem żywych rekordów z filtra.
+                Wklej <code>{"changes":[{"id":123,"field":"category","value":"Transport"}]}</code>
+                z ChatGPT albo <code>{"tasks":[…]}</code> z eksportu Impki (edytowane pola).
+                Nic nie trafi do bazy bez zatwierdzenia w tabeli.
+            </p>
+            <details class="mb-3">
+                <summary class="small fw-semibold" style="cursor:pointer">Oczekiwany format</summary>
+                <pre class="small mb-0 mt-2 p-3 rounded" style="background:rgba(0,0,0,.25);border:1px solid var(--glass-border);max-height:180px;overflow:auto"><code>{
+  "changes": [
+    {"id": 123, "field": "category", "value": "Transport"}
+  ]
+}</code></pre>
+            </details>
+            <label class="form-label small fw-semibold">Wklej JSON Ediego</label>
+            <textarea rows="9" class="form-control font-monospace" wire:model.defer="importText"
+                      placeholder='{"changes":[{"id":123,"field":"name","value":"Poprawiona nazwa"}]}'
+                      spellcheck="false"></textarea>
+        @elseif($chronoMode === 'edi-export')
+            <p class="text-muted small mb-3">
+                Paczka dla ChatGPT: instrukcja + snapshot filtra
+                @if($this->isEdiReviewing())
+                    + aktualne propozycje (po ręcznej korekcie).
+                @else
+                    (jeszcze bez zmian — wklej odpowiedź z powrotem przez „Wklej JSON”).
+                @endif
+                Pola poza name / description / category / priority / due_date są ignorowane przy imporcie.
             </p>
             <textarea
                 id="chronoExportJson"
@@ -1313,7 +1469,7 @@
         @endif
 
         <x-slot:footer>
-            @if($chronoMode !== 'menu')
+            @if($chronoMode !== 'menu' && ! $this->isEdiReviewing())
                 <button type="button" class="btn btn-outline-secondary" wire:click="chronoBackToMenu">Wstecz</button>
             @endif
             <button type="button" class="btn btn-outline-secondary" wire:click="closeChronoModal">Zamknij</button>
@@ -1327,9 +1483,15 @@
                 <button type="button" class="btn btn-primary" wire:click="confirmImportProposals"
                         wire:loading.attr="disabled" wire:target="confirmImportProposals"
                         @disabled(count($importSelected) === 0)>
-                    Utwórz zaznaczone ({{ count($importSelected) }})
+                    Zastosuj zaznaczone ({{ count($importSelected) }})
                 </button>
-            @elseif($chronoMode === 'export' && $exportJson !== '')
+            @elseif($chronoMode === 'edi-import')
+                <button type="button" class="btn btn-primary" wire:click="parseEdiImportText"
+                        wire:loading.attr="disabled" wire:target="parseEdiImportText">
+                    <span wire:loading.remove wire:target="parseEdiImportText">Pokaż DIFF</span>
+                    <span wire:loading wire:target="parseEdiImportText">Parsuję…</span>
+                </button>
+            @elseif(($chronoMode === 'export' || $chronoMode === 'edi-export') && $exportJson !== '')
                 <button
                     type="button"
                     class="btn btn-outline-primary"
@@ -1349,5 +1511,6 @@
             @endif
         </x-slot:footer>
     </x-chrono.modal>
+    @endif
 @endif
 </div>

@@ -251,7 +251,7 @@
                                 <x-chrono.trigger
                                     target="openChronoModal"
                                     hint="Zaproponuj przepływ"
-                                    hint-loading="Budzę bota…"
+                                    hint-loading="Budzę zespół…"
                                 />
                             @endif
                             <button

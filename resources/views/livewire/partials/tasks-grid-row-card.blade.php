@@ -82,7 +82,16 @@
                 {{ $subtaskDone }}/{{ $subtaskTotal }}
             </span>
         @endif
-        <a href="{{ $openUrl }}" class="tg-card-name" title="{{ $task->name }}">{{ $task->name }}</a>
+        @php $ediName = $this->ediCell($task, 'name'); @endphp
+        @if($ediName)
+            <span class="tg-card-name tg-edi tg-edi--{{ $ediName['kind'] }}">
+                @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediName, 'rowId' => $task->id, 'field' => 'name'])
+            </span>
+        @else
+        <a href="{{ $openUrl }}" class="tg-card-name" title="{{ $task->name }}">
+                {{ $task->name }}
+        </a>
+        @endif
         @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
             <x-ui.approval-decision :decision="$approvalDecision" size="sm" />
         @endif
@@ -170,7 +179,12 @@
         @endif
 
         {{-- Category --}}
-        @if(in_array('category', $visibleColumns) && $task->category)
+        @php $ediCategory = $this->ediCell($task, 'category'); @endphp
+        @if($ediCategory)
+            <span class="tg-meta-item tg-edi tg-edi--{{ $ediCategory['kind'] }}">
+                @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediCategory, 'rowId' => $task->id, 'field' => 'category'])
+            </span>
+        @elseif(in_array('category', $visibleColumns) && $task->category)
             <span class="tg-meta-item">
                 <x-ui.badge variant="info" class="text-truncate" style="max-width:110px">{{ $task->category }}</x-ui.badge>
             </span>
@@ -189,12 +203,22 @@
         @endif
 
         {{-- Priority --}}
-        @if(in_array('priority', $visibleColumns) && $pc)
+        @php $ediPriority = $this->ediCell($task, 'priority'); @endphp
+        @if($ediPriority)
+            <span class="tg-meta-item tg-edi tg-edi--{{ $ediPriority['kind'] }}">
+                @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediPriority, 'rowId' => $task->id, 'field' => 'priority'])
+            </span>
+        @elseif(in_array('priority', $visibleColumns) && $pc)
             <span class="tg-meta-item" style="color:{{ $pc['color'] }};font-weight:600">{{ $pc['label'] }}</span>
         @endif
 
         {{-- Due date --}}
-        @if(in_array('due_date', $visibleColumns) && $task->due_date)
+        @php $ediDue = $this->ediCell($task, 'due_date'); @endphp
+        @if($ediDue)
+            <span class="tg-meta-item tg-edi tg-edi--{{ $ediDue['kind'] }}">
+                @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediDue, 'rowId' => $task->id, 'field' => 'due_date'])
+            </span>
+        @elseif(in_array('due_date', $visibleColumns) && $task->due_date)
             <span class="tg-meta-item" style="{{ $dueStyle }}"><i class="bi bi-calendar-event"></i>{{ $task->due_date->format('d.m.Y') }}</span>
         @endif
 

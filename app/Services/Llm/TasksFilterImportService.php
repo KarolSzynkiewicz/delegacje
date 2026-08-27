@@ -3,11 +3,11 @@
 namespace App\Services\Llm;
 
 use App\Exceptions\LlmException;
-use App\Support\Llm\PromptContext;
+use App\Services\UserMentionService;
 
 /**
- * Parsuje wklejony tekst do propozycji zadań — JSON (jak Chrono) albo luźna lista
- * przez model. Domyślne pola z aktywnego filtra listy nakłada warstwa UI.
+ * Import Impka: tylko nowe rekordy (JSON albo lista linii).
+ * Bez LLM i bez update po id — edycja istniejących to domena Ediego.
  */
 class TasksFilterImportService extends StructuredSuggestionService
 {
@@ -30,147 +30,29 @@ class TasksFilterImportService extends StructuredSuggestionService
     }
 
     /**
-     * @param  array{category?: ?string, assignee_label?: ?string}  $filterDefaults
-     * @return list<array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>}>
+     * @param  array{category?: ?string, assigned_to?: ?int, assignee_label?: ?string}  $filterDefaults
+     * @return list<array<string, mixed>>
      */
-    public function parse(string $text, array $filterDefaults = [], int $maxTasks = 20): array
+    public function parseJson(string $text, array $filterDefaults = [], int $maxTasks = 200): array
     {
         $text = trim($text);
 
         if ($text === '') {
-            throw new LlmException('Wklej listę zadań albo JSON z tablicą tasks.');
+            throw new LlmException('Wklej JSON z tablicą tasks.');
         }
 
-        try {
-            $data = $this->decodeJson($text);
-            $tasks = $this->normalizeTasks($data['tasks'] ?? $data, $maxTasks, $filterDefaults);
+        $data = $this->decodeJson($text);
+        $items = $data['tasks'] ?? $data;
 
-            if ($tasks !== []) {
-                return $tasks;
-            }
-        } catch (LlmException) {
-            // Luźny tekst — poniżej przez model albo linie.
-        }
-
-        $lineTasks = $this->fromPlainLines($text, $maxTasks, $filterDefaults);
-
-        if ($lineTasks !== [] && ! $this->looksLikeProse($text)) {
-            return $lineTasks;
-        }
-
-        if (! $this->isAvailable()) {
-            if ($lineTasks !== []) {
-                return $lineTasks;
-            }
-
-            throw LlmException::notConfigured();
-        }
-
-        return $this->suggestFromProse($text, $filterDefaults, $maxTasks);
-    }
-
-    /**
-     * @param  array{category?: ?string, assignee_label?: ?string}  $filterDefaults
-     * @return list<array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>}>
-     */
-    protected function suggestFromProse(string $text, array $filterDefaults, int $maxTasks): array
-    {
-        $context = PromptContext::make()
-            ->field('Tekst użytkownika', $text, 4000)
-            ->field('Domyślna kategoria z filtra', $filterDefaults['category'] ?? null, 100)
-            ->field('Kontekst przypisania z filtra', $filterDefaults['assignee_label'] ?? null, 100);
-
-        $data = $this->askForJson(
-            $context,
-            implode(' ', [
-                'Wyodrębnij zadania z tekstu użytkownika.',
-                'Odpowiedz TYLKO JSON: {"tasks":[{"name":"…","description":"…","category":null,"priority":null,"subtasks":["…"]}]}.',
-                'Po polsku, max '.$maxTasks.' zadań, name max 120 znaków.',
-                'Jeśli w tekście jest lista — każde hasło to osobne zadanie.',
-                'category i priority tylko gdy wynikają z tekstu; inaczej null.',
-                'subtasks tylko gdy w tekście widać kroki.',
-            ]),
-            maxTokens: 2048,
-        );
-
-        $tasks = $this->normalizeTasks($data['tasks'] ?? $data, $maxTasks, $filterDefaults);
-
-        if ($tasks === []) {
-            throw new LlmException('Nie znaleziono zadań w wklejonym tekście.');
-        }
-
-        return $tasks;
-    }
-
-    /**
-     * @param  array{category?: ?string}  $filterDefaults
-     * @return list<array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>}>
-     */
-    protected function fromPlainLines(string $text, int $maxTasks, array $filterDefaults): array
-    {
-        $lines = preg_split('/\R+/', $text) ?: [];
-        $names = [];
-
-        foreach ($lines as $line) {
-            $name = $this->cleanLine($line, 120);
-
-            if ($name === '' || str_starts_with($name, '{') || str_starts_with($name, '[')) {
-                continue;
-            }
-
-            $names[] = $name;
-
-            if (count($names) >= $maxTasks) {
-                break;
-            }
-        }
-
-        $defaultCategory = $this->nullableString($filterDefaults['category'] ?? null, 255);
-
-        return array_map(fn (string $name) => [
-            'name' => $name,
-            'description' => '',
-            'category' => $defaultCategory,
-            'priority' => null,
-            'subtasks' => [],
-        ], $names);
-    }
-
-    protected function looksLikeProse(string $text): bool
-    {
-        $lines = array_values(array_filter(preg_split('/\R+/', $text) ?: [], fn ($l) => trim($l) !== ''));
-
-        if (count($lines) <= 1 && mb_strlen($text) > 160) {
-            return true;
-        }
-
-        $long = 0;
-        foreach ($lines as $line) {
-            if (mb_strlen(trim($line)) > 140) {
-                $long++;
-            }
-        }
-
-        return $long >= max(1, (int) floor(count($lines) / 2));
-    }
-
-    /**
-     * @param  array{category?: ?string}  $filterDefaults
-     * @return list<array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>}>
-     */
-    protected function normalizeTasks(mixed $items, int $maxTasks, array $filterDefaults): array
-    {
         if (! is_array($items)) {
-            return [];
+            throw new LlmException('JSON musi zawierać tablicę tasks.');
         }
 
-        // Pojedyncze zadanie jako obiekt zamiast listy.
         if (isset($items['name']) && is_string($items['name'])) {
             $items = [$items];
         }
 
-        $defaultCategory = $this->nullableString($filterDefaults['category'] ?? null, 255);
-        $tasks = [];
+        $proposals = [];
 
         foreach ($items as $item) {
             if (is_string($item)) {
@@ -181,32 +63,155 @@ class TasksFilterImportService extends StructuredSuggestionService
                 continue;
             }
 
-            $name = $this->cleanLine($item['name'] ?? null, 120);
+            $proposal = $this->proposalFromJsonItem($item, $filterDefaults);
 
-            if ($name === '') {
+            if ($proposal === null) {
                 continue;
             }
 
-            $priority = isset($item['priority']) && is_numeric($item['priority'])
-                ? max(1, min(5, (int) $item['priority']))
-                : null;
+            $proposals[] = $proposal;
 
-            $category = $this->nullableString($item['category'] ?? null, 255) ?? $defaultCategory;
-
-            $tasks[] = [
-                'name' => $name,
-                'description' => $this->cleanLine($item['description'] ?? null, 1000),
-                'category' => $category,
-                'priority' => $priority,
-                'subtasks' => $this->stringList($item['subtasks'] ?? [], 12, 255),
-            ];
-
-            if (count($tasks) >= $maxTasks) {
+            if (count($proposals) >= $maxTasks) {
                 break;
             }
         }
 
-        return $tasks;
+        if ($proposals === []) {
+            throw new LlmException('Nie znaleziono zadań w JSON.');
+        }
+
+        return $proposals;
+    }
+
+    /**
+     * @param  array{category?: ?string, assigned_to?: ?int, assignee_label?: ?string}  $filterDefaults
+     * @return list<array<string, mixed>>
+     */
+    public function parseLines(string $text, array $filterDefaults = [], int $maxTasks = 50): array
+    {
+        $text = trim($text);
+
+        if ($text === '') {
+            throw new LlmException('Wklej listę linii (jedna linia = jedno zadanie).');
+        }
+
+        $lines = preg_split('/\R+/', $text) ?: [];
+        $proposals = [];
+
+        foreach ($lines as $line) {
+            $proposal = $this->proposalFromLine((string) $line, $filterDefaults);
+
+            if ($proposal === null) {
+                continue;
+            }
+
+            $proposals[] = $proposal;
+
+            if (count($proposals) >= $maxTasks) {
+                break;
+            }
+        }
+
+        if ($proposals === []) {
+            throw new LlmException('Nie znaleziono zadań w liście linii.');
+        }
+
+        return $proposals;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array{category?: ?string, assigned_to?: ?int, assignee_label?: ?string}  $filterDefaults
+     * @return array<string, mixed>|null
+     */
+    protected function proposalFromJsonItem(array $item, array $filterDefaults): ?array
+    {
+        $name = $this->cleanLine($item['name'] ?? null, 120);
+
+        if ($name === '') {
+            return null;
+        }
+
+        $assignedTo = isset($item['assigned_to']) && is_numeric($item['assigned_to'])
+            ? (int) $item['assigned_to']
+            : ($filterDefaults['assigned_to'] ?? null);
+
+        $priority = isset($item['priority']) && is_numeric($item['priority'])
+            ? max(1, min(5, (int) $item['priority']))
+            : null;
+
+        $category = $this->nullableString($item['category'] ?? null, 255)
+            ?? $this->nullableString($filterDefaults['category'] ?? null, 255);
+
+        $subtasks = $item['subtasks'] ?? [];
+        if (! is_array($subtasks)) {
+            $subtasks = [];
+        }
+
+        return [
+            'action' => 'create',
+            'existing_task_id' => null,
+            'name' => $name,
+            'description' => $this->cleanLine($item['description'] ?? null, 4000),
+            'category' => $category,
+            'priority' => $priority,
+            'due_date' => $this->nullableString($item['due_date'] ?? null, 32),
+            'status' => $this->nullableString($item['status'] ?? null, 32),
+            'assigned_to' => $assignedTo,
+            'assignee' => is_string($item['assignee'] ?? null) ? $item['assignee'] : ($filterDefaults['assignee_label'] ?? null),
+            'sprint_id' => isset($item['sprint_id']) && is_numeric($item['sprint_id'])
+                ? (int) $item['sprint_id']
+                : ($filterDefaults['sprint_id'] ?? null),
+            'subtasks' => $subtasks,
+        ];
+    }
+
+    /**
+     * @param  array{category?: ?string, assigned_to?: ?int, assignee_label?: ?string}  $filterDefaults
+     * @return array<string, mixed>|null
+     */
+    protected function proposalFromLine(string $line, array $filterDefaults): ?array
+    {
+        $line = trim($line);
+
+        if ($line === '' || str_starts_with($line, '{') || str_starts_with($line, '[')) {
+            return null;
+        }
+
+        $fields = UserMentionService::approvalFieldsFromBody($line, '');
+        $title = trim(preg_replace('/[\s\-–—]+$/u', '', $fields['title']) ?? $fields['title']);
+
+        if ($title === '') {
+            return null;
+        }
+
+        $assignedTo = $filterDefaults['assigned_to'] ?? null;
+        $assigneeLabel = $filterDefaults['assignee_label'] ?? null;
+
+        foreach (UserMentionService::extractHandles($line) as $handle) {
+            $user = UserMentionService::resolveUserByMentionHandle($handle);
+
+            if ($user) {
+                $assignedTo = $user->id;
+                $assigneeLabel = $user->name;
+                break;
+            }
+        }
+
+        return [
+            'action' => 'create',
+            'existing_task_id' => null,
+            'name' => mb_substr($title, 0, 120),
+            'description' => $fields['description'] ?? '',
+            'category' => $this->nullableString($filterDefaults['category'] ?? null, 255),
+            'priority' => null,
+            'due_date' => null,
+            'status' => null,
+            'assigned_to' => $assignedTo,
+            'assignee' => $assigneeLabel,
+            'sprint_id' => $filterDefaults['sprint_id'] ?? null,
+            'subtasks' => [],
+        ];
     }
 
     protected function nullableString(mixed $value, int $maxLength): ?string

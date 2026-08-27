@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Llm\SubtaskSuggestionService;
 use App\Services\UserMentionService;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class TaskSubtasks extends Component
@@ -26,6 +27,8 @@ class TaskSubtasks extends Component
     public ?int $assigningSubtaskId = null;
 
     public string $assignSubtaskUserId = '';
+
+    public bool $showChronoAssist = false;
 
     public bool $showAiModal = false;
 
@@ -76,6 +79,34 @@ class TaskSubtasks extends Component
     }
 
     /**
+     * Najpierw picker zespołu — model odpalamy dopiero po wyborze Chrono / Twórz.
+     */
+    public function openChronoAssist(): void
+    {
+        $this->authorizeTaskUpdate();
+        $this->showChronoAssist = true;
+        $this->reset(['aiError', 'aiProposals', 'aiSelected', 'aiLoading']);
+        $this->showAiModal = false;
+    }
+
+    #[On('chrono-assist-closed')]
+    public function closeChronoAssist(): void
+    {
+        $this->showChronoAssist = false;
+    }
+
+    #[On('chrono-assist-picked')]
+    public function handleChronoAssistPicked(string $key): void
+    {
+        if ($key !== 'create-task') {
+            return;
+        }
+
+        $this->showChronoAssist = false;
+        $this->openAiModal();
+    }
+
+    /**
      * Otwiera okno od razu, jeszcze przed odpytaniem modelu — dzięki temu
      * użytkownik widzi pracującego bota zamiast zamrożonego przycisku.
      */
@@ -117,6 +148,7 @@ class TaskSubtasks extends Component
     public function closeAiModal(): void
     {
         $this->showAiModal = false;
+        $this->showChronoAssist = false;
         $this->reset(['aiError', 'aiProposals', 'aiSelected', 'aiLoading']);
     }
 

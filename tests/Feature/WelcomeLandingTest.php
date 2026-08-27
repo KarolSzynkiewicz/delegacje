@@ -13,6 +13,7 @@ class WelcomeLandingTest extends TestCase
             ->assertSee('Rotacje pracowników')
             ->assertSee('nie w Excelu')
             ->assertSee('Zaloguj się')
+            ->assertDontSee('Poznaj boty')
             ->assertDontSee('MK TECHNIC');
     }
 

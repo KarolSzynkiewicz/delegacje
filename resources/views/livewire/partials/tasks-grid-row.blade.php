@@ -99,7 +99,8 @@
 
     {{-- ── Name ── --}}
     @case('name')
-    <td style="min-width:200px; max-width:320px">
+    @php $ediName = $this->ediCell($task, 'name'); @endphp
+    <td class="{{ $ediName ? 'tg-edi tg-edi--'.$ediName['kind'] : '' }}" style="min-width:200px; max-width:320px">
         <div class="d-flex align-items-center gap-1" style="min-width:0">
                 @if($canDrag)
                     <i class="bi bi-grip-vertical tg-task-grip flex-shrink-0"
@@ -115,10 +116,16 @@
                         {{ $subtaskDone }}/{{ $subtaskTotal }}
                     </span>
                 @endif
+                @if($ediName)
+                    @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediName, 'rowId' => $task->id, 'field' => 'name'])
+                @else
                 <a href="{{ $openUrl }}"
                    class="text-decoration-none"
                    style="padding:2px 4px; border-radius:3px; display:block; min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main,#f1f5f9)"
-                   title="{{ $task->name }}">{{ $task->name }}</a>
+                   title="{{ $task->name }}">
+                        {{ $task->name }}
+                </a>
+                @endif
                 @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
                     <x-ui.approval-decision :decision="$approvalDecision" size="sm" />
                 @endif
@@ -234,8 +241,11 @@
 
     {{-- ── Category ── --}}
     @case('category')
-    <td style="max-width:140px">
-        @if($isEditing && $editingField === 'category')
+    @php $ediCategory = $this->ediCell($task, 'category'); @endphp
+    <td class="{{ $ediCategory ? 'tg-edi tg-edi--'.$ediCategory['kind'] : '' }}" style="max-width:140px">
+        @if($ediCategory)
+            @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediCategory, 'rowId' => $task->id, 'field' => 'category'])
+        @elseif($isEditing && $editingField === 'category')
             <input type="text" wire:model="editingValue" class="form-control form-control-sm"
                    wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                    x-data x-init="$el.focus(); $el.select()">
@@ -305,8 +315,11 @@
 
     {{-- ── Priority ── --}}
     @case('priority')
-    <td style="white-space:nowrap; min-width:90px">
-        @if($isEditing && $editingField === 'priority')
+    @php $ediPriority = $this->ediCell($task, 'priority'); @endphp
+    <td class="{{ $ediPriority ? 'tg-edi tg-edi--'.$ediPriority['kind'] : '' }}" style="white-space:nowrap; min-width:90px">
+        @if($ediPriority)
+            @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediPriority, 'rowId' => $task->id, 'field' => 'priority'])
+        @elseif($isEditing && $editingField === 'priority')
             <select wire:model="editingValue" class="form-select form-select-sm"
                     wire:change="saveEdit" wire:keydown.escape="cancelEdit"
                     x-data x-init="$el.focus()">
@@ -335,8 +348,11 @@
 
     {{-- ── Due date ── --}}
     @case('due_date')
-    <td style="white-space:nowrap; min-width:95px">
-        @if($isEditing && $editingField === 'due_date')
+    @php $ediDue = $this->ediCell($task, 'due_date'); @endphp
+    <td class="{{ $ediDue ? 'tg-edi tg-edi--'.$ediDue['kind'] : '' }}" style="white-space:nowrap; min-width:95px">
+        @if($ediDue)
+            @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediDue, 'rowId' => $task->id, 'field' => 'due_date'])
+        @elseif($isEditing && $editingField === 'due_date')
             <input type="date" wire:model="editingValue" class="form-control form-control-sm"
                    wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                    x-data x-init="$el.focus()">
@@ -444,8 +460,15 @@
                         <button wire:click="cancelEdit" class="btn btn-sm btn-outline-secondary">Anuluj</button>
                     </div>
                 @else
-                    @php $descText = $task->plainDescription(); @endphp
-                    @if($descText)
+                    @php
+                        $descText = $task->plainDescription();
+                        $ediDesc = $this->ediCell($task, 'description');
+                    @endphp
+                    @if($ediDesc)
+                        <div class="tg-edi tg-edi--{{ $ediDesc['kind'] }} p-2 rounded">
+                            @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediDesc, 'rowId' => $task->id, 'field' => 'description'])
+                        </div>
+                    @elseif($descText)
                         <div style="white-space:pre-wrap; max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:10px 12px; font-size:0.82rem; line-height:1.55; color:var(--text-main,#f1f5f9)">{{ $descText }}</div>
                     @else
                         <div style="font-size:0.82rem; font-style:italic; color:rgba(255,255,255,0.25)">

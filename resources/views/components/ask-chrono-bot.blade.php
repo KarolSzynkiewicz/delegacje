@@ -1,11 +1,11 @@
 @props([
     'state' => 'idle',   // idle | thinking | done
-    'variant' => 'clock', // clock | visor | orb | spark
+    'variant' => 'clock', // clock | visor | orb | spark | lens | ferry | nib | forge | radar
     'size' => null,       // px; null = dziedziczy --ac-size z rodzica (domyślnie 40px)
 ])
 
 @php
-    $variants = ['clock', 'visor', 'orb', 'spark'];
+    $variants = ['clock', 'visor', 'orb', 'spark', 'lens', 'ferry', 'nib', 'forge', 'radar'];
     $variant = in_array($variant, $variants, true) ? $variant : 'clock';
 
     // Unikalne id gradientów: kilka botów na stronie nie może współdzielić <defs>.
@@ -15,10 +15,17 @@
 
     // Oś obrotu wskazówek jest inna w każdym wariancie — CSS czyta ją z --ac-pivot.
     [$viewBox, $pivot] = match ($variant) {
-        'visor' => ['0 0 72 82', '36px 65.5px'],
-        'orb' => ['0 0 72 72', '36px 34px'],
+        'visor', 'lens', 'ferry', 'nib', 'forge', 'radar', 'orb' => ['0 0 72 82', match ($variant) {
+            'lens' => '36px 28px',
+            'ferry' => '36px 65.5px',
+            'nib' => '36px 64px',
+            'forge' => '36px 61px',
+            'radar' => '36px 67px',
+            'orb' => '36px 33px',
+            default => '36px 65.5px', // visor
+        }],
         'spark' => ['0 0 64 64', '32px 32px'],
-        default => ['0 0 72 82', '36px 36px'],
+        default => ['0 0 72 82', '36px 35px'],
     };
 
     $classes = 'ac-bot ac-bot--v-'.$variant.($state !== 'idle' ? ' ac-bot--'.$state : '');
@@ -30,7 +37,7 @@
     }
 @endphp
 
-<span {{ $attributes->merge(['class' => $classes, 'style' => $style]) }}>
+<span {{ $attributes->merge(['style' => $style])->class($classes) }}>
     <svg class="ac-bot__svg" viewBox="{{ $viewBox }}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
         <defs>
             <linearGradient id="{{ $grad }}" x1="0%" y1="0%" x2="100%" y2="100%">

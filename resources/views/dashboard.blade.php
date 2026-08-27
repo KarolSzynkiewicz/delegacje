@@ -16,6 +16,51 @@
                 </div>
             </x-ui.card>
 
+            {{-- AskChrono — poznaj boty --}}
+            <style>
+                .dash-bots__head { margin-bottom: 1.25rem; }
+                .dash-bots__kicker {
+                    display: block; font-size: 0.72rem; font-weight: 600;
+                    letter-spacing: 0.08em; text-transform: uppercase;
+                    color: var(--text-muted); margin-bottom: 0.35rem;
+                }
+                .dash-bots__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+                .dash-bot {
+                    height: 100%;
+                    display: flex; flex-direction: column; gap: 0.35rem;
+                    padding: 1.25rem 1.35rem;
+                }
+                .dash-bot__figure { margin-bottom: 0.25rem; }
+                .dash-bot__role {
+                    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+                    color: var(--text-muted);
+                }
+                .dash-bot h3 { font-size: 1.15rem; font-weight: 600; margin: 0; }
+                .dash-bot p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.55; margin: 0.35rem 0 0; }
+                @media (max-width: 767.98px) {
+                    .dash-bots__grid { grid-template-columns: 1fr; }
+                }
+            </style>
+            <section class="mb-5" id="boty" aria-labelledby="dash-bots-title">
+                <div class="dash-bots__head">
+                    <span class="dash-bots__kicker">AskChrono</span>
+                    <h2 id="dash-bots-title" class="h4 fw-semibold mb-1">Poznaj boty- Twoi agenci AI</h2>
+                    <p class="text-muted mb-0 small">Czterech specjalistów obok Twojej pracy. Każdy robi jedną rzecz — i nic nie zapisuje, dopóki nie zatwierdzisz.</p>
+                </div>
+                <div class="dash-bots__grid">
+                    @foreach (\App\Support\ChronoPersona::all() as $bot)
+                        <x-ui.card class="dash-bot">
+                            <div class="dash-bot__figure">
+                                <x-ask-chrono-bot :variant="$bot['variant']" :size="64" />
+                            </div>
+                            <span class="dash-bot__role font-mono">{{ $bot['role'] }}</span>
+                            <h3>{{ $bot['name'] }}</h3>
+                            <p>{{ $bot['pitch'] }}</p>
+                        </x-ui.card>
+                    @endforeach
+                </div>
+            </section>
+
             {{-- Główne Moduły --}}
             <div class="row g-4 mb-5">
                 {{-- Dashboard Rentowności --}}

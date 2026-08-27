@@ -99,6 +99,10 @@ abstract class StructuredSuggestionService
         $values = [];
 
         foreach ($items as $item) {
+            if (is_array($item)) {
+                $item = $item['name'] ?? '';
+            }
+
             if (! is_string($item)) {
                 continue;
             }

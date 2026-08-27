@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Contracts\Llm\LlmCredentialRepository;
+use App\Livewire\ChronoAssist;
 use App\Livewire\TaskSubtasks;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
@@ -41,8 +42,7 @@ class TaskSubtaskAiTest extends TestCase
 
         Livewire::actingAs($this->admin())
             ->test(TaskSubtasks::class, ['task' => $task])
-            ->assertSee('AskChrono')
-            ->assertSee('Rozbij na podzadania');
+            ->assertSeeHtml('wire:click="openChronoAssist"');
     }
 
     public function test_subtask_rows_render_quiet_icon_actions(): void
@@ -68,6 +68,50 @@ class TaskSubtaskAiTest extends TestCase
             ->assertSee('Usuń podzadanie')
             ->assertDontSee('form-check-input', false)
             ->assertDontSee('btn-outline-danger', false);
+    }
+
+    public function test_trigger_opens_assist_picker_instead_of_the_model(): void
+    {
+        app(LlmCredentialRepository::class)->store('gemini', 'AIzaTESTKEY1234567890', 'gemini-2.5-flash');
+        app(LlmCredentialRepository::class)->activate('gemini');
+
+        $user = $this->admin();
+        $task = ProjectTask::query()->create([
+            'name' => 'Rekrutacja malarzy',
+            'status' => \App\Enums\TaskStatus::PENDING,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TaskSubtasks::class, ['task' => $task])
+            ->call('openChronoAssist')
+            ->assertSet('showChronoAssist', true)
+            ->assertSet('showAiModal', false)
+            ->assertSet('aiLoading', false)
+            ->assertSeeLivewire(ChronoAssist::class)
+            ->assertDontSee('Czytam zadanie i układam kroki');
+    }
+
+    public function test_picking_create_task_starts_the_existing_ai_flow(): void
+    {
+        app(LlmCredentialRepository::class)->store('gemini', 'AIzaTESTKEY1234567890', 'gemini-2.5-flash');
+        app(LlmCredentialRepository::class)->activate('gemini');
+
+        $user = $this->admin();
+        $task = ProjectTask::query()->create([
+            'name' => 'Rekrutacja malarzy',
+            'status' => \App\Enums\TaskStatus::PENDING,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TaskSubtasks::class, ['task' => $task])
+            ->call('openChronoAssist')
+            ->dispatch('chrono-assist-picked', key: 'create-task')
+            ->assertSet('showChronoAssist', false)
+            ->assertSet('showAiModal', true)
+            ->assertSet('aiLoading', true)
+            ->assertSee('Czytam zadanie i układam kroki');
     }
 
     public function test_opening_modal_shows_thinking_state_before_the_model_answers(): void

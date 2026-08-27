@@ -137,16 +137,32 @@
             </div>
 
             @php
-                $acVariants = [
-                    'clock' => ['Chrono', 'Twórca', 'Zaczynam od zera — zadania, sprinty, procedury.'],
-                    'visor' => ['Wizjer', 'Analityk', 'Podsumowuję filtr: brief, standup, ryzyka.'],
-                    'orb' => ['Orbi', 'Kurier', 'Importuję i eksportuję dane z widoku.'],
-                    'spark' => ['Iskra', 'Redaktor', 'Mutuję to, co już jest — kategorie, opisy, przypisania.'],
-                ];
+                $acCurrent = [];
+                foreach (\App\Support\ChronoPersona::all() as $key => $meta) {
+                    $acCurrent[$key] = [
+                        $meta['name'],
+                        $meta['role'],
+                        $meta['blurb'],
+                        'roster',
+                    ];
+                }
+
+                $acCandidates = [];
+                foreach (\App\Support\ChronoPersona::candidates() as $key => $meta) {
+                    $replaces = $meta['replaces'] ?? null;
+                    $replacesName = $replaces ? (\App\Support\ChronoPersona::name($replaces)) : null;
+                    $acCandidates[$key] = [
+                        $meta['name'],
+                        $meta['role'],
+                        $meta['blurb'],
+                        $replacesName ? 'alt → '.$replacesName : 'kandydat',
+                    ];
+                }
             @endphp
 
-            <div class="row g-3" :style="'--ac-size: ' + size + 'px'">
-                @foreach($acVariants as $acKey => $acMeta)
+            <p class="text-muted small mb-2 text-uppercase fw-semibold" style="letter-spacing:.06em">Aktualny roster (4)</p>
+            <div class="row g-3 mb-4" :style="'--ac-size: ' + size + 'px'">
+                @foreach($acCurrent as $acKey => $acMeta)
                     <div class="col-6 col-lg-3">
                         <x-ui.card class="h-100 text-center">
                             <div class="d-flex justify-content-center align-items-end mb-3" style="min-height:200px">
@@ -164,12 +180,36 @@
                 @endforeach
             </div>
 
+            <p class="text-muted small mb-2 text-uppercase fw-semibold" style="letter-spacing:.06em">
+                Kandydaci domenowi
+                <span class="fw-normal text-lowercase">(wybierzemy 4 — wygląd ma sugerować rolę)</span>
+            </p>
+            <div class="row g-3" :style="'--ac-size: ' + size + 'px'">
+                @foreach($acCandidates as $acKey => $acMeta)
+                    <div class="col-6 col-lg-4">
+                        <x-ui.card class="h-100 text-center">
+                            <div class="d-flex justify-content-center align-items-end mb-3" style="min-height:200px">
+                                <x-ask-chrono-bot
+                                    :variant="$acKey"
+                                    ::class="state === 'idle' ? '' : 'ac-bot--' + state"
+                                />
+                            </div>
+                            <h6 class="mb-0">{{ $acMeta[0] }}</h6>
+                            <div class="small mb-1" style="color:#c4b5fd;font-weight:650;letter-spacing:.04em;text-transform:uppercase;font-size:.68rem">{{ $acMeta[1] }}</div>
+                            <div class="small text-muted mb-2 font-mono" style="font-size:.65rem">{{ $acMeta[3] }}</div>
+                            <p class="text-muted small mb-2">{{ $acMeta[2] }}</p>
+                            <code class="small">variant="{{ $acKey }}"</code>
+                        </x-ui.card>
+                    </div>
+                @endforeach
+            </div>
+
             <div class="mt-4">
                 <p class="text-muted small mb-2">
                     Czytelność w realnych rozmiarach UI — 24 px (ikona w tabeli), 40 px (przycisk), 64 px (nagłówek okna):
                 </p>
                 <div class="d-flex flex-wrap align-items-end gap-4">
-                    @foreach(array_keys($acVariants) as $acKey)
+                    @foreach(array_merge(array_keys($acCurrent), array_keys($acCandidates)) as $acKey)
                         <div class="d-flex align-items-end gap-2 p-2 rounded border border-secondary border-opacity-25">
                             <x-ask-chrono-bot :variant="$acKey" :size="24" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
                             <x-ask-chrono-bot :variant="$acKey" :size="40" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
@@ -181,11 +221,20 @@
             </div>
 
             <div class="mt-4">
-                <p class="text-muted small mb-2">Tak wygląda przycisk używany dziś na karcie zadania:</p>
+                <p class="text-muted small mb-2">
+                    Trigger na karcie zadania — ikona warsztatu (4 boty), bo klik otwiera wybór persony, nie Chrono wprost:
+                </p>
+                <div class="d-flex flex-wrap align-items-end gap-3 mb-3">
+                    <x-chrono.workshop-icon :size="24" />
+                    <x-chrono.workshop-icon :size="36" />
+                    <x-chrono.workshop-icon :size="48" />
+                    <x-chrono.workshop-icon :size="64" />
+                    <span class="small text-muted ms-1 align-self-center font-mono">workshop</span>
+                </div>
                 <button type="button" class="ac-trigger" x-on:click="simulate()">
-                    <x-ask-chrono-bot :size="40" ::class="state === 'idle' ? '' : 'ac-bot--' + state" />
+                    <x-chrono.workshop-icon :size="40" />
                     <span class="ac-trigger__text">
-                        <span class="ac-trigger__name">AskChrono</span>
+                        <span class="ac-trigger__name">Chrono Assist</span>
                         <span class="ac-trigger__hint">Rozbij na podzadania</span>
                     </span>
                 </button>
@@ -201,36 +250,59 @@
             x-data="{
                 path: [],
                 picked: null,
+                busy: false,
+                ready: false,
                 toast: null,
+                _timer: null,
                 go(key) {
                     this.path = [...this.path, key];
                     this.picked = null;
+                    this.busy = false;
+                    this.ready = false;
                     this.toast = null;
+                    clearTimeout(this._timer);
                 },
                 jump(key) {
+                    if (this.path[0] === key && this.path.length === 1 && !this.busy && !this.ready) {
+                        this.reset();
+                        return;
+                    }
                     this.path = [key];
                     this.picked = null;
+                    this.busy = false;
+                    this.ready = false;
                     this.toast = null;
+                    clearTimeout(this._timer);
                 },
                 back() {
                     this.path = this.path.slice(0, -1);
                     this.picked = null;
+                    this.busy = false;
+                    this.ready = false;
                     this.toast = null;
+                    clearTimeout(this._timer);
                 },
                 reset() {
                     this.path = [];
                     this.picked = null;
+                    this.busy = false;
+                    this.ready = false;
                     this.toast = null;
+                    clearTimeout(this._timer);
                 },
                 pick(label) {
+                    clearTimeout(this._timer);
                     this.picked = label;
-                    this.toast = 'Wybrane (demo): ' + label + ' — tu wejdzie flow HITL.';
+                    this.ready = false;
+                    this.busy = true;
+                    this.toast = null;
+                    this._timer = setTimeout(() => {
+                        this.busy = false;
+                        this.ready = true;
+                    }, 1000);
                 },
                 handleAssistClick(event) {
-                    if (event.target.closest('[data-back]')) {
-                        this.back();
-                        return;
-                    }
+                    if (this.busy) return;
                     const root = event.target.closest('[data-root]');
                     if (root) {
                         this.jump(root.dataset.root);
@@ -255,76 +327,12 @@
             </h3>
             <p class="text-muted small mb-3">
                 Komponent <code>&lt;x-chrono.assist /&gt;</code> — zespół person: każda twarz = specjalizacja.
-                <strong>Wizjer</strong> podsumowuje, <strong>Orbi</strong> wozi dane (import/export w jednej ścieżce),
-                <strong>Chrono</strong> tworzy, <strong>Iskra</strong> mutuje. Klik zamienia UI (stepper), bez dropdownów.
+                <strong>Argus</strong> podsumowuje, <strong>Impek</strong> wozi dane (import/export w jednej ścieżce),
+                <strong>Chrono</strong> tworzy, <strong>Edi</strong> mutuje. Klik zamienia UI (stepper), bez dropdownów.
             </p>
 
             @php
-                $assistActions = [
-                    [
-                        'key' => 'summarize',
-                        'persona' => 'visor',
-                        'label' => 'Podsumuj',
-                        'hint' => 'Brief, standup, ryzyka',
-                        'children' => [
-                            ['key' => 'summary-brief', 'label' => 'Krótki brief', 'hint' => '3–5 zdań + ryzyka', 'icon' => 'bi-lightning'],
-                            ['key' => 'summary-standup', 'label' => 'Standup', 'hint' => 'Punkty do omówienia dziś', 'icon' => 'bi-people'],
-                            ['key' => 'summary-risks', 'label' => 'Same ryzyka', 'hint' => 'Przeterminowane, blokery', 'icon' => 'bi-exclamation-triangle'],
-                        ],
-                    ],
-                    [
-                        'key' => 'transfer',
-                        'persona' => 'orb',
-                        'label' => 'Import / Export',
-                        'hint' => 'Wnoszę i wynoszę dane',
-                        'children' => [
-                            [
-                                'key' => 'import',
-                                'label' => 'Importuj',
-                                'hint' => 'JSON, lista, opis',
-                                'icon' => 'bi-box-arrow-in-down',
-                                'children' => [
-                                    ['key' => 'import-json', 'label' => 'Wklej JSON', 'hint' => 'Format Chrono tasks[]', 'icon' => 'bi-braces'],
-                                    ['key' => 'import-list', 'label' => 'Lista linii', 'hint' => 'Każda linia = zadanie', 'icon' => 'bi-list-ul'],
-                                    ['key' => 'import-prose', 'label' => 'Luźny opis', 'hint' => 'AI wyodrębni taski', 'icon' => 'bi-chat-dots'],
-                                ],
-                            ],
-                            [
-                                'key' => 'export',
-                                'label' => 'Eksportuj',
-                                'hint' => 'Bieżący filtr',
-                                'icon' => 'bi-box-arrow-up',
-                                'children' => [
-                                    ['key' => 'export-json', 'label' => 'JSON (reimport)', 'hint' => 'Pełny kontekst + podzadania', 'icon' => 'bi-filetype-json'],
-                                    ['key' => 'export-csv', 'label' => 'CSV', 'hint' => 'Do arkusza', 'icon' => 'bi-filetype-csv'],
-                                    ['key' => 'export-md', 'label' => 'Markdown', 'hint' => 'Do notatki / PR', 'icon' => 'bi-markdown'],
-                                ],
-                            ],
-                        ],
-                    ],
-                    [
-                        'key' => 'create',
-                        'persona' => 'clock',
-                        'label' => 'Twórz',
-                        'hint' => 'Task, sprint, SOP',
-                        'children' => [
-                            ['key' => 'create-task', 'label' => 'Zadanie + podzadania', 'hint' => 'Z kontekstu filtra', 'icon' => 'bi-check2-square'],
-                            ['key' => 'create-sprint', 'label' => 'Sprint', 'hint' => 'Cel, DoD, scope', 'icon' => 'bi-flag'],
-                            ['key' => 'create-procedure', 'label' => 'Procedura', 'hint' => 'Flow z kroków', 'icon' => 'bi-diagram-3'],
-                        ],
-                    ],
-                    [
-                        'key' => 'mutate',
-                        'persona' => 'spark',
-                        'label' => 'Mutuj',
-                        'hint' => 'Kategorie, osoby, opisy',
-                        'children' => [
-                            ['key' => 'mutate-category', 'label' => 'Kategorie', 'hint' => 'Uzupełnij / ujednolić', 'icon' => 'bi-tags'],
-                            ['key' => 'mutate-assign', 'label' => 'Przypisz', 'hint' => 'Do osoby / sprintu', 'icon' => 'bi-person-plus'],
-                            ['key' => 'mutate-refine', 'label' => 'Doprecyzuj', 'hint' => 'Opis, AC, priorytet', 'icon' => 'bi-magic'],
-                        ],
-                    ],
-                ];
+                $assistActions = \App\Support\ChronoAssistCatalog::actions();
             @endphp
 
             <div class="row g-4 align-items-start">
@@ -356,8 +364,8 @@
                                 </x-chrono.assist>
                             </div>
 
-                            <template x-if="toast">
-                                <p class="ac-assist__toast mt-2 mb-1" x-text="toast"></p>
+                            <template x-if="ready && !busy">
+                                <p class="ac-assist__toast mt-2 mb-1">HITL gotowy — zatwierdź w następnym kroku.</p>
                             </template>
                         </div>
                     </div>
@@ -384,7 +392,7 @@
                                 <button
                                     type="button"
                                     class="btn btn-sm btn-primary"
-                                    x-bind:disabled="!picked"
+                                    x-bind:disabled="!ready || busy"
                                     x-on:click="toast = picked ? ('Kontynuuj: ' + picked) : null"
                                 >
                                     Dalej
@@ -400,8 +408,8 @@
                     <ul class="small text-muted mt-3 mb-0 ps-3">
                         <li>Kontekst zostaje na kolejnych krokach: „Filtry [N]” + chip liczby elementów.</li>
                         <li>Mobile: pełna szerokość, dropdown = 1 filtr na linię.</li>
-                        <li>Stepper: klik zamienia sekcję akcji (root → opcje → liść).</li>
-                        <li>Orbi: „Import / Export” → Importuj|Eksportuj → format.</li>
+                        <li>Stepper bez „Wstecz” — persony u góry przełączają / wracają do root.</li>
+                        <li>Impek: „Import / Export” → Importuj|Eksportuj → format.</li>
                     </ul>
                 </div>
             </div>
@@ -1145,7 +1153,8 @@
                         @if(auth()->check())
                             <x-ui.person :user="auth()->user()" :link="true" />
                         @else
-                            <x-ui.person :user="(object)['id' => 1, 'name' => 'Anna Nowak', 'email' => 'anna.nowak@example.com']" :link="true" />
+                            <x-ui.person :user="(object)['name' => 'Anna Nowak', 'email' => 'anna.nowak@example.com']" />
+                            <div class="small text-muted mt-2">(link wymaga zalogowanego usera / modelu Eloquent)</div>
                         @endif
                     </x-ui.card>
                 </div>

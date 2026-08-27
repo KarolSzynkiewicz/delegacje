@@ -54,7 +54,7 @@ class ProcedureChronoFlowTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(ProcedureTemplatesIndex::class)
             ->call('openNewModal')
-            ->assertSee('AskChrono')
+            ->assertSee('Chrono Assist')
             ->assertSee('Zaproponuj przepływ');
     }
 

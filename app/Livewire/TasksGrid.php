@@ -2,9 +2,11 @@
 
 namespace App\Livewire;
 
+use App\Contracts\Llm\LlmClient;
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
+use App\Exceptions\LlmException;
 use App\Models\ApprovalRequest;
 use App\Models\Comment;
 use App\Models\CommentMention;
@@ -16,22 +18,25 @@ use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
 use App\Models\User;
 use App\Models\WorkItem;
-use App\Contracts\Llm\LlmClient;
-use App\Exceptions\LlmException;
 use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
 use App\Services\Llm\TasksFilterImportService;
+use App\Services\Llm\TasksFilterMutateService;
 use App\Services\Llm\TasksFilterSummaryService;
 use App\Services\ProcedureRunService;
 use App\Services\TaskCreationService;
 use App\Services\UserMentionService;
+use App\Support\EdiTaskEdit;
+use App\Support\Export\TaskExport;
 use App\Support\TasksGridUrlParams;
 use App\WorkItems\GridField;
+use App\WorkItems\ProjectTaskFields;
 use App\WorkItems\StatusWidget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -99,7 +104,7 @@ class TasksGrid extends Component
     // Chrono: podsumowanie filtra / import zadań w kontekście widoku
     public bool $showChronoModal = false;
 
-    /** menu | summary | import */
+    /** menu | summary | import | export | edi-import | edi-export */
     public string $chronoMode = 'menu';
 
     public bool $chronoLoading = false;
@@ -111,7 +116,9 @@ class TasksGrid extends Component
 
     public string $importText = '';
 
-    /** @var list<array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>}> */
+    public string $importMode = 'json';
+
+    /** @var list<array<string, mixed>> */
     public array $importProposals = [];
 
     /** @var list<int> */
@@ -122,6 +129,23 @@ class TasksGrid extends Component
     public int $exportCount = 0;
 
     public int $exportTotal = 0;
+
+    public ?string $ediIntent = null;
+
+    public bool $ediLoading = false;
+
+    public ?string $ediError = null;
+
+    public int $ediReviewed = 0;
+
+    public int $ediTotal = 0;
+
+    /** @var list<array{row_id: int, field: string, kind: string, from: mixed, to: mixed, from_label: string, to_label: string}> */
+    public array $ediChanges = [];
+
+    public ?int $ediEditingRowId = null;
+
+    public string $ediEditingField = '';
 
     // Inline editing
     public ?int $editingTaskId = null;
@@ -1138,6 +1162,7 @@ class TasksGrid extends Component
         $this->chronoError = null;
         $this->chronoSummary = null;
         $this->importText = '';
+        $this->importMode = 'json';
         $this->importProposals = [];
         $this->importSelected = [];
         $this->exportJson = '';
@@ -1145,6 +1170,57 @@ class TasksGrid extends Component
         $this->exportTotal = 0;
     }
 
+    #[On('chrono-assist-picked')]
+    public function handleChronoAssistPicked(string $key): void
+    {
+        if ($key === 'export-csv') {
+            $this->js('$wire.downloadChronoCsv()');
+
+            return;
+        }
+
+        if ($key === 'export-json') {
+            $this->chronoChooseExport();
+
+            return;
+        }
+
+        if ($key === 'import-json') {
+            $this->chronoChooseImport('json');
+
+            return;
+        }
+
+        if ($key === 'import-list') {
+            $this->chronoChooseImport('list');
+
+            return;
+        }
+
+        if ($key === 'mutate-json') {
+            $this->chronoChooseEdiImport();
+
+            return;
+        }
+
+        if ($key === 'mutate-export') {
+            $this->chronoChooseEdiExport();
+
+            return;
+        }
+
+        if (str_starts_with($key, 'mutate-')) {
+            $this->chronoChooseMutate($key);
+
+            return;
+        }
+
+        if (str_starts_with($key, 'summary-')) {
+            $this->chronoChooseSummary();
+        }
+    }
+
+    #[On('chrono-assist-closed')]
     public function closeChronoModal(): void
     {
         $this->showChronoModal = false;
@@ -1153,6 +1229,7 @@ class TasksGrid extends Component
         $this->chronoError = null;
         $this->chronoSummary = null;
         $this->importText = '';
+        $this->importMode = 'json';
         $this->importProposals = [];
         $this->importSelected = [];
         $this->exportJson = '';
@@ -1168,11 +1245,13 @@ class TasksGrid extends Component
         $this->chronoLoading = true;
     }
 
-    public function chronoChooseImport(): void
+    public function chronoChooseImport(string $mode = 'json'): void
     {
         $this->chronoMode = 'import';
+        $this->importMode = in_array($mode, ['json', 'list'], true) ? $mode : 'json';
         $this->chronoLoading = false;
         $this->chronoError = null;
+        $this->importText = '';
         $this->importProposals = [];
         $this->importSelected = [];
     }
@@ -1185,12 +1264,370 @@ class TasksGrid extends Component
         $this->buildChronoExport();
     }
 
+    public function chronoChooseMutate(string $intent): void
+    {
+        if (EdiTaskEdit::fieldsForIntent($intent) === []) {
+            return;
+        }
+
+        $this->showChronoModal = false;
+        $this->chronoMode = 'menu';
+        $this->ediIntent = $intent;
+        $this->ediLoading = true;
+        $this->ediError = null;
+        $this->ediChanges = [];
+        $this->ediReviewed = 0;
+        $this->ediTotal = 0;
+        $this->ediEditingRowId = null;
+        $this->ediEditingField = '';
+        $this->flash = null;
+    }
+
+    public function chronoChooseEdiImport(): void
+    {
+        $this->showChronoModal = true;
+        $this->chronoMode = 'edi-import';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->importText = '';
+    }
+
+    public function parseEdiImportText(TasksFilterMutateService $service): void
+    {
+        $this->chronoError = null;
+
+        $editable = EdiTaskEdit::EDITABLE;
+
+        try {
+            [, $records, $total] = $this->chronoEdiSnapshot($editable, 200);
+            $diffs = $service->parseImportedJson($this->importText, $records, $editable);
+
+            $this->ediIntent = 'mutate-json';
+            $this->ediLoading = false;
+            $this->ediReviewed = count($records);
+            $this->ediTotal = $total;
+            $this->adoptEdiDiffs($diffs);
+            $this->showChronoModal = false;
+            $this->chronoMode = 'menu';
+            $this->importText = '';
+            $this->flash = null;
+        } catch (LlmException $e) {
+            $this->chronoError = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->chronoError = 'Nie udało się wczytać JSON Ediego: '.$e->getMessage();
+        }
+    }
+
+    public function chronoChooseEdiExport(): void
+    {
+        $this->showChronoModal = true;
+        $this->chronoMode = 'edi-export';
+        $this->chronoLoading = false;
+        $this->chronoError = null;
+        $this->buildEdiExport();
+    }
+
+    public function fetchEdiProposals(TasksFilterMutateService $service): void
+    {
+        if (! $this->ediLoading || ! $this->ediIntent || $this->ediIntent === 'mutate-json') {
+            $this->ediLoading = false;
+
+            return;
+        }
+
+        $editable = EdiTaskEdit::fieldsForIntent($this->ediIntent);
+
+        try {
+            [$labels, $records, $total] = $this->chronoEdiSnapshot($editable);
+            $this->ediReviewed = count($records);
+            $this->ediTotal = $total;
+            $this->adoptEdiDiffs($service->propose($records, $editable, $this->ediIntent, $labels));
+        } catch (LlmException $e) {
+            $this->ediError = $e->getMessage();
+            $this->ediChanges = [];
+        } catch (\Throwable $e) {
+            $this->ediError = 'Nie udało się przygotować propozycji Ediego: '.$e->getMessage();
+            $this->ediChanges = [];
+        } finally {
+            $this->ediLoading = false;
+        }
+    }
+
+    public function applyEdiChanges(): void
+    {
+        if ($this->ediChanges === [] || ! $this->ediIntent) {
+            return;
+        }
+
+        $applied = 0;
+
+        foreach ($this->ediChanges as $change) {
+            if ($this->writeEdiChange($change)) {
+                $applied++;
+            }
+        }
+
+        $this->discardEdiChanges();
+        $this->flash = $applied === 1
+            ? 'Zastosowano 1 zmianę Ediego.'
+            : "Zastosowano {$applied} zmian Ediego.";
+    }
+
+    public function discardEdiChanges(): void
+    {
+        $this->ediIntent = null;
+        $this->ediLoading = false;
+        $this->ediError = null;
+        $this->ediChanges = [];
+        $this->ediReviewed = 0;
+        $this->ediTotal = 0;
+        $this->ediEditingRowId = null;
+        $this->ediEditingField = '';
+    }
+
+    public function acceptEdiChange(int $rowId, string $field): void
+    {
+        $index = $this->ediChangeIndex($rowId, $field);
+        if ($index === null) {
+            return;
+        }
+
+        $this->writeEdiChange($this->ediChanges[$index]);
+        $this->pullEdiChange($index);
+
+        if ($this->ediChanges === []) {
+            $this->discardEdiChanges();
+        }
+    }
+
+    public function rejectEdiChange(int $rowId, string $field): void
+    {
+        $index = $this->ediChangeIndex($rowId, $field);
+        if ($index === null) {
+            return;
+        }
+
+        $this->pullEdiChange($index);
+
+        if ($this->ediChanges === []) {
+            $this->discardEdiChanges();
+        }
+    }
+
+    public function startEdiRevise(int $rowId, string $field): void
+    {
+        if ($this->ediChangeIndex($rowId, $field) === null) {
+            return;
+        }
+
+        $this->ediEditingRowId = $rowId;
+        $this->ediEditingField = $field;
+    }
+
+    public function cancelEdiRevise(): void
+    {
+        $this->ediEditingRowId = null;
+        $this->ediEditingField = '';
+    }
+
+    public function commitEdiRevise(int $rowId, string $field, mixed $value = null): void
+    {
+        $this->reviseEdiChange($rowId, $field, $value);
+        $this->cancelEdiRevise();
+    }
+
+    public function reviseEdiChange(int $rowId, string $field, mixed $value): void
+    {
+        $index = $this->ediChangeIndex($rowId, $field);
+        if ($index === null || ! $this->ediIntent || ! EdiTaskEdit::allows($field, $this->ediIntent)) {
+            return;
+        }
+
+        $from = $this->ediChanges[$index]['from'] ?? null;
+        $to = app(TasksFilterMutateService::class)->normalizeProposed($field, $value);
+        $kind = EdiTaskEdit::kind($from, $to);
+
+        if ($kind === null) {
+            $this->pullEdiChange($index);
+            $this->cancelEdiRevise();
+            if ($this->ediChanges === []) {
+                $this->discardEdiChanges();
+            }
+
+            return;
+        }
+
+        $updated = $this->ediChanges[$index];
+        $updated['to'] = $to;
+        $updated['kind'] = $kind;
+        $updated['to_label'] = EdiTaskEdit::label($field, $to);
+        $this->ediChanges[$index] = $updated;
+    }
+
+    public function isEdiEditing(int $rowId, string $field): bool
+    {
+        return $this->ediEditingRowId === $rowId && $this->ediEditingField === $field;
+    }
+
+    public function isEdiReviewing(): bool
+    {
+        return $this->ediLoading || $this->ediChanges !== [] || ($this->ediIntent !== null && $this->ediError !== null);
+    }
+
+    /**
+     * @param  array{row_id?: int, field?: string, to?: mixed}  $change
+     */
+    protected function writeEdiChange(array $change): bool
+    {
+        if (! $this->ediIntent) {
+            return false;
+        }
+
+        $field = GridField::tryFrom($change['field'] ?? '');
+        if (! $field || ! EdiTaskEdit::allows($field->value, $this->ediIntent)) {
+            return false;
+        }
+
+        $rowId = (int) ($change['row_id'] ?? 0);
+        $value = $change['to'] ?? '';
+        $item = $this->resolveWorkItem($rowId);
+
+        if ($item) {
+            if (! $this->canEditTask($item) || ! $item->writable($field)) {
+                return false;
+            }
+            $item->handler()->write($item, $field, $value);
+
+            return true;
+        }
+
+        $task = $this->resolveProjectTask($rowId);
+        if (! $task || ! $this->canEditTask($task)) {
+            return false;
+        }
+
+        app(ProjectTaskFields::class)->write($task, $field, $value);
+
+        return true;
+    }
+
+    protected function ediChangeIndex(int $rowId, string $field): ?int
+    {
+        foreach ($this->ediChanges as $index => $change) {
+            if ((int) $change['row_id'] === $rowId && $change['field'] === $field) {
+                return (int) $index;
+            }
+        }
+
+        return null;
+    }
+
+    protected function pullEdiChange(int $index): void
+    {
+        unset($this->ediChanges[$index]);
+        $this->ediChanges = array_values($this->ediChanges);
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function ediReviewRowIds(): array
+    {
+        if ($this->ediChanges === []) {
+            return [];
+        }
+
+        return array_values(array_unique(array_map(
+            fn (array $change) => (int) $change['row_id'],
+            $this->ediChanges,
+        )));
+    }
+
+    /**
+     * @return array{row_id: int, field: string, kind: string, from: mixed, to: mixed, from_label: string, to_label: string}|null
+     */
+    public function ediCell(mixed $task, string $field): ?array
+    {
+        if ($this->ediChanges === []) {
+            return null;
+        }
+
+        $id = (int) $task->id;
+
+        foreach ($this->ediChanges as $change) {
+            if ((int) $change['row_id'] === $id && $change['field'] === $field) {
+                return $change;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<array{row_id: int, field: string, kind: string, from: mixed, to: mixed, from_label: string, to_label: string}>  $diffs
+     */
+    protected function adoptEdiDiffs(array $diffs): void
+    {
+        $this->ediChanges = $diffs;
+        $this->ediError = $diffs === []
+            ? 'Edi nie znalazł nic do poprawienia w tym filtrze.'
+            : null;
+        $this->ediEditingRowId = null;
+        $this->ediEditingField = '';
+
+        foreach ($diffs as $change) {
+            if ($change['field'] === 'description' && ! in_array($change['row_id'], $this->expandedTasks, true)) {
+                $this->expandedTasks[] = $change['row_id'];
+            }
+        }
+    }
+
+    /**
+     * @param  list<string>  $editable
+     * @return array{0: list<string>, 1: list<array<string, mixed>>, 2: int}
+     */
+    protected function chronoEdiSnapshot(array $editable, int $max = 40): array
+    {
+        [$labels, , $total] = $this->chronoFilterSnapshot();
+
+        $query = $this->filteredTasksQuery();
+        if ($this->usesWorkItems()) {
+            $query->where('type', WorkItemType::Task);
+        }
+
+        $max = $max > 0 ? $max : 40;
+        $records = [];
+
+        foreach ((clone $query)->with(['assignedTo'])->limit($max)->get() as $item) {
+            if ($item instanceof WorkItem && $item->type !== WorkItemType::Task) {
+                continue;
+            }
+
+            $row = [
+                'id' => $item->id,
+                'source_id' => $item instanceof WorkItem ? $item->source_id : $item->id,
+                'name' => $item instanceof WorkItem ? (string) $item->title : (string) $item->name,
+                'description' => method_exists($item, 'plainDescription') ? $item->plainDescription() : (string) ($item->description ?? ''),
+                'category' => $item->category,
+                'priority' => $item->priority,
+                'due_date' => $item instanceof WorkItem
+                    ? $item->due_at?->toDateString()
+                    : $item->due_date?->toDateString(),
+            ];
+
+            $records[] = array_intersect_key($row, array_flip(array_merge(['id', 'source_id', 'name'], $editable)));
+        }
+
+        return [$labels, $records, $total];
+    }
+
     public function chronoBackToMenu(): void
     {
         $this->chronoMode = 'menu';
         $this->chronoLoading = false;
         $this->chronoError = null;
         $this->chronoSummary = null;
+        $this->importMode = 'json';
         $this->importProposals = [];
         $this->importSelected = [];
         $this->exportJson = '';
@@ -1225,9 +1662,15 @@ class TasksGrid extends Component
 
         try {
             $defaults = $this->chronoImportDefaults();
-            $this->importProposals = $service->parse($this->importText, $defaults);
+            $this->importProposals = $this->importMode === 'list'
+                ? $service->parseLines($this->importText, $defaults)
+                : $service->parseJson($this->importText, $defaults);
             $this->importProposals = array_map(function (array $proposal) {
                 $bits = [];
+                $bits[] = 'Nowe';
+                if (! empty($proposal['assignee'])) {
+                    $bits[] = '@'.$proposal['assignee'];
+                }
                 if (! empty($proposal['category'])) {
                     $bits[] = $proposal['category'];
                 }
@@ -1272,7 +1715,7 @@ class TasksGrid extends Component
             ->values();
 
         if ($selected->isEmpty()) {
-            $this->chronoError = 'Zaznacz co najmniej jedno zadanie do utworzenia.';
+            $this->chronoError = 'Zaznacz co najmniej jedną pozycję.';
 
             return;
         }
@@ -1293,9 +1736,10 @@ class TasksGrid extends Component
                 'description' => ($proposal['description'] ?? '') ?: null,
                 'category' => ($proposal['category'] ?? null) ?: ($defaults['category'] ?? null),
                 'priority' => isset($proposal['priority']) ? (int) $proposal['priority'] : null,
-                'assigned_to' => $defaults['assigned_to'] ?? null,
-                'sprint_id' => $defaults['sprint_id'] ?? null,
-                'subtasks' => $proposal['subtasks'] ?? [],
+                'due_date' => $proposal['due_date'] ?? null,
+                'assigned_to' => $proposal['assigned_to'] ?? ($defaults['assigned_to'] ?? null),
+                'sprint_id' => $proposal['sprint_id'] ?? ($defaults['sprint_id'] ?? null),
+                'subtasks' => $this->chronoImportSubtaskNames($proposal['subtasks'] ?? []),
             ], $user);
 
             $created++;
@@ -1305,6 +1749,29 @@ class TasksGrid extends Component
         $this->flash = $created === 1
             ? 'Utworzono 1 zadanie z importu.'
             : "Utworzono {$created} zadań z importu.";
+    }
+
+    /**
+     * @param  list<mixed>  $subtasks
+     * @return list<string>
+     */
+    protected function chronoImportSubtaskNames(array $subtasks): array
+    {
+        $names = [];
+
+        foreach ($subtasks as $subtask) {
+            if (is_string($subtask)) {
+                $name = trim($subtask);
+            } else {
+                $name = trim((string) ($subtask['name'] ?? ''));
+            }
+
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
     }
 
     /**
@@ -1408,21 +1875,30 @@ class TasksGrid extends Component
         $query = $this->filteredTasksQuery();
         $this->exportTotal = (clone $query)->count();
 
-        $items = (clone $query)
-            ->with(['assignedTo'])
-            ->limit($max)
-            ->get();
+        $items = (clone $query)->limit($max);
 
         if ($this->usesWorkItems()) {
-            $items->loadMissing([
+            $items = $items->with([
+                'assignedTo',
+                'createdBy',
+                'sprint',
                 'source' => function (MorphTo $morphTo) {
                     $morphTo->morphWith([
-                        ProjectTask::class => ['subtasks'],
+                        ProjectTask::class => ['subtasks.assignedTo', 'createdBy', 'sprint', 'assignedTo'],
+                        TaskSubtask::class => ['task', 'assignedTo'],
+                        CommentMention::class => ['comment'],
+                        \App\Models\ProcedureRun::class => ['task', 'template'],
+                        \App\Models\WarehouseDispatch::class => ['tasks'],
+                        ApprovalRequest::class => ['approver', 'decidedBy'],
+                    ])->morphWithCount([
+                        ProjectTask::class => ['comments'],
                     ]);
                 },
-            ]);
+            ])->get();
         } else {
-            $items->loadMissing('subtasks');
+            $items = $items->with(['assignedTo', 'createdBy', 'sprint', 'subtasks.assignedTo'])
+                ->withCount('comments')
+                ->get();
         }
 
         $tasks = [];
@@ -1437,7 +1913,7 @@ class TasksGrid extends Component
 
         $payload = [
             'format' => 'tasks-filter-export',
-            'version' => 1,
+            'version' => 2,
             'exported_at' => now()->toIso8601String(),
             'filters' => $labels,
             'count' => count($tasks),
@@ -1457,43 +1933,135 @@ class TasksGrid extends Component
         }
     }
 
-    /** @return array{name: string, description: string, category: ?string, priority: ?int, subtasks: list<string>} */
+    protected function buildEdiExport(): void
+    {
+        $editable = EdiTaskEdit::EDITABLE;
+        [$labels, $records, $total] = $this->chronoEdiSnapshot($editable, 200);
+
+        $payload = app(TasksFilterMutateService::class)->exportPayload(
+            $records,
+            $editable,
+            $this->ediChanges,
+            $labels,
+        );
+        $payload['total_in_filter'] = $total;
+        $payload['truncated'] = $total > count($records);
+
+        $this->exportCount = count($records);
+        $this->exportTotal = $total;
+        $this->exportJson = json_encode(
+            $payload,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        ) ?: '';
+
+        if ($this->exportCount === 0) {
+            $this->chronoError = 'Filtr nie zwraca żadnych zadań do eksportu Ediego.';
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     protected function chronoExportRow(mixed $item): array
     {
         if ($item instanceof WorkItem) {
             $source = $item->source;
-            $subtasks = [];
-
-            if ($source instanceof ProjectTask) {
-                $source->loadMissing('subtasks');
-                $subtasks = $source->subtasks->pluck('name')->filter()->values()->all();
-            }
+            $parentTask = $source instanceof TaskSubtask ? $source->task : null;
+            $projectTask = $source instanceof ProjectTask ? $source : null;
 
             return [
+                'id' => $item->id,
+                'type' => $item->type instanceof WorkItemType ? $item->type->value : (string) $item->type,
+                'type_label' => $item->type instanceof WorkItemType ? $item->type->label() : null,
+                'source_type' => $item->source_type,
+                'source_id' => $item->source_id,
                 'name' => (string) $item->title,
                 'description' => $item->plainDescription(),
-                'category' => $item->category,
+                'status' => $this->chronoStatusValue($item->status),
                 'priority' => $item->priority,
-                'subtasks' => array_values(array_map('strval', $subtasks)),
+                'category' => $item->category,
+                'sprint_id' => $item->sprint_id,
+                'sprint' => $item->sprint?->name,
+                'assigned_to' => $item->assignee_id,
+                'assignee' => $item->assignedTo?->name,
+                'created_by' => $item->created_by_id,
+                'created_by_name' => $item->createdBy?->name,
+                'due_date' => $item->due_at?->toDateString(),
+                'comments_count' => (int) ($projectTask?->comments_count ?? 0),
+                'url' => $item->openUrl(),
+                'parent' => $parentTask ? [
+                    'id' => $parentTask->id,
+                    'name' => $parentTask->name,
+                ] : null,
+                'approval_decision' => $item->approvalDecision()?->value,
+                'subtasks' => $projectTask ? $this->chronoExportSubtasks($projectTask) : [],
+                'created_at' => $item->created_at?->toIso8601String(),
+                'updated_at' => $item->updated_at?->toIso8601String(),
             ];
         }
 
         /** @var ProjectTask $item */
-        $item->loadMissing('subtasks');
+        $item->loadMissing(['subtasks.assignedTo', 'assignedTo', 'createdBy', 'sprint']);
 
         return [
+            'id' => $item->id,
+            'type' => WorkItemType::Task->value,
+            'type_label' => WorkItemType::Task->label(),
+            'source_type' => $item->getMorphClass(),
+            'source_id' => $item->id,
             'name' => (string) $item->name,
             'description' => method_exists($item, 'plainDescription') ? $item->plainDescription() : (string) ($item->description ?? ''),
-            'category' => $item->category,
+            'status' => $this->chronoStatusValue($item->status),
             'priority' => $item->priority,
-            'subtasks' => $item->subtasks->pluck('name')->filter()->values()->all(),
+            'category' => $item->category,
+            'sprint_id' => $item->sprint_id,
+            'sprint' => $item->sprint?->name,
+            'assigned_to' => $item->assigned_to,
+            'assignee' => $item->assignedTo?->name,
+            'created_by' => $item->created_by,
+            'created_by_name' => $item->createdBy?->name,
+            'due_date' => $item->due_date?->toDateString(),
+            'comments_count' => (int) ($item->comments_count ?? 0),
+            'url' => route('tasks.show', $item),
+            'parent' => null,
+            'approval_decision' => null,
+            'subtasks' => $this->chronoExportSubtasks($item),
+            'created_at' => $item->created_at?->toIso8601String(),
+            'updated_at' => $item->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function chronoExportSubtasks(ProjectTask $task): array
+    {
+        $task->loadMissing(['subtasks.assignedTo']);
+
+        return $task->subtasks->map(fn (TaskSubtask $subtask) => [
+            'id' => $subtask->id,
+            'name' => (string) $subtask->name,
+            'is_completed' => (bool) $subtask->is_completed,
+            'sort_order' => $subtask->sort_order,
+            'assigned_to' => $subtask->assigned_to,
+            'assignee' => $subtask->assignedTo?->name,
+            'created_by' => $subtask->created_by,
+        ])->values()->all();
+    }
+
+    public function downloadChronoCsv()
+    {
+        return TaskExport::csv($this->filteredTasksQuery());
     }
 
     public function downloadChronoExport()
     {
         if ($this->exportJson === '') {
-            $this->buildChronoExport();
+            if ($this->chronoMode === 'edi-export') {
+                $this->buildEdiExport();
+            } else {
+                $this->buildChronoExport();
+            }
         }
 
         if ($this->exportJson === '') {
@@ -1502,7 +2070,9 @@ class TasksGrid extends Component
             return null;
         }
 
-        $filename = 'zadania-filtr-'.now()->format('Y-m-d-His').'.json';
+        $filename = $this->chronoMode === 'edi-export'
+            ? 'edi-zmiany-'.now()->format('Y-m-d-His').'.json'
+            : 'zadania-filtr-'.now()->format('Y-m-d-His').'.json';
 
         return response()->streamDownload(
             function () {
@@ -2474,7 +3044,13 @@ class TasksGrid extends Component
             $query->with($eager)->withCount('comments');
         }
 
-        if ($this->groupBy) {
+        $ediIds = $this->ediReviewRowIds();
+
+        if ($ediIds !== []) {
+            $query->whereIn($this->usesWorkItems() ? 'work_items.id' : 'project_tasks.id', $ediIds);
+            $groupedTasks = null;
+            $tasks = $query->get();
+        } elseif ($this->groupBy) {
             $allTasks = $query->limit(500)->get();
             $groupedTasks = $allTasks
                 ->groupBy(fn ($task) => $this->groupValueFor($task))
@@ -2513,6 +3089,9 @@ class TasksGrid extends Component
             ),
             'chronoImportDefaults' => $this->chronoImportDefaults(),
             'chronoImportDefaultsHint' => $this->chronoImportDefaultsHint(),
+            'chronoItemCount' => $tasks instanceof \Illuminate\Contracts\Pagination\Paginator
+                ? $tasks->total()
+                : ($tasks?->count() ?? $groupedTasks?->flatten()->count()),
         ]);
     }
 

@@ -31,7 +31,7 @@
                 @endif
 
                 @if($canSuggestWithAi && $llmConfigured)
-                    <x-chrono.trigger target="openAiModal" hint="Rozbij na podzadania" />
+                    <x-chrono.trigger target="openChronoAssist" hint="Rozbij na podzadania" />
                 @endif
             </div>
         </div>
@@ -109,6 +109,17 @@
             />
         @endif
     </x-ui.card>
+
+    @if($showChronoAssist)
+        <livewire:chrono-assist
+            context="task"
+            status="Wybierz akcję dla tego zadania"
+            context-label="Zadanie"
+            :context-chips="array_values(array_filter([$task->name]))"
+            :item-count="$totalSubtasks"
+            wire:key="task-{{ $task->id }}-assist"
+        />
+    @endif
 
     @if($showAiModal)
         <x-chrono.modal

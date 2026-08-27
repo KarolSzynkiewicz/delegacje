@@ -1,4 +1,4 @@
-{{-- Wariant „spark”: sam zegar bez twarzy — do miejsc, gdzie bot byłby zbyt zabawkowy. --}}
+{{-- spark / Iskra: czysty zegar (loading mark) — bez atrybutu / bez twarzy --}}
 <circle class="ac-bot__aura" cx="32" cy="32" r="31" fill="url(#{{ $glow }})"/>
 
 <circle class="ac-bot__head" cx="32" cy="32" r="24" fill="none"

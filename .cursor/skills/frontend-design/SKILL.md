@@ -318,6 +318,57 @@ inline text, e.g. `@if($x)some text @endif`. If something like this ever
 breaks again, dump the compiled view (`Blade::compileString(...)`) and
 `php -l` it to see exactly which `@endif` stayed as literal text.
 
+## Chrono Assist — take the whole package
+
+When wiring Assist (or Edi / Impka) onto another screen, copy **complete
+methods**, not a slice from the middle of a neighbor. Two production breaks
+came from the same habit:
+
+1. `isEdiReviewing()` lost its `function` line; a leftover `{` sat at class
+   scope → `syntax error, unexpected token "{", expecting "function"`.
+2. JSON import was spliced into `TasksFilterMutateService` and dropped
+   `systemPrompt()` (LLM path still calls it) → `Call to undefined method
+   ...::systemPrompt()`.
+
+If the search-replace touches the boundary between two methods, the
+`old_string` **must include the next method's signature**, so its body
+cannot be orphaned.
+
+**Roster intent** (don't mix jobs; Spark is not a fifth persona):
+
+- **Chrono** (`forge`) — create from prose / filter context. HITL before insert.
+- **Argus** (`lens`) — summarize the current filter. Read-only.
+- **Impek** (`orb`) — courier. Export the filter; import **creates** only.
+  Ignore ids. Never update existing rows.
+- **Edi** (`visor`) — editor. Propose changes to `$editable` fields only
+  (`EdiTaskEdit`). HITL in the grid. JSON import/export exists so you can
+  iterate prompts in ChatGPT without burning tokens on every front-end check.
+  No add/delete, no comments / status / assignee unless explicitly granted.
+- **Spark** — loading clock in content, not on the landing roster.
+
+Public/product copy lives on `ChronoPersona::all()` (`pitch` — ogólny zamysł,
+`can` — krótkie punkty). Roster „Poznaj boty” jest na `/dashboard` (`#boty`),
+nie na landingu. Zmieniaj teksty w `ChronoPersona`, nie w Blade.
+
+**Edi package to copy together:** `fieldsForIntent` / `chatInstruction`,
+`diffsFromChanges`, `parseImportedJson`, `exportPayload`, `systemPrompt`
+(LLM), `chronoEdiSnapshot`, `isEdiReviewing`, accept / reject / revise,
+review-bar export that **must not** discard diffs. Cell colors belong in the
+Blade local `<style>` as well as `app.css` — Vite build is often not running.
+
+Dashboard „Poznaj boty” (`/dashboard` `#boty`): `.dash-bot` + `<x-ask-chrono-bot>`,
+teksty z `ChronoPersona::all()` (`pitch`). Spark nie jest personą.
+
+**Assist tiles (`.ac-assist__tile`)**: bot is the visual anchor — centered,
+`--ac-size` ~56px (phone) / 72–92px (`.ac-assist--flush` desktop). Do **not**
+shrink the face back to a 32px corner chip. Flush modal uses 4 columns from
+`md` up so `modal-xl` width is filled; phone stays 2×2. Title uses
+`clamp()` + `overflow-wrap` so „Jak mogę Ci pomóc?” does not overflow on
+narrow screens. **Flush header**: column — title full width, then roster
+stretched across the modal (not a 13.5rem strip on the right). Critical
+sizing also lives in a local `<style>` inside
+`components/chrono/assist.blade.php` (Vite build often missing).
+
 ## Two more traps worth knowing about
 
 **Sticky header cells silently losing `position: sticky`**: if a `<th>` (or

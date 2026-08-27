@@ -225,5 +225,10 @@ class ViewTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('dashboard');
+        $response->assertSee('Poznaj boty');
+        $response->assertSee('Chrono');
+        $response->assertSee('Argus');
+        $response->assertSee('Impek');
+        $response->assertSee('Edi');
     }
 }
