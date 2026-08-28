@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Enums\LocationPurposeType;
+use App\Models\EquipmentIssue;
 use App\Models\EquipmentStock;
+use App\Models\EquipmentStockMovement;
 use App\Models\Location;
 use App\Models\Warehouse;
+use App\Models\WarehouseDispatch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -204,6 +207,80 @@ class WarehouseService
             $location = $warehouse->location;
             $warehouse->stocks()->delete();
             $warehouse->delete();
+
+            if ($location) {
+                $location->purposes()
+                    ->where('purpose', LocationPurposeType::WAREHOUSE->value)
+                    ->delete();
+            }
+        });
+    }
+
+    public function mergeAndDelete(Warehouse $from, Warehouse $to): void
+    {
+        if ($from->id === $to->id) {
+            throw ValidationException::withMessages([
+                'target_warehouse_id' => 'Wybierz inny magazyn docelowy.',
+            ]);
+        }
+
+        if ($from->is_default) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć magazynu siedziby. Ustaw najpierw inny magazyn jako domyślny.',
+            ]);
+        }
+
+        if (Warehouse::query()->count() <= 1) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Nie można usunąć jedynego magazynu.',
+            ]);
+        }
+
+        DB::transaction(function () use ($from, $to) {
+            $from = Warehouse::query()->whereKey($from->id)->lockForUpdate()->firstOrFail();
+            $to = Warehouse::query()->whereKey($to->id)->lockForUpdate()->firstOrFail();
+
+            foreach ($from->stocks()->lockForUpdate()->get() as $stock) {
+                if ((int) $stock->quantity_in_stock < 1) {
+                    continue;
+                }
+
+                $target = EquipmentStock::query()
+                    ->where('warehouse_id', $to->id)
+                    ->where('equipment_variant_id', $stock->equipment_variant_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($target) {
+                    $target->increment('quantity_in_stock', (int) $stock->quantity_in_stock);
+                    $target->update([
+                        'min_quantity' => max((int) $target->min_quantity, (int) $stock->min_quantity),
+                    ]);
+                } else {
+                    EquipmentStock::query()->create([
+                        'warehouse_id' => $to->id,
+                        'equipment_variant_id' => $stock->equipment_variant_id,
+                        'quantity_in_stock' => (int) $stock->quantity_in_stock,
+                        'min_quantity' => (int) $stock->min_quantity,
+                    ]);
+                }
+            }
+
+            EquipmentIssue::query()
+                ->where('warehouse_id', $from->id)
+                ->update(['warehouse_id' => $to->id]);
+
+            WarehouseDispatch::query()
+                ->where('warehouse_id', $from->id)
+                ->update(['warehouse_id' => $to->id]);
+
+            EquipmentStockMovement::query()
+                ->where('warehouse_id', $from->id)
+                ->update(['warehouse_id' => $to->id]);
+
+            $location = $from->location;
+            $from->stocks()->delete();
+            $from->delete();
 
             if ($location) {
                 $location->purposes()

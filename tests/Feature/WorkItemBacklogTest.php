@@ -581,32 +581,33 @@ class WorkItemBacklogTest extends TestCase
             ->assertDontSeeHtml("startEdit({$item->id}, 'sprint')");
     }
 
-    public function test_dispatch_status_is_a_badge_and_cannot_be_closed_from_the_grid(): void
+    public function test_partial_dispatch_work_item_is_completed_and_hidden_from_active_grid(): void
     {
         $dispatch = WarehouseDispatch::factory()->create([
             'status' => WarehouseDispatch::STATUS_PARTIAL,
-            'issued_at' => null,
-            'issued_by' => null,
+            'issued_at' => now(),
+            'issued_by' => $this->user->id,
             'created_by' => $this->user->id,
         ]);
 
         $item = WorkItem::query()->where('type', WorkItemType::Dispatch)->first();
         $this->assertNotNull($item);
-        $this->assertSame(WorkItemStatus::Pending, $item->status);
+        $this->assertSame(WorkItemStatus::Completed, $item->status);
 
-        $component = Livewire::actingAs($this->user)
+        Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
+            ->assertDontSee($dispatch->number);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->set('status', 'all')
             ->assertSee('Częściowo wydane')
             ->assertSee('Kompletacja')
             ->assertDontSeeHtml("toggleExpand({$item->id})")
-            ->assertDontSee('Brak opisu.')
-            ->call('toggleExpand', $item->id)
             ->call('quickStatusChange', $item->id, 'completed')
             ->assertDontSee('Status zaktualizowany.');
 
-        $this->assertSame([], $component->get('expandedTasks'));
-
-        $this->assertSame(WorkItemStatus::Pending, $item->fresh()->status);
+        $this->assertSame(WorkItemStatus::Completed, $item->fresh()->status);
         $this->assertSame(WarehouseDispatch::STATUS_PARTIAL, $dispatch->fresh()->status);
     }
 

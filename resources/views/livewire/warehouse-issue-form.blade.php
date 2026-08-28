@@ -363,7 +363,14 @@
                 <div class="warehouse-issue-size-dialog" style="width:min(960px,100%);max-height:min(90vh,920px);display:flex;flex-direction:column;overflow:hidden;background:#1e293b;border:1px solid var(--glass-border);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.55);">
                     <div class="warehouse-issue-size-dialog__header">
                         <div>
-                            <h5 id="warehouse-issue-size-title" class="mb-1">{{ $sizePanel['type']->name }} — rozmiar per osoba</h5>
+                            <h5 id="warehouse-issue-size-title" class="mb-1">
+                                {{ $sizePanel['type']->name }}
+                                @if($sizePanel['has_variants'])
+                                    — rozmiar per osoba
+                                @else
+                                    — ilość per osoba
+                                @endif
+                            </h5>
                             <div class="d-flex flex-wrap gap-1 mt-1">
                                 @foreach($sizePanel['stock'] as $option)
                                     <x-ui.badge
@@ -401,71 +408,83 @@
                         @endif
 
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-                            <span class="small" style="color:var(--text-muted);">Wszyscy</span>
-                            <select
-                                class="form-select"
-                                style="max-width:16rem;"
-                                wire:change="applyVariantToAll({{ $sizePanel['type']->id }}, $event.target.value)"
-                            >
-                                <option value="">wybierz rozmiar</option>
-                                @foreach($sizePanel['variants'] as $variant)
-                                    <option value="{{ $variant->id }}">{{ $variant->kind_label }}</option>
-                                @endforeach
-                            </select>
+                            @if($sizePanel['has_variants'])
+                                <span class="small" style="color:var(--text-muted);">Wszyscy</span>
+                                <select
+                                    class="form-select"
+                                    style="max-width:16rem;"
+                                    wire:change="applyVariantToAll({{ $sizePanel['type']->id }}, $event.target.value)"
+                                >
+                                    <option value="">wybierz rozmiar</option>
+                                    @foreach($sizePanel['variants'] as $variant)
+                                        <option value="{{ $variant->id }}">{{ $variant->kind_label }}</option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <span class="small" style="color:var(--text-muted);">Ustaw 0, jeśli dana osoba nie dostaje tej pozycji.</span>
+                            @endif
                         </div>
 
                         <table class="warehouse-issue-size-table">
                             <thead>
                                 <tr>
-                                    <th style="width:40%;">Pracownik</th>
-                                    <th style="width:25%;">Rozmiar</th>
+                                    <th style="width:{{ $sizePanel['has_variants'] ? '40' : '55' }}%;">Pracownik</th>
+                                    @if($sizePanel['has_variants'])
+                                        <th style="width:25%;">Rozmiar</th>
+                                    @endif
                                     <th style="width:12%;">Ilość</th>
-                                    <th style="width:23%;">Podpowiedź</th>
+                                    @if($sizePanel['has_variants'])
+                                        <th style="width:23%;">Podpowiedź</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($sizePanel['assignments'] as $row)
                                     <tr wire:key="size-row-{{ $sizePanel['type']->id }}-{{ $row['employee']->id }}">
                                         <td class="fw-semibold">{{ $row['employee']->full_name }}</td>
-                                        <td>
-                                            <select
-                                                class="form-select"
-                                                wire:change="setAssignmentVariant({{ $sizePanel['type']->id }}, {{ $row['employee']->id }}, $event.target.value)"
-                                            >
-                                                <option value="">— wybierz</option>
-                                                @foreach($sizePanel['variants'] as $variant)
-                                                    <option value="{{ $variant->id }}" @selected($row['variant_id'] === $variant->id)>
-                                                        {{ $variant->kind_label }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </td>
+                                        @if($sizePanel['has_variants'])
+                                            <td>
+                                                <select
+                                                    class="form-select"
+                                                    wire:change="setAssignmentVariant({{ $sizePanel['type']->id }}, {{ $row['employee']->id }}, $event.target.value)"
+                                                >
+                                                    <option value="">— wybierz</option>
+                                                    @foreach($sizePanel['variants'] as $variant)
+                                                        <option value="{{ $variant->id }}" @selected($row['variant_id'] === $variant->id)>
+                                                            {{ $variant->kind_label }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                        @endif
                                         <td>
                                             <input
                                                 type="number"
-                                                min="1"
+                                                min="0"
                                                 class="form-control"
                                                 style="max-width:6.5rem;"
                                                 value="{{ $row['quantity'] }}"
                                                 wire:change="setAssignmentQuantity({{ $sizePanel['type']->id }}, {{ $row['employee']->id }}, $event.target.value)"
                                             >
                                         </td>
-                                        <td>
-                                            @if($row['last_variant_id'] && $row['variant_id'] === null)
-                                                <button
-                                                    type="button"
-                                                    class="warehouse-issue-last-hint"
-                                                    wire:click="setAssignmentVariant({{ $sizePanel['type']->id }}, {{ $row['employee']->id }}, {{ $row['last_variant_id'] }})"
-                                                    title="Ustaw ostatni rozmiar"
-                                                >
-                                                    {{ $row['last_label'] }}
-                                                </button>
-                                            @elseif($row['last_label'])
-                                                <span class="small" style="color:var(--text-muted);">{{ $row['last_label'] }}</span>
-                                            @else
-                                                <span class="small" style="color:var(--text-muted);">brak historii</span>
-                                            @endif
-                                        </td>
+                                        @if($sizePanel['has_variants'])
+                                            <td>
+                                                @if($row['last_variant_id'] && $row['variant_id'] === null)
+                                                    <button
+                                                        type="button"
+                                                        class="warehouse-issue-last-hint"
+                                                        wire:click="setAssignmentVariant({{ $sizePanel['type']->id }}, {{ $row['employee']->id }}, {{ $row['last_variant_id'] }})"
+                                                        title="Ustaw ostatni rozmiar"
+                                                    >
+                                                        {{ $row['last_label'] }}
+                                                    </button>
+                                                @elseif($row['last_label'])
+                                                    <span class="small" style="color:var(--text-muted);">{{ $row['last_label'] }}</span>
+                                                @else
+                                                    <span class="small" style="color:var(--text-muted);">brak historii</span>
+                                                @endif
+                                            </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             </tbody>

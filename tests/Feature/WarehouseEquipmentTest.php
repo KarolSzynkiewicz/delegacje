@@ -84,8 +84,9 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Dodaj do magazynu')
             ->assertSee('Asortyment')
             ->assertSee('Zleć wydanie')
-            ->assertSee('Zlecenia')
-            ->assertSee('Wydane')
+            ->assertSee('Zlecenia kompletacji')
+            ->assertSee('Historia wydań')
+            ->assertSee('Lista magazynów')
             ->assertSee('eq-wh-card is-active', false)
             ->assertSee('data-warehouse-id="'.$this->warehouse->id.'"', false)
             ->assertDontSee('Stan magazynu')
@@ -100,7 +101,7 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('Asortyment')
             ->assertDontSee('Stan magazynu')
             ->assertDontSee('Asortyment historyczny')
-            ->assertSee('Wydane')
+            ->assertSee('Historia wydań')
             ->assertDontSee('Wydaj bezzwrotnie')
             ->assertSee('Rozchód');
 
@@ -277,7 +278,7 @@ class WarehouseEquipmentTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]))
             ->assertOk()
-            ->assertSee('Zlecenia')
+            ->assertSee('Zlecenia kompletacji')
             ->assertSee($dispatch->number)
             ->assertSee('Anna Nowak')
             ->assertSee('Kompletuj')
@@ -2165,5 +2166,118 @@ class WarehouseEquipmentTest extends TestCase
             'status' => LogisticsEventStatus::PLANNED,
             'created_by' => $this->user->id,
         ]);
+    }
+
+    public function test_issue_form_without_variants_allows_skipping_recipients(): void
+    {
+        $anna = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $jan = Employee::factory()->create(['first_name' => 'Jan', 'last_name' => 'Kowalski']);
+        $piotr = Employee::factory()->create(['first_name' => 'Piotr', 'last_name' => 'Wiśniewski']);
+        $flashlight = Equipment::factory()->withoutKinds()->create(['name' => 'Latarka LED']);
+        $variant = EquipmentVariant::factory()->unnamed()->inStock(5)->create([
+            'equipment_id' => $flashlight->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->call('onEmployeesUpdated', [$anna->id, $jan->id, $piotr->id])
+            ->call('addTypeToCart', $flashlight->id)
+            ->assertSet('sizePanelTypeId', $flashlight->id)
+            ->call('setAssignmentQuantity', $flashlight->id, $jan->id, 0)
+            ->call('setAssignmentQuantity', $flashlight->id, $piotr->id, 0)
+            ->call('confirmSizePanel')
+            ->set('assigneeId', $this->user->id)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $issues = EquipmentIssue::query()->where('warehouse_dispatch_id', $dispatch->id)->get();
+        $this->assertCount(1, $issues);
+        $this->assertSame($anna->id, $issues->first()->employee_id);
+        $this->assertSame($variant->id, $issues->first()->equipment_variant_id);
+    }
+
+    public function test_can_cancel_reserved_dispatch(): void
+    {
+        $employee = Employee::factory()->create();
+        $item = Equipment::factory()->withoutKinds()->create(['name' => 'Kask']);
+        $variant = EquipmentVariant::factory()->unnamed()->inStock(3)->create([
+            'equipment_id' => $item->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->call('onEmployeesUpdated', [$employee->id])
+            ->call('addTypeToCart', $item->id)
+            ->call('confirmSizePanel')
+            ->set('assigneeId', $this->user->id)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $task = ProjectTask::query()->where('subject_id', $dispatch->id)->first();
+        $this->assertNotNull($task);
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.cancel', $dispatch))
+            ->assertRedirect(route('equipment.tab.orders', ['warehouse_id' => $this->warehouse->id]));
+
+        $dispatch->refresh();
+        $this->assertTrue($dispatch->isCancelled());
+        $this->assertSame(EquipmentIssue::STATUS_CANCELLED, $dispatch->issues()->first()->fresh()->status);
+        $this->assertSame(TaskStatus::CANCELLED, $task->fresh()->status);
+        $this->assertSame(3, $variant->fresh()->availableIn($this->warehouse));
+    }
+
+    public function test_partial_dispatch_closes_work_item_on_tasks_grid(): void
+    {
+        $anna = Employee::factory()->create();
+        $jan = Employee::factory()->create();
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP', 'variant_label' => 'Rozmiar']);
+        $sizeM = EquipmentVariant::factory()->inStock(10)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->set('assigneeId', $this->user->id)
+            ->call('onEmployeesUpdated', [$anna->id, $jan->id])
+            ->call('addToCart', $sizeM->id, 'returnable')
+            ->call('confirmSizePanel')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $annasIssue = EquipmentIssue::query()->where('employee_id', $anna->id)->first();
+        $this->fulfillDispatch($dispatch, [$annasIssue->id]);
+
+        $item = \App\Models\WorkItem::query()
+            ->where('source_type', $dispatch->getMorphClass())
+            ->where('source_id', $dispatch->id)
+            ->first();
+
+        $this->assertNotNull($item);
+        $this->assertSame(\App\Enums\WorkItemStatus::Completed, $item->fresh()->status);
+    }
+
+    public function test_merge_and_delete_warehouse_moves_stock_and_issues(): void
+    {
+        $other = Warehouse::factory()->create(['name' => 'Magazyn B']);
+        $item = Equipment::factory()->withoutKinds()->create(['name' => 'Kask']);
+        $variant = EquipmentVariant::factory()->unnamed()->inStock(5, 0, $this->warehouse)->create([
+            'equipment_id' => $item->id,
+        ]);
+        EquipmentStock::query()->create([
+            'warehouse_id' => $other->id,
+            'equipment_variant_id' => $variant->id,
+            'quantity_in_stock' => 2,
+            'min_quantity' => 0,
+        ]);
+
+        app(WarehouseService::class)->mergeAndDelete($other, $this->warehouse);
+
+        $this->assertDatabaseMissing('warehouses', ['id' => $other->id]);
+        $this->assertSame(7, $variant->fresh()->quantityIn($this->warehouse));
     }
 }

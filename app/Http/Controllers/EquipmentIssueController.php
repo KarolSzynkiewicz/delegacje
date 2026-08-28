@@ -81,6 +81,23 @@ class EquipmentIssueController extends Controller
             ->with('success', $message);
     }
 
+    public function cancelDispatch(WarehouseDispatch $warehouseDispatch)
+    {
+        try {
+            $dispatch = $this->equipmentService->cancelDispatch($warehouseDispatch);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->route('warehouse-dispatches.show', $warehouseDispatch)
+                ->with('error', collect($e->errors())->flatten()->first() ?: 'Nie można anulować zlecenia.');
+        }
+
+        $warehouse = $dispatch->warehouse;
+
+        return redirect()
+            ->route('equipment.tab.orders', $warehouse ? ['warehouse_id' => $warehouse->id] : [])
+            ->with('success', "Anulowano zlecenie {$dispatch->number}.");
+    }
+
     public function returnForm(EquipmentIssue $equipmentIssue)
     {
         if ($equipmentIssue->isReserved()) {

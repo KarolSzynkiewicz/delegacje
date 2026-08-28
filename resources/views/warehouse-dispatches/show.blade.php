@@ -1,6 +1,7 @@
 <x-app-layout>
     @php
         $picking = $warehouseDispatch->isReserved();
+        $cancelled = $warehouseDispatch->isCancelled();
         $warehouse = $warehouseDispatch->warehouse;
         $reservedIssues = $warehouseDispatch->issues->where('status', \App\Models\EquipmentIssue::STATUS_RESERVED)->values();
         $selectedInit = $reservedIssues->mapWithKeys(fn ($issue) => [(string) $issue->id => false])->all();
@@ -10,7 +11,7 @@
             : route('equipment.tab.issues');
     @endphp
     <x-slot name="header">
-        <x-ui.page-header :title="($picking ? 'Kompletacja ' : 'Wydanie ').$warehouseDispatch->number">
+        <x-ui.page-header :title="($picking ? 'Kompletacja ' : ($cancelled ? 'Anulowane ' : 'Wydanie ')).$warehouseDispatch->number">
             <x-slot name="left">
                 <x-ui.button
                     variant="ghost"
@@ -20,6 +21,20 @@
                     Powrót
                 </x-ui.button>
             </x-slot>
+            @if($picking)
+                <x-slot name="right">
+                    <form
+                        method="POST"
+                        action="{{ route('warehouse-dispatches.cancel', $warehouseDispatch) }}"
+                        onsubmit="return confirm('Anulować zlecenie {{ $warehouseDispatch->number }}? Rezerwacja zostanie cofnięta.');"
+                    >
+                        @csrf
+                        <x-ui.button variant="outline-danger" type="submit" action="delete">
+                            Anuluj zlecenie
+                        </x-ui.button>
+                    </form>
+                </x-slot>
+            @endif
         </x-ui.page-header>
     </x-slot>
 
@@ -210,7 +225,15 @@
             </x-ui.card>
         </form>
     @else
-        <x-ui.card :label="$warehouseDispatch->isPartial() ? 'Częściowo wydane' : 'Wydanie z magazynu'">
+        <x-ui.card :label="$warehouseDispatch->statusLabel()">
+            @if($cancelled)
+                <x-ui.alert variant="secondary" title="Zlecenie anulowane" class="mb-3">
+                    Anulowano {{ $warehouseDispatch->cancelled_at?->format('d.m.Y H:i') ?? '—' }}
+                    @if($warehouseDispatch->canceller?->name)
+                        · {{ $warehouseDispatch->canceller->name }}
+                    @endif
+                </x-ui.alert>
+            @endif
             @include('equipment-issues._dispatch-summary', ['summary' => $warehouseDispatch->summary()])
         </x-ui.card>
     @endif

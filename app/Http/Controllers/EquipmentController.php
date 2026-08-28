@@ -95,6 +95,13 @@ class EquipmentController extends Controller
         ]);
     }
 
+    public function indexWarehouses()
+    {
+        return view('equipment.warehouses', [
+            'activeTab' => 'warehouses',
+        ]);
+    }
+
     public function create(Request $request)
     {
         $warehouse = $this->warehouseService->current($request);

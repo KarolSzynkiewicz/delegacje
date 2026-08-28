@@ -14,15 +14,20 @@
             'href' => route('equipment.tab.stock', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
         ],
         'orders' => [
-            'label' => 'Zlecenia',
+            'label' => 'Zlecenia kompletacji',
             'icon' => 'bi bi-clipboard-check',
             'href' => route('equipment.tab.orders', $warehouse ? ['warehouse_id' => $warehouse->id] : []),
             'count' => $pendingOrdersCount,
         ],
         'issues' => [
-            'label' => 'Wydane',
+            'label' => 'Historia wydań',
             'icon' => 'bi bi-box-arrow-up',
             'href' => route('equipment.tab.issues'),
+        ],
+        'warehouses' => [
+            'label' => 'Lista magazynów',
+            'icon' => 'bi bi-buildings',
+            'href' => route('equipment.tab.warehouses'),
         ],
     ];
 @endphp

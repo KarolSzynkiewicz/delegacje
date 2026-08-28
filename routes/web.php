@@ -461,6 +461,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('equipment/tab/orders', [\App\Http\Controllers\EquipmentController::class, 'indexOrders'])
             ->name('equipment.tab.orders')
             ->defaults('resource', 'equipment');
+        Route::get('equipment/tab/warehouses', [\App\Http\Controllers\EquipmentController::class, 'indexWarehouses'])
+            ->name('equipment.tab.warehouses')
+            ->defaults('resource', 'equipment');
         Route::post('equipment/{equipment}/restore', [\App\Http\Controllers\EquipmentController::class, 'restore'])
             ->name('equipment.restore')
             ->defaults('resource', 'equipment');
@@ -470,6 +473,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->defaults('resource', 'equipment-issues');
         Route::post('warehouse-dispatches/{warehouseDispatch}/fulfill', [\App\Http\Controllers\EquipmentIssueController::class, 'fulfillDispatch'])
             ->name('warehouse-dispatches.fulfill')
+            ->defaults('resource', 'equipment-issues');
+        Route::post('warehouse-dispatches/{warehouseDispatch}/cancel', [\App\Http\Controllers\EquipmentIssueController::class, 'cancelDispatch'])
+            ->name('warehouse-dispatches.cancel')
             ->defaults('resource', 'equipment-issues');
         Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
         Route::get('warehouses', [\App\Http\Controllers\WarehouseController::class, 'index'])

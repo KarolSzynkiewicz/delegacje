@@ -19,6 +19,8 @@ class WarehouseDispatch extends Model implements TaskSubject
 
     public const STATUS_ISSUED = 'issued';
 
+    public const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
         'number',
         'year',
@@ -29,6 +31,8 @@ class WarehouseDispatch extends Model implements TaskSubject
         'status',
         'issued_at',
         'issued_by',
+        'cancelled_at',
+        'cancelled_by',
         'created_by',
     ];
 
@@ -37,6 +41,7 @@ class WarehouseDispatch extends Model implements TaskSubject
         'sequence' => 'integer',
         'issue_date' => 'date',
         'issued_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     public function warehouse(): BelongsTo
@@ -54,6 +59,13 @@ class WarehouseDispatch extends Model implements TaskSubject
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by')->withDefault([
+            'name' => '—',
+        ]);
+    }
+
+    public function canceller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by')->withDefault([
             'name' => '—',
         ]);
     }
@@ -148,11 +160,22 @@ class WarehouseDispatch extends Model implements TaskSubject
         return $this->status === self::STATUS_PARTIAL;
     }
 
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
+    public function isClosed(): bool
+    {
+        return $this->isIssued() || $this->isPartial() || $this->isCancelled();
+    }
+
     public function statusLabel(): string
     {
         return match ($this->status) {
             self::STATUS_RESERVED => 'Do kompletacji',
             self::STATUS_PARTIAL => 'Częściowo wydane',
+            self::STATUS_CANCELLED => 'Anulowane',
             default => 'Wydane',
         };
     }
@@ -176,6 +199,9 @@ class WarehouseDispatch extends Model implements TaskSubject
 
         $recipients = [];
         foreach ($this->issues->sortBy(fn (EquipmentIssue $issue) => $issue->employee?->last_name.' '.$issue->employee?->first_name) as $issue) {
+            if ($issue->status === EquipmentIssue::STATUS_CANCELLED) {
+                continue;
+            }
             $employeeId = (int) $issue->employee_id;
             if (! isset($recipients[$employeeId])) {
                 $recipients[$employeeId] = [

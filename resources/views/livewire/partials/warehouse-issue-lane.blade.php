@@ -86,16 +86,16 @@
                                         </div>
                                     </div>
                                     @if($canMove)
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-primary"
-                                            draggable="false"
-                                            wire:click.stop="addToCart({{ $variant->id }})"
-                                            title="Dodaj"
-                                        >
-                                            <i class="bi bi-plus"></i>
-                                        </button>
-                                    @endif
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        draggable="false"
+                                        wire:click.stop="addTypeToCart({{ $type->id }})"
+                                        title="Dodaj"
+                                    >
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                @endif
                                 </div>
                             </div>
                         @endif
@@ -104,8 +104,8 @@
             @else
                 @php
                     $type = $card['type'];
-                    $incomplete = $card['has_variants'] && $card['filled'] < $card['total'];
-                    $single = $card['total'] === 1 ? ($card['assignments'][0] ?? null) : null;
+                    $incomplete = $card['filled'] < $card['total'] && ($card['has_variants'] || $multipleRecipients);
+                    $single = ! $multipleRecipients && $card['total'] === 1 ? ($card['assignments'][0] ?? null) : null;
                     $variantLabel = $type->variant_label ?: 'Wariant';
                 @endphp
                 <div
@@ -114,7 +114,7 @@
                     style="cursor:grab;"
                     draggable="true"
                     x-on:dragstart="start($event, 'cart', {{ $type->id }})"
-                    @if($card['has_variants'])
+                    @if($card['has_variants'] || ($multipleRecipients && $card['total'] > 1))
                         wire:click="openSizePanel({{ $type->id }})"
                     @endif
                 >
@@ -123,7 +123,13 @@
                             @include('livewire.partials.warehouse-issue-item-title', ['type' => $type])
                             @if($incomplete)
                                 <div class="mt-1">
-                                    <x-ui.badge variant="warning">{{ mb_strtolower($variantLabel) }} {{ $card['filled'] }}/{{ $card['total'] }}</x-ui.badge>
+                                    <x-ui.badge variant="warning">
+                                        @if($card['has_variants'])
+                                            {{ mb_strtolower($variantLabel) }} {{ $card['filled'] }}/{{ $card['total'] }}
+                                        @else
+                                            odbiorcy {{ $card['filled'] }}/{{ $card['total'] }}
+                                        @endif
+                                    </x-ui.badge>
                                 </div>
                             @endif
                         </div>

@@ -112,7 +112,9 @@ class WarehouseIssueForm extends Component
             return;
         }
 
-        $this->addToCart($variant->id, $kind);
+        $this->ensureTypeGroup($type, $kind);
+        $this->ensurePeopleOnGroup($type);
+        $this->openSizePanel($typeId);
     }
 
     public function addToCart(int $variantId, ?string $kind = null, int $quantity = 1): void
@@ -136,23 +138,35 @@ class WarehouseIssueForm extends Component
         $type = $variant->equipment;
         $kind = $this->kindFor($type);
         $quantity = max(1, $quantity);
-        $needed = $quantity * count($employeeIds);
+
+        $this->ensureTypeGroup($type, $kind);
+
+        if (count($employeeIds) > 1 || $type->hasVariants()) {
+            $needed = $quantity * count($employeeIds);
+            $remaining = $this->remainingFor($variantId);
+            if ($needed > $remaining) {
+                $this->addError('lines', "Niewystarczająca ilość w magazynie. Dostępne: {$remaining}.");
+
+                return;
+            }
+
+            foreach ($employeeIds as $employeeId) {
+                $this->putAssignment($type->id, $employeeId, $variantId, $quantity);
+            }
+
+            $this->openSizePanel($type->id);
+
+            return;
+        }
+
         $remaining = $this->remainingFor($variantId);
-        if ($needed > $remaining) {
+        if ($quantity > $remaining) {
             $this->addError('lines', "Niewystarczająca ilość w magazynie. Dostępne: {$remaining}.");
 
             return;
         }
 
-        $this->ensureTypeGroup($type, $kind);
-
-        foreach ($employeeIds as $employeeId) {
-            $this->putAssignment($type->id, $employeeId, $variantId, $quantity);
-        }
-
-        if ($type->hasVariants()) {
-            $this->openSizePanel($type->id);
-        }
+        $this->putAssignment($type->id, $employeeIds[0], $variantId, $quantity);
     }
 
     public function openSizePanel(int $typeId): void
@@ -211,8 +225,18 @@ class WarehouseIssueForm extends Component
         }
 
         $quantity = (int) $quantity;
-        if ($quantity < 1) {
-            $this->removeAssignment($typeId, $employeeId);
+        if ($quantity < 0) {
+            return;
+        }
+
+        if ($quantity === 0) {
+            foreach ($this->lines[$index]['assignments'] as $key => $assignment) {
+                if ((int) $assignment['employee_id'] !== $employeeId) {
+                    continue;
+                }
+
+                $this->lines[$index]['assignments'][$key]['quantity'] = 0;
+            }
 
             return;
         }
@@ -470,7 +494,17 @@ class WarehouseIssueForm extends Component
             }
 
             $assignments = $group['assignments'] ?? [];
-            $filled = collect($assignments)->filter(fn ($assignment) => (int) ($assignment['variant_id'] ?? 0) > 0)->count();
+            $filled = collect($assignments)->filter(function ($assignment) use ($type) {
+                if ((int) $assignment['quantity'] < 1) {
+                    return false;
+                }
+
+                if ($type->hasVariants()) {
+                    return (int) ($assignment['variant_id'] ?? 0) > 0;
+                }
+
+                return true;
+            })->count();
 
             $cards[] = [
                 'index' => $index,
@@ -537,10 +571,13 @@ class WarehouseIssueForm extends Component
 
         return [
             'type' => $type,
+            'has_variants' => $type->hasVariants(),
             'variants' => $type->variants,
             'assignments' => $assignments,
             'stock' => $stock,
-            'missing' => collect($assignments)->filter(fn (array $row) => ! $row['variant_id'])->count(),
+            'missing' => $type->hasVariants()
+                ? collect($assignments)->filter(fn (array $row) => (int) $row['quantity'] > 0 && ! $row['variant_id'])->count()
+                : 0,
             'shortages' => $stock
                 ->filter(fn (array $option) => $option['over'])
                 ->map(fn (array $option) => [
@@ -661,10 +698,20 @@ class WarehouseIssueForm extends Component
         $entries = [];
 
         foreach ($this->lines as $group) {
+            $type = $this->typeFromCatalog((int) $group['type_id']);
+
             foreach ($group['assignments'] as $assignment) {
+                $quantity = (int) $assignment['quantity'];
+                if ($quantity < 1) {
+                    continue;
+                }
+
                 $variantId = (int) ($assignment['variant_id'] ?? 0);
+                if ($variantId < 1 && $type && ! $type->hasVariants()) {
+                    $variantId = (int) $type->variants->first()?->id;
+                }
+
                 if ($variantId < 1) {
-                    $type = $this->typeFromCatalog((int) $group['type_id']);
                     $this->addError('lines', 'Uzupełnij rozmiary dla „'.($type?->name ?? 'pozycji').'”.');
                     $this->sizePanelTypeId = (int) $group['type_id'];
 
@@ -674,13 +721,13 @@ class WarehouseIssueForm extends Component
                 $entries[] = [
                     'employee_id' => (int) $assignment['employee_id'],
                     'variant_id' => $variantId,
-                    'quantity' => (int) $assignment['quantity'],
+                    'quantity' => $quantity,
                 ];
             }
         }
 
         if ($entries === []) {
-            $this->addError('lines', 'Przerzuć co najmniej jedną pozycję na prawą stronę.');
+            $this->addError('lines', 'Wybierz co najmniej jednego odbiorcę z ilością większą od zera.');
 
             return null;
         }
@@ -924,6 +971,7 @@ class WarehouseIssueForm extends Component
 
         if (! $type->hasVariants()) {
             $names = collect($assignments)
+                ->filter(fn ($assignment) => (int) $assignment['quantity'] > 0)
                 ->map(fn ($assignment) => $employees->get((int) $assignment['employee_id'])?->full_name)
                 ->filter()
                 ->values()
@@ -931,7 +979,7 @@ class WarehouseIssueForm extends Component
             $qty = (int) collect($assignments)->sum(fn ($assignment) => (int) $assignment['quantity']);
 
             return [[
-                'label' => count($assignments) === 1 ? '1 os.' : count($assignments).' os.',
+                'label' => count($names) === 1 ? '1 os.' : count($names).' os.',
                 'count' => $qty,
                 'recipients' => $names,
             ]];
@@ -940,7 +988,7 @@ class WarehouseIssueForm extends Component
         $variants = $type->variants->keyBy('id');
 
         return collect($assignments)
-            ->filter(fn ($assignment) => (int) ($assignment['variant_id'] ?? 0) > 0)
+            ->filter(fn ($assignment) => (int) ($assignment['variant_id'] ?? 0) > 0 && (int) $assignment['quantity'] > 0)
             ->groupBy(fn ($assignment) => (int) $assignment['variant_id'])
             ->map(function (Collection $group, $variantId) use ($variants, $employees) {
                 $names = $group
@@ -978,16 +1026,41 @@ class WarehouseIssueForm extends Component
 
         $messages = [];
         $requested = [];
+        $activeCount = 0;
 
         foreach ($this->lines[$index]['assignments'] as $assignment) {
-            $variantId = (int) ($assignment['variant_id'] ?? 0);
+            $quantity = (int) $assignment['quantity'];
+            if ($quantity < 1) {
+                continue;
+            }
+
+            $activeCount++;
+
+            if ($type->hasVariants()) {
+                $variantId = (int) ($assignment['variant_id'] ?? 0);
+                if ($variantId < 1) {
+                    $messages[] = 'Uzupełnij rozmiar dla każdej osoby z ilością większą od zera.';
+
+                    break;
+                }
+
+                $requested[$variantId] = ($requested[$variantId] ?? 0) + $quantity;
+
+                continue;
+            }
+
+            $variantId = (int) ($assignment['variant_id'] ?? $type->variants->first()?->id ?? 0);
             if ($variantId < 1) {
-                $messages[] = 'Uzupełnij rozmiar dla każdej osoby.';
+                $messages[] = 'Brak wariantu dla pozycji.';
 
                 break;
             }
 
-            $requested[$variantId] = ($requested[$variantId] ?? 0) + (int) $assignment['quantity'];
+            $requested[$variantId] = ($requested[$variantId] ?? 0) + $quantity;
+        }
+
+        if ($activeCount === 0) {
+            $messages[] = 'Wybierz co najmniej jednego odbiorcę z ilością większą od zera.';
         }
 
         foreach ($requested as $variantId => $quantity) {

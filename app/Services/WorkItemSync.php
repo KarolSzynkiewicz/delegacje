@@ -380,9 +380,9 @@ class WorkItemSync
     private function fromDispatch(WarehouseDispatch $dispatch): ?array
     {
         $wrapper = $dispatch->tasks()->orderBy('id')->first();
-        $status = $dispatch->isIssued()
-            ? WorkItemStatus::Completed
-            : WorkItemStatus::Pending;
+        $status = $dispatch->isReserved()
+            ? WorkItemStatus::Pending
+            : WorkItemStatus::Completed;
 
         return [
             'type' => WorkItemType::Dispatch,

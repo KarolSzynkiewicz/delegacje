@@ -448,6 +448,43 @@ class EquipmentService
         });
     }
 
+    public function cancelDispatch(WarehouseDispatch $dispatch): WarehouseDispatch
+    {
+        if (! $dispatch->isReserved()) {
+            throw ValidationException::withMessages([
+                'dispatch' => 'Można anulować tylko zlecenie oczekujące na kompletację.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($dispatch) {
+            /** @var WarehouseDispatch $dispatch */
+            $dispatch = WarehouseDispatch::query()
+                ->whereKey($dispatch->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $dispatch->isReserved()) {
+                throw ValidationException::withMessages([
+                    'dispatch' => 'To zlecenie zostało już zamknięte.',
+                ]);
+            }
+
+            $dispatch->issues()
+                ->where('status', EquipmentIssue::STATUS_RESERVED)
+                ->update(['status' => EquipmentIssue::STATUS_CANCELLED]);
+
+            $dispatch->update([
+                'status' => WarehouseDispatch::STATUS_CANCELLED,
+                'cancelled_at' => now(),
+                'cancelled_by' => auth()->id(),
+            ]);
+
+            $this->cancelDispatchTasks($dispatch);
+
+            return $dispatch->fresh(['warehouse.location', 'creator', 'issuer', 'canceller', 'issues.employee', 'issues.equipment', 'issues.variant']);
+        });
+    }
+
     private function createDispatchTask(WarehouseDispatch $dispatch, int $assigneeId): ProjectTask
     {
         $task = ProjectTask::query()->create([
@@ -475,6 +512,14 @@ class EquipmentService
             ->whereNotIn('status', [TaskStatus::COMPLETED, TaskStatus::CANCELLED])
             ->get()
             ->each(fn (ProjectTask $task) => $task->markCompleted());
+    }
+
+    private function cancelDispatchTasks(WarehouseDispatch $dispatch): void
+    {
+        $dispatch->tasks()
+            ->whereNotIn('status', [TaskStatus::COMPLETED, TaskStatus::CANCELLED])
+            ->get()
+            ->each(fn (ProjectTask $task) => $task->cancel());
     }
 
     /**
@@ -1150,7 +1195,7 @@ class EquipmentService
 
         EquipmentIssue::query()
             ->where('equipment_id', $equipment->id)
-            ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED])
+            ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED, EquipmentIssue::STATUS_CANCELLED])
             ->with('dispatch')
             ->get()
             ->each(function (EquipmentIssue $issue) use (&$inbound, &$outbound, $add): void {
@@ -1271,7 +1316,7 @@ class EquipmentService
     {
         $issues = EquipmentIssue::query()
             ->where('equipment_id', $equipment->id)
-            ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED])
+            ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED, EquipmentIssue::STATUS_CANCELLED])
             ->with(['variant.equipment', 'warehouse.location', 'employee', 'dispatch.issuer', 'issuer', 'returner'])
             ->get();
 

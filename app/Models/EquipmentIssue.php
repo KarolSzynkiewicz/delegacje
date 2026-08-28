@@ -24,6 +24,8 @@ class EquipmentIssue extends Model
 
     public const STATUS_UNFULFILLED = 'unfulfilled';
 
+    public const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
         'equipment_id',
         'equipment_variant_id',
@@ -120,7 +122,7 @@ class EquipmentIssue extends Model
     {
         return match ($this->status) {
             self::STATUS_RESERVED => 'warning',
-            self::STATUS_UNFULFILLED => 'secondary',
+            self::STATUS_UNFULFILLED, self::STATUS_CANCELLED => 'secondary',
             self::STATUS_ISSUED => 'info',
             self::STATUS_GIVEN => 'accent',
             self::STATUS_RETURNED => 'success',
@@ -152,6 +154,7 @@ class EquipmentIssue extends Model
         return match ($status) {
             self::STATUS_RESERVED => 'Zarezerwowane',
             self::STATUS_UNFULFILLED => 'Nie wydano',
+            self::STATUS_CANCELLED => 'Anulowane',
             self::STATUS_ISSUED => 'Do zwrotu',
             self::STATUS_GIVEN => 'Bezzwrotne',
             self::STATUS_RETURNED => 'Zwrócony',
