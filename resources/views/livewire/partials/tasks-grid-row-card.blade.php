@@ -71,7 +71,7 @@
 @endphp
 
 <x-ui.card
-    class="dt-card tg-dt-card"
+    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}"
     wire:key="tg-card-{{ $task->id }}"
     style="border-left-color: {{ $borderColor }}"
 >
@@ -113,6 +113,7 @@
         </div>
     </div>
 
+    @unless ($isExpanded)
     @if(in_array('type', $visibleColumns))
         <div class="dt-card__row">
             <span class="dt-card__label">Typ</span>
@@ -389,59 +390,12 @@
             <span class="dt-card__value font-mono">{{ $task->updated_at?->format('d.m.Y') ?? '—' }}</span>
         </div>
     @endif
+    @endunless
 
     @if($isExpanded)
     <div class="tg-card-expand">
-        <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="dt-card__label" style="border:0;padding:0">
-                <i class="bi bi-card-text me-1"></i>Opis
-            </span>
-            @if($this->rowWritable($task, 'description') && !($isEditing && $editingField === 'description'))
-            <button wire:click="startEdit({{ $task->id }}, 'description')"
-                    class="btn btn-link btn-sm p-0 tg-dt-hit"
-                    style="font-size:0.72rem; color:rgba(255,255,255,0.3); text-decoration:none; line-height:1">
-                <i class="bi bi-pencil-square"></i>
-            </button>
-            @endif
-        </div>
-
-        @if($isEditing && $editingField === 'description')
-            <textarea wire:model="editingValue"
-                      class="form-control form-control-sm"
-                      rows="4"
-                      placeholder="Opis zadania…"
-                      wire:keydown.escape="cancelEdit"></textarea>
-            <div class="d-flex gap-1 mt-2">
-                <button wire:click="saveEdit" class="btn btn-sm btn-primary">
-                    <i class="bi bi-floppy me-1"></i>Zapisz
-                </button>
-                <button wire:click="cancelEdit" class="btn btn-sm btn-outline-secondary">Anuluj</button>
-            </div>
-        @else
-            @php $descText = $task->plainDescription(); @endphp
-            @if($descText)
-                <div class="tg-dt-card__desc">{{ $descText }}</div>
-            @else
-                <div class="text-muted" style="font-size:0.8rem; font-style:italic">
-                    Brak opisu.
-                    @if($this->rowWritable($task, 'description'))
-                        <button wire:click="startEdit({{ $task->id }}, 'description')"
-                                class="btn btn-link btn-sm p-0 ms-1"
-                                style="font-size:0.78rem">Dodaj opis</button>
-                    @endif
-                </div>
-            @endif
-            @if($sourceCard)
-                <div class="mt-2">
-                    <a href="{{ $sourceCard['url'] }}" class="btn btn-sm btn-outline-primary" style="font-size:0.74rem">
-                        <i class="bi {{ $sourceCard['icon'] }} me-1"></i>{{ $sourceCard['label'] }}
-                    </a>
-                </div>
-            @endif
-        @endif
-
         @if($canAddSubtask || $subtaskTotal > 0)
-        <div class="mt-3">
+        <div>
             <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                 <span class="dt-card__label" style="border:0;padding:0">
                     <i class="bi bi-list-check me-1"></i>Podzadania

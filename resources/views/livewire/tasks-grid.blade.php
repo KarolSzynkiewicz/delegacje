@@ -453,7 +453,7 @@
             gap: 0.75rem;
         }
 
-        /* Jeden zwarty rząd: widok + filtry + liczba + grupowanie. */
+        /* Jeden zwarty rząd: widok + filtry + liczba (badge grupowania tylko na md+). */
         .tg-toolbar__row {
             flex-wrap: nowrap;
             align-items: center;
@@ -487,6 +487,7 @@
         .tg-toolbar__view-icon { display: none !important; }
         .tg-toolbar .btn { padding: 4px 8px !important; font-size: 0.72rem !important; }
         .tg-active-filters { display: none !important; }
+        .tg-group-badge { display: none !important; }
     }
 
     /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
@@ -498,6 +499,9 @@
         font-size: 1.05rem;
         margin-bottom: 0.45rem;
         padding-bottom: 0.55rem;
+    }
+    .tg-dt-card.is-expanded .dt-card__title {
+        margin-bottom: 0;
     }
     .tg-dt-card .dt-card__row {
         grid-template-columns: 6.8rem 1fr;
@@ -575,26 +579,44 @@
 
         .tg-add-actions {
             display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.3rem;
-            margin-top: 0.35rem;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.55rem;
         }
         .tg-add-actions .btn {
-            padding: 0.14rem 0.55rem !important;
-            font-size: 0.68rem !important;
-            font-weight: 500 !important;
-            line-height: 1.3 !important;
-            border-radius: 999px !important;
-            background: rgba(255, 255, 255, 0.04) !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.75rem !important;
+            width: 100% !important;
+            min-height: 52px;
+            padding: 0.8rem 1rem !important;
+            font-size: 0.95rem !important;
+            font-weight: 600 !important;
+            line-height: 1.25 !important;
+            border-radius: 14px !important;
+            background: var(--bg-card, rgba(13, 18, 30, 0.52)) !important;
             border: 1px solid var(--glass-border, rgba(255,255,255,0.1)) !important;
-            color: var(--text-muted, #94a3b8) !important;
+            color: var(--text-main, #f1f5f9) !important;
             text-decoration: none !important;
+            text-align: left;
             box-shadow: none !important;
-            width: auto !important;
-            gap: 0.25rem !important;
         }
-        .tg-add-actions .btn i { font-size: 0.72rem; }
+        .tg-add-actions .btn i {
+            font-size: 1.25rem;
+            width: 1.5rem;
+            text-align: center;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, var(--primary, #3b82f6), var(--accent, #a855f7));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+        }
+        .tg-add-actions .btn:active {
+            background: rgba(59, 130, 246, 0.12) !important;
+            border-color: rgba(96, 165, 250, 0.45) !important;
+        }
     .xuiv2-tasks.is-edi-review .tg-add-actions { display: none !important; }
     body:has(.xuiv2-tasks.is-edi-review) .ui-page-header__right {
         display: none !important;
@@ -821,7 +843,7 @@
                         {{ $groupedTasks->flatten()->count() }} zadań
                     @endif
                     @if($groupBy)
-                        <span class="ms-1 badge"
+                        <span class="ms-1 badge tg-group-badge d-none d-md-inline-block"
                               title="Przeciągnij zadanie (uchwyt ⋮⋮) na inną grupę, żeby zmienić: {{ $availableColumns[$groupBy]['label'] ?? '' }}"
                               style="font-size:0.65rem;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.25)">grupowanie</span>
                     @endif
@@ -1256,15 +1278,18 @@
     </x-ui.card>
     @else
     <div class="tg-add-actions">
-        <button type="button" wire:click="startAdd('task')" class="btn btn-sm">
-            <i class="bi bi-plus-circle"></i>Dodaj zadanie
+        <button type="button" wire:click="startAdd('task')" class="btn">
+            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+            <span>Dodaj zadanie</span>
         </button>
         @if($this->usesWorkItems())
-        <button type="button" wire:click="startAdd('procedure')" class="btn btn-sm">
-            <i class="bi bi-play-circle"></i>Uruchom procedurę
+        <button type="button" wire:click="startAdd('procedure')" class="btn">
+            <i class="bi bi-play-circle" aria-hidden="true"></i>
+            <span>Uruchom procedurę</span>
         </button>
-        <button type="button" wire:click="startAdd('approval')" class="btn btn-sm">
-            <i class="bi bi-check2-circle"></i>Poproś o zatwierdzenie
+        <button type="button" wire:click="startAdd('approval')" class="btn">
+            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+            <span>Poproś o zatwierdzenie</span>
         </button>
         @endif
     </div>

@@ -7215,6 +7215,9 @@ span.eq-wh-card {
     margin-bottom: 0.45rem;
     padding-bottom: 0.55rem;
 }
+.tg-dt-card.is-expanded .dt-card__title {
+    margin-bottom: 0;
+}
 .tg-dt-card .dt-card__row {
     grid-template-columns: 6.8rem 1fr;
 }
