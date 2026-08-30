@@ -416,6 +416,136 @@
         </div>
 
         {{-- ══════════════════════════════════════════════════════════════
+             Navbar + pasek tytułu (x-ui.page-header)
+             Ta sama konwencja co Chrono Assist: telefon ~390px + desktop.
+             ══════════════════════════════════════════════════════════════ --}}
+        <div class="mb-5 pb-4 border-bottom border-secondary border-opacity-25" id="clChromePreview">
+            <h3 class="mb-1">
+                Navbar + pasek tytułu
+                <span class="text-muted small fw-normal">(mobile · desktop · bez resize okna)</span>
+            </h3>
+            <p class="text-muted small mb-3">
+                Górny pasek to <code>layouts/navigation</code>, pod nim <code>&lt;x-ui.page-header /&gt;</code>.
+                Na telefonie drugi hamburger (po prawej) rozwija opcje z przycisków.
+                Prop <code>phone</code> wymusza ten układ w ramce —
+                media query viewportu tu nie zadziała.
+            </p>
+
+            <div class="row g-4 align-items-start">
+                <div class="col-12 col-md-5 col-lg-4">
+                    <div class="small text-muted text-uppercase fw-semibold mb-2" style="letter-spacing:.06em">Mobile · ~390px</div>
+                    <div class="mx-auto" style="max-width:390px">
+                        <div
+                            class="rounded-4 overflow-hidden"
+                            style="border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25)"
+                        >
+                            <div class="d-flex justify-content-center py-2">
+                                <span style="width:72px;height:5px;border-radius:999px;background:rgba(255,255,255,.15)"></span>
+                            </div>
+
+                            <nav class="navbar navbar-light cl-nav-preview cl-nav-preview--phone">
+                                <div class="container-fluid px-2">
+                                    <a class="navbar-brand d-flex align-items-center gap-2 m-0 p-0" href="#" onclick="return false">
+                                        <x-application-logo />
+                                        <span class="navbar-brand-name">Chrono<span class="navbar-brand-name__accent">Logic</span></span>
+                                    </a>
+                                    <button class="navbar-toggler" type="button" disabled aria-label="Menu">
+                                        <span class="navbar-toggler-icon"></span>
+                                    </button>
+                                </div>
+                            </nav>
+
+                            <header class="app-header app-header--phone">
+                                <div class="py-2 px-2">
+                                    <x-ui.page-header title="Backlog" :phone="true">
+                                        <x-slot:right>
+                                            <a href="#" class="btn btn-sm btn-outline-secondary" onclick="return false">
+                                                <i class="bi bi-calendar3 me-1"></i>Sprinty
+                                            </a>
+                                            <a href="#" class="btn btn-sm btn-outline-secondary" onclick="return false">
+                                                <i class="bi bi-card-list me-1"></i>Widok kart
+                                            </a>
+                                        </x-slot:right>
+                                    </x-ui.page-header>
+                                </div>
+                            </header>
+
+                            <div class="px-2 pb-3">
+                                <div class="rounded-3 px-3 py-3" style="border:1px dashed rgba(255,255,255,.1); min-height:4.5rem">
+                                    <div class="small text-muted">Treść strony — filtry, tabela…</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-7 col-lg-8">
+                    <div class="small text-muted text-uppercase fw-semibold mb-2" style="letter-spacing:.06em">Desktop · pełna szerokość</div>
+                    <div
+                        class="rounded-4 overflow-hidden"
+                        style="border:1px solid var(--glass-border); background:rgba(13,18,30,.45)"
+                    >
+                        <nav class="navbar navbar-light cl-nav-preview">
+                            <div class="container-fluid px-3">
+                                <a class="navbar-brand d-flex align-items-center gap-2 m-0 py-1" href="#" onclick="return false">
+                                    <x-application-logo />
+                                    <span class="navbar-brand-name">Chrono<span class="navbar-brand-name__accent">Logic</span></span>
+                                </a>
+                                <div class="d-none d-md-flex align-items-center gap-1 ms-3">
+                                    <span class="nav-link py-1 px-2 small">Pulpit</span>
+                                    <span class="nav-link py-1 px-2 small active">Zadania</span>
+                                    <span class="nav-link py-1 px-2 small">Magazyn</span>
+                                </div>
+                                <div class="ms-auto d-flex align-items-center gap-2">
+                                    <span class="small text-muted">Jan Kowalski</span>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <header class="app-header">
+                            <div class="py-3 px-3">
+                                <x-ui.page-header title="Backlog">
+                                    <x-slot:right>
+                                        <a href="#" class="btn btn-sm btn-outline-secondary" onclick="return false">
+                                            <i class="bi bi-calendar3 me-1"></i>Sprinty
+                                        </a>
+                                        <a href="#" class="btn btn-sm btn-outline-secondary" onclick="return false">
+                                            <i class="bi bi-card-list me-1"></i>Widok kart
+                                        </a>
+                                    </x-slot:right>
+                                </x-ui.page-header>
+                            </div>
+                        </header>
+
+                        <div class="px-3 pb-3">
+                            <div class="rounded-3 px-3 py-3" style="border:1px dashed rgba(255,255,255,.1); min-height:4.5rem">
+                                <div class="small text-muted">Treść strony — ten sam pasek, tytuł nad przyciskami.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ul class="small text-muted mt-3 mb-0 ps-3">
+                        <li>Telefon: tytuł z lewej, hamburger opcji z prawej — rozwija te same przyciski.</li>
+                        <li>Desktop: tytuł 2.5rem na środku, sloty lewy/prawy pod spodem.</li>
+                        <li>Navbar ma własne menu; to drugie jest tylko na akcje strony.</li>
+                    </ul>
+                </div>
+            </div>
+
+            {{-- Vite bywa wyłączony — te same reguły co w app.css, tylko na ramkę. --}}
+            <style>
+                #clChromePreview .app-header.app-header--phone h2,
+                #clChromePreview .app-header.app-header--phone .ui-page-header__heading {
+                    font-size: 1.75rem !important;
+                    line-height: 1.2 !important;
+                    text-align: left !important;
+                }
+                #clChromePreview .cl-nav-preview--phone { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+                #clChromePreview .cl-nav-preview--phone .navbar-brand-name { font-size: 1.125rem; }
+            </style>
+        </div>
+
+        {{-- ══════════════════════════════════════════════════════════════
              🧪 PROBE — teal2 / xuiv2
              Testowy wariant stylu zainspirowany "chronologic-landing.html":
              tło (siatka + ziarno + poświata kursora), animacje hover
@@ -1010,7 +1140,10 @@
         {{-- x-ui.page-header --}}
         <div class="mb-4">
             <h4 class="fw-semibold">x-ui.page-header</h4>
-            <p class="text-muted small">Sloty: left (lewy slot), right (prawy slot)</p>
+            <p class="text-muted small">
+                Sloty: left / right. Mobile i ramka telefonu: zobacz
+                <a href="#clChromePreview">Navbar + pasek tytułu</a> wyżej.
+            </p>
             <x-ui.card>
                 <x-ui.page-header title="Przykładowy nagłówek">
                     <x-slot name="left">
@@ -1333,7 +1466,10 @@
         {{-- x-ui.navbar --}}
         <div class="mb-4">
             <h4 class="fw-semibold">x-ui.navbar</h4>
-            <p class="text-muted small">Props: brand, brandUrl | Slot dla elementów nawigacji</p>
+            <p class="text-muted small">
+                Stary komponent katalogowy. Realny pasek aplikacji + mobile:
+                <a href="#clChromePreview">Navbar + pasek tytułu</a>.
+            </p>
             <x-ui.card>
                 <x-ui.navbar brand="Stocznia PRO" brandUrl="#">
                     <x-ui.button variant="ghost" class="text-white">Menu 1</x-ui.button>
