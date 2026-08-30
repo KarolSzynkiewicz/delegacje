@@ -42,9 +42,13 @@
                 <!-- Page Content -->
                 <main class="{{ $edgeToEdge ? 'w-100 py-3 px-0' : ($fullWidth ? 'container-fluid py-3 px-2 px-md-3' : 'container-xxl py-4 px-3 px-md-4 px-lg-5') }}">
                     @if($edgeToEdge)
+                        <div class="px-2 px-md-3">
+                            <x-work-item-list-nav />
+                        </div>
                         {{ $slot }}
                     @else
                         <div class="app-page-shell">
+                            <x-work-item-list-nav />
                             {{ $slot }}
                         </div>
                     @endif

@@ -48,6 +48,7 @@
                     'container-xxl px-3 px-md-4 px-lg-5' => ! $edgeToEdge && ! $fullWidth,
                 ])>
                     <div class="app-page-shell">
+                        <x-work-item-list-nav />
                         @yield('content')
                         @isset($slot)
                             {{ $slot }}

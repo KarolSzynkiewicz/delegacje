@@ -272,6 +272,27 @@
         outline: 1px dashed rgba(168,85,247,0.5);
         border-radius: 4px;
     }
+    .tg-dt-card .tg-hover-edit {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        width: 100%;
+        min-height: 1.7rem;
+        cursor: pointer;
+        padding: 0.1rem 0.25rem;
+        border-radius: 4px;
+    }
+    @media (hover: none) {
+        .tg-dt-card .tg-hover-edit {
+            outline: 1px dashed rgba(168, 85, 247, 0.28);
+        }
+    }
+    .tg-dt-card .dt-card__value .form-select,
+    .tg-dt-card .dt-card__value .form-control {
+        width: 100%;
+        max-width: 100%;
+    }
 
     /* ── Status badge pill ── */
     .tg-status-badge {
@@ -426,7 +447,11 @@
     @media (max-width: 767.98px) {
         /* Tabela znika, karty przejmują ── */
         .tg-table-wrap { display: none !important; }
-        .tg-cards { display: block !important; }
+        .tg-cards {
+            display: flex !important;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
 
         /* Jeden zwarty rząd: widok + filtry + liczba + grupowanie. */
         .tg-toolbar__row {
@@ -464,53 +489,86 @@
         .tg-active-filters { display: none !important; }
     }
 
-    /* ── Karty zadań (mobile) ── */
-    .tg-card {
-        position: relative;
-        border-radius: 10px;
-        border: 1px solid rgba(255,255,255,0.07);
-        border-left: 3px solid rgba(255,255,255,0.15);
-        background: rgba(255,255,255,0.02);
-        padding: 9px 10px;
-        margin-bottom: 7px;
+    /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
+    .tg-dt-card.card {
+        border-left-width: 3px !important;
+        border-left-style: solid !important;
     }
-    .tg-card-top { display: flex; align-items: center; gap: 6px; }
+    .tg-dt-card .dt-card__title {
+        font-size: 1.05rem;
+        margin-bottom: 0.45rem;
+        padding-bottom: 0.55rem;
+    }
+    .tg-dt-card .dt-card__row {
+        grid-template-columns: 6.8rem 1fr;
+    }
+    .tg-dt-card__heading {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.45rem;
+    }
+    .tg-dt-card__name {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        color: inherit;
+        text-decoration: none;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+    .tg-dt-hit {
+        position: relative;
+        z-index: 2;
+    }
+    .tg-dt-card .dt-card__value,
+    .tg-dt-card .tg-card-expand {
+        position: relative;
+        z-index: 2;
+    }
     .tg-card-expand-btn {
         appearance: none; border: none; background: transparent; padding: 2px;
         color: rgba(255,255,255,0.4); line-height: 1; flex-shrink: 0;
+        margin-top: 0.15rem;
     }
     .tg-card-subtask-badge {
         flex-shrink: 0; font-size: 0.6rem; min-width: 30px; text-align: center;
-        border-radius: 999px; padding: 1px 6px;
+        border-radius: 999px; padding: 1px 6px; margin-top: 0.2rem;
         background: rgba(255,255,255,0.1); color: var(--text-muted,#94a3b8);
     }
-    .tg-card-name {
-        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        color: var(--text-main,#f1f5f9); text-decoration: none; font-size: 0.88rem; font-weight: 500;
-        padding: 2px 0;
-    }
-    .tg-card-source-link { flex-shrink: 0; color: #c084fc; line-height: 1; }
-    .tg-card-meta {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px;
-        margin-top: 7px; font-size: 0.74rem; color: var(--text-muted,#94a3b8);
-    }
-    .tg-card-meta .tg-meta-item { display: inline-flex; align-items: center; gap: 3px; line-height: 1.3; }
+    .tg-card-source-link { flex-shrink: 0; color: #c084fc; line-height: 1; margin-top: 0.2rem; }
     .tg-card-expand {
-        margin-top: 9px; padding-top: 9px; border-top: 1px dashed rgba(255,255,255,0.08);
+        margin-top: 0.55rem; padding-top: 0.7rem;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .tg-dt-card__desc {
+        white-space: pre-wrap;
+        max-height: 160px;
+        overflow-y: auto;
+        background: rgba(0,0,0,0.25);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: var(--text-main,#f1f5f9);
     }
 
     /* ── Nagłówek grupy (mobile) ── */
     .tg-group-card-header {
         display: flex; align-items: center; gap: 8px;
-        padding: 9px 4px 6px; margin-top: 4px;
-        font-size: 0.78rem; font-weight: 600;
-        color: var(--text-muted,#94a3b8); letter-spacing: 0.3px;
+        padding: 0.35rem 0.15rem 0.15rem;
+        margin-top: 0.35rem;
+        font-size: 0.78rem; font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--text-muted,#94a3b8);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 0.45rem;
     }
     .tg-group-card-header:first-child { margin-top: 0; }
 
     /* ── Add-task (mobile) ── */
     .tg-add-card {
-        border: 1px dashed rgba(255, 255, 255, 0.12);
+        border: 1px dashed rgba(255, 255, 255, 0.16) !important;
         background: rgba(255, 255, 255, 0.02);
     }
         .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
@@ -1094,7 +1152,7 @@
             @include('livewire.partials.tasks-grid-row-card', compact('task'))
         @endforeach
     @else
-        <div class="text-center text-muted py-5">
+        <div class="text-center text-muted py-4">
             <i class="bi bi-inbox display-5 d-block mb-2 opacity-30"></i>
             <div>Brak zadań spełniających kryteria</div>
             @if($searchTask || $searchCategory || $searchAssignedTo)
@@ -1105,15 +1163,15 @@
 
     {{-- ── Inline add-task card ── --}}
     @if($showAddRow)
-    <div class="tg-card tg-add-card">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-semibold small">
+    <x-ui.card class="dt-card tg-add-card">
+        <div class="dt-card__title d-flex justify-content-between align-items-start gap-2">
+            <span>
                 @if($addKind === 'procedure') Uruchom procedurę
                 @elseif($addKind === 'approval') Poproś o zatwierdzenie
                 @else Nowe zadanie
                 @endif
             </span>
-            <button wire:click="cancelAdd" class="btn btn-sm btn-link text-muted p-0" title="Anuluj">
+            <button wire:click="cancelAdd" class="btn btn-sm btn-link text-muted p-0 tg-dt-hit" title="Anuluj">
                 <i class="bi bi-x-lg" style="font-size:0.8rem"></i>
             </button>
         </div>
@@ -1195,7 +1253,7 @@
                 @endif
             </button>
         </div>
-    </div>
+    </x-ui.card>
     @else
     <div class="tg-add-actions">
         <button type="button" wire:click="startAdd('task')" class="btn btn-sm">

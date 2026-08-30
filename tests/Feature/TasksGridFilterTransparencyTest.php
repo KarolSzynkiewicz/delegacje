@@ -67,7 +67,9 @@ class TasksGridFilterTransparencyTest extends TestCase
         $component->assertSee('Filtry:')
             ->assertSee('Status: Aktywne')
             ->assertSee('Aktywne zadanie')
-            ->assertDontSee('Dawno zakończone zadanie');
+            ->assertDontSee('Dawno zakończone zadanie')
+            ->assertSee('dt-card__row', false)
+            ->assertSee('dt-card__label', false);
 
         // "Wyczyść" ma realnie pokazać wszystko — nie wrócić do tego samego
         // domyślnego zawężenia, które user właśnie próbował zdjąć.
@@ -176,5 +178,92 @@ class TasksGridFilterTransparencyTest extends TestCase
             ->assertSee('Utworzono przez: Kolega')
             ->assertDontSee('Zainicjowane przeze mnie')
             ->assertSee('Zainicjowane przez kolegę');
+    }
+
+    public function test_or_within_a_field_ands_across_fields(): void
+    {
+        $stranger = User::factory()->create(['name' => 'Obcy']);
+
+        ProjectTask::query()->create([
+            'name' => 'Ja oczekujące',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Kolega zakończone',
+            'status' => TaskStatus::COMPLETED,
+            'assigned_to' => $this->other->id,
+            'created_by' => $this->other->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Ja zakończone też',
+            'status' => TaskStatus::COMPLETED,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Obcy oczekujące poza',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $stranger->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Kolega w trakcie poza',
+            'status' => TaskStatus::IN_PROGRESS,
+            'assigned_to' => $this->other->id,
+            'created_by' => $this->other->id,
+        ]);
+
+        $and = Livewire::actingAs($this->user)->test(TasksGrid::class)
+            ->call('clearFilters')
+            ->call('setStatusBucket', 'closed')
+            ->set('assignedFilter', 'me');
+
+        // Między polami zawsze I: zamknięte ORAZ przypisane do mnie.
+        $and->assertDontSee('Ja oczekujące')
+            ->assertDontSee('Kolega zakończone')
+            ->assertSee('Ja zakończone też');
+
+        // Wewnątrz pola: Ja LUB Kolega, oraz oczekujące LUB zakończone.
+        $and->call('toggleAssignedFilter', (string) $this->other->id)
+            ->call('toggleStatusValue', TaskStatus::PENDING->value)
+            ->call('toggleStatusValue', TaskStatus::CANCELLED->value)
+            ->assertSee('Przypisany: Ja lub Kolega')
+            ->assertSee('Status: Oczekujące lub Zakończone')
+            ->assertSee('Ja oczekujące')
+            ->assertSee('Kolega zakończone')
+            ->assertSee('Ja zakończone też')
+            ->assertDontSee('Obcy oczekujące poza')
+            ->assertDontSee('Kolega w trakcie poza');
+    }
+
+    public function test_neq_status_excludes_the_selected_bucket(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Neq aktywne',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Neq zamknięte',
+            'status' => TaskStatus::COMPLETED,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)->test(TasksGrid::class)
+            ->assertSee('Neq aktywne')
+            ->assertDontSee('Neq zamknięte')
+            ->call('setFilterOp', 'status', 'neq')
+            ->assertSee('Status: ≠ Aktywne')
+            ->assertDontSee('Neq aktywne')
+            ->assertSee('Neq zamknięte');
     }
 }

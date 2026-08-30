@@ -14,6 +14,10 @@ class TasksGridUrlParams
         'assignedFilter',
         'createdByFilter',
         'types',
+        'statuses',
+        'assigned',
+        'createdBy',
+        'join',
         'groupBy',
         'sortField',
         'sortDirection',
@@ -34,17 +38,17 @@ class TasksGridUrlParams
 
             $value = $params[$key];
 
-            if ($key === 'types') {
-                $types = is_array($value)
+            if (in_array($key, ['types', 'statuses', 'assigned', 'createdBy'], true)) {
+                $items = is_array($value)
                     ? array_values(array_unique(array_filter($value, fn ($v) => $v !== '' && $v !== null)))
                     : [];
-                sort($types);
+                sort($items);
 
-                if ($types === []) {
+                if ($items === []) {
                     continue;
                 }
 
-                $normalized[$key] = $types;
+                $normalized[$key] = $items;
 
                 continue;
             }
@@ -58,6 +62,10 @@ class TasksGridUrlParams
             }
 
             if ($key === 'sortDirection' && (string) $value === 'desc') {
+                continue;
+            }
+
+            if ($key === 'join' && (string) $value === 'and') {
                 continue;
             }
 
@@ -80,7 +88,7 @@ class TasksGridUrlParams
 
     /**
      * @param  array<string, mixed>  $requestQuery
-     * @return array<string, string>
+     * @return array<string, string|list<string>>
      */
     public static function fromRequestQuery(array $requestQuery): array
     {

@@ -94,6 +94,22 @@ class TasksGridGroupColumnTest extends TestCase
         $this->assertNotContains('type', $component->get('visibleColumns'));
     }
 
+    public function test_type_column_can_be_hidden_from_column_picker(): void
+    {
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class);
+
+        $this->assertContains('type', $component->get('visibleColumns'));
+
+        $component->call('toggleColumn', 'type');
+
+        $this->assertNotContains('type', $component->get('visibleColumns'));
+
+        $component->call('toggleColumn', 'type');
+
+        $this->assertContains('type', $component->get('visibleColumns'));
+    }
+
     public function test_active_filter_chips_show_and_can_be_removed(): void
     {
         Livewire::actingAs($this->user)

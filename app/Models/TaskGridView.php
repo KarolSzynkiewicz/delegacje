@@ -26,7 +26,12 @@ class TaskGridView extends Model
         'my_tasks_only',
         'assigned_filter',
         'created_by_filter',
+        'status_filter',
+        'assigned_filters',
+        'created_by_filters',
         'type_filter',
+        'filter_join',
+        'filter_ops',
     ];
 
     protected $casts = [
@@ -35,6 +40,10 @@ class TaskGridView extends Model
         'my_tasks_only' => 'boolean',
         'is_global' => 'boolean',
         'type_filter' => 'array',
+        'status_filter' => 'array',
+        'assigned_filters' => 'array',
+        'created_by_filters' => 'array',
+        'filter_ops' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -103,17 +112,33 @@ class TaskGridView extends Model
         if ($this->status !== '') {
             $params['status'] = $this->status;
         }
-        if ($this->assigned_filter !== '' && $this->assigned_filter !== null) {
+        if (! empty($this->status_filter) && is_array($this->status_filter)) {
+            $params['statuses'] = $this->status_filter;
+        }
+        if (! empty($this->assigned_filters) && is_array($this->assigned_filters)) {
+            $params['assigned'] = $this->assigned_filters;
+            if (count($this->assigned_filters) === 1) {
+                $params['assignedFilter'] = $this->assigned_filters[0];
+            }
+        } elseif ($this->assigned_filter !== '' && $this->assigned_filter !== null) {
             $params['assignedFilter'] = $this->assigned_filter;
         } elseif ($this->my_tasks_only) {
             // Kompatybilność wsteczna: widoki zapisane przed dodaniem kolumny assigned_filter.
             $params['assignedFilter'] = 'me';
         }
-        if ($this->created_by_filter !== '' && $this->created_by_filter !== null) {
+        if (! empty($this->created_by_filters) && is_array($this->created_by_filters)) {
+            $params['createdBy'] = $this->created_by_filters;
+            if (count($this->created_by_filters) === 1) {
+                $params['createdByFilter'] = $this->created_by_filters[0];
+            }
+        } elseif ($this->created_by_filter !== '' && $this->created_by_filter !== null) {
             $params['createdByFilter'] = $this->created_by_filter;
         }
         if (! empty($this->type_filter)) {
             $params['types'] = $this->type_filter;
+        }
+        if (($this->filter_join ?? 'and') === 'or') {
+            $params['join'] = 'or';
         }
         if (($this->group_by ?? '') !== '' && $this->group_by !== 'project') {
             $params['groupBy'] = $this->group_by;

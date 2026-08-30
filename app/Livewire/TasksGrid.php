@@ -29,11 +29,14 @@ use App\Services\UserMentionService;
 use App\Support\EdiTaskEdit;
 use App\Support\Export\TaskExport;
 use App\Support\TasksGridUrlParams;
+use App\Support\WorkItemListNavigator;
 use App\WorkItems\GridField;
 use App\WorkItems\ProjectTaskFields;
 use App\WorkItems\StatusWidget;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -51,13 +54,33 @@ class TasksGrid extends Component
 
     public string $searchAssignedTo = '';
 
-    public string $status = ''; // '' = active (pending+in_progress), 'closed', 'all'
+    public string $status = ''; // '' = active (pending+in_progress), 'closed', 'all' — skrót z selectedStatuses
 
-    /** '' = wszyscy, 'me' = zalogowany użytkownik, w innym wypadku ID użytkownika jako string. */
+    /**
+     * Statusy w filtrze (OR wewnątrz). Domyślnie aktywne.
+     *
+     * @var list<string>
+     */
+    public array $selectedStatuses = ['pending', 'in_progress'];
+
+    /** '' = wszyscy, 'me' / ID — skrót gdy wybrana jest jedna osoba. */
     public string $assignedFilter = '';
 
-    /** '' = wszyscy, 'me' = zalogowany, inaczej ID twórcy. */
+    /**
+     * Przypisani (OR wewnątrz). Pusta tablica = wszyscy.
+     *
+     * @var list<string>
+     */
+    public array $assignedFilters = [];
+
     public string $createdByFilter = '';
+
+    /**
+     * Twórcy (OR wewnątrz). Pusta tablica = wszyscy.
+     *
+     * @var list<string>
+     */
+    public array $createdByFilters = [];
 
     /**
      * Zaznaczone typy work itemów (checkboxy „Typ pracy” w panelu filtrów,
@@ -69,6 +92,28 @@ class TasksGrid extends Component
      * @var list<string>
      */
     public array $selectedTypes = ['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up', 'approval'];
+
+    /**
+     * Zostawione pod zapisane widoki / stary query string. Między wymiarami
+     * filtrów zawsze AND; OR jest tylko wewnątrz wielowartościowego pola
+     * (np. Marek lub Krzyś).
+     */
+    public string $filterJoin = 'and';
+
+    /**
+     * Operator per wymiar: eq (jest / zawiera) albo neq (nie jest / nie zawiera).
+     *
+     * @var array<string, string>
+     */
+    public array $filterOps = [
+        'status' => 'eq',
+        'assignedFilter' => 'eq',
+        'createdByFilter' => 'eq',
+        'selectedTypes' => 'eq',
+        'searchTask' => 'eq',
+        'searchCategory' => 'eq',
+        'searchAssignedTo' => 'eq',
+    ];
 
     // Sorting
     public string $sortField = 'created_at';
@@ -196,9 +241,13 @@ class TasksGrid extends Component
             'searchCategory' => ['except' => '', 'history' => true],
             'searchAssignedTo' => ['except' => '', 'history' => true],
             'status' => ['except' => '', 'history' => true],
+            'selectedStatuses' => ['except' => $this->defaultStatuses(), 'as' => 'statuses', 'history' => true],
             'assignedFilter' => ['except' => '', 'history' => true],
+            'assignedFilters' => ['except' => [], 'as' => 'assigned', 'history' => true],
             'createdByFilter' => ['except' => '', 'history' => true],
+            'createdByFilters' => ['except' => [], 'as' => 'createdBy', 'history' => true],
             'selectedTypes' => ['except' => $this->defaultSelectedTypes(), 'as' => 'types', 'history' => true],
+            'filterJoin' => ['except' => 'and', 'as' => 'join', 'history' => true],
             'sortField' => ['except' => 'created_at', 'history' => true],
             'sortDirection' => ['except' => 'desc', 'history' => true],
             'groupBy' => ['except' => '', 'history' => true],
@@ -213,9 +262,14 @@ class TasksGrid extends Component
         'searchCategory',
         'searchAssignedTo',
         'status',
+        'selectedStatuses',
         'assignedFilter',
+        'assignedFilters',
         'createdByFilter',
+        'createdByFilters',
         'selectedTypes',
+        'filterJoin',
+        'filterOps',
         'groupBy',
         'sortField',
         'sortDirection',
@@ -226,6 +280,7 @@ class TasksGrid extends Component
     {
         if ($this->isLockedToSprint()) {
             $this->status = 'all';
+            $this->selectedStatuses = $this->allStatusValues();
             $this->sortField = 'sprint_position';
             $this->sortDirection = 'asc';
             $this->groupBy = '';
@@ -297,6 +352,213 @@ class TasksGrid extends Component
         $this->detachActiveView();
     }
 
+    /** @return list<string> */
+    public function allStatusValues(): array
+    {
+        return TaskStatus::values();
+    }
+
+    /** @return list<string> */
+    public function defaultStatuses(): array
+    {
+        return [TaskStatus::PENDING->value, TaskStatus::IN_PROGRESS->value];
+    }
+
+    /** @return list<string> */
+    public function closedStatuses(): array
+    {
+        return [TaskStatus::COMPLETED->value, TaskStatus::CANCELLED->value];
+    }
+
+    public function currentStatusBucket(): string
+    {
+        return $this->statusBucketFromSelection($this->selectedStatuses);
+    }
+
+    public function setStatusBucket(string $bucket): void
+    {
+        $bucket = $bucket === 'active' ? '' : $bucket;
+        if (! in_array($bucket, ['', 'closed', 'all'], true) && TaskStatus::tryFrom($bucket) === null) {
+            return;
+        }
+
+        $this->status = $bucket;
+        $this->selectedStatuses = $this->statusesFromBucket($bucket);
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function toggleStatusValue(string $value): void
+    {
+        if (! in_array($value, $this->allStatusValues(), true)) {
+            return;
+        }
+
+        if (in_array($value, $this->selectedStatuses, true)) {
+            $this->selectedStatuses = array_values(array_diff($this->selectedStatuses, [$value]));
+        } else {
+            $this->selectedStatuses[] = $value;
+        }
+
+        $this->selectedStatuses = $this->normalizeStatusSelection($this->selectedStatuses);
+        $bucket = $this->statusBucketFromSelection($this->selectedStatuses);
+        if ($bucket !== 'mixed' && $bucket !== 'none') {
+            $this->status = $bucket;
+        }
+
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function updatedStatus(mixed $value): void
+    {
+        $value = (string) $value;
+        if ($value === 'mixed' || $value === 'none') {
+            return;
+        }
+
+        $this->selectedStatuses = $this->statusesFromBucket($value);
+    }
+
+    public function updatedAssignedFilter(mixed $value): void
+    {
+        $this->assignedFilters = ($value === '' || $value === null)
+            ? []
+            : $this->normalizeUserFilterKeys([(string) $value]);
+    }
+
+    public function updatedCreatedByFilter(mixed $value): void
+    {
+        $this->createdByFilters = ($value === '' || $value === null)
+            ? []
+            : $this->normalizeUserFilterKeys([(string) $value]);
+    }
+
+    public function toggleAssignedFilter(string $key): void
+    {
+        $this->assignedFilters = $this->toggleUserFilterKey($this->assignedFilters, $key);
+        if (count($this->assignedFilters) <= 1) {
+            $this->assignedFilter = $this->assignedFilters[0] ?? '';
+        }
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function toggleCreatedByFilter(string $key): void
+    {
+        $this->createdByFilters = $this->toggleUserFilterKey($this->createdByFilters, $key);
+        if (count($this->createdByFilters) <= 1) {
+            $this->createdByFilter = $this->createdByFilters[0] ?? '';
+        }
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function clearAssignedFilters(): void
+    {
+        $this->assignedFilters = [];
+        $this->assignedFilter = '';
+        $this->filterOps['assignedFilter'] = 'eq';
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function clearCreatedByFilters(): void
+    {
+        $this->createdByFilters = [];
+        $this->createdByFilter = '';
+        $this->filterOps['createdByFilter'] = 'eq';
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function itemOpenUrl(ProjectTask|WorkItem $task): string
+    {
+        if ($task instanceof WorkItem) {
+            return WorkItemListNavigator::itemUrl($task);
+        }
+
+        return route('tasks.show', $task);
+    }
+
+    /**
+     * @param  Paginator<WorkItem|ProjectTask>|Collection<int, WorkItem|ProjectTask>|null  $tasks
+     * @param  Collection<string, Collection<int, WorkItem|ProjectTask>>|null  $groupedTasks
+     */
+    protected function rememberWorkItemList(mixed $tasks, mixed $groupedTasks): void
+    {
+        if (! $this->usesWorkItems()) {
+            WorkItemListNavigator::forget();
+
+            return;
+        }
+
+        if ($groupedTasks instanceof Collection) {
+            WorkItemListNavigator::remember(
+                $groupedTasks->flatten(1)->pluck('id')->map(fn ($id) => (int) $id)->take(500)->all()
+            );
+
+            return;
+        }
+
+        if ($tasks instanceof Paginator) {
+            $idQuery = $this->filteredTasksQuery();
+            $this->applyWorkItemSorting($idQuery);
+            WorkItemListNavigator::remember(
+                $idQuery->limit(500)->pluck('work_items.id')->map(fn ($id) => (int) $id)->all()
+            );
+
+            return;
+        }
+
+        if ($tasks instanceof Collection) {
+            WorkItemListNavigator::remember(
+                $tasks->pluck('id')->map(fn ($id) => (int) $id)->take(500)->all()
+            );
+
+            return;
+        }
+
+        WorkItemListNavigator::forget();
+    }
+
+    /** @return array<string, string> */
+    public function defaultFilterOps(): array
+    {
+        return [
+            'status' => 'eq',
+            'assignedFilter' => 'eq',
+            'createdByFilter' => 'eq',
+            'selectedTypes' => 'eq',
+            'searchTask' => 'eq',
+            'searchCategory' => 'eq',
+            'searchAssignedTo' => 'eq',
+        ];
+    }
+
+    public function filterOp(string $key): string
+    {
+        return ($this->filterOps[$key] ?? 'eq') === 'neq' ? 'neq' : 'eq';
+    }
+
+    public function setFilterJoin(string $join): void
+    {
+        $this->filterJoin = $join === 'or' ? 'or' : 'and';
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function setFilterOp(string $key, string $op): void
+    {
+        if (! array_key_exists($key, $this->defaultFilterOps())) {
+            return;
+        }
+
+        $this->filterOps[$key] = $op === 'neq' ? 'neq' : 'eq';
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
     public function getAvailableColumnsProperty(): array
     {
         return [
@@ -318,7 +580,7 @@ class TasksGrid extends Component
 
     public function updating(string $name, mixed $value): void
     {
-        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'assignedFilter', 'createdByFilter', 'selectedTypes'], true)) {
+        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'status', 'selectedStatuses', 'assignedFilter', 'assignedFilters', 'createdByFilter', 'createdByFilters', 'selectedTypes', 'filterJoin', 'filterOps'], true)) {
             $this->resetPage();
         }
     }
@@ -345,9 +607,14 @@ class TasksGrid extends Component
         $this->searchCategory = '';
         $this->searchAssignedTo = '';
         $this->status = 'all';
+        $this->selectedStatuses = $this->allStatusValues();
         $this->assignedFilter = '';
+        $this->assignedFilters = [];
         $this->createdByFilter = '';
+        $this->createdByFilters = [];
         $this->selectedTypes = $this->allWorkItemTypeValues();
+        $this->filterJoin = 'and';
+        $this->filterOps = $this->defaultFilterOps();
         $this->sortField = 'created_at';
         $this->sortDirection = 'desc';
         $previousGroup = $this->groupBy;
@@ -377,15 +644,18 @@ class TasksGrid extends Component
         }
 
         if ($this->searchTask !== '') {
-            $chips[] = ['key' => 'searchTask', 'label' => 'Szukaj: '.$this->searchTask];
+            $neg = $this->filterOp('searchTask') === 'neq';
+            $chips[] = ['key' => 'searchTask', 'label' => ($neg ? 'Szukaj ≠ ' : 'Szukaj: ').$this->searchTask];
         }
 
         if ($this->searchCategory !== '') {
-            $chips[] = ['key' => 'searchCategory', 'label' => 'Kategoria: '.$this->searchCategory];
+            $neg = $this->filterOp('searchCategory') === 'neq';
+            $chips[] = ['key' => 'searchCategory', 'label' => ($neg ? 'Kategoria ≠ ' : 'Kategoria: ').$this->searchCategory];
         }
 
         if ($this->searchAssignedTo !== '') {
-            $chips[] = ['key' => 'searchAssignedTo', 'label' => 'Osoba: '.$this->searchAssignedTo];
+            $neg = $this->filterOp('searchAssignedTo') === 'neq';
+            $chips[] = ['key' => 'searchAssignedTo', 'label' => ($neg ? 'Osoba ≠ ' : 'Osoba: ').$this->searchAssignedTo];
         }
 
         // "all" to jedyna wartość statusu, która niczego nie odfiltrowuje —
@@ -394,36 +664,39 @@ class TasksGrid extends Component
         // Wcześniej domyślne "" było traktowane jak "brak filtra" i chip się
         // nie pokazywał — stąd user widział np. 15 z 129 zadań bez żadnej
         // wskazówki, że coś jest odfiltrowane.
-        if ($this->status !== 'all') {
-            $statusLabel = match ($this->status) {
-                '' => 'Aktywne',
-                'closed' => 'Zamknięte',
-                'all' => 'Wszystkie',
-                default => TaskStatus::tryFrom($this->status)?->label() ?? $this->status,
-            };
-            $chips[] = ['key' => 'status', 'label' => 'Status: '.$statusLabel];
+        if (! $this->selectsAllStatuses() || $this->filterOp('status') === 'neq') {
+            $statusLabel = $this->statusChipLabel();
+            $chips[] = ['key' => 'status', 'label' => 'Status: '.($this->filterOp('status') === 'neq' ? '≠ ' : '').$statusLabel];
         }
 
-        if ($this->assignedFilter === 'me') {
-            $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: Ja'];
-        } elseif ($this->assignedFilter !== '') {
-            $name = User::query()->whereKey((int) $this->assignedFilter)->value('name');
-            $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: '.($name ?: '#'.$this->assignedFilter)];
+        $assignedKeys = $this->assignedFilterKeys();
+        if ($assignedKeys !== []) {
+            $neg = $this->filterOp('assignedFilter') === 'neq' ? '≠ ' : '';
+            $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: '.$neg.$this->userFilterChipLabel($assignedKeys)];
         }
 
-        if ($this->createdByFilter === 'me') {
-            $chips[] = ['key' => 'createdByFilter', 'label' => 'Utworzono przez: Ja'];
-        } elseif ($this->createdByFilter !== '') {
-            $name = User::query()->whereKey((int) $this->createdByFilter)->value('name');
-            $chips[] = ['key' => 'createdByFilter', 'label' => 'Utworzono przez: '.($name ?: '#'.$this->createdByFilter)];
+        $createdKeys = $this->createdByFilterKeys();
+        if ($createdKeys !== []) {
+            $neg = $this->filterOp('createdByFilter') === 'neq' ? '≠ ' : '';
+            $chips[] = ['key' => 'createdByFilter', 'label' => 'Utworzono przez: '.$neg.$this->userFilterChipLabel($createdKeys)];
         }
 
         if ($this->usesWorkItems()) {
             $allTypes = $this->allWorkItemTypeValues();
             $selected = $this->selectedTypes;
             $missing = array_values(array_diff($allTypes, $selected));
+            $neg = $this->filterOp('selectedTypes') === 'neq';
 
-            if ($missing !== []) {
+            if ($neg) {
+                if ($selected === []) {
+                    // exclude nothing
+                } elseif ($missing === []) {
+                    $chips[] = ['key' => 'selectedTypes', 'label' => 'Typ pracy: ≠ wszystkie (0 wyników)'];
+                } else {
+                    $labels = array_map(fn ($v) => WorkItemType::from($v)->label(), $selected);
+                    $chips[] = ['key' => 'selectedTypes', 'label' => 'Typ pracy: ≠ '.implode(', ', $labels)];
+                }
+            } elseif ($missing !== []) {
                 if ($selected === []) {
                     $chips[] = ['key' => 'selectedTypes', 'label' => 'Typ pracy: żaden (0 wyników)'];
                 } elseif (count($missing) <= count($selected)) {
@@ -458,11 +731,21 @@ class TasksGrid extends Component
             return;
         }
 
+        if ($key === 'filterJoin') {
+            $this->filterJoin = 'and';
+            $this->resetPage();
+            $this->detachActiveView();
+
+            return;
+        }
+
         if ($key === 'status') {
             // Usunięcie chipa = "przestań zawężać", czyli pokaż wszystko —
             // nie wracaj do domyślnego "Aktywne", bo to by wyglądało jak nic
             // się nie zmieniło (patrz komentarz przy activeFilterChips()).
             $this->status = 'all';
+            $this->selectedStatuses = $this->allStatusValues();
+            $this->filterOps['status'] = 'eq';
             $this->resetPage();
             $this->detachActiveView();
 
@@ -471,6 +754,7 @@ class TasksGrid extends Component
 
         if ($key === 'selectedTypes') {
             $this->selectedTypes = $this->allWorkItemTypeValues();
+            $this->filterOps['selectedTypes'] = 'eq';
             $this->resetPage();
             $this->detachActiveView();
 
@@ -478,23 +762,20 @@ class TasksGrid extends Component
         }
 
         if ($key === 'assignedFilter') {
-            $this->assignedFilter = '';
-            $this->resetPage();
-            $this->detachActiveView();
+            $this->clearAssignedFilters();
 
             return;
         }
 
         if ($key === 'createdByFilter') {
-            $this->createdByFilter = '';
-            $this->resetPage();
-            $this->detachActiveView();
+            $this->clearCreatedByFilters();
 
             return;
         }
 
         if (in_array($key, ['searchTask', 'searchCategory', 'searchAssignedTo'], true)) {
             $this->{$key} = '';
+            $this->filterOps[$key] = 'eq';
             $this->resetPage();
             $this->detachActiveView();
         }
@@ -1851,12 +2132,15 @@ class TasksGrid extends Component
         $assignedTo = null;
         $assigneeLabel = null;
 
-        if ($this->assignedFilter === 'me') {
-            $assignedTo = auth()->id();
-            $assigneeLabel = auth()->user()?->name;
-        } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
-            $assignedTo = (int) $this->assignedFilter;
-            $assigneeLabel = User::query()->whereKey($assignedTo)->value('name');
+        $keys = $this->assignedFilterKeys();
+        $ids = $this->resolveUserFilterIds($keys);
+        if ($ids !== []) {
+            $assignedTo = $ids[0];
+            if (($keys[0] ?? '') === 'me') {
+                $assigneeLabel = auth()->user()?->name;
+            } else {
+                $assigneeLabel = User::query()->whereKey($assignedTo)->value('name');
+            }
         }
 
         $category = trim($this->searchCategory) !== '' ? trim($this->searchCategory) : null;
@@ -2094,9 +2378,13 @@ class TasksGrid extends Component
             'searchCategory' => $this->searchCategory,
             'searchAssignedTo' => $this->searchAssignedTo,
             'status' => $this->status,
-            'assignedFilter' => $this->assignedFilter,
-            'createdByFilter' => $this->createdByFilter,
+            'assignedFilter' => count($this->assignedFilterKeys()) === 1 ? $this->assignedFilterKeys()[0] : '',
+            'createdByFilter' => count($this->createdByFilterKeys()) === 1 ? $this->createdByFilterKeys()[0] : '',
+            'statuses' => $this->selectedStatuses,
+            'assigned' => $this->assignedFilterKeys(),
+            'createdBy' => $this->createdByFilterKeys(),
             'types' => $this->selectedTypes,
+            'join' => $this->filterJoin,
             'groupBy' => $this->groupBy,
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
@@ -2112,34 +2400,14 @@ class TasksGrid extends Component
 
     protected function countForSavedView(TaskGridView $view): int
     {
-        $previous = [
-            'searchTask' => $this->searchTask,
-            'searchCategory' => $this->searchCategory,
-            'searchAssignedTo' => $this->searchAssignedTo,
-            'status' => $this->status,
-            'assignedFilter' => $this->assignedFilter,
-            'createdByFilter' => $this->createdByFilter,
-            'selectedTypes' => $this->selectedTypes,
-        ];
-
-        $this->searchTask = $view->search_task ?? '';
-        $this->searchCategory = $view->search_category ?? '';
-        $this->searchAssignedTo = $view->search_assigned_to ?? '';
-        $this->status = $view->status ?? '';
-        $this->assignedFilter = $view->assigned_filter ?? ($view->my_tasks_only ? 'me' : '');
-        $this->createdByFilter = $view->created_by_filter ?? '';
-        $this->selectedTypes = $view->type_filter ?: $this->defaultSelectedTypes();
+        $previous = $this->filterSnapshot();
+        $this->applyFilterFieldsFromView($view);
+        $this->sanitizeFilterState();
 
         try {
             return $this->filteredTasksQuery()->count();
         } finally {
-            $this->searchTask = $previous['searchTask'];
-            $this->searchCategory = $previous['searchCategory'];
-            $this->searchAssignedTo = $previous['searchAssignedTo'];
-            $this->status = $previous['status'];
-            $this->assignedFilter = $previous['assignedFilter'];
-            $this->createdByFilter = $previous['createdByFilter'];
-            $this->selectedTypes = $previous['selectedTypes'];
+            $this->restoreFilterSnapshot($previous);
         }
     }
 
@@ -2182,10 +2450,7 @@ class TasksGrid extends Component
         $this->searchTask = $record->search_task ?? '';
         $this->searchCategory = $record->search_category ?? '';
         $this->searchAssignedTo = $record->search_assigned_to ?? '';
-        $this->status = $record->status ?? '';
-        $this->assignedFilter = $record->assigned_filter ?? ($record->my_tasks_only ? 'me' : '');
-        $this->createdByFilter = $record->created_by_filter ?? '';
-        $this->selectedTypes = $record->type_filter ?: $this->defaultSelectedTypes();
+        $this->applyFilterFieldsFromView($record);
         $this->sanitizeRemovedProjectField();
         $this->hideGroupedColumn();
         $this->batchingViewPersist = false;
@@ -2229,9 +2494,7 @@ class TasksGrid extends Component
             }
         }
 
-        if ($this->usesWorkItems() && $this->groupBy !== 'type' && ! in_array('type', $this->visibleColumns, true)) {
-            $this->insertVisibleColumn('type');
-        }
+        $this->sanitizeFilterState();
 
         if ($this->groupBy === 'project') {
             $this->groupBy = '';
@@ -2240,6 +2503,308 @@ class TasksGrid extends Component
         if ($this->sortField === 'project') {
             $this->sortField = 'created_at';
         }
+    }
+
+    protected function sanitizeFilterState(): void
+    {
+        $this->filterJoin = $this->filterJoin === 'or' ? 'or' : 'and';
+        $defaults = $this->defaultFilterOps();
+        $merged = array_merge($defaults, array_intersect_key($this->filterOps, $defaults));
+        foreach ($merged as $key => $op) {
+            $merged[$key] = $op === 'neq' ? 'neq' : 'eq';
+        }
+        $this->filterOps = $merged;
+
+        $this->selectedStatuses = $this->normalizeStatusSelection($this->selectedStatuses);
+        $this->assignedFilters = $this->normalizeUserFilterKeys($this->assignedFilters);
+        $this->createdByFilters = $this->normalizeUserFilterKeys($this->createdByFilters);
+
+        if ($this->assignedFilters === [] && $this->assignedFilter !== '') {
+            $this->assignedFilters = $this->normalizeUserFilterKeys([$this->assignedFilter]);
+        }
+        if ($this->createdByFilters === [] && $this->createdByFilter !== '') {
+            $this->createdByFilters = $this->normalizeUserFilterKeys([$this->createdByFilter]);
+        }
+
+        $looksDefault = $this->sortedCopy($this->selectedStatuses) === $this->sortedCopy($this->defaultStatuses());
+        $status = $this->status === 'active' ? '' : $this->status;
+        if ($looksDefault && $status !== '' && $status !== 'mixed' && $status !== 'none') {
+            $this->selectedStatuses = $this->statusesFromBucket($status);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function filterSnapshot(): array
+    {
+        return [
+            'searchTask' => $this->searchTask,
+            'searchCategory' => $this->searchCategory,
+            'searchAssignedTo' => $this->searchAssignedTo,
+            'status' => $this->status,
+            'selectedStatuses' => $this->selectedStatuses,
+            'assignedFilter' => $this->assignedFilter,
+            'assignedFilters' => $this->assignedFilters,
+            'createdByFilter' => $this->createdByFilter,
+            'createdByFilters' => $this->createdByFilters,
+            'selectedTypes' => $this->selectedTypes,
+            'filterJoin' => $this->filterJoin,
+            'filterOps' => $this->filterOps,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $previous
+     */
+    protected function restoreFilterSnapshot(array $previous): void
+    {
+        foreach ($previous as $property => $value) {
+            $this->{$property} = $value;
+        }
+    }
+
+    protected function applyFilterFieldsFromView(TaskGridView $view): void
+    {
+        $this->searchTask = $view->search_task ?? '';
+        $this->searchCategory = $view->search_category ?? '';
+        $this->searchAssignedTo = $view->search_assigned_to ?? '';
+        $this->status = $view->status ?? '';
+        $this->selectedTypes = $view->type_filter ?: $this->defaultSelectedTypes();
+        $this->filterJoin = ($view->filter_join ?? 'and') === 'or' ? 'or' : 'and';
+        $this->filterOps = is_array($view->filter_ops) ? $view->filter_ops : $this->defaultFilterOps();
+
+        if (is_array($view->status_filter) && $view->status_filter !== []) {
+            $this->selectedStatuses = $this->normalizeStatusSelection($view->status_filter);
+            $bucket = $this->statusBucketFromSelection($this->selectedStatuses);
+            if ($bucket !== 'mixed' && $bucket !== 'none') {
+                $this->status = $bucket;
+            }
+        } else {
+            $this->selectedStatuses = $this->statusesFromBucket($this->status);
+        }
+
+        if (is_array($view->assigned_filters) && $view->assigned_filters !== []) {
+            $this->assignedFilters = $this->normalizeUserFilterKeys($view->assigned_filters);
+            $this->assignedFilter = count($this->assignedFilters) === 1 ? $this->assignedFilters[0] : '';
+        } else {
+            $this->assignedFilter = $view->assigned_filter ?? ($view->my_tasks_only ? 'me' : '');
+            $this->assignedFilters = $this->assignedFilter !== '' ? [$this->assignedFilter] : [];
+        }
+
+        if (is_array($view->created_by_filters) && $view->created_by_filters !== []) {
+            $this->createdByFilters = $this->normalizeUserFilterKeys($view->created_by_filters);
+            $this->createdByFilter = count($this->createdByFilters) === 1 ? $this->createdByFilters[0] : '';
+        } else {
+            $this->createdByFilter = $view->created_by_filter ?? '';
+            $this->createdByFilters = $this->createdByFilter !== '' ? [$this->createdByFilter] : [];
+        }
+    }
+
+    /** @return list<string> */
+    protected function statusesFromBucket(string $status): array
+    {
+        return match ($status) {
+            'all' => $this->allStatusValues(),
+            'closed' => $this->closedStatuses(),
+            '', 'active' => $this->defaultStatuses(),
+            default => TaskStatus::tryFrom($status) ? [$status] : $this->defaultStatuses(),
+        };
+    }
+
+    /**
+     * @param  list<string>  $selected
+     */
+    protected function statusBucketFromSelection(array $selected): string
+    {
+        $normalized = $this->normalizeStatusSelection($selected);
+        if ($normalized === []) {
+            return 'none';
+        }
+        if ($this->sortedCopy($normalized) === $this->sortedCopy($this->allStatusValues())) {
+            return 'all';
+        }
+        if ($this->sortedCopy($normalized) === $this->sortedCopy($this->defaultStatuses())) {
+            return '';
+        }
+        if ($this->sortedCopy($normalized) === $this->sortedCopy($this->closedStatuses())) {
+            return 'closed';
+        }
+        if (count($normalized) === 1) {
+            return $normalized[0];
+        }
+
+        return 'mixed';
+    }
+
+    protected function persistedStatusBucket(): string
+    {
+        $bucket = $this->statusBucketFromSelection($this->selectedStatuses);
+        if ($bucket === 'mixed') {
+            return $this->status === 'mixed' ? '' : $this->status;
+        }
+
+        return $bucket === 'none' ? 'all' : $bucket;
+    }
+
+    public function selectsAllStatuses(): bool
+    {
+        return $this->sortedCopy($this->selectedStatuses) === $this->sortedCopy($this->allStatusValues());
+    }
+
+    public function statusChipLabel(): string
+    {
+        return match ($this->statusBucketFromSelection($this->selectedStatuses)) {
+            '' => 'Aktywne',
+            'closed' => 'Zamknięte',
+            'all' => 'Wszystkie',
+            'none' => 'żaden (0 wyników)',
+            default => implode(' lub ', array_map(
+                fn (string $value) => TaskStatus::from($value)->label(),
+                $this->normalizeStatusSelection($this->selectedStatuses)
+            )),
+        };
+    }
+
+    /**
+     * @param  list<mixed>  $selected
+     * @return list<string>
+     */
+    protected function normalizeStatusSelection(array $selected): array
+    {
+        $picked = [];
+        foreach ($selected as $value) {
+            $value = (string) $value;
+            if (in_array($value, $this->allStatusValues(), true)) {
+                $picked[$value] = true;
+            }
+        }
+
+        $out = [];
+        foreach ($this->allStatusValues() as $value) {
+            if (isset($picked[$value])) {
+                $out[] = $value;
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return list<string> */
+    public function assignedFilterKeys(): array
+    {
+        if ($this->assignedFilters !== []) {
+            return $this->assignedFilters;
+        }
+
+        return $this->assignedFilter !== '' ? [$this->assignedFilter] : [];
+    }
+
+    /** @return list<string> */
+    public function createdByFilterKeys(): array
+    {
+        if ($this->createdByFilters !== []) {
+            return $this->createdByFilters;
+        }
+
+        return $this->createdByFilter !== '' ? [$this->createdByFilter] : [];
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function userFilterChipLabel(array $keys): string
+    {
+        $ids = [];
+        foreach ($keys as $key) {
+            if ($key !== 'me' && ctype_digit((string) $key)) {
+                $ids[] = (int) $key;
+            }
+        }
+        $names = $ids === []
+            ? collect()
+            : User::query()->whereIn('id', $ids)->pluck('name', 'id');
+
+        $labels = [];
+        foreach ($keys as $key) {
+            if ($key === 'me') {
+                $labels[] = 'Ja';
+            } elseif (ctype_digit((string) $key)) {
+                $labels[] = $names[(int) $key] ?? '#'.$key;
+            }
+        }
+
+        return implode(' lub ', $labels);
+    }
+
+    /**
+     * @param  list<mixed>  $keys
+     * @return list<string>
+     */
+    protected function normalizeUserFilterKeys(array $keys): array
+    {
+        $out = [];
+        foreach ($keys as $key) {
+            $key = (string) $key;
+            if (($key === 'me' || ctype_digit($key)) && ! in_array($key, $out, true)) {
+                $out[] = $key;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    protected function toggleUserFilterKey(array $keys, string $key): array
+    {
+        $keys = $this->normalizeUserFilterKeys($keys);
+        if ($key !== 'me' && ! ctype_digit($key)) {
+            return $keys;
+        }
+
+        if (in_array($key, $keys, true)) {
+            return array_values(array_diff($keys, [$key]));
+        }
+
+        $keys[] = $key;
+
+        return $keys;
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return list<int>
+     */
+    protected function resolveUserFilterIds(array $keys): array
+    {
+        $ids = [];
+        foreach ($keys as $key) {
+            if ($key === 'me') {
+                $id = (int) auth()->id();
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            } elseif (ctype_digit((string) $key)) {
+                $ids[] = (int) $key;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  list<string>  $values
+     * @return list<string>
+     */
+    protected function sortedCopy(array $values): array
+    {
+        $copy = array_values($values);
+        sort($copy);
+
+        return $copy;
     }
 
     protected function hideGroupedColumn(): void
@@ -2303,11 +2868,16 @@ class TasksGrid extends Component
             'search_project' => '',
             'search_category' => $this->searchCategory,
             'search_assigned_to' => $this->searchAssignedTo,
-            'status' => $this->status,
-            'my_tasks_only' => $this->assignedFilter === 'me',
-            'assigned_filter' => $this->assignedFilter,
-            'created_by_filter' => $this->createdByFilter,
+            'status' => $this->persistedStatusBucket(),
+            'status_filter' => $this->selectedStatuses,
+            'my_tasks_only' => $this->assignedFilterKeys() === ['me'],
+            'assigned_filter' => count($this->assignedFilterKeys()) === 1 ? $this->assignedFilterKeys()[0] : '',
+            'assigned_filters' => $this->assignedFilterKeys(),
+            'created_by_filter' => count($this->createdByFilterKeys()) === 1 ? $this->createdByFilterKeys()[0] : '',
+            'created_by_filters' => $this->createdByFilterKeys(),
             'type_filter' => $this->selectedTypes,
+            'filter_join' => $this->filterJoin,
+            'filter_ops' => $this->filterOps,
         ];
     }
 
@@ -2902,39 +3472,7 @@ class TasksGrid extends Component
             $query->where('project_tasks.sprint_id', $this->lockedSprintId);
         }
 
-        if ($this->assignedFilter === 'me') {
-            $query->where('project_tasks.assigned_to', auth()->id());
-        } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
-            $query->where('project_tasks.assigned_to', (int) $this->assignedFilter);
-        }
-
-        if ($this->createdByFilter === 'me') {
-            $query->where('project_tasks.created_by', auth()->id());
-        } elseif ($this->createdByFilter !== '' && ctype_digit($this->createdByFilter)) {
-            $query->where('project_tasks.created_by', (int) $this->createdByFilter);
-        }
-
-        if ($this->searchTask) {
-            $query->where(fn ($q) => $q
-                ->where('project_tasks.name', 'like', '%'.$this->searchTask.'%')
-                ->orWhere('project_tasks.description', 'like', '%'.$this->searchTask.'%'));
-        }
-
-        if ($this->searchCategory) {
-            $query->where('project_tasks.category', 'like', '%'.$this->searchCategory.'%');
-        }
-
-        if ($this->searchAssignedTo) {
-            $query->whereHas('assignedTo', fn ($q) => $q->where('name', 'like', '%'.$this->searchAssignedTo.'%'));
-        }
-
-        if ($this->status === '' || $this->status === 'active') {
-            $query->whereIn('project_tasks.status', [TaskStatus::PENDING, TaskStatus::IN_PROGRESS]);
-        } elseif ($this->status === 'closed') {
-            $query->whereIn('project_tasks.status', [TaskStatus::COMPLETED, TaskStatus::CANCELLED]);
-        } elseif ($this->status !== 'all' && $this->status) {
-            $query->where('project_tasks.status', $this->status);
-        }
+        $this->applyGridFilters($query);
 
         return $query;
     }
@@ -2942,45 +3480,154 @@ class TasksGrid extends Component
     protected function filteredWorkItemsQuery(): Builder
     {
         $query = WorkItem::query();
-
-        // Checkboxy "Typ pracy" w panelu filtrów — pusta tablica jest świadomym
-        // wyborem usera (odznaczył wszystko) i celowo zwraca zero wyników,
-        // whereIn Laravela sam skompiluje to jako zawsze-fałszywy warunek.
-        $query->whereIn('work_items.type', $this->selectedTypes);
-
-        if ($this->assignedFilter === 'me') {
-            $query->where('work_items.assignee_id', auth()->id());
-        } elseif ($this->assignedFilter !== '' && ctype_digit($this->assignedFilter)) {
-            $query->where('work_items.assignee_id', (int) $this->assignedFilter);
-        }
-
-        if ($this->createdByFilter === 'me') {
-            $query->where('work_items.created_by_id', auth()->id());
-        } elseif ($this->createdByFilter !== '' && ctype_digit($this->createdByFilter)) {
-            $query->where('work_items.created_by_id', (int) $this->createdByFilter);
-        }
-
-        if ($this->searchTask) {
-            $query->where('work_items.title', 'like', '%'.$this->searchTask.'%');
-        }
-
-        if ($this->searchCategory) {
-            $query->where('work_items.category', 'like', '%'.$this->searchCategory.'%');
-        }
-
-        if ($this->searchAssignedTo) {
-            $query->whereHas('assignedTo', fn ($q) => $q->where('name', 'like', '%'.$this->searchAssignedTo.'%'));
-        }
-
-        if ($this->status === '' || $this->status === 'active') {
-            $query->whereIn('work_items.status', [TaskStatus::PENDING, TaskStatus::IN_PROGRESS]);
-        } elseif ($this->status === 'closed') {
-            $query->whereIn('work_items.status', [TaskStatus::COMPLETED, TaskStatus::CANCELLED]);
-        } elseif ($this->status !== 'all' && $this->status) {
-            $query->where('work_items.status', $this->status);
-        }
+        $this->applyGridFilters($query);
 
         return $query;
+    }
+
+    /**
+     * @return list<\Closure(Builder): void>
+     */
+    protected function gridFilterClauses(): array
+    {
+        $workItems = $this->usesWorkItems();
+        $clauses = [];
+
+        if ($workItems) {
+            $selected = $this->selectedTypes;
+            $allTypes = $this->allWorkItemTypeValues();
+            $selectedSorted = $selected;
+            $allSorted = $allTypes;
+            sort($selectedSorted);
+            sort($allSorted);
+            $selectsAll = $selected !== [] && $selectedSorted === $allSorted;
+            $neq = $this->filterOp('selectedTypes') === 'neq';
+            if ($neq) {
+                if ($selected !== []) {
+                    $clauses[] = function (Builder $q) use ($selected) {
+                        $q->whereNotIn('work_items.type', $selected);
+                    };
+                }
+            } elseif ($selected === [] || ! $selectsAll) {
+                $clauses[] = function (Builder $q) use ($selected) {
+                    $q->whereIn('work_items.type', $selected);
+                };
+            }
+        }
+
+        $statusCol = $workItems ? 'work_items.status' : 'project_tasks.status';
+        if (! $this->selectsAllStatuses() || $this->filterOp('status') === 'neq') {
+            $values = $this->selectedStatuses;
+            $neq = $this->filterOp('status') === 'neq';
+            $clauses[] = function (Builder $q) use ($statusCol, $values, $neq) {
+                if ($neq) {
+                    $q->whereNotIn($statusCol, $values);
+                } else {
+                    $q->whereIn($statusCol, $values);
+                }
+            };
+        }
+
+        $assigneeCol = $workItems ? 'work_items.assignee_id' : 'project_tasks.assigned_to';
+        $assignedIds = $this->resolveUserFilterIds($this->assignedFilterKeys());
+        if ($assignedIds !== []) {
+            $neq = $this->filterOp('assignedFilter') === 'neq';
+            $clauses[] = function (Builder $q) use ($assigneeCol, $assignedIds, $neq) {
+                if ($neq) {
+                    $q->where(fn (Builder $inner) => $inner->whereNull($assigneeCol)->orWhereNotIn($assigneeCol, $assignedIds));
+                } else {
+                    $q->whereIn($assigneeCol, $assignedIds);
+                }
+            };
+        }
+
+        $createdCol = $workItems ? 'work_items.created_by_id' : 'project_tasks.created_by';
+        $createdIds = $this->resolveUserFilterIds($this->createdByFilterKeys());
+        if ($createdIds !== []) {
+            $neq = $this->filterOp('createdByFilter') === 'neq';
+            $clauses[] = function (Builder $q) use ($createdCol, $createdIds, $neq) {
+                if ($neq) {
+                    $q->where(fn (Builder $inner) => $inner->whereNull($createdCol)->orWhereNotIn($createdCol, $createdIds));
+                } else {
+                    $q->whereIn($createdCol, $createdIds);
+                }
+            };
+        }
+
+        if ($this->searchTask !== '') {
+            $term = '%'.$this->searchTask.'%';
+            $neq = $this->filterOp('searchTask') === 'neq';
+            if ($workItems) {
+                $clauses[] = function (Builder $q) use ($term, $neq) {
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner
+                            ->whereNull('work_items.title')
+                            ->orWhere('work_items.title', 'not like', $term));
+                    } else {
+                        $q->where('work_items.title', 'like', $term);
+                    }
+                };
+            } else {
+                $clauses[] = function (Builder $q) use ($term, $neq) {
+                    if ($neq) {
+                        $q->where(function (Builder $inner) use ($term) {
+                            $inner->where(fn (Builder $q2) => $q2
+                                ->whereNull('project_tasks.name')
+                                ->orWhere('project_tasks.name', 'not like', $term))
+                                ->where(fn (Builder $q2) => $q2
+                                    ->whereNull('project_tasks.description')
+                                    ->orWhere('project_tasks.description', 'not like', $term));
+                        });
+                    } else {
+                        $q->where(fn (Builder $inner) => $inner
+                            ->where('project_tasks.name', 'like', $term)
+                            ->orWhere('project_tasks.description', 'like', $term));
+                    }
+                };
+            }
+        }
+
+        if ($this->searchCategory !== '') {
+            $col = $workItems ? 'work_items.category' : 'project_tasks.category';
+            $term = '%'.$this->searchCategory.'%';
+            $neq = $this->filterOp('searchCategory') === 'neq';
+            $clauses[] = function (Builder $q) use ($col, $term, $neq) {
+                if ($neq) {
+                    $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, 'not like', $term));
+                } else {
+                    $q->where($col, 'like', $term);
+                }
+            };
+        }
+
+        if ($this->searchAssignedTo !== '') {
+            $term = '%'.$this->searchAssignedTo.'%';
+            $neq = $this->filterOp('searchAssignedTo') === 'neq';
+            $clauses[] = function (Builder $q) use ($term, $neq) {
+                if ($neq) {
+                    $q->where(function (Builder $inner) use ($term) {
+                        $inner->whereDoesntHave('assignedTo')
+                            ->orWhereHas('assignedTo', fn ($u) => $u->where('name', 'not like', $term));
+                    });
+                } else {
+                    $q->whereHas('assignedTo', fn ($u) => $u->where('name', 'like', $term));
+                }
+            };
+        }
+
+        return $clauses;
+    }
+
+    protected function applyGridFilters(Builder $query): void
+    {
+        $clauses = $this->gridFilterClauses();
+        if ($clauses === []) {
+            return;
+        }
+
+        foreach ($clauses as $apply) {
+            $apply($query);
+        }
     }
 
     public function render()
@@ -3060,6 +3707,8 @@ class TasksGrid extends Component
             $groupedTasks = null;
             $tasks = $query->paginate(50);
         }
+
+        $this->rememberWorkItemList($tasks, $groupedTasks);
 
         return view('livewire.tasks-grid', [
             'tasks' => $tasks,

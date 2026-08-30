@@ -1,6 +1,6 @@
 @php
     $isWorkItem   = $task instanceof \App\Models\WorkItem;
-    $openUrl      = $isWorkItem ? $task->openUrl() : route('tasks.show', $task);
+    $openUrl      = $this->itemOpenUrl($task);
     $sprintUrl    = $task->sprint ? route('sprints.show', $task->sprint) : null;
     $canAddSubtask = $this->rowSupports($task, 'subtasks');
     $canExpand   = $this->rowExpandable($task);

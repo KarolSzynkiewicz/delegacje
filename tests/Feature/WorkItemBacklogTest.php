@@ -17,6 +17,7 @@ use App\Models\WarehouseDispatch;
 use App\Models\WorkItem;
 use App\Notifications\TaskAssigned;
 use App\Services\ProcedureRunService;
+use App\Support\WorkItemListNavigator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
@@ -194,7 +195,7 @@ class WorkItemBacklogTest extends TestCase
         $this->assertStringContainsString("quickStatusChange({$mentionItem->id}, 'completed')", $html);
         $this->assertStringNotContainsString("quickStatusChange({$mentionItem->id}, 'in_progress')", $html);
         $this->assertStringNotContainsString("quickStatusChange({$mentionItem->id}, 'cancelled')", $html);
-        $this->assertStringContainsString(route('projects.show', $project).'#comment-', $html);
+        $this->assertStringContainsString(WorkItemListNavigator::itemUrl($mentionItem), $html);
         $this->assertStringContainsString('bi-folder', $html);
     }
 
@@ -414,7 +415,7 @@ class WorkItemBacklogTest extends TestCase
             ->assertSee('Zadanie')
             ->assertSeeHtml('bi-check2-square')
             ->assertSeeHtml("toggleExpand({$item->id})")
-            ->assertSeeHtml('href="'.e(route('tasks.show', $item->source_id)).'"')
+            ->assertSeeHtml('href="'.e(route('tasks.show', $item->source_id)).'?wi='.$item->id.'"')
             ->assertDontSeeHtml('title="Podgląd"')
             ->assertDontSeeHtml('>Akcje</th>');
     }
@@ -698,5 +699,93 @@ class WorkItemBacklogTest extends TestCase
             ->assertSee('Zadanie przeniesione.');
 
         $this->assertSame($robert->id, $subtaskItem->fresh()->assignee_id);
+    }
+
+    public function test_append_query_keeps_existing_fragment(): void
+    {
+        $this->assertSame(
+            'https://example.test/projects/1?wi=5#comment-9',
+            WorkItemListNavigator::appendQuery('https://example.test/projects/1#comment-9', ['wi' => '5'])
+        );
+    }
+
+    public function test_grid_remembers_list_order_and_show_page_links_to_neighbors(): void
+    {
+        $this->actingAs($this->user);
+
+        $older = ProjectTask::query()->create([
+            'name' => 'Nav starsze',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+            'created_at' => now()->subDay(),
+        ]);
+        $newer = ProjectTask::query()->create([
+            'name' => 'Nav nowsze',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)->test(TasksGrid::class);
+
+        $olderItem = WorkItem::query()
+            ->where('source_type', $older->getMorphClass())
+            ->where('source_id', $older->id)
+            ->first();
+        $newerItem = WorkItem::query()
+            ->where('source_type', $newer->getMorphClass())
+            ->where('source_id', $newer->id)
+            ->first();
+
+        $this->assertNotNull($olderItem);
+        $this->assertNotNull($newerItem);
+
+        $ids = WorkItemListNavigator::ids();
+        $this->assertContains((int) $olderItem->id, $ids);
+        $this->assertContains((int) $newerItem->id, $ids);
+        $this->assertGreaterThanOrEqual(2, count($ids));
+
+        $firstId = $ids[0];
+        $secondId = $ids[1];
+        $first = WorkItem::query()->with('source')->findOrFail($firstId);
+        $second = WorkItem::query()->with('source')->findOrFail($secondId);
+
+        $response = $this->get(WorkItemListNavigator::itemUrl($first));
+        $response->assertOk()
+            ->assertSee('Nawigacja po liście backlogu', false)
+            ->assertSee('Następne')
+            ->assertSee('Poprzednie')
+            ->assertSee('1 / '.count($ids), false);
+        $this->assertStringContainsString(
+            'href="'.e(WorkItemListNavigator::itemUrl($second)).'"',
+            $response->getContent()
+        );
+
+        $this->get(route('tasks.show', $newer))
+            ->assertOk()
+            ->assertDontSee('Nawigacja po liście backlogu', false);
+    }
+
+    public function test_neighbors_are_hidden_when_the_list_has_one_item(): void
+    {
+        $this->actingAs($this->user);
+
+        $task = ProjectTask::query()->create([
+            'name' => 'Samotne',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
+
+        WorkItemListNavigator::remember([(int) $item->id]);
+
+        $this->get(WorkItemListNavigator::itemUrl($item))
+            ->assertOk()
+            ->assertDontSee('Nawigacja po liście backlogu', false);
     }
 }
