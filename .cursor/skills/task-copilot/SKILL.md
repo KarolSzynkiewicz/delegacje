@@ -83,7 +83,7 @@ Wyzwalacze: „zrób zadanie”, „dodaj task z podzadaniami”, „stwórz che
 
 ## Ograniczenia
 
-- Serwer działa na koncie z `MCP_ACTOR_USER_ID`, nie na koncie zalogowanego
-  użytkownika aplikacji.
+- Lokalny stdio (Cursor) działa na koncie z `MCP_ACTOR_USER_ID`.
+- HTTP `/mcp/tasks` (ChatGPT, Grok) działa na koncie użytkownika z OAuth.
 - Kategoria to zwykły tekst; nie ma rejestru etykiet ani ich walidacji.
 - Edycja istniejących zadań (poza kategoriami i sprintem) — na razie ręcznie w aplikacji.

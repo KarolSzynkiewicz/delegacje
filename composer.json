@@ -10,6 +10,7 @@
         "doctrine/dbal": "^3.10",
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.10",
+        "laravel/passport": "^11.10",
         "laravel/pulse": "^1.8",
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
@@ -66,6 +67,11 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "audit": {
+            "ignore": {
+                "PKSA-y2cr-5h3j-g3ys": "CVE-2025-45769 disputed; Passport 11 on Laravel 10 requires firebase/php-jwt v6"
+            }
         }
     },
     "minimum-stability": "stable",

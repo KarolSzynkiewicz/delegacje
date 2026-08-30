@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Passport\Passport;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -25,9 +26,21 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Passport::tokensCan([
+            'mcp:use' => 'Dostęp do zadań i sprintów ChronoLogic przez MCP',
+        ]);
+        Passport::setDefaultScope(['mcp:use']);
+        Passport::authorizationView('mcp.authorize');
+        Passport::tokensExpireIn(now()->addDays(15));
+        Passport::refreshTokensExpireIn(now()->addDays(30));
+
         // Hook przed standardowym sprawdzaniem permissions
         // Jeśli user zarządza projektem, pozwól na dostęp (pomija sprawdzanie permissions)
         Gate::before(function ($user, $ability, $arguments = []) {
+            if (! $user instanceof \App\Models\User) {
+                return null;
+            }
+
             // Admin zawsze ma dostęp
             if ($user->isAdmin()) {
                 return null; // null = kontynuuj standardowe sprawdzanie (ale admin i tak ma wszystkie permissions)

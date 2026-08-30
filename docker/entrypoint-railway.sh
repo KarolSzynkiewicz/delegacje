@@ -73,6 +73,17 @@ else
     echo "[INFO] Migrations skipped (RUN_MIGRATIONS not set to 'true')"
 fi
 
+# Passport keys for HTTP MCP (ChatGPT / Grok). Prefer PASSPORT_* env vars.
+if [ -n "$PASSPORT_PRIVATE_KEY" ]; then
+    echo "[INFO] Using PASSPORT_PRIVATE_KEY from environment"
+elif [ -f storage/oauth-private.key ]; then
+    echo "[OK] Passport OAuth keys already present"
+else
+    echo "[STEP] Generating Passport OAuth keys..."
+    php artisan passport:keys --no-interaction
+    echo "[WARN] Keys are ephemeral on Railway unless PASSPORT_PRIVATE_KEY and PASSPORT_PUBLIC_KEY are set"
+fi
+
 # Start server
 echo "[START] Starting Laravel server..."
 echo "[INFO] Listening on 0.0.0.0:${PORT:-8000}"

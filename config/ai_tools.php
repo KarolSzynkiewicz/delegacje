@@ -7,9 +7,8 @@ return [
     | Użytkownik wykonujący operacje MCP
     |--------------------------------------------------------------------------
     |
-    | Lokalny serwer MCP działa po stdio, poza sesją HTTP, więc nie ma
-    | zalogowanego użytkownika. Narzędzia logują się jako ten użytkownik,
-    | żeby polityki, uprawnienia i pola audytowe działały tak samo jak w UI.
+    | Lokalny serwer MCP (stdio) nie ma sesji HTTP — narzędzia logują się
+    | jako ten użytkownik. Przy HTTP /mcp/tasks obowiązuje użytkownik OAuth.
     |
     */
 

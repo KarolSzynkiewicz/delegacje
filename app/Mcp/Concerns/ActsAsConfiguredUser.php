@@ -9,22 +9,26 @@ use RuntimeException;
 trait ActsAsConfiguredUser
 {
     /**
-     * Zaloguj użytkownika skonfigurowanego w MCP_ACTOR_USER_ID.
+     * Użytkownik, w imieniu którego działa narzędzie.
      *
-     * Bez tego auth()->id() jest puste, a część modeli i polityk (np.
-     * ProjectTask::callbackStory) zakłada zalogowanego użytkownika.
+     * HTTP MCP (OAuth / Passport) loguje rzeczywistego użytkownika.
+     * Lokalny stdio nie ma sesji — wtedy fallback to MCP_ACTOR_USER_ID.
      */
     protected function actingUser(): User
     {
-        if ($user = Auth::user()) {
-            return $user;
+        $resolved = Auth::user() ?? Auth::guard('api')->user();
+
+        if ($resolved instanceof User) {
+            Auth::setUser($resolved);
+
+            return $resolved;
         }
 
         $id = config('ai_tools.actor_user_id');
 
         if (blank($id)) {
             throw new RuntimeException(
-                'Brak MCP_ACTOR_USER_ID w .env – ustaw ID użytkownika, w imieniu którego działa serwer MCP.'
+                'Brak zalogowanego użytkownika MCP i MCP_ACTOR_USER_ID w .env.'
             );
         }
 

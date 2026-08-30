@@ -29,29 +29,35 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('mcp', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
         // Route model binding for Spatie Role - prefer name over id
         // Laravel converts snake_case to camelCase, so {user_role} uses 'userRole' binding
         Route::bind('userRole', function ($value) {
             // Try name first (for friendly URLs), then id (for backward compatibility)
             $role = Role::where('name', $value)->first();
-            if (!$role && is_numeric($value)) {
+            if (! $role && is_numeric($value)) {
                 $role = Role::find($value);
             }
-            if (!$role) {
-                throw new \Illuminate\Database\Eloquent\ModelNotFoundException();
+            if (! $role) {
+                throw new \Illuminate\Database\Eloquent\ModelNotFoundException;
             }
+
             return $role;
         });
-        
+
         // Also bind for snake_case parameter name (just in case)
         Route::bind('user_role', function ($value) {
             $role = Role::where('name', $value)->first();
-            if (!$role && is_numeric($value)) {
+            if (! $role && is_numeric($value)) {
                 $role = Role::find($value);
             }
-            if (!$role) {
-                throw new \Illuminate\Database\Eloquent\ModelNotFoundException();
+            if (! $role) {
+                throw new \Illuminate\Database\Eloquent\ModelNotFoundException;
             }
+
             return $role;
         });
 
