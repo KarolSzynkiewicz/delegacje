@@ -73,15 +73,15 @@ else
     echo "[INFO] Migrations skipped (RUN_MIGRATIONS not set to 'true')"
 fi
 
-# Passport keys for HTTP MCP (ChatGPT / Grok). Prefer PASSPORT_* env vars.
-if [ -n "$PASSPORT_PRIVATE_KEY" ]; then
-    echo "[INFO] Using PASSPORT_PRIVATE_KEY from environment"
-elif [ -f storage/oauth-private.key ]; then
-    echo "[OK] Passport OAuth keys already present"
+# Passport keys for HTTP MCP (ChatGPT / Grok).
+# Prefer PASSPORT_* env vars; otherwise keep one key pair in the database so
+# Railway restarts do not invalidate existing Grok/ChatGPT tokens.
+echo "[STEP] Ensuring Passport OAuth keys..."
+if php artisan mcp:ensure-passport-keys --no-interaction; then
+    echo "[OK] Passport OAuth keys ready"
 else
-    echo "[STEP] Generating Passport OAuth keys..."
-    php artisan passport:keys --no-interaction
-    echo "[WARN] Keys are ephemeral on Railway unless PASSPORT_PRIVATE_KEY and PASSPORT_PUBLIC_KEY are set"
+    echo "[WARN] mcp:ensure-passport-keys failed; falling back to passport:keys"
+    php artisan passport:keys --no-interaction || true
 fi
 
 # Start server

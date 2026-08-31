@@ -3,7 +3,11 @@
 namespace App\Mcp\Support;
 
 use App\Mcp\Http\RegisterOAuthClientController;
+use App\Mcp\OAuth\McpRefreshTokenGrant;
 use Illuminate\Support\Facades\Route;
+use Laravel\Passport\Bridge\RefreshTokenRepository;
+use Laravel\Passport\Passport;
+use League\OAuth2\Server\AuthorizationServer;
 
 class McpOAuth
 {
@@ -43,5 +47,15 @@ class McpOAuth
 
         Route::post('/oauth/register', RegisterOAuthClientController::class)
             ->middleware('throttle:10,1');
+    }
+
+    /**
+     * Podmień grant refresh_token na wariant przyjazny klientom MCP.
+     */
+    public static function configureAuthorizationServer(AuthorizationServer $server): void
+    {
+        $grant = new McpRefreshTokenGrant(app(RefreshTokenRepository::class));
+        $grant->setRefreshTokenTTL(Passport::refreshTokensExpireIn());
+        $server->enableGrantType($grant, Passport::tokensExpireIn());
     }
 }

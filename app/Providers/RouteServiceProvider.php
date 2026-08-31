@@ -30,7 +30,7 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('mcp', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
         });
 
         // Route model binding for Spatie Role - prefer name over id

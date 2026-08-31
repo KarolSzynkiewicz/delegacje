@@ -25,7 +25,7 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => ['WWW-Authenticate', 'MCP-Session-Id', 'Mcp-Session-Id'],
 
     'max_age' => 0,
 

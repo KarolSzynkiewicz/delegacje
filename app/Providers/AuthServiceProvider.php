@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Mcp\Support\McpOAuth;
+use App\Mcp\Support\PassportKeyStore;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Passport\Passport;
+use League\OAuth2\Server\AuthorizationServer;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -21,18 +24,30 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\TimeLog::class => \App\Policies\TimeLogPolicy::class,
     ];
 
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->afterResolving(
+            AuthorizationServer::class,
+            fn (AuthorizationServer $server) => McpOAuth::configureAuthorizationServer($server)
+        );
+    }
+
     /**
      * Register any authentication / authorization services.
      */
     public function boot(): void
     {
+        PassportKeyStore::restoreFilesIfMissing();
+
         Passport::tokensCan([
             'mcp:use' => 'Dostęp do zadań i sprintów ChronoLogic przez MCP',
         ]);
         Passport::setDefaultScope(['mcp:use']);
         Passport::authorizationView('mcp.authorize');
-        Passport::tokensExpireIn(now()->addDays(15));
-        Passport::refreshTokensExpireIn(now()->addDays(30));
+        Passport::tokensExpireIn(now()->addDays(30));
+        Passport::refreshTokensExpireIn(now()->addDays(90));
 
         // Hook przed standardowym sprawdzaniem permissions
         // Jeśli user zarządza projektem, pozwól na dostęp (pomija sprawdzanie permissions)
