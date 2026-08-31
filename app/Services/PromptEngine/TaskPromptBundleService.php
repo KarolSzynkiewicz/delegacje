@@ -28,20 +28,7 @@ class TaskPromptBundleService
                     ->with(['user:id,name'])
                     ->orderBy('created_at'),
             ])
-            ->where(function ($q) use ($start, $end) {
-                $q->whereBetween('created_at', [$start, $end])
-                    ->orWhereBetween('updated_at', [$start, $end])
-                    ->orWhereBetween('completed_at', [$start, $end])
-                    ->orWhereBetween('due_date', [$start->toDateString(), $end->toDateString()])
-                    ->orWhereHas('comments', function ($c) use ($start, $end) {
-                        $c->whereBetween('created_at', [$start, $end]);
-                    })
-                    ->orWhereHas('subtasks', function ($s) use ($start, $end) {
-                        $s->whereBetween('completed_at', [$start, $end])
-                            ->orWhereBetween('created_at', [$start, $end])
-                            ->orWhereBetween('updated_at', [$start, $end]);
-                    });
-            })
+            ->inPeriod($start, $end)
             ->orderBy('id')
             ->get();
 

@@ -28,4 +28,8 @@ return [
 
     'max_sprint_assignments' => (int) env('MCP_MAX_SPRINT_ASSIGNMENTS', 50),
 
+    'max_search_results' => (int) env('MCP_MAX_SEARCH_RESULTS', 200),
+
+    'max_comments_per_thread' => (int) env('MCP_MAX_COMMENTS_PER_THREAD', 100),
+
 ];

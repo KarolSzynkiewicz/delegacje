@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\TaskSubject;
 use App\Enums\TaskStatus;
 use App\Traits\HasComments;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -221,6 +222,31 @@ class ProjectTask extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Zadanie „w okresie”: utworzone, zmienione, zakończone, z terminem,
+     * komentarzem albo ruchem na podzadaniu w tym zakresie.
+     */
+    public function scopeInPeriod(Builder $query, Carbon $start, Carbon $end): Builder
+    {
+        $start = $start->copy()->startOfDay();
+        $end = $end->copy()->endOfDay();
+
+        return $query->where(function (Builder $q) use ($start, $end) {
+            $q->whereBetween('created_at', [$start, $end])
+                ->orWhereBetween('updated_at', [$start, $end])
+                ->orWhereBetween('completed_at', [$start, $end])
+                ->orWhereBetween('due_date', [$start->toDateString(), $end->toDateString()])
+                ->orWhereHas('comments', function (Builder $c) use ($start, $end) {
+                    $c->whereBetween('created_at', [$start, $end]);
+                })
+                ->orWhereHas('subtasks', function (Builder $s) use ($start, $end) {
+                    $s->whereBetween('completed_at', [$start, $end])
+                        ->orWhereBetween('created_at', [$start, $end])
+                        ->orWhereBetween('updated_at', [$start, $end]);
+                });
+        });
     }
 
     /**

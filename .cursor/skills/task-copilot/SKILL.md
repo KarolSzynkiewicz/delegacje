@@ -1,6 +1,6 @@
 ---
 name: task-copilot
-description: Playbooki pracy na zadaniach i backlogu ChronoLogic przez serwer MCP chrono-tasks. Użyj, gdy użytkownik prosi o podsumowanie tygodnia lub okresu, uzupełnienie kategorii zadań, utworzenie zadania z podzadaniami, przegląd backlogu albo pomoc w planowaniu sprintu.
+description: Playbooki pracy na zadaniach i backlogu ChronoLogic przez serwer MCP chrono-tasks. Użyj, gdy użytkownik prosi o podsumowanie tygodnia lub okresu, uzupełnienie kategorii, przypisanie osób, utworzenie zadania, przegląd backlogu, planowanie sprintu albo ping na martwe taski.
 ---
 
 # Task Copilot
@@ -8,82 +8,79 @@ description: Playbooki pracy na zadaniach i backlogu ChronoLogic przez serwer MC
 Praca na zadaniach aplikacji przez serwer MCP `chrono-tasks`. Wszystkie dane
 pobieraj narzędziami, nigdy nie zgaduj stanu zadań z pamięci ani z kodu.
 
-Dostępne narzędzia: `tasks_in_period`, `tasks_without_category`,
-`backlog_overview` (czytające) oraz `set_task_categories`, `create_task`,
-`create_sprint`, `assign_tasks_to_sprint` (zapisujące, wymagają HITL).
-
 **Nigdy nie mutuj danych przez tinker, shell ani SQL – wyłącznie narzędzia MCP.**
+
+## Narzędzia
+
+Czytające: `period_analytics`, `search_tasks`, `get_task`, `get_task_comments`,
+`list_users`, `sprint_insights`, `tasks_without_category`, `backlog_overview`,
+`tasks_in_period` (dump – unikaj na rzecz analityki).
+
+Zapisujące (HITL): `set_task_categories`, `update_task`, `add_comment`,
+`create_task`, `create_sprint`, `assign_tasks_to_sprint`.
 
 ## Zasada nadrzędna
 
 Zmiana danych wymaga wyraźnej zgody użytkownika.
-Nie wywołuj `set_task_categories` ani `create_task`, dopóki użytkownik nie zobaczył propozycji
-i ich nie zaakceptował. Flagi `confirmed_by_user` i `overwrite` odzwierciedlają
-decyzję użytkownika, nie Twoją ocenę.
+Nie wywołuj narzędzi zapisujących, dopóki użytkownik nie zobaczył propozycji
+i ich nie zaakceptował. `confirmed_by_user` odzwierciedla decyzję użytkownika,
+nie Twoją ocenę.
+
+## Playbook: hygiene kategorii i przypisań
+
+Wyzwalacze: „ogarnij kategorie”, „kto nie ma kategorii / osoby”, „przypisz Anię”.
+
+1. `search_tasks` z `missing_category` i/lub `unassigned` (albo
+   `tasks_without_category`). Słownik: `known_categories` albo kategorie z
+   `period_analytics` / `backlog_overview`.
+2. Osoby: `list_users` (albo `assignee_name` w `search_tasks`).
+3. Tabela: ID, nazwa, proponowana kategoria / osoba, uzasadnienie.
+4. Po zgodzie: `set_task_categories` albo `update_task` (jedno zadanie na
+   wywołanie przypisania) z `confirmed_by_user: true`.
 
 ## Playbook: podsumowanie okresu
 
-Wyzwalacze: „co się działo w tym tygodniu”, „podsumuj ostatnie dni”, „raport za sierpień”.
+Wyzwalacze: „co się działo”, „podsumuj tydzień”, „co mówią wykresy”.
 
-1. Wywołaj `tasks_in_period` z `period` (`this_week`, `last_week`, `last_7_days`,
-   `this_month`, `last_month`) albo z parą `start_date` i `end_date`.
-2. Napisz zwięzłe podsumowanie prozą, nie listę wszystkich zadań. Pogrupuj po
-   temacie lub kategorii, a nie po ID.
-3. Uwzględnij: co zamknięto, co utknęło (długo `in_progress`, termin po czasie),
-   co jest nowe i gdzie toczy się dyskusja w komentarzach.
-4. Wyróżnij ryzyka: przeterminowane `due_date`, zadania bez przypisanej osoby,
-   podzadania stojące w miejscu.
-5. Nazwy zadań cytuj oryginalnie i podawaj ID, żeby dało się je odnaleźć.
+1. `period_analytics` (`this_week`, `last_week`, … albo daty). To KPI,
+   hottest threads, stale, macierze współpracy – bez ciał komentarzy.
+2. Dla 3–5 ID z `pointers.hottest_task_ids`: `get_task` (o czym jest)
+   i `get_task_comments` (co się działo w wątku).
+3. Napisz prozą: tematy (nie lista ID), kto komu komentuje / pomaga
+   w podzadaniach, ryzyka (stale, unassigned, overdue).
+4. Opcjonalnie zaproponuj ping na stale: treść
+   `@{assignee} proszę o krótki update statusu.` Po zgodzie `add_comment`.
 
-## Playbook: uzupełnianie kategorii
+Nie wołaj `tasks_in_period` do raportu – za duży JSON.
 
-Wyzwalacze: „ogarnij kategorie”, „które taski nie mają kategorii”, „poprzypisuj etykiety”.
+## Playbook: taski osoby / kategorii
 
-1. Wywołaj `tasks_without_category`. Odpowiedź zawiera też `known_categories`
-   ze słownikiem wartości już używanych.
-2. Zaproponuj kategorię dla każdego zadania, korzystając z istniejącego słownika.
-   Nową nazwę twórz tylko wtedy, gdy żadna istniejąca nie pasuje, i oznacz ją
-   wprost jako nową propozycję.
-3. Pokaż tabelę: ID, nazwa zadania, proponowana kategoria, jednozdaniowe uzasadnienie.
-4. Poproś o akceptację i pozwól odrzucić lub poprawić pojedyncze pozycje.
-5. Po zgodzie wywołaj `set_task_categories` z `confirmed_by_user: true` i wyłącznie
-   zaakceptowanymi pozycjami. Nadpisanie istniejącej kategorii wymaga osobnej
-   zgody i `overwrite: true`.
-6. Podsumuj raport zwrotny: co zapisano, co pominięto i dlaczego.
+Wyzwalacze: „co ma Karol”, „Bug / UI”, „otwarte u Ani”.
 
-Uwaga na spójność słownika: w bazie istnieją zarówno warianty typu `Bug / UI`,
-jak i `UI / Bug`. Preferuj wariant częstszy według liczników w `known_categories`.
+`search_tasks` z `assignee_name` / `assigned_to` / `created_by_name` /
+`category` / `status`. Potem ewentualnie `get_task` na konkretne ID.
 
 ## Playbook: planowanie sprintu
 
-Wyzwalacze: „zaplanuj sprint”, „co wziąć z backlogu”, „pogrupuj backlog”.
+Wyzwalacze: „zaplanuj sprint”, „co wziąć z backlogu”.
 
-1. Wywołaj `backlog_overview`. Zwraca otwarte pozycje bez sprintu, listę sprintów
-   z celem i definition of done oraz rozkład po kategoriach i typach.
-2. Pogrupuj pozycje w spójne tematy — po wspólnym celu, module lub zależności.
-3. Przedstaw propozycję sprintu (nazwa, cel, DoD, daty) i listę zadań z podzadaniami.
-4. Po zgodzie użytkownika:
-   - `create_sprint` z `confirmed_by_user: true`
-   - dla każdego zadania `create_task` z `sprint_id` albo `assign_tasks_to_sprint`
-     dla pozycji już istniejących w backlogu
-5. Podaj linki do sprintu i utworzonych zadań z odpowiedzi narzędzi.
+1. `backlog_overview`.
+2. Propozycja: nazwa, cel, DoD, daty, lista zadań.
+3. Po zgodzie: `create_sprint` → `create_task` z `sprint_id` albo
+   `assign_tasks_to_sprint`.
+4. W trakcie sprintu: `sprint_insights`.
 
 ## Playbook: tworzenie zadania
 
-Wyzwalacze: „zrób zadanie”, „dodaj task z podzadaniami”, „stwórz checklistę”.
-
-1. Na podstawie prośby użytkownika przygotuj propozycję: nazwa, opis, kategoria
-   (preferuj `known_categories` z `tasks_without_category` jeśli nie wiesz),
-   opcjonalnie priorytet, termin, przypisanie.
-2. Jeśli zadanie ma kroki — dodaj numerowaną listę podzadań w logicznej kolejności.
-3. Pokaż użytkownikowi pełną propozycję przed zapisem. Nic nie twórz „w tle”.
-4. Po zgodzie wywołaj `create_task` z `confirmed_by_user: true` i dokładnie tymi
-   danymi, które zaakceptował.
-5. Podaj link do utworzonego zadania z odpowiedzi narzędzia (`task.url`).
+1. Propozycja (nazwa, opis, kategoria ze słownika, priorytet, termin, osoba,
+   podzadania). `list_users` gdy przypisujesz.
+2. Pokaż pełną kartę. Nic nie twórz w tle.
+3. `create_task` z `confirmed_by_user: true`. Podaj `task.url`.
 
 ## Ograniczenia
 
 - Lokalny stdio (Cursor) działa na koncie z `MCP_ACTOR_USER_ID`.
 - HTTP `/mcp/tasks` (ChatGPT, Grok) działa na koncie użytkownika z OAuth.
-- Kategoria to zwykły tekst; nie ma rejestru etykiet ani ich walidacji.
-- Edycja istniejących zadań (poza kategoriami i sprintem) — na razie ręcznie w aplikacji.
+- Kategoria to zwykły tekst; preferuj częstszy wariant ze słownika
+  (`Bug / UI` vs `UI / Bug`).
+- `update_task` nie zmienia kategorii ani sprintu.

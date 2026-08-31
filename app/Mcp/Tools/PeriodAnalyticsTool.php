@@ -4,7 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Mcp\Concerns\ResolvesPeriodRange;
-use App\Services\PromptEngine\TaskPromptBundleService;
+use App\Services\PeriodTaskAnalyticsService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -12,20 +12,22 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[IsReadOnly]
-class TasksInPeriodTool extends Tool
+class PeriodAnalyticsTool extends Tool
 {
     use ActsAsConfiguredUser;
     use ResolvesPeriodRange;
 
-    protected string $name = 'tasks_in_period';
+    protected string $name = 'period_analytics';
 
     protected string $description = <<<'MARKDOWN'
-        Pełny dump zadań z okresu (opisy, podzadania, całe komentarze).
-        Do zwykłego raportu preferuj `period_analytics` + `get_task` /
-        `get_task_comments` – ten dump łatwo przekracza limit.
+        Zwraca zwarty raport KPI i współpracy za okres: statusy, load per osoba,
+        kategorie, czas życia, najgorętsze wątki (same ID), zadania bez aktywności,
+        macierze komentarzy / delegacji / @wzmianek oraz kto domyka cudze podzadania.
 
-        Zadanie trafia do wyniku, gdy w okresie zostało utworzone, zmienione,
-        zakończone, ma w nim termin albo dostało komentarz lub ruch na podzadaniu.
+        Nie zawiera ciał komentarzy ani opisów – do treści użyj `get_task`
+        i `get_task_comments` na ID z `pointers` / `hottest_threads` / `stale`.
+
+        Użyj `period` albo pary `start_date` i `end_date`.
     MARKDOWN;
 
     public function handle(Request $request): Response
@@ -36,6 +38,7 @@ class TasksInPeriodTool extends Tool
             'period' => ['nullable', 'string', 'in:this_week,last_week,last_7_days,this_month,last_month'],
             'start_date' => ['nullable', 'date_format:Y-m-d'],
             'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'stale_days' => ['nullable', 'integer', 'min:1', 'max:90'],
         ]);
 
         [$start, $end] = $this->resolveRange($validated);
@@ -44,18 +47,11 @@ class TasksInPeriodTool extends Tool
             return Response::error('Podaj `period` albo parę `start_date` i `end_date` w formacie YYYY-MM-DD.');
         }
 
-        $bundle = app(TaskPromptBundleService::class)->build($start, $end);
+        $staleDays = (int) ($validated['stale_days'] ?? 7);
 
-        $max = config('ai_tools.max_tasks_per_bundle');
-        $count = $bundle['counts']['tasks'] ?? 0;
-
-        if ($count > $max) {
-            return Response::error(
-                "Okres obejmuje {$count} zadań, limit to {$max}. Użyj `period_analytics` albo zawęź zakres dat."
-            );
-        }
-
-        return Response::json($bundle);
+        return Response::json(
+            app(PeriodTaskAnalyticsService::class)->build($start, $end, $staleDays)
+        );
     }
 
     /**
@@ -63,6 +59,12 @@ class TasksInPeriodTool extends Tool
      */
     public function schema(JsonSchema $schema): array
     {
-        return $this->periodSchema($schema);
+        return [
+            ...$this->periodSchema($schema),
+            'stale_days' => $schema->integer()
+                ->description('Próg bezczynności w dniach dla listy stale. Domyślnie 7.')
+                ->min(1)
+                ->max(90),
+        ];
     }
 }
