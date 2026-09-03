@@ -122,7 +122,7 @@ class WorkItemBacklogTest extends TestCase
         ]);
 
         $run = app(ProcedureRunService::class)->startRun($template, [
-            'task_name' => 'Onboarding Jan',
+            'name_suffix' => 'Jan',
             'assigned_to' => $this->user->id,
         ]);
 
@@ -130,7 +130,7 @@ class WorkItemBacklogTest extends TestCase
         $this->assertSame(0, WorkItem::query()->where('source_type', 'project_task')->where('source_id', $run->task->id)->count());
 
         $item = WorkItem::query()->where('type', WorkItemType::ProcedureRun)->first();
-        $this->assertSame('Onboarding Jan', $item->title);
+        $this->assertSame('Onboarding · Jan', $item->title);
         $this->assertSame($this->user->id, $item->assignee_id);
         $this->assertSame($this->user->id, $item->created_by_id);
         $this->assertSame($run->id, $item->source_id);
@@ -153,7 +153,7 @@ class WorkItemBacklogTest extends TestCase
             ],
         ]);
         app(ProcedureRunService::class)->startRun($template, [
-            'task_name' => 'Onboarding Jan',
+            'name_suffix' => 'Jan',
             'assigned_to' => $this->user->id,
         ]);
         $procedureItem = WorkItem::query()->where('type', WorkItemType::ProcedureRun)->first();
@@ -180,7 +180,7 @@ class WorkItemBacklogTest extends TestCase
 
         $html = Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSee('Onboarding Jan')
+            ->assertSee('Onboarding · Jan')
             ->assertSee('sprawdź to')
             ->assertSee('Wzmianka')
             ->assertSee('Oczekujące')

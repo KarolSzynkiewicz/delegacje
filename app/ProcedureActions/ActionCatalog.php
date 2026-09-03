@@ -72,7 +72,7 @@ class ActionCatalog
         $subjectType = (string) $run->subject_type;
 
         if (! in_array($subjectType, $action->subjectTypes(), true)) {
-            throw new RuntimeException('Akcja „'.$action->label().'” nie pasuje do przedmiotu tej procedury.');
+            throw new RuntimeException('Akcja „'.$action->label().'” nie pasuje do tego, kogo dotyczy ta procedura.');
         }
 
         return $action->execute($run, $payload, $actor);

@@ -28,6 +28,10 @@ class ProcedureTemplatesIndex extends Component
 
     public string $startTaskName = '';
 
+    public string $startNameSuffix = '';
+
+    public string $startTemplateName = '';
+
     public ?int $startAssignedTo = null;
 
     public string $startDueDate = '';
@@ -80,7 +84,9 @@ class ProcedureTemplatesIndex extends Component
     {
         $template = ProcedureTemplate::findOrFail($templateId);
         $this->startTemplateId = $templateId;
+        $this->startTemplateName = $template->name;
         $this->startTaskName = $template->name;
+        $this->startNameSuffix = '';
         $this->startDueDate = '';
         $this->startAssignedTo = null;
         $this->startSubjectType = (string) ($template->subject_type ?? '');
@@ -117,12 +123,13 @@ class ProcedureTemplatesIndex extends Component
         return '';
     }
 
-    /** Live preview of the final task name (base name + selected entity). */
+    /** Live preview of the final task name (procedure + karta or dopisek). */
     public function getStartFinalTaskNameProperty(): string
     {
-        $detail = $this->selectedSubjectLabel();
-
-        return trim($detail === '' ? $this->startTaskName : $this->startTaskName.' '.$detail);
+        return ProcedureRunService::composeTaskName(
+            $this->startTemplateName !== '' ? $this->startTemplateName : $this->startTaskName,
+            $this->selectedSubjectLabel() !== '' ? $this->selectedSubjectLabel() : $this->startNameSuffix,
+        );
     }
 
     public function startRun(ProcedureRunService $service): mixed
@@ -135,28 +142,30 @@ class ProcedureTemplatesIndex extends Component
         }
 
         $this->validate([
-            'startTaskName' => ['required', 'string', 'max:255'],
             'startAssignedTo' => ['nullable', 'integer', 'exists:users,id'],
             'startDueDate' => ['nullable', 'date'],
+            'startNameSuffix' => ['nullable', 'string', 'max:80'],
             'startSubjectId' => array_values(array_filter([
-                'nullable',
+                $subjectType ? 'required' : 'nullable',
                 'integer',
                 $subjectTable ? Rule::exists($subjectTable, 'id') : null,
             ])),
-        ], [], [
-            'startTaskName' => 'nazwa zadania',
+        ], [
+            'startSubjectId.required' => 'Wybierz '.mb_strtolower($subjectType?->label() ?? 'kogo dotyczy procedura').'.',
+        ], [
             'startAssignedTo' => 'przypisany do',
             'startDueDate' => 'termin',
-            'startSubjectId' => 'dotyczy',
+            'startNameSuffix' => 'dopisek',
+            'startSubjectId' => $subjectType?->label() ?? 'dotyczy',
         ]);
 
         $template = ProcedureTemplate::findOrFail($this->startTemplateId);
 
         $run = $service->startRun($template, [
-            'task_name' => $this->startFinalTaskName,
+            'name_suffix' => $subjectType ? null : ($this->startNameSuffix ?: null),
             'assigned_to' => $this->startAssignedTo ?: null,
             'due_date' => $this->startDueDate ?: null,
-            'subject_type' => $subjectType && $this->startSubjectId !== '' ? $subjectType->value : null,
+            'subject_type' => $subjectType?->value,
             'subject_id' => $this->startSubjectId !== '' ? (int) $this->startSubjectId : null,
         ]);
 

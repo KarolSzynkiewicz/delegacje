@@ -5910,7 +5910,10 @@ a.rp-tool-item {
 .modal-dialog-centered {
     display: flex;
     align-items: center;
+    justify-content: center;
     min-height: calc(100% - 3.5rem);
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* Departure planner v2: @teleport('body') — wyśrodkowanie w widocznym oknie (viewport), nie w środku całej wysokości przewijanej treści */

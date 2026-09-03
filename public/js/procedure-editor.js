@@ -503,7 +503,7 @@ function nodeMetaLine(n){
     const act = editorActions().find(a => a.key === n.action);
     parts.push(`<span class="pe-chip">${esc(act?.label || (n.action || 'brak akcji'))}</span>`);
   }
-  if(n.type==='comment')   parts.push(`<span class="pe-chip">na encję</span>`);
+  if(n.type==='comment')   parts.push(`<span class="pe-chip">na kartę</span>`);
   if(n.type==='approval')  parts.push(`<span class="pe-chip">zatwierdzenie</span>`);
   if(n.estimatedDuration)  parts.push(`<span class="pe-chip">⏱ ${n.estimatedDuration} ${n.durationUnit||'min'}</span>`);
   if(n.assigned_user_id){
@@ -839,7 +839,7 @@ function renderProperties(){
 
 function renderProcessMetaPanel(p){
   const types = (window.ProcedureEditorData && window.ProcedureEditorData.subjectTypes) || [];
-  const typeOptions = [`<option value="">— bez konkretnej encji —</option>`]
+  const typeOptions = [`<option value="">— bez konkretnej karty —</option>`]
     .concat(types.map(t => `<option value="${esc(t.value)}" ${p.subject_type===t.value?'selected':''}>${esc(t.label)}</option>`))
     .join('');
   return `
@@ -881,7 +881,7 @@ function renderNodePanel(n){
   if(n.type==='wait')      html+=renderWaitEditor(n);
   if(n.type==='action')    html+=renderActionEditor(n);
   if(n.type==='approval')  html+=`<div class="pe-hint">Dwa wyjścia: Zatwierdzone / Odrzucone. Odpowiedzialny to zatwierdzający (work item w backlogu).</div>`;
-  if(n.type==='comment')   html+=`<div class="pe-hint">Wykonawca wpisuje komentarz, który ląduje na powiązanej encji (pracownik / kandydat).</div>`;
+  if(n.type==='comment')   html+=`<div class="pe-hint">Wykonawca wpisuje komentarz, który ląduje na powiązanej karcie (pracownik / kandydat / samochód).</div>`;
   html+=`
     <div class="pe-prop-section-title">Akcje</div>
     <div style="display:flex;gap:8px;">

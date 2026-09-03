@@ -238,7 +238,7 @@ class ApprovalRequestTest extends TestCase
         ]);
 
         app(ProcedureRunService::class)->startRun($template, [
-            'task_name' => 'Onboarding Jan',
+            'name_suffix' => 'Jan',
             'assigned_to' => $robert->id,
         ]);
 
@@ -344,10 +344,10 @@ class ApprovalRequestTest extends TestCase
             ->test(TasksGrid::class)
             ->call('startAdd', 'procedure')
             ->set('newProcedureTemplateId', (string) $template->id)
-            ->set('newTaskName', 'Onboarding Jan siatka')
+            ->set('newProcedureNameSuffix', 'Jan')
             ->call('submitAdd')
             ->assertSee('Procedura uruchomiona.')
-            ->assertSee('Onboarding Jan siatka');
+            ->assertSee('Onboarding siatka · Jan');
 
         $this->assertSame(1, WorkItem::query()->where('type', WorkItemType::ProcedureRun)->count());
     }

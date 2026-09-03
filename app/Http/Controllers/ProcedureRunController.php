@@ -11,31 +11,29 @@ use Illuminate\Http\Request;
 
 class ProcedureRunController extends Controller
 {
-    public function __construct(private ProcedureRunService $service)
-    {
-    }
+    public function __construct(private ProcedureRunService $service) {}
 
     public function store(Request $request, ProcedureTemplate $procedureTemplate): RedirectResponse
     {
         $data = $request->validate([
-            'task_name'    => ['required', 'string', 'max:255'],
-            'assigned_to'  => ['nullable', 'integer', 'exists:users,id'],
-            'due_date'     => ['nullable', 'date'],
+            'name_suffix' => ['nullable', 'string', 'max:80'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'due_date' => ['nullable', 'date'],
             'subject_type' => ['nullable', 'string', 'max:100'],
-            'subject_id'   => ['nullable', 'integer'],
+            'subject_id' => ['nullable', 'integer'],
         ]);
 
         $run = $this->service->startRun($procedureTemplate, $data);
 
         return redirect()->route('tasks.show', $run->task)
-            ->with('success', 'Procedura "' . $procedureTemplate->name . '" została uruchomiona.');
+            ->with('success', 'Procedura "'.$procedureTemplate->name.'" została uruchomiona.');
     }
 
     public function advance(Request $request, ProcedureRun $procedureRun): RedirectResponse
     {
         $data = $request->validate([
-            'node_id'   => ['required', 'string'],
-            'edge_id'   => ['nullable', 'string'],
+            'node_id' => ['required', 'string'],
+            'edge_id' => ['nullable', 'string'],
             'step_data' => ['nullable', 'array'],
         ]);
 
@@ -76,8 +74,8 @@ class ProcedureRunController extends Controller
 
         ProcedureRunComment::create([
             'procedure_run_id' => $procedureRun->id,
-            'user_id'          => auth()->id(),
-            'body'             => $data['body'],
+            'user_id' => auth()->id(),
+            'body' => $data['body'],
         ]);
 
         return back();

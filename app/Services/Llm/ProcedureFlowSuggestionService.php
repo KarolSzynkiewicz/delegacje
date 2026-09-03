@@ -99,7 +99,7 @@ class ProcedureFlowSuggestionService extends StructuredSuggestionService
         $context = PromptContext::make()
             ->field('Nazwa procedury', $input['name'] ?? null, 200)
             ->field('Kategoria', $input['category'] ?? null, 100)
-            ->field('Procedura dotyczy encji', $subjectLabel, 100)
+            ->field('Procedura dotyczy', $subjectLabel, 100)
             ->field('Opis', $input['description'] ?? null, 1000);
 
         $data = $this->askForJson($context, $this->systemPrompt($maxSteps), maxTokens: 2048);

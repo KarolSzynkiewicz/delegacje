@@ -46,13 +46,13 @@ class ProcedureRunTaskCategoryTest extends TestCase
         ]);
 
         $run = app(ProcedureRunService::class)->startRun($template, [
-            'task_name' => 'Onboarding Jan',
+            'name_suffix' => 'Jan',
         ]);
 
         $task = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
 
         $this->assertNotNull($task);
-        $this->assertSame('Onboarding Jan', $task->name);
+        $this->assertSame('Onboarding · Jan', $task->name);
         $this->assertSame('Procedura', $task->category);
     }
 
@@ -72,7 +72,7 @@ class ProcedureRunTaskCategoryTest extends TestCase
         ]);
 
         $run = app(ProcedureRunService::class)->startRun($template, [
-            'task_name' => 'Onboarding Jan',
+            'name_suffix' => 'Jan',
         ]);
         $task = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
 
@@ -101,7 +101,7 @@ class ProcedureRunTaskCategoryTest extends TestCase
         ]);
 
         $run = app(ProcedureRunService::class)->startRun($template, [
-            'task_name' => 'Onboarding Jan',
+            'name_suffix' => 'Jan',
         ]);
         $task = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
 
@@ -109,7 +109,7 @@ class ProcedureRunTaskCategoryTest extends TestCase
             ->assertOk()
             ->assertSeeLivewire(ProcedureRunStepper::class)
             ->assertDontSeeLivewire(TaskSubtasks::class)
-            ->assertSee('Onboarding Jan')
+            ->assertSee('Onboarding · Jan')
             ->assertSee('Procedura')
             ->assertSee('Szablon')
             ->assertSee('Onboarding')

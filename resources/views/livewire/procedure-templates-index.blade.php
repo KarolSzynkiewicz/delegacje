@@ -140,7 +140,7 @@
     @if($showStartModal)
         <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.55);"
              wire:click.self="$set('showStartModal',false)">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mx-2">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mx-auto">
                 <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;">
                     <div class="modal-header" style="border-color:var(--glass-border)!important;">
                         <h5 class="modal-title"><i class="bi bi-play-circle me-2"></i>Uruchom procedurę</h5>
@@ -148,16 +148,10 @@
                     </div>
                     <div class="modal-body">
                         <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label small fw-semibold">Nazwa zadania</label>
-                                <input type="text" class="form-control" wire:model.live.debounce.300ms="startTaskName">
-                                @error('startTaskName')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                            </div>
                             @if($startSubjectType !== '')
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold">
-                                        Dotyczy: {{ $startSubjectTypeLabel }}
-                                        <span class="text-muted fw-normal">(opcjonalnie)</span>
+                                        Dotyczy: {{ $startSubjectTypeLabel }} <span class="text-danger">*</span>
                                     </label>
                                     <select class="form-select" wire:model.live="startSubjectId">
                                         <option value="">— wybierz {{ mb_strtolower($startSubjectTypeLabel) }} —</option>
@@ -167,13 +161,17 @@
                                     </select>
                                     @error('startSubjectId')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                 </div>
-                            @endif
-                            @if($this->selectedSubjectLabel() !== '')
+                            @else
                                 <div class="col-12">
-                                    <div class="small text-muted">Nazwa zadania po zapisaniu:</div>
-                                    <div class="fw-semibold">{{ $this->startFinalTaskName }}</div>
+                                    <label class="form-label small fw-semibold">Dopisek <span class="text-muted fw-normal">(opcjonalnie)</span></label>
+                                    <input type="text" class="form-control" wire:model.live.debounce.300ms="startNameSuffix" maxlength="80" placeholder="np. rano, tydzień 36">
+                                    @error('startNameSuffix')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                 </div>
                             @endif
+                            <div class="col-12">
+                                <div class="small text-muted">Nazwa zadania</div>
+                                <div class="fw-semibold">{{ $this->startFinalTaskName }}</div>
+                            </div>
                             <div class="col-12">
                                 <label class="form-label small fw-semibold">Przypisz do</label>
                                 <select class="form-select" wire:model.defer="startAssignedTo">
@@ -206,7 +204,7 @@
     @if($showNewModal)
         <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.55);"
              wire:click.self="$set('showNewModal',false)">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mx-2">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mx-auto">
                 <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;">
                     <div class="modal-header" style="border-color:var(--glass-border)!important;">
                         <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Nowa procedura</h5>
@@ -227,12 +225,12 @@
                             <div class="col-12">
                                 <label class="form-label small fw-semibold">Dotyczy</label>
                                 <select class="form-select" wire:model.defer="newSubjectType">
-                                    <option value="">— bez konkretnej encji —</option>
+                                    <option value="">— bez konkretnej karty —</option>
                                     @foreach($subjectTypes as $type)
                                         <option value="{{ $type['value'] }}">{{ $type['label'] }}</option>
                                     @endforeach
                                 </select>
-                                <div class="form-text small">Przy uruchomieniu wybierzesz konkretny rekord tego typu (np. samochód albo zakwaterowanie).</div>
+                                <div class="form-text small">Przy uruchomieniu trzeba będzie wybrać konkretny rekord (np. samochód albo zakwaterowanie). Bez tego kroki komentarza i akcji nie zadziałają.</div>
                                 @error('newSubjectType')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-12">
@@ -351,7 +349,7 @@
             :error="$chronoError"
             title="AskChrono — przepływ procedury"
             status-loading="Projektuję kroki procedury…"
-            thinking="Chrono czyta nazwę, kategorię, typ encji i opis, a potem układa kroki. Za chwilę zobaczysz je na canvasie — nic nie zapisze się bez Twojego kliknięcia."
+            thinking="Chrono czyta nazwę, kategorię, kogo dotyczy procedura i opis, a potem układa kroki. Za chwilę zobaczysz je na canvasie — nic nie zapisze się bez Twojego kliknięcia."
             empty-message="Wróć do formularza i doprecyzuj opis procedury."
             dialog-class="modal-dialog-centered"
         />

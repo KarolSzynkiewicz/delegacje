@@ -200,54 +200,66 @@
                                 Strona sama ruszy, gdy minie czas — albo kontynuuj wcześniej.
                             </div>
                         @elseif($nodeType === 'comment')
-                            @error('comment.'.$nodeId)
-                                <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
-                            @enderror
-                            <label class="form-label small text-muted">Komentarz do {{ $run->sourceCard()['label'] ?? 'encji' }}</label>
-                            <textarea class="form-control mb-3" rows="3"
-                                      wire:model="commentBodies.{{ $nodeId }}"
-                                      placeholder="Co zostało ustalone / sprawdzone…"></textarea>
-                        @elseif($nodeType === 'action')
-                            @php $actionLabel = $this->actionLabel($node); $fields = $this->actionFields($node); @endphp
-                            @error('action.'.$nodeId)
-                                <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
-                            @enderror
-                            @if($actionLabel)
-                                <div class="small text-muted mb-2">{{ $actionLabel }}</div>
+                            @if(! $run->hasBoundSubject())
+                                <div class="alert alert-warning py-2 px-3 small mb-3">
+                                    Ta procedura nie dotyczy żadnej karty — nie da się tu zostawić komentarza. Wróć i uruchom procedurę z wybraną osobą albo rekordem.
+                                </div>
                             @else
-                                <div class="alert alert-warning py-2 px-3 small mb-3">W węźle nie wybrano akcji.</div>
+                                @error('comment.'.$nodeId)
+                                    <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
+                                @enderror
+                                <label class="form-label small text-muted">Komentarz do {{ $run->sourceCard()['label'] ?? 'karty' }}</label>
+                                <textarea class="form-control mb-3" rows="3"
+                                          wire:model="commentBodies.{{ $nodeId }}"
+                                          placeholder="Co zostało ustalone / sprawdzone…"></textarea>
                             @endif
-                            <div class="d-flex flex-column gap-2 mb-3">
-                                @foreach($fields as $field)
-                                    @php $fname = $field['name']; @endphp
-                                    <label class="form-label small mb-0">{{ $field['label'] }}</label>
-                                    @if(($field['type'] ?? '') === 'textarea')
-                                        <textarea class="form-control form-control-sm" rows="2"
-                                                  wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}"></textarea>
-                                    @elseif(($field['type'] ?? '') === 'select')
-                                        <select class="form-select form-select-sm" wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
-                                            <option value="">— wybierz —</option>
-                                            @foreach($field['options'] ?? [] as $opt)
-                                                <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
-                                            @endforeach
-                                        </select>
-                                    @elseif(($field['type'] ?? '') === 'multiselect')
-                                        <select class="form-select form-select-sm" multiple
-                                                wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
-                                            @foreach($field['options'] ?? [] as $opt)
-                                                <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
-                                            @endforeach
-                                        </select>
-                                    @else
-                                        <input class="form-control form-control-sm"
-                                               type="{{ $field['type'] === 'date' ? 'date' : ($field['type'] === 'number' ? 'number' : 'text') }}"
-                                               @if(! empty($field['step'])) step="{{ $field['step'] }}" @endif
-                                               @if(isset($field['min'])) min="{{ $field['min'] }}" @endif
-                                               @if(isset($field['max'])) max="{{ $field['max'] }}" @endif
-                                               wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
-                                    @endif
-                                @endforeach
-                            </div>
+                        @elseif($nodeType === 'action')
+                            @if(! $run->hasBoundSubject())
+                                <div class="alert alert-warning py-2 px-3 small mb-3">
+                                    Ta procedura nie dotyczy żadnej karty — nie da się wykonać tej akcji. Wróć i uruchom procedurę z wybraną osobą albo rekordem.
+                                </div>
+                            @else
+                                @php $actionLabel = $this->actionLabel($node); $fields = $this->actionFields($node); @endphp
+                                @error('action.'.$nodeId)
+                                    <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
+                                @enderror
+                                @if($actionLabel)
+                                    <div class="small text-muted mb-2">{{ $actionLabel }}</div>
+                                @else
+                                    <div class="alert alert-warning py-2 px-3 small mb-3">W węźle nie wybrano akcji.</div>
+                                @endif
+                                <div class="d-flex flex-column gap-2 mb-3">
+                                    @foreach($fields as $field)
+                                        @php $fname = $field['name']; @endphp
+                                        <label class="form-label small mb-0">{{ $field['label'] }}</label>
+                                        @if(($field['type'] ?? '') === 'textarea')
+                                            <textarea class="form-control form-control-sm" rows="2"
+                                                      wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}"></textarea>
+                                        @elseif(($field['type'] ?? '') === 'select')
+                                            <select class="form-select form-select-sm" wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
+                                                <option value="">— wybierz —</option>
+                                                @foreach($field['options'] ?? [] as $opt)
+                                                    <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        @elseif(($field['type'] ?? '') === 'multiselect')
+                                            <select class="form-select form-select-sm" multiple
+                                                    wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
+                                                @foreach($field['options'] ?? [] as $opt)
+                                                    <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <input class="form-control form-control-sm"
+                                                   type="{{ $field['type'] === 'date' ? 'date' : ($field['type'] === 'number' ? 'number' : 'text') }}"
+                                                   @if(! empty($field['step'])) step="{{ $field['step'] }}" @endif
+                                                   @if(isset($field['min'])) min="{{ $field['min'] }}" @endif
+                                                   @if(isset($field['max'])) max="{{ $field['max'] }}" @endif
+                                                   wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
                         @elseif($nodeType === 'approval')
                             @php $approval = $this->openApprovalStep($nodeId); @endphp
                             @error('approval.'.$nodeId)
@@ -274,12 +286,16 @@
                         @endif
 
                         @if(! $isDone && $nodeType !== 'approval')
+                            @php
+                                $stepBlocked = in_array($nodeType, ['comment', 'action'], true) && ! $run->hasBoundSubject();
+                            @endphp
                             <div class="d-flex gap-2 justify-content-between flex-wrap">
                                 <button type="button"
                                         class="btn btn-outline-secondary btn-sm flex-grow-1 flex-sm-grow-0"
                                         wire:click="goBackNode('{{ $nodeId }}')">
                                     <i class="bi bi-arrow-left me-1"></i> Wstecz
                                 </button>
+                                @unless($stepBlocked)
                                 <button type="button"
                                         class="btn btn-primary btn-sm flex-grow-1 flex-sm-grow-0"
                                         wire:click="advanceNode('{{ $nodeId }}')">
@@ -295,6 +311,7 @@
                                         <i class="bi bi-check-circle me-1"></i> Oznacz jako wykonane
                                     @endif
                                 </button>
+                                @endunless
                             </div>
                         @elseif(! $isDone)
                             <button type="button"

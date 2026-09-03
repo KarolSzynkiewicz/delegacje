@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\ProcedureTemplatesIndex;
+use App\Livewire\TasksGrid;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
@@ -81,7 +82,78 @@ class ProcedureTemplateSubjectTest extends TestCase
 
         $task = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
         $this->assertNotNull($task);
-        $this->assertSame('Przegląd auta WA 12345 Ford Transit', $task->name);
+        $this->assertSame('Przegląd auta · WA 12345 Ford Transit', $task->name);
         $this->assertSame('Procedura', $task->category);
+    }
+
+    public function test_starting_a_subject_procedure_without_a_record_is_blocked(): void
+    {
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Przegląd auta',
+            'subject_type' => 'vehicle',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                ],
+                'edges' => [],
+            ],
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(ProcedureTemplatesIndex::class)
+            ->call('openStartModal', $template->id)
+            ->call('startRun')
+            ->assertHasErrors(['startSubjectId']);
+
+        $this->assertSame(0, ProcedureRun::query()->count());
+    }
+
+    public function test_starting_an_unbound_procedure_appends_optional_suffix(): void
+    {
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Poranna odprawa',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                ],
+                'edges' => [],
+            ],
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(ProcedureTemplatesIndex::class)
+            ->call('openStartModal', $template->id)
+            ->set('startNameSuffix', 'tydzień 36')
+            ->call('startRun');
+
+        $task = ProjectTask::query()->latest('id')->first();
+        $this->assertNotNull($task);
+        $this->assertSame('Poranna odprawa · tydzień 36', $task->name);
+    }
+
+    public function test_grid_cannot_start_subject_procedure_without_a_record(): void
+    {
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Przegląd auta',
+            'subject_type' => 'vehicle',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                ],
+                'edges' => [],
+            ],
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('startAdd', 'procedure')
+            ->set('newProcedureTemplateId', (string) $template->id)
+            ->call('submitAdd')
+            ->assertHasErrors(['newProcedureSubjectId']);
+
+        $this->assertSame(0, ProcedureRun::query()->count());
     }
 }

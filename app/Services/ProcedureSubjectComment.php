@@ -19,7 +19,7 @@ class ProcedureSubjectComment
         $subject = $run->subject;
 
         if ($subject === null || ! in_array(HasComments::class, class_uses_recursive($subject), true)) {
-            throw new RuntimeException('Ta procedura nie jest powiązana z encją, na której można zostawić komentarz.');
+            throw new RuntimeException('Ta procedura nie jest powiązana z kartą, na której można zostawić komentarz.');
         }
 
         $body = trim($body);

@@ -1102,29 +1102,23 @@
                     <td style="padding:4px 6px; min-width:220px">
                         <div class="d-flex flex-column gap-1">
                             @if($addKind === 'procedure')
-                                <select wire:model.live="newProcedureTemplateId"
-                                        class="form-select form-select-sm @error('newProcedureTemplateId') is-invalid @enderror">
-                                    <option value="">Szablon procedury *</option>
-                                    @foreach($procedureTemplates as $tpl)
-                                        <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newProcedureTemplateId')
-                                    <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
-                                @enderror
-                            @endif
+                                @include('livewire.partials.tasks-grid-procedure-start-fields')
+                                <div class="d-flex gap-1 align-items-start">
+                                    <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
+                                        <i class="bi bi-play-fill me-1"></i>Uruchom
+                                    </button>
+                                </div>
+                            @else
                             <div class="d-flex gap-1 align-items-start">
                                 <input type="text"
                                        wire:model="newTaskName"
                                        class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : ($addKind === 'procedure' ? 'Nazwa procedury *' : 'Nazwa zadania *') }}"
+                                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : 'Nazwa zadania *' }}"
                                        wire:keydown.enter="submitAdd"
                                        wire:keydown.escape="cancelAdd"
                                        x-data x-init="$el.focus()">
                                 <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
-                                    @if($addKind === 'procedure')
-                                        <i class="bi bi-play-fill me-1"></i>Uruchom
-                                    @elseif($addKind === 'approval')
+                                    @if($addKind === 'approval')
                                         <i class="bi bi-check2-circle me-1"></i>Poproś
                                     @else
                                         <i class="bi bi-plus-lg me-1"></i>Dodaj
@@ -1134,6 +1128,7 @@
                             @error('newTaskName')
                                 <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
                             @enderror
+                            @endif
                         </div>
                     </td>
                     @endif
@@ -1294,24 +1289,15 @@
         </div>
         <div class="d-flex flex-column gap-2">
             @if($addKind === 'procedure')
-            <select wire:model.live="newProcedureTemplateId"
-                    class="form-select form-select-sm @error('newProcedureTemplateId') is-invalid @enderror">
-                <option value="">Szablon procedury *</option>
-                @foreach($procedureTemplates as $tpl)
-                    <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
-                @endforeach
-            </select>
-            @error('newProcedureTemplateId')
-                <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
-            @enderror
+            @include('livewire.partials.tasks-grid-procedure-start-fields')
             @endif
 
-            @if(in_array('name', $visibleColumns))
+            @if(in_array('name', $visibleColumns) && $addKind !== 'procedure')
             <div>
                 <input type="text"
                        wire:model="newTaskName"
                        class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : ($addKind === 'procedure' ? 'Nazwa procedury *' : 'Nazwa zadania *') }}"
+                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : 'Nazwa zadania *' }}"
                        wire:keydown.enter="submitAdd"
                        wire:keydown.escape="cancelAdd">
                 @error('newTaskName')

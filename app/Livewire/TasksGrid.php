@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Contracts\Llm\LlmClient;
+use App\Enums\ProcedureSubjectType;
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
@@ -39,6 +40,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -223,6 +225,10 @@ class TasksGrid extends Component
     public string $newTaskDueDate = '';
 
     public string $newProcedureTemplateId = '';
+
+    public string $newProcedureSubjectId = '';
+
+    public string $newProcedureNameSuffix = '';
 
     // Inline add subtask
     public ?int $addingSubtaskForTask = null;
@@ -1166,7 +1172,7 @@ class TasksGrid extends Component
             $assignee?->notify(new TaskAssigned($task, auth()->user()));
         }
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }
@@ -1187,7 +1193,7 @@ class TasksGrid extends Component
 
         $this->addKind = $kind;
         $this->showAddRow = true;
-        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }
@@ -1203,10 +1209,51 @@ class TasksGrid extends Component
 
     public function updatedNewProcedureTemplateId(string $value): void
     {
-        $template = ProcedureTemplate::query()->find((int) $value);
-        if ($template) {
-            $this->newTaskName = $template->name;
+        $this->newProcedureSubjectId = '';
+        $this->newProcedureNameSuffix = '';
+        $this->resetErrorBag(['newProcedureSubjectId', 'newProcedureNameSuffix']);
+    }
+
+    public function procedureStartSubjectType(): ?ProcedureSubjectType
+    {
+        if ($this->newProcedureTemplateId === '') {
+            return null;
         }
+
+        $template = ProcedureTemplate::query()->find((int) $this->newProcedureTemplateId);
+
+        return $template?->subjectType();
+    }
+
+    /** @return list<array{id: int, label: string}> */
+    public function procedureStartSubjectOptions(): array
+    {
+        return $this->procedureStartSubjectType()?->dropdownOptions() ?? [];
+    }
+
+    public function getNewProcedureTaskNamePreviewProperty(): string
+    {
+        if ($this->newProcedureTemplateId === '') {
+            return '';
+        }
+
+        $template = ProcedureTemplate::query()->find((int) $this->newProcedureTemplateId);
+        if (! $template) {
+            return '';
+        }
+
+        $subjectType = $template->subjectType();
+        $detail = $this->newProcedureNameSuffix;
+        if ($subjectType && $this->newProcedureSubjectId !== '') {
+            foreach ($subjectType->dropdownOptions() as $option) {
+                if ((string) $option['id'] === $this->newProcedureSubjectId) {
+                    $detail = $option['label'];
+                    break;
+                }
+            }
+        }
+
+        return ProcedureRunService::composeTaskName($template->name, $detail !== '' ? $detail : null);
     }
 
     public function submitAdd(): void
@@ -1226,21 +1273,41 @@ class TasksGrid extends Component
 
         $this->validate([
             'newProcedureTemplateId' => 'required|exists:procedure_templates,id',
-            'newTaskName' => 'required|string|max:255',
+            'newProcedureNameSuffix' => ['nullable', 'string', 'max:80'],
             'newTaskAssignedTo' => 'nullable|exists:users,id',
             'newTaskDueDate' => 'nullable|date',
         ], [], [
             'newProcedureTemplateId' => 'szablon procedury',
-            'newTaskName' => 'nazwa',
+            'newProcedureNameSuffix' => 'dopisek',
         ]);
 
         $template = ProcedureTemplate::query()->findOrFail((int) $this->newProcedureTemplateId);
+        $subjectType = $template->subjectType();
+        $subjectTable = null;
+        if ($subjectType) {
+            $modelClass = $subjectType->modelClass();
+            $subjectTable = (new $modelClass)->getTable();
+        }
+
+        $this->validate([
+            'newProcedureSubjectId' => array_values(array_filter([
+                $subjectType ? 'required' : 'nullable',
+                'integer',
+                $subjectTable ? Rule::exists($subjectTable, 'id') : null,
+            ])),
+        ], [
+            'newProcedureSubjectId.required' => 'Wybierz '.mb_strtolower($subjectType?->label() ?? 'kogo dotyczy').'.',
+        ], [
+            'newProcedureSubjectId' => $subjectType?->label() ?? 'dotyczy',
+        ]);
 
         try {
             app(ProcedureRunService::class)->startRun($template, [
-                'task_name' => $this->newTaskName,
+                'name_suffix' => $subjectType ? null : ($this->newProcedureNameSuffix ?: null),
                 'assigned_to' => $this->newTaskAssignedTo ?: null,
                 'due_date' => $this->newTaskDueDate ?: null,
+                'subject_type' => $subjectType?->value,
+                'subject_id' => $this->newProcedureSubjectId !== '' ? (int) $this->newProcedureSubjectId : null,
             ]);
         } catch (\RuntimeException $e) {
             $this->flash = $e->getMessage();
@@ -1248,7 +1315,7 @@ class TasksGrid extends Component
             return;
         }
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
         $this->showAddRow = false;
         $this->addKind = 'task';
         $this->flash = 'Procedura uruchomiona.';
@@ -1286,7 +1353,7 @@ class TasksGrid extends Component
             'due_at' => $this->newTaskDueDate ?: null,
         ]);
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId']);
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }
@@ -3818,7 +3885,7 @@ class TasksGrid extends Component
                 : Sprint::query()->orderByDesc('start_date')->get(),
             'allUsers' => User::orderedDirectory(),
             'procedureTemplates' => $this->usesWorkItems()
-                ? ProcedureTemplate::query()->orderBy('name')->get(['id', 'name'])
+                ? ProcedureTemplate::query()->orderBy('name')->get(['id', 'name', 'subject_type'])
                 : collect(),
             'availableColumns' => $this->availableColumns,
             'savedViews' => $savedViews,

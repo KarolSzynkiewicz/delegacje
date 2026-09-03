@@ -77,6 +77,17 @@ class ProcedureRunStepper extends Component
         $stepData = [];
         $edgeId = null;
 
+        if (in_array($nodeType, ['comment', 'action'], true) && ! $this->run->hasBoundSubject()) {
+            $this->addError(
+                $nodeType.'.'.$nodeId,
+                $nodeType === 'comment'
+                    ? 'Ta procedura nie jest powiązana z kartą, na której można zostawić komentarz.'
+                    : 'Ta procedura nie dotyczy żadnej karty — nie da się wykonać tej akcji.',
+            );
+
+            return;
+        }
+
         if ($nodeType === 'checklist') {
             $items = $node['checklist'] ?? [];
             $state = $this->checklistState[$nodeId] ?? [];

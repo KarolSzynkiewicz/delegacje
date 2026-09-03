@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ApprovalDecision;
 use App\Enums\ProcedureRunStatus;
+use App\Enums\ProcedureSubjectType;
 use App\Enums\TaskStatus;
 use App\Events\ProcedureRunStepCompleted;
 use App\Events\ProcedureRunStepEntered;
@@ -28,7 +29,7 @@ class ProcedureRunService
      * Create a new procedure run and a linked ProjectTask.
      *
      * @param  array{
-     *     task_name: string,
+     *     name_suffix: string|null,
      *     description: string|null,
      *     category: string|null,
      *     assigned_to: int|null,
@@ -42,6 +43,14 @@ class ProcedureRunService
      */
     public function startRun(ProcedureTemplate $template, array $params): ProcedureRun
     {
+        $bound = $this->bindSubject($template, $params);
+        $params['subject_type'] = $bound['subject_type'];
+        $params['subject_id'] = $bound['subject_id'];
+        $params['task_name'] = self::composeTaskName(
+            $template->name,
+            $bound['subject_label'] ?: ($params['name_suffix'] ?? null),
+        );
+
         $version = $this->versions->resolveVersionForRun($template);
         $definition = $version->definition;
         $startNode = $this->findNodeByType($definition, 'start');
@@ -109,6 +118,53 @@ class ProcedureRunService
         $this->dispatchStepEntered($run->load(['task', 'version']), $startNode, null);
 
         return $run;
+    }
+
+    public static function composeTaskName(string $templateName, ?string $detail = null): string
+    {
+        $base = trim($templateName);
+        if ($base === '') {
+            $base = 'Procedura';
+        }
+
+        $detail = trim((string) $detail);
+
+        return $detail === '' ? $base : $base.' · '.$detail;
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array{subject_type: string|null, subject_id: int|null, subject_label: string|null}
+     */
+    private function bindSubject(ProcedureTemplate $template, array $params): array
+    {
+        $required = ProcedureSubjectType::tryFrom((string) $template->subject_type);
+        $requested = ProcedureSubjectType::tryFrom((string) ($params['subject_type'] ?? ''));
+        $type = $required ?? $requested;
+        $id = (int) ($params['subject_id'] ?? 0);
+
+        if ($required !== null && $id <= 0) {
+            throw new RuntimeException('Wybierz '.mb_strtolower($required->label()).'.');
+        }
+
+        if ($type === null || $id <= 0) {
+            return [
+                'subject_type' => null,
+                'subject_id' => null,
+                'subject_label' => null,
+            ];
+        }
+
+        $model = $type->modelClass()::query()->find($id);
+        if ($model === null) {
+            throw new RuntimeException('Nie znaleziono wybranego rekordu.');
+        }
+
+        return [
+            'subject_type' => $type->value,
+            'subject_id' => $id,
+            'subject_label' => $type->labelFor($model),
+        ];
     }
 
     /**

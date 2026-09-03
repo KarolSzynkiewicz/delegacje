@@ -178,6 +178,12 @@ class ProcedureRun extends Model
         return $type->sourceCardFor($subject);
     }
 
+    public function hasBoundSubject(): bool
+    {
+        return ProcedureSubjectType::tryFrom((string) $this->subject_type) !== null
+            && (int) $this->subject_id > 0;
+    }
+
     /** Outgoing edges from a given node id. */
     public function outgoingEdges(string $nodeId): array
     {
