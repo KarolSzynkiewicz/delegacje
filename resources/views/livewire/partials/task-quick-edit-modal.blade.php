@@ -63,6 +63,8 @@
                     Przypisany
                 @elseif($quickEditField === 'sprint_id')
                     Sprint
+                @elseif($quickEditField === 'priority')
+                    Priorytet
                 @else
                     Termin wykonania
                 @endif
@@ -94,6 +96,19 @@
                         @endforeach
                     </select>
                     @error('qeSprintId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                </div>
+            @elseif($quickEditField === 'priority')
+                <div class="mb-3">
+                    <label class="form-label small text-muted mb-1">Priorytet</label>
+                    <select class="form-select form-select-sm" wire:model="qePriority" data-quick-focus>
+                        <option value="">Brak</option>
+                        <option value="1">1 – Najniższy</option>
+                        <option value="2">2 – Niski</option>
+                        <option value="3">3 – Średni</option>
+                        <option value="4">4 – Wysoki</option>
+                        <option value="5">5 – Krytyczny</option>
+                    </select>
+                    @error('qePriority') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
             @else
                 <div class="mb-3">

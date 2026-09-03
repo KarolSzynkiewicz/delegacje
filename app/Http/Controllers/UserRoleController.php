@@ -2,14 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\RoutePermissionService;
 use App\Services\MenuService;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class UserRoleController extends Controller
 {
@@ -18,8 +15,7 @@ class UserRoleController extends Controller
      */
     public function index(): View
     {
-        $userRoles = Role::with('permissions')->orderBy('name')->get();
-        return view('user-roles.index', compact('userRoles'));
+        return view('user-roles.index');
     }
 
     /**
@@ -29,7 +25,7 @@ class UserRoleController extends Controller
     {
         // Pobierz WSZYSTKIE uprawnienia z bazy (Spatie) zamiast z routes
         $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
-        
+
         return view('user-roles.create', compact('allPermissions'));
     }
 
@@ -66,7 +62,7 @@ class UserRoleController extends Controller
     public function show(Role $userRole): View
     {
         $userRole->load(['permissions', 'users']);
-        
+
         return view('user-roles.show', compact('userRole'));
     }
 
@@ -78,7 +74,7 @@ class UserRoleController extends Controller
         // Pobierz WSZYSTKIE uprawnienia z bazy (Spatie) zamiast z routes
         $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
         $userRole->load('permissions');
-        
+
         return view('user-roles.edit', compact('userRole', 'allPermissions'));
     }
 
@@ -88,7 +84,7 @@ class UserRoleController extends Controller
     public function update(Request $request, Role $userRole): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:user_roles,name,' . $userRole->id,
+            'name' => 'required|string|max:255|unique:user_roles,name,'.$userRole->id,
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,name', // Musi istnieć w bazie!
         ]);
@@ -135,7 +131,7 @@ class UserRoleController extends Controller
         if ($userRole->name === 'administrator') {
             return response()->json([
                 'success' => false,
-                'message' => 'Nie można zmieniać uprawnień dla roli administrator.'
+                'message' => 'Nie można zmieniać uprawnień dla roli administrator.',
             ], 403);
         }
 
@@ -157,7 +153,7 @@ class UserRoleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Uprawnienia zostały zaktualizowane.',
-            'count' => isset($validated['permissions']) ? count($validated['permissions']) : 0
+            'count' => isset($validated['permissions']) ? count($validated['permissions']) : 0,
         ]);
     }
 }

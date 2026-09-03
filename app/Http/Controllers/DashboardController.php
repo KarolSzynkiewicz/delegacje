@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
 use App\Services\ProfitabilityService;
+use App\Support\DashboardSnaps\DummyWorld;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,7 +21,9 @@ class DashboardController extends Controller
      */
     public function home(): View
     {
-        return view('dashboard');
+        return view('dashboard', [
+            'snaps' => DummyWorld::make()->toView(),
+        ]);
     }
 
     /**

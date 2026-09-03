@@ -58,7 +58,7 @@
     @if($showBindModal)
         <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.55);"
              wire:click.self="closeBindModal">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mx-2">
                 <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--glass-border);border-radius:20px;">
                     <div class="modal-header" style="border-color:var(--glass-border)!important;">
                         <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Przypisz procedurę</h5>

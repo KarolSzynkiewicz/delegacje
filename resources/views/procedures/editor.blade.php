@@ -6,21 +6,21 @@
         {{-- ── TOOLBAR ──────────────────────────────────────────────── --}}
         <div class="pe-toolbar">
             <a id="btnBack" href="{{ route('procedure-templates.index') }}" class="pe-btn pe-btn-ghost" title="Powrót do listy procedur">
-                <i class="bi bi-arrow-left"></i> Procedury
+                <i class="bi bi-arrow-left"></i> <span class="pe-btn-text">Procedury</span>
             </a>
             <a href="{{ route('procedure-templates.show', $template) }}" class="pe-btn pe-btn-ghost" title="Podgląd szablonu">
-                <i class="bi bi-eye"></i> Podgląd
+                <i class="bi bi-eye"></i> <span class="pe-btn-text">Podgląd</span>
             </a>
-            <div class="pe-sep"></div>
+            <div class="pe-sep pe-sep-lg"></div>
             <input type="text" id="procNameInput" class="pe-procname" value="{{ $template->name }}" placeholder="Nazwa procedury">
             <span class="pe-dirty-dot" id="dirtyDot" title="Niezapisane zmiany"></span>
-            <div class="pe-sep"></div>
-            <button class="pe-btn" id="btnUndo" title="Cofnij (Ctrl+Z)" disabled><i class="bi bi-arrow-counterclockwise"></i></button>
-            <button class="pe-btn" id="btnRedo" title="Ponów (Ctrl+Y)" disabled><i class="bi bi-arrow-clockwise"></i></button>
+            <div class="pe-sep pe-sep-lg"></div>
+            <button class="pe-btn pe-btn-icon" id="btnUndo" title="Cofnij (Ctrl+Z)" disabled><i class="bi bi-arrow-counterclockwise"></i></button>
+            <button class="pe-btn pe-btn-icon" id="btnRedo" title="Ponów (Ctrl+Y)" disabled><i class="bi bi-arrow-clockwise"></i></button>
             @if($chronoEnabled)
-                <div class="pe-sep"></div>
+                <div class="pe-sep pe-sep-lg"></div>
                 <button class="pe-btn" id="btnChrono" title="AskChrono — zaproponuj przepływ na podstawie nazwy, kategorii i opisu">
-                    <x-ask-chrono-bot :size="20" /> Chrono
+                    <x-ask-chrono-bot :size="20" /> <span class="pe-btn-text">Chrono</span>
                 </button>
             @endif
             <button class="pe-btn pe-btn-icon" id="btnImport" title="Importuj przepływ z tekstu (JSON) — nadpisuje canvas">
@@ -31,7 +31,14 @@
             </button>
             <div class="pe-toolbar-spacer"></div>
             <span class="pe-zoom-indicator" id="zoomIndicator">100%</span>
-            <button class="pe-btn pe-btn-primary" id="btnSave" title="Zapisz (Ctrl+S)"><i class="bi bi-save"></i> Zapisz</button>
+            <button type="button" class="pe-btn pe-btn-icon pe-narrow-only" id="btnToggleBottom" title="Walidacja i logi">
+                <i class="bi bi-exclamation-circle"></i>
+                <span class="pe-count" id="validationCountFab">0</span>
+            </button>
+            <button type="button" class="pe-btn pe-btn-icon pe-narrow-only" id="btnToggleProps" title="Właściwości">
+                <i class="bi bi-sliders"></i>
+            </button>
+            <button class="pe-btn pe-btn-primary" id="btnSave" title="Zapisz (Ctrl+S)"><i class="bi bi-save"></i> <span class="pe-btn-text">Zapisz</span></button>
         </div>
 
         {{-- ── CONTENT GRID ─────────────────────────────────────────── --}}
@@ -59,11 +66,17 @@
                 </div>
             </div>
 
+            <div class="pe-scrim" id="peScrim" hidden></div>
+
             {{-- BOTTOM PANEL --}}
             <div class="pe-bottom-panel">
                 <div class="pe-bp-tabs">
                     <div class="pe-bp-tab active" data-tab="validation">Walidacja <span class="pe-count" id="validationCount">0</span></div>
                     <div class="pe-bp-tab" data-tab="logs">Logi <span class="pe-count" id="logsCount">0</span></div>
+                    <div class="pe-toolbar-spacer"></div>
+                    <button type="button" class="pe-btn pe-btn-icon pe-panel-close" id="btnCloseBottom" title="Zamknij" aria-label="Zamknij panel walidacji">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
                 <div class="pe-bp-body">
                     <div class="pe-bp-pane active" id="paneValidation"></div>
@@ -74,8 +87,13 @@
             {{-- PROPERTIES --}}
             <div class="pe-sidebar-right">
                 <div class="pe-prop-head">
-                    <h2>Właściwości</h2>
-                    <div class="pe-prop-sub" id="propSub">Nic nie wybrano</div>
+                    <div class="pe-prop-head-text">
+                        <h2>Właściwości</h2>
+                        <div class="pe-prop-sub" id="propSub">Nic nie wybrano</div>
+                    </div>
+                    <button type="button" class="pe-btn pe-btn-icon pe-panel-close" id="btnCloseProps" title="Zamknij" aria-label="Zamknij właściwości">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
                 <div class="pe-prop-body" id="propBody"></div>
             </div>
@@ -154,11 +172,25 @@
    ============================================================ */
 
 /* Full-page shell */
+body:has(.pe-shell) {
+    overflow: hidden;
+}
+body:has(.pe-shell) main.flex-grow-1 {
+    padding: 0 !important;
+}
+body:has(.pe-shell) .app-page-shell {
+    padding: 0;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none;
+    border-radius: 0;
+}
 .pe-shell {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 56px); /* minus navbar height */
+    height: calc(100dvh - 5.5rem); /* navbar fallback; JS nadpisuje dokładną wysokość */
     overflow: hidden;
+    overscroll-behavior: none;
     --pe-bg: #070a13;
     --pe-panel: #10141d;
     --pe-panel2: #151b26;
@@ -186,24 +218,27 @@
 
 /* ─ Toolbar ─────────────────────────────────────────────────── */
 .pe-toolbar {
-    height: 52px; flex: 0 0 52px;
+    min-height: 52px; flex: 0 0 auto;
     display: flex; align-items: center; gap: 8px;
-    padding: 0 12px;
+    padding: 6px 12px;
     background: var(--pe-panel);
     border-bottom: 1px solid var(--pe-border);
     z-index: 20;
+    flex-wrap: wrap;
 }
 .pe-sep { width: 1px; align-self: stretch; background: var(--pe-border); margin: 0 4px; }
-.pe-toolbar-spacer { flex: 1; }
+.pe-toolbar-spacer { flex: 1; min-width: 4px; }
 .pe-procname {
     background: transparent; border: 1px solid transparent;
     color: var(--pe-text-hi); font-size: 13px; font-weight: 600;
-    padding: 5px 8px; border-radius: 7px; width: 220px;
+    padding: 5px 8px; border-radius: 7px; width: 220px; min-width: 0;
 }
 .pe-procname:hover,.pe-procname:focus { background: var(--pe-panel2); border-color: var(--pe-border); outline: none; }
-.pe-dirty-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pe-warn); margin-left: 2px; display: none; }
+.pe-dirty-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pe-warn); margin-left: 2px; display: none; flex-shrink: 0; }
 .pe-dirty-dot.show { display: inline-block; }
 .pe-zoom-indicator { font-family: var(--pe-mono); font-size: 11px; color: var(--pe-text-lo); padding: 0 6px; min-width: 42px; text-align: center; }
+.pe-narrow-only { display: none !important; }
+.pe-panel-close { display: none; }
 
 /* ─ Buttons ─────────────────────────────────────────────────── */
 .pe-btn {
@@ -212,6 +247,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     cursor: pointer; transition: background .15s, border-color .15s; white-space: nowrap;
     text-decoration: none; font-family: var(--pe-sans);
+    touch-action: manipulation;
 }
 .pe-btn:hover { background: #212a3d; border-color: var(--pe-border-strong); }
 .pe-btn:active { transform: translateY(1px); }
@@ -232,6 +268,7 @@
     grid-template-columns: 1fr 340px;
     grid-template-rows: 1fr 220px;
     min-height: 0;
+    position: relative;
 }
 .pe-canvas-area   { grid-column: 1; grid-row: 1; position: relative; overflow: hidden; background: var(--pe-bg); }
 .pe-bottom-panel  { grid-column: 1; grid-row: 2; background: var(--pe-panel); border-top: 1px solid var(--pe-border); display: flex; flex-direction: column; min-height: 0; }
@@ -243,6 +280,7 @@
     background-color: var(--pe-bg);
     background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1px);
     overflow: hidden;
+    touch-action: none;
 }
 .pe-canvas-bg.panning { cursor: grabbing; }
 .pe-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
@@ -256,11 +294,12 @@
     border-radius: 12px; padding: 10px 12px 8px;
     cursor: grab; user-select: none; box-sizing: border-box;
     transition: border-color .12s, box-shadow .12s;
+    touch-action: none;
 }
 .pe-node:hover { border-color: var(--pe-border-strong); box-shadow: 0 0 0 3px rgba(91,141,239,.15); }
 .pe-node.selected { border-color: var(--pe-accent); box-shadow: 0 0 0 3px rgba(91,141,239,.25); }
 .pe-n-del { position: absolute; top: 5px; right: 6px; font-size: 10px; color: var(--pe-text-dim); cursor: pointer; padding: 2px 4px; border-radius: 4px; opacity: 0; transition: opacity .15s; }
-.pe-node:hover .pe-n-del { opacity: 1; }
+.pe-node:hover .pe-n-del, .pe-node.selected .pe-n-del { opacity: 1; }
 .pe-n-del:hover { background: rgba(239,90,111,.15); color: var(--pe-danger); }
 .pe-n-top { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 5px; }
 .pe-n-icon { width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
@@ -341,9 +380,10 @@ body.pe-connecting .pe-canvas-bg { cursor: crosshair; }
 .pe-t { color: var(--pe-text-dim); flex-shrink: 0; font-family: var(--pe-mono); }
 
 /* ─ Properties sidebar ─────────────────────────────────────── */
-.pe-prop-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--pe-border); flex-shrink: 0; }
+.pe-prop-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--pe-border); flex-shrink: 0; display: flex; align-items: flex-start; gap: 8px; }
+.pe-prop-head-text { flex: 1; min-width: 0; }
 .pe-prop-head h2 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--pe-text-lo); font-weight: 700; }
-.pe-prop-sub { font-size: 13px; color: var(--pe-text-hi); font-weight: 600; line-height: 1.35; }
+.pe-prop-sub { font-size: 13px; color: var(--pe-text-hi); font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .pe-prop-body { flex: 1; overflow-y: auto; padding: 14px 16px 18px; }
 .pe-prop-empty { color: var(--pe-text-lo); font-size: 12.5px; padding: 16px 0; line-height: 1.5; }
 .pe-prop-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--pe-text-lo); font-weight: 700; margin: 16px 0 10px; }
@@ -425,4 +465,101 @@ body.pe-connecting .pe-canvas-bg { cursor: crosshair; }
 /* ─ Scrollbars ──────────────────────────────────────────────── */
 .pe-prop-body::-webkit-scrollbar,.pe-bp-pane::-webkit-scrollbar { width: 6px; }
 .pe-prop-body::-webkit-scrollbar-thumb,.pe-bp-pane::-webkit-scrollbar-thumb { background: var(--pe-panel3); border-radius: 6px; }
+
+.pe-scrim {
+    display: none;
+    position: absolute; inset: 0; z-index: 24;
+    background: rgba(0,0,0,.5);
+}
+
+/* ─ Responsive: tablet / phone ─────────────────────────────────────── */
+@media (max-width: 1099.98px) {
+    .pe-narrow-only { display: inline-flex !important; }
+    .pe-panel-close { display: inline-flex; }
+    .pe-content {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+    }
+    .pe-canvas-area { grid-column: 1; grid-row: 1; }
+    .pe-sidebar-right,
+    .pe-bottom-panel {
+        position: absolute;
+        z-index: 30;
+        left: auto; right: 0; top: 0; bottom: 0;
+        width: min(360px, 100%);
+        max-width: 100%;
+        grid-column: auto; grid-row: auto;
+        transform: translateX(105%);
+        transition: transform .2s ease;
+        box-shadow: -12px 0 32px rgba(0,0,0,.4);
+        border-left: 1px solid var(--pe-border);
+    }
+    .pe-bottom-panel {
+        top: auto;
+        left: 0; right: 0;
+        width: 100%;
+        height: min(48vh, 360px);
+        transform: translateY(110%);
+        box-shadow: 0 -12px 32px rgba(0,0,0,.4);
+        border-left: none;
+        border-top: 1px solid var(--pe-border);
+        border-radius: 16px 16px 0 0;
+    }
+    .pe-shell.pe-props-open .pe-sidebar-right { transform: none; }
+    .pe-shell.pe-bottom-open .pe-bottom-panel { transform: none; }
+    .pe-shell.pe-props-open .pe-scrim,
+    .pe-shell.pe-bottom-open .pe-scrim { display: block; }
+    .pe-canvas-hint { display: none; }
+}
+
+@media (max-width: 767.98px) {
+    .pe-btn-text { display: none; }
+    .pe-sep-lg { display: none; }
+    .pe-zoom-indicator { display: none; }
+    .pe-toolbar { padding: 6px 8px; gap: 6px; }
+    .pe-procname { flex: 1 1 110px; width: auto; }
+    .pe-btn { padding: 6px 8px; }
+    .pe-sidebar-right {
+        top: auto; left: 0; right: 0; bottom: 0;
+        width: 100%;
+        height: min(78dvh, 640px);
+        transform: translateY(110%);
+        border-left: none;
+        border-top: 1px solid var(--pe-border);
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -12px 32px rgba(0,0,0,.45);
+    }
+    .pe-shell.pe-props-open .pe-sidebar-right { transform: none; }
+    .pe-bottom-panel { height: min(56dvh, 420px); }
+    .pe-palette {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        bottom: 8px; left: 8px; right: 92px;
+        max-width: none;
+        padding: 6px;
+        gap: 2px;
+    }
+    .pe-p-label { display: none; }
+    .pe-palette-item {
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 8px;
+        font-size: 9.5px;
+        flex-shrink: 0;
+        min-width: 52px;
+        text-align: center;
+    }
+    .pe-zoom-controls { bottom: 8px; right: 8px; }
+    .pe-row2 { grid-template-columns: 1fr; }
+    .pe-import-dialog { max-height: calc(100dvh - 16px); border-radius: 14px; }
+    .pe-import-format pre { max-height: 110px; }
+    .pe-field--import textarea { min-height: 120px; }
+    .pe-import-foot { flex-wrap: wrap; }
+    .pe-import-foot .pe-btn { flex: 1; justify-content: center; }
+    .pe-toast-wrap { left: 12px; right: 12px; bottom: 12px; }
+    .pe-n-del { opacity: 1; }
+}
 </style>

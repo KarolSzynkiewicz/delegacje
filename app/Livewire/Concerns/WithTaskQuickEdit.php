@@ -17,13 +17,15 @@ trait WithTaskQuickEdit
 
     public string $qeDueDate = '';
 
+    public string $qePriority = '';
+
     public string $qeAssignedTo = '';
 
     public string $qeSprintId = '';
 
     public ?string $quickEditFlash = null;
 
-    /** category|due_date|assigned_to|sprint_id */
+    /** category|due_date|priority|assigned_to|sprint_id */
     public string $quickEditField = 'category';
 
     public ?float $quickEditClientX = null;
@@ -44,7 +46,7 @@ trait WithTaskQuickEdit
     {
         $this->quickEditFlash = null;
 
-        if (! in_array($field, ['category', 'due_date', 'assigned_to', 'sprint_id'], true)) {
+        if (! in_array($field, ['category', 'due_date', 'priority', 'assigned_to', 'sprint_id'], true)) {
             $field = 'category';
         }
 
@@ -60,6 +62,7 @@ trait WithTaskQuickEdit
         $this->quickEditTaskId = $task->id;
         $this->qeCategory = (string) ($task->category ?? '');
         $this->qeDueDate = $task->due_date ? $task->due_date->format('Y-m-d') : '';
+        $this->qePriority = $task->priority ? (string) $task->priority : '';
         $this->qeAssignedTo = $task->assigned_to ? (string) $task->assigned_to : '';
         $this->qeSprintId = $task->sprint_id ? (string) $task->sprint_id : '';
     }
@@ -69,6 +72,7 @@ trait WithTaskQuickEdit
         $this->quickEditTaskId = null;
         $this->qeCategory = '';
         $this->qeDueDate = '';
+        $this->qePriority = '';
         $this->qeAssignedTo = '';
         $this->qeSprintId = '';
         $this->quickEditField = 'category';
@@ -87,13 +91,14 @@ trait WithTaskQuickEdit
             abort(403);
         }
 
-        if (! in_array($this->quickEditField, ['category', 'due_date', 'assigned_to', 'sprint_id'], true)) {
+        if (! in_array($this->quickEditField, ['category', 'due_date', 'priority', 'assigned_to', 'sprint_id'], true)) {
             $this->quickEditField = 'category';
         }
 
         match ($this->quickEditField) {
             'category' => $this->saveQuickEditCategory($task),
             'due_date' => $this->saveQuickEditDueDate($task),
+            'priority' => $this->saveQuickEditPriority($task),
             'assigned_to' => $this->saveQuickEditAssignedTo($task),
             'sprint_id' => $this->saveQuickEditSprint($task),
         };
@@ -137,6 +142,18 @@ trait WithTaskQuickEdit
 
         $task->update([
             'due_date' => $this->qeDueDate === '' ? null : $this->qeDueDate,
+        ]);
+    }
+
+    protected function saveQuickEditPriority(ProjectTask $task): void
+    {
+        Validator::make(
+            ['qePriority' => $this->qePriority === '' ? null : $this->qePriority],
+            ['qePriority' => ['nullable', 'integer', 'in:1,2,3,4,5']],
+        )->validate();
+
+        $task->update([
+            'priority' => $this->qePriority === '' ? null : (int) $this->qePriority,
         ]);
     }
 

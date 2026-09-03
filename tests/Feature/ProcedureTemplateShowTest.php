@@ -84,7 +84,9 @@ class ProcedureTemplateShowTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('procedure-templates.editor', $template))
             ->assertOk()
-            ->assertSee(route('procedure-templates.show', $template), false);
+            ->assertSee(route('procedure-templates.show', $template), false)
+            ->assertSee('btnToggleProps', false)
+            ->assertSee('pe-narrow-only', false);
     }
 
     public function test_weekly_overview_period_nav_renders(): void

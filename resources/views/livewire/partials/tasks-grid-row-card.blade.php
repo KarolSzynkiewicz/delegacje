@@ -226,16 +226,28 @@
                     <input type="text" wire:model="editingValue" class="form-control form-control-sm"
                            wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                            x-data x-init="$el.focus(); $el.select()">
-                @elseif($this->rowWritable($task, 'category'))
-                    <span wire:click.stop="startEdit({{ $task->id }}, 'category')" class="tg-hover-edit">
+                @elseif($this->rowWritable($task, 'category') || $task->category)
+                    <div class="tg-facet tg-dt-hit">
                         @if($task->category)
-                            <x-ui.badge variant="info">{{ $task->category }}</x-ui.badge>
+                            <button type="button"
+                                    class="tg-facet__value"
+                                    wire:click.stop="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
+                                    title="Zawęź listę do tej kategorii">
+                                <x-ui.badge variant="info">{{ $task->category }}</x-ui.badge>
+                            </button>
                         @else
                             <span class="text-muted">—</span>
                         @endif
-                    </span>
-                @elseif($task->category)
-                    <x-ui.badge variant="info">{{ $task->category }}</x-ui.badge>
+                        @if($this->rowWritable($task, 'category'))
+                            <button type="button"
+                                    class="tg-facet__edit"
+                                    wire:click.stop="startEdit({{ $task->id }}, 'category')"
+                                    title="Edytuj kategorię"
+                                    aria-label="Edytuj kategorię">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        @endif
+                    </div>
                 @else
                     <span class="text-muted">—</span>
                 @endif
@@ -306,16 +318,31 @@
                         <option value="4">4 – Wysoki</option>
                         <option value="5">5 – Krytyczny</option>
                     </select>
-                @elseif($this->rowWritable($task, 'priority'))
-                    <span wire:click.stop="startEdit({{ $task->id }}, 'priority')"
-                          class="tg-hover-edit tg-mono"
-                          style="font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.35)' }}">
-                        {{ $pc ? $pc['label'] : '—' }}
-                    </span>
+                @elseif($this->rowWritable($task, 'priority') || $pc)
+                    <div class="tg-facet tg-dt-hit">
+                        @if($pc)
+                            <button type="button"
+                                    class="tg-facet__value tg-mono"
+                                    wire:click.stop="filterByPriority('{{ $task->priority }}')"
+                                    title="Zawęź listę do tego priorytetu"
+                                    style="font-weight:600; color:{{ $pc['color'] }}">
+                                {{ $pc['label'] }}
+                            </button>
+                        @else
+                            <span class="tg-mono" style="color:rgba(255,255,255,0.35)">—</span>
+                        @endif
+                        @if($this->rowWritable($task, 'priority'))
+                            <button type="button"
+                                    class="tg-facet__edit"
+                                    wire:click.stop="startEdit({{ $task->id }}, 'priority')"
+                                    title="Edytuj priorytet"
+                                    aria-label="Edytuj priorytet">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        @endif
+                    </div>
                 @else
-                    <span class="tg-mono" style="font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.35)' }}">
-                        {{ $pc ? $pc['label'] : '—' }}
-                    </span>
+                    <span class="tg-mono" style="color:rgba(255,255,255,0.35)">—</span>
                 @endif
             </span>
         </div>
@@ -334,16 +361,31 @@
                     <input type="date" wire:model="editingValue" class="form-control form-control-sm"
                            wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                            x-data x-init="$el.focus()">
-                @elseif($this->rowWritable($task, 'due_date'))
-                    <span wire:click.stop="startEdit({{ $task->id }}, 'due_date')"
-                          class="tg-hover-edit tg-mono"
-                          style="{{ $dueStyle }}">
-                        {{ $task->due_date ? $task->due_date->format('d.m.Y') : '—' }}
-                    </span>
+                @elseif($this->rowWritable($task, 'due_date') || $task->due_date)
+                    <div class="tg-facet tg-dt-hit">
+                        @if($task->due_date)
+                            <button type="button"
+                                    class="tg-facet__value tg-mono"
+                                    wire:click.stop="filterByDueDate('{{ $task->due_date->format('Y-m-d') }}')"
+                                    title="Zawęź listę do tego dnia"
+                                    style="{{ $dueStyle }}">
+                                {{ $task->due_date->format('d.m.Y') }}
+                            </button>
+                        @else
+                            <span class="tg-mono" style="{{ $dueStyle }}">—</span>
+                        @endif
+                        @if($this->rowWritable($task, 'due_date'))
+                            <button type="button"
+                                    class="tg-facet__edit"
+                                    wire:click.stop="startEdit({{ $task->id }}, 'due_date')"
+                                    title="Edytuj termin"
+                                    aria-label="Edytuj termin">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        @endif
+                    </div>
                 @else
-                    <span class="tg-mono" style="{{ $dueStyle }}">
-                        {{ $task->due_date ? $task->due_date->format('d.m.Y') : '—' }}
-                    </span>
+                    <span class="tg-mono" style="{{ $dueStyle }}">—</span>
                 @endif
             </span>
         </div>

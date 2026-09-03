@@ -78,6 +78,61 @@
     .xuiv2-tasks .rp-active-filters { gap: .4rem .55rem; padding: .3rem 0 .2rem; }
     .xuiv2-tasks .rp-active-filters__chip { padding: .3rem .65rem; font-size: .78rem; }
     .xuiv2-tasks .rp-active-filters__clear { padding: .3rem .5rem; font-size: .78rem; }
+    .tg-active-filters__chips { display: contents; }
+
+    .tg-facet {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        min-width: 0;
+        max-width: 100%;
+    }
+    .tg-facet__value {
+        appearance: none;
+        background: none;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        min-width: 0;
+        max-width: 100%;
+        border-radius: 4px;
+    }
+    .tg-facet__value:hover {
+        outline: 1px dashed rgba(168, 85, 247, 0.45);
+    }
+    .tg-facet__edit {
+        appearance: none;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.35rem;
+        height: 1.35rem;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-muted, #94a3b8);
+        font-size: 0.72rem;
+        opacity: 0.45;
+        cursor: pointer;
+    }
+    .tg-facet:hover .tg-facet__edit,
+    .tg-facet__edit:focus-visible {
+        opacity: 1;
+        color: var(--text-main, #f1f5f9);
+        background: rgba(168, 85, 247, 0.16);
+    }
+    .tg-dt-card .tg-facet {
+        width: 100%;
+        justify-content: space-between;
+        position: relative;
+        z-index: 3;
+    }
 
     /* Panel „Filtry” (teleportowany do body — scoped przez klasę, nie DOM ancestry) */
     .tg-filter-panel-teal button.rp-filter-chip.is-active {
@@ -486,8 +541,46 @@
         }
         .tg-toolbar__view-icon { display: none !important; }
         .tg-toolbar .btn { padding: 4px 8px !important; font-size: 0.72rem !important; }
-        .tg-active-filters { display: none !important; }
         .tg-group-badge { display: none !important; }
+
+        .tg-active-filters {
+            display: flex !important;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.4rem;
+        }
+        .tg-active-filters__chips {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            width: 100%;
+        }
+        .tg-active-filters .rp-active-filters__chip {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 10px;
+            padding: 0.45rem 0.7rem;
+        }
+        .tg-active-filters .rp-active-filters__chip-text {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .tg-active-filters .rp-active-filters__chip-remove {
+            width: 1.35rem;
+            height: 1.35rem;
+            margin: 0;
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+        .tg-active-filters .rp-active-filters__clear {
+            align-self: flex-end;
+        }
+        @media (hover: none) {
+            .tg-facet__edit { opacity: 0.8; }
+        }
     }
 
     /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
@@ -856,17 +949,19 @@
 @if(count($this->activeFilterChips()) > 0)
     <div class="rp-active-filters tg-active-filters mb-2 px-1">
         <span class="rp-active-filters__label">Filtry:</span>
-        @foreach($this->activeFilterChips() as $chip)
-            <span class="rp-active-filters__chip">
-                {{ $chip['label'] }}
-                <button type="button"
-                        wire:click="clearFilter('{{ $chip['key'] }}')"
-                        class="rp-active-filters__chip-remove"
-                        title="Usuń filtr">
-                    <i class="bi bi-x"></i>
-                </button>
-            </span>
-        @endforeach
+        <div class="tg-active-filters__chips">
+            @foreach($this->activeFilterChips() as $chip)
+                <span class="rp-active-filters__chip">
+                    <span class="rp-active-filters__chip-text">{{ $chip['label'] }}</span>
+                    <button type="button"
+                            wire:click="clearFilter('{{ $chip['key'] }}')"
+                            class="rp-active-filters__chip-remove"
+                            title="Usuń filtr">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </span>
+            @endforeach
+        </div>
         <button type="button" wire:click="clearFilters" class="rp-active-filters__clear">Wyczyść</button>
     </div>
 @endif

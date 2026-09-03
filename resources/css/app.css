@@ -10590,3 +10590,148 @@ body:has(.xuiv2-tasks.is-edi-review) .ui-page-header__right {
 body:has(.xuiv2-tasks.is-edi-review) .ui-page-header:not(.ui-page-header--has-left) .ui-page-header__menu-btn {
     display: none !important;
 }
+
+/* ── Dashboard snapy (showcase dummy data) ─────────────────────────── */
+.dash-bots__head { margin-bottom: 1.25rem; }
+.dash-bots__kicker {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+.dash-bots__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.dash-bot {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1.25rem 1.35rem;
+}
+.dash-bot__figure { margin-bottom: 0.25rem; }
+.dash-bot__role {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.dash-bot h3 { font-size: 1.15rem; font-weight: 600; margin: 0; }
+.dash-bot p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.55; margin: 0.35rem 0 0; }
+@media (max-width: 767.98px) {
+    .dash-bots__grid { grid-template-columns: 1fr; }
+}
+
+.dash-snap-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.55rem;
+}
+.dash-snap-toc a {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 0.28rem 0.65rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+}
+.dash-snap-toc a:hover {
+    color: var(--text-main);
+    border-color: rgba(168, 85, 247, 0.35);
+}
+
+.dash-snaps { margin-bottom: 2.5rem; }
+.dash-snap__head { margin-bottom: 1rem; }
+.dash-snap__kicker {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+.dash-snap__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+}
+.dash-snap__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+}
+.dash-snap__live {
+    margin-left: auto;
+    color: var(--text-muted);
+    text-decoration: none;
+}
+.dash-snap__live:hover { color: var(--text-main); }
+.dash-snap__caption { font-size: 0.92rem; line-height: 1.55; max-width: 62rem; }
+.dash-snap__note {
+    margin-top: 0.55rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    padding: 0.55rem 0.75rem;
+    border-left: 2px solid var(--accent);
+    background: rgba(168, 85, 247, 0.08);
+    border-radius: 0 10px 10px 0;
+}
+.dash-snap__stage {
+    max-height: 32rem;
+    overflow: auto;
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 1rem 1rem 1.15rem;
+    background: rgba(13, 18, 30, 0.28);
+}
+.dash-snap__stage--tall { max-height: 44rem; }
+.dash-snap:not(.dash-snap--interactive) .dash-snap__stage a,
+.dash-snap:not(.dash-snap--interactive) .dash-snap__stage button {
+    pointer-events: none;
+}
+.dash-snap--interactive .weekly-summary-popover-panel a {
+    pointer-events: none;
+}
+.dash-snap .time-logs-monthly-grid-root {
+    padding-left: 0;
+    padding-right: 0;
+}
+.dash-snap .eq-stock-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.85rem;
+    padding: 0;
+}
+.dash-charts { min-height: 220px; }
+.pdb-stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.pdb-stat-label { font-size: .72rem; opacity: .65; text-transform: uppercase; letter-spacing: .04em; }
+.pdb-kpi-card {
+    text-align: center;
+    padding: 1rem .75rem;
+    background: rgba(255,255,255,.03);
+    border-radius: .6rem;
+    height: 100%;
+    border: 1px solid rgba(255,255,255,.08);
+}
+.payroll-doc-card .payroll-doc-table thead th {
+    background: rgba(15, 23, 42, 0.55) !important;
+    color: var(--text-main) !important;
+    border-color: var(--glass-border) !important;
+    font-weight: 600;
+}
+.payroll-doc-card .payroll-doc-table tfoot th {
+    background: rgba(15, 23, 42, 0.72) !important;
+    color: var(--text-main) !important;
+    border-color: var(--glass-border) !important;
+}
+.payroll-doc-card .payroll-doc-table.table-bordered > :not(caption) > * > * {
+    border-color: var(--glass-border) !important;
+}

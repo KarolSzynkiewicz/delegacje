@@ -16,7 +16,7 @@
             go(href) { if (href) window.location.href = href; },
             start(e) {
                 const el = e.target;
-                if (el && el.closest && el.closest('input, textarea, select, button, a, [contenteditable=true]')) {
+                if (el && el.closest && el.closest('input, textarea, select, button, a, [contenteditable=true], .pe-shell')) {
                     this.x0 = null;
                     return;
                 }

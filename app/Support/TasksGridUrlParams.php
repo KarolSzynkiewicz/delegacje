@@ -10,6 +10,8 @@ class TasksGridUrlParams
         'searchTask',
         'searchCategory',
         'searchAssignedTo',
+        'priority',
+        'due',
         'status',
         'assignedFilter',
         'createdByFilter',
@@ -93,5 +95,16 @@ class TasksGridUrlParams
     public static function fromRequestQuery(array $requestQuery): array
     {
         return self::normalize(array_intersect_key($requestQuery, array_flip(self::KEYS)));
+    }
+
+    /**
+     * Link do /tasks2 z podanymi filtrami. Statusu nie przekazujemy —
+     * siatka zostaje przy domyślnym „Aktywne”.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    public static function gridUrl(array $params = []): string
+    {
+        return route('tasks.grid', self::normalize($params));
     }
 }

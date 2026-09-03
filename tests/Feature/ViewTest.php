@@ -2,20 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Accommodation;
+use App\Models\AccommodationAssignment;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
-use App\Models\Document;
 use App\Models\Project;
 use App\Models\Role;
+use App\Models\Rotation;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\Accommodation;
-use App\Models\Location;
-use App\Models\ProjectAssignment;
-use App\Models\ProjectDemand;
-use App\Models\Rotation;
 use App\Models\VehicleAssignment;
-use App\Models\AccommodationAssignment;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -26,13 +23,13 @@ class ViewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Run seeders to set up roles
         // Note: Permissions are now generated dynamically from routes, no PermissionSeeder needed
         $this->artisan('db:seed', ['--class' => 'UserRoleSeeder']);
-        
+
         $this->user = User::factory()->create();
-        
+
         // Assign administrator role to user for tests
         $adminRole = \Spatie\Permission\Models\Role::where('name', 'administrator')->first();
         if ($adminRole) {
@@ -230,5 +227,15 @@ class ViewTest extends TestCase
         $response->assertSee('Argus');
         $response->assertSee('Impek');
         $response->assertSee('Edi');
+        $response->assertSee('Przegląd tygodniowy');
+        $response->assertSee('Widok miesięczny');
+        $response->assertSee('Wygeneruj dla wszystkich');
+        $response->assertSee('LISTA PŁAC');
+        $response->assertSee('Stan na');
+        $response->assertSee('Dashboard finansowy');
+        $response->assertSee('Magazyny i asortyment');
+        $response->assertSee('Kandydaci i proces');
+        $response->assertSee('Zadania i sprint');
+        $response->assertSee('Sprint 14');
     }
 }

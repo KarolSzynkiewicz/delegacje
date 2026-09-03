@@ -1,10 +1,11 @@
 @php
     use App\Enums\RecruitmentCandidateFlag;
 
+    $readonly = $readonly ?? false;
     $candHasActive = $cand->processes->contains(fn ($p) => $selectedId === $p->id);
     $isPinned = $isPinned ?? false;
 @endphp
-<div class="rp-cand-group {{ $candHasActive ? 'rp-cand-group--active' : '' }}" wire:key="lc-{{ $cand->id }}">
+<div class="rp-cand-group {{ $candHasActive ? 'rp-cand-group--active' : '' }}" @unless($readonly) wire:key="lc-{{ $cand->id }}" @endunless>
     <div class="rp-cand-group__head">
         <div class="position-relative flex-shrink-0">
             <x-ui.avatar :image-url="$cand->photo_url" :initials="mb_strtoupper(mb_substr($cand->first_name,0,1).mb_substr($cand->last_name,0,1))" size="28px" shape="rounded" :border="false" />
@@ -27,17 +28,29 @@
     </div>
     @foreach($cand->processes as $proc)
         @php
-            $matchesFilter = ! $status || $proc->status?->value === $status;
+            $matchesFilter = ! ($status ?? null) || $proc->status?->value === $status;
             $variant = $proc->status?->variant() ?? 'secondary';
         @endphp
-        <button type="button"
-                wire:click="selectProcess({{ $proc->id }})"
-                wire:key="li-{{ $proc->id }}"
-                class="rp-cand-proc {{ $selectedId===$proc->id ? 'rp-cand-proc--active' : '' }} {{ $matchesFilter ? '' : 'rp-cand-proc--muted' }}">
-            <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
-            <span class="rp-cand-proc__status is-{{ $variant }}">
-                <span class="rp-status-dot"></span>{{ $proc->status?->label() ?? '—' }}
-            </span>
-        </button>
+        @php
+            $procClass = 'rp-cand-proc '.($selectedId===$proc->id ? 'rp-cand-proc--active' : '').' '.($matchesFilter ? '' : 'rp-cand-proc--muted');
+        @endphp
+        @if($readonly)
+            <div class="{{ $procClass }}">
+                <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
+                <span class="rp-cand-proc__status is-{{ $variant }}">
+                    <span class="rp-status-dot"></span>{{ $proc->status?->label() ?? '—' }}
+                </span>
+            </div>
+        @else
+            <button type="button"
+                    wire:click="selectProcess({{ $proc->id }})"
+                    wire:key="li-{{ $proc->id }}"
+                    class="{{ $procClass }}">
+                <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
+                <span class="rp-cand-proc__status is-{{ $variant }}">
+                    <span class="rp-status-dot"></span>{{ $proc->status?->label() ?? '—' }}
+                </span>
+            </button>
+        @endif
     @endforeach
 </div>

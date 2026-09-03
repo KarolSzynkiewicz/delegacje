@@ -266,4 +266,61 @@ class TasksGridFilterTransparencyTest extends TestCase
             ->assertDontSee('Neq aktywne')
             ->assertSee('Neq zamknięte');
     }
+
+    public function test_clicking_category_priority_and_due_date_adds_chips_without_dropping_active_status(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Transport A',
+            'status' => TaskStatus::PENDING,
+            'category' => 'Transport',
+            'priority' => 4,
+            'due_date' => '2026-09-03',
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'HR B',
+            'status' => TaskStatus::PENDING,
+            'category' => 'HR',
+            'priority' => 2,
+            'due_date' => '2026-09-10',
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Transport zamknięty',
+            'status' => TaskStatus::COMPLETED,
+            'category' => 'Transport',
+            'priority' => 4,
+            'due_date' => '2026-09-03',
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $component = Livewire::actingAs($this->user)->test(TasksGrid::class);
+
+        $component->assertSee('tg-facet', false)
+            ->assertSee('tg-facet tg-dt-hit', false)
+            ->assertSee('tg-active-filters__chips', false)
+            ->call('filterByCategory', 'Transport')
+            ->assertSee('Kategoria: Transport')
+            ->assertSee('Status: Aktywne')
+            ->assertSee('Transport A')
+            ->assertDontSee('HR B')
+            ->assertDontSee('Transport zamknięty')
+            ->call('filterByPriority', '4')
+            ->assertSee('Priorytet: Wysoki')
+            ->assertSee('Transport A')
+            ->call('filterByDueDate', '2026-09-03')
+            ->assertSee('Termin: 03.09.2026')
+            ->assertSee('Transport A')
+            ->call('clearFilter', 'filterDueDate')
+            ->assertDontSee('Termin: 03.09.2026')
+            ->assertSee('Kategoria: Transport')
+            ->call('clearFilters')
+            ->assertDontSee('Kategoria: Transport')
+            ->assertDontSee('Priorytet: Wysoki');
+    }
 }

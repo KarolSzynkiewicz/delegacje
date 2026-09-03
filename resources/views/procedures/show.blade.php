@@ -56,7 +56,7 @@
                 @else
                     <div class="d-flex flex-column gap-2">
                         @foreach($steps as $i => $node)
-                            <div class="d-flex align-items-center gap-3 p-2 rounded-3" style="background: rgba(255,255,255,.03); border: 1px solid var(--glass-border);">
+                            <div class="d-flex align-items-center gap-3 p-2 rounded-3 min-w-0" style="background: rgba(255,255,255,.03); border: 1px solid var(--glass-border);">
                                 <div class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0 font-mono small fw-semibold"
                                      style="width:28px; height:28px; background: color-mix(in srgb, {{ $node['color'] ?? 'var(--accent)' }} 22%, transparent); color: {{ $node['color'] ?? 'var(--accent)' }};">
                                     {{ $i + 1 }}

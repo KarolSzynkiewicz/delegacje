@@ -12,8 +12,8 @@
 <div>
     <x-ui.card>
         @unless($compact)
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                <div>
+            <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
+                <div class="min-w-0">
                     <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                         <i class="bi bi-diagram-3 text-primary"></i>
                         <span class="fw-semibold">{{ $run->template->name ?? 'Procedura' }}</span>
@@ -37,7 +37,7 @@
                     </div>
                 </div>
                 @if(! $isDone)
-                    <button class="btn btn-sm btn-outline-danger"
+                    <button class="btn btn-sm btn-outline-danger flex-shrink-0"
                             wire:click="abandon"
                             wire:confirm="Porzucić procedurę? Zadanie zostanie anulowane."
                             title="Porzuć procedurę">
@@ -181,13 +181,13 @@
             </div>
 
             @if(! $isDone)
-                <div class="d-flex gap-2 justify-content-between">
-                    <button class="btn btn-outline-secondary btn-sm"
+                <div class="d-flex gap-2 justify-content-between flex-wrap">
+                    <button class="btn btn-outline-secondary btn-sm flex-grow-1 flex-sm-grow-0"
                             wire:click="goBack"
                             {{ count($run->path ?? []) <= 1 ? 'disabled' : '' }}>
                         <i class="bi bi-arrow-left me-1"></i> Wstecz
                     </button>
-                    <button class="btn btn-primary btn-sm" wire:click="advance">
+                    <button class="btn btn-primary btn-sm flex-grow-1 flex-sm-grow-0" wire:click="advance">
                         @if($nodeType === 'end')
                             <i class="bi bi-check2 me-1"></i> Zakończ procedurę
                         @elseif($nodeType === 'decision')
@@ -211,14 +211,14 @@
             </div>
             <div class="d-flex flex-column gap-1">
                 @foreach($run->steps->whereNotNull('completed_at') as $step)
-                    <div class="d-flex align-items-center gap-2 small py-1 border-bottom"
+                    <div class="d-flex align-items-start gap-2 small py-1 border-bottom flex-wrap"
                          style="border-color: var(--glass-border) !important;">
-                        <i class="bi bi-check-circle-fill text-success flex-shrink-0"></i>
-                        <span class="fw-semibold">{{ $step->node_name }}</span>
+                        <i class="bi bi-check-circle-fill text-success flex-shrink-0 mt-1"></i>
+                        <span class="fw-semibold min-w-0 text-break">{{ $step->node_name }}</span>
                         <span class="badge bg-secondary bg-opacity-25 text-muted" style="font-size:.65rem;">
                             {{ \App\Models\ProcedureRun::nodeTypeLabel($step->node_type) }}
                         </span>
-                        <span class="ms-auto text-muted">
+                        <span class="ms-sm-auto text-muted">
                             {{ $step->performed_by ? \App\Models\User::find($step->performed_by)?->name : '—' }}
                             · {{ $step->completed_at->format('d.m H:i') }}
                         </span>

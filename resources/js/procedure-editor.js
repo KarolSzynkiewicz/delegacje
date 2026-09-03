@@ -59,6 +59,49 @@ function toast(msg, variant){
 function markDirty(){ state.dirty = true; document.getElementById('dirtyDot').classList.add('show'); }
 function clearDirty(){ state.dirty = false; document.getElementById('dirtyDot').classList.remove('show'); }
 
+const NARROW_MQ = window.matchMedia('(max-width: 1099.98px)');
+function isNarrow(){ return NARROW_MQ.matches; }
+function peShell(){ return document.getElementById('peShell'); }
+function syncShellHeight(){
+  const shell = peShell(); if(!shell) return;
+  const nav = document.querySelector('nav.navbar');
+  const navH = nav ? Math.round(nav.getBoundingClientRect().height) : 88;
+  shell.style.height = `calc(100dvh - ${navH}px)`;
+}
+function setScrim(open){
+  const scrim = document.getElementById('peScrim');
+  if(!scrim) return;
+  if(open && isNarrow()) scrim.removeAttribute('hidden');
+  else scrim.setAttribute('hidden','');
+}
+function closeNarrowPanels(){
+  const shell = peShell(); if(!shell) return;
+  shell.classList.remove('pe-props-open','pe-bottom-open');
+  setScrim(false);
+}
+function openPropsPanel(){
+  const shell = peShell(); if(!shell || !isNarrow()) return;
+  shell.classList.remove('pe-bottom-open');
+  shell.classList.add('pe-props-open');
+  setScrim(true);
+}
+function togglePropsPanel(){
+  const shell = peShell(); if(!shell) return;
+  if(shell.classList.contains('pe-props-open')) closeNarrowPanels();
+  else openPropsPanel();
+}
+function openBottomPanel(){
+  const shell = peShell(); if(!shell || !isNarrow()) return;
+  shell.classList.remove('pe-props-open');
+  shell.classList.add('pe-bottom-open');
+  setScrim(true);
+}
+function toggleBottomPanel(){
+  const shell = peShell(); if(!shell) return;
+  if(shell.classList.contains('pe-bottom-open')) closeNarrowPanels();
+  else openBottomPanel();
+}
+
 /* ── 4. MODEL FACTORIES ────────────────────────────────────────────── */
 function createNode(type, x, y){
   const def = NODE_TYPES[type];
@@ -162,7 +205,7 @@ async function saveToServer(){
 
   const btnSave = document.getElementById('btnSave');
   btnSave.disabled = true;
-  btnSave.textContent = '⏳ Zapisywanie…';
+  btnSave.innerHTML = '<i class="bi bi-hourglass-split"></i> <span class="pe-btn-text">Zapisywanie…</span>';
 
   try{
     const body = {
@@ -195,7 +238,7 @@ async function saveToServer(){
     plog('Błąd zapisu: ' + e.message, 'error');
   } finally {
     btnSave.disabled = false;
-    btnSave.textContent = '💾 Zapisz';
+    btnSave.innerHTML = '<i class="bi bi-save"></i> <span class="pe-btn-text">Zapisz</span>';
   }
 }
 
@@ -423,14 +466,17 @@ let canvasEdgeIndex = {};
 
 function renderPalette(){
   const pal = document.getElementById('palette');
-  pal.innerHTML = '<div class="pe-p-label">Przeciągnij węzeł</div>' + NODE_TYPE_ORDER.map(type => {
+  const allowDrag = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  pal.innerHTML = `<div class="pe-p-label">${allowDrag ? 'Przeciągnij węzeł' : 'Dodaj węzeł'}</div>` + NODE_TYPE_ORDER.map(type => {
     const d = NODE_TYPES[type];
-    return `<div class="pe-palette-item" draggable="true" data-type="${type}">
+    return `<div class="pe-palette-item" ${allowDrag ? 'draggable="true"' : ''} data-type="${type}">
       <span class="pe-pi-icon" style="background:${d.color}">${d.icon}</span>${d.label}
     </div>`;
   }).join('');
   pal.querySelectorAll('.pe-palette-item').forEach(el => {
-    el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/pe-node-type', el.dataset.type); e.dataTransfer.effectAllowed='copy'; });
+    if(allowDrag){
+      el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/pe-node-type', el.dataset.type); e.dataTransfer.effectAllowed='copy'; });
+    }
     el.addEventListener('click', () => {
       if(!state.currentProcess) return;
       const rect = document.getElementById('canvasBg').getBoundingClientRect();
@@ -479,10 +525,14 @@ function renderCanvas(){
       ${n.type!=='end'?`<div class="pe-port pe-port-out" data-portout="${n.id}"></div>`:''}
     `;
     nodesLayer.appendChild(div);
-    div.addEventListener('mousedown', e => { if(e.target.closest('.pe-n-del')||e.target.closest('.pe-port-out')) return; startNodeDrag(n.id, e); });
+    div.addEventListener('pointerdown', e => {
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      if(e.target.closest('.pe-n-del')||e.target.closest('.pe-port-out')) return;
+      startNodeDrag(n.id, e);
+    });
     div.addEventListener('dblclick', () => { selectNode(n.id); setTimeout(()=>{ const el=document.getElementById('propNameInput'); if(el){el.focus();el.select();} },30); });
-    div.querySelector('.pe-n-del')?.addEventListener('mousedown', e => { e.stopPropagation(); deleteNode(n.id); });
-    div.querySelector('.pe-port-out')?.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); startConnecting(n.id, e); });
+    div.querySelector('.pe-n-del')?.addEventListener('pointerdown', e => { e.stopPropagation(); deleteNode(n.id); });
+    div.querySelector('.pe-port-out')?.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); startConnecting(n.id, e); });
   });
 
   svg.innerHTML='<defs></defs>';
@@ -499,7 +549,7 @@ function renderCanvas(){
     let labelBg=null,labelText=null;
     if(e.label){ labelBg=document.createElementNS('http://www.w3.org/2000/svg','rect'); labelBg.setAttribute('class','pe-edge-label-bg'); labelBg.setAttribute('rx','8'); labelText=document.createElementNS('http://www.w3.org/2000/svg','text'); labelText.setAttribute('class','pe-edge-label-text'); labelText.textContent=e.label; grp.appendChild(labelBg); grp.appendChild(labelText); }
     svg.appendChild(grp);
-    hit.addEventListener('mousedown', ev=>{ ev.stopPropagation(); selectEdge(e.id); });
+    hit.addEventListener('pointerdown', ev=>{ ev.stopPropagation(); selectEdge(e.id); });
     (canvasEdgeIndex[e.from]=canvasEdgeIndex[e.from]||[]).push({edge:e,hit,line,arrow,labelBg,labelText});
     (canvasEdgeIndex[e.to]=canvasEdgeIndex[e.to]||[]).push({edge:e,hit,line,arrow,labelBg,labelText});
     updateEdgeGeometry(e,from,to,hit,line,arrow,labelBg,labelText);
@@ -552,17 +602,39 @@ function addNodeToCanvas(type,x,y){
 
 function startNodeDrag(nodeId,e){
   const n=state.currentProcess.nodes.find(x=>x.id===nodeId); if(!n) return;
-  selectNode(nodeId);
+  selectNode(nodeId, {openPanel: false});
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
   let moved=false;
+  const pointerId=e.pointerId;
   state.dragging={id:nodeId,startClientX:e.clientX,startClientY:e.clientY,origX:n.x,origY:n.y};
   const el=document.querySelector(`.pe-node[data-id="${nodeId}"]`);
   if(el) el.style.cursor='grabbing';
-  function onMove(ev){ if(!moved){pushUndo();moved=true;} const dx=(ev.clientX-state.dragging.startClientX)/state.viewport.scale, dy=(ev.clientY-state.dragging.startClientY)/state.viewport.scale; n.x=Math.round(state.dragging.origX+dx); n.y=Math.round(state.dragging.origY+dy); if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';} updateEdgesForNode(nodeId); }
-  function onUp(){ window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); state.dragging=null; if(el) el.style.cursor='grab'; if(moved){markDirty();renderBottomPanel();} }
-  window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+  function onMove(ev){
+    if(ev.pointerId!==pointerId) return;
+    if(!moved){pushUndo();moved=true;}
+    const dx=(ev.clientX-state.dragging.startClientX)/state.viewport.scale, dy=(ev.clientY-state.dragging.startClientY)/state.viewport.scale;
+    n.x=Math.round(state.dragging.origX+dx); n.y=Math.round(state.dragging.origY+dy);
+    if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';}
+    updateEdgesForNode(nodeId);
+  }
+  function onUp(ev){
+    if(ev.pointerId!==pointerId) return;
+    window.removeEventListener('pointermove',onMove);
+    window.removeEventListener('pointerup',onUp);
+    window.removeEventListener('pointercancel',onUp);
+    state.dragging=null;
+    if(el) el.style.cursor='grab';
+    if(moved){markDirty();renderBottomPanel();}
+    else if(isNarrow()) openPropsPanel();
+  }
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('pointerup',onUp);
+  window.addEventListener('pointercancel',onUp);
 }
 
 function startConnecting(fromId,e){
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
   const svg=document.getElementById('edgesSvg');
   const temp=document.createElementNS('http://www.w3.org/2000/svg','path'); temp.setAttribute('class','pe-temp-line'); svg.appendChild(temp);
   state.connecting={fromId,temp};
@@ -571,6 +643,7 @@ function startConnecting(fromId,e){
   portEl?.classList.add('connecting');
   document.body.classList.add('pe-connecting');
   const x1=fromNode.x+NODE_W/2, y1=fromNode.y+NODE_H;
+  const pointerId=e.pointerId;
   let hoveredNodeEl=null;
   function setHovered(el){
     if(hoveredNodeEl===el) return;
@@ -580,6 +653,7 @@ function startConnecting(fromId,e){
   }
   function toWorld(cx,cy){ const rect=document.getElementById('canvasBg').getBoundingClientRect(); return{x:(cx-rect.left-state.viewport.panX)/state.viewport.scale,y:(cy-rect.top-state.viewport.panY)/state.viewport.scale}; }
   function onMove(ev){
+    if(ev.pointerId!==pointerId) return;
     const w=toWorld(ev.clientX,ev.clientY); const dy=Math.max(40,Math.abs(w.y-y1)/2);
     temp.setAttribute('d',`M ${x1} ${y1} C ${x1} ${y1+dy}, ${w.x} ${w.y-dy}, ${w.x} ${w.y}`);
     const targetEl=document.elementFromPoint(ev.clientX,ev.clientY);
@@ -587,14 +661,19 @@ function startConnecting(fromId,e){
     setHovered(nodeEl && nodeEl.dataset.id!==fromId ? nodeEl : null);
   }
   function onUp(ev){
-    window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+    if(ev.pointerId!==pointerId) return;
+    window.removeEventListener('pointermove',onMove);
+    window.removeEventListener('pointerup',onUp);
+    window.removeEventListener('pointercancel',onUp);
     temp.remove(); portEl?.classList.remove('connecting'); document.body.classList.remove('pe-connecting');
     setHovered(null);
     const targetEl=document.elementFromPoint(ev.clientX,ev.clientY); const nodeEl=targetEl?.closest('.pe-node');
     if(nodeEl&&nodeEl.dataset.id&&nodeEl.dataset.id!==fromId) finalizeConnection(fromId,nodeEl.dataset.id);
     state.connecting=null;
   }
-  window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('pointerup',onUp);
+  window.addEventListener('pointercancel',onUp);
 }
 
 function finalizeConnection(fromId,toId){
@@ -609,9 +688,14 @@ function finalizeConnection(fromId,toId){
   plog(`Połączono "${fromNode.name}" → "${p.nodes.find(n=>n.id===toId)?.name}"`,'success');
 }
 
-function selectNode(id){ state.selection={type:'node',id}; renderCanvas(); renderProperties(); }
-function selectEdge(id){ state.selection={type:'edge',id}; renderCanvas(); renderProperties(); }
-function clearSelection(){ state.selection=null; renderCanvas(); renderProperties(); }
+function selectNode(id, opts){
+  state.selection={type:'node',id};
+  renderCanvas();
+  renderProperties();
+  if(isNarrow() && opts?.openPanel !== false) openPropsPanel();
+}
+function selectEdge(id){ state.selection={type:'edge',id}; renderCanvas(); renderProperties(); if(isNarrow()) openPropsPanel(); }
+function clearSelection(){ state.selection=null; renderCanvas(); renderProperties(); if(isNarrow()) closeNarrowPanels(); }
 
 function deleteNode(id){
   const p=state.currentProcess; const n=p.nodes.find(x=>x.id===id); if(!n) return;
@@ -640,14 +724,74 @@ function duplicateSelectedNode(){
 /* ── 11. PAN & ZOOM ────────────────────────────────────────────────── */
 function initCanvasPanZoom(){
   const bg=document.getElementById('canvasBg');
-  bg.addEventListener('mousedown',e=>{
-    if(e.target!==bg&&e.target.id!=='world') return;
-    clearSelection(); bg.classList.add('panning');
-    const start={x:e.clientX,y:e.clientY,panX:state.viewport.panX,panY:state.viewport.panY};
-    function onMove(ev){ state.viewport.panX=start.panX+(ev.clientX-start.x); state.viewport.panY=start.panY+(ev.clientY-start.y); applyViewportTransform(); }
-    function onUp(){ window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); bg.classList.remove('panning'); }
-    window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+  const pointers=new Map();
+  let pan=null;
+  let pinch=null;
+  function isCanvasTarget(t){
+    if(!t) return false;
+    if(t===bg || t.id==='world' || t.classList?.contains('pe-edges-svg')) return true;
+    return Boolean(t.closest?.('#world')) && !t.closest('.pe-node');
+  }
+  bg.addEventListener('pointerdown', e=>{
+    if(!isCanvasTarget(e.target)) return;
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    e.preventDefault();
+    try { bg.setPointerCapture(e.pointerId); } catch(_) {}
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===1){
+      clearSelection();
+      bg.classList.add('panning');
+      pan={x:e.clientX,y:e.clientY,panX:state.viewport.panX,panY:state.viewport.panY};
+      pinch=null;
+    } else if(pointers.size===2){
+      pan=null;
+      const pts=[...pointers.values()];
+      const dx=pts[1].x-pts[0].x, dy=pts[1].y-pts[0].y;
+      pinch={
+        dist: Math.hypot(dx,dy)||1,
+        scale: state.viewport.scale,
+        midX: (pts[0].x+pts[1].x)/2,
+        midY: (pts[0].y+pts[1].y)/2,
+        panX: state.viewport.panX,
+        panY: state.viewport.panY,
+      };
+    }
   });
+  bg.addEventListener('pointermove', e=>{
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pinch && pointers.size>=2){
+      const pts=[...pointers.values()];
+      const dx=pts[1].x-pts[0].x, dy=pts[1].y-pts[0].y;
+      const dist=Math.hypot(dx,dy)||1;
+      const factor=dist/pinch.dist;
+      const rect=bg.getBoundingClientRect();
+      const mx=pinch.midX-rect.left, my=pinch.midY-rect.top;
+      const worldX=(mx-pinch.panX)/pinch.scale, worldY=(my-pinch.panY)/pinch.scale;
+      const ns=clamp(pinch.scale*factor,0.3,2.2);
+      const midNowX=(pts[0].x+pts[1].x)/2, midNowY=(pts[0].y+pts[1].y)/2;
+      state.viewport.scale=ns;
+      state.viewport.panX=(mx+(midNowX-pinch.midX))-worldX*ns;
+      state.viewport.panY=(my+(midNowY-pinch.midY))-worldY*ns;
+      applyViewportTransform();
+    } else if(pan && pointers.size===1){
+      state.viewport.panX=pan.panX+(e.clientX-pan.x);
+      state.viewport.panY=pan.panY+(e.clientY-pan.y);
+      applyViewportTransform();
+    }
+  });
+  function endPointer(e){
+    if(!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+    if(pointers.size<2) pinch=null;
+    if(pointers.size===0){ pan=null; bg.classList.remove('panning'); }
+    else if(pointers.size===1){
+      const pt=[...pointers.values()][0];
+      pan={x:pt.x,y:pt.y,panX:state.viewport.panX,panY:state.viewport.panY};
+    }
+  }
+  bg.addEventListener('pointerup', endPointer);
+  bg.addEventListener('pointercancel', endPointer);
   bg.addEventListener('wheel',e=>{
     e.preventDefault();
     const rect=bg.getBoundingClientRect(); const mx=e.clientX-rect.left, my=e.clientY-rect.top;
@@ -862,8 +1006,10 @@ function renderValidation(){
   const issues=validateProcess(state.currentProcess);
   const errCount=issues.filter(i=>i.level==='error').length; const warnCount=issues.filter(i=>i.level==='warning').length;
   const countEl=document.getElementById('validationCount'); countEl.textContent=issues.length; countEl.className='pe-count'+(errCount?' pe-err':warnCount?' pe-warn':'');
-  if(!issues.length){ pane.innerHTML='<div class="pe-validation-ok">✓ Brak błędów i ostrzeżeń.</div>'; return; }
-  pane.innerHTML=issues.map(i=>`<div class="pe-validation-item"><span class="pe-vi-icon">${i.level==='error'?'🔴':'🟡'}</span><span>${esc(i.msg)}</span></div>`).join('');
+  const fab=document.getElementById('validationCountFab');
+  if(fab){ fab.textContent=issues.length; fab.className='pe-count'+(errCount?' pe-err':warnCount?' pe-warn':''); }
+  if(!issues.length){ pane.innerHTML='<div class="pe-validation-ok"><i class="bi bi-check-circle-fill"></i> Brak błędów i ostrzeżeń.</div>'; return; }
+  pane.innerHTML=issues.map(i=>`<div class="pe-validation-item"><span class="pe-vi-icon">${i.level==='error'?'<i class="bi bi-x-circle-fill" style="color:var(--pe-danger)"></i>':'<i class="bi bi-exclamation-triangle-fill" style="color:var(--pe-warn)"></i>'}</span><span>${esc(i.msg)}</span></div>`).join('');
 }
 function renderLogs(){
   const pane=document.getElementById('paneLogs'); const countEl=document.getElementById('logsCount'); countEl.textContent=state.logs.length;
@@ -936,6 +1082,17 @@ function initEditor(){
   document.querySelectorAll('.pe-bp-tab').forEach(tab=>{
     tab.addEventListener('click',()=>switchBottomTab(tab.dataset.tab));
   });
+  document.getElementById('btnToggleProps')?.addEventListener('click', togglePropsPanel);
+  document.getElementById('btnCloseProps')?.addEventListener('click', closeNarrowPanels);
+  document.getElementById('btnToggleBottom')?.addEventListener('click', toggleBottomPanel);
+  document.getElementById('btnCloseBottom')?.addEventListener('click', closeNarrowPanels);
+  document.getElementById('peScrim')?.addEventListener('click', closeNarrowPanels);
+  window.addEventListener('resize', ()=>{
+    syncShellHeight();
+    if(!isNarrow()) closeNarrowPanels();
+  });
+  NARROW_MQ.addEventListener('change', ()=>{ if(!isNarrow()) closeNarrowPanels(); });
+  syncShellHeight();
 
   initCanvasPanZoom();
   initKeyboard();

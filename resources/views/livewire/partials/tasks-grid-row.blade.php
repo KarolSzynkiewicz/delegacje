@@ -250,21 +250,27 @@
                    wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                    x-data x-init="$el.focus(); $el.select()">
         @else
-            @if($this->rowWritable($task, 'category'))
-                <span wire:click="startEdit({{ $task->id }}, 'category')" class="tg-hover-edit d-block" style="cursor:text; padding:2px 4px; border-radius:3px">
-                    @if($task->category)
-                        <x-ui.badge variant="info" class="text-truncate" style="max-width:120px">{{ $task->category }}</x-ui.badge>
-                    @else
-                        <span class="text-muted" style="font-size:0.82rem">—</span>
-                    @endif
-                </span>
-            @else
+            <div class="tg-facet">
                 @if($task->category)
-                    <x-ui.badge variant="info" class="text-truncate" style="max-width:120px">{{ Str::limit($task->category, 16) }}</x-ui.badge>
+                    <button type="button"
+                            class="tg-facet__value"
+                            wire:click="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
+                            title="Zawęź listę do tej kategorii">
+                        <x-ui.badge variant="info" class="text-truncate" style="max-width:120px">{{ $task->category }}</x-ui.badge>
+                    </button>
                 @else
                     <span class="text-muted" style="font-size:0.82rem">—</span>
                 @endif
-            @endif
+                @if($this->rowWritable($task, 'category'))
+                    <button type="button"
+                            class="tg-facet__edit"
+                            wire:click.stop="startEdit({{ $task->id }}, 'category')"
+                            title="Edytuj kategorię"
+                            aria-label="Edytuj kategorię">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                @endif
+            </div>
         @endif
     </td>
     @break
@@ -331,17 +337,28 @@
                 <option value="5">5 – Krytyczny</option>
             </select>
         @else
-            @if($this->rowWritable($task, 'priority'))
-                <span wire:click="startEdit({{ $task->id }}, 'priority')"
-                      class="tg-hover-edit tg-mono"
-                      style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.78rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
-                    {{ $pc ? $pc['label'] : '—' }}
-                </span>
-            @else
-                <span class="tg-mono" style="font-size:0.78rem; font-weight:{{ $pc ? '600' : '400' }}; color:{{ $pc ? $pc['color'] : 'rgba(255,255,255,0.2)' }}">
-                    {{ $pc ? $pc['label'] : '—' }}
-                </span>
-            @endif
+            <div class="tg-facet">
+                @if($pc)
+                    <button type="button"
+                            class="tg-facet__value tg-mono"
+                            wire:click="filterByPriority('{{ $task->priority }}')"
+                            title="Zawęź listę do tego priorytetu"
+                            style="font-weight:600; color:{{ $pc['color'] }}; font-size:0.78rem">
+                        {{ $pc['label'] }}
+                    </button>
+                @else
+                    <span class="tg-mono" style="font-size:0.78rem; color:rgba(255,255,255,0.2)">—</span>
+                @endif
+                @if($this->rowWritable($task, 'priority'))
+                    <button type="button"
+                            class="tg-facet__edit"
+                            wire:click.stop="startEdit({{ $task->id }}, 'priority')"
+                            title="Edytuj priorytet"
+                            aria-label="Edytuj priorytet">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                @endif
+            </div>
         @endif
     </td>
     @break
@@ -357,17 +374,28 @@
                    wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                    x-data x-init="$el.focus()">
         @else
-            @if($this->rowWritable($task, 'due_date'))
-                <span wire:click="startEdit({{ $task->id }}, 'due_date')"
-                      class="tg-hover-edit tg-mono"
-                      style="cursor:pointer; padding:2px 4px; border-radius:3px; display:block; font-size:0.78rem; {{ $dueStyle }}">
-                    {{ $task->due_date ? $task->due_date->format('d.m.Y') : '—' }}
-                </span>
-            @else
-                <span class="tg-mono" style="font-size:0.78rem; {{ $dueStyle }}">
-                    {{ $task->due_date ? $task->due_date->format('d.m.Y') : '—' }}
-                </span>
-            @endif
+            <div class="tg-facet">
+                @if($task->due_date)
+                    <button type="button"
+                            class="tg-facet__value tg-mono"
+                            wire:click="filterByDueDate('{{ $task->due_date->format('Y-m-d') }}')"
+                            title="Zawęź listę do tego dnia"
+                            style="font-size:0.78rem; {{ $dueStyle }}">
+                        {{ $task->due_date->format('d.m.Y') }}
+                    </button>
+                @else
+                    <span class="tg-mono" style="font-size:0.78rem; {{ $dueStyle }}">—</span>
+                @endif
+                @if($this->rowWritable($task, 'due_date'))
+                    <button type="button"
+                            class="tg-facet__edit"
+                            wire:click.stop="startEdit({{ $task->id }}, 'due_date')"
+                            title="Edytuj termin"
+                            aria-label="Edytuj termin">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                @endif
+            </div>
         @endif
     </td>
     @break
