@@ -98,7 +98,8 @@ class ProcedureChronoFlowTest extends TestCase
         $template = ProcedureTemplate::query()->firstOrFail();
 
         // Szablon zapisuje się pusty — propozycja czeka na canvasie na „Zapisz".
-        $this->assertSame(['nodes' => [], 'edges' => []], $template->definition);
+        $this->assertSame([], $template->definition['nodes'] ?? null);
+        $this->assertSame([], $template->definition['edges'] ?? null);
 
         $proposal = session('chrono_proposal');
         $this->assertSame(
@@ -152,7 +153,9 @@ class ProcedureChronoFlowTest extends TestCase
         );
 
         // Endpoint tylko proponuje — zapis robi dopiero „Zapisz" w edytorze.
-        $this->assertSame(['nodes' => [], 'edges' => []], $template->fresh()->definition);
+        $fresh = $template->fresh();
+        $this->assertSame([], $fresh->definition['nodes'] ?? null);
+        $this->assertSame([], $fresh->definition['edges'] ?? null);
     }
 
     public function test_build_definition_wires_a_decision_branch_to_the_next_step_and_to_the_end(): void

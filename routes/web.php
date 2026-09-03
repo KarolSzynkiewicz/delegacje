@@ -225,6 +225,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             Route::post('procedure-templates/{procedureTemplate}/import-flow',
                 [\App\Http\Controllers\ProcedureTemplateController::class, 'importFlow'])
                 ->name('procedure-templates.import-flow');
+            Route::delete('procedure-templates/{procedureTemplate}/versions/{version}',
+                [\App\Http\Controllers\ProcedureTemplateController::class, 'destroyVersion'])
+                ->name('procedure-templates.versions.destroy');
         });
         Route::group(['defaults' => ['resource' => 'procedure-runs']], function () {
             Route::post('procedure-templates/{procedureTemplate}/runs',

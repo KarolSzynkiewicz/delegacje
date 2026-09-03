@@ -9,6 +9,7 @@ use App\Events\ProcedureRunStepEntered;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
 use App\Models\ProcedureTemplate;
+use App\Models\ProcedureTemplateVersion;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
@@ -18,6 +19,8 @@ use RuntimeException;
 
 class ProcedureRunService
 {
+    public function __construct(private ProcedureTemplateVersionService $versions) {}
+
     /**
      * Create a new procedure run and a linked ProjectTask.
      *
@@ -36,7 +39,8 @@ class ProcedureRunService
      */
     public function startRun(ProcedureTemplate $template, array $params): ProcedureRun
     {
-        $definition = $template->definition;
+        $version = $this->versions->resolveVersionForRun($template);
+        $definition = $version->definition;
         $startNode = $this->findNodeByType($definition, 'start');
 
         if ($startNode === null) {
@@ -44,16 +48,17 @@ class ProcedureRunService
         }
 
         $createdTask = null;
-        $run = DB::transaction(function () use ($template, $definition, $startNode, $params, &$createdTask) {
+        $run = DB::transaction(function () use ($template, $version, $startNode, $params, &$createdTask) {
             $now = now();
 
             $run = ProcedureRun::create([
                 'procedure_template_id' => $template->id,
-                'definition_snapshot' => $definition,
+                'procedure_template_version_id' => $version->id,
+                'active_node_ids' => [$startNode['id']],
+                'join_tokens' => [],
                 'subject_type' => $params['subject_type'] ?? null,
                 'subject_id' => $params['subject_id'] ?? null,
                 'slot_key' => $params['slot_key'] ?? null,
-                'current_node_id' => $startNode['id'],
                 'path' => [$startNode['id']],
                 'status' => ProcedureRunStatus::IN_PROGRESS,
                 'variables' => $params['variables'] ?? null,
@@ -98,30 +103,45 @@ class ProcedureRunService
             User::query()->find($assigneeId)?->notify(new TaskAssigned($createdTask, $actor));
         }
 
-        $this->dispatchStepEntered($run->load('task'), $startNode, null);
+        $this->dispatchStepEntered($run->load(['task', 'version']), $startNode, null);
 
         return $run;
     }
 
     /**
-     * Advance the run to the next node.
+     * Advance a single active node in the run (supports parallel branches).
      *
-     * @param  string|null  $edgeId  Required when current node is a decision with multiple outgoing edges.
-     * @param  array  $stepData  Checklist state or decision choice to store in the current step.
+     * @param  array<string, mixed>  $stepData
      */
-    public function advance(ProcedureRun $run, ?string $edgeId = null, array $stepData = []): void
-    {
+    public function advanceNode(
+        ProcedureRun $run,
+        string $nodeId,
+        ?string $edgeId = null,
+        array $stepData = [],
+    ): void {
         if ($run->status !== ProcedureRunStatus::IN_PROGRESS) {
             return;
         }
 
+        $run->loadMissing('version');
+
+        if (! in_array($nodeId, $run->activeNodeIds(), true)) {
+            return;
+        }
+
+        $definition = $run->definition();
+        $node = $this->findNodeById($definition, $nodeId);
+
+        if ($node === null) {
+            throw new RuntimeException("Węzeł '{$nodeId}' nie istnieje w definicji.");
+        }
+
         $now = now();
         $userId = Auth::id();
-        $previousNode = $this->findNodeById($run->definition_snapshot, (string) $run->current_node_id);
 
-        // Close current step
-        $currentStep = ProcedureRunStep::where('procedure_run_id', $run->id)
-            ->where('node_id', $run->current_node_id)
+        $currentStep = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $nodeId)
             ->whereNull('completed_at')
             ->latest('entered_at')
             ->first();
@@ -134,77 +154,481 @@ class ProcedureRunService
             ]);
         }
 
-        // Determine next node
-        $outgoing = $run->outgoingEdges($run->current_node_id);
+        $outgoing = $run->outgoingEdges($nodeId);
 
         if (empty($outgoing)) {
-            // Dead-end — treat as finished
-            $this->dispatchStepCompleted($run, $previousNode, null);
-            $this->finishRun($run, $now);
+            $this->dispatchStepCompleted($run, $node, null);
+            $this->removeActiveNode($run, $nodeId);
+
+            if ($run->fresh()->activeNodeIds() === []) {
+                $this->finishRun($run->fresh(), $now);
+            }
 
             return;
         }
 
-        if (count($outgoing) === 1) {
-            $nextNodeId = $outgoing[0]['to'];
-        } else {
-            // Multiple edges — pick by edgeId or by optionId match
+        if (($node['type'] ?? '') === 'decision') {
             $chosen = collect($outgoing)->first(fn ($e) => ($e['id'] ?? null) === $edgeId
                 || ($e['optionId'] ?? null) === ($stepData['option_id'] ?? null));
-            $nextNodeId = ($chosen ?? $outgoing[0])['to'];
+
+            if ($chosen === null) {
+                throw new RuntimeException('Wybierz opcję decyzji przed kontynuacją.');
+            }
+
+            $outgoing = [$chosen];
         }
 
-        $nextNode = $this->findNodeById($run->definition_snapshot, $nextNodeId);
+        $nextNodeIds = [];
 
-        if ($nextNode === null) {
-            throw new RuntimeException("Następny węzeł '{$nextNodeId}' nie istnieje w definicji.");
+        foreach ($outgoing as $edge) {
+            $nextNodeId = (string) $edge['to'];
+            $nextNode = $this->findNodeById($definition, $nextNodeId);
+
+            if ($nextNode === null) {
+                throw new RuntimeException("Następny węzeł '{$nextNodeId}' nie istnieje w definicji.");
+            }
+
+            $this->registerToken($run, $nodeId, $nextNodeId);
+            $this->dispatchStepCompleted($run, $node, $nextNode);
+
+            if (! $this->joinReady($run, $nextNodeId)) {
+                continue;
+            }
+
+            if (($nextNode['type'] ?? '') === 'end') {
+                $this->recordEndStep($run, $nextNode, $now, $userId, $currentStep?->id);
+
+                continue;
+            }
+
+            $nextNodeIds[] = $nextNodeId;
         }
 
-        // Finish if we hit end node
-        if ($nextNode['type'] === 'end') {
-            $run->update([
-                'current_node_id' => $nextNodeId,
-                'path' => array_merge($run->path, [$nextNodeId]),
-            ]);
+        $this->removeActiveNode($run, $nodeId);
+        $run->refresh();
 
-            // Record end step as immediately completed
-            ProcedureRunStep::create([
-                'procedure_run_id' => $run->id,
-                'node_id' => $nextNodeId,
-                'node_name' => $nextNode['name'] ?? 'Koniec',
-                'node_type' => 'end',
-                'entered_at' => $now,
-                'completed_at' => $now,
-                'performed_by' => $userId,
-                'data' => null,
-            ]);
+        if ($nextNodeIds !== []) {
+            $this->activateNodes($run, $nextNodeIds, $currentStep?->id, $node, $now);
+        }
 
-            $this->dispatchStepCompleted($run, $previousNode, $nextNode);
-            $this->finishRun($run, $now);
+        if ($run->fresh()->activeNodeIds() === []) {
+            $this->finishRun($run->fresh(), $now);
+        }
+    }
+
+    /** @deprecated Use advanceNode() — kept for HTTP/tests that omit node id on linear flows. */
+    public function advance(ProcedureRun $run, ?string $edgeId = null, array $stepData = []): void
+    {
+        $active = $run->activeNodeIds();
+
+        if ($active === []) {
+            return;
+        }
+
+        $this->advanceNode($run, $active[0], $edgeId, $stepData);
+    }
+
+    /**
+     * Revert a specific active or recently completed node.
+     */
+    public function goBackNode(ProcedureRun $run, string $nodeId): void
+    {
+        if ($run->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return;
+        }
+
+        $run->loadMissing('version');
+        $now = now();
+
+        $openStep = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $nodeId)
+            ->whereNull('completed_at')
+            ->latest('entered_at')
+            ->first();
+
+        if ($openStep !== null) {
+            $this->cancelSpawnedSteps($run, $openStep->id);
+            $openStep->delete();
+            $this->removeActiveNode($run, $nodeId);
 
             return;
         }
 
-        $this->dispatchStepCompleted($run, $previousNode, $nextNode);
+        $completedStep = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $nodeId)
+            ->whereNotNull('completed_at')
+            ->latest('completed_at')
+            ->first();
 
-        // Move to next node
-        $run->update([
-            'current_node_id' => $nextNodeId,
-            'path' => array_merge($run->path, [$nextNodeId]),
-        ]);
+        if ($completedStep === null) {
+            return;
+        }
 
-        ProcedureRunStep::create([
-            'procedure_run_id' => $run->id,
-            'node_id' => $nextNodeId,
-            'node_name' => $nextNode['name'] ?? '',
-            'node_type' => $nextNode['type'],
-            'entered_at' => $now,
+        $this->revokeTokensFrom($run, $nodeId);
+        $this->cancelSpawnedSteps($run, $completedStep->id);
+
+        $completedStep->update([
             'completed_at' => null,
             'performed_by' => null,
             'data' => null,
         ]);
 
-        $this->dispatchStepEntered($run->load('task'), $nextNode, $previousNode);
+        $this->addActiveNode($run, $nodeId);
+
+        ProcedureRunStep::create([
+            'procedure_run_id' => $run->id,
+            'node_id' => $nodeId,
+            'node_name' => $completedStep->node_name,
+            'node_type' => $completedStep->node_type,
+            'entered_at' => $now,
+            'completed_at' => null,
+            'performed_by' => null,
+            'data' => null,
+            'spawned_from_step_id' => $completedStep->spawned_from_step_id,
+        ]);
+    }
+
+    /** @deprecated Use goBackNode() */
+    public function goBack(ProcedureRun $run): void
+    {
+        $active = $run->activeNodeIds();
+
+        if ($active === []) {
+            return;
+        }
+
+        $this->goBackNode($run, $active[0]);
+    }
+
+    public function abandon(ProcedureRun $run): void
+    {
+        if ($run->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return;
+        }
+
+        DB::transaction(function () use ($run) {
+            $run->update([
+                'status' => ProcedureRunStatus::ABANDONED,
+                'finished_at' => now(),
+                'active_node_ids' => [],
+                'join_tokens' => [],
+            ]);
+
+            $run->task?->cancel();
+        });
+    }
+
+    /**
+     * @param  list<string>  $nodeIds
+     * @param  array<string, mixed>  $previousNode
+     */
+    protected function activateNodes(
+        ProcedureRun $run,
+        array $nodeIds,
+        ?int $spawnedFromStepId,
+        array $previousNode,
+        \DateTimeInterface $now,
+    ): void {
+        $uniqueIds = array_values(array_unique($nodeIds));
+        $active = $run->activeNodeIds();
+        $path = $run->path ?? [];
+
+        foreach ($uniqueIds as $nextNodeId) {
+            if (! in_array($nextNodeId, $active, true)) {
+                $active[] = $nextNodeId;
+            }
+
+            if (! in_array($nextNodeId, $path, true)) {
+                $path[] = $nextNodeId;
+            }
+
+            $nextNode = $this->findNodeById($run->definition(), $nextNodeId);
+
+            if ($nextNode === null) {
+                continue;
+            }
+
+            $alreadyOpen = ProcedureRunStep::query()
+                ->where('procedure_run_id', $run->id)
+                ->where('node_id', $nextNodeId)
+                ->whereNull('completed_at')
+                ->exists();
+
+            if (! $alreadyOpen) {
+                ProcedureRunStep::create([
+                    'procedure_run_id' => $run->id,
+                    'spawned_from_step_id' => $spawnedFromStepId,
+                    'node_id' => $nextNodeId,
+                    'node_name' => $nextNode['name'] ?? '',
+                    'node_type' => $nextNode['type'],
+                    'entered_at' => $now,
+                    'completed_at' => null,
+                    'performed_by' => null,
+                    'data' => null,
+                ]);
+
+                $this->dispatchStepEntered($run->load(['task', 'version']), $nextNode, $previousNode);
+            }
+        }
+
+        $run->update([
+            'active_node_ids' => $active,
+            'path' => $path,
+        ]);
+    }
+
+    protected function cancelSpawnedSteps(ProcedureRun $run, int $parentStepId): void
+    {
+        $queue = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('spawned_from_step_id', $parentStepId)
+            ->pluck('id')
+            ->all();
+
+        while ($queue !== []) {
+            $stepId = array_shift($queue);
+            $step = ProcedureRunStep::query()->find($stepId);
+
+            if ($step === null) {
+                continue;
+            }
+
+            $childIds = ProcedureRunStep::query()
+                ->where('procedure_run_id', $run->id)
+                ->where('spawned_from_step_id', $stepId)
+                ->pluck('id')
+                ->all();
+
+            $queue = array_merge($queue, $childIds);
+
+            $this->removeActiveNode($run, $step->node_id);
+            $step->delete();
+        }
+    }
+
+    protected function removeActiveNode(ProcedureRun $run, string $nodeId): void
+    {
+        $active = array_values(array_filter(
+            $run->activeNodeIds(),
+            fn (string $id) => $id !== $nodeId
+        ));
+
+        $run->update(['active_node_ids' => $active]);
+    }
+
+    protected function addActiveNode(ProcedureRun $run, string $nodeId): void
+    {
+        $active = $run->activeNodeIds();
+
+        if (! in_array($nodeId, $active, true)) {
+            $active[] = $nodeId;
+        }
+
+        $run->update(['active_node_ids' => $active]);
+    }
+
+    /**
+     * BPMN AND-join: a node activates only after every live incoming token has arrived.
+     * XOR branches that were never taken are not waited on.
+     */
+    protected function registerToken(ProcedureRun $run, string $fromNodeId, string $toNodeId): void
+    {
+        $tokens = $run->join_tokens ?? [];
+        $arrived = array_values($tokens[$toNodeId] ?? []);
+
+        if (! in_array($fromNodeId, $arrived, true)) {
+            $arrived[] = $fromNodeId;
+        }
+
+        $tokens[$toNodeId] = $arrived;
+        $run->update(['join_tokens' => $tokens]);
+        $run->refresh();
+    }
+
+    /** @param  array<string, bool>  $visited */
+    protected function revokeTokensFrom(ProcedureRun $run, string $fromNodeId, array &$visited = []): void
+    {
+        $run->refresh();
+        $tokens = $run->join_tokens ?? [];
+        $targets = [];
+
+        foreach ($tokens as $toNodeId => $fromIds) {
+            $fromIds = array_values(array_map('strval', $fromIds ?? []));
+            if (! in_array($fromNodeId, $fromIds, true)) {
+                continue;
+            }
+
+            $fromIds = array_values(array_filter($fromIds, fn ($id) => $id !== $fromNodeId));
+            if ($fromIds === []) {
+                unset($tokens[$toNodeId]);
+            } else {
+                $tokens[$toNodeId] = $fromIds;
+            }
+            $targets[] = (string) $toNodeId;
+        }
+
+        $run->update(['join_tokens' => $tokens]);
+
+        foreach ($targets as $toNodeId) {
+            $this->unwindIfJoinIncomplete($run, $toNodeId, $visited);
+        }
+    }
+
+    /** @param  array<string, bool>  $visited */
+    protected function unwindIfJoinIncomplete(ProcedureRun $run, string $nodeId, array &$visited = []): void
+    {
+        if (isset($visited[$nodeId])) {
+            return;
+        }
+        $visited[$nodeId] = true;
+
+        $run->refresh();
+        if ($this->joinReady($run, $nodeId)) {
+            return;
+        }
+
+        $steps = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $nodeId)
+            ->get();
+
+        foreach ($steps as $step) {
+            $this->cancelSpawnedSteps($run, $step->id);
+            $step->delete();
+        }
+
+        $this->removeActiveNode($run, $nodeId);
+        $this->revokeTokensFrom($run, $nodeId, $visited);
+    }
+
+    protected function joinReady(ProcedureRun $run, string $toNodeId): bool
+    {
+        $arrived = $this->arrivedSources($run, $toNodeId);
+        $expected = $this->expectedIncomingSources($run, $toNodeId);
+
+        if ($expected === []) {
+            return $arrived !== [];
+        }
+
+        foreach ($expected as $fromId) {
+            if (! in_array($fromId, $arrived, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return list<string> */
+    protected function arrivedSources(ProcedureRun $run, string $toNodeId): array
+    {
+        return array_values($run->join_tokens[$toNodeId] ?? []);
+    }
+
+    /**
+     * Incoming edges that already delivered a token, are still active, or can still
+     * be reached from an active node (so a token is still in flight).
+     *
+     * @return list<string>
+     */
+    protected function expectedIncomingSources(ProcedureRun $run, string $toNodeId): array
+    {
+        $arrived = $this->arrivedSources($run, $toNodeId);
+        $active = $run->activeNodeIds();
+        $reachable = $this->nodesReachableFromActive($run);
+        $expected = [];
+
+        foreach ($run->incomingEdges($toNodeId) as $edge) {
+            $fromId = (string) ($edge['from'] ?? '');
+            if ($fromId === '') {
+                continue;
+            }
+
+            if (in_array($fromId, $arrived, true)
+                || in_array($fromId, $active, true)
+                || in_array($fromId, $reachable, true)
+            ) {
+                $expected[] = $fromId;
+            }
+        }
+
+        return array_values(array_unique($expected));
+    }
+
+    /**
+     * Nodes that can still be visited from currently active nodes (future path).
+     *
+     * @return list<string>
+     */
+    protected function nodesReachableFromActive(ProcedureRun $run): array
+    {
+        $reachable = [];
+        $visited = [];
+        $queue = $run->activeNodeIds();
+
+        while ($queue !== []) {
+            $nodeId = array_shift($queue);
+            if (isset($visited[$nodeId])) {
+                continue;
+            }
+            $visited[$nodeId] = true;
+
+            foreach ($run->outgoingEdges($nodeId) as $edge) {
+                $to = (string) ($edge['to'] ?? '');
+                if ($to === '' || isset($visited[$to])) {
+                    continue;
+                }
+                $reachable[] = $to;
+                $queue[] = $to;
+            }
+        }
+
+        return array_values(array_unique($reachable));
+    }
+
+    /**
+     * @param  array<string, mixed>  $endNode
+     */
+    protected function recordEndStep(
+        ProcedureRun $run,
+        array $endNode,
+        \DateTimeInterface $now,
+        ?int $userId,
+        ?int $spawnedFromStepId,
+    ): void {
+        $endId = (string) $endNode['id'];
+
+        $alreadyRecorded = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $endId)
+            ->where('node_type', 'end')
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        $path = $run->path ?? [];
+
+        if (! in_array($endId, $path, true)) {
+            $path[] = $endId;
+        }
+
+        ProcedureRunStep::create([
+            'procedure_run_id' => $run->id,
+            'spawned_from_step_id' => $spawnedFromStepId,
+            'node_id' => $endId,
+            'node_name' => $endNode['name'] ?? 'Koniec',
+            'node_type' => 'end',
+            'entered_at' => $now,
+            'completed_at' => $now,
+            'performed_by' => $userId,
+            'data' => null,
+        ]);
+
+        $run->update(['path' => $path]);
     }
 
     /**
@@ -225,83 +649,14 @@ class ProcedureRunService
         ProcedureRunStepCompleted::dispatch($run, $leavingNode, $nextNode);
     }
 
-    /**
-     * Go back to the previous node in the path.
-     */
-    public function goBack(ProcedureRun $run): void
-    {
-        if ($run->status !== ProcedureRunStatus::IN_PROGRESS) {
-            return;
-        }
-
-        $path = $run->path;
-        if (count($path) <= 1) {
-            return;
-        }
-
-        $now = now();
-        $userId = Auth::id();
-
-        // Remove current node from path
-        array_pop($path);
-        $prevNodeId = end($path);
-        $prevNode = $this->findNodeById($run->definition_snapshot, $prevNodeId);
-
-        // Close current step without completing
-        ProcedureRunStep::where('procedure_run_id', $run->id)
-            ->where('node_id', $run->current_node_id)
-            ->whereNull('completed_at')
-            ->latest('entered_at')
-            ->first()
-            ?->delete();
-
-        $run->update([
-            'current_node_id' => $prevNodeId,
-            'path' => $path,
-        ]);
-
-        // Re-open previous step (create new entry)
-        ProcedureRunStep::create([
-            'procedure_run_id' => $run->id,
-            'node_id' => $prevNodeId,
-            'node_name' => $prevNode['name'] ?? '',
-            'node_type' => $prevNode['type'] ?? 'task',
-            'entered_at' => $now,
-            'completed_at' => null,
-            'performed_by' => null,
-            'data' => null,
-        ]);
-    }
-
-    /**
-     * Abandon an in-progress run and cancel the linked task.
-     */
-    public function abandon(ProcedureRun $run): void
-    {
-        if ($run->status !== ProcedureRunStatus::IN_PROGRESS) {
-            return;
-        }
-
-        DB::transaction(function () use ($run) {
-            $run->update([
-                'status' => ProcedureRunStatus::ABANDONED,
-                'finished_at' => now(),
-            ]);
-
-            $run->task?->cancel();
-        });
-    }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Private helpers
-    // ──────────────────────────────────────────────────────────────────────
-
     private function finishRun(ProcedureRun $run, \DateTimeInterface $at): void
     {
         DB::transaction(function () use ($run, $at) {
             $run->update([
                 'status' => ProcedureRunStatus::FINISHED,
                 'finished_at' => $at,
+                'active_node_ids' => [],
+                'join_tokens' => [],
             ]);
 
             $run->task?->markCompleted();

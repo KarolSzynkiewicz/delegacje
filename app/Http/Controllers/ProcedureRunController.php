@@ -34,12 +34,14 @@ class ProcedureRunController extends Controller
     public function advance(Request $request, ProcedureRun $procedureRun): RedirectResponse
     {
         $data = $request->validate([
+            'node_id'   => ['required', 'string'],
             'edge_id'   => ['nullable', 'string'],
             'step_data' => ['nullable', 'array'],
         ]);
 
-        $this->service->advance(
+        $this->service->advanceNode(
             $procedureRun,
+            $data['node_id'],
             $data['edge_id'] ?? null,
             $data['step_data'] ?? []
         );
@@ -47,9 +49,13 @@ class ProcedureRunController extends Controller
         return back();
     }
 
-    public function back(ProcedureRun $procedureRun): RedirectResponse
+    public function back(Request $request, ProcedureRun $procedureRun): RedirectResponse
     {
-        $this->service->goBack($procedureRun);
+        $data = $request->validate([
+            'node_id' => ['required', 'string'],
+        ]);
+
+        $this->service->goBackNode($procedureRun, $data['node_id']);
 
         return back();
     }

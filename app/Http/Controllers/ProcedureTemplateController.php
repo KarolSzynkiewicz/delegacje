@@ -27,7 +27,7 @@ class ProcedureTemplateController extends Controller
         $procedureTemplate->load('createdBy');
 
         $runs = $procedureTemplate->runs()
-            ->with(['startedBy', 'subject'])
+            ->with(['startedBy', 'subject', 'version'])
             ->latest('started_at')
             ->paginate(10);
 
@@ -39,10 +39,14 @@ class ProcedureTemplateController extends Controller
                 $row->status instanceof \App\Enums\ProcedureRunStatus ? $row->status->value : (string) $row->status => $row->aggregate,
             ]);
 
+        $versionStats = app(\App\Services\ProcedureTemplateVersionService::class)
+            ->versionsWithRunCounts($procedureTemplate);
+
         return view('procedures.show', [
             'template' => $procedureTemplate,
             'runs' => $runs,
             'runsByStatus' => $runsByStatus,
+            'versionStats' => $versionStats,
         ]);
     }
 
@@ -137,6 +141,11 @@ class ProcedureTemplateController extends Controller
 
         $procedureTemplate->update($data);
 
+        if (array_key_exists('definition', $data)) {
+            app(\App\Services\ProcedureTemplateVersionService::class)
+                ->publishDefinition($procedureTemplate, $data['definition']);
+        }
+
         return response()->json(['ok' => true]);
     }
 
@@ -146,5 +155,20 @@ class ProcedureTemplateController extends Controller
 
         return redirect()->route('procedure-templates.index')
             ->with('success', 'Szablon został usunięty.');
+    }
+
+    public function destroyVersion(
+        ProcedureTemplate $procedureTemplate,
+        \App\Models\ProcedureTemplateVersion $version,
+    ): RedirectResponse {
+        abort_unless((int) $version->procedure_template_id === (int) $procedureTemplate->id, 404);
+
+        try {
+            app(\App\Services\ProcedureTemplateVersionService::class)->deleteVersion($version);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Wersja '.$version->label().' została usunięta.');
     }
 }

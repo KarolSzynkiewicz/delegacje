@@ -9,6 +9,7 @@ class ProcedureRunStep extends Model
 {
     protected $fillable = [
         'procedure_run_id',
+        'spawned_from_step_id',
         'node_id',
         'node_name',
         'node_type',
@@ -19,14 +20,19 @@ class ProcedureRunStep extends Model
     ];
 
     protected $casts = [
-        'entered_at'   => 'datetime',
+        'entered_at' => 'datetime',
         'completed_at' => 'datetime',
-        'data'         => 'array',
+        'data' => 'array',
     ];
 
     public function run(): BelongsTo
     {
         return $this->belongsTo(ProcedureRun::class, 'procedure_run_id');
+    }
+
+    public function spawnedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'spawned_from_step_id');
     }
 
     public function performedBy(): BelongsTo

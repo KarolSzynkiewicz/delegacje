@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Enums\ProcedureRunStatus;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
+use App\Models\ProcedureTemplateVersion;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 
@@ -55,9 +56,18 @@ class ProcedureRunProgressTest extends TestCase
     /** @param  list<array{node_id: string, completed: bool}>  $steps */
     private function makeRun(array $attributes, array $steps): ProcedureRun
     {
+        $definition = $this->branchingDefinition();
+
+        $version = ProcedureTemplateVersion::make([
+            'version_number' => 1,
+            'definition' => $definition,
+        ]);
+
         $run = ProcedureRun::make(array_merge([
-            'definition_snapshot' => $this->branchingDefinition(),
+            'active_node_ids' => ['step-5'],
         ], $attributes));
+
+        $run->setRelation('version', $version);
 
         $run->setRelation('steps', Collection::make(array_map(function (array $step) use ($run) {
             return ProcedureRunStep::make([
@@ -76,7 +86,7 @@ class ProcedureRunProgressTest extends TestCase
     public function test_finished_run_reports_full_progress_even_with_many_unused_nodes(): void
     {
         $run = $this->makeRun([
-            'current_node_id' => 'end-1',
+            'active_node_ids' => [],
             'status' => ProcedureRunStatus::FINISHED,
         ], array_map(fn (string $id) => ['node_id' => $id, 'completed' => true], [
             'start-1', 'step-1', 'step-2', 'step-3', 'step-5', 'step-6', 'step-7', 'step-8', 'end-1',
@@ -93,7 +103,7 @@ class ProcedureRunProgressTest extends TestCase
     public function test_in_progress_run_estimates_total_from_shortest_path_not_all_nodes(): void
     {
         $run = $this->makeRun([
-            'current_node_id' => 'step-5',
+            'active_node_ids' => ['step-5'],
             'status' => ProcedureRunStatus::IN_PROGRESS,
         ], [
             ['node_id' => 'start-1', 'completed' => true],
@@ -115,13 +125,13 @@ class ProcedureRunProgressTest extends TestCase
     public function test_old_logic_would_have_underreported_finished_branching_run(): void
     {
         $run = $this->makeRun([
-            'current_node_id' => 'end-1',
+            'active_node_ids' => [],
             'status' => ProcedureRunStatus::FINISHED,
         ], array_map(fn (string $id) => ['node_id' => $id, 'completed' => true], [
             'start-1', 'step-1', 'step-2', 'step-3', 'step-5', 'step-6', 'step-7', 'step-8', 'end-1',
         ]));
 
-        $allNodes = count($run->definition_snapshot['nodes']);
+        $allNodes = count($run->definition()['nodes']);
         $completed = 9;
         $legacyPercent = (int) round(($completed / $allNodes) * 100);
 

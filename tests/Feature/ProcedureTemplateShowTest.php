@@ -47,10 +47,12 @@ class ProcedureTemplateShowTest extends TestCase
             'created_by' => $this->admin()->id,
         ]);
 
+        $version = $template->latestVersion();
+
         ProcedureRun::query()->create([
             'procedure_template_id' => $template->id,
-            'definition_snapshot' => $template->definition,
-            'current_node_id' => 'n2',
+            'procedure_template_version_id' => $version->id,
+            'active_node_ids' => ['n2'],
             'path' => ['n1'],
             'status' => 'in_progress',
             'started_by' => $template->created_by,
@@ -64,7 +66,9 @@ class ProcedureTemplateShowTest extends TestCase
             ->assertSee('Onboarding testowy')
             ->assertSee('Podpisz umowę')
             ->assertSee('W trakcie')
-            ->assertSee('Przebiegi');
+            ->assertSee('Przebiegi')
+            ->assertSee('v1')
+            ->assertSee('1 uruchomień');
     }
 
     public function test_index_links_to_preview_and_editor_still_renders(): void

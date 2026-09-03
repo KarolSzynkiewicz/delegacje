@@ -79,6 +79,8 @@ class ProcedureRunTaskCategoryTest extends TestCase
         $this->get(route('tasks.show', $task))
             ->assertOk()
             ->assertSeeLivewire(ProcedureRunStepper::class)
+            ->assertSee('Aktywny')
+            ->assertSee('Czeka na zbieg')
             ->assertDontSeeLivewire(TaskSubtasks::class)
             ->assertDontSee('Wpisz nazwę podzadania');
     }

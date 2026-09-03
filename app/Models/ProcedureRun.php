@@ -14,11 +14,12 @@ class ProcedureRun extends Model
 {
     protected $fillable = [
         'procedure_template_id',
-        'definition_snapshot',
+        'procedure_template_version_id',
+        'active_node_ids',
+        'join_tokens',
         'subject_type',
         'subject_id',
         'slot_key',
-        'current_node_id',
         'path',
         'status',
         'variables',
@@ -29,7 +30,8 @@ class ProcedureRun extends Model
 
     protected $casts = [
         'status' => ProcedureRunStatus::class,
-        'definition_snapshot' => 'array',
+        'active_node_ids' => 'array',
+        'join_tokens' => 'array',
         'path' => 'array',
         'variables' => 'array',
         'started_at' => 'datetime',
@@ -39,6 +41,88 @@ class ProcedureRun extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(ProcedureTemplate::class, 'procedure_template_id');
+    }
+
+    public function version(): BelongsTo
+    {
+        return $this->belongsTo(ProcedureTemplateVersion::class, 'procedure_template_version_id');
+    }
+
+    /** @return array{nodes: array, edges: array} */
+    public function definition(): array
+    {
+        return $this->version?->definition ?? ['nodes' => [], 'edges' => []];
+    }
+
+    /** @return list<string> */
+    public function activeNodeIds(): array
+    {
+        return array_values($this->active_node_ids ?? []);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function activeNodes(): array
+    {
+        return collect($this->activeNodeIds())
+            ->map(fn (string $id) => $this->findNodeById($id))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /** @return list<string> */
+    public function completedNodeIds(): array
+    {
+        if ($this->relationLoaded('steps')) {
+            return $this->steps->whereNotNull('completed_at')->pluck('node_id')->unique()->values()->all();
+        }
+
+        return $this->steps()->whereNotNull('completed_at')->pluck('node_id')->unique()->values()->all();
+    }
+
+    /**
+     * Highlight state for the run-flow canvas.
+     *
+     * @return array{completed: list<string>, active: list<string>, waiting: list<string>}
+     */
+    public function flowHighlight(): array
+    {
+        $completed = $this->completedNodeIds();
+        $active = $this->activeNodeIds();
+        $waiting = [];
+
+        foreach (array_keys($this->join_tokens ?? []) as $nodeId) {
+            $nodeId = (string) $nodeId;
+            if (! in_array($nodeId, $active, true) && ! in_array($nodeId, $completed, true)) {
+                $waiting[] = $nodeId;
+            }
+        }
+
+        return [
+            'completed' => $completed,
+            'active' => $active,
+            'waiting' => $waiting,
+        ];
+    }
+
+    /** @deprecated Use activeNodes() — kept for transitional callers. */
+    public function currentNode(): ?array
+    {
+        $ids = $this->activeNodeIds();
+
+        return $ids === [] ? null : $this->findNodeById($ids[0]);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function findNodeById(string $nodeId): ?array
+    {
+        foreach ($this->definition()['nodes'] ?? [] as $node) {
+            if (($node['id'] ?? null) === $nodeId) {
+                return $node;
+            }
+        }
+
+        return null;
     }
 
     /** The arbitrary model this run was started for (e.g. a RecruitmentProcess). */
@@ -67,19 +151,6 @@ class ProcedureRun extends Model
         return $this->hasOne(ProjectTask::class, 'procedure_run_id');
     }
 
-    /** Returns the current node array from the snapshot, or null if not found. */
-    public function currentNode(): ?array
-    {
-        $nodes = $this->definition_snapshot['nodes'] ?? [];
-        foreach ($nodes as $node) {
-            if (($node['id'] ?? null) === $this->current_node_id) {
-                return $node;
-            }
-        }
-
-        return null;
-    }
-
     /**
      * Link do rekordu, którego dotyczy przebieg (samochód, pracownik, …).
      *
@@ -105,8 +176,17 @@ class ProcedureRun extends Model
     public function outgoingEdges(string $nodeId): array
     {
         return array_values(array_filter(
-            $this->definition_snapshot['edges'] ?? [],
+            $this->definition()['edges'] ?? [],
             fn ($e) => ($e['from'] ?? null) === $nodeId
+        ));
+    }
+
+    /** Incoming edges to a given node id. */
+    public function incomingEdges(string $nodeId): array
+    {
+        return array_values(array_filter(
+            $this->definition()['edges'] ?? [],
+            fn ($e) => ($e['to'] ?? null) === $nodeId
         ));
     }
 
@@ -163,9 +243,9 @@ class ProcedureRun extends Model
             ];
         }
 
-        $remaining = $this->estimateStepsToEndFromCurrent();
-        $hasOpenStep = $this->hasOpenStepOnCurrentNode();
-        $total = max($completed + ($hasOpenStep ? 1 : 0) + $remaining, $completed, 1);
+        $remaining = $this->estimateStepsToEndFromActive();
+        $openActive = count($this->activeNodeIds());
+        $total = max($completed + $openActive + $remaining, $completed, 1);
         $fraction = min($completed / $total, 0.99);
 
         return [
@@ -186,46 +266,25 @@ class ProcedureRun extends Model
         return $this->steps()->whereNotNull('completed_at')->count();
     }
 
-    protected function hasOpenStepOnCurrentNode(): bool
+    /** Minimalna liczba węzłów od aktywnych do najbliższego końca (BFS, merge-aware). */
+    protected function estimateStepsToEndFromActive(): int
     {
-        if (! $this->current_node_id) {
-            return false;
-        }
+        $activeIds = $this->activeNodeIds();
 
-        if ($this->relationLoaded('steps')) {
-            return $this->steps
-                ->where('node_id', $this->current_node_id)
-                ->whereNull('completed_at')
-                ->isNotEmpty();
-        }
-
-        return $this->steps()
-            ->where('node_id', $this->current_node_id)
-            ->whereNull('completed_at')
-            ->exists();
-    }
-
-    /** Minimalna liczba węzłów od bieżącego (bez niego) do najbliższego końca. */
-    protected function estimateStepsToEndFromCurrent(): int
-    {
-        $currentId = $this->current_node_id;
-
-        if (! $currentId) {
+        if ($activeIds === []) {
             return 1;
         }
 
-        $nodes = collect($this->definition_snapshot['nodes'] ?? [])
+        $nodes = collect($this->definition()['nodes'] ?? [])
             ->keyBy(fn (array $node) => (string) ($node['id'] ?? ''));
 
-        $current = $nodes->get($currentId);
-
-        if ($current && ($current['type'] ?? '') === 'end') {
-            return 0;
-        }
-
-        $edges = $this->definition_snapshot['edges'] ?? [];
-        $queue = [[$currentId, 0]];
+        $edges = $this->definition()['edges'] ?? [];
+        $queue = [];
         $visited = [];
+
+        foreach ($activeIds as $nodeId) {
+            $queue[] = [$nodeId, 0];
+        }
 
         while ($queue !== []) {
             [$nodeId, $depth] = array_shift($queue);

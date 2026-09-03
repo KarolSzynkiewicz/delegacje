@@ -1,5 +1,6 @@
 import './bootstrap';
 import './dashboard-snaps';
+import './procedure-run-flow';
 import * as bootstrap from 'bootstrap'; // Bootstrap JS (dla modals, dropdowns, etc.)
 window.bootstrap = bootstrap;
 

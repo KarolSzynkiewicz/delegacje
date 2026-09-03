@@ -17,6 +17,9 @@
     @if(session('success'))
         <x-ui.alert variant="success" dismissible class="mb-3">{{ session('success') }}</x-ui.alert>
     @endif
+    @if(session('error'))
+        <x-ui.alert variant="danger" dismissible class="mb-3">{{ session('error') }}</x-ui.alert>
+    @endif
 
     <div class="row g-4">
         <div class="col-lg-8">
@@ -38,36 +41,27 @@
             </x-ui.card>
 
             <x-ui.card>
-                <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-3" style="letter-spacing:.05em;">
-                    <i class="bi bi-diagram-3 me-1"></i> Kroki procedury ({{ $template->nodeCount() }})
-                </h3>
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-3 flex-wrap">
+                    <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-0" style="letter-spacing:.05em;">
+                        <i class="bi bi-diagram-3 me-1"></i> Przepływ ({{ $template->nodeCount() }})
+                    </h3>
+                    @if($template->latestVersion())
+                        <span class="small text-muted font-mono">{{ $template->latestVersion()->label() }}</span>
+                    @endif
+                </div>
 
                 @php
-                    $steps = collect($template->definition['nodes'] ?? [])
-                        ->filter(fn ($n) => ($n['type'] ?? '') !== 'note')
-                        ->values();
+                    $latestDefinition = $template->latestVersion()?->definition ?? $template->definition;
+                    $hasNodes = count($latestDefinition['nodes'] ?? []) > 0;
                 @endphp
 
-                @if($steps->isEmpty())
+                @if(! $hasNodes)
                     <p class="text-muted small mb-0">
                         Ten szablon nie ma jeszcze zdefiniowanych kroków.
                         <a href="{{ route('procedure-templates.editor', $template) }}">Otwórz edytor</a>, aby je dodać.
                     </p>
                 @else
-                    <div class="d-flex flex-column gap-2">
-                        @foreach($steps as $i => $node)
-                            <div class="d-flex align-items-center gap-3 p-2 rounded-3 min-w-0" style="background: rgba(255,255,255,.03); border: 1px solid var(--glass-border);">
-                                <div class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0 font-mono small fw-semibold"
-                                     style="width:28px; height:28px; background: color-mix(in srgb, {{ $node['color'] ?? 'var(--accent)' }} 22%, transparent); color: {{ $node['color'] ?? 'var(--accent)' }};">
-                                    {{ $i + 1 }}
-                                </div>
-                                <div class="min-w-0 flex-grow-1">
-                                    <div class="fw-semibold text-truncate">{{ $node['name'] ?? 'Bez nazwy' }}</div>
-                                    <div class="small text-muted">{{ \App\Models\ProcedureRun::nodeTypeLabel($node['type'] ?? null) }}</div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
+                    <x-procedure-flow :definition="$latestDefinition" legend="none" class="pr-flow--lg" />
                 @endif
             </x-ui.card>
         </div>
@@ -93,6 +87,49 @@
                     <dt class="col-8 text-muted fw-normal border-top pt-2 mt-1" style="border-color: var(--glass-border) !important;">Kroków w szablonie</dt>
                     <dd class="col-4 text-end fw-semibold font-mono border-top pt-2 mt-1" style="border-color: var(--glass-border) !important;">{{ $template->nodeCount() }}</dd>
                 </dl>
+            </x-ui.card>
+
+            <x-ui.card class="mb-4">
+                <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-3" style="letter-spacing:.05em;">
+                    <i class="bi bi-layers me-1"></i> Wersje
+                </h3>
+
+                @if($versionStats === [])
+                    <p class="text-muted small mb-0">Brak opublikowanych wersji.</p>
+                @else
+                    <div class="d-flex flex-column gap-2">
+                        @foreach($versionStats as $stat)
+                            @php $version = $stat['version']; @endphp
+                            <div class="d-flex align-items-center justify-content-between gap-2 p-2 rounded-3"
+                                 style="background: rgba(255,255,255,.03); border: 1px solid var(--glass-border);">
+                                <div class="min-w-0">
+                                    <div class="fw-semibold">{{ $version->label() }}</div>
+                                    <div class="small text-muted">
+                                        {{ $version->changedBy?->name ?? '—' }}
+                                        · {{ $version->changed_at?->format('d.m.Y H:i') }}
+                                        · {{ $version->nodeCount() }} kroków
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    <x-ui.badge variant="{{ $stat['runs_count'] > 0 ? 'primary' : 'secondary' }}">
+                                        {{ $stat['runs_count'] }} uruchomień
+                                    </x-ui.badge>
+                                    @if($stat['runs_count'] === 0)
+                                        <form action="{{ route('procedure-templates.versions.destroy', [$template, $version]) }}"
+                                              method="POST"
+                                              onsubmit="return confirm('Usunąć {{ $version->label() }}?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Usuń wersję">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </x-ui.card>
 
             <x-ui.card>
@@ -126,6 +163,7 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr class="small text-muted text-uppercase">
+                            <th>Wersja</th>
                             <th>Status</th>
                             <th>Dotyczy</th>
                             <th>Rozpoczął</th>
@@ -138,6 +176,7 @@
                         @foreach($runs as $run)
                             @php $sourceCard = $run->sourceCard(); @endphp
                             <tr>
+                                <td class="font-mono small">{{ $run->version?->label() ?? '—' }}</td>
                                 <td><x-ui.badge variant="{{ $run->status->badgeVariant() }}">{{ $run->status->label() }}</x-ui.badge></td>
                                 <td>
                                     @if($sourceCard)
@@ -171,7 +210,12 @@
                     @php $sourceCard = $run->sourceCard(); @endphp
                     <div class="p-3 rounded-3" style="background: rgba(255,255,255,.03); border: 1px solid var(--glass-border);">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <x-ui.badge variant="{{ $run->status->badgeVariant() }}">{{ $run->status->label() }}</x-ui.badge>
+                            <div class="d-flex align-items-center gap-2">
+                                <x-ui.badge variant="{{ $run->status->badgeVariant() }}">{{ $run->status->label() }}</x-ui.badge>
+                                @if($run->version)
+                                    <span class="small text-muted font-mono">{{ $run->version->label() }}</span>
+                                @endif
+                            </div>
                             @if($run->task)
                                 <a href="{{ route('tasks.show', $run->task) }}" class="btn btn-sm btn-outline-secondary" title="Otwórz zadanie">
                                     <i class="bi bi-box-arrow-up-right"></i>

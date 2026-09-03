@@ -24,6 +24,11 @@
                     <div class="fw-semibold">{{ $run->template->name ?? '—' }}</div>
                 </div>
 
+                <div>
+                    <small class="text-muted d-block mb-1">Wersja</small>
+                    <div class="fw-semibold">{{ $run->version?->label() ?? '—' }}</div>
+                </div>
+
                 @if($sourceCard)
                     <div>
                         <small class="text-muted d-block mb-1">Dotyczy</small>

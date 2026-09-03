@@ -36,12 +36,18 @@ class ProcedureTemplate extends Model
 
     public function versions(): HasMany
     {
-        return $this->hasMany(ProcedureTemplateVersion::class)->orderByDesc('changed_at');
+        return $this->hasMany(ProcedureTemplateVersion::class)->orderByDesc('version_number');
+    }
+
+    public function latestVersion(): ?ProcedureTemplateVersion
+    {
+        return $this->versions()->orderByDesc('version_number')->first();
     }
 
     public function nodeCount(): int
     {
-        $nodes = $this->definition['nodes'] ?? [];
+        $definition = $this->latestVersion()?->definition ?? $this->definition;
+        $nodes = $definition['nodes'] ?? [];
 
         return count(array_filter($nodes, fn ($n) => ($n['type'] ?? '') !== 'note'));
     }
