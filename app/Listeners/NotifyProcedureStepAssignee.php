@@ -17,7 +17,7 @@ class NotifyProcedureStepAssignee
         $node = $event->node;
         $type = $node['type'] ?? '';
 
-        if (in_array($type, ['start', 'end', 'note'], true)) {
+        if (in_array($type, ['start', 'end', 'note', 'approval'], true)) {
             return;
         }
 

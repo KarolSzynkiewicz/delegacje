@@ -10,6 +10,7 @@ use App\Models\Comment;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
+use App\Models\ProcedureRun;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentProcess;
@@ -38,6 +39,11 @@ class AttachmentPolicy
             return $user->hasPermission('tasks.view');
         }
 
+        if ($parent instanceof ProcedureRun) {
+            return $user->hasPermission('tasks.view')
+                || $user->hasPermission('procedure-templates.view');
+        }
+
         if ($parent instanceof Comment) {
             return $this->userCanAccessCommentContext($user, $parent);
         }
@@ -63,6 +69,12 @@ class AttachmentPolicy
 
         if ($parent instanceof Sprint) {
             return $user->hasPermission('tasks.update');
+        }
+
+        if ($parent instanceof ProcedureRun) {
+            return $attachment->uploaded_by === $user->id
+                || $user->hasPermission('tasks.update')
+                || $user->hasPermission('procedure-templates.update');
         }
 
         if ($parent instanceof Comment) {

@@ -36,6 +36,7 @@ class Comment extends Model implements TaskSubject
         'commentable_id',
         'user_id',
         'parent_id',
+        'procedure_run_id',
         'body',
     ];
 
@@ -62,6 +63,11 @@ class Comment extends Model implements TaskSubject
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function procedureRun(): BelongsTo
+    {
+        return $this->belongsTo(ProcedureRun::class);
     }
 
     public function replies(): HasMany
@@ -141,6 +147,32 @@ class Comment extends Model implements TaskSubject
             'url' => $url,
             'label' => $this->notificationContextLabel(),
             'icon' => $this->commentableIcon(),
+        ];
+    }
+
+    /**
+     * Link do przebiegu procedury, z którego powstał ten komentarz.
+     *
+     * @return array{url: string, label: string}|null
+     */
+    public function procedureSourceCard(): ?array
+    {
+        if (! $this->procedure_run_id) {
+            return null;
+        }
+
+        $this->loadMissing(['procedureRun.template', 'procedureRun.task']);
+        $run = $this->procedureRun;
+        $task = $run?->task;
+        if (! $task) {
+            return null;
+        }
+
+        $name = trim((string) ($run->template?->name ?? ''));
+
+        return [
+            'url' => route('tasks.show', $task),
+            'label' => $name !== '' ? $name : 'Procedura',
         ];
     }
 

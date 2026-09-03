@@ -25,6 +25,21 @@ services:
             - sail
         depends_on:
             - mysql
+    scheduler:
+        image: sail-8.3/app
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - mysql
+            - laravel.test
+        command: php artisan schedule:work
     mysql:
         image: 'mysql:8.0'
         ports:

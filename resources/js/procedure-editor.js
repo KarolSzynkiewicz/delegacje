@@ -10,15 +10,17 @@ const NODE_W = 190;
 const NODE_H = 84;
 
 const NODE_TYPES = {
-  start:     { label:'Start',        icon:'▶',  color:'#3ecf8e' },
-  end:       { label:'Koniec',       icon:'⏹',  color:'#ef5a6f' },
-  task:      { label:'Zadanie',      icon:'☰',  color:'#5b8def' },
-  checklist: { label:'Checklista',   icon:'☑',  color:'#3ecf8e' },
-  decision:  { label:'Decyzja',      icon:'◆',  color:'#f0a84e' },
-  wait:      { label:'Oczekiwanie',  icon:'⏱',  color:'#8b96b3' },
-  note:      { label:'Notatka',      icon:'✎',  color:'#6b7280' },
+  start:     { label:'Start',         icon:'▶',  color:'#3ecf8e' },
+  end:       { label:'Koniec',        icon:'⏹',  color:'#ef5a6f' },
+  task:      { label:'Zadanie',       icon:'☰',  color:'#5b8def' },
+  checklist: { label:'Checklista',    icon:'☑',  color:'#3ecf8e' },
+  decision:  { label:'Decyzja',       icon:'◆',  color:'#f0a84e' },
+  wait:      { label:'Oczekiwanie',   icon:'⏱',  color:'#8b96b3' },
+  comment:   { label:'Komentarz',     icon:'✎',  color:'#6b7280' },
+  action:    { label:'Akcja',         icon:'⚡',  color:'#a855f7' },
+  approval:  { label:'Zatwierdzenie', icon:'✓',  color:'#3ecf8e' },
 };
-const NODE_TYPE_ORDER = ['start','task','checklist','decision','wait','end','note'];
+const NODE_TYPE_ORDER = ['start','task','checklist','decision','wait','comment','action','approval','end'];
 
 /* ── 2. STATE ──────────────────────────────────────────────────────── */
 const state = {
@@ -113,7 +115,9 @@ function createNode(type, x, y){
   };
   if(type === 'checklist') node.checklist = [];
   if(type === 'decision') node.decision = { mode:'yesno', options:[{id:uid('opt'),label:'Tak'},{id:uid('opt'),label:'Nie'}] };
-  if(type === 'wait') node.wait = { duration: 5, unit: 'min' };
+  if(type === 'wait') node.wait = { duration: 1, unit: 'godz' };
+  if(type === 'action') node.action = '';
+  if(type === 'approval') node.decision = { mode:'yesno', options:[{id:'approved',label:'Zatwierdzone'},{id:'rejected',label:'Odrzucone'}] };
   return node;
 }
 function createEdge(from, to, label, optionId){
@@ -127,8 +131,11 @@ function userNameById(id){
   const u = editorUsers().find(x => Number(x.id) === Number(id));
   return u ? u.name : '';
 }
+function editorActions(){
+  return (window.ProcedureEditorData && window.ProcedureEditorData.actions) || [];
+}
 function renderAssigneeField(n){
-  if(['start','end','note'].includes(n.type)) return '';
+  if(['start','end'].includes(n.type)) return '';
   const opts = [`<option value="">— nikt —</option>`]
     .concat(editorUsers().map(u => `<option value="${u.id}" ${Number(n.assigned_user_id)===Number(u.id)?'selected':''}>${esc(u.name)}</option>`))
     .join('');
@@ -180,19 +187,21 @@ function validateProcess(p){
   if(starts.length){
     const visited = new Set(); const queue = [starts[0].id];
     while(queue.length){ const id=queue.shift(); if(visited.has(id)) continue; visited.add(id); p.edges.filter(e=>e.from===id).forEach(e=>queue.push(e.to)); }
-    p.nodes.forEach(n => { if(!visited.has(n.id) && n.type!=='note') issues.push({level:'warning', msg:`Węzeł "${n.name}" nie jest osiągalny ze Startu.`}); });
+    p.nodes.forEach(n => { if(!visited.has(n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie jest osiągalny ze Startu.`}); });
   }
 
   p.nodes.forEach(n => {
     if(!n.name||!n.name.trim()) issues.push({level:'error', msg:`Węzeł typu "${NODE_TYPES[n.type]?.label}" nie ma nazwy.`});
-    if(n.type==='decision'){
+    if(n.type==='decision' || n.type==='approval'){
       const opts=(n.decision&&n.decision.options)||[];
-      if(opts.length<2) issues.push({level:'error', msg:`Decyzja "${n.name}" ma mniej niż 2 opcje.`});
+      if(opts.length<2) issues.push({level:'error', msg:`${n.type==='approval'?'Zatwierdzenie':'Decyzja'} "${n.name}" ma mniej niż 2 wyjścia.`});
       opts.forEach(o=>{ if(!p.edges.some(e=>e.from===n.id&&e.optionId===o.id)) issues.push({level:'warning', msg:`Opcja "${o.label}" w węźle "${n.name}" nie ma połączenia.`}); });
     }
+    if(n.type==='approval' && !n.assigned_user_id) issues.push({level:'error', msg:`Zatwierdzenie "${n.name}" musi mieć odpowiedzialnego.`});
+    if(n.type==='action' && !n.action) issues.push({level:'error', msg:`Akcja "${n.name}" nie ma wybranej operacji.`});
     if(n.type==='checklist'&&(!n.checklist||n.checklist.length===0)) issues.push({level:'warning', msg:`Checklista "${n.name}" jest pusta.`});
-    if(n.type!=='end'&&n.type!=='note'&&!p.edges.some(e=>e.from===n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie ma wyjścia.`});
-    if(n.type!=='start'&&n.type!=='note'&&!p.edges.some(e=>e.to===n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie ma wejścia.`});
+    if(n.type!=='end'&&!p.edges.some(e=>e.from===n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie ma wyjścia.`});
+    if(n.type!=='start'&&!p.edges.some(e=>e.to===n.id)) issues.push({level:'warning', msg:`Węzeł "${n.name}" nie ma wejścia.`});
   });
   p.edges.forEach(e=>{ if(!p.nodes.find(n=>n.id===e.from)||!p.nodes.find(n=>n.id===e.to)) issues.push({level:'error', msg:'Wiszące połączenie do nieistniejącego węzła.'}); });
   return issues;
@@ -490,6 +499,12 @@ function nodeMetaLine(n){
   if(n.type==='checklist') parts.push(`<span class="pe-chip">${(n.checklist||[]).length} poz.</span>`);
   if(n.type==='decision')  parts.push(`<span class="pe-chip">${(n.decision?.options||[]).length} opcji</span>`);
   if(n.type==='wait')      parts.push(`<span class="pe-chip">${n.wait?.duration||0} ${n.wait?.unit||'min'}</span>`);
+  if(n.type==='action'){
+    const act = editorActions().find(a => a.key === n.action);
+    parts.push(`<span class="pe-chip">${esc(act?.label || (n.action || 'brak akcji'))}</span>`);
+  }
+  if(n.type==='comment')   parts.push(`<span class="pe-chip">na encję</span>`);
+  if(n.type==='approval')  parts.push(`<span class="pe-chip">zatwierdzenie</span>`);
   if(n.estimatedDuration)  parts.push(`<span class="pe-chip">⏱ ${n.estimatedDuration} ${n.durationUnit||'min'}</span>`);
   if(n.assigned_user_id){
     const assigneeName = userNameById(n.assigned_user_id);
@@ -681,7 +696,7 @@ function finalizeConnection(fromId,toId){
   const fromNode=p.nodes.find(n=>n.id===fromId);
   if(fromNode.type==='end'){ toast('Węzeł Koniec nie może mieć wychodzących połączeń.'); return; }
   pushUndo(); let label='',optionId=null;
-  if(fromNode.type==='decision'){ const opts=fromNode.decision.options; const usedOptIds=p.edges.filter(e=>e.from===fromId).map(e=>e.optionId); const freeOpt=opts.find(o=>!usedOptIds.includes(o.id))||opts[0]; optionId=freeOpt.id; label=freeOpt.label; }
+  if(fromNode.type==='decision' || fromNode.type==='approval'){ const opts=fromNode.decision.options; const usedOptIds=p.edges.filter(e=>e.from===fromId).map(e=>e.optionId); const freeOpt=opts.find(o=>!usedOptIds.includes(o.id))||opts[0]; optionId=freeOpt.id; label=freeOpt.label; }
   const edge=createEdge(fromId,toId,label,optionId); p.edges.push(edge); markDirty();
   state.selection={type:'edge',id:edge.id};
   renderCanvas(); renderProperties(); renderBottomPanel();
@@ -840,7 +855,7 @@ function wireProcessMetaPanel(){
   const p=state.currentProcess;
   document.getElementById('metaName').addEventListener('input',function(){ p.name=this.value; markDirty(); document.getElementById('procNameInput').value=p.name; });
   document.getElementById('metaCategory').addEventListener('input',function(){ p.category=this.value; markDirty(); });
-  document.getElementById('metaSubjectType').addEventListener('change',function(){ p.subject_type=this.value||null; markDirty(); });
+  document.getElementById('metaSubjectType').addEventListener('change',function(){ p.subject_type=this.value||null; markDirty(); renderProperties(); });
   document.getElementById('metaDesc').addEventListener('input',function(){ p.description=this.value; markDirty(); });
 }
 
@@ -864,6 +879,9 @@ function renderNodePanel(n){
   if(n.type==='checklist') html+=renderChecklistEditor(n);
   if(n.type==='decision')  html+=renderDecisionEditor(n);
   if(n.type==='wait')      html+=renderWaitEditor(n);
+  if(n.type==='action')    html+=renderActionEditor(n);
+  if(n.type==='approval')  html+=`<div class="pe-hint">Dwa wyjścia: Zatwierdzone / Odrzucone. Odpowiedzialny to zatwierdzający (work item w backlogu).</div>`;
+  if(n.type==='comment')   html+=`<div class="pe-hint">Wykonawca wpisuje komentarz, który ląduje na powiązanej encji (pracownik / kandydat).</div>`;
   html+=`
     <div class="pe-prop-section-title">Akcje</div>
     <div style="display:flex;gap:8px;">
@@ -926,6 +944,23 @@ function renderWaitEditor(n){
       <label class="pe-field"><span class="pe-lbl">Czas</span><input type="number" min="0" id="waitDuration" value="${n.wait.duration}"></label>
       <label class="pe-field"><span class="pe-lbl">Jednostka</span><select id="waitUnit">${['sek','min','godz','dni'].map(u=>`<option value="${u}" ${n.wait.unit===u?'selected':''}>${u}</option>`).join('')}</select></label>
     </div>
+    <div class="pe-hint">Po tym czasie procedura sama pójdzie dalej i wyśle powiadomienie. Można też kliknąć wcześniej.</div>
+  `;
+}
+
+function renderActionEditor(n){
+  const subject = state.currentProcess?.subject_type || '';
+  const actions = editorActions().filter(a => !subject || a.subject_types.includes(subject));
+  const opts = [`<option value="">— wybierz akcję —</option>`]
+    .concat(actions.map(a => `<option value="${esc(a.key)}" ${n.action===a.key?'selected':''}>${esc(a.label)}</option>`))
+    .join('');
+  const emptyHint = actions.length === 0
+    ? '<div class="pe-hint">Akcje są na razie dla pracownika i kandydata — ustaw typ przedmiotu szablonu.</div>'
+    : '';
+  return `
+    <div class="pe-prop-section-title">Akcja domenowa</div>
+    <label class="pe-field"><span class="pe-lbl">Operacja</span><select id="propAction">${opts}</select></label>
+    ${emptyHint}
   `;
 }
 
@@ -956,6 +991,9 @@ function wireNodePanel(n){
   if(n.type==='wait'){
     $('waitDuration').addEventListener('input',function(){ n.wait.duration=Number(this.value)||0; markDirty(); updateNodeCanvasLabel(n.id); });
     $('waitUnit').addEventListener('change',function(){ n.wait.unit=this.value; markDirty(); updateNodeCanvasLabel(n.id); });
+  }
+  if(n.type==='action'){
+    $('propAction')?.addEventListener('change',function(){ n.action=this.value||''; markDirty(); updateNodeCanvasLabel(n.id); });
   }
 }
 

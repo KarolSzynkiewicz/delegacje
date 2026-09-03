@@ -2,11 +2,15 @@
 
 namespace App\Livewire;
 
+use App\Enums\ApprovalDecision;
 use App\Enums\ProcedureRunStatus;
 use App\Models\ProcedureRun;
 use App\Models\User;
+use App\ProcedureActions\ActionCatalog;
 use App\Services\ProcedureRunService;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use RuntimeException;
 
 class ProcedureRunStepper extends Component
 {
@@ -21,9 +25,16 @@ class ProcedureRunStepper extends Component
     /** Decision choice per node: [node_id => edge_id] */
     public array $selectedEdgeIds = [];
 
+    /** Comment capture: [node_id => body] */
+    public array $commentBodies = [];
+
+    /** Domain action payload: [node_id => [field => value]] */
+    public array $actionPayload = [];
+
     public function mount(ProcedureRun $run): void
     {
-        $this->run = $run->load(['steps', 'task', 'subject', 'version']);
+        $this->run = $run->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version']);
+        $this->catchUpWaits();
         $this->initChecklistState();
     }
 
@@ -94,14 +105,47 @@ class ProcedureRunStepper extends Component
 
             $edge = collect($this->run->outgoingEdges($nodeId))->firstWhere('id', $edgeId);
             $stepData = ['option_id' => $edge['optionId'] ?? null, 'label' => $edge['label'] ?? ''];
+        } elseif ($nodeType === 'comment') {
+            $stepData = ['body' => $this->commentBodies[$nodeId] ?? ''];
+        } elseif ($nodeType === 'action') {
+            $stepData = $this->actionPayload[$nodeId] ?? [];
+        } elseif ($nodeType === 'approval') {
+            $this->addError('approval.'.$nodeId, 'Ten krok czeka na zatwierdzenie.');
+
+            return;
         }
 
         $this->resetErrorBag();
 
-        app(ProcedureRunService::class)->advanceNode($this->run, $nodeId, $edgeId, $stepData);
+        try {
+            app(ProcedureRunService::class)->advanceNode($this->run, $nodeId, $edgeId, $stepData);
+        } catch (ValidationException $e) {
+            $this->setErrorBag($e->validator->getMessageBag());
 
-        $this->run->refresh()->load(['steps', 'task', 'subject', 'version']);
-        unset($this->selectedEdgeIds[$nodeId], $this->checklistState[$nodeId]);
+            return;
+        } catch (RuntimeException $e) {
+            $this->addError($nodeType.'.'.$nodeId, $e->getMessage());
+
+            return;
+        }
+
+        $this->reloadRun();
+        unset($this->selectedEdgeIds[$nodeId], $this->checklistState[$nodeId], $this->commentBodies[$nodeId], $this->actionPayload[$nodeId]);
+        $this->initChecklistState();
+    }
+
+    public function decideApproval(string $nodeId, string $decision): void
+    {
+        $step = $this->run->steps
+            ->first(fn ($s) => $s->node_id === $nodeId && $s->completed_at === null);
+        $approval = $step?->approvalRequest;
+
+        if (! $approval || $approval->isDecided() || ! $approval->isApprover(auth()->user())) {
+            return;
+        }
+
+        $approval->decide(ApprovalDecision::from($decision), auth()->user());
+        $this->reloadRun();
         $this->initChecklistState();
     }
 
@@ -113,15 +157,28 @@ class ProcedureRunStepper extends Component
 
         app(ProcedureRunService::class)->goBackNode($this->run, $nodeId);
 
-        $this->run->refresh()->load(['steps', 'task', 'subject', 'version']);
-        unset($this->selectedEdgeIds[$nodeId], $this->checklistState[$nodeId]);
+        $this->reloadRun();
+        unset($this->selectedEdgeIds[$nodeId], $this->checklistState[$nodeId], $this->commentBodies[$nodeId], $this->actionPayload[$nodeId]);
         $this->initChecklistState();
     }
 
     public function abandon(): void
     {
         app(ProcedureRunService::class)->abandon($this->run);
-        $this->run->refresh()->load(['steps', 'task', 'subject', 'version']);
+        $this->reloadRun();
+    }
+
+    public function catchUpWaits(): void
+    {
+        if ($this->run->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return;
+        }
+
+        $resumed = app(ProcedureRunService::class)->resumeExpiredWaits($this->run);
+        if ($resumed > 0) {
+            $this->reloadRun();
+            $this->initChecklistState();
+        }
     }
 
     public function nodeAssigneeName(?array $node): ?string
@@ -134,8 +191,77 @@ class ProcedureRunStepper extends Component
         return User::query()->whereKey($id)->value('name');
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function actionFields(array $node): array
+    {
+        $key = (string) ($node['action'] ?? '');
+        if ($key === '') {
+            return [];
+        }
+
+        try {
+            return app(ActionCatalog::class)->find($key)->fields($this->run);
+        } catch (RuntimeException) {
+            return [];
+        }
+    }
+
+    public function actionLabel(array $node): ?string
+    {
+        $key = (string) ($node['action'] ?? '');
+        if ($key === '') {
+            return null;
+        }
+
+        try {
+            return app(ActionCatalog::class)->find($key)->label();
+        } catch (RuntimeException) {
+            return $key;
+        }
+    }
+
+    public function openApprovalStep(string $nodeId): ?\App\Models\ApprovalRequest
+    {
+        return $this->run->steps
+            ->first(fn ($s) => $s->node_id === $nodeId && $s->completed_at === null)
+            ?->approvalRequest;
+    }
+
     public function render()
     {
-        return view('livewire.procedure-run-stepper');
+        return view('livewire.procedure-run-stepper', [
+            'historyAssignees' => $this->historyAssigneeNames(),
+        ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function historyAssigneeNames(): array
+    {
+        $ids = [];
+        foreach ($this->run->steps as $step) {
+            $node = $this->run->findNodeById($step->node_id);
+            $id = (int) ($node['assigned_user_id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return User::query()
+            ->whereIn('id', array_unique($ids))
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    private function reloadRun(): void
+    {
+        $this->run->refresh()->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version', 'template']);
     }
 }

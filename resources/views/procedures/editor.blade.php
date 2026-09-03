@@ -148,6 +148,7 @@
         template: @json($template),
         subjectTypes: @json(\App\Enums\ProcedureSubjectType::formOptions()),
         users: @json($users),
+        actions: @json(app(\App\ProcedureActions\ActionCatalog::class)->editorOptions()),
         saveUrl:  "{{ route('procedure-templates.update', $template) }}",
         csrfToken: "{{ csrf_token() }}",
         indexUrl: "{{ route('procedure-templates.index') }}",

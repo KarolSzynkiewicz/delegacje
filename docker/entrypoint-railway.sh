@@ -84,6 +84,10 @@ else
     php artisan passport:keys --no-interaction || true
 fi
 
+# Keep procedure waits ticking without an external cron.
+echo "[SCHEDULER] Starting schedule:work in background..."
+php artisan schedule:work >> storage/logs/scheduler.log 2>&1 &
+
 # Start server
 echo "[START] Starting Laravel server..."
 echo "[INFO] Listening on 0.0.0.0:${PORT:-8000}"

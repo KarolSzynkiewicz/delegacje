@@ -14,15 +14,6 @@
     $tokens = is_array($tokens) ? $tokens : [];
     $nodeW = 190;
     $nodeH = 88;
-    $typeMeta = [
-        'start' => ['icon' => '▶', 'color' => '#3ecf8e'],
-        'end' => ['icon' => '⏹', 'color' => '#ef5a6f'],
-        'task' => ['icon' => '☰', 'color' => '#5b8def'],
-        'checklist' => ['icon' => '☑', 'color' => '#3ecf8e'],
-        'decision' => ['icon' => '◆', 'color' => '#f0a84e'],
-        'wait' => ['icon' => '⏱', 'color' => '#8b96b3'],
-        'note' => ['icon' => '✎', 'color' => '#6b7280'],
-    ];
 
     $laid = [];
     foreach ($nodes as $i => $node) {
@@ -115,7 +106,7 @@
                     @php
                         $id = (string) ($node['id'] ?? '');
                         $type = $node['type'] ?? 'task';
-                        $meta = $typeMeta[$type] ?? $typeMeta['task'];
+                        $meta = \App\Models\ProcedureRun::nodeTypeMeta($type);
                         $state = $nodeState($id);
                         $color = $node['color'] ?? $meta['color'];
                         $icon = $node['icon'] ?? $meta['icon'];

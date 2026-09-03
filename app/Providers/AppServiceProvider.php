@@ -27,6 +27,7 @@ use App\Models\TransportCost;
 use App\Models\User;
 use App\Models\VehicleAssignment;
 use App\Models\WarehouseDispatch;
+use App\Observers\AdvancesProcedureOnApproval;
 use App\Observers\AuditableModelObserver;
 use App\Observers\NotifiesApprovalAssignee;
 use App\Observers\ProcedureTemplateObserver;
@@ -102,6 +103,7 @@ class AppServiceProvider extends ServiceProvider
         CommentMention::observe(SyncsWorkItems::class);
         ApprovalRequest::observe(SyncsWorkItems::class);
         ApprovalRequest::observe(NotifiesApprovalAssignee::class);
+        ApprovalRequest::observe(AdvancesProcedureOnApproval::class);
 
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,

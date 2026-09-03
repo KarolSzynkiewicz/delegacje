@@ -146,7 +146,7 @@ class TaskController extends Controller
             return $redirect;
         }
 
-        $task->load(['assignedTo', 'createdBy', 'sprint', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.version', 'procedureRun.startedBy', 'procedureRun.steps', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess.candidate', 'subject.user', 'subject.commentable', 'subject.parent']);
+        $task->load(['assignedTo', 'createdBy', 'sprint', 'comments.user', 'subtasks', 'attachments.uploader', 'procedureRun.template', 'procedureRun.version', 'procedureRun.startedBy', 'procedureRun.steps.approvalRequest.approver', 'procedureRun.steps.performedBy', 'procedureRun.comments.user', 'procedureRun.subject', 'recruitmentProcess.candidate', 'subject.user', 'subject.commentable', 'subject.parent']);
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('tasks.show', compact('task', 'users'));

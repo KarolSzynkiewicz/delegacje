@@ -67,6 +67,8 @@
                 'likes.user',
                 'parent.user',
                 'parent.attachments',
+                'procedureRun.template',
+                'procedureRun.task',
                 'mentions' => fn ($q) => $q->where('assigned_to', auth()->id()),
                 'approvalRequests' => fn ($q) => $q->where('approver_id', auth()->id()),
             ])

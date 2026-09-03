@@ -2,17 +2,20 @@
 
 namespace App\Services;
 
+use App\Enums\ApprovalDecision;
 use App\Enums\ProcedureRunStatus;
 use App\Enums\TaskStatus;
 use App\Events\ProcedureRunStepCompleted;
 use App\Events\ProcedureRunStepEntered;
+use App\Models\ApprovalRequest;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
 use App\Models\ProcedureTemplate;
-use App\Models\ProcedureTemplateVersion;
 use App\Models\ProjectTask;
 use App\Models\User;
+use App\Notifications\ProcedureWaitElapsed;
 use App\Notifications\TaskAssigned;
+use App\ProcedureActions\ActionCatalog;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -146,11 +149,14 @@ class ProcedureRunService
             ->latest('entered_at')
             ->first();
 
+        $stepData = $this->applyNodeSideEffects($run, $node, $stepData, $userId);
+
         if ($currentStep) {
             $currentStep->update([
                 'completed_at' => $now,
                 'performed_by' => $userId,
                 'data' => $stepData ?: null,
+                'resume_at' => null,
             ]);
         }
 
@@ -167,12 +173,15 @@ class ProcedureRunService
             return;
         }
 
-        if (($node['type'] ?? '') === 'decision') {
+        if (in_array($node['type'] ?? '', ['decision', 'approval'], true)) {
             $chosen = collect($outgoing)->first(fn ($e) => ($e['id'] ?? null) === $edgeId
-                || ($e['optionId'] ?? null) === ($stepData['option_id'] ?? null));
+                || ($e['optionId'] ?? null) === ($stepData['option_id'] ?? $stepData['approval_decision'] ?? null));
 
             if ($chosen === null) {
-                throw new RuntimeException('Wybierz opcję decyzji przed kontynuacją.');
+                $label = ($node['type'] ?? '') === 'approval'
+                    ? 'Zatwierdzenie nie ma gałęzi dla tej decyzji.'
+                    : 'Wybierz opcję decyzji przed kontynuacją.';
+                throw new RuntimeException($label);
             }
 
             $outgoing = [$chosen];
@@ -248,6 +257,7 @@ class ProcedureRunService
             ->first();
 
         if ($openStep !== null) {
+            $this->discardPendingApproval($openStep);
             $this->cancelSpawnedSteps($run, $openStep->id);
             $openStep->delete();
             $this->removeActiveNode($run, $nodeId);
@@ -277,7 +287,7 @@ class ProcedureRunService
 
         $this->addActiveNode($run, $nodeId);
 
-        ProcedureRunStep::create([
+        $reopened = ProcedureRunStep::create([
             'procedure_run_id' => $run->id,
             'node_id' => $nodeId,
             'node_name' => $completedStep->node_name,
@@ -288,6 +298,11 @@ class ProcedureRunService
             'data' => null,
             'spawned_from_step_id' => $completedStep->spawned_from_step_id,
         ]);
+
+        $node = $this->findNodeById($run->definition(), $nodeId);
+        if ($node !== null) {
+            $this->afterActivate($run, $reopened, $node);
+        }
     }
 
     /** @deprecated Use goBackNode() */
@@ -357,7 +372,7 @@ class ProcedureRunService
                 ->exists();
 
             if (! $alreadyOpen) {
-                ProcedureRunStep::create([
+                $opened = ProcedureRunStep::create([
                     'procedure_run_id' => $run->id,
                     'spawned_from_step_id' => $spawnedFromStepId,
                     'node_id' => $nextNodeId,
@@ -369,6 +384,7 @@ class ProcedureRunService
                     'data' => null,
                 ]);
 
+                $this->afterActivate($run, $opened, $nextNode);
                 $this->dispatchStepEntered($run->load(['task', 'version']), $nextNode, $previousNode);
             }
         }
@@ -403,6 +419,7 @@ class ProcedureRunService
 
             $queue = array_merge($queue, $childIds);
 
+            $this->discardPendingApproval($step);
             $this->removeActiveNode($run, $step->node_id);
             $step->delete();
         }
@@ -683,5 +700,197 @@ class ProcedureRunService
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     * @param  array<string, mixed>  $stepData
+     * @return array<string, mixed>
+     */
+    protected function applyNodeSideEffects(ProcedureRun $run, array $node, array $stepData, ?int $userId): array
+    {
+        $type = $node['type'] ?? '';
+        $actor = Auth::user() ?? $run->startedBy;
+
+        if ($type === 'approval' && empty($stepData['approval_decision'])) {
+            throw new RuntimeException('Ten krok czeka na zatwierdzenie.');
+        }
+
+        if ($type === 'comment') {
+            if (! $actor) {
+                throw new RuntimeException('Brak użytkownika do zapisania komentarza.');
+            }
+            $comment = app(ProcedureSubjectComment::class)->write(
+                $run,
+                $node,
+                (string) ($stepData['body'] ?? ''),
+                $actor,
+            );
+            $stepData['comment_id'] = $comment->id;
+        }
+
+        if ($type === 'action') {
+            if (! $actor) {
+                throw new RuntimeException('Brak użytkownika do wykonania akcji.');
+            }
+            $key = (string) ($node['action'] ?? '');
+            if ($key === '') {
+                throw new RuntimeException('Węzeł akcji nie ma wybranej operacji.');
+            }
+            $stepData['result'] = app(ActionCatalog::class)->execute($key, $run, $stepData, $actor);
+            $stepData['action'] = $key;
+        }
+
+        return $stepData;
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    protected function afterActivate(ProcedureRun $run, ProcedureRunStep $step, array $node): void
+    {
+        $type = $node['type'] ?? '';
+
+        if ($type === 'wait') {
+            $step->update(['resume_at' => ProcedureWait::resumeAt($node['wait'] ?? [], $step->entered_at)]);
+        }
+
+        if ($type === 'approval') {
+            $this->openApproval($run, $step, $node);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    protected function openApproval(ProcedureRun $run, ProcedureRunStep $step, array $node): void
+    {
+        $approverId = (int) ($node['assigned_user_id'] ?? 0);
+        if ($approverId <= 0) {
+            throw new RuntimeException('Krok zatwierdzenia musi mieć odpowiedzialnego (zatwierdzającego).');
+        }
+
+        $run->loadMissing(['template', 'task', 'startedBy']);
+
+        $approval = ApprovalRequest::query()->create([
+            'name' => $node['name'] ?? ('Zatwierdzenie: '.($run->template?->name ?? 'procedura')),
+            'description' => trim((string) ($node['instructions'] ?? $node['description'] ?? '')) ?: null,
+            'approver_id' => $approverId,
+            'created_by' => Auth::id() ?? $run->started_by,
+            'procedure_run_id' => $run->id,
+            'sprint_id' => $run->task?->sprint_id,
+            'category' => $run->template?->category ?: $run->task?->category,
+        ]);
+
+        $step->update(['approval_request_id' => $approval->id]);
+    }
+
+    protected function discardPendingApproval(ProcedureRunStep $step): void
+    {
+        if (! $step->approval_request_id) {
+            return;
+        }
+
+        $approval = ApprovalRequest::query()->find($step->approval_request_id);
+        if ($approval && ! $approval->isDecided()) {
+            $approval->delete();
+        }
+    }
+
+    public function resumeFromApproval(ApprovalRequest $approval): void
+    {
+        $approval->loadMissing('procedureRun.version');
+        $run = $approval->procedureRun;
+        if ($run === null || $run->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return;
+        }
+
+        $step = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('approval_request_id', $approval->id)
+            ->whereNull('completed_at')
+            ->first();
+
+        if ($step === null) {
+            return;
+        }
+
+        $decision = $approval->decision?->value;
+        $outgoing = $run->outgoingEdges($step->node_id);
+        $wantedLabel = $decision === ApprovalDecision::Approved->value ? 'Zatwierdzone' : 'Odrzucone';
+        $edge = collect($outgoing)->first(function ($e) use ($decision, $wantedLabel) {
+            return ($e['optionId'] ?? null) === $decision
+                || strcasecmp((string) ($e['label'] ?? ''), $wantedLabel) === 0;
+        });
+
+        if ($edge === null && $outgoing !== []) {
+            $edge = $decision === ApprovalDecision::Approved->value
+                ? $outgoing[0]
+                : ($outgoing[1] ?? $outgoing[0]);
+        }
+
+        $this->advanceNode($run, $step->node_id, $edge['id'] ?? null, [
+            'approval_decision' => $decision,
+            'option_id' => $decision,
+            'approval_request_id' => $approval->id,
+        ]);
+    }
+
+    public function resumeExpiredWaits(?ProcedureRun $only = null): int
+    {
+        $query = ProcedureRunStep::query()
+            ->with(['run.version', 'run.template', 'run.task', 'run.startedBy'])
+            ->where('node_type', 'wait')
+            ->whereNull('completed_at');
+
+        if ($only) {
+            $query->where('procedure_run_id', $only->id);
+        }
+
+        $steps = $query->get();
+        $count = 0;
+
+        foreach ($steps as $step) {
+            $run = $step->run;
+            if ($run === null || $run->status !== ProcedureRunStatus::IN_PROGRESS) {
+                continue;
+            }
+            if (! in_array($step->node_id, $run->activeNodeIds(), true)) {
+                continue;
+            }
+
+            if ($step->resume_at === null) {
+                $node = $run->findNodeById($step->node_id) ?? [];
+                $step->update(['resume_at' => ProcedureWait::resumeAt($node['wait'] ?? [], $step->entered_at)]);
+                $step->refresh();
+            }
+
+            if ($step->resume_at === null || $step->resume_at->gt(now())) {
+                continue;
+            }
+
+            $this->advanceNode($run, $step->node_id, null, ['wait_elapsed' => true]);
+            $this->notifyWaitElapsed($run->fresh(), $step);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    protected function notifyWaitElapsed(ProcedureRun $run, ProcedureRunStep $step): void
+    {
+        $run->loadMissing(['task', 'startedBy', 'version']);
+        $node = $run->findNodeById($step->node_id);
+        $ids = array_filter([
+            (int) ($node['assigned_user_id'] ?? 0),
+            (int) ($run->task?->assigned_to ?? 0),
+        ]);
+
+        foreach (array_unique($ids) as $userId) {
+            if ($userId <= 0) {
+                continue;
+            }
+            User::query()->find($userId)?->notify(new ProcedureWaitElapsed($run, $step, $run->startedBy));
+        }
     }
 }

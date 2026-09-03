@@ -6,9 +6,10 @@
     $isAbandoned = $run->status->value === 'abandoned';
     $isDone      = $isFinished || $isAbandoned;
     $definition  = $run->definition();
+    $hasActiveWait = collect($activeNodes)->contains(fn ($n) => ($n['type'] ?? '') === 'wait');
 @endphp
 
-<div>
+<div @if($hasActiveWait && ! $isDone) wire:poll.5s="catchUpWaits" @endif>
     <x-ui.card>
         @unless($compact)
             <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
@@ -187,14 +188,92 @@
                                 @endforeach
                             </div>
                         @elseif($nodeType === 'wait')
+                            @php
+                                $waitStep = $run->steps->first(fn ($s) => $s->node_id === $nodeId && $s->completed_at === null);
+                            @endphp
                             <div class="alert alert-warning py-2 px-3 small mb-3">
                                 <i class="bi bi-clock-history me-1"></i>
                                 Oczekiwanie: {{ $node['wait']['duration'] ?? '?' }} {{ $node['wait']['unit'] ?? 'min' }}.
-                                Kontynuuj gdy warunek jest spełniony.
+                                @if($waitStep?->resume_at)
+                                    Wznawia się {{ $waitStep->resume_at->format('d.m H:i') }}.
+                                @endif
+                                Strona sama ruszy, gdy minie czas — albo kontynuuj wcześniej.
                             </div>
+                        @elseif($nodeType === 'comment')
+                            @error('comment.'.$nodeId)
+                                <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
+                            @enderror
+                            <label class="form-label small text-muted">Komentarz do {{ $run->sourceCard()['label'] ?? 'encji' }}</label>
+                            <textarea class="form-control mb-3" rows="3"
+                                      wire:model="commentBodies.{{ $nodeId }}"
+                                      placeholder="Co zostało ustalone / sprawdzone…"></textarea>
+                        @elseif($nodeType === 'action')
+                            @php $actionLabel = $this->actionLabel($node); $fields = $this->actionFields($node); @endphp
+                            @error('action.'.$nodeId)
+                                <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
+                            @enderror
+                            @if($actionLabel)
+                                <div class="small text-muted mb-2">{{ $actionLabel }}</div>
+                            @else
+                                <div class="alert alert-warning py-2 px-3 small mb-3">W węźle nie wybrano akcji.</div>
+                            @endif
+                            <div class="d-flex flex-column gap-2 mb-3">
+                                @foreach($fields as $field)
+                                    @php $fname = $field['name']; @endphp
+                                    <label class="form-label small mb-0">{{ $field['label'] }}</label>
+                                    @if(($field['type'] ?? '') === 'textarea')
+                                        <textarea class="form-control form-control-sm" rows="2"
+                                                  wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}"></textarea>
+                                    @elseif(($field['type'] ?? '') === 'select')
+                                        <select class="form-select form-select-sm" wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
+                                            <option value="">— wybierz —</option>
+                                            @foreach($field['options'] ?? [] as $opt)
+                                                <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    @elseif(($field['type'] ?? '') === 'multiselect')
+                                        <select class="form-select form-select-sm" multiple
+                                                wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
+                                            @foreach($field['options'] ?? [] as $opt)
+                                                <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <input class="form-control form-control-sm"
+                                               type="{{ $field['type'] === 'date' ? 'date' : ($field['type'] === 'number' ? 'number' : 'text') }}"
+                                               @if(! empty($field['step'])) step="{{ $field['step'] }}" @endif
+                                               @if(isset($field['min'])) min="{{ $field['min'] }}" @endif
+                                               @if(isset($field['max'])) max="{{ $field['max'] }}" @endif
+                                               wire:model="actionPayload.{{ $nodeId }}.{{ $fname }}">
+                                    @endif
+                                @endforeach
+                            </div>
+                        @elseif($nodeType === 'approval')
+                            @php $approval = $this->openApprovalStep($nodeId); @endphp
+                            @error('approval.'.$nodeId)
+                                <div class="alert alert-danger py-2 px-3 small mb-2">{{ $message }}</div>
+                            @enderror
+                            @if($approval)
+                                <div class="alert alert-info py-2 px-3 small mb-3">
+                                    Czeka na decyzję: <strong>{{ $approval->approver?->name ?? '—' }}</strong>
+                                    · <a href="{{ route('approval-requests.show', $approval) }}">otwórz wniosek</a>
+                                </div>
+                                @if($approval->isApprover(auth()->user()) && ! $approval->isDecided())
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button type="button" class="btn btn-success btn-sm"
+                                                wire:click="decideApproval('{{ $nodeId }}', 'approved')">
+                                            Zatwierdź
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm"
+                                                wire:click="decideApproval('{{ $nodeId }}', 'rejected')">
+                                            Odrzuć
+                                        </button>
+                                    </div>
+                                @endif
+                            @endif
                         @endif
 
-                        @if(! $isDone)
+                        @if(! $isDone && $nodeType !== 'approval')
                             <div class="d-flex gap-2 justify-content-between flex-wrap">
                                 <button type="button"
                                         class="btn btn-outline-secondary btn-sm flex-grow-1 flex-sm-grow-0"
@@ -206,13 +285,23 @@
                                         wire:click="advanceNode('{{ $nodeId }}')">
                                     @if($nodeType === 'decision')
                                         <i class="bi bi-arrow-right-circle me-1"></i> Wybierz opcję
-                                    @elseif($nodeType === 'note')
-                                        <i class="bi bi-arrow-right me-1"></i> Kontynuuj
+                                    @elseif($nodeType === 'comment')
+                                        <i class="bi bi-chat-text me-1"></i> Zapisz komentarz
+                                    @elseif($nodeType === 'action')
+                                        <i class="bi bi-lightning me-1"></i> Wykonaj i dalej
+                                    @elseif($nodeType === 'wait')
+                                        <i class="bi bi-skip-forward me-1"></i> Kontynuuj wcześniej
                                     @else
                                         <i class="bi bi-check-circle me-1"></i> Oznacz jako wykonane
                                     @endif
                                 </button>
                             </div>
+                        @elseif(! $isDone)
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    wire:click="goBackNode('{{ $nodeId }}')">
+                                <i class="bi bi-arrow-left me-1"></i> Wstecz
+                            </button>
                         @endif
                     </div>
                 @endforeach
@@ -226,19 +315,61 @@
                     <i class="bi bi-list-ol me-1"></i>Historia kroków
                 </span>
             </div>
-            <div class="d-flex flex-column gap-1">
+            <div class="procedure-step-history-list">
                 @foreach($run->steps->whereNotNull('completed_at') as $step)
-                    <div class="d-flex align-items-start gap-2 small py-1 border-bottom flex-wrap"
-                         style="border-color: var(--glass-border) !important;">
-                        <i class="bi bi-check-circle-fill text-success flex-shrink-0 mt-1"></i>
-                        <span class="fw-semibold min-w-0 text-break">{{ $step->node_name }}</span>
-                        <span class="badge bg-secondary bg-opacity-25 text-muted" style="font-size:.65rem;">
-                            {{ \App\Models\ProcedureRun::nodeTypeLabel($step->node_type) }}
+                    @php
+                        $node = $run->findNodeById($step->node_id);
+                        $frame = $step->historyFrame($node);
+                        $outcome = $step->historyOutcome();
+                        $assigneeName = $frame['assignee_id'] > 0
+                            ? (($historyAssignees ?? [])[$frame['assignee_id']] ?? null)
+                            : null;
+                        $performerName = $step->performedBy?->name;
+                        $whenName = $assigneeName
+                            ? (($performerName && $performerName !== $assigneeName) ? $performerName : null)
+                            : $performerName;
+                    @endphp
+                    <div class="procedure-step-history" style="--step-color: {{ $frame['color'] }}">
+                        <span class="procedure-step-history__icon" title="{{ $frame['type_label'] }}">
+                            <i class="bi {{ $frame['bi'] }}"></i>
                         </span>
-                        <span class="ms-sm-auto text-muted">
-                            {{ $step->performed_by ? \App\Models\User::find($step->performed_by)?->name : '—' }}
-                            · {{ $step->completed_at->format('d.m H:i') }}
-                        </span>
+                        <div class="procedure-step-history__body min-w-0">
+                            <div class="procedure-step-history__head">
+                                <div class="min-w-0">
+                                    <div class="procedure-step-history__name">{{ $frame['name'] }}</div>
+                                    @if($frame['show_type'])
+                                        <div class="procedure-step-history__type">{{ $frame['type_label'] }}</div>
+                                    @endif
+                                </div>
+                                <div class="procedure-step-history__when">
+                                    @if($whenName)
+                                        <span>{{ $whenName }}</span>
+                                    @endif
+                                    <span>{{ $step->completed_at->format('d.m H:i') }}</span>
+                                </div>
+                            </div>
+                            @if($frame['description'])
+                                <p class="procedure-step-history__desc">{!! nl2br(e($frame['description'])) !!}</p>
+                            @endif
+                            @if($assigneeName)
+                                <div class="procedure-step-history__assignee">
+                                    <i class="bi bi-person"></i>
+                                    {{ $assigneeName }}
+                                </div>
+                            @endif
+                            @if($outcome)
+                                <div @class([
+                                    'procedure-step-history__outcome',
+                                    'is-ok' => ($outcome['tone'] ?? null) === 'ok',
+                                    'is-no' => ($outcome['tone'] ?? null) === 'no',
+                                ])>
+                                    <span>{{ $outcome['text'] }}</span>
+                                    @if(! empty($outcome['url']))
+                                        <a href="{{ $outcome['url'] }}" class="procedure-step-history__link">zobacz</a>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 @endforeach
             </div>

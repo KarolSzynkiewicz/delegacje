@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('pulse:check --once')->everyMinute();
+        $schedule->command('procedures:resume-waits')->everyMinute()->withoutOverlapping();
     }
 
     /**

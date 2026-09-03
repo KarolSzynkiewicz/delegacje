@@ -43,6 +43,12 @@
             <div class="comment-item__meta">
                 <span class="comment-item__name">{{ $comment->user->name }}</span>
                 <span class="comment-item__time">{{ $comment->created_at->format('d.m.Y H:i') }}</span>
+                @if($procedureLink = $comment->procedureSourceCard())
+                    <a href="{{ $procedureLink['url'] }}" class="comment-item__proc" title="Otwórz procedurę">
+                        <i class="bi bi-diagram-3"></i>
+                        <span>{{ $procedureLink['label'] }}</span>
+                    </a>
+                @endif
             </div>
         </div>
         <div class="comment-item__actions">

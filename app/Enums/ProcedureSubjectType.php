@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Models\Project;
 use App\Models\RecruitmentCandidate;
+use App\Models\RecruitmentProcess;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,7 @@ enum ProcedureSubjectType: string
     case Employee = 'employee';
     case Project = 'project';
     case RecruitmentCandidate = 'recruitment_candidate';
+    case RecruitmentProcess = 'recruitment_process';
 
     public function label(): string
     {
@@ -29,6 +31,7 @@ enum ProcedureSubjectType: string
             self::Employee => 'Pracownik',
             self::Project => 'Projekt',
             self::RecruitmentCandidate => 'Kandydat',
+            self::RecruitmentProcess => 'Proces rekrutacji',
         };
     }
 
@@ -44,6 +47,7 @@ enum ProcedureSubjectType: string
             self::Employee => Employee::class,
             self::Project => Project::class,
             self::RecruitmentCandidate => RecruitmentCandidate::class,
+            self::RecruitmentProcess => RecruitmentProcess::class,
         };
     }
 
@@ -58,6 +62,7 @@ enum ProcedureSubjectType: string
             ]))) ?: $fallback,
             self::Accommodation, self::Location, self::Project => (string) ($model->name ?: $fallback),
             self::Employee, self::RecruitmentCandidate => trim(($model->first_name ?? '').' '.($model->last_name ?? '')) ?: $fallback,
+            self::RecruitmentProcess => trim(($model->candidate?->first_name ?? $model->first_name ?? '').' '.($model->candidate?->last_name ?? $model->last_name ?? '')) ?: $fallback,
         };
     }
 
@@ -84,6 +89,7 @@ enum ProcedureSubjectType: string
             self::Employee => Employee::query()->whereNull('terminated_at')->orderBy('last_name')->orderBy('first_name'),
             self::Project => Project::query()->orderBy('name'),
             self::RecruitmentCandidate => RecruitmentCandidate::query()->orderBy('last_name')->orderBy('first_name'),
+            self::RecruitmentProcess => RecruitmentProcess::query()->with('candidate')->latest('id'),
         };
     }
 
@@ -96,6 +102,7 @@ enum ProcedureSubjectType: string
             self::Employee => 'bi-person-badge',
             self::Project => 'bi-folder',
             self::RecruitmentCandidate => 'bi-person-vcard',
+            self::RecruitmentProcess => 'bi-person-lines-fill',
         };
     }
 
@@ -108,6 +115,7 @@ enum ProcedureSubjectType: string
             self::Employee => route('employees.show', $model),
             self::Project => route('projects.show', $model),
             self::RecruitmentCandidate => $this->recruitmentCandidateUrl($model),
+            self::RecruitmentProcess => route('recruitment-processes.show', $model),
         };
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ProcedureRun extends Model
@@ -146,6 +147,11 @@ class ProcedureRun extends Model
         return $this->hasMany(ProcedureRunComment::class)->orderBy('created_at');
     }
 
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
     public function task(): HasOne
     {
         return $this->hasOne(ProjectTask::class, 'procedure_run_id');
@@ -190,18 +196,31 @@ class ProcedureRun extends Model
         ));
     }
 
-    public static function nodeTypeLabel(?string $type): string
+    /**
+     * Ikona, kolor i etykieta typu — te same co na canvasie edytora / przebiegu.
+     *
+     * @return array{icon: string, color: string, label: string, default_name: string, bi: string}
+     */
+    public static function nodeTypeMeta(?string $type): array
     {
         return match ($type) {
-            'start' => 'Start',
-            'end' => 'Koniec',
-            'task' => 'Krok',
-            'checklist' => 'Checklista',
-            'decision' => 'Decyzja',
-            'wait' => 'Oczekiwanie',
-            'note' => 'Notatka',
-            default => $type ?: '—',
+            'start' => ['icon' => '▶', 'color' => '#3ecf8e', 'label' => 'Start', 'default_name' => 'Start', 'bi' => 'bi-play-fill'],
+            'end' => ['icon' => '⏹', 'color' => '#ef5a6f', 'label' => 'Koniec', 'default_name' => 'Koniec', 'bi' => 'bi-stop-fill'],
+            'task' => ['icon' => '☰', 'color' => '#5b8def', 'label' => 'Krok', 'default_name' => 'Zadanie', 'bi' => 'bi-list-task'],
+            'checklist' => ['icon' => '☑', 'color' => '#3ecf8e', 'label' => 'Checklista', 'default_name' => 'Checklista', 'bi' => 'bi-check2-square'],
+            'decision' => ['icon' => '◆', 'color' => '#f0a84e', 'label' => 'Decyzja', 'default_name' => 'Decyzja', 'bi' => 'bi-diamond-fill'],
+            'wait' => ['icon' => '⏱', 'color' => '#8b96b3', 'label' => 'Oczekiwanie', 'default_name' => 'Oczekiwanie', 'bi' => 'bi-hourglass-split'],
+            'comment' => ['icon' => '✎', 'color' => '#6b7280', 'label' => 'Komentarz', 'default_name' => 'Komentarz', 'bi' => 'bi-pencil-fill'],
+            'action' => ['icon' => '⚡', 'color' => '#a855f7', 'label' => 'Akcja', 'default_name' => 'Akcja', 'bi' => 'bi-lightning-fill'],
+            'approval' => ['icon' => '✓', 'color' => '#3ecf8e', 'label' => 'Zatwierdzenie', 'default_name' => 'Zatwierdzenie', 'bi' => 'bi-check-lg'],
+            'note' => ['icon' => '✎', 'color' => '#6b7280', 'label' => 'Notatka', 'default_name' => 'Notatka', 'bi' => 'bi-sticky'],
+            default => ['icon' => '☰', 'color' => '#5b8def', 'label' => $type ?: '—', 'default_name' => $type ?: '—', 'bi' => 'bi-list-task'],
         };
+    }
+
+    public static function nodeTypeLabel(?string $type): string
+    {
+        return self::nodeTypeMeta($type)['label'];
     }
 
     /** 0.0–1.0 progress fraction. */

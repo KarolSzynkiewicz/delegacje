@@ -16,6 +16,7 @@ class ApprovalRequest extends Model
         'approver_id',
         'created_by',
         'comment_id',
+        'procedure_run_id',
         'sprint_id',
         'category',
         'priority',
@@ -57,6 +58,11 @@ class ApprovalRequest extends Model
     public function comment(): BelongsTo
     {
         return $this->belongsTo(Comment::class);
+    }
+
+    public function procedureRun(): BelongsTo
+    {
+        return $this->belongsTo(ProcedureRun::class);
     }
 
     public function sprint(): BelongsTo

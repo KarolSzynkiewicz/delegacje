@@ -7692,6 +7692,10 @@ a.comment-quote:hover {
 .comment-item__meta {
     min-width: 0;
     line-height: 1.2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.15rem 0;
 }
 .comment-item__name {
     font-weight: 600;
@@ -7703,6 +7707,30 @@ a.comment-quote:hover {
     color: var(--text-muted);
     margin-left: 0.35rem;
     font-weight: 400;
+}
+.comment-item__proc {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin-left: 0.45rem;
+    max-width: min(16rem, 46vw);
+    padding: 0.08rem 0.42rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.28);
+}
+.comment-item__proc span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.comment-item__proc:hover {
+    color: var(--accent);
+    text-decoration: underline;
 }
 .comment-item__reply-tag {
     font-size: 0.72rem;
@@ -10840,6 +10868,156 @@ body:has(.xuiv2-tasks.is-edi-review) .ui-page-header:not(.ui-page-header--has-le
 .pr-flow-n-flag--done { color: #6ee7b7; }
 .pr-flow-n-flag--waiting { color: #fbbf24; }
 .pr-flow-hint { font-size: 10.5px; margin-top: .4rem; }
+
+.procedure-step-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+.procedure-step-history {
+    --step-color: var(--primary);
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    column-gap: 0.85rem;
+    position: relative;
+    padding: 0.55rem 0.15rem 0.7rem;
+}
+.procedure-step-history:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 16px;
+    top: 2.35rem;
+    bottom: -0.2rem;
+    width: 2px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--step-color) 38%, var(--glass-border));
+}
+.procedure-step-history__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    font-size: 0.92rem;
+    line-height: 1;
+    color: #fff;
+    background: color-mix(in srgb, var(--step-color) 88%, #0b1220);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--step-color) 45%, transparent),
+        0 6px 16px color-mix(in srgb, var(--step-color) 22%, transparent);
+}
+.procedure-step-history__icon .bi {
+    display: block;
+    line-height: 1;
+    translate: 0 0.5px;
+}
+.procedure-step-history__body {
+    min-width: 0;
+    padding-top: 0.12rem;
+}
+.procedure-step-history__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+}
+.procedure-step-history__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main);
+    line-height: 1.3;
+    overflow-wrap: break-word;
+}
+.procedure-step-history__type {
+    margin-top: 0.12rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.procedure-step-history__when {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.08rem;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.procedure-step-history__desc {
+    margin: 0.45rem 0 0;
+    padding: 0.45rem 0.7rem;
+    border-left: 2px solid color-mix(in srgb, var(--step-color) 70%, transparent);
+    border-radius: 0 10px 10px 0;
+    background: color-mix(in srgb, var(--step-color) 9%, transparent);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+.procedure-step-history__assignee {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.procedure-step-history__outcome {
+    display: block;
+    margin-top: 0.45rem;
+    max-width: 100%;
+    padding: 0.42rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    overflow-wrap: break-word;
+}
+.procedure-step-history__outcome.is-ok {
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.28);
+}
+.procedure-step-history__outcome.is-no {
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.28);
+}
+.procedure-step-history__link {
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.procedure-step-history__link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+@media (max-width: 575.98px) {
+    .procedure-step-history__head {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+    .procedure-step-history__when {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.35rem;
+        text-align: left;
+    }
+}
 
 @media (max-width: 767.98px) {
     .pr-flow-canvas { height: 240px; }

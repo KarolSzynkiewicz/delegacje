@@ -16,7 +16,7 @@ class CompleteProcedureStepMentionTasks
         }
 
         $leavingType = $leaving['type'] ?? '';
-        if (in_array($leavingType, ['start', 'end', 'note'], true)) {
+        if (in_array($leavingType, ['start', 'end', 'note', 'approval'], true)) {
             return;
         }
 
