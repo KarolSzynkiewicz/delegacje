@@ -21,6 +21,9 @@ class ApprovalRequestController extends Controller
             'sprint',
             'attachments.uploader',
             'comment.commentable',
+            'procedureRun.template',
+            'procedureRun.task',
+            'procedureRun.subject',
         ]);
 
         return view('approval-requests.show', [
@@ -40,11 +43,13 @@ class ApprovalRequestController extends Controller
 
         $validated = $request->validate([
             'decision' => ['required', 'in:approved,rejected'],
+            'comment' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $approvalRequest->decide(
             ApprovalDecision::from($validated['decision']),
             $request->user(),
+            (string) ($validated['comment'] ?? ''),
         );
 
         $label = $approvalRequest->fresh()->decision?->label() ?? 'decyzja';

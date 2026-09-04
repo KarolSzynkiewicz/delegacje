@@ -28,6 +28,9 @@ class ProcedureRunStepper extends Component
     /** Comment capture: [node_id => body] */
     public array $commentBodies = [];
 
+    /** Justification on approval steps: [node_id => body] */
+    public array $approvalComments = [];
+
     /** Domain action payload: [node_id => [field => value]] */
     public array $actionPayload = [];
 
@@ -155,7 +158,8 @@ class ProcedureRunStepper extends Component
             return;
         }
 
-        $approval->decide(ApprovalDecision::from($decision), auth()->user());
+        $approval->decide(ApprovalDecision::from($decision), auth()->user(), $this->approvalComments[$nodeId] ?? '');
+        unset($this->approvalComments[$nodeId]);
         $this->reloadRun();
         $this->initChecklistState();
     }

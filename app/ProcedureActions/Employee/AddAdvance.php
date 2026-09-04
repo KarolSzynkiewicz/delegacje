@@ -35,17 +35,7 @@ class AddAdvance extends AbstractAction
             ? $employee->payrolls()->with('employee')->orderByDesc('period_start')->get()
             : collect();
 
-        return [
-            [
-                'name' => 'payroll_id',
-                'label' => 'Lista płac',
-                'type' => 'select',
-                'required' => true,
-                'options' => $payrolls->map(fn (Payroll $p) => [
-                    'value' => (string) $p->id,
-                    'label' => $p->display_name,
-                ])->all(),
-            ],
+        $fields = [
             ['name' => 'amount', 'label' => 'Kwota', 'type' => 'number', 'required' => true, 'step' => '0.01'],
             [
                 'name' => 'currency',
@@ -57,14 +47,36 @@ class AddAdvance extends AbstractAction
             ['name' => 'date', 'label' => 'Data', 'type' => 'date', 'required' => true],
             ['name' => 'notes', 'label' => 'Notatka', 'type' => 'textarea'],
         ];
+
+        if ($payrolls->isNotEmpty()) {
+            array_unshift($fields, [
+                'name' => 'payroll_id',
+                'label' => 'Lista płac (opcjonalnie)',
+                'type' => 'select',
+                'required' => false,
+                'options' => collect([['value' => '', 'label' => '— przypisz później —']])
+                    ->concat($payrolls->map(fn (Payroll $p) => [
+                        'value' => (string) $p->id,
+                        'label' => $p->display_name,
+                    ]))
+                    ->all(),
+            ]);
+        }
+
+        return $fields;
     }
 
     public function execute(ProcedureRun $run, array $payload, User $actor): array
     {
         $employee = $this->employee($run);
-        $payroll = Payroll::query()->find((int) ($payload['payroll_id'] ?? 0));
-        if (! $payroll || (int) $payroll->employee_id !== (int) $employee->id) {
-            throw new RuntimeException('Wybierz listę płac tego pracownika.');
+
+        $payroll = null;
+        $payrollId = (int) ($payload['payroll_id'] ?? 0);
+        if ($payrollId > 0) {
+            $payroll = Payroll::query()->find($payrollId);
+            if (! $payroll || (int) $payroll->employee_id !== (int) $employee->id) {
+                throw new RuntimeException('Wybierz listę płac tego pracownika.');
+            }
         }
 
         $amount = $payload['amount'] ?? null;
@@ -74,14 +86,14 @@ class AddAdvance extends AbstractAction
 
         $advance = Advance::query()->create([
             'employee_id' => $employee->id,
-            'payroll_id' => $payroll->id,
+            'payroll_id' => $payroll?->id,
             'amount' => $amount,
             'currency' => strtoupper((string) ($payload['currency'] ?? 'PLN')),
             'date' => $this->string($payload, 'date', true),
             'notes' => $this->string($payload, 'notes'),
         ]);
 
-        if ($payroll->canBeRecalculated()) {
+        if ($payroll && $payroll->canBeRecalculated()) {
             $payroll->adjustments_amount = app(GeneratePayrollForEmployee::class)
                 ->calculateAdjustmentsAmountForPayroll($payroll);
             $payroll->recalculateTotal();

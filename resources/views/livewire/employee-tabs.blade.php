@@ -1,147 +1,76 @@
-<div>
-    <x-ui.tabs 
-        :tabs="$tabsForComponent" 
-        :activeTab="$activeTab" 
-        id="employeeTabs"
-        :compact-mobile="true"
-    />
+<div class="emp-shell">
+    @include('livewire.partials.employee-hero')
 
-<div id="employeeTabsContent">
+    <div class="emp-body">
+        <nav class="card emp-rail d-none d-lg-flex" aria-label="Sekcje karty pracownika">
+            @foreach($tabGroups as $groupLabel => $groupTabs)
+                <div class="emp-rail__group" wire:key="emp-rail-{{ \Illuminate\Support\Str::slug($groupLabel) }}">
+                    <div class="emp-rail__group-label">{{ $groupLabel }}</div>
+                    @foreach($groupTabs as $tabKey => $tab)
+                        <button
+                            type="button"
+                            class="emp-rail__item {{ $activeTab === $tabKey ? 'is-active' : '' }}"
+                            wire:click="{{ $tab['wireClick'] }}"
+                            wire:key="emp-rail-item-{{ $tabKey }}"
+                            title="{{ $tab['label'] }}"
+                        >
+                            @if(! empty($tab['icon']))
+                                <i class="{{ $tab['icon'] }}" aria-hidden="true"></i>
+                            @endif
+                            <span class="emp-rail__label">{{ $tab['short'] ?? $tab['label'] }}</span>
+                            @if(($tab['count'] ?? null) !== null && $tab['count'] > 0)
+                                <span class="badge badge-accent ms-auto">{{ $tab['count'] }}</span>
+                            @endif
+                        </button>
+                    @endforeach
+                </div>
+            @endforeach
+        </nav>
+
+        <div class="emp-main">
+            <x-ui.tabs
+                :tabs="$tabsForComponent"
+                :activeTab="$activeTab"
+                id="employeeTabs"
+                :compact-mobile="true"
+                :hide-strip="true"
+                mobile-label="Sekcja"
+            />
+
+            <div id="employeeTabsContent">
     @if($activeTab === 'info')
-        <!-- Zakładka Informacje -->
         <div id="info" role="tabpanel">
             <div class="card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4 p-3 rounded" style="background:{{ $employee->isTerminated() ? 'rgba(239,68,68,.08)' : 'rgba(52,211,153,.08)' }};border:1px solid {{ $employee->isTerminated() ? 'rgba(239,68,68,.25)' : 'rgba(52,211,153,.25)' }};">
-                        <div>
-                            @if($employee->isTerminated())
-                                <x-ui.badge variant="danger">
-                                    <i class="bi bi-person-x me-1"></i>Zwolniony
-                                </x-ui.badge>
-                                <div class="small text-muted mt-1">
-                                    {{ $employee->terminated_at->format('Y-m-d') }}
-                                    &nbsp;·&nbsp;
-                                    {{ $employee->termination_reason?->label() ?? '-' }}
-                                    @if($employee->termination_note)
-                                        <br>{{ $employee->termination_note }}
-                                    @endif
-                                </div>
-                            @else
-                                <x-ui.badge variant="success">
-                                    <i class="bi bi-person-check me-1"></i>Zatrudniony
-                                </x-ui.badge>
-                            @endif
+                <div class="card-body emp-dossier">
+                    <div class="emp-facts">
+                        <div class="emp-fact">
+                            <div class="emp-fact__label">Email</div>
+                            <p class="emp-fact__value">{{ $employee->email ?? '-' }}</p>
                         </div>
-                        @if(auth()->user()->hasPermission('employees.update'))
-                            <div>
-                                @if($employee->isTerminated())
-                                    <x-ui.button variant="outline-secondary" class="btn-sm" wire:click="reinstate" wire:confirm="Czy na pewno chcesz cofnąć zwolnienie tego pracownika?">
-                                        <i class="bi bi-arrow-counterclockwise me-1"></i>Cofnij zwolnienie
-                                    </x-ui.button>
+                        <div class="emp-fact">
+                            <div class="emp-fact__label">Telefon</div>
+                            <p class="emp-fact__value">{{ $employee->phone ?? '-' }}</p>
+                        </div>
+                        <div class="emp-fact">
+                            <div class="emp-fact__label">Konto bankowe</div>
+                            <p class="emp-fact__value font-mono">{{ $currentBankAccount?->formattedAccountNumber() ?? '-' }}</p>
+                        </div>
+                        <div class="emp-fact">
+                            <div class="emp-fact__label">Komornik</div>
+                            <p class="emp-fact__value mb-0">
+                                @if($employee->has_komornik)
+                                    <x-ui.badge variant="warning">Tak</x-ui.badge>
                                 @else
-                                    <x-ui.button variant="danger" class="btn-sm" wire:click="openTerminateModal">
-                                        <i class="bi bi-person-x me-1"></i>Zwolnij pracownika
-                                    </x-ui.button>
+                                    <x-ui.badge variant="accent">Nie</x-ui.badge>
                                 @endif
+                            </p>
+                        </div>
+                        @if($employee->notes)
+                            <div class="emp-fact emp-fact--wide">
+                                <div class="emp-fact__label">Notatki</div>
+                                <p class="emp-fact__value emp-fact__value--notes">{{ $employee->notes }}</p>
                             </div>
                         @endif
-                    </div>
-
-                    @if($employee->image_path)
-                        <div class="mb-4 text-center">
-                            <img src="{{ $employee->image_url }}" alt="{{ $employee->full_name }}" class="img-fluid rounded" style="max-width: 500px; max-height: 400px; object-fit: cover;">
-                        </div>
-                    @endif
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <h5>Imię i Nazwisko</h5>
-                            <p>{{ $employee->first_name }} {{ $employee->last_name }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <h5>Role</h5>
-                            <p>
-                                @if($employee->roles->count() > 0)
-                                    @foreach($employee->roles as $role)
-                                        <x-ui.badge variant="accent" class="me-1">{{ $role->name }}</x-ui.badge>
-                                    @endforeach
-                                @else
-                                    <span class="text-muted">-</span>
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <h5>Email</h5>
-                            <p>{{ $employee->email ?? '-' }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <h5>Telefon</h5>
-                            <p>{{ $employee->phone ?? '-' }}</p>
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <h5>
-                                <i class="bi bi-geo-alt me-1"></i> Aktualna lokalizacja
-                            </h5>
-                            <p>
-                                @php
-                                    $locationTracker = app(\App\Services\LocationTrackingService::class);
-                                    $locationStatus = $locationTracker->getLocationStatus($employee, now());
-                                    $currentProjects = $employee->current_projects;
-                                    $projectsList = $currentProjects->pluck('name')->join(', ');
-                                @endphp
-                                
-                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
-                                    <x-tooltip title="Pracownik jest w trakcie wyjazdu/powrotu">
-                                        <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
-                                    </x-tooltip>
-                                @elseif($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE)
-                                    <x-tooltip title="Pracownik jest w bazie">
-                                        <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
-                                    </x-tooltip>
-                                @elseif(count($locationStatus['accommodation_names'] ?? []) > 0 || count($locationStatus['project_names'] ?? []) > 0 || count($locationStatus['vehicle_labels'] ?? []) > 0)
-                                    @if($locationStatus['has_assignment_overlap'] ?? false)
-                                        <div class="small text-warning mb-1">⚠ Wiele aktywnych przypisań tego dnia — sprawdź dane.</div>
-                                    @endif
-                                    <div class="d-flex flex-wrap gap-1 align-items-center">
-                                        @foreach($locationStatus['accommodation_names'] ?? [] as $n)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏡 {{ $n }}</x-ui.badge>
-                                        @endforeach
-                                        @foreach($locationStatus['vehicle_labels'] ?? [] as $reg)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🚗 {{ $reg }}</x-ui.badge>
-                                        @endforeach
-                                        @foreach($locationStatus['project_names'] ?? [] as $pn)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏢 {{ $pn }}</x-ui.badge>
-                                        @endforeach
-                                    </div>
-                                    @if($projectsList)
-                                        <div class="small text-muted mt-1">
-                                            Projekt: {{ $projectsList }}
-                                        </div>
-                                    @endif
-                                @else
-                                    <x-tooltip title="Pracownik jest poza bazą, oczekuje na przypisania">
-                                        <x-ui.badge variant="accent">⏳ Poza bazą</x-ui.badge>
-                                    </x-tooltip>
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-
-                    @if ($employee->notes)
-                        <div class="mb-3">
-                            <h5>Notatki</h5>
-                            <p>{{ $employee->notes }}</p>
-                        </div>
-                    @endif
-
-                    <div class="d-flex gap-2">
-                        <x-ui.button variant="warning" href="{{ route('employees.edit', $employee) }}">Edytuj</x-ui.button>
                     </div>
                 </div>
             </div>
@@ -629,6 +558,53 @@
                 </div>
             </div>
         </div>
+    @elseif($activeTab === 'bank')
+        <div id="bank" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-4">
+                        <x-ui.table-header title="Konta bankowe">
+                            <x-slot name="actions">
+                                <x-ui.button variant="primary" href="{{ route('employee-bank-accounts.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj konto</x-ui.button>
+                            </x-slot>
+                        </x-ui.table-header>
+                        @if($tabData && $tabData->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Od</th>
+                                            <th>Do</th>
+                                            <th>Numer konta</th>
+                                            <th>Akcje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($tabData as $account)
+                                            <tr>
+                                                <td>{{ $account->start_date->format('Y-m-d') }}</td>
+                                                <td>{{ $account->end_date ? $account->end_date->format('Y-m-d') : '-' }}</td>
+                                                <td class="font-mono">{{ $account->formattedAccountNumber() }}</td>
+                                                <td>
+                                                    <x-ui.button variant="ghost" href="{{ route('employee-bank-accounts.show', $account) }}" class="btn-sm">
+                                                        <i class="bi bi-eye"></i> Szczegóły
+                                                    </x-ui.button>
+                                                    <x-ui.button variant="ghost" href="{{ route('employee-bank-accounts.edit', $account) }}" class="btn-sm">
+                                                        <i class="bi bi-pencil"></i> Edytuj
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">Brak kont bankowych dla tego pracownika.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
     @elseif($activeTab === 'company-assignments')
         <div id="company-assignments" role="tabpanel">
             <div class="card">
@@ -981,7 +957,9 @@
             <livewire:employee-equipment-history :employee="$employee" :wire:key="'employee-equipment-'.$employee->id" />
         </div>
     @endif
-</div>
+            </div>
+        </div>
+    </div>
 
 @if($showTerminateModal)
     @teleport('body')
@@ -1046,4 +1024,121 @@
     </div>
     @endteleport
 @endif
+
+{{-- Vite bywa wyłączony — krytyczny układ karty zostaje lokalnie --}}
+<style>
+.emp-shell { display: flex; flex-direction: column; gap: 1.15rem; }
+.card.emp-hero, .emp-hero {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1.35rem 1.7rem;
+    align-items: start;
+    padding: 1.2rem 1.3rem 1.3rem !important;
+    overflow: hidden;
+}
+.emp-hero__photo-frame {
+    width: 10.5rem;
+    height: 13.25rem;
+    padding: 2px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    flex-shrink: 0;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.emp-hero--out .emp-hero__photo-frame { background: linear-gradient(135deg, #ef4444, var(--accent)); }
+.emp-hero__photo {
+    width: 100%; height: 100%; object-fit: cover; object-position: center top;
+    border-radius: 14px; display: block; background: #0b1220;
+}
+.emp-hero__photo--empty {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.35rem; font-weight: 700; letter-spacing: 0.06em;
+    background: radial-gradient(120% 80% at 20% 0%, rgba(59,130,246,.35), transparent 55%),
+        linear-gradient(165deg, rgba(59,130,246,.22), rgba(168,85,247,.18));
+    color: #e2e8f0 !important;
+}
+.emp-hero__body { display: flex; flex-direction: column; min-width: 0; gap: 0.55rem; }
+.emp-hero__bar { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem 1rem; flex-wrap: wrap; }
+.emp-hero__status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.7rem; min-width: 0; }
+.emp-hero__status-meta, .emp-hero__status-note { font-size: 0.78rem; color: var(--text-muted) !important; }
+.emp-hero__status-note { flex-basis: 100%; }
+.emp-hero__id { font-size: 0.72rem; color: var(--text-muted) !important; letter-spacing: 0.04em; }
+.emp-hero__actions { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; }
+.emp-hero__name {
+    font-size: clamp(1.45rem, 2.2vw, 2.05rem); font-weight: 700;
+    letter-spacing: -0.03em; line-height: 1.12; margin: 0.15rem 0 0;
+    color: var(--text-main) !important;
+}
+.emp-hero__roles { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.emp-hero__contact { display: flex; flex-wrap: wrap; gap: 0.45rem 1.15rem; margin-top: 0.25rem; }
+.emp-hero__contact-row {
+    display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; max-width: 100%;
+    font-size: 0.88rem; color: var(--text-muted) !important; text-decoration: none;
+}
+.emp-hero__contact-row:hover { color: var(--text-main) !important; }
+.emp-hero__contact-icon {
+    width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    background: rgba(59,130,246,.14); border: 1px solid rgba(59,130,246,.22);
+    color: #93c5fd !important; font-size: 0.72rem;
+}
+.emp-hero__contact-icon i { color: inherit !important; }
+.emp-body { display: grid; grid-template-columns: 1fr; gap: 1.15rem; align-items: start; }
+.emp-main { min-width: 0; }
+.emp-rail {
+    flex-direction: column; gap: 0.95rem; padding: 0.8rem 0.65rem !important;
+    position: sticky; top: 1rem; align-self: start;
+}
+.emp-rail__group { display: flex; flex-direction: column; gap: 0.12rem; }
+.emp-rail__group-label {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted) !important; padding: 0 0.55rem 0.3rem;
+}
+.emp-rail__item {
+    position: relative; appearance: none; display: flex; align-items: center; gap: 0.5rem;
+    width: 100%; padding: 0.4rem 0.55rem 0.4rem 0.7rem; border: 0; border-radius: 8px;
+    background: transparent; color: var(--text-muted) !important;
+    font-size: 0.84rem; font-weight: 600; line-height: 1.2; text-align: left;
+    font-family: inherit; cursor: pointer;
+}
+.emp-rail__item i { font-size: 0.95rem; color: inherit !important; width: 1.05rem; text-align: center; flex-shrink: 0; }
+.emp-rail__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-rail__item:hover { color: var(--text-main) !important; background: rgba(255,255,255,.04); }
+.emp-rail__item.is-active { color: var(--text-main) !important; background: rgba(59,130,246,.1); }
+.emp-rail__item.is-active::before {
+    content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--primary), var(--accent));
+}
+.emp-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 0.8rem; }
+.emp-fact {
+    padding: 0.85rem 1rem; border: 1px solid var(--glass-border); border-radius: 12px;
+    background: rgba(255,255,255,.025); min-width: 0;
+}
+.emp-fact--wide { grid-column: 1 / -1; }
+.emp-fact__label {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-muted) !important; margin-bottom: 0.35rem;
+}
+.emp-fact__value { font-size: 0.95rem; font-weight: 600; color: var(--text-main) !important; margin: 0; overflow-wrap: anywhere; }
+.emp-fact__value--notes { font-weight: 500; line-height: 1.45; color: #cbd5e1 !important; }
+.emp-dossier { padding: 0.35rem 0.15rem !important; }
+.ui-compact-nav__group {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted) !important; padding: 0.55rem 0.7rem 0.2rem; list-style: none;
+}
+@media (min-width: 992px) {
+    .emp-body { grid-template-columns: 13.75rem minmax(0, 1fr); }
+    .emp-hero { grid-template-columns: 11.25rem minmax(0, 1fr); }
+    .emp-hero__photo-frame { width: 11.25rem; height: 14.15rem; }
+}
+@media (max-width: 575.98px) {
+    .emp-hero { grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.85rem 0.95rem; padding: 1rem !important; }
+    .emp-hero__photo-frame { width: 5.5rem; height: 7rem; border-radius: 12px; }
+    .emp-hero__photo, .emp-hero__photo--empty { border-radius: 10px; }
+    .emp-hero__photo--empty { font-size: 1.35rem; }
+    .emp-hero__name { font-size: 1.28rem; }
+    .emp-hero__actions { width: 100%; justify-content: flex-start; }
+    .emp-facts { grid-template-columns: 1fr; }
+}
+</style>
 </div>

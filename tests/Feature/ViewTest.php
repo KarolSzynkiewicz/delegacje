@@ -87,6 +87,9 @@ class ViewTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('employees.show');
         $response->assertSeeText($employee->full_name, false);
+        $response->assertSee('emp-hero', false);
+        $response->assertSee('emp-rail', false);
+        $response->assertSee('Konto bankowe');
     }
 
     /**

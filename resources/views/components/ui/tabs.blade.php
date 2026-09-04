@@ -3,6 +3,7 @@
     'activeTab' => null, // Key of active tab
     'id' => 'tabs', // ID for the tabs container
     'compactMobile' => false, // Na < md: jeden wiersz + dropdown zamiast wielu rzędów tabów
+    'hideStrip' => false, // Ukryj poziomy pasek (gdy strona ma własny rail)
     'mobileLabel' => 'Sekcja',
     'mobileAriaLabel' => 'Wybierz sekcję profilu',
 ])
@@ -15,7 +16,11 @@
 @endphp
 
 @if($compactMobile && count($tabs) > 0)
-    <div class="d-md-none mb-4 ui-compact-nav employee-tabs-mobile-nav" data-employee-tabs-mobile>
+    <div @class([
+        'mb-4 ui-compact-nav employee-tabs-mobile-nav',
+        'd-md-none' => ! $hideStrip,
+        'd-lg-none' => $hideStrip,
+    ]) data-employee-tabs-mobile>
         <label class="form-label small text-muted mb-1" for="{{ $id }}-mobile-trigger">{{ $mobileLabel }}</label>
         <div class="dropdown w-100">
             <button
@@ -53,6 +58,7 @@
                 role="listbox"
                 aria-labelledby="{{ $id }}-mobile-trigger"
             >
+                @php $lastGroup = null; @endphp
                 @foreach($tabs as $tabKey => $tab)
                     @php
                         $isActive = $activeTab === $tabKey;
@@ -62,7 +68,12 @@
                         $wireClick = $tab['wireClick'] ?? null;
                         $href = $tab['href'] ?? null;
                         $warning = ! empty($tab['warning']);
+                        $group = $tab['group'] ?? null;
                     @endphp
+                    @if($group && $group !== $lastGroup)
+                        <li class="ui-compact-nav__group" aria-hidden="true">{{ $group }}</li>
+                        @php $lastGroup = $group; @endphp
+                    @endif
                     <li role="none">
                         @if($wireClick)
                             <button
@@ -115,7 +126,11 @@
     </div>
 @endif
 
-<ul @class(['nav-tabs-ui mb-4', 'd-none d-md-flex' => $compactMobile]) id="{{ $id }}" role="tablist">
+<ul @class([
+        'nav-tabs-ui mb-4',
+        'd-none d-md-flex' => $compactMobile && ! $hideStrip,
+        'd-none' => $hideStrip,
+    ]) id="{{ $id }}" role="tablist">
     @foreach($tabs as $tabKey => $tab)
         @php
             $isActive = $activeTab === $tabKey;

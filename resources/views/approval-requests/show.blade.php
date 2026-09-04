@@ -2,6 +2,9 @@
     $canDecide = auth()->user()->can('decide', $approval);
     $sourceCard = $approval->comment?->commentableCard();
     $decision = $approval->decision;
+    $procedureRun = $approval->procedureRun;
+    $subjectCard = $procedureRun?->sourceCard();
+    $procedureTask = $procedureRun?->task;
 @endphp
 
 <x-app-layout>
@@ -33,7 +36,26 @@
     <div class="row g-4 justify-content-center">
         <div class="col-lg-7">
             <x-ui.card class="mb-4">
-                <div class="d-flex align-items-center gap-3 mb-4 pb-3" style="border-bottom:1px solid var(--glass-border, rgba(255,255,255,0.1))">
+                <div class="mb-4">
+                    <h3 class="fs-5 fw-semibold mb-2">{{ $approval->name }}</h3>
+                    @if($subjectCard)
+                        <a href="{{ $subjectCard['url'] }}" class="d-inline-flex align-items-center gap-1 small text-decoration-none mb-1">
+                            <i class="bi {{ $subjectCard['icon'] }}"></i>
+                            <span>Dotyczy: {{ $subjectCard['label'] }}</span>
+                        </a>
+                    @endif
+                    @if($procedureTask)
+                        <div class="small text-muted">
+                            Procedura:
+                            <a href="{{ route('tasks.show', $procedureTask) }}">{{ $procedureRun?->template?->name ?? 'przebieg' }}</a>
+                        </div>
+                    @endif
+                    @if(filled($approval->description))
+                        <p class="mb-0 mt-3 text-break" style="white-space:pre-wrap">{{ $approval->description }}</p>
+                    @endif
+                </div>
+
+                <div class="d-flex align-items-center gap-3 mb-4 pb-3" style="border-bottom:1px solid var(--glass-border, rgba(255,255,255,0.1)); border-top:1px solid var(--glass-border, rgba(255,255,255,0.1)); padding-top:1rem;">
                     <x-ui.approval-decision :decision="$decision" size="lg" />
                     <div>
                         <div class="fw-semibold">{{ $decision?->label() ?? 'Oczekuje' }}</div>
@@ -84,15 +106,6 @@
                 </dl>
             </x-ui.card>
 
-            <x-ui.card class="mb-4">
-                <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-3" style="letter-spacing:.05em;">Opis</h3>
-                @if(filled($approval->description))
-                    <p class="mb-0 text-break" style="white-space:pre-wrap">{{ $approval->description }}</p>
-                @else
-                    <p class="text-muted fst-italic mb-0">Brak opisu.</p>
-                @endif
-            </x-ui.card>
-
             @if($approval->attachments->isNotEmpty())
                 <x-ui.card class="mb-4">
                     <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-3" style="letter-spacing:.05em;">Załącznik</h3>
@@ -101,26 +114,32 @@
             @endif
 
             @if($canDecide && ! $approval->isDecided())
-                <x-ui.card>
+                <x-ui.card class="mb-4">
                     <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-3" style="letter-spacing:.05em;">Decyzja</h3>
-                    <div class="d-flex flex-wrap gap-2">
-                        <form action="{{ route('approval-requests.decide', $approval) }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="decision" value="approved">
-                            <x-ui.button variant="success" type="submit">
+                    <form action="{{ route('approval-requests.decide', $approval) }}" method="POST">
+                        @csrf
+                        <label class="form-label small text-muted" for="approval-comment">Uzasadnienie (opcjonalnie)</label>
+                        <textarea id="approval-comment"
+                                  name="comment"
+                                  class="form-control mb-3"
+                                  rows="3"
+                                  placeholder="Dlaczego zatwierdzasz albo odrzucasz?">{{ old('comment') }}</textarea>
+                        @error('comment')
+                            <div class="invalid-feedback d-block mb-2">{{ $message }}</div>
+                        @enderror
+                        <div class="d-flex flex-wrap gap-2">
+                            <x-ui.button variant="success" type="submit" name="decision" value="approved">
                                 <i class="bi bi-check-lg me-1"></i>Zatwierdź
                             </x-ui.button>
-                        </form>
-                        <form action="{{ route('approval-requests.decide', $approval) }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="decision" value="rejected">
-                            <x-ui.button variant="danger" type="submit">
+                            <x-ui.button variant="danger" type="submit" name="decision" value="rejected">
                                 <i class="bi bi-x-lg me-1"></i>Odrzuć
                             </x-ui.button>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </x-ui.card>
             @endif
+
+            <x-comments :commentable="$approval" />
         </div>
     </div>
 </x-app-layout>

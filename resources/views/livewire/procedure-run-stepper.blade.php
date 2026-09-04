@@ -271,6 +271,14 @@
                                     · <a href="{{ route('approval-requests.show', $approval) }}">otwórz wniosek</a>
                                 </div>
                                 @if($approval->isApprover(auth()->user()) && ! $approval->isDecided())
+                                    <div class="mb-3">
+                                        <label class="form-label small mb-1" for="approval-note-{{ $nodeId }}">Uzasadnienie (opcjonalnie)</label>
+                                        <textarea id="approval-note-{{ $nodeId }}"
+                                                  class="form-control form-control-sm"
+                                                  rows="2"
+                                                  placeholder="Dlaczego zatwierdzasz albo odrzucasz?"
+                                                  wire:model="approvalComments.{{ $nodeId }}"></textarea>
+                                    </div>
                                     <div class="d-flex gap-2 mb-3">
                                         <button type="button" class="btn btn-success btn-sm"
                                                 wire:click="decideApproval('{{ $nodeId }}', 'approved')">

@@ -50,6 +50,41 @@
                         />
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <x-ui.input
+                                type="text"
+                                name="shoe_size"
+                                label="Rozmiar buta"
+                                value="{{ old('shoe_size', $employee->shoe_size) }}"
+                                placeholder="np. 42"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input
+                                type="text"
+                                name="pants_size"
+                                label="Rozmiar spodni"
+                                value="{{ old('pants_size', $employee->pants_size) }}"
+                                placeholder="np. 52"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                name="has_komornik"
+                                id="has_komornik"
+                                value="1"
+                                {{ old('has_komornik', $employee->has_komornik) ? 'checked' : '' }}
+                            >
+                            <label class="form-check-label" for="has_komornik">Komornik</label>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Role *</label>
                         <div class="border rounded p-3 @error('roles') border-danger @enderror">

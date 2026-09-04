@@ -26,6 +26,9 @@ class Employee extends Model
         'last_name',
         'email',
         'phone',
+        'shoe_size',
+        'pants_size',
+        'has_komornik',
         'notes',
         'image_path',
         'outside_base',
@@ -42,6 +45,7 @@ class Employee extends Model
      */
     protected $casts = [
         'outside_base' => 'boolean',
+        'has_komornik' => 'boolean',
         'terminated_at' => 'datetime',
         'termination_reason' => EmployeeTerminationReason::class,
     ];
@@ -117,6 +121,23 @@ class Employee extends Model
     public function currentRate(): ?EmployeeRate
     {
         return $this->rates()->active()->orderByDesc('start_date')->first();
+    }
+
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(EmployeeBankAccount::class);
+    }
+
+    public function currentBankAccount(): ?EmployeeBankAccount
+    {
+        if ($this->relationLoaded('bankAccounts')) {
+            return $this->bankAccounts
+                ->filter(fn (EmployeeBankAccount $account) => $account->isCurrentlyActive())
+                ->sortByDesc(fn (EmployeeBankAccount $account) => $account->start_date)
+                ->first();
+        }
+
+        return $this->bankAccounts()->active()->orderByDesc('start_date')->first();
     }
 
     /**

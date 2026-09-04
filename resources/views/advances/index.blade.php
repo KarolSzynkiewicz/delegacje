@@ -20,6 +20,21 @@
         </x-alert>
     @endif
 
+    <x-ui.card class="mb-3">
+        <form method="GET" action="{{ route('advances.index') }}" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <x-ui.input type="select" name="payroll" label="Payroll">
+                    <option value="all" {{ ($payrollFilter ?? request('payroll', 'all')) === 'all' ? 'selected' : '' }}>Wszystkie</option>
+                    <option value="linked" {{ ($payrollFilter ?? request('payroll', 'all')) === 'linked' ? 'selected' : '' }}>Z payrollem</option>
+                    <option value="unlinked" {{ ($payrollFilter ?? request('payroll', 'all')) === 'unlinked' ? 'selected' : '' }}>Bez payrollu</option>
+                </x-ui.input>
+            </div>
+            <div class="col-md-2">
+                <x-ui.button variant="primary" type="submit" class="btn-sm">Filtruj</x-ui.button>
+            </div>
+        </form>
+    </x-ui.card>
+
     <x-ui.card>
         @if($advances->count() > 0)
             <div class="table-responsive">
@@ -31,6 +46,7 @@
                             <th>Oprocentowanie</th>
                             <th>Do odliczenia</th>
                             <th>Data</th>
+                            <th>Payroll</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -55,6 +71,13 @@
                                         </td>
                                         <td>
                                             <small class="text-muted">{{ $advance->date->format('Y-m-d') }}</small>
+                                        </td>
+                                        <td>
+                                            @if($advance->payroll_id)
+                                                <x-ui.badge variant="success">Z payrollem</x-ui.badge>
+                                            @else
+                                                <x-ui.badge variant="warning">Bez payrollu</x-ui.badge>
+                                            @endif
                                         </td>
                                         <td>
                                             <x-action-buttons

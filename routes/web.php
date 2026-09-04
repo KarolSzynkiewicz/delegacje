@@ -560,6 +560,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         // Employee Rates
         Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
 
+        Route::resource('employee-bank-accounts', \App\Http\Controllers\EmployeeBankAccountController::class)
+            ->except(['index']);
+
         // Employee Evaluations
         Route::resource('employee-evaluations', \App\Http\Controllers\EmployeeEvaluationController::class);
 

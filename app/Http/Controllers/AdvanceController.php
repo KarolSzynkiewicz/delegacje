@@ -2,127 +2,126 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Advance;
-use App\Models\Payroll;
 use App\Http\Requests\StoreAdvanceRequest;
 use App\Http\Requests\UpdateAdvanceRequest;
-use Illuminate\View\View;
+use App\Models\Advance;
+use App\Models\Employee;
+use App\Models\Payroll;
+use App\Services\GeneratePayrollForEmployee;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class AdvanceController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $advances = Advance::with('employee')
+        $payrollFilter = $request->query('payroll', 'all');
+
+        $advances = Advance::query()
+            ->with(['employee', 'payroll'])
+            ->when($payrollFilter === 'linked', fn ($q) => $q->whereNotNull('payroll_id'))
+            ->when($payrollFilter === 'unlinked', fn ($q) => $q->whereNull('payroll_id'))
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
-        
-        return view('advances.index', compact('advances'));
+            ->paginate(20)
+            ->appends($request->query());
+
+        return view('advances.index', compact('advances', 'payrollFilter'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create(): View
     {
-        // Pobierz wszystkie payrolle z informacją o pracowniku i okresie
+        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
         $payrolls = Payroll::with('employee')
             ->orderBy('period_start', 'desc')
             ->orderBy('employee_id')
             ->get();
-        return view('advances.create', compact('payrolls'));
+
+        return view('advances.create', compact('employees', 'payrolls'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreAdvanceRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        
-        // Pobierz payroll i ustaw employee_id automatycznie
-        $payroll = Payroll::findOrFail($validated['payroll_id']);
-        $validated['employee_id'] = $payroll->employee_id;
-        
+        $payroll = $this->syncEmployeeFromPayroll($validated);
+
         Advance::create($validated);
-        
-        // Przelicz payroll jeśli jest w statusie draft/issued
-        if ($payroll->canBeRecalculated()) {
-            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
-            $payroll->recalculateTotal();
-            $payroll->save();
-        }
+
+        $this->recalculatePayroll($payroll);
 
         return redirect()->route('advances.index')
             ->with('success', 'Zaliczka została dodana.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Advance $advance): View
     {
-        $advance->load('employee');
+        $advance->load(['employee', 'payroll.employee']);
+
         return view('advances.show', compact('advance'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Advance $advance): View
     {
-        // Pobierz wszystkie payrolle z informacją o pracowniku i okresie
+        $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
         $payrolls = Payroll::with('employee')
             ->orderBy('period_start', 'desc')
             ->orderBy('employee_id')
             ->get();
-        return view('advances.edit', compact('advance', 'payrolls'));
+
+        return view('advances.edit', compact('advance', 'employees', 'payrolls'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateAdvanceRequest $request, Advance $advance): RedirectResponse
     {
         $validated = $request->validated();
-        
-        // Pobierz payroll i ustaw employee_id automatycznie
-        $payroll = Payroll::findOrFail($validated['payroll_id']);
-        $validated['employee_id'] = $payroll->employee_id;
-        
+        $payroll = $this->syncEmployeeFromPayroll($validated);
+
         $advance->update($validated);
-        
-        // Przelicz payroll jeśli jest w statusie draft/issued
-        if ($payroll->canBeRecalculated()) {
-            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
-            $payroll->recalculateTotal();
-            $payroll->save();
-        }
+
+        $this->recalculatePayroll($payroll);
 
         return redirect()->route('advances.index')
             ->with('success', 'Zaliczka została zaktualizowana.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Advance $advance): RedirectResponse
     {
         $payroll = $advance->payroll;
         $advance->delete();
-        
-        // Przelicz payroll jeśli jest w statusie draft/issued
-        if ($payroll && $payroll->canBeRecalculated()) {
-            $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
-            $payroll->recalculateTotal();
-            $payroll->save();
-        }
+
+        $this->recalculatePayroll($payroll);
 
         return redirect()->route('advances.index')
             ->with('success', 'Zaliczka została usunięta.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function syncEmployeeFromPayroll(array &$validated): ?Payroll
+    {
+        if (empty($validated['payroll_id'])) {
+            $validated['payroll_id'] = null;
+
+            return null;
+        }
+
+        $payroll = Payroll::findOrFail($validated['payroll_id']);
+        $validated['employee_id'] = $payroll->employee_id;
+
+        return $payroll;
+    }
+
+    private function recalculatePayroll(?Payroll $payroll): void
+    {
+        if (! $payroll || ! $payroll->canBeRecalculated()) {
+            return;
+        }
+
+        $payroll->adjustments_amount = app(GeneratePayrollForEmployee::class)
+            ->calculateAdjustmentsAmountForPayroll($payroll);
+        $payroll->recalculateTotal();
+        $payroll->save();
     }
 }

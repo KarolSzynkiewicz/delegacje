@@ -125,8 +125,8 @@
                                             </div>
                                         </div>
                                         <div class="d-flex flex-wrap gap-1 ms-auto">
-                                            @foreach($candidate->roles as $role)
-                                                <span class="badge badge-info" style="font-size:.65rem;">{{ $role->name }}</span>
+                                            @foreach($candidate->roles as $candidateRole)
+                                                <span class="badge badge-info" style="font-size:.65rem;">{{ $candidateRole->name }}</span>
                                             @endforeach
                                             @if($candidate->shipyard_experience)
                                                 <span class="badge badge-secondary" style="font-size:.65rem;"><i class="bi bi-tools me-1"></i>{{ $candidate->shipyard_experience->label() }}</span>
@@ -199,7 +199,7 @@
                                 </tr>
                             @endforeach
                         @empty
-                            <tr><td colspan="8"><x-ui.empty-state :in-table="false" icon="person-lines-fill" :message="$status || $search || $recruiter || $rejectionFilter || $referralSource || $flag || $mine || $formerEmployee ? 'Brak kandydatów spełniających kryteria.' : 'Nie przesłano jeszcze żadnych zgłoszeń.'" /></td></tr>
+                            <tr><td colspan="8"><x-ui.empty-state :in-table="false" icon="person-lines-fill" :message="$activeFilterCount || $search ? 'Brak kandydatów spełniających kryteria.' : 'Nie przesłano jeszcze żadnych zgłoszeń.'" /></td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -497,8 +497,8 @@
                                     </div>
                                     @if($candidate?->roles?->isNotEmpty())
                                         <div class="rp-skill-chips">
-                                            @foreach($candidate->roles as $role)
-                                                <span class="rp-skill-chip rp-skill-chip--role">{{ $role->name }}</span>
+                                            @foreach($candidate->roles as $candidateRole)
+                                                <span class="rp-skill-chip rp-skill-chip--role">{{ $candidateRole->name }}</span>
                                             @endforeach
                                         </div>
                                     @endif

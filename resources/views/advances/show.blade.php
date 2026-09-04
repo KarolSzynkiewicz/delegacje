@@ -38,6 +38,15 @@
                                 <strong>{{ number_format($advance->amount, 2, ',', ' ') }} {{ $advance->currency }}</strong>
                             </x-ui.detail-item>
                             <x-ui.detail-item label="Data:">{{ $advance->date->format('d.m.Y') }}</x-ui.detail-item>
+                            <x-ui.detail-item label="Payroll:">
+                                @if($advance->payroll)
+                                    <a href="{{ route('payrolls.show', $advance->payroll) }}" class="text-primary text-decoration-none">
+                                        {{ $advance->payroll->display_name }}
+                                    </a>
+                                @else
+                                    <x-ui.badge variant="warning">Bez payrollu</x-ui.badge>
+                                @endif
+                            </x-ui.detail-item>
                             <x-ui.detail-item label="Oprocentowana:">
                                 <x-ui.badge variant="{{ $advance->is_interest_bearing ? 'warning' : 'accent' }}">
                                     {{ $advance->is_interest_bearing ? 'Tak' : 'Nie' }}

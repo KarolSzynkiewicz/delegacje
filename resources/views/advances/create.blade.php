@@ -2,8 +2,8 @@
     <x-slot name="header">
         <x-ui.page-header title="Dodaj Zaliczkę">
             <x-slot name="left">
-                <x-ui.button 
-                    variant="ghost" 
+                <x-ui.button
+                    variant="ghost"
                     href="{{ route('advances.index') }}"
                     action="back"
                 >
@@ -20,28 +20,49 @@
                     @csrf
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="select" 
-                            name="payroll_id" 
-                            id="payroll_id"
-                            label="Payroll"
+                        <x-ui.input
+                            type="select"
+                            name="employee_id"
+                            id="employee_id"
+                            label="Pracownik"
                             required="true"
                         >
-                            <option value="">Wybierz payroll</option>
+                            <option value="">Wybierz pracownika</option>
+                            @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}" {{ (string) old('employee_id', request('employee_id')) === (string) $employee->id ? 'selected' : '' }}>
+                                    {{ $employee->full_name }}
+                                </option>
+                            @endforeach
+                        </x-ui.input>
+                        <small class="form-text text-muted">Wybierz pracownika, którego dotyczy zaliczka</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input
+                            type="select"
+                            name="payroll_id"
+                            id="payroll_id"
+                            label="Payroll (opcjonalnie)"
+                        >
+                            <option value="">— przypisz później —</option>
                             @foreach($payrolls as $payroll)
-                                <option value="{{ $payroll->id }}" {{ old('payroll_id') == $payroll->id ? 'selected' : '' }}>
+                                <option
+                                    value="{{ $payroll->id }}"
+                                    data-employee-id="{{ $payroll->employee_id }}"
+                                    {{ old('payroll_id') == $payroll->id ? 'selected' : '' }}
+                                >
                                     {{ $payroll->display_name }}
                                 </option>
                             @endforeach
                         </x-ui.input>
-                        <small class="form-text text-muted">Wybierz payroll, do którego przypisać zaliczkę</small>
+                        <small class="form-text text-muted">Jeśli payroll nie istnieje jeszcze, zostaw puste</small>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-6 mb-3 mb-md-0">
-                            <x-ui.input 
-                                type="number" 
-                                name="amount" 
+                            <x-ui.input
+                                type="number"
+                                name="amount"
                                 id="amount"
                                 label="Kwota"
                                 value="{{ old('amount') }}"
@@ -51,24 +72,26 @@
                             />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input 
-                                type="select" 
-                                name="currency" 
+                            <x-ui.input
+                                type="select"
+                                name="currency"
                                 id="currency"
                                 label="Waluta"
                                 required="true"
                             >
-                                <option value="PLN" {{ old('currency', 'PLN') == 'PLN' ? 'selected' : '' }}>PLN</option>
-                                <option value="EUR" {{ old('currency') == 'EUR' ? 'selected' : '' }}>EUR</option>
-                                <option value="USD" {{ old('currency') == 'USD' ? 'selected' : '' }}>USD</option>
+                                @foreach(\App\Enums\Currency::cases() as $c)
+                                    <option value="{{ $c->value }}" {{ old('currency', 'PLN') == $c->value ? 'selected' : '' }}>
+                                        {{ $c->label() }}
+                                    </option>
+                                @endforeach
                             </x-ui.input>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="date" 
-                            name="date" 
+                        <x-ui.input
+                            type="date"
+                            name="date"
                             id="date"
                             label="Data"
                             value="{{ old('date') }}"
@@ -86,9 +109,9 @@
                     </div>
 
                     <div class="mb-3" id="interest_rate_field" style="display: {{ old('is_interest_bearing') ? 'block' : 'none' }};">
-                        <x-ui.input 
-                            type="number" 
-                            name="interest_rate" 
+                        <x-ui.input
+                            type="number"
+                            name="interest_rate"
                             id="interest_rate"
                             label="Stawka oprocentowania (%)"
                             value="{{ old('interest_rate') }}"
@@ -99,9 +122,9 @@
                     </div>
 
                     <div class="mb-4">
-                        <x-ui.input 
-                            type="textarea" 
-                            name="notes" 
+                        <x-ui.input
+                            type="textarea"
+                            name="notes"
                             id="notes"
                             label="Notatki"
                             value="{{ old('notes') }}"
@@ -110,15 +133,15 @@
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <x-ui.button 
-                            variant="primary" 
+                        <x-ui.button
+                            variant="primary"
                             type="submit"
                             action="save"
                         >
                             Zapisz
                         </x-ui.button>
-                        <x-ui.button 
-                            variant="ghost" 
+                        <x-ui.button
+                            variant="ghost"
                             href="{{ route('advances.index') }}"
                             action="cancel"
                         >
@@ -129,10 +152,42 @@
             </x-ui.card>
         </div>
     </div>
-
-    <script>
-        document.getElementById('is_interest_bearing').addEventListener('change', function() {
-            document.getElementById('interest_rate_field').style.display = this.checked ? 'block' : 'none';
-        });
-    </script>
 </x-app-layout>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const employeeSelect = document.getElementById('employee_id');
+    const payrollSelect = document.getElementById('payroll_id');
+    const interestCheckbox = document.getElementById('is_interest_bearing');
+    const interestField = document.getElementById('interest_rate_field');
+
+    if (interestCheckbox && interestField) {
+        interestCheckbox.addEventListener('change', function () {
+            interestField.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+
+    if (!employeeSelect || !payrollSelect) return;
+
+    function syncPayrollOptions() {
+        const employeeId = employeeSelect.value;
+        const options = Array.from(payrollSelect.options);
+
+        options.forEach((opt) => {
+            const optEmployeeId = opt.getAttribute('data-employee-id');
+            if (!optEmployeeId) return;
+            const match = employeeId && optEmployeeId === employeeId;
+            opt.hidden = !match;
+            opt.disabled = !match;
+        });
+
+        const selected = payrollSelect.selectedOptions[0];
+        if (selected && selected.getAttribute('data-employee-id') && selected.disabled) {
+            payrollSelect.value = '';
+        }
+    }
+
+    employeeSelect.addEventListener('change', syncPayrollOptions);
+    syncPayrollOptions();
+});
+</script>

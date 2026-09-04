@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Enums\ApprovalDecision;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
+use App\Livewire\ProcedureRunStepper;
 use App\Livewire\TasksGrid;
 use App\Models\ApprovalRequest;
 use App\Models\Comment;
 use App\Models\CommentMention;
+use App\Models\Employee;
 use App\Models\ProcedureTemplate;
 use App\Models\Project;
 use App\Models\ProjectTask;
@@ -305,7 +307,159 @@ class ApprovalRequestTest extends TestCase
             ->assertSee('Zatwierdzone')
             ->assertSee($this->user->name)
             ->assertDontSee('Decyzja: Zatwierdzone')
-            ->assertSee('bi-check-circle-fill', false);
+            ->assertSee('bi-check-circle-fill', false)
+            ->assertSee('Komentarze')
+            ->assertSee('Dodaj komentarz');
+    }
+
+    public function test_show_page_repeats_what_it_is_about_and_offers_decision_comment(): void
+    {
+        $approval = ApprovalRequest::query()->create([
+            'name' => 'Potwierdzenie zmiany stawki XYZ',
+            'description' => 'Sprawdź nową stawkę przed akceptacją',
+            'approver_id' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('approval-requests.show', $approval))
+            ->assertOk()
+            ->assertSee('Potwierdzenie zmiany stawki XYZ')
+            ->assertSee('Sprawdź nową stawkę przed akceptacją')
+            ->assertSee('Uzasadnienie (opcjonalnie)')
+            ->assertSee('Dlaczego zatwierdzasz albo odrzucasz?')
+            ->assertSee('Komentarze');
+    }
+
+    public function test_procedure_approval_show_lists_the_subject_above_the_decision(): void
+    {
+        $employee = Employee::factory()->create([
+            'first_name' => 'Jan',
+            'last_name' => 'KowalskiUnikat',
+        ]);
+
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Zmiana stawki Unikat',
+            'subject_type' => 'employee',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    [
+                        'id' => 'approval-1',
+                        'type' => 'approval',
+                        'name' => 'Potwierdzenie zmiany stawki Unikat',
+                        'instructions' => 'Instrukcja dla Darii',
+                        'assigned_user_id' => $this->user->id,
+                    ],
+                    ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
+                ],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'approval-1'],
+                    ['id' => 'e-ok', 'from' => 'approval-1', 'to' => 'end-1', 'optionId' => 'approved'],
+                    ['id' => 'e-no', 'from' => 'approval-1', 'to' => 'end-1', 'optionId' => 'rejected'],
+                ],
+            ],
+        ]);
+
+        $this->actingAs($this->user);
+        $run = app(ProcedureRunService::class)->startRun($template, [
+            'subject_id' => $employee->id,
+        ]);
+        app(ProcedureRunService::class)->advanceNode($run->fresh(), 'start-1');
+
+        $approval = ApprovalRequest::query()->where('procedure_run_id', $run->id)->first();
+        $this->assertNotNull($approval);
+
+        $this->actingAs($this->user)
+            ->get(route('approval-requests.show', $approval))
+            ->assertOk()
+            ->assertSee('Potwierdzenie zmiany stawki Unikat')
+            ->assertSee('Dotyczy:')
+            ->assertSee('KowalskiUnikat')
+            ->assertSee('Instrukcja dla Darii')
+            ->assertSee('Zmiana stawki Unikat')
+            ->assertSee('Komentarze');
+    }
+
+    public function test_decision_comment_is_stored_on_the_approval(): void
+    {
+        $robert = User::factory()->create(['name' => 'robert']);
+        $adminRole = \Spatie\Permission\Models\Role::where('name', 'administrator')->first();
+        if ($adminRole) {
+            $robert->assignRole($adminRole);
+        }
+
+        $approval = ApprovalRequest::query()->create([
+            'name' => 'Urlop z uzasadnieniem',
+            'approver_id' => $robert->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->actingAs($robert)
+            ->post(route('approval-requests.decide', $approval), [
+                'decision' => 'rejected',
+                'comment' => 'Za niska stawka',
+            ])
+            ->assertRedirect(route('approval-requests.show', $approval));
+
+        $this->assertSame(ApprovalDecision::Rejected, $approval->fresh()->decision);
+        $this->assertDatabaseHas('comments', [
+            'commentable_type' => 'approval_request',
+            'commentable_id' => $approval->id,
+            'user_id' => $robert->id,
+            'body' => 'Odrzucam: Za niska stawka',
+        ]);
+
+        $this->actingAs($robert)
+            ->get(route('approval-requests.show', $approval))
+            ->assertSee('Odrzucam: Za niska stawka')
+            ->assertDontSee('Uzasadnienie (opcjonalnie)');
+    }
+
+    public function test_procedure_stepper_can_attach_a_decision_comment(): void
+    {
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Playbook',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    [
+                        'id' => 'approval-1',
+                        'type' => 'approval',
+                        'name' => 'Akceptacja',
+                        'assigned_user_id' => $this->user->id,
+                    ],
+                    ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
+                ],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'approval-1'],
+                    ['id' => 'e-ok', 'from' => 'approval-1', 'to' => 'end-1', 'optionId' => 'approved'],
+                ],
+            ],
+        ]);
+
+        $this->actingAs($this->user);
+        $run = app(ProcedureRunService::class)->startRun($template, ['task_name' => 'Do akceptacji']);
+        app(ProcedureRunService::class)->advanceNode($run->fresh(), 'start-1');
+
+        $approval = ApprovalRequest::query()->where('procedure_run_id', $run->id)->first();
+        $this->assertNotNull($approval);
+
+        Livewire::actingAs($this->user)
+            ->test(ProcedureRunStepper::class, ['run' => $run->fresh()])
+            ->assertSee('Uzasadnienie (opcjonalnie)')
+            ->set('approvalComments.approval-1', 'Zgadzam się ze stawką')
+            ->call('decideApproval', 'approval-1', 'approved');
+
+        $this->assertSame(ApprovalDecision::Approved, $approval->fresh()->decision);
+        $this->assertDatabaseHas('comments', [
+            'commentable_type' => 'approval_request',
+            'commentable_id' => $approval->id,
+            'body' => 'Zatwierdzam: Zgadzam się ze stawką',
+            'procedure_run_id' => $run->id,
+        ]);
     }
 
     public function test_grid_can_request_approval_from_footer_action(): void

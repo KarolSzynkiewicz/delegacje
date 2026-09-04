@@ -26,11 +26,21 @@ class StoreEmployeeRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:employees'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'shoe_size' => ['nullable', 'string', 'max:20'],
+            'pants_size' => ['nullable', 'string', 'max:20'],
+            'has_komornik' => ['boolean'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['exists:roles,id'],
             'notes' => ['nullable', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'has_komornik' => $this->boolean('has_komornik'),
+        ]);
     }
 
     /**
@@ -55,4 +65,3 @@ class StoreEmployeeRequest extends FormRequest
         ];
     }
 }
-

@@ -49,6 +49,9 @@ class RecruitmentProcessesTable extends Component
     /** '' | referral source value (or employee_lifecycle:reinstate|terminate). */
     public string $referralSource = '';
 
+    /** '' | none | role id — filter by candidate profession (Role). */
+    public string $role = '';
+
     /** When true, only candidates with a process in status „Były pracownik”. */
     public bool $formerEmployee = false;
 
@@ -141,6 +144,8 @@ class RecruitmentProcessesTable extends Component
 
     public string $draftRejectionFilter = '';
 
+    public string $draftRole = '';
+
     public ?string $flash = null;
 
     private bool $batchingViewPersist = false;
@@ -167,6 +172,7 @@ class RecruitmentProcessesTable extends Component
         'recruiter',
         'referralSource',
         'rejectionFilter',
+        'role',
         'search',
         'sortField',
         'sortDirection',
@@ -280,6 +286,7 @@ class RecruitmentProcessesTable extends Component
         'recruiter' => ['except' => '', 'history' => true],
         'referralSource' => ['except' => '', 'as' => 'source', 'history' => true],
         'rejectionFilter' => ['except' => '', 'as' => 'rejection', 'history' => true],
+        'role' => ['except' => '', 'history' => true],
         'search' => ['except' => '', 'as' => 'q', 'history' => true],
         'sortField' => ['except' => 'created_at', 'as' => 'sort', 'history' => true],
         'sortDirection' => ['except' => 'desc', 'as' => 'dir', 'history' => true],
@@ -307,6 +314,11 @@ class RecruitmentProcessesTable extends Component
     }
 
     public function updatingReferralSource(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingRole(): void
     {
         $this->resetPage();
     }
@@ -356,6 +368,7 @@ class RecruitmentProcessesTable extends Component
     public function mount(): void
     {
         $this->backlog = RecruitmentBacklog::sanitizeFilterKey($this->backlog);
+        $this->role = $this->sanitizeRole($this->role);
 
         if ($this->view !== '' && $this->gridViewsTableExists()) {
             $this->loadViewFromSlug($this->view, flash: false);
@@ -428,6 +441,7 @@ class RecruitmentProcessesTable extends Component
         $this->draftHasTask = $this->hasTask;
         $this->draftLastContact = $this->lastContact;
         $this->draftRejectionFilter = $this->rejectionFilter;
+        $this->draftRole = $this->role;
     }
 
     public function applyDraftFilters(): void
@@ -458,6 +472,7 @@ class RecruitmentProcessesTable extends Component
         $this->hasTask = $this->draftHasTask;
         $this->lastContact = $this->sanitizeLastContact($this->draftLastContact);
         $this->rejectionFilter = $this->draftRejectionFilter;
+        $this->role = $this->sanitizeRole($this->draftRole);
         $this->resetPage();
         $this->persistActiveView();
     }
@@ -486,6 +501,7 @@ class RecruitmentProcessesTable extends Component
         $this->backlog = '';
         $this->lastContact = '';
         $this->rejectionFilter = '';
+        $this->role = '';
         $this->batchingViewPersist = false;
         $this->syncDraftFilters();
         $this->resetPage();
@@ -543,6 +559,13 @@ class RecruitmentProcessesTable extends Component
             $labels[] = 'Zatrudniony';
         } elseif ($this->employment === 'former' || $this->formerEmployee) {
             $labels[] = 'Były pracownik';
+        }
+
+        if ($this->role === 'none') {
+            $labels[] = 'Bez profesji';
+        } elseif ($this->role !== '') {
+            $name = Role::query()->whereKey((int) $this->role)->value('name');
+            $labels[] = 'Profesja: '.($name ?: '#'.$this->role);
         }
 
         if ($this->shipyardExperience !== '') {
@@ -676,6 +699,40 @@ class RecruitmentProcessesTable extends Component
         return array_key_exists($value, $this->lastContactFilterOptions()) ? $value : '';
     }
 
+    /** '' | none | positive role id */
+    protected function sanitizeRole(string $value): string
+    {
+        $value = trim($value);
+        if ($value === 'none') {
+            return 'none';
+        }
+
+        if (ctype_digit($value) && (int) $value > 0) {
+            return (string) (int) $value;
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  Builder<\App\Models\RecruitmentCandidate>  $query
+     */
+    protected function applyRoleFilter(Builder $query, string $role): void
+    {
+        $role = $this->sanitizeRole($role);
+        if ($role === '') {
+            return;
+        }
+
+        if ($role === 'none') {
+            $query->whereDoesntHave('roles');
+
+            return;
+        }
+
+        $query->whereHas('roles', fn ($q) => $q->where('roles.id', (int) $role));
+    }
+
     protected function lastCandidateContactSql(): string
     {
         return '(SELECT MAX(rca.created_at)'
@@ -749,6 +806,7 @@ class RecruitmentProcessesTable extends Component
             'min_processes' => $this->minProcesses,
             'has_task' => $this->hasTask,
             'last_contact' => $this->lastContact,
+            'role' => $this->role,
         ];
     }
 
@@ -777,6 +835,7 @@ class RecruitmentProcessesTable extends Component
             : '';
         $this->hasTask = (bool) ($filters['has_task'] ?? false);
         $this->lastContact = $this->sanitizeLastContact((string) ($filters['last_contact'] ?? ''));
+        $this->role = $this->sanitizeRole((string) ($filters['role'] ?? ''));
     }
 
     public function saveView(): void
@@ -989,6 +1048,43 @@ class RecruitmentProcessesTable extends Component
     }
 
     /**
+     * Liczniki opcji profesji — kandydaci z procesem (jednostka listy).
+     *
+     * @return array<string, int>
+     */
+    protected function roleFilterCounts(): array
+    {
+        $processConstraint = function ($q) {
+            $q->when($this->status, fn ($q) => $q->where('status', $this->status));
+        };
+
+        $byRole = DB::table('recruitment_candidates')
+            ->join('recruitment_candidate_role as rcr', 'rcr.recruitment_candidate_id', '=', 'recruitment_candidates.id')
+            ->whereExists(function ($q) use ($processConstraint) {
+                $q->selectRaw('1')
+                    ->from('recruitment_processes')
+                    ->whereColumn('recruitment_processes.candidate_id', 'recruitment_candidates.id');
+                $processConstraint($q);
+            })
+            ->groupBy('rcr.role_id')
+            ->selectRaw('rcr.role_id, COUNT(DISTINCT recruitment_candidates.id) as total')
+            ->pluck('total', 'role_id');
+
+        $counts = [
+            'none' => RecruitmentCandidate::query()
+                ->whereHas('processes', $processConstraint)
+                ->whereDoesntHave('roles')
+                ->count(),
+        ];
+
+        foreach ($byRole as $roleId => $total) {
+            $counts[(string) $roleId] = (int) $total;
+        }
+
+        return $counts;
+    }
+
+    /**
      * Licznik opcji w panelu filtrów — procesy (nie kandydaci), spójnie z badge’ami statusów.
      *
      * @param  callable(\Illuminate\Database\Eloquent\Builder<\App\Models\RecruitmentProcess>): void  $processConstraint
@@ -1032,6 +1128,7 @@ class RecruitmentProcessesTable extends Component
             'recruiter' => $this->recruiter,
             'referral_source' => $this->referralSource,
             'rejection_filter' => $this->rejectionFilter,
+            'role' => $this->role,
             'search' => $this->search,
         ];
     }
@@ -1064,6 +1161,7 @@ class RecruitmentProcessesTable extends Component
             'recruiter' => $view->recruiter ?? '',
             'referral_source' => $view->referral_source ?? '',
             'rejection_filter' => $view->rejection_filter ?? '',
+            'role' => $this->sanitizeRole((string) ($advanced['role'] ?? '')),
             'search' => $view->search ?? '',
         ];
     }
@@ -1099,6 +1197,7 @@ class RecruitmentProcessesTable extends Component
         $hasTask = (bool) ($filters['has_task'] ?? false);
         $backlog = RecruitmentBacklog::sanitizeFilterKey((string) ($filters['backlog'] ?? ''));
         $lastContact = $this->sanitizeLastContact((string) ($filters['last_contact'] ?? ''));
+        $role = $this->sanitizeRole((string) ($filters['role'] ?? ''));
         $search = (string) ($filters['search'] ?? '');
         $userId = auth()->id();
 
@@ -1146,6 +1245,7 @@ class RecruitmentProcessesTable extends Component
             })
             ->when($minProcesses >= 2, fn ($q) => $q->having('processes_count', '>=', $minProcesses));
 
+        $this->applyRoleFilter($query, $role);
         $this->applyLastContactFilter($query, $lastContact);
 
         return $query->when($search, function ($q) use ($search, $phoneSearch) {
@@ -1830,6 +1930,7 @@ class RecruitmentProcessesTable extends Component
             ->paginate(20);
 
         $recruiters = User::orderBy('name')->get();
+        $roles = Role::orderBy('name')->get();
         $selected = $this->getSelectedProcess();
 
         $recruiterCounts = [
@@ -1851,6 +1952,8 @@ class RecruitmentProcessesTable extends Component
         $formerEmployeeCount = $this->countProcessesForFilter(
             fn ($q) => $q->where('status', RecruitmentStatus::BylyPracownik->value)
         );
+
+        $roleCounts = $this->roleFilterCounts();
 
         $savedViews = $this->gridViewsTableExists()
             ? RecruitmentGridView::query()
@@ -1898,6 +2001,7 @@ class RecruitmentProcessesTable extends Component
             'recruiterCounts' => $recruiterCounts,
             'referralSourceCounts' => $referralSourceCounts,
             'referralSourceOptions' => $this->referralSourceFilterOptions(),
+            'roleCounts' => $roleCounts,
             'activeFilterCount' => $this->activeFilterCount(),
             'activeFilterLabels' => $this->activeFilterLabels(),
             'savedViews' => $savedViews,
@@ -1906,7 +2010,7 @@ class RecruitmentProcessesTable extends Component
                 ? ($savedViews->firstWhere('slug', $this->view)?->name ?? $this->view)
                 : null,
             'total' => RecruitmentCandidate::whereHas('processes')->count(),
-            'roles' => Role::orderBy('name')->get(),
+            'roles' => $roles,
             'recruiters' => $recruiters,
             'selected' => $selected,
             'processTimeline' => $this->buildProcessTimeline($selected),

@@ -89,21 +89,22 @@ class EmployeeTabs extends Component
     {
         // Definicja wszystkich możliwych tabów z przypisanym permission i ikonami
         $allTabs = [
-            'info' => ['label' => 'Informacje', 'permission' => null, 'icon' => 'bi bi-info-circle'],
-            'documents' => ['label' => 'Dokumenty', 'permission' => 'employee-documents.view', 'icon' => 'bi bi-file-earmark-medical'],
-            'rotations' => ['label' => 'Rotacje', 'permission' => 'rotations.view', 'icon' => 'bi bi-arrow-repeat'],
-            'assignments' => ['label' => 'Przypisania do projektów', 'permission' => 'project-assignments.view', 'icon' => 'bi bi-person-check'],
-            'vehicle-assignments' => ['label' => 'Przypisania do aut', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
-            'accommodation-assignments' => ['label' => 'Przypisania do domów', 'permission' => 'accommodation-assignments.view', 'icon' => 'bi bi-house-fill'],
-            'equipment' => ['label' => 'Asortyment', 'permission' => 'equipment.view', 'icon' => 'bi bi-box-seam'],
-            'payrolls' => ['label' => 'Płace', 'permission' => 'payrolls.view', 'icon' => 'bi bi-cash-stack'],
-            'employee-rates' => ['label' => 'Stawki', 'permission' => 'employee-rates.view', 'icon' => 'bi bi-currency-dollar'],
-            'company-assignments' => ['label' => 'Przypisania do spółek', 'permission' => 'company-assignments.view', 'icon' => 'bi bi-building'],
-            'advances' => ['label' => 'Zaliczki', 'permission' => 'advances.view', 'icon' => 'bi bi-wallet2'],
-            'time-logs' => ['label' => 'Godziny', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
-            'evaluations' => ['label' => 'Oceny', 'permission' => 'employee-evaluations.view', 'icon' => 'bi bi-star-fill'],
-            'adjustments' => ['label' => 'Obciążenia i uznania', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
-            'comments' => ['label' => 'Komentarze', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
+            'info' => ['label' => 'Informacje', 'short' => 'Informacje', 'group' => 'Profil', 'permission' => null, 'icon' => 'bi bi-person'],
+            'documents' => ['label' => 'Dokumenty', 'short' => 'Dokumenty', 'group' => 'Profil', 'permission' => 'employee-documents.view', 'icon' => 'bi bi-file-earmark-medical'],
+            'comments' => ['label' => 'Komentarze', 'short' => 'Komentarze', 'group' => 'Profil', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
+            'rotations' => ['label' => 'Rotacje', 'short' => 'Rotacje', 'group' => 'Praca', 'permission' => 'rotations.view', 'icon' => 'bi bi-arrow-repeat'],
+            'assignments' => ['label' => 'Przypisania do projektów', 'short' => 'Projekty', 'group' => 'Praca', 'permission' => 'project-assignments.view', 'icon' => 'bi bi-person-check'],
+            'vehicle-assignments' => ['label' => 'Przypisania do aut', 'short' => 'Auta', 'group' => 'Praca', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
+            'accommodation-assignments' => ['label' => 'Przypisania do domów', 'short' => 'Domy', 'group' => 'Praca', 'permission' => 'accommodation-assignments.view', 'icon' => 'bi bi-house-fill'],
+            'equipment' => ['label' => 'Asortyment', 'short' => 'Asortyment', 'group' => 'Praca', 'permission' => 'equipment.view', 'icon' => 'bi bi-box-seam'],
+            'time-logs' => ['label' => 'Godziny', 'short' => 'Godziny', 'group' => 'Praca', 'permission' => 'time-logs.view', 'icon' => 'bi bi-clock'],
+            'payrolls' => ['label' => 'Płace', 'short' => 'Płace', 'group' => 'Kadry', 'permission' => 'payrolls.view', 'icon' => 'bi bi-cash-stack'],
+            'employee-rates' => ['label' => 'Stawki', 'short' => 'Stawki', 'group' => 'Kadry', 'permission' => 'employee-rates.view', 'icon' => 'bi bi-currency-dollar'],
+            'bank' => ['label' => 'Bank', 'short' => 'Bank', 'group' => 'Kadry', 'permission' => 'employee-bank-accounts.view', 'icon' => 'bi bi-bank'],
+            'company-assignments' => ['label' => 'Przypisania do spółek', 'short' => 'Spółki', 'group' => 'Kadry', 'permission' => 'company-assignments.view', 'icon' => 'bi bi-building'],
+            'advances' => ['label' => 'Zaliczki', 'short' => 'Zaliczki', 'group' => 'Kadry', 'permission' => 'advances.view', 'icon' => 'bi bi-wallet2'],
+            'evaluations' => ['label' => 'Oceny', 'short' => 'Oceny', 'group' => 'Kadry', 'permission' => 'employee-evaluations.view', 'icon' => 'bi bi-star-fill'],
+            'adjustments' => ['label' => 'Obciążenia i uznania', 'short' => 'Obciążenia', 'group' => 'Kadry', 'permission' => 'adjustments.view', 'icon' => 'bi bi-award'],
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp
@@ -140,6 +141,7 @@ class EmployeeTabs extends Component
             'accommodation-assignments' => $this->employee->accommodationAssignments()->with('accommodation')->orderBy('start_date', 'desc')->get(),
             'payrolls' => $this->employee->payrolls()->orderBy('period_start', 'desc')->get(),
             'employee-rates' => \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->orderBy('start_date', 'desc')->get(),
+            'bank' => $this->employee->bankAccounts()->orderBy('start_date', 'desc')->get(),
             'company-assignments' => $this->employee->companyAssignments()->with('company')->orderBy('start_date', 'desc')->get(),
             'advances' => $this->employee->advances()->orderBy('date', 'desc')->get(),
             'time-logs' => \App\Models\TimeLog::whereHas('projectAssignment', function ($query) {
@@ -173,6 +175,7 @@ class EmployeeTabs extends Component
             'evaluations',
             'adjustments',
             'comments',
+            'bankAccounts',
             'equipmentIssues' => fn ($issues) => $issues->whereNotIn('status', [
                 EquipmentIssue::STATUS_UNFULFILLED,
             ]),
@@ -201,6 +204,7 @@ class EmployeeTabs extends Component
                 'company-assignments' => $this->employee->company_assignments_count ?? 0,
                 'payrolls' => $this->employee->payrolls_count ?? 0,
                 'employee-rates' => $employeeRatesCount,
+                'bank' => $this->employee->bank_accounts_count ?? 0,
                 'advances' => $this->employee->advances_count ?? 0,
                 'time-logs' => $timeLogsCount,
                 'evaluations' => $this->employee->evaluations_count ?? 0,
@@ -212,12 +216,36 @@ class EmployeeTabs extends Component
 
             $tabsForComponent[$tabKey] = [
                 'label' => $tab['label'],
+                'short' => $tab['short'] ?? $tab['label'],
+                'group' => $tab['group'] ?? 'Profil',
                 'icon' => $tab['icon'] ?? null,
                 'count' => $count,
                 'wireClick' => "setTab('{$tabKey}')",
             ];
         }
 
-        return view('livewire.employee-tabs', compact('tabData', 'employeeRatesCount', 'timeLogsCount', 'tabsForComponent'));
+        $tabGroups = [];
+        foreach ($tabsForComponent as $tabKey => $tab) {
+            $tabGroups[$tab['group']][$tabKey] = $tab;
+        }
+
+        $currentBankAccount = $this->employee->currentBankAccount();
+        $locationStatus = app(\App\Services\LocationTrackingService::class)
+            ->getLocationStatus($this->employee, now());
+        $initials = mb_strtoupper(
+            mb_substr((string) $this->employee->first_name, 0, 1).
+            mb_substr((string) $this->employee->last_name, 0, 1)
+        );
+
+        return view('livewire.employee-tabs', compact(
+            'tabData',
+            'employeeRatesCount',
+            'timeLogsCount',
+            'tabsForComponent',
+            'tabGroups',
+            'currentBankAccount',
+            'locationStatus',
+            'initials',
+        ));
     }
 }

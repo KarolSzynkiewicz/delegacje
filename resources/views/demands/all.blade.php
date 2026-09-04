@@ -1,21 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Wszystkie zapotrzebowania projektów">
-            <x-slot name="right">
-                @php
-                    $firstProject = \App\Models\Project::orderBy('name')->first();
-                @endphp
-                @if($firstProject)
-                    <x-ui.button
-                        variant="primary"
-                        href="{{ route('projects.demands.create', $firstProject) }}"
-                        action="create"
-                    >
-                        Dodaj zapotrzebowanie
-                    </x-ui.button>
-                @endif
-            </x-slot>
-        </x-ui.page-header>
+        <x-ui.page-header title="Wszystkie zapotrzebowania projektów" />
     </x-slot>
 
     @if (session('success'))

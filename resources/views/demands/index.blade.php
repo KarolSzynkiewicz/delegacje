@@ -1,17 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Zapotrzebowanie projektu: {{ $project->name }}">
-            <x-slot name="right">
-                <x-ui.button 
-                    variant="primary" 
-                    href="{{ route('projects.demands.create', $project) }}"
-                    routeName="projects.demands.create"
-                    action="create"
-                >
-                    Dodaj Zapotrzebowanie
-                </x-ui.button>
-            </x-slot>
-        </x-ui.page-header>
+        <x-ui.page-header title="Zapotrzebowanie projektu: {{ $project->name }}" />
     </x-slot>
 
     @if (session('success'))
@@ -79,19 +68,10 @@
                 </div>
             @endif
         @else
-            <x-ui.empty-state 
-                icon="inbox" 
+            <x-ui.empty-state
+                icon="inbox"
                 message="Brak zapotrzebowań dla tego projektu."
-            >
-                <x-ui.button 
-                    variant="primary" 
-                    href="{{ route('projects.demands.create', $project) }}"
-                    routeName="projects.demands.create"
-                    action="create"
-                >
-                    Dodaj pierwsze zapotrzebowanie
-                </x-ui.button>
-            </x-ui.empty-state>
+            />
         @endif
     </x-ui.card>
 </x-app-layout>

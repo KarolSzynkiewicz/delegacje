@@ -115,6 +115,9 @@ class AttachmentPolicy
         if ($ctx instanceof RecruitmentProcess) {
             return $user->hasPermission('recruitment-processes.view');
         }
+        if ($ctx instanceof ApprovalRequest) {
+            return $user->can('view', $ctx);
+        }
         if ($ctx instanceof LogisticsEvent) {
             return match ($ctx->type) {
                 LogisticsEventType::DEPARTURE => $user->hasPermission('departures.view'),

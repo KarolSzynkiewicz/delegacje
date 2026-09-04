@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ApprovalDecision;
+use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class ApprovalRequest extends Model
 {
+    use HasComments;
+
     protected $fillable = [
         'name',
         'description',
@@ -37,6 +40,7 @@ class ApprovalRequest extends Model
     {
         static::deleting(function (ApprovalRequest $approval) {
             $approval->attachments->each->delete();
+            $approval->comments()->with('attachments')->get()->each->delete();
         });
     }
 
@@ -95,7 +99,7 @@ class ApprovalRequest extends Model
         return $user !== null && $this->created_by !== null && (int) $user->id === (int) $this->created_by;
     }
 
-    public function decide(ApprovalDecision $decision, User $actor): void
+    public function decide(ApprovalDecision $decision, User $actor, string $note = ''): void
     {
         if ($this->isDecided()) {
             return;
@@ -106,5 +110,24 @@ class ApprovalRequest extends Model
             'decided_at' => now(),
             'decided_by' => $actor->id,
         ]);
+
+        $this->addDecisionComment($decision, $actor, $note);
+    }
+
+    public function addDecisionComment(ApprovalDecision $decision, User $actor, string $note): ?Comment
+    {
+        $note = trim($note);
+        if ($note === '') {
+            return null;
+        }
+
+        $prefix = $decision === ApprovalDecision::Approved ? 'Zatwierdzam' : 'Odrzucam';
+        $comment = $this->addComment($prefix.': '.$note, $actor);
+
+        if ($this->procedure_run_id) {
+            $comment->update(['procedure_run_id' => $this->procedure_run_id]);
+        }
+
+        return $comment;
     }
 }

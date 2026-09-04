@@ -20,7 +20,28 @@
         <div x-show="openCandidate" class="rp-filter-section__body">
             <div class="rp-filter-grid">
                 <div>
-                    <div class="rp-filter-label">Oznaczenia</div>
+                    <div class="rp-filter-label">Profesja</div>
+                    <div class="rp-filter-scroll">
+                        <button type="button"
+                                wire:click="$set('draftRole', '{{ $draftRole === 'none' ? '' : 'none' }}')"
+                                class="rp-filter-option {{ $draftRole === 'none' ? 'is-active' : '' }}">
+                            <span class="rp-filter-check {{ $draftRole === 'none' ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
+                            <span class="rp-filter-option__label">Bez profesji</span>
+                            <span class="rp-filter-option__count">{{ $roleCounts['none'] ?? 0 }}</span>
+                        </button>
+                        @foreach($roles as $roleOption)
+                            @php $roleKey = (string) $roleOption->id; @endphp
+                            <button type="button"
+                                    wire:click="$set('draftRole', '{{ $draftRole === $roleKey ? '' : $roleKey }}')"
+                                    class="rp-filter-option {{ $draftRole === $roleKey ? 'is-active' : '' }}">
+                                <span class="rp-filter-check {{ $draftRole === $roleKey ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
+                                <span class="rp-filter-option__label">{{ $roleOption->name }}</span>
+                                <span class="rp-filter-option__count">{{ $roleCounts[$roleKey] ?? 0 }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <div class="rp-filter-label mt-2">Oznaczenia</div>
                     <button type="button"
                             wire:click="$set('draftFlag', '{{ $draftFlag === RecruitmentCandidateFlag::Wartosciowy->value ? '' : RecruitmentCandidateFlag::Wartosciowy->value }}')"
                             class="rp-filter-option {{ $draftFlag === RecruitmentCandidateFlag::Wartosciowy->value ? 'is-active' : '' }}">
