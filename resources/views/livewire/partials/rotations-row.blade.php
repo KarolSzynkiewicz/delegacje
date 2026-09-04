@@ -1,4 +1,4 @@
-@props(['rotation'])
+@props(['rotation', 'hideEmployee' => false])
 
 @php
     $status = $rotation->status;
@@ -34,9 +34,11 @@
 @endphp
 
 <tr wire:key="rotation-{{ $rotation->id }}">
-    <td>
-        <x-employee-cell :employee="$rotation->employee" />
-    </td>
+    @unless($hideEmployee)
+        <td>
+            <x-employee-cell :employee="$rotation->employee" />
+        </td>
+    @endunless
     <td><small class="text-muted">{{ $rotation->start_date->format('Y-m-d') }}</small></td>
     <td><small class="text-muted">{{ $rotation->end_date->format('Y-m-d') }}</small></td>
     <td class="text-end text-nowrap">

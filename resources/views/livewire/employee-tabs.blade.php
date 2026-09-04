@@ -44,12 +44,12 @@
                 <div class="card-body emp-dossier">
                     <div class="emp-facts">
                         <div class="emp-fact">
-                            <div class="emp-fact__label">Email</div>
-                            <p class="emp-fact__value">{{ $employee->email ?? '-' }}</p>
+                            <div class="emp-fact__label">Rozmiar buta</div>
+                            <p class="emp-fact__value">{{ $employee->shoe_size ?: '-' }}</p>
                         </div>
                         <div class="emp-fact">
-                            <div class="emp-fact__label">Telefon</div>
-                            <p class="emp-fact__value">{{ $employee->phone ?? '-' }}</p>
+                            <div class="emp-fact__label">Rozmiar spodni</div>
+                            <p class="emp-fact__value">{{ $employee->pants_size ?: '-' }}</p>
                         </div>
                         <div class="emp-fact">
                             <div class="emp-fact__label">Konto bankowe</div>
@@ -65,13 +65,16 @@
                                 @endif
                             </p>
                         </div>
-                        @if($employee->notes)
-                            <div class="emp-fact emp-fact--wide">
-                                <div class="emp-fact__label">Notatki</div>
-                                <p class="emp-fact__value emp-fact__value--notes">{{ $employee->notes }}</p>
-                            </div>
-                        @endif
+                        <div class="emp-fact emp-fact--wide">
+                            <div class="emp-fact__label">Notatki</div>
+                            <p class="emp-fact__value emp-fact__value--notes">{{ $employee->notes ?: '-' }}</p>
+                        </div>
                     </div>
+                    @if(auth()->user()->hasPermission('comments.view'))
+                        <div class="emp-dossier__comments">
+                            <x-comments embedded :commentable="$employee" />
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -165,293 +168,32 @@
             </x-ui.card>
         </div>
     @elseif($activeTab === 'rotations')
-        <!-- Zakładka Rotacje -->
         <div id="rotations" role="tabpanel">
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-4">
-                        <x-ui.table-header title="Rotacje">
-                            <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}" class="btn-sm">Dodaj Rotację</x-ui.button>
-                            </x-slot>
-                        </x-ui.table-header>
-                        @if($tabData && $tabData->count() > 0)
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Data rozpoczęcia</th>
-                                            <th>Data zakończenia</th>
-                                            <th>Status</th>
-                                            <th>Notatki</th>
-                                            <th>Akcje</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($tabData->sortByDesc('start_date') as $rotation)
-                                            <tr>
-                                                <td>{{ $rotation->start_date->format('Y-m-d') }}</td>
-                                                <td>{{ $rotation->end_date->format('Y-m-d') }}</td>
-                                                <td>
-                                                    @php
-                                                        $status = $rotation->status;
-                                                    @endphp
-                                                    @if($status === 'active')
-                                                        <x-ui.badge variant="success">Aktywna</x-ui.badge>
-                                                    @elseif($status === 'scheduled')
-                                                        <x-ui.badge variant="accent">Zaplanowana</x-ui.badge>
-                                                    @elseif($status === 'completed')
-                                                        <x-ui.badge variant="info">Zakończona</x-ui.badge>
-                                                    @elseif($status === 'cancelled')
-                                                        <x-ui.badge variant="danger">Anulowana</x-ui.badge>
-                                                    @endif
-                                                </td>
-                                                <td>{{ $rotation->notes ? Str::limit($rotation->notes, 50) : '-' }}</td>
-                                                <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('employees.rotations.edit', [$employee, $rotation]) }}" class="btn-sm">
-                                                        <i class="bi bi-pencil"></i> Edytuj
-                                                    </x-ui.button>
-                                                    <x-ui.delete-form 
-                                                        action="{{ route('employees.rotations.destroy', [$employee, $rotation]) }}"
-                                                        message="Czy na pewno chcesz usunąć tę rotację?"
-                                                        size="sm"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <p class="text-muted">Brak rotacji dla tego pracownika.</p>
-                            <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}">Dodaj pierwszą rotację</x-ui.button>
-                        @endif
-                    </div>
-                </div>
+            <div class="d-flex justify-content-end mb-3">
+                <x-ui.button variant="primary" href="{{ route('employees.rotations.create', $employee) }}" class="btn-sm">Dodaj Rotację</x-ui.button>
             </div>
+            <livewire:rotations-table :employee-id="$employee->id" :wire:key="'emp-rotations-'.$employee->id" />
         </div>
     @elseif($activeTab === 'assignments')
-        <!-- Zakładka Przypisania do projektów -->
         <div id="assignments" role="tabpanel">
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-4">
-                        <x-ui.table-header title="Przypisania do projektów">
-                            <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
-                            </x-slot>
-                        </x-ui.table-header>
-                        @if($tabData && $tabData->count() > 0)
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Projekt</th>
-                                            <th>Rola</th>
-                                            <th>Okres</th>
-                                            <th>Status</th>
-                                            <th>Akcje</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($tabData as $assignment)
-                                            <tr>
-                                                <td>
-                                                    <a href="{{ route('projects.show', $assignment->project) }}" class="text-primary">
-                                                        {{ $assignment->project->name }}
-                                                    </a>
-                                                </td>
-                                                <td>{{ $assignment->role->name }}</td>
-                                                <td>
-                                                    {{ $assignment->start_date->format('Y-m-d') }}
-                                                    @if($assignment->end_date)
-                                                        - {{ $assignment->end_date->format('Y-m-d') }}
-                                                    @else
-                                                        - ...
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    @php
-                                                        $status = $assignment->status ?? \App\Enums\AssignmentStatus::ACTIVE;
-                                                        $statusValue = $status instanceof \App\Enums\AssignmentStatus ? $status->value : $status;
-                                                        $statusLabel = $status instanceof \App\Enums\AssignmentStatus ? $status->label() : ucfirst($status);
-                                                    @endphp
-                                                    <span class="badge 
-                                                        @if($statusValue === 'active') bg-success
-                                                        @elseif($statusValue === 'completed') bg-info
-                                                        @elseif($statusValue === 'cancelled') bg-danger
-                                                        @elseif($statusValue === 'in_transit') bg-warning
-                                                        @elseif($statusValue === 'at_base') bg-secondary
-                                                        @else bg-secondary
-                                                        @endif">
-                                                        {{ $statusLabel }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('project-assignments.show', $assignment) }}" class="btn-sm">
-                                                        <i class="bi bi-eye"></i> Szczegóły
-                                                    </x-ui.button>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <x-ui.empty-state 
-                                icon="people" 
-                                message="Brak przypisań do projektów dla tego pracownika."
-                            >
-                                <x-ui.button 
-                                    variant="primary" 
-                                    href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}"
-                                    routeName="project-assignments.create"
-                                    action="create"
-                                >
-                                    Dodaj przypisanie
-                                </x-ui.button>
-                            </x-ui.empty-state>
-                        @endif
-                    </div>
-                </div>
+            <div class="d-flex justify-content-end mb-3">
+                <x-ui.button variant="primary" href="{{ route('project-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
             </div>
+            <livewire:assignments-table :employee-id="$employee->id" :wire:key="'emp-assignments-'.$employee->id" />
         </div>
     @elseif($activeTab === 'vehicle-assignments')
-        <!-- Zakładka Przypisania do aut -->
         <div id="vehicle-assignments" role="tabpanel">
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-4">
-                        <x-ui.table-header title="Przypisania do aut">
-                            <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('vehicle-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">
-                                    <i class="bi bi-plus-circle"></i> Dodaj przypisanie
-                                </x-ui.button>
-                            </x-slot>
-                        </x-ui.table-header>
-                        @if($tabData && $tabData->count() > 0)
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Pojazd</th>
-                                            <th>Rola</th>
-                                            <th>Okres</th>
-                                            <th>Akcje</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($tabData as $assignment)
-                                            <tr>
-                                                <td>
-                                                    <a href="{{ route('vehicles.show', $assignment->vehicle) }}" class="text-primary">
-                                                        {{ $assignment->vehicle->registration_number }}
-                                                        @if($assignment->vehicle->brand)
-                                                            ({{ $assignment->vehicle->brand }}{{ $assignment->vehicle->model ? ' ' . $assignment->vehicle->model : '' }})
-                                                        @endif
-                                                    </a>
-                                                </td>
-                                                <td>
-                                                    @php
-                                                        $position = $assignment->position ?? \App\Enums\VehiclePosition::PASSENGER;
-                                                        $positionValue = $position instanceof \App\Enums\VehiclePosition ? $position->value : $position;
-                                                        $isDriver = $positionValue === 'driver';
-                                                    @endphp
-                                                    <x-ui.badge variant="{{ $isDriver ? 'success' : 'info' }}">
-                                                        {{ $isDriver ? 'Kierowca' : 'Pasażer' }}
-                                                    </x-ui.badge>
-                                                </td>
-                                                <td>
-                                                    {{ $assignment->start_date->format('Y-m-d') }}
-                                                    @if($assignment->end_date)
-                                                        - {{ $assignment->end_date->format('Y-m-d') }}
-                                                    @else
-                                                        - ...
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('vehicle-assignments.show', $assignment) }}" class="btn-sm">
-                                                        <i class="bi bi-eye"></i> Szczegóły
-                                                    </x-ui.button>
-                                                    <x-ui.button variant="ghost" href="{{ route('vehicle-assignments.edit', $assignment) }}" class="btn-sm">
-                                                        <i class="bi bi-pencil"></i> Edytuj
-                                                    </x-ui.button>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <p class="text-muted">Brak przypisań do aut dla tego pracownika.</p>
-                            <x-ui.button variant="primary" href="{{ route('vehicle-assignments.create', ['employee_id' => $employee->id]) }}">Dodaj pierwsze przypisanie</x-ui.button>
-                        @endif
-                    </div>
-                </div>
+            <div class="d-flex justify-content-end mb-3">
+                <x-ui.button variant="primary" href="{{ route('vehicle-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
             </div>
+            <livewire:vehicle-assignments-table :employee-id="$employee->id" :wire:key="'emp-vehicle-assignments-'.$employee->id" />
         </div>
     @elseif($activeTab === 'accommodation-assignments')
-        <!-- Zakładka Przypisania do domów -->
         <div id="accommodation-assignments" role="tabpanel">
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-4">
-                        <x-ui.table-header title="Przypisania do domów">
-                            <x-slot name="actions">
-                                <x-ui.button variant="primary" href="{{ route('accommodation-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">
-                                    <i class="bi bi-plus-circle"></i> Dodaj przypisanie
-                                </x-ui.button>
-                            </x-slot>
-                        </x-ui.table-header>
-                        @if($tabData && $tabData->count() > 0)
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Mieszkanie</th>
-                                            <th>Okres</th>
-                                            <th>Akcje</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($tabData as $assignment)
-                                            <tr>
-                                                <td>
-                                                    <a href="{{ route('accommodations.show', $assignment->accommodation) }}" class="text-primary">
-                                                        {{ $assignment->accommodation->name }}
-                                                        @if($assignment->accommodation->city)
-                                                            ({{ $assignment->accommodation->city }})
-                                                        @endif
-                                                    </a>
-                                                </td>
-                                                <td>
-                                                    {{ $assignment->start_date->format('Y-m-d') }}
-                                                    @if($assignment->end_date)
-                                                        - {{ $assignment->end_date->format('Y-m-d') }}
-                                                    @else
-                                                        - ...
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('accommodation-assignments.show', $assignment) }}" class="btn-sm">
-                                                        <i class="bi bi-eye"></i> Szczegóły
-                                                    </x-ui.button>
-                                                    <x-ui.button variant="ghost" href="{{ route('accommodation-assignments.edit', $assignment) }}" class="btn-sm">
-                                                        <i class="bi bi-pencil"></i> Edytuj
-                                                    </x-ui.button>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <p class="text-muted">Brak przypisań do domów dla tego pracownika.</p>
-                            <x-ui.button variant="primary" href="{{ route('accommodation-assignments.create', ['employee_id' => $employee->id]) }}">Dodaj pierwsze przypisanie</x-ui.button>
-                        @endif
-                    </div>
-                </div>
+            <div class="d-flex justify-content-end mb-3">
+                <x-ui.button variant="primary" href="{{ route('accommodation-assignments.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj przypisanie</x-ui.button>
             </div>
+            <livewire:accommodation-assignments-table :employee-id="$employee->id" :wire:key="'emp-accommodation-assignments-'.$employee->id" />
         </div>
     @elseif($activeTab === 'payrolls')
         <!-- Zakładka Płace -->
@@ -738,64 +480,13 @@
             </div>
         </div>
     @elseif($activeTab === 'time-logs')
-        <!-- Zakładka Godziny -->
         <div id="time-logs" role="tabpanel">
-            <div class="card">
-                <div class="card-body">
-                    <div class="mb-4">
-                        <x-ui.table-header title="Ewidencja Godzin">
-                            @if(auth()->user()->isAdmin())
-                                <x-slot name="actions">
-                                    <x-ui.button variant="primary" href="{{ route('time-logs.create') }}" class="btn-sm">Dodaj Wpis</x-ui.button>
-                                </x-slot>
-                            @endif
-                        </x-ui.table-header>
-                        @if($tabData && $tabData->count() > 0)
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Projekt</th>
-                                            <th>Data</th>
-                                            <th>Godziny</th>
-                                            <th>Notatki</th>
-                                            <th>Akcje</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($tabData as $timeLog)
-                                            <tr>
-                                                <td>
-                                                    @if($timeLog->projectAssignment && $timeLog->projectAssignment->project)
-                                                        <a href="{{ route('projects.show', $timeLog->projectAssignment->project) }}" class="text-primary">
-                                                            {{ $timeLog->projectAssignment->project->name }}
-                                                        </a>
-                                                    @else
-                                                        <span class="text-muted">-</span>
-                                                    @endif
-                                                </td>
-                                                <td>{{ $timeLog->start_time->format('Y-m-d H:i') }}</td>
-                                                <td><strong>{{ number_format($timeLog->hours_worked, 2, ',', ' ') }}</strong></td>
-                                                <td>{{ $timeLog->notes ?? '-' }}</td>
-                                                <td>
-                                                    <x-ui.button variant="ghost" href="{{ route('time-logs.show', $timeLog) }}" class="btn-sm">
-                                                        <i class="bi bi-eye"></i> Szczegóły
-                                                    </x-ui.button>
-                                                    <x-ui.button variant="ghost" href="{{ route('time-logs.edit', $timeLog) }}" class="btn-sm">
-                                                        <i class="bi bi-pencil"></i> Edytuj
-                                                    </x-ui.button>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <p class="text-muted">Brak wpisów godzin dla tego pracownika.</p>
-                        @endif
-                    </div>
+            @if(auth()->user()->isAdmin())
+                <div class="d-flex justify-content-end mb-3">
+                    <x-ui.button variant="primary" href="{{ route('time-logs.create') }}" class="btn-sm">Dodaj Wpis</x-ui.button>
                 </div>
-            </div>
+            @endif
+            <livewire:time-logs-table :employee-id="$employee->id" :wire:key="'emp-time-logs-'.$employee->id" />
         </div>
     @elseif($activeTab === 'evaluations')
         <!-- Zakładka Oceny -->
@@ -946,11 +637,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-    @elseif($activeTab === 'comments')
-        <!-- Zakładka Komentarze -->
-        <div id="comments" role="tabpanel">
-            <x-comments :commentable="$employee" />
         </div>
     @elseif($activeTab === 'equipment')
         <div id="equipment" role="tabpanel">
@@ -1122,6 +808,7 @@
 .emp-fact__value { font-size: 0.95rem; font-weight: 600; color: var(--text-main) !important; margin: 0; overflow-wrap: anywhere; }
 .emp-fact__value--notes { font-weight: 500; line-height: 1.45; color: #cbd5e1 !important; }
 .emp-dossier { padding: 0.35rem 0.15rem !important; }
+.emp-dossier__comments { margin-top: 1.15rem; padding-top: 0.95rem; border-top: 1px solid var(--glass-border); }
 .ui-compact-nav__group {
     font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--text-muted) !important; padding: 0.55rem 0.7rem 0.2rem; list-style: none;

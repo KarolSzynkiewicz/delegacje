@@ -91,7 +91,6 @@ class EmployeeTabs extends Component
         $allTabs = [
             'info' => ['label' => 'Informacje', 'short' => 'Informacje', 'group' => 'Profil', 'permission' => null, 'icon' => 'bi bi-person'],
             'documents' => ['label' => 'Dokumenty', 'short' => 'Dokumenty', 'group' => 'Profil', 'permission' => 'employee-documents.view', 'icon' => 'bi bi-file-earmark-medical'],
-            'comments' => ['label' => 'Komentarze', 'short' => 'Komentarze', 'group' => 'Profil', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
             'rotations' => ['label' => 'Rotacje', 'short' => 'Rotacje', 'group' => 'Praca', 'permission' => 'rotations.view', 'icon' => 'bi bi-arrow-repeat'],
             'assignments' => ['label' => 'Przypisania do projektów', 'short' => 'Projekty', 'group' => 'Praca', 'permission' => 'project-assignments.view', 'icon' => 'bi bi-person-check'],
             'vehicle-assignments' => ['label' => 'Przypisania do aut', 'short' => 'Auta', 'group' => 'Praca', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
@@ -135,25 +134,13 @@ class EmployeeTabs extends Component
         // Filtracja przez relacje hasMany - bez osobnych route
         return match ($this->activeTab) {
             'documents' => $this->employee->employeeDocuments()->with('document')->get(),
-            'rotations' => $this->employee->rotations()->get(),
-            'assignments' => $this->employee->assignments()->with(['project', 'role'])->orderBy('start_date', 'desc')->get(),
-            'vehicle-assignments' => $this->employee->vehicleAssignments()->with('vehicle')->orderBy('start_date', 'desc')->get(),
-            'accommodation-assignments' => $this->employee->accommodationAssignments()->with('accommodation')->orderBy('start_date', 'desc')->get(),
             'payrolls' => $this->employee->payrolls()->orderBy('period_start', 'desc')->get(),
             'employee-rates' => \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->orderBy('start_date', 'desc')->get(),
             'bank' => $this->employee->bankAccounts()->orderBy('start_date', 'desc')->get(),
             'company-assignments' => $this->employee->companyAssignments()->with('company')->orderBy('start_date', 'desc')->get(),
             'advances' => $this->employee->advances()->orderBy('date', 'desc')->get(),
-            'time-logs' => \App\Models\TimeLog::whereHas('projectAssignment', function ($query) {
-                $query->where('employee_id', $this->employee->id);
-            })
-                ->with(['projectAssignment.project', 'projectAssignment.role'])
-                ->orderBy('start_time', 'desc')
-                ->get(),
             'evaluations' => $this->employee->evaluations()->with('createdBy')->orderBy('created_at', 'desc')->get(),
             'adjustments' => $this->employee->adjustments()->orderBy('date', 'desc')->get(),
-            'comments' => null, // komentarze ładowane przez komponent x-comments
-            'equipment' => null, // historia wydań ładowana przez EmployeeEquipmentHistory
             default => null,
         };
     }
@@ -174,7 +161,6 @@ class EmployeeTabs extends Component
             'advances',
             'evaluations',
             'adjustments',
-            'comments',
             'bankAccounts',
             'equipmentIssues' => fn ($issues) => $issues->whereNotIn('status', [
                 EquipmentIssue::STATUS_UNFULFILLED,
@@ -209,7 +195,6 @@ class EmployeeTabs extends Component
                 'time-logs' => $timeLogsCount,
                 'evaluations' => $this->employee->evaluations_count ?? 0,
                 'adjustments' => $this->employee->adjustments_count ?? 0,
-                'comments' => $this->employee->comments_count ?? 0,
                 'equipment' => $this->employee->equipment_issues_count ?? 0,
                 default => null,
             };

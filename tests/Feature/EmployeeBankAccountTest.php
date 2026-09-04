@@ -168,8 +168,10 @@ class EmployeeBankAccountTest extends TestCase
 
         $this->get(route('employees.show', $employee))
             ->assertOk()
-            ->assertDontSee('Rozmiar buta')
-            ->assertDontSee('Rozmiar spodni')
+            ->assertSee('Rozmiar buta')
+            ->assertSee('Rozmiar spodni')
+            ->assertSee('42')
+            ->assertSee('52')
             ->assertSee('Komornik');
 
         $this->put(route('employees.update', $employee), [
@@ -184,6 +186,23 @@ class EmployeeBankAccountTest extends TestCase
         ]);
 
         $this->assertFalse($employee->fresh()->has_komornik);
+    }
+
+    public function test_legacy_comments_tab_opens_info_with_thread(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->get(route('employees.show', ['employee' => $employee, 'tab' => 'comments']))
+            ->assertOk()
+            ->assertSee('Rozmiar buta')
+            ->assertSee('Dodaj komentarz');
+
+        Livewire::withQueryParams(['tab' => 'comments'])
+            ->test(EmployeeTabs::class, ['employee' => $employee])
+            ->assertSet('activeTab', 'info')
+            ->assertSee('Rozmiar buta')
+            ->assertSee('Dodaj komentarz')
+            ->assertDontSee('emp-rail-item-comments', false);
     }
 
     public function test_formats_nrb_and_iban(): void

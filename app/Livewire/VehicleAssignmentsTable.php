@@ -2,30 +2,37 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\ScopesToEmployee;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
+use Carbon\Carbon;
 use Livewire\Component;
+use Livewire\WithoutUrlPagination;
 use Livewire\WithPagination;
 
 class VehicleAssignmentsTable extends Component
 {
+    use ScopesToEmployee;
+    use WithoutUrlPagination;
     use WithPagination;
 
     public $searchEmployee = '';
 
     public $searchVehicle = '';
 
-    /** Konkretny pojazd z listy (jak projectFilter przy przypisaniach do projektów) */
     public $vehicleFilter = '';
 
     public $statusFilter = '';
 
-    protected $queryString = [
-        'searchEmployee' => ['except' => ''],
-        'searchVehicle' => ['except' => ''],
-        'vehicleFilter' => ['except' => ''],
-        'statusFilter' => ['except' => ''],
-    ];
+    protected function queryString(): array
+    {
+        return $this->scopedQueryString([
+            'searchEmployee' => ['except' => ''],
+            'searchVehicle' => ['except' => ''],
+            'vehicleFilter' => ['except' => ''],
+            'statusFilter' => ['except' => ''],
+        ]);
+    }
 
     public function updating($name, $value)
     {
@@ -34,11 +41,21 @@ class VehicleAssignmentsTable extends Component
 
     public function clearFilters()
     {
-        $this->searchEmployee = '';
+        if (! $this->isEmployeeScoped()) {
+            $this->searchEmployee = '';
+        }
         $this->searchVehicle = '';
         $this->vehicleFilter = '';
         $this->statusFilter = '';
         $this->resetPage();
+    }
+
+    public function hasActiveFilters(): bool
+    {
+        return (bool) ((! $this->isEmployeeScoped() && $this->searchEmployee)
+            || $this->searchVehicle
+            || $this->vehicleFilter
+            || $this->statusFilter);
     }
 
     public function paginationView()
@@ -48,11 +65,11 @@ class VehicleAssignmentsTable extends Component
 
     public function render()
     {
-        $query = VehicleAssignment::with(['employee', 'vehicle'])
-            ->orderBy('start_date', 'asc');
+        $query = VehicleAssignment::with(['employee', 'vehicle'])->orderBy('start_date', 'desc');
 
-        // Filter by employee
-        if ($this->searchEmployee) {
+        if ($this->isEmployeeScoped()) {
+            $query->where('employee_id', $this->employeeId);
+        } elseif ($this->searchEmployee) {
             $query->whereHas('employee', function ($q) {
                 $q->where('first_name', 'like', '%'.$this->searchEmployee.'%')
                     ->orWhere('last_name', 'like', '%'.$this->searchEmployee.'%');
@@ -63,7 +80,6 @@ class VehicleAssignmentsTable extends Component
             $query->where('vehicle_id', (int) $this->vehicleFilter);
         }
 
-        // Filter by vehicle (tekst: nr rej., marka, model)
         if ($this->searchVehicle) {
             $query->whereHas('vehicle', function ($q) {
                 $q->where('registration_number', 'like', '%'.$this->searchVehicle.'%')
@@ -72,31 +88,21 @@ class VehicleAssignmentsTable extends Component
             });
         }
 
-        // Filter by status
+        $today = Carbon::today();
         if ($this->statusFilter === 'active') {
-            $today = \Carbon\Carbon::today();
             $query->where('start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
-                    $q->whereNull('end_date')
-                        ->orWhere('end_date', '>=', $today);
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', $today);
                 });
         } elseif ($this->statusFilter === 'scheduled') {
-            $today = \Carbon\Carbon::today();
             $query->where('start_date', '>', $today);
         } elseif ($this->statusFilter === 'completed') {
-            $today = \Carbon\Carbon::today();
-            $query->whereNotNull('end_date')
-                ->where('end_date', '<', $today);
+            $query->whereNotNull('end_date')->where('end_date', '<', $today);
         }
-        // Note: 'cancelled' filter removed - assignments are physically deleted when cancelled
-
-        $assignments = $query->paginate(20);
-
-        $vehicles = Vehicle::orderBy('registration_number')->get();
 
         return view('livewire.vehicle-assignments-table', [
-            'assignments' => $assignments,
-            'vehicles' => $vehicles,
+            'assignments' => $query->paginate(20),
+            'vehicles' => Vehicle::orderBy('registration_number')->get(),
         ]);
     }
 }

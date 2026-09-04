@@ -11295,6 +11295,11 @@ body:has(.xuiv2-tasks.is-edi-review) .ui-page-header:not(.ui-page-header--has-le
 .emp-dossier {
     padding: 0.35rem 0.15rem !important;
 }
+.emp-dossier__comments {
+    margin-top: 1.15rem;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--glass-border);
+}
 @media (min-width: 992px) {
     .emp-body {
         grid-template-columns: 13.75rem minmax(0, 1fr);

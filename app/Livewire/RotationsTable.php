@@ -3,14 +3,18 @@
 namespace App\Livewire;
 
 use App\Livewire\Concerns\InteractsWithSortableTable;
+use App\Livewire\Concerns\ScopesToEmployee;
 use App\Models\Rotation;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
+use Livewire\WithoutUrlPagination;
 use Livewire\WithPagination;
 
 class RotationsTable extends Component
 {
     use InteractsWithSortableTable;
+    use ScopesToEmployee;
+    use WithoutUrlPagination;
     use WithPagination;
 
     public $search = '';
@@ -21,12 +25,20 @@ class RotationsTable extends Component
 
     public $sortDirection = 'asc';
 
-    protected $queryString = [
-        'search' => ['except' => ''],
-        'statusFilter' => ['except' => ''],
-        'sortField' => ['except' => 'end_date'],
-        'sortDirection' => ['except' => 'asc'],
-    ];
+    public function mount(): void
+    {
+        //
+    }
+
+    protected function queryString(): array
+    {
+        return $this->scopedQueryString([
+            'search' => ['except' => ''],
+            'statusFilter' => ['except' => ''],
+            'sortField' => ['except' => 'end_date'],
+            'sortDirection' => ['except' => 'asc'],
+        ]);
+    }
 
     public function updatingSearch(): void
     {
@@ -40,11 +52,18 @@ class RotationsTable extends Component
 
     public function clearFilters(): void
     {
-        $this->search = '';
+        if (! $this->isEmployeeScoped()) {
+            $this->search = '';
+        }
         $this->statusFilter = '';
         $this->sortField = 'end_date';
         $this->sortDirection = 'asc';
         $this->resetPage();
+    }
+
+    public function hasActiveFilters(): bool
+    {
+        return (bool) ((! $this->isEmployeeScoped() && $this->search) || $this->statusFilter);
     }
 
     public function paginationView(): string
@@ -61,7 +80,9 @@ class RotationsTable extends Component
     {
         $query = Rotation::with('employee');
 
-        if (! empty($this->search)) {
+        if ($this->isEmployeeScoped()) {
+            $query->where('employee_id', $this->employeeId);
+        } elseif (! empty($this->search)) {
             $searchTerm = trim($this->search);
             $query->whereHas('employee', function (Builder $q) use ($searchTerm) {
                 $q->where(function ($query) use ($searchTerm) {

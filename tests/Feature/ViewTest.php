@@ -90,6 +90,9 @@ class ViewTest extends TestCase
         $response->assertSee('emp-hero', false);
         $response->assertSee('emp-rail', false);
         $response->assertSee('Konto bankowe');
+        $response->assertSee('Rozmiar buta');
+        $response->assertSee('Rozmiar spodni');
+        $response->assertSee('Dodaj komentarz');
     }
 
     /**

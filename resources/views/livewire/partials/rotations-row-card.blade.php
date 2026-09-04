@@ -1,4 +1,4 @@
-@props(['rotation'])
+@props(['rotation', 'hideEmployee' => false])
 
 @php
     $status = $rotation->status;
@@ -35,7 +35,11 @@
 
 <x-ui.card class="dt-card" wire:key="rotation-card-{{ $rotation->id }}">
     <div class="dt-card__title mb-2">
-        <x-employee-cell :employee="$rotation->employee" />
+        @if($hideEmployee)
+            {{ $rotation->start_date->format('d.m.Y') }} – {{ $rotation->end_date->format('d.m.Y') }}
+        @else
+            <x-employee-cell :employee="$rotation->employee" />
+        @endif
         <a href="{{ route('employees.rotations.show', [$rotation->employee, $rotation]) }}" class="stretched-link visually-hidden">
             Szczegóły rotacji
         </a>
