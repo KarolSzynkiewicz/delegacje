@@ -1043,27 +1043,718 @@
             <pre class="small text-muted mb-0 mt-3 p-3 rounded-3" style="background: rgba(0,0,0,0.25); font-size: 0.72rem; overflow-x: auto;"><code>&lt;x-departure.planner-step1-assignments-styles /&gt;</code></pre>
         </div>
 
-        {{-- Hero Card Example --}}
-        <div class="mb-5">
-            <h3 class="mb-4">Komponent x-ui.hero-card</h3>
-            <x-ui.hero-card
-                title="Are you ready"
-                subtitle="for an adventure?"
-                icon="rocket-takeoff"
-                iconColor="primary"
-                variant="gradient"
-                imagePosition="right"
-            >
-                <x-slot name="image">
-                    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(168, 85, 247, 0.2)); border-radius: 16px; padding: 2rem; min-height: 300px; display: flex; align-items: center; justify-content: center;">
-                        <i class="bi bi-play-circle" style="font-size: 5rem; color: var(--primary);"></i>
+        {{-- Forum dummy: karta / kreator / otwarty wątek --}}
+        <div class="mb-5" id="forumPostPreview" x-data="forumDummy()">
+            <h3 class="mb-1">Forum — karta, kreator, podgląd</h3>
+            <p class="text-muted small mb-4">
+                Dummy. Kreator po lewej steruje kartą i otwartym wątkiem po prawej / poniżej. Nic się nie zapisuje.
+            </p>
+
+            <div class="forum-kicker">Na liście</div>
+            <article class="forum-post mb-5" aria-labelledby="forum-post-title">
+                <div class="forum-post__content">
+                    <div class="forum-post__topline">
+                        <div class="forum-post__author">
+                            <x-ui.avatar initials="MW" size="40px" :border="false" />
+                            <div class="forum-post__author-meta">
+                                <span class="forum-post__name">Marta Wiśniewska</span>
+                                <span class="forum-post__time font-mono">4 wrz 2026 · 14:20</span>
+                            </div>
+                        </div>
+                        <div class="forum-post__tags">
+                            <span class="forum-post__pin" title="Przypięty" x-show="pinned" x-cloak>
+                                <i class="bi bi-pin-angle-fill"></i>
+                                Przypięty
+                            </span>
+                            <x-ui.badge variant="info"><span x-text="category">Logistyka</span></x-ui.badge>
+                            <x-ui.badge variant="accent"><span x-text="tag">Instrukcja</span></x-ui.badge>
+                        </div>
                     </div>
-                </x-slot>
-                <p class="mb-0">
-                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Minima officia consequatur adipisci tenetur repudiandae rerum quos.
-                </p>
-            </x-ui.hero-card>
+
+                    <h2 id="forum-post-title" class="forum-post__title" x-text="displayTitle()">Jak działają nowe wyjazdy</h2>
+                    <p class="forum-post__excerpt" x-text="excerpt()"></p>
+
+                    <div class="forum-post__footer">
+                        <span class="forum-post__stat">
+                            <i class="bi bi-chat-dots"></i>
+                            8 odpowiedzi
+                        </span>
+                        <span class="forum-post__stat">
+                            <i class="bi bi-eye"></i>
+                            142
+                        </span>
+                        <span class="forum-post__stat">
+                            <i class="bi bi-hand-thumbs-up"></i>
+                            11
+                        </span>
+                        <span class="forum-post__read">
+                            Czytaj dalej
+                            <i class="bi bi-arrow-right"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="forum-post__cover" aria-hidden="true" x-show="cover" x-cloak>
+                    @include('welcome2-forum-cover')
+                </div>
+            </article>
+
+            <div class="forum-kicker">Kreator + podgląd na żywo</div>
+            <div class="row g-4 mb-5">
+                <div class="col-lg-6">
+                    <x-ui.card label="Nowy wątek">
+                        <form x-on:submit.prevent="publish()">
+                            <div class="mb-3">
+                                <x-ui.input
+                                    type="text"
+                                    name="forum_title"
+                                    id="forum_title"
+                                    label="Tytuł"
+                                    placeholder="O czym jest wątek?"
+                                    maxlength="80"
+                                    x-model="title"
+                                />
+                                <div class="forum-char font-mono"><span x-text="title.length">0</span>/80</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <x-ui.input
+                                    type="textarea"
+                                    name="forum_body"
+                                    id="forum_body"
+                                    label="Treść"
+                                    placeholder="Pisz zwykłym tekstem. Pusta linia = nowy akapit."
+                                    rows="11"
+                                    x-model="body"
+                                />
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-sm-6">
+                                    <x-ui.input type="select" name="forum_category" id="forum_category" label="Kategoria" x-model="category">
+                                        <option>Logistyka</option>
+                                        <option>Ogłoszenie</option>
+                                        <option>Pytanie</option>
+                                        <option>Poradnik</option>
+                                    </x-ui.input>
+                                </div>
+                                <div class="col-sm-6">
+                                    <x-ui.input type="select" name="forum_tag" id="forum_tag" label="Etykieta" x-model="tag">
+                                        <option>Instrukcja</option>
+                                        <option>Zmiana</option>
+                                        <option>FAQ</option>
+                                        <option>—</option>
+                                    </x-ui.input>
+                                </div>
+                            </div>
+
+                            <div class="forum-cover-drop mb-3">
+                                <div class="forum-cover-drop__icon"><i class="bi bi-image"></i></div>
+                                <div>
+                                    <div class="fw-semibold">Okładka</div>
+                                    <div class="text-muted small">Upuść obrazek albo zostaw ilustrację wyjazdu. Dummy — bez uploadu.</div>
+                                </div>
+                                <label class="form-check mb-0 ms-auto">
+                                    <input class="form-check-input" type="checkbox" x-model="cover">
+                                    <span class="form-check-label">Pokaż</span>
+                                </label>
+                            </div>
+
+                            <div class="form-check mb-4">
+                                <input class="form-check-input" type="checkbox" id="forum_pinned" x-model="pinned">
+                                <label class="form-check-label" for="forum_pinned">Przypnij na górze tablicy</label>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <x-ui.button variant="ghost" type="button">Anuluj</x-ui.button>
+                                <x-ui.button variant="ghost" type="button" x-on:click="publish()">Zapisz szkic</x-ui.button>
+                                <x-ui.button variant="primary" type="submit" action="save">Opublikuj</x-ui.button>
+                                <span class="forum-flash font-mono" x-show="flash" x-cloak x-text="flash"></span>
+                            </div>
+                        </form>
+                    </x-ui.card>
+                </div>
+                <div class="col-lg-6">
+                    <div class="forum-composer__preview">
+                        <div class="forum-kicker">Podgląd karty</div>
+                        <article class="forum-post forum-post--compact">
+                            <div class="forum-post__content">
+                                <div class="forum-post__topline">
+                                    <div class="forum-post__author">
+                                        <x-ui.avatar initials="MW" size="32px" :border="false" />
+                                        <div class="forum-post__author-meta">
+                                            <span class="forum-post__name">Marta Wiśniewska</span>
+                                            <span class="forum-post__time font-mono">teraz · szkic</span>
+                                        </div>
+                                    </div>
+                                    <div class="forum-post__tags">
+                                        <span class="forum-post__pin" x-show="pinned" x-cloak>
+                                            <i class="bi bi-pin-angle-fill"></i>
+                                            Przypięty
+                                        </span>
+                                        <x-ui.badge variant="info"><span x-text="category"></span></x-ui.badge>
+                                    </div>
+                                </div>
+                                <h2 class="forum-post__title" x-text="displayTitle()"></h2>
+                                <p class="forum-post__excerpt" x-text="excerpt()"></p>
+                            </div>
+                            <div class="forum-post__cover" x-show="cover" x-cloak>
+                                @include('welcome2-forum-cover')
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+
+            <div class="forum-kicker">Otwarty wątek</div>
+            <article class="forum-thread">
+                <div class="forum-thread__nav">
+                    <i class="bi bi-arrow-left"></i>
+                    Tablica
+                </div>
+
+                <div class="forum-post__cover forum-thread__cover" x-show="cover" x-cloak>
+                    @include('welcome2-forum-cover')
+                </div>
+
+                <div class="forum-thread__head">
+                    <div class="forum-post__author">
+                        <x-ui.avatar initials="MW" size="44px" :border="false" />
+                        <div class="forum-post__author-meta">
+                            <span class="forum-post__name">Marta Wiśniewska</span>
+                            <span class="forum-post__time font-mono">4 wrz 2026 · 14:20</span>
+                        </div>
+                    </div>
+                    <div class="forum-post__tags">
+                        <span class="forum-post__pin" x-show="pinned" x-cloak>
+                            <i class="bi bi-pin-angle-fill"></i>
+                            Przypięty
+                        </span>
+                        <x-ui.badge variant="info"><span x-text="category"></span></x-ui.badge>
+                        <x-ui.badge variant="accent"><span x-text="tag"></span></x-ui.badge>
+                    </div>
+                </div>
+
+                <h1 class="forum-thread__title" x-text="displayTitle()"></h1>
+
+                <div class="forum-thread__body">
+                    <template x-for="(para, i) in paragraphs()" :key="i">
+                        <p x-text="para"></p>
+                    </template>
+                </div>
+
+                <div class="forum-thread__actions">
+                    <button type="button" class="forum-action-btn">
+                        <i class="bi bi-hand-thumbs-up"></i>
+                        11
+                    </button>
+                    <button type="button" class="forum-action-btn">
+                        <i class="bi bi-chat-dots"></i>
+                        Odpowiedz
+                    </button>
+                    <span class="forum-post__stat ms-auto">
+                        <i class="bi bi-eye"></i>
+                        142 wyświetlenia
+                    </span>
+                </div>
+            </article>
+
+            <div class="forum-thread-replies">
+                <div class="forum-kicker mb-2">Odpowiedzi · 3 z 8</div>
+
+                <article class="comment-item">
+                    <div class="comment-item__head">
+                        <div class="comment-item__who">
+                            <x-ui.avatar initials="JN" size="28px" :border="false" />
+                            <div class="comment-item__meta">
+                                <span class="comment-item__name">Jan Nowak</span>
+                                <span class="comment-item__time">4 wrz 2026 · 15:02</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="comment-item__body">
+                        Czyli jak ktoś ma już godziny na projekcie, nie zmienię mu projektu z poziomu wyjazdu?
+                    </div>
+                </article>
+
+                <article class="comment-item">
+                    <div class="comment-item__head">
+                        <div class="comment-item__who">
+                            <x-ui.avatar initials="MW" size="28px" :border="false" />
+                            <div class="comment-item__meta">
+                                <span class="comment-item__name">Marta Wiśniewska</span>
+                                <span class="comment-item__time">4 wrz 2026 · 15:11</span>
+                                <span class="comment-item__reply-tag">odpowiedź</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="comment-item__body">
+                        Dokładnie. Trzeba najpierw domknąć godziny albo zostawić to przypisanie. Sam wyjazd nie nadpisuje time logów.
+                    </div>
+                </article>
+
+                <article class="comment-item">
+                    <div class="comment-item__head">
+                        <div class="comment-item__who">
+                            <x-ui.avatar initials="AK" size="28px" :border="false" />
+                            <div class="comment-item__meta">
+                                <span class="comment-item__name">Anna Kowalska</span>
+                                <span class="comment-item__time">5 wrz 2026 · 09:18</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="comment-item__body">
+                        A bilet — waluta zawsze 3 znaki, tak? PLN / EUR i nic więcej?
+                    </div>
+                </article>
+
+                <div class="comments-composer mt-3">
+                    <textarea class="comments-composer-input" rows="2" placeholder="Odpowiedz na wątek…" readonly tabindex="-1"></textarea>
+                    <div class="comments-composer-toolbar">
+                        <span class="comments-icon-btn" title="Załącznik (dummy)"><i class="bi bi-paperclip"></i></span>
+                        <button type="button" class="comments-icon-btn comments-send-btn" title="Wyślij (dummy)">
+                            <i class="bi bi-arrow-return-left"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <script>
+            function forumDummy() {
+                return {
+                    title: 'Jak działają nowe wyjazdy',
+                    body: 'Wyjazd to jeden rekord logistyczny: data, trasa i lista osób. Nie składasz już projektu, auta i noclegu obok siebie — planer spina to w jedną całość.\n\nKogoś dopisujesz tylko wtedy, gdy w dniu startu jest w bazie. Jeśli system widzi osobę na projekcie albo w drodze, nie puści jej do tego wyjazdu.\n\nPlaner idzie trzema krokami. Najpierw projekt i role, potem nocleg, na końcu auto albo koszt biletu — gdy jedziecie komunikacją, waluta ma mieć trzy znaki.\n\nPrzy edycji obsady nagłówka nie ruszasz: daty, auto i trasa to zmiana na samym wyjeździe, nie przy dopisywaniu ludzi.',
+                    category: 'Logistyka',
+                    tag: 'Instrukcja',
+                    pinned: true,
+                    cover: true,
+                    flash: '',
+                    excerpt() {
+                        const t = (this.body || '').trim().replace(/\s+/g, ' ');
+                        if (!t) return 'Zacznij pisać treść — tu pojawi się skrót na kartę.';
+                        return t.length > 220 ? t.slice(0, 217) + '…' : t;
+                    },
+                    paragraphs() {
+                        const parts = (this.body || '').split(/\n\n+/).map((s) => s.trim()).filter(Boolean);
+                        return parts.length ? parts : ['Treść wątku pojawi się tutaj.'];
+                    },
+                    displayTitle() {
+                        return (this.title || '').trim() || 'Bez tytułu';
+                    },
+                    publish() {
+                        this.flash = 'Dummy — nic nie zapisuję.';
+                        clearTimeout(this._flashT);
+                        this._flashT = setTimeout(() => { this.flash = ''; }, 2800);
+                    },
+                };
+            }
+        </script>
+
+        <style>
+            #forumPostPreview .forum-post {
+                display: flex;
+                align-items: stretch;
+                gap: 2rem;
+                padding: 1.75rem 1.85rem;
+                background: var(--bg-card);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                border: 1px solid var(--glass-border);
+                border-radius: 20px;
+                position: relative;
+                overflow: hidden;
+                cursor: default;
+            }
+            #forumPostPreview .forum-post::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: linear-gradient(135deg, var(--primary), var(--accent));
+                transform: scaleX(1);
+                transform-origin: left;
+            }
+            #forumPostPreview .forum-post__content {
+                flex: 1 1 0;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 0.85rem;
+            }
+            #forumPostPreview .forum-post__topline {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem 1rem;
+                flex-wrap: wrap;
+            }
+            #forumPostPreview .forum-post__author {
+                display: flex;
+                align-items: center;
+                gap: 0.7rem;
+                min-width: 0;
+            }
+            #forumPostPreview .forum-post__author-meta {
+                display: flex;
+                flex-direction: column;
+                gap: 0.05rem;
+                min-width: 0;
+            }
+            #forumPostPreview .forum-post__name {
+                font-weight: 600;
+                color: var(--text-main);
+                line-height: 1.2;
+            }
+            #forumPostPreview .forum-post__time {
+                font-size: 0.72rem;
+                color: var(--text-muted);
+                letter-spacing: 0.02em;
+            }
+            #forumPostPreview .forum-post__tags {
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+                flex-wrap: wrap;
+            }
+            #forumPostPreview .forum-post__pin {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.3rem;
+                font-size: 0.72rem;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: var(--warning);
+                background: rgba(245, 158, 11, 0.12);
+                border: 1px solid rgba(245, 158, 11, 0.28);
+                border-radius: 999px;
+                padding: 0.18rem 0.6rem;
+            }
+            #forumPostPreview .forum-post__title {
+                font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+                font-weight: 700;
+                line-height: 1.2;
+                margin: 0;
+                color: var(--text-main);
+            }
+            #forumPostPreview .forum-post__excerpt {
+                margin: 0;
+                color: var(--text-muted);
+                font-size: 0.98rem;
+                line-height: 1.65;
+                max-width: 42rem;
+            }
+            #forumPostPreview .forum-post__footer {
+                display: flex;
+                align-items: center;
+                gap: 1.1rem;
+                flex-wrap: wrap;
+                margin-top: auto;
+                padding-top: 0.35rem;
+            }
+            #forumPostPreview .forum-post__stat {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                color: var(--text-muted);
+                font-size: 0.82rem;
+            }
+            #forumPostPreview .forum-post__stat i {
+                color: var(--primary);
+                opacity: 0.85;
+            }
+            #forumPostPreview .forum-post__read {
+                margin-left: auto;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                font-size: 0.82rem;
+                font-weight: 600;
+                background: linear-gradient(135deg, var(--primary), var(--accent));
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+            #forumPostPreview .forum-post__cover {
+                flex: 0 0 min(42%, 22rem);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                gap: 1rem;
+                padding: 1.35rem 1.4rem;
+                border-radius: 16px;
+                border: 1px solid rgba(59, 130, 246, 0.22);
+                background:
+                    radial-gradient(120% 80% at 100% 0%, rgba(168, 85, 247, 0.22), transparent 55%),
+                    radial-gradient(90% 70% at 0% 100%, rgba(59, 130, 246, 0.18), transparent 50%),
+                    rgba(7, 10, 19, 0.45);
+                min-height: 14rem;
+            }
+            #forumPostPreview .forum-post__cover-kicker {
+                font-size: 0.68rem;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--text-muted);
+            }
+            #forumPostPreview .forum-post__route {
+                display: flex;
+                align-items: center;
+                gap: 0.55rem;
+                color: var(--text-main);
+                font-weight: 600;
+                font-size: 0.95rem;
+            }
+            #forumPostPreview .forum-post__route i {
+                color: var(--primary);
+                font-size: 1.15rem;
+            }
+            #forumPostPreview .forum-post__route-line {
+                flex: 1;
+                height: 1px;
+                background: linear-gradient(90deg, var(--primary), var(--accent));
+                opacity: 0.7;
+            }
+            #forumPostPreview .forum-post__pin-dot::before {
+                content: '';
+                display: inline-block;
+                width: 0.45rem;
+                height: 0.45rem;
+                border-radius: 50%;
+                background: var(--primary);
+                margin-right: 0.4rem;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+                vertical-align: middle;
+            }
+            #forumPostPreview .forum-post__pin-dot--end::before {
+                background: var(--accent);
+                box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.28);
+            }
+            #forumPostPreview .forum-post__cover-when {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+            }
+            #forumPostPreview .forum-post__steps {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 0.4rem;
+            }
+            #forumPostPreview .forum-post__steps li {
+                display: flex;
+                align-items: center;
+                gap: 0.55rem;
+                font-size: 0.85rem;
+                color: var(--text-main);
+            }
+            #forumPostPreview .forum-post__steps li span {
+                width: 1.35rem;
+                height: 1.35rem;
+                border-radius: 6px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.7rem;
+                font-weight: 700;
+                font-family: 'JetBrains Mono', ui-monospace, monospace;
+                background: linear-gradient(135deg, var(--primary), var(--accent));
+                color: #fff;
+            }
+            #forumPostPreview .forum-post__faces {
+                display: flex;
+                margin-top: 0.15rem;
+            }
+            #forumPostPreview .forum-post__faces span {
+                width: 1.85rem;
+                height: 1.85rem;
+                border-radius: 50%;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.62rem;
+                font-weight: 700;
+                color: #fff;
+                background: linear-gradient(135deg, var(--accent), var(--primary));
+                box-shadow: 0 0 0 2px #0b1020;
+                margin-left: -0.45rem;
+            }
+            #forumPostPreview .forum-post__faces span:first-child {
+                margin-left: 0;
+            }
+            #forumPostPreview .forum-kicker {
+                font-size: 0.68rem;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                font-weight: 600;
+                margin-bottom: 0.7rem;
+            }
+            #forumPostPreview .forum-char {
+                font-size: 0.7rem;
+                color: var(--text-muted);
+                text-align: right;
+                margin-top: 0.3rem;
+            }
+            #forumPostPreview .forum-flash {
+                font-size: 0.72rem;
+                color: var(--warning);
+            }
+            #forumPostPreview .forum-cover-drop {
+                display: flex;
+                align-items: center;
+                gap: 0.85rem;
+                padding: 0.9rem 1rem;
+                border-radius: 14px;
+                border: 1px dashed var(--glass-border);
+                background: rgba(255, 255, 255, 0.02);
+            }
+            #forumPostPreview .forum-cover-drop__icon {
+                width: 2.4rem;
+                height: 2.4rem;
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, var(--primary), var(--accent));
+                color: #fff;
+                font-size: 1.1rem;
+                flex-shrink: 0;
+            }
+            #forumPostPreview .forum-post--compact {
+                flex-direction: column;
+                padding: 1.15rem 1.2rem;
+                gap: 1rem;
+            }
+            #forumPostPreview .forum-post--compact .forum-post__cover {
+                flex: none;
+                width: 100%;
+                min-height: 0;
+                padding: 1rem 1.1rem;
+                gap: 0.65rem;
+            }
+            #forumPostPreview .forum-post--compact .forum-post__title {
+                font-size: 1.25rem;
+            }
+            #forumPostPreview .forum-post--compact .forum-post__steps {
+                display: none;
+            }
+            @media (min-width: 992px) {
+                #forumPostPreview .forum-composer__preview {
+                    position: sticky;
+                    top: 1rem;
+                }
+            }
+            #forumPostPreview .forum-thread {
+                display: flex;
+                flex-direction: column;
+                gap: 1.25rem;
+                padding: 1.5rem 1.65rem 1.75rem;
+                background: var(--bg-card);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                border: 1px solid var(--glass-border);
+                border-radius: 20px;
+                position: relative;
+                overflow: hidden;
+            }
+            #forumPostPreview .forum-thread::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: linear-gradient(135deg, var(--primary), var(--accent));
+            }
+            #forumPostPreview .forum-thread__nav {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                font-size: 0.82rem;
+                color: var(--text-muted);
+                width: fit-content;
+            }
+            #forumPostPreview .forum-thread__cover.forum-post__cover {
+                flex: none;
+                width: 100%;
+                min-height: 0;
+            }
+            #forumPostPreview .forum-thread__head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem 1rem;
+                flex-wrap: wrap;
+            }
+            #forumPostPreview .forum-thread__title {
+                font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+                font-weight: 700;
+                line-height: 1.2;
+                margin: 0;
+                color: var(--text-main);
+            }
+            #forumPostPreview .forum-thread__body {
+                max-width: 42rem;
+            }
+            #forumPostPreview .forum-thread__body p {
+                margin: 0 0 1rem;
+                color: var(--text-muted);
+                font-size: 1.02rem;
+                line-height: 1.7;
+            }
+            #forumPostPreview .forum-thread__body p:last-child {
+                margin-bottom: 0;
+            }
+            #forumPostPreview .forum-thread__actions {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                flex-wrap: wrap;
+                padding-top: 0.35rem;
+                border-top: 1px solid var(--glass-border);
+            }
+            #forumPostPreview .forum-action-btn {
+                appearance: none;
+                border: 1px solid var(--glass-border);
+                background: rgba(255, 255, 255, 0.03);
+                color: var(--text-main);
+                border-radius: 999px;
+                padding: 0.35rem 0.8rem;
+                font-size: 0.82rem;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+            }
+            #forumPostPreview .forum-action-btn i {
+                color: var(--primary);
+            }
+            #forumPostPreview .forum-thread-replies {
+                margin-top: 0.75rem;
+                padding: 1rem 1.25rem 1.25rem;
+                border: 1px solid var(--glass-border);
+                border-radius: 16px;
+                background: var(--bg-card);
+            }
+            @media (max-width: 991.98px) {
+                #forumPostPreview .forum-post {
+                    flex-direction: column;
+                    padding: 1.35rem 1.25rem;
+                    gap: 1.25rem;
+                }
+                #forumPostPreview .forum-post__cover {
+                    flex-basis: auto;
+                    width: 100%;
+                    min-height: 0;
+                }
+                #forumPostPreview .forum-post__read {
+                    margin-left: 0;
+                }
+            }
+        </style>
         <hr class="mb-5">
 
         <h3 class="mb-4">Komponenty x-ui.*</h3>

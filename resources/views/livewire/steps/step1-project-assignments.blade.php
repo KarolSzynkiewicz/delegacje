@@ -8,7 +8,13 @@
             <x-ui.card class="s1-panel">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <span class="fw-semibold s1-panel-title">
-                        {{ $forTransfer ? 'Uczestnicy transferu' : 'Dostępni pracownicy' }}
+                        @if($participantPlannerEmbed && $forTransfer)
+                            Edytowana osoba
+                        @elseif($forTransfer)
+                            Uczestnicy transferu
+                        @else
+                            Dostępni pracownicy
+                        @endif
                     </span>
                     @if($isVehicleFull && !$forTransfer)
                         <span class="s1-capacity-badge">
@@ -255,7 +261,7 @@
             <div class="d-flex justify-content-end gap-2">
                 <x-ui.button
                     variant="ghost"
-                    href="{{ route('departures.index') }}"
+                    href="{{ $cancelHref ?: route('departures.index') }}"
                     action="cancel"
                 >
                     Anuluj

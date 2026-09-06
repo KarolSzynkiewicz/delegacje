@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('employee-rates.index') }}"
+                    href="{{ $backUrl }}"
                     action="back"
                 >
                     Powrót
@@ -109,7 +109,7 @@
                         </x-ui.button>
                         <x-ui.button 
                             variant="ghost" 
-                            href="{{ route('employee-rates.index') }}"
+                            href="{{ $backUrl }}"
                             action="cancel"
                         >
                             Anuluj

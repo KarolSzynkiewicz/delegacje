@@ -8,8 +8,10 @@ use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\Role;
+use App\Services\AccommodationAssignmentService;
 use App\Services\DeparturePlannerService;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Step2AccommodationAssignments extends Component
@@ -66,11 +68,18 @@ class Step2AccommodationAssignments extends Component
 
     public $arrivalDate;
 
+    public ?string $assignmentModalError = null;
+
     protected $departurePlannerService;
 
-    public function boot(DeparturePlannerService $departurePlannerService)
-    {
+    protected AccommodationAssignmentService $accommodationAssignmentService;
+
+    public function boot(
+        DeparturePlannerService $departurePlannerService,
+        AccommodationAssignmentService $accommodationAssignmentService
+    ) {
         $this->departurePlannerService = $departurePlannerService;
+        $this->accommodationAssignmentService = $accommodationAssignmentService;
     }
 
     public function mount(
@@ -190,7 +199,7 @@ class Step2AccommodationAssignments extends Component
         // Load all accommodations into cache as models
         $accommodationIds = array_column($this->accommodations, 'id');
         if (! empty($accommodationIds)) {
-            $accommodations = Accommodation::whereIn('id', $accommodationIds)->get();
+            $accommodations = Accommodation::with('leases')->whereIn('id', $accommodationIds)->get();
             foreach ($accommodations as $accommodation) {
                 $this->accommodationsCache[$accommodation->id] = $accommodation;
             }
@@ -231,7 +240,7 @@ class Step2AccommodationAssignments extends Component
             return $this->accommodationsCache[$accommodationId];
         }
 
-        $accommodation = Accommodation::find($accommodationId);
+        $accommodation = Accommodation::with('leases')->find($accommodationId);
         if ($accommodation) {
             $this->accommodationsCache[$accommodationId] = $accommodation;
         }
@@ -598,6 +607,7 @@ class Step2AccommodationAssignments extends Component
 
         $this->selectedStartDate = null;
         $this->selectedEndDate = null;
+        $this->assignmentModalError = null;
         $this->showAccommodationModal = true;
     }
 
@@ -610,6 +620,7 @@ class Step2AccommodationAssignments extends Component
         $this->selectedStartDate = null;
         $this->selectedEndDate = null;
         $this->calendarMonthStart = null;
+        $this->assignmentModalError = null;
     }
 
     protected function loadAccommodationAvailabilityForMonth()
@@ -658,6 +669,8 @@ class Step2AccommodationAssignments extends Component
             return;
         }
 
+        $this->assignmentModalError = null;
+
         if (! $this->selectedStartDate) {
             // Select start date
             $this->selectedStartDate = $dateKey;
@@ -683,12 +696,55 @@ class Step2AccommodationAssignments extends Component
             return;
         }
 
-        $startDate = Carbon::parse($this->selectedStartDate);
-        $endDate = $this->selectedEndDate ? Carbon::parse($this->selectedEndDate) : $startDate;
+        $this->assignmentModalError = null;
 
-        // Wysyła event do rodzica
+        $employeeId = (int) $this->selectedEmployee['id'];
+        $startDate = Carbon::parse($this->selectedStartDate)->startOfDay();
+        $endDate = ($this->selectedEndDate ? Carbon::parse($this->selectedEndDate) : $startDate->copy())->startOfDay();
+        $employee = Employee::find($employeeId);
+
+        if (! $employee) {
+            $this->assignmentModalError = 'Nie znaleziono pracownika.';
+
+            return;
+        }
+
+        $excludeAssignmentId = AccommodationAssignment::query()
+            ->where('accommodation_id', $this->selectedAccommodation->id)
+            ->where('employee_id', $employeeId)
+            ->where('start_date', '<=', $endDate)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $startDate))
+            ->orderByDesc('id')
+            ->value('id');
+
+        try {
+            $this->accommodationAssignmentService->assertCanAssign(
+                $employee,
+                $this->selectedAccommodation,
+                $startDate,
+                $endDate,
+                $excludeAssignmentId ? (int) $excludeAssignmentId : null,
+                $this->arrivalDate?->copy()->startOfDay()
+            );
+        } catch (ValidationException $e) {
+            $this->assignmentModalError = collect($e->errors())->flatten()->first() ?: 'Nie można zapisać tego zakresu dat.';
+
+            return;
+        }
+
+        $day = $startDate->copy();
+        while ($day->lte($endDate)) {
+            if ($this->getAvailableCapacityForEmployeeOnDate($this->selectedAccommodation, $day, $employeeId) <= 0) {
+                $this->assignmentModalError = 'Brak wolnych miejsc w dniu '.$day->format('d.m.Y').
+                    '. Wybierz zakres, w którym kwatera ma wolne łóżko przez wszystkie dni — nie tylko na początku i końcu.';
+
+                return;
+            }
+            $day->addDay();
+        }
+
         $this->dispatch('accommodation-assigned', [
-            'employee_id' => $this->selectedEmployee['id'],
+            'employee_id' => $employeeId,
             'accommodation_id' => $this->selectedAccommodation->id,
             'start_date' => $startDate->format('Y-m-d'),
             'end_date' => $endDate->format('Y-m-d'),
@@ -749,12 +805,7 @@ class Step2AccommodationAssignments extends Component
             $availableSpots = $this->getAvailableCapacityForEmployeeOnDate($accommodation, $currentDate, $employeeId);
             $isOverbooked = $availableSpots <= 0;
 
-            // Check lease end date
-            $leaseEnded = false;
-            if ($accommodation->type === 'wynajmowany' && $accommodation->lease_end_date) {
-                $leaseEnd = Carbon::parse($accommodation->lease_end_date);
-                $leaseEnded = $currentDate->gt($leaseEnd);
-            }
+            $leaseEnded = $this->rentalLeaseBlocksDate($accommodation, $currentDate);
 
             $canAssign = ! $isOverbooked && ! $leaseEnded;
 
@@ -774,7 +825,7 @@ class Step2AccommodationAssignments extends Component
             if ($isOverbooked) {
                 $reasonText = 'Brak wolnych miejsc (pełne obłożenie: '.$capacity.' miejsc)';
             } elseif ($leaseEnded) {
-                $reasonText = 'Koniec najmu – brak dostępności';
+                $reasonText = 'Poza okresem najmu – brak dostępności';
             } else {
                 $reasonText = 'Wolne miejsca: '.$availableSpots.' / '.$capacity;
             }
@@ -799,6 +850,23 @@ class Step2AccommodationAssignments extends Component
         }
 
         return $availability;
+    }
+
+    /**
+     * Blokuj dzień, gdy na datę przyjazdu mieszkanie jest wynajmowane, a ten dzień
+     * nie wpada w żaden najem (przed startem albo po końcu) — zgodnie z zapisem.
+     */
+    protected function rentalLeaseBlocksDate(Accommodation $accommodation, Carbon $date): bool
+    {
+        $accommodation->loadMissing('leases');
+        $arrivalCovering = $accommodation->leaseCoveringDate($this->arrivalDate);
+        if (! $arrivalCovering || $arrivalCovering->type !== 'wynajmowany') {
+            return false;
+        }
+
+        $covering = $accommodation->leaseCoveringDate($date);
+
+        return ! $covering || $covering->type !== 'wynajmowany';
     }
 
     public function goToNextStep()

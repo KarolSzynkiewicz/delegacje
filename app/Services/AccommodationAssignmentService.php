@@ -26,18 +26,7 @@ class AccommodationAssignmentService
     ): AccommodationAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
-        // Validate start date is not before arrival (if provided)
-        if ($arrivalDate) {
-            $this->validateStartDateAfterArrival($startDate, $arrivalDate);
-        }
-
-        // Validate lease covers the assignment period (for rented accommodations)
-        $this->validateLeaseCoversRange($accommodation, $startDate, $endDate);
-
-        // Validate employee doesn't have overlapping assignment to the same accommodation
-        $this->validateNoOverlappingAssignment($employee, $accommodation, $startDate, $endDate);
-
-        $this->validateAccommodationCapacity($accommodation, $startDate, $endDate);
+        $this->assertCanAssign($employee, $accommodation, $startDate, $endDate, null, $arrivalDate);
 
         return AccommodationAssignment::create([
             'employee_id' => $employee->id,
@@ -63,14 +52,13 @@ class AccommodationAssignmentService
     ): AccommodationAssignment {
         $endDate = $endDate ?? DateRangeService::getDefaultEndDate();
 
-        // Validate lease covers the assignment period (for rented accommodations)
-        $this->validateLeaseCoversRange($accommodation, $startDate, $endDate);
-
-        // Validate employee doesn't have overlapping assignment to the same accommodation (excluding current)
-        $this->validateNoOverlappingAssignment($assignment->employee, $accommodation, $startDate, $endDate, $assignment->id);
-
-        // Validate capacity excluding current assignment
-        $this->validateAccommodationCapacity($accommodation, $startDate, $endDate, $assignment->id);
+        $this->assertCanAssign(
+            $assignment->employee,
+            $accommodation,
+            $startDate,
+            $endDate,
+            $assignment->id
+        );
 
         $assignment->update([
             'accommodation_id' => $accommodation->id,
@@ -83,7 +71,29 @@ class AccommodationAssignmentService
     }
 
     /**
-     * Validate that employee doesn't have overlapping assignment to the same accommodation.
+     * Ta sama walidacja co przy zapisie — do UI (kalendarz / potwierdzenie zakresu).
+     *
+     * @throws ValidationException
+     */
+    public function assertCanAssign(
+        Employee $employee,
+        Accommodation $accommodation,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $excludeAssignmentId = null,
+        ?Carbon $arrivalDate = null
+    ): void {
+        if ($arrivalDate) {
+            $this->validateStartDateAfterArrival($startDate, $arrivalDate);
+        }
+
+        $this->validateLeaseCoversRange($accommodation, $startDate, $endDate);
+        $this->validateNoOverlappingAssignment($employee, $accommodation, $startDate, $endDate, $excludeAssignmentId);
+        $this->validateAccommodationCapacity($accommodation, $startDate, $endDate, $excludeAssignmentId);
+    }
+
+    /**
+     * Jedna osoba = jedno mieszkanie w danym okresie (nie tylko to samo mieszkanie).
      *
      * @throws ValidationException
      */
@@ -94,51 +104,82 @@ class AccommodationAssignmentService
         Carbon $endDate,
         ?int $excludeAssignmentId = null
     ): void {
-        $query = $employee->accommodationAssignments()
-            ->where('accommodation_id', $accommodation->id);
+        $query = $employee->accommodationAssignments()->with('accommodation');
+        if ($excludeAssignmentId) {
+            $query->where('id', '!=', $excludeAssignmentId);
+        }
 
-        DateRangeService::validateNoOverlappingAssignments(
-            $query,
-            $startDate,
-            $endDate,
-            $excludeAssignmentId,
-            'accommodation_id',
-            'Pracownik ma już przypisanie do tego mieszkania w tym okresie. Nie można tworzyć nakładających się przypisań.'
-        );
+        $overlapping = $query->overlappingWith($startDate, $endDate)->first();
+        if (! $overlapping) {
+            return;
+        }
+
+        $houseName = $overlapping->accommodation?->name ?? 'inne mieszkanie';
+        $from = $overlapping->start_date?->format('d.m.Y') ?? '—';
+        $to = $overlapping->end_date?->format('d.m.Y') ?? 'bezterminowo';
+
+        throw ValidationException::withMessages([
+            'accommodation_id' => "Pracownik {$employee->full_name} ma już przypisanie do mieszkania {$houseName} ({$from} – {$to}). ".
+                'Jedna osoba może mieć tylko jedno zakwaterowanie w danym okresie.',
+        ]);
     }
 
     /**
-     * Validate accommodation capacity in date range.
-     *
      * @throws ValidationException
      */
-    protected function validateAccommodationCapacity(Accommodation $accommodation, Carbon $startDate, Carbon $endDate, ?int $excludeAssignmentId = null): void
-    {
-        if (! $accommodation->hasAvailableSpace($startDate, $endDate, $excludeAssignmentId)) {
-            throw ValidationException::withMessages([
-                'accommodation_id' => 'Brak wolnych miejsc w tym mieszkaniu w wybranym okresie.',
-            ]);
+    protected function validateAccommodationCapacity(
+        Accommodation $accommodation,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $excludeAssignmentId = null
+    ): void {
+        if ($accommodation->hasAvailableSpace($startDate, $endDate, $excludeAssignmentId)) {
+            return;
         }
+
+        $fullOn = $accommodation->firstDateAtCapacity($startDate, $endDate, $excludeAssignmentId);
+        $when = $fullOn ? $fullOn->format('d.m.Y') : $startDate->format('d.m.Y');
+        $capacity = (int) $accommodation->capacity;
+
+        throw ValidationException::withMessages([
+            'accommodation_id' => "Brak wolnych miejsc w mieszkaniu {$accommodation->name} w dniu {$when} ".
+                "(pojemność {$capacity}). Kalendarz pokazuje obłożenie dzień po dniu — zakres musi mieć wolne łóżko przez wszystkie wybrane dni, nie tylko na początku i końcu.",
+        ]);
     }
 
     /**
-     * Validate that a rented accommodation's active lease covers the assignment range.
-     * Own accommodations (no active lease or type !== 'wynajmowany') are always allowed.
+     * Najem liczony od dat przypisania, nie od „aktywnego teraz” (activeLease).
      *
      * @throws ValidationException
      */
     protected function validateLeaseCoversRange(Accommodation $accommodation, Carbon $startDate, Carbon $endDate): void
     {
-        $accommodation->loadMissing('activeLease');
-        $lease = $accommodation->activeLease;
-
-        // Own accommodations have no lease restriction
-        if (! $lease || $lease->type !== 'wynajmowany') {
+        $covering = $accommodation->leaseCoveringRange($startDate, $endDate);
+        if ($covering) {
             return;
         }
 
-        $leaseEnd = $lease->end_date ? Carbon::parse($lease->end_date) : null;
+        $start = $startDate->toDateString();
+        $end = $endDate->toDateString();
+
+        $overlappingRentals = $accommodation->leases()
+            ->where('type', 'wynajmowany')
+            ->where(function ($q) use ($end) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', $end);
+            })
+            ->where(function ($q) use ($start) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $start);
+            })
+            ->orderBy('start_date')
+            ->get();
+
+        if ($overlappingRentals->isEmpty()) {
+            return;
+        }
+
+        $lease = $overlappingRentals->first();
         $leaseStart = $lease->start_date ? Carbon::parse($lease->start_date) : null;
+        $leaseEnd = $lease->end_date ? Carbon::parse($lease->end_date) : null;
 
         if ($leaseStart && $startDate->lt($leaseStart)) {
             throw ValidationException::withMessages([
@@ -151,11 +192,14 @@ class AccommodationAssignmentService
                 'end_date' => 'Data zakończenia przypisania ('.$endDate->format('d.m.Y').') wykracza poza datę końca najmu mieszkania ('.$leaseEnd->format('d.m.Y').'). Przedłuż najem lub skróć przypisanie.',
             ]);
         }
+
+        throw ValidationException::withMessages([
+            'accommodation_id' => 'Najem mieszkania '.$accommodation->name.' nie pokrywa całego okresu przypisania ('.
+                $startDate->format('d.m.Y').' – '.$endDate->format('d.m.Y').').',
+        ]);
     }
 
     /**
-     * Validate that assignment start date is not before the logistics event arrival date.
-     *
      * @throws ValidationException
      */
     protected function validateStartDateAfterArrival(Carbon $startDate, Carbon $arrivalDate): void

@@ -12,6 +12,15 @@
             </x-slot>
             <x-slot name="right">
                 @if($departure->status === \App\Enums\LogisticsEventStatus::PLANNED || $departure->status === \App\Enums\LogisticsEventStatus::COMPLETED)
+                    @if(!empty($canMutateParticipants))
+                        <x-ui.button
+                            variant="ghost"
+                            href="{{ route('departures.participants.create', $departure) }}"
+                            action="create"
+                        >
+                            Dopisz uczestnika
+                        </x-ui.button>
+                    @endif
                     <x-ui.button 
                         variant="danger" 
                         href="{{ route('departures.prepare-cancellation', $departure) }}"
@@ -130,7 +139,7 @@
                                     <i class="bi bi-house me-1"></i>
                                     Zakwaterowanie
                                 </th>
-                                @if(!empty($canRemoveParticipants))
+                                @if(!empty($canMutateParticipants))
                                     <th class="text-uppercase small text-muted fw-semibold py-3 pe-4 text-end">Akcja</th>
                                 @endif
                             </tr>
@@ -200,7 +209,7 @@
                                             @endif
                                         @endif
                                     </td>
-                                    <td class="py-3{{ empty($canRemoveParticipants) ? ' pe-4' : '' }}">
+                                    <td class="py-3{{ empty($canMutateParticipants) ? ' pe-4' : '' }}">
                                         @if($accommodationAssignment)
                                             <div>
                                                 <span class="badge bg-success me-1">✓</span>
@@ -221,26 +230,34 @@
                                             @endif
                                         @endif
                                     </td>
-                                    @if(!empty($canRemoveParticipants))
+                                    @if(!empty($canMutateParticipants))
                                         <td class="py-3 pe-4 text-end">
-                                            @if($removalBlock)
-                                                <span class="small text-muted"
-                                                      title="{{ $removalBlock }}"
-                                                      data-bs-toggle="tooltip"
-                                                      data-bs-placement="left">
-                                                    <i class="bi bi-lock-fill me-1"></i>Zablokowane
-                                                </span>
-                                            @else
-                                                <form method="POST"
-                                                      action="{{ route('departures.participants.remove', [$departure, $participant->employee]) }}"
-                                                      class="d-inline"
-                                                      onsubmit="return confirm('Wypisać {{ addslashes($participant->employee->full_name ?? 'uczestnika') }} z tego wyjazdu? Usunięte zostaną przypisania (projekt / auto / mieszkanie) tej osoby powiązane z wyjazdem.');">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger border-opacity-50">
-                                                        <i class="bi bi-person-dash me-1"></i>Wypisz
-                                                    </button>
-                                                </form>
-                                            @endif
+                                            <div class="d-flex flex-wrap justify-content-end gap-2">
+                                                <a href="{{ route('departures.participants.edit', [$departure, $participant->employee]) }}"
+                                                   class="btn btn-sm btn-outline-secondary border-opacity-50">
+                                                    <i class="bi bi-pencil me-1"></i>Edytuj
+                                                </a>
+                                                @if(!empty($canRemoveParticipants))
+                                                    @if($removalBlock)
+                                                        <span class="small text-muted align-self-center"
+                                                              title="{{ $removalBlock }}"
+                                                              data-bs-toggle="tooltip"
+                                                              data-bs-placement="left">
+                                                            <i class="bi bi-lock-fill me-1"></i>Wypis zablokowany
+                                                        </span>
+                                                    @else
+                                                        <form method="POST"
+                                                              action="{{ route('departures.participants.remove', [$departure, $participant->employee]) }}"
+                                                              class="d-inline"
+                                                              onsubmit="return confirm('Wypisać {{ addslashes($participant->employee->full_name ?? 'uczestnika') }} z tego wyjazdu? Usunięte zostaną przypisania (projekt / auto / mieszkanie) tej osoby powiązane z wyjazdem.');">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger border-opacity-50">
+                                                                <i class="bi bi-person-dash me-1"></i>Wypisz
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endif
+                                            </div>
                                         </td>
                                     @endif
                                 </tr>

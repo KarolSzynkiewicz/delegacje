@@ -38,10 +38,19 @@
     'attachmentFlatBindingKey' => null,
     'flatAttachmentUploads' => null,
     'linkableDepartures' => null,
+    /** Podgląd bez edycji dat / transportu (dopisywanie uczestnika do istniejącego wyjazdu). */
+    'readOnly' => false,
+    /** Siatka foteli: null = jak !readOnly. true = można zmienić kierowcę mimo zablokowanego nagłówka. */
+    'seatsInteractive' => null,
+    /** Osoby do kart biletów. Domyślnie = $employees. Siatka miejsc zawsze z $employees. */
+    'ticketEmployees' => null,
 ])
 
 @php
     $tripEmployees = $employees === null ? collect() : (is_array($employees) ? collect($employees) : $employees);
+    $ticketPeople = $ticketEmployees === null
+        ? $tripEmployees
+        : (is_array($ticketEmployees) ? collect($ticketEmployees) : $ticketEmployees);
     $showOwnGrid = $transportMode === 'own' && ! empty($vehicleId) && $selectedVehicle;
     $showPublicTickets = $transportMode === 'public';
     $ownEmptyFallback = 'Wybierz uczestników, aby zobaczyć siatkę miejsc.';
@@ -50,11 +59,16 @@
     $headerVehicles = $availableVehicles ?? collect();
     $headerHubs = $availablePublicTransportHubs ?? collect();
     $headerLinkableDepartures = $linkableDepartures ?? collect();
+    $seatsAreInteractive = $seatsInteractive === null ? ! $readOnly : (bool) $seatsInteractive;
+    $headerCfg = $tripLogisticsHeader;
+    if ($readOnly) {
+        $headerCfg['readOnly'] = true;
+    }
 @endphp
 
 <x-ui.card {{ $attributes->class(['mb-4']) }}>
     @include('components.logistics.trip-logistics-header', [
-        'tripLogisticsHeader' => $tripLogisticsHeader,
+        'tripLogisticsHeader' => $headerCfg,
         'endDate' => $endDate,
         'departureDate' => $departureDate,
         'returnDate' => $returnDate,
@@ -66,6 +80,8 @@
         'availableVehicles' => $headerVehicles,
         'availablePublicTransportHubs' => $headerHubs,
         'linkableDepartures' => $headerLinkableDepartures,
+        'selectedVehicle' => $selectedVehicle,
+        'readOnly' => $readOnly,
     ])
 
     @if($showOwnGrid)
@@ -80,12 +96,19 @@
                 :vehicle-seats="$vehicleSeats"
                 :selected-employees="$tripEmployees"
                 :wire-key-prefix="$seatGridWireKeyPrefix"
+                :interactive="$seatsAreInteractive"
             />
+            @if($readOnly && $seatsAreInteractive)
+                <p class="small text-muted mt-2 mb-0">
+                    <i class="bi bi-steering-wheel me-1"></i>
+                    Możesz zmienić kierowcę: przeciągnij osobę na ten fotel albo odznacz „Zewnętrzny”, jeśli ktoś z auta może prowadzić.
+                </p>
+            @endif
         @endif
     @endif
 
     @if($showPublicTickets)
-        @if($tripEmployees->isEmpty())
+        @if($ticketPeople->isEmpty())
             <div class="mt-3 pt-3 small text-muted" style="border-top: 1px solid rgba(255,255,255,0.08);">
                 <i class="bi bi-ticket-perforated me-1"></i>
                 {{ $publicTransportEmptyHint !== '' ? $publicTransportEmptyHint : $publicEmptyFallback }}
@@ -94,7 +117,7 @@
             <x-logistics.public-transport-tickets
                 variant="cards"
                 :section-title="$publicTicketsSectionTitle"
-                :employees="$tripEmployees"
+                :employees="$ticketPeople"
                 :ticket-costs-by-employee="$ticketCostsByEmployee"
                 :tickets-incomplete="$ticketsIncomplete"
                 :require-attachment="$requireAttachmentTickets"

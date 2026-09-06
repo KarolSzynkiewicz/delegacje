@@ -191,6 +191,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof LogisticsEvent => 'bi-signpost-split',
             $morph instanceof Sprint => 'bi-kanban',
             $morph instanceof ApprovalRequest => 'bi-check2-circle',
+            $morph instanceof ForumPost => 'bi-chat-square-text',
             default => 'bi-chat-dots',
         };
     }
@@ -245,6 +246,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof RecruitmentProcess => route('recruitment-processes.show', $morph),
             $morph instanceof RecruitmentCandidate => route('recruitment-processes.index'),
             $morph instanceof Sprint => route('sprints.show', $morph),
+            $morph instanceof ForumPost => route('dashboard.posts.show', $morph),
             $morph instanceof ApprovalRequest => route('approval-requests.show', $morph),
             $morph instanceof LogisticsEvent => match ($morph->type) {
                 LogisticsEventType::DEPARTURE => route('departures.show', $morph),
@@ -273,6 +275,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof RecruitmentProcess => filled($morph->full_name) ? 'Rekrutacja: '.$morph->full_name : 'Rekrutacja #'.$morph->id,
             $morph instanceof RecruitmentCandidate => filled($morph->full_name) ? 'Kandydat: '.$morph->full_name : 'Kandydat #'.$morph->id,
             $morph instanceof Sprint => filled($morph->name) ? (string) $morph->name : 'Sprint #'.$morph->id,
+            $morph instanceof ForumPost => filled($morph->title) ? (string) $morph->title : 'Wątek #'.$morph->id,
             $morph instanceof ApprovalRequest => filled($morph->name) ? (string) $morph->name : 'Zatwierdzenie #'.$morph->id,
             default => class_basename($morph).' #'.$morph->id,
         };

@@ -24,7 +24,9 @@ class CreateSprintTool extends Tool
         i poczekaj na wyraźną zgodę. Dopiero wtedy wywołaj z `confirmed_by_user: true`.
 
         Po utworzeniu sprintu zadania dodawaj narzędziem `create_task` (pole sprint_id)
-        albo przypisuj istniejące przez `assign_tasks_to_sprint`.
+        albo przypisuj istniejące przez `assign_tasks_to_sprint`. Ponowne wywołanie
+        z tą samą nazwą i datami w krótkim oknie zwraca istniejący sprint
+        (`meta.reused: true`) zamiast tworzyć drugi.
     MARKDOWN;
 
     public function handle(Request $request): Response
@@ -65,6 +67,7 @@ class CreateSprintTool extends Tool
             'meta' => [
                 'created_at' => now()->toIso8601String(),
                 'created_by' => $user->name,
+                'reused' => ! $sprint->wasRecentlyCreated,
             ],
             'sprint' => [
                 'id' => $sprint->id,

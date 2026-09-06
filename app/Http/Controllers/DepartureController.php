@@ -178,6 +178,8 @@ class DepartureController extends Controller
         $canRemoveParticipants = in_array($departure->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)
             && $departure->participants->count() > 1;
 
+        $canMutateParticipants = in_array($departure->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true);
+
         $participantRemovalBlocks = [];
         if ($canRemoveParticipants) {
             $assignmentIdsByEmployee = $departure->projectAssignments
@@ -211,6 +213,7 @@ class DepartureController extends Controller
             'groundLegTicketRows' => $groundLegTicketRows,
             'relatedUznania' => $relatedUznania,
             'canRemoveParticipants' => $canRemoveParticipants,
+            'canMutateParticipants' => $canMutateParticipants,
             'participantRemovalBlocks' => $participantRemovalBlocks,
         ]);
     }

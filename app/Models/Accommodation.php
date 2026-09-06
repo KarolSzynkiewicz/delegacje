@@ -120,20 +120,124 @@ class Accommodation extends Model
     }
 
     /**
-     * Get available capacity at a given date range.
+     * Najem, który w całości pokrywa podany zakres dat (jeden rekord).
      */
-    public function getAvailableCapacity($startDate, $endDate, ?int $excludeAssignmentId = null): int
+    public function leaseCoveringRange($startDate, $endDate): ?AccommodationLease
     {
-        $query = $this->assignments()
-            ->inDateRange($startDate, $endDate);
+        $start = Carbon::parse($startDate)->toDateString();
+        $end = Carbon::parse($endDate)->toDateString();
 
+        return $this->leases()
+            ->where(function ($q) use ($start) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', $start);
+            })
+            ->where(function ($q) use ($end) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $end);
+            })
+            ->orderByDesc('start_date')
+            ->first();
+    }
+
+    /**
+     * Najem pokrywający konkretny dzień.
+     */
+    public function leaseCoveringDate($date): ?AccommodationLease
+    {
+        return $this->leaseCoveringRange($date, $date);
+    }
+
+    /**
+     * Szczytowe obłożenie w zakresie: ile osób śpi tu jednocześnie
+     * w najgorszym dniu, a nie ile rekordów nakłada się na cały zakres.
+     *
+     * (A: 1–10, B: 11–20 przy pojemności 2 zostawia wolne miejsce na 1–20;
+     *  stare count() traktowało to jako 2 zajęte i blokowało zapis.)
+     */
+    public function getPeakOccupancy($startDate, $endDate, ?int $excludeAssignmentId = null): int
+    {
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->startOfDay();
+        if ($end->lt($start)) {
+            return 0;
+        }
+
+        $query = $this->assignments()->inDateRange($start, $end);
         if ($excludeAssignmentId) {
             $query->where('id', '!=', $excludeAssignmentId);
         }
 
-        $occupiedCount = $query->count();
+        $assignments = $query->get(['id', 'start_date', 'end_date']);
+        if ($assignments->isEmpty()) {
+            return 0;
+        }
 
-        return max(0, $this->capacity - $occupiedCount);
+        $events = [];
+        foreach ($assignments as $assignment) {
+            $aStart = Carbon::parse($assignment->start_date)->startOfDay();
+            $aEnd = $assignment->end_date
+                ? Carbon::parse($assignment->end_date)->startOfDay()
+                : $end->copy();
+
+            $overlapStart = $aStart->greaterThan($start) ? $aStart : $start->copy();
+            $overlapEnd = $aEnd->lessThan($end) ? $aEnd : $end->copy();
+            if ($overlapStart->greaterThan($overlapEnd)) {
+                continue;
+            }
+
+            $events[] = [$overlapStart->getTimestamp(), 1];
+            $events[] = [$overlapEnd->copy()->addDay()->startOfDay()->getTimestamp(), -1];
+        }
+
+        if ($events === []) {
+            return 0;
+        }
+
+        usort($events, function (array $a, array $b): int {
+            if ($a[0] === $b[0]) {
+                return $a[1] <=> $b[1];
+            }
+
+            return $a[0] <=> $b[0];
+        });
+
+        $current = 0;
+        $peak = 0;
+        foreach ($events as [, $delta]) {
+            $current += $delta;
+            if ($current > $peak) {
+                $peak = $current;
+            }
+        }
+
+        return $peak;
+    }
+
+    /**
+     * Pierwszy dzień w zakresie, w którym obłożenie >= pojemność (brak wolnego łóżka).
+     */
+    public function firstDateAtCapacity($startDate, $endDate, ?int $excludeAssignmentId = null): ?Carbon
+    {
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->startOfDay();
+        $capacity = (int) $this->capacity;
+
+        $day = $start->copy();
+        while ($day->lte($end)) {
+            if ($this->getPeakOccupancy($day, $day, $excludeAssignmentId) >= $capacity) {
+                return $day->copy();
+            }
+            $day->addDay();
+        }
+
+        return null;
+    }
+
+    /**
+     * Wolne miejsca w zakresie = pojemność minus szczytowe obłożenie.
+     */
+    public function getAvailableCapacity($startDate, $endDate, ?int $excludeAssignmentId = null): int
+    {
+        return max(0, (int) $this->capacity - $this->getPeakOccupancy($startDate, $endDate, $excludeAssignmentId));
     }
 
     /**

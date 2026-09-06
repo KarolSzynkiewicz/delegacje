@@ -12,7 +12,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <x-ui.card label="Nowy sprint">
-                <form method="POST" action="{{ route('sprints.store') }}" enctype="multipart/form-data">
+                <form method="POST" action="{{ route('sprints.store') }}" enctype="multipart/form-data" onsubmit="if (this.dataset.busy) { return false; } this.dataset.busy = '1';">
                     @csrf
                     @include('sprints._form')
                     <div class="d-flex justify-content-between align-items-center mt-4">

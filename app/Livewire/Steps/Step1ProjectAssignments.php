@@ -38,6 +38,20 @@ class Step1ProjectAssignments extends Component
     /** W trybie transferu — tylko ci pracownicy (np. uczestnicy transferu). */
     public array $allowedEmployeeIds = [];
 
+    /**
+     * Osoby, których nie wycinamy z listy mimo przypisania w bazie / „poza bazą”
+     * (edycja uczestnika już wpisanego na ten wyjazd).
+     *
+     * @var array<int>
+     */
+    public array $alwaysAllowEmployeeIds = [];
+
+    /** Osadzenie w planerze dopisywania / edycji uczestnika istniejącego wyjazdu. */
+    public bool $participantPlannerEmbed = false;
+
+    /** Anuluj — np. powrót do karty wyjazdu zamiast listy. */
+    public ?string $cancelHref = null;
+
     // Własne dane (ciężkie obliczenia)
     public $availableEmployees = [];
 
@@ -156,7 +170,10 @@ class Step1ProjectAssignments extends Component
         $assignmentRanges = [],
         $vehicleSeats = [],
         $forTransfer = false,
-        $allowedEmployeeIds = []
+        $allowedEmployeeIds = [],
+        $alwaysAllowEmployeeIds = [],
+        $participantPlannerEmbed = false,
+        $cancelHref = null
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
@@ -168,6 +185,11 @@ class Step1ProjectAssignments extends Component
         $this->allowedEmployeeIds = is_array($allowedEmployeeIds)
             ? array_values(array_map('intval', $allowedEmployeeIds))
             : [];
+        $this->alwaysAllowEmployeeIds = is_array($alwaysAllowEmployeeIds)
+            ? array_values(array_map('intval', $alwaysAllowEmployeeIds))
+            : [];
+        $this->participantPlannerEmbed = (bool) $participantPlannerEmbed;
+        $this->cancelHref = is_string($cancelHref) && $cancelHref !== '' ? $cancelHref : null;
 
         // Wykonuje ciężkie operacje
         $this->loadData();
@@ -286,12 +308,17 @@ class Step1ProjectAssignments extends Component
             })
             // Domyślnie: tylko osoby z rotacją obejmującą dzień wyjazdu (mniej danych, szybszy Step1).
             ->when(! $this->showEmployeesWithoutRotation, function ($q) use ($departureDate) {
-                $q->whereHas('rotations', function ($rq) use ($departureDate) {
-                    $rq->whereDate('start_date', '<=', $departureDate->toDateString())
-                        ->where(function ($rq2) use ($departureDate) {
-                            $rq2->whereNull('end_date')
-                                ->orWhereDate('end_date', '>=', $departureDate->toDateString());
-                        });
+                $q->where(function ($inner) use ($departureDate) {
+                    $inner->whereHas('rotations', function ($rq) use ($departureDate) {
+                        $rq->whereDate('start_date', '<=', $departureDate->toDateString())
+                            ->where(function ($rq2) use ($departureDate) {
+                                $rq2->whereNull('end_date')
+                                    ->orWhereDate('end_date', '>=', $departureDate->toDateString());
+                            });
+                    });
+                    if ($this->alwaysAllowEmployeeIds !== []) {
+                        $inner->orWhereIn('id', $this->alwaysAllowEmployeeIds);
+                    }
                 });
             })
             ->orderBy('last_name')
@@ -673,21 +700,21 @@ class Step1ProjectAssignments extends Component
                 ->toArray();
         }
 
+        $alwaysAllow = array_flip($this->alwaysAllowEmployeeIds);
+
         // Filter from all available employees (not just current page)
-        $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments, $notInBaseIds) {
-            // Filter out already assigned employees (in form)
+        $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments, $notInBaseIds, $alwaysAllow) {
             if (in_array($employee['id'], $assignedIds)) {
                 return false;
             }
 
-            // Tylko osoby w bazie w dniu wyjazdu
-            if (in_array((int) $employee['id'], $notInBaseIds, true)) {
+            $allowedDespiteState = isset($alwaysAllow[(int) $employee['id']]);
+
+            if (! $allowedDespiteState && in_array((int) $employee['id'], $notInBaseIds, true)) {
                 return false;
             }
 
-            // Filter out employees who have assignments in database for this date range
-            // (unless they're already assigned in form, which is checked above)
-            if (in_array($employee['id'], $employeesWithDbAssignments)) {
+            if (! $allowedDespiteState && in_array($employee['id'], $employeesWithDbAssignments)) {
                 return false;
             }
 

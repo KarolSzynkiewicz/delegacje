@@ -7,6 +7,7 @@ use App\Http\Requests\StoreSprintRequest;
 use App\Http\Requests\UpdateSprintRequest;
 use App\Models\Attachment;
 use App\Models\Sprint;
+use App\Services\SprintCreationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -30,18 +31,17 @@ class SprintController extends Controller
         return view('sprints.create');
     }
 
-    public function store(StoreSprintRequest $request): RedirectResponse
+    public function store(StoreSprintRequest $request, SprintCreationService $sprints): RedirectResponse
     {
-        $sprint = Sprint::query()->create([
-            ...$request->safe()->except('attachments'),
-            'created_by' => auth()->id(),
-        ]);
+        $sprint = $sprints->create($request->safe()->except('attachments'), $request->user());
 
-        $uploads = $request->file('attachments', []);
-        if (! is_array($uploads)) {
-            $uploads = $uploads ? [$uploads] : [];
+        if ($sprint->wasRecentlyCreated) {
+            $uploads = $request->file('attachments', []);
+            if (! is_array($uploads)) {
+                $uploads = $uploads ? [$uploads] : [];
+            }
+            Attachment::storeManyFor($sprint, $uploads, $request->user()->id, 'sprints');
         }
-        Attachment::storeManyFor($sprint, $uploads, auth()->id(), 'sprints');
 
         return redirect()
             ->route('sprints.show', $sprint)

@@ -162,7 +162,7 @@
             @foreach($passengerSlots as $slotIdx => $emp)
                 @if($emp)
                     <div @if($interactive) wire:key="{{ $wireKeyPrefix }}-seat-{{ $slotIdx }}-{{ $emp->id }}" @endif
-                         class="lvs-seat lvs-seat-occupied"
+                         class="lvs-seat lvs-seat-occupied{{ $interactive ? '' : ' pe-none' }}"
                          @if($interactive)
                              draggable="true"
                              x-on:dragstart="startDrag({{ $emp->id }})"

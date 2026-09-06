@@ -131,6 +131,18 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('departures/{departure}/participants/{employee}/remove', [\App\Http\Controllers\DepartureController::class, 'removeParticipant'])
             ->name('departures.participants.remove')
             ->defaults('resource', 'departures');
+        Route::get('departures/{departure}/participants/create', [\App\Http\Controllers\DepartureParticipantController::class, 'create'])
+            ->name('departures.participants.create')
+            ->defaults('resource', 'departures');
+        Route::post('departures/{departure}/participants', [\App\Http\Controllers\DepartureParticipantController::class, 'store'])
+            ->name('departures.participants.store')
+            ->defaults('resource', 'departures');
+        Route::get('departures/{departure}/participants/{employee}/edit', [\App\Http\Controllers\DepartureParticipantController::class, 'edit'])
+            ->name('departures.participants.edit')
+            ->defaults('resource', 'departures');
+        Route::put('departures/{departure}/participants/{employee}', [\App\Http\Controllers\DepartureParticipantController::class, 'update'])
+            ->name('departures.participants.update')
+            ->defaults('resource', 'departures');
         Route::get('departures/{departure}/route-pdf', [\App\Http\Controllers\DepartureController::class, 'downloadRoutePdf'])
             ->name('departures.route-pdf')
             ->defaults('resource', 'departures');
@@ -602,7 +614,16 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
     // ===== VIEW ROUTES =====
     Route::group(['defaults' => ['permission_type' => 'view']], function () {
-        Route::get('/dashboard', [DashboardController::class, 'home'])->name('dashboard');
+        Route::get('/dashboard', [\App\Http\Controllers\ForumPostController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/przeglad', [DashboardController::class, 'overview'])->name('dashboard.overview');
+        Route::get('/dashboard/posts/create', [\App\Http\Controllers\ForumPostController::class, 'create'])->name('dashboard.posts.create');
+        Route::post('/dashboard/posts/images', [\App\Http\Controllers\ForumPostController::class, 'uploadImage'])->name('dashboard.posts.images');
+        Route::post('/dashboard/posts', [\App\Http\Controllers\ForumPostController::class, 'store'])->name('dashboard.posts.store');
+        Route::get('/dashboard/posts/{forumPost}', [\App\Http\Controllers\ForumPostController::class, 'show'])->name('dashboard.posts.show');
+        Route::get('/dashboard/posts/{forumPost}/edit', [\App\Http\Controllers\ForumPostController::class, 'edit'])->name('dashboard.posts.edit');
+        Route::put('/dashboard/posts/{forumPost}', [\App\Http\Controllers\ForumPostController::class, 'update'])->name('dashboard.posts.update');
+        Route::delete('/dashboard/posts/{forumPost}', [\App\Http\Controllers\ForumPostController::class, 'destroy'])->name('dashboard.posts.destroy');
+        Route::post('/dashboard/posts/{forumPost}/like', [\App\Http\Controllers\ForumPostController::class, 'like'])->name('dashboard.posts.like');
 
         Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
             ->name('notifications.index')

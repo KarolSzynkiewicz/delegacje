@@ -342,7 +342,8 @@ class RoutePermissionService
             'no-role',
             'logout',
             'home',
-            'dashboard', // Dashboard dostępny dla każdego zalogowanego użytkownika
+            'dashboard', // Dashboard / tablica — każdy zalogowany
+            'dashboard.*',
             'pulse', // Laravel Pulse — osobny gate viewPulse (tylko admin)
             'mine.*', // Wykluczone na testy - routes dla /mine/*
             'health', // Healthcheck endpoint - no auth/permission required

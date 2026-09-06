@@ -9,6 +9,7 @@ use App\Models\ProjectTask;
 use App\Models\Sprint;
 use App\Models\TaskSubtask;
 use App\Models\User;
+use App\Services\SprintCreationService;
 use App\Services\SprintInsights;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -102,6 +103,63 @@ class SprintTest extends TestCase
             'definition_of_done' => 'Code review + testy',
             'created_by' => $this->user->id,
         ]);
+    }
+
+    public function test_double_http_create_does_not_duplicate_sprint(): void
+    {
+        $payload = [
+            'name' => 'Sprint 12',
+            'goal' => 'Wdrożyć sprints',
+            'definition_of_done' => 'Code review + testy',
+            'start_date' => '2026-08-24',
+            'end_date' => '2026-09-06',
+        ];
+
+        $this->actingAs($this->user)
+            ->post(route('sprints.store'), $payload)
+            ->assertRedirect();
+
+        $this->actingAs($this->user)
+            ->post(route('sprints.store'), $payload)
+            ->assertRedirect();
+
+        $this->assertSame(1, Sprint::query()->where('name', 'Sprint 12')->count());
+    }
+
+    public function test_create_service_reuses_recent_identical_sprint(): void
+    {
+        $payload = [
+            'name' => 'Sprint HQ',
+            'goal' => 'Cel',
+            'definition_of_done' => 'DoD',
+            'start_date' => '2026-08-24',
+            'end_date' => '2026-09-06',
+        ];
+
+        $service = app(SprintCreationService::class);
+        $first = $service->create($payload, $this->user);
+        $second = $service->create($payload, $this->user);
+
+        $this->assertTrue($first->is($second));
+        $this->assertFalse($second->wasRecentlyCreated);
+        $this->assertSame(1, Sprint::query()->where('name', 'Sprint HQ')->count());
+    }
+
+    public function test_create_service_allows_same_name_after_dedupe_window(): void
+    {
+        $payload = [
+            'name' => 'Sprint HQ',
+            'start_date' => '2026-08-24',
+            'end_date' => '2026-09-06',
+        ];
+
+        $this->travel(-11)->minutes();
+        app(SprintCreationService::class)->create($payload, $this->user);
+        $this->travelBack();
+
+        app(SprintCreationService::class)->create($payload, $this->user);
+
+        $this->assertSame(2, Sprint::query()->where('name', 'Sprint HQ')->count());
     }
 
     public function test_sprint_end_date_cannot_be_before_start_date(): void

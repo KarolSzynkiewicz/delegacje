@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\EmployeeRate;
 use App\Models\Employee;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
+use App\Models\EmployeeRate;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class EmployeeRateController extends Controller
 {
@@ -23,10 +23,13 @@ class EmployeeRateController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
+        $selectedEmployeeId = $request->query('employee_id');
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('employee-rates.create', compact('employees'));
+        $backUrl = $this->backUrl($selectedEmployeeId);
+
+        return view('employee-rates.create', compact('employees', 'selectedEmployeeId', 'backUrl'));
     }
 
     /**
@@ -53,7 +56,7 @@ class EmployeeRateController extends Controller
 
         EmployeeRate::create($validated);
 
-        return redirect()->route('employee-rates.index')
+        return $this->redirectToEmployee((int) $validated['employee_id'])
             ->with('success', 'Stawka została dodana.');
     }
 
@@ -63,6 +66,7 @@ class EmployeeRateController extends Controller
     public function show(EmployeeRate $employeeRate): View
     {
         $employeeRate->load('employee');
+
         return view('employee-rates.show', compact('employeeRate'));
     }
 
@@ -72,7 +76,9 @@ class EmployeeRateController extends Controller
     public function edit(EmployeeRate $employeeRate): View
     {
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
-        return view('employee-rates.edit', compact('employeeRate', 'employees'));
+        $backUrl = $this->backUrl($employeeRate->employee_id);
+
+        return view('employee-rates.edit', compact('employeeRate', 'employees', 'backUrl'));
     }
 
     /**
@@ -99,7 +105,7 @@ class EmployeeRateController extends Controller
 
         $employeeRate->update($validated);
 
-        return redirect()->route('employee-rates.index')
+        return $this->redirectToEmployee((int) $validated['employee_id'])
             ->with('success', 'Stawka została zaktualizowana.');
     }
 
@@ -107,7 +113,7 @@ class EmployeeRateController extends Controller
      * Check if a rate with the given date range overlaps with existing rates for the same employee+currency.
      * Throws ValidationException if an overlap is detected.
      *
-     * @param int $excludeId Rate ID to exclude from the check (used during update)
+     * @param  int  $excludeId  Rate ID to exclude from the check (used during update)
      */
     private function checkOverlap(
         int $employeeId,
@@ -142,9 +148,30 @@ class EmployeeRateController extends Controller
      */
     public function destroy(EmployeeRate $employeeRate): RedirectResponse
     {
+        $employeeId = $employeeRate->employee_id;
         $employeeRate->delete();
 
-        return redirect()->route('employee-rates.index')
+        return $this->redirectToEmployee($employeeId)
             ->with('success', 'Stawka została usunięta.');
+    }
+
+    private function redirectToEmployee(int $employeeId): RedirectResponse
+    {
+        return redirect()->route('employees.show', [
+            'employee' => $employeeId,
+            'tab' => 'employee-rates',
+        ]);
+    }
+
+    private function backUrl(int|string|null $employeeId): string
+    {
+        if ($employeeId) {
+            return route('employees.show', [
+                'employee' => $employeeId,
+                'tab' => 'employee-rates',
+            ]);
+        }
+
+        return route('employee-rates.index');
     }
 }

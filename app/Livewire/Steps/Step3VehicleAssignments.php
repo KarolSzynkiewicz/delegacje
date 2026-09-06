@@ -38,6 +38,9 @@ class Step3VehicleAssignments extends Component
 
     public bool $transferWizardEmbed = false;
 
+    /** Stepper dopisywania / edycji uczestnika istniejącego wyjazdu — zapis zamiast kroku 4. */
+    public bool $participantPlannerEmbed = false;
+
     public array $allowedEmployeeIds = [];
 
     // Własne dane (ciężkie obliczenia)
@@ -91,7 +94,8 @@ class Step3VehicleAssignments extends Component
         $forTransfer = false,
         $allowedEmployeeIds = [],
         $forTransferBoard = false,
-        $transferWizardEmbed = false
+        $transferWizardEmbed = false,
+        $participantPlannerEmbed = false
     ) {
         $this->departureDate = $departureDate;
         $this->endDate = $endDate;
@@ -110,6 +114,7 @@ class Step3VehicleAssignments extends Component
         $this->forTransfer = (bool) $forTransfer;
         $this->forTransferBoard = (bool) $forTransferBoard;
         $this->transferWizardEmbed = (bool) $transferWizardEmbed;
+        $this->participantPlannerEmbed = (bool) $participantPlannerEmbed;
         $this->allowedEmployeeIds = is_array($allowedEmployeeIds)
             ? array_values(array_map('intval', $allowedEmployeeIds))
             : [];
@@ -977,6 +982,12 @@ class Step3VehicleAssignments extends Component
                 return;
             }
             $this->dispatch('transfer-wizard-vehicle-done');
+
+            return;
+        }
+
+        if ($this->participantPlannerEmbed) {
+            $this->dispatch('save-participant-planner');
 
             return;
         }

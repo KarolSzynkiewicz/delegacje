@@ -1,74 +1,80 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Dashboard" />
+        <x-ui.page-header title="Tablica">
+            <x-slot:left>
+                <x-ui.button variant="ghost" href="{{ route('dashboard.overview') }}">
+                    Przegląd systemu
+                </x-ui.button>
+            </x-slot:left>
+            <x-slot:right>
+                <x-ui.button variant="primary" href="{{ route('dashboard.posts.create') }}" action="create">
+                    Nowy wątek
+                </x-ui.button>
+            </x-slot:right>
+        </x-ui.page-header>
     </x-slot>
 
-    <x-ui.card class="mb-5">
-        <div class="text-center py-4 py-md-5">
-            <h1 class="h2 fw-bold mb-3">ChronoLogic w skrócie</h1>
-            <p class="lead text-muted mb-2">ERP do delegacji: kto gdzie jest, ile godzin, ile kosztuje, kto jedzie.</p>
-            <p class="text-muted mb-0">Poniżej <strong>snapy</strong> prawdziwych ekranów z przykładowymi danymi — tak wygląda praca w systemie, zanim wrzucisz swoje ekipy.</p>
-        </div>
-    </x-ui.card>
+    @if(session('success'))
+        <x-ui.alert variant="success" dismissible class="mb-4">{{ session('success') }}</x-ui.alert>
+    @endif
 
-    <nav class="dash-snap-toc mb-5" aria-label="Snapy systemu">
-        <a href="#boty">Boty</a>
-        <a href="#snap-weekly">Tydzień</a>
-        <a href="#snap-charts">Wykresy</a>
-        <a href="#snap-hours">Godziny</a>
-        <a href="#snap-payroll">Payroll</a>
-        <a href="#snap-people">Kadry</a>
-        <a href="#snap-finance">Finanse</a>
-        <a href="#snap-warehouse">Magazyn</a>
-        <a href="#snap-hr">Rekrutacja</a>
-        <a href="#snap-tasks">Sprint</a>
-    </nav>
+    <form method="GET" action="{{ route('dashboard') }}" class="forum-toolbar">
+        <label class="forum-search">
+            <i class="bi bi-search"></i>
+            <input
+                type="search"
+                name="q"
+                value="{{ $q }}"
+                placeholder="Szukaj po tytule, treści, tagu…"
+                aria-label="Szukaj wątków"
+            >
+        </label>
+        @if($tagSlug)
+            <input type="hidden" name="tag" value="{{ $tagSlug }}">
+        @endif
+        <x-ui.button variant="ghost" type="submit">Szukaj</x-ui.button>
+        @if($q !== '' || $tagSlug !== '')
+            <x-ui.button variant="ghost" href="{{ route('dashboard') }}">Wyczyść</x-ui.button>
+        @endif
+    </form>
 
-    <section class="mb-5" id="boty" aria-labelledby="dash-bots-title">
-        <div class="dash-bots__head">
-            <span class="dash-bots__kicker">AskChrono</span>
-            <h2 id="dash-bots-title" class="h4 fw-semibold mb-1">Poznaj boty — Twoi agenci AI</h2>
-            <p class="text-muted mb-0 small">Czterech specjalistów obok Twojej pracy. Każdy robi jedną rzecz — i nic nie zapisuje, dopóki nie zatwierdzisz.</p>
-        </div>
-        <div class="dash-bots__grid">
-            @foreach (\App\Support\ChronoPersona::all() as $bot)
-                <x-ui.card class="dash-bot">
-                    <div class="dash-bot__figure">
-                        <x-ask-chrono-bot :variant="$bot['variant']" :size="64" />
-                    </div>
-                    <span class="dash-bot__role font-mono">{{ $bot['role'] }}</span>
-                    <h3>{{ $bot['name'] }}</h3>
-                    <p>{{ $bot['pitch'] }}</p>
-                </x-ui.card>
+    @if($tags->isNotEmpty())
+        <div class="forum-tag-cloud" aria-label="Tagi">
+            @foreach($tags as $tag)
+                <a
+                    href="{{ route('dashboard', array_filter(['q' => $q ?: null, 'tag' => $tag->slug])) }}"
+                    class="forum-tag {{ $tagSlug === $tag->slug ? 'is-active' : '' }}"
+                >
+                    #{{ $tag->name }}
+                    <span class="forum-tag__count">{{ $tag->posts_count }}</span>
+                </a>
             @endforeach
         </div>
-    </section>
+    @endif
 
-    <div class="dash-snaps" id="snap-weekly">
-        @include('dashboard.snaps.weekly')
-    </div>
-    <div class="dash-snaps" id="snap-charts">
-        @include('dashboard.snaps.charts')
-    </div>
-    <div class="dash-snaps" id="snap-hours">
-        @include('dashboard.snaps.time-logs')
-    </div>
-    <div class="dash-snaps" id="snap-payroll">
-        @include('dashboard.snaps.payroll')
-    </div>
-    <div class="dash-snaps" id="snap-people">
-        @include('dashboard.snaps.employees')
-    </div>
-    <div class="dash-snaps" id="snap-finance">
-        @include('dashboard.snaps.finance')
-    </div>
-    <div class="dash-snaps" id="snap-warehouse">
-        @include('dashboard.snaps.warehouse')
-    </div>
-    <div class="dash-snaps" id="snap-hr">
-        @include('dashboard.snaps.recruitment')
-    </div>
-    <div class="dash-snaps" id="snap-tasks">
-        @include('dashboard.snaps.tasks-sprint')
-    </div>
+    @if($posts->isEmpty())
+        <x-ui.card>
+            <x-ui.empty-state
+                icon="chat-square-text"
+                :message="$q !== '' || $tagSlug !== '' ? 'Brak wątków dla tego filtra' : 'Tablica jest pusta — napisz pierwszy wątek'"
+                :has-filters="$q !== '' || $tagSlug !== ''"
+                :clear-filters-action="$q !== '' || $tagSlug !== '' ? route('dashboard') : null"
+            >
+                @if($q === '' && $tagSlug === '')
+                    <x-ui.button variant="primary" href="{{ route('dashboard.posts.create') }}" action="create" class="mt-2">
+                        Nowy wątek
+                    </x-ui.button>
+                @endif
+            </x-ui.empty-state>
+        </x-ui.card>
+    @else
+        <div class="d-flex flex-column gap-3">
+            @foreach($posts as $post)
+                @include('dashboard.posts._card', ['post' => $post])
+            @endforeach
+        </div>
+        <div class="mt-4">
+            {{ $posts->links() }}
+        </div>
+    @endif
 </x-app-layout>

@@ -304,6 +304,21 @@
                     >
                         Dalej
                     </x-ui.button>
+                @elseif($participantPlannerEmbed)
+                    <x-ui.button
+                        variant="ghost"
+                        wire:click="$dispatch('go-to-step', { step: 2 })"
+                        action="cancel"
+                    >
+                        ← Wróć do poprzedniej karty
+                    </x-ui.button>
+                    <x-ui.button
+                        variant="primary"
+                        wire:click="confirmProceedToNextPlannerStep"
+                        action="save"
+                    >
+                        Zapisz uczestnika
+                    </x-ui.button>
                 @else
                     <x-ui.button 
                         variant="ghost" 

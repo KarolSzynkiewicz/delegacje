@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\TaskStatus;
 use App\Mcp\Servers\TasksServer;
 use App\Mcp\Tools\AddCommentTool;
+use App\Mcp\Tools\CreateSprintTool;
 use App\Mcp\Tools\GetTaskCommentsTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListUsersTool;
@@ -171,6 +172,31 @@ class McpTaskToolsTest extends TestCase
             $payload['collaboration']['subtask_help'][0]['helper'] ?? null
         );
         $this->assertArrayNotHasKey('tasks', $payload);
+    }
+
+    public function test_create_sprint_requires_hitl_then_reuses_identical_payload(): void
+    {
+        $payload = [
+            'name' => 'Sprint MCP',
+            'goal' => 'Ogarnąć backlog',
+            'definition_of_done' => 'Na produkcji',
+            'start_date' => '2026-08-24',
+            'end_date' => '2026-09-06',
+        ];
+
+        TasksServer::actingAs($this->admin)
+            ->tool(CreateSprintTool::class, $payload + ['confirmed_by_user' => false])
+            ->assertHasErrors(['potwierdzenia']);
+
+        $this->assertDatabaseMissing('sprints', ['name' => 'Sprint MCP']);
+
+        $first = $this->toolJson(CreateSprintTool::class, $payload + ['confirmed_by_user' => true]);
+        $second = $this->toolJson(CreateSprintTool::class, $payload + ['confirmed_by_user' => true]);
+
+        $this->assertFalse($first['meta']['reused']);
+        $this->assertTrue($second['meta']['reused']);
+        $this->assertSame($first['sprint']['id'], $second['sprint']['id']);
+        $this->assertSame(1, Sprint::query()->where('name', 'Sprint MCP')->count());
     }
 
     public function test_sprint_insights_and_list_users(): void

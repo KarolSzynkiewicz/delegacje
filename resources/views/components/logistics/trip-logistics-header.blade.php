@@ -14,6 +14,16 @@
     $datesIncomplete = $missingFirst || $missingEnd;
     $enableRelatedDepartureLink = ! empty($cfg['enableRelatedDepartureLink']);
     $linkableDepartures = $linkableDepartures ?? collect();
+    $readOnly = $readOnly ?? (bool) ($cfg['readOnly'] ?? false);
+    $selectedVehicle = $selectedVehicle ?? null;
+    $hubs = $availablePublicTransportHubs ?? collect();
+    $startHub = $hubs->firstWhere('id', (int) ($sharedStartAirportLocationId ?? 0));
+    $endHub = $hubs->firstWhere('id', (int) ($sharedEndAirportLocationId ?? 0));
+    $startHubName = $startHub?->name ?? '—';
+    $endHubName = $endHub?->name ?? '—';
+    $vehicleLabel = $selectedVehicle
+        ? trim(($selectedVehicle->registration_number ?? '').' – '.($selectedVehicle->brand ?? '').' '.($selectedVehicle->model ?? ''))
+        : '—';
 @endphp
 
 <x-logistics.section-header :title="$cfg['title'] ?? 'Szczegóły'">
@@ -41,27 +51,51 @@
 <div class="row g-3 g-lg-4 align-items-stretch logistics-trip-header-row">
     {{-- Daty — poniżej lg pełna szerokość (unikamy nachodzenia kolumn na ~md) --}}
     <div class="col-12 col-lg-4 d-flex min-w-0">
-        <div class="rounded-3 p-2 transition-all logistics-trip-header-card d-flex flex-column w-100 h-100{{ $datesIncomplete ? ' logistics-trip-header-card--invalid' : '' }}"
+        <div class="rounded-3 p-2 transition-all logistics-trip-header-card d-flex flex-column w-100 h-100{{ (! $readOnly && $datesIncomplete) ? ' logistics-trip-header-card--invalid' : '' }}"
              style="justify-content: flex-start;">
             <div class="row g-2 align-items-end flex-grow-1">
                 <div class="col-12 col-sm-6 min-w-0">
-                    <label class="form-label small mb-1 {{ $missingFirst ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        {{ $cfg['firstLabel'] ?? 'Data' }} <span class="text-danger">*</span>
+                    <label class="form-label small mb-1 {{ (! $readOnly && $missingFirst) ? 'text-danger fw-semibold' : 'text-muted' }}">
+                        {{ $cfg['firstLabel'] ?? 'Data' }}
+                        @unless($readOnly)<span class="text-danger">*</span>@endunless
                     </label>
-                    <input type="date"
-                           wire:model.live="{{ $fw }}"
-                           class="form-control w-100 logistics-trip-header-control @if($errors->has($fw) || $missingFirst) is-invalid @endif">
+                    @if($readOnly)
+                        <input type="date"
+                               value="{{ $$fw }}"
+                               disabled
+                               tabindex="-1"
+                               class="form-control w-100 logistics-trip-header-control">
+                    @else
+                        <input type="date"
+                               wire:model.live="{{ $fw }}"
+                               class="form-control w-100 logistics-trip-header-control @if($errors->has($fw) || $missingFirst) is-invalid @endif">
+                    @endif
                 </div>
                 <div class="col-12 col-sm-6 min-w-0">
-                    <label class="form-label small mb-1 {{ $missingEnd ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        Data zakończenia <span class="text-danger">*</span>
+                    <label class="form-label small mb-1 {{ (! $readOnly && $missingEnd) ? 'text-danger fw-semibold' : 'text-muted' }}">
+                        Data zakończenia
+                        @unless($readOnly)<span class="text-danger">*</span>@endunless
                     </label>
-                    <input type="date"
-                           wire:model.live="endDate"
-                           class="form-control w-100 logistics-trip-header-control @if($errors->has('endDate') || $missingEnd) is-invalid @endif"
-                           @if(! empty($$fw)) min="{{ $$fw }}" @endif>
+                    @if($readOnly)
+                        <input type="date"
+                               value="{{ $endDate }}"
+                               disabled
+                               tabindex="-1"
+                               class="form-control w-100 logistics-trip-header-control">
+                    @else
+                        <input type="date"
+                               wire:model.live="endDate"
+                               class="form-control w-100 logistics-trip-header-control @if($errors->has('endDate') || $missingEnd) is-invalid @endif"
+                               @if(! empty($$fw)) min="{{ $$fw }}" @endif>
+                    @endif
                 </div>
-                @if($datesIncomplete)
+                @if($readOnly)
+                    <div class="col-12">
+                        <div class="small text-muted mb-0 logistics-trip-header-hint">
+                            <i class="bi bi-lock me-1"></i>{{ $cfg['readOnlyHelp'] ?? 'Bez zmian — dotyczy całego wyjazdu.' }}
+                        </div>
+                    </div>
+                @elseif($datesIncomplete)
                     <div class="col-12">
                         <div class="small text-danger mb-0 logistics-trip-header-hint">
                             <i class="bi bi-exclamation-circle me-1"></i>{{ $cfg['datesHelp'] ?? 'Wybierz obie daty.' }}</div>
@@ -69,13 +103,15 @@
                 @else
                     <div class="col-12 flex-shrink-0" style="min-height: 16px;"></div>
                 @endif
-                @foreach([$fw, 'endDate'] as $dateField)
-                    @error($dateField)
-                        <div class="col-12">
-                            <div class="invalid-feedback d-block logistics-trip-header-hint">{{ $message }}</div>
-                        </div>
-                    @enderror
-                @endforeach
+                @unless($readOnly)
+                    @foreach([$fw, 'endDate'] as $dateField)
+                        @error($dateField)
+                            <div class="col-12">
+                                <div class="invalid-feedback d-block logistics-trip-header-hint">{{ $message }}</div>
+                            </div>
+                        @enderror
+                    @endforeach
+                @endunless
             </div>
         </div>
     </div>
@@ -84,12 +120,54 @@
         <x-logistics.transport-mode-toggle
             :mode="$transportMode"
             :hub-kind="$publicTransportHubKind"
+            :interactive="! $readOnly"
+            :required="! $readOnly"
             class="flex-fill"
         />
     </div>
 
     <div class="col-12 col-sm-7 col-lg-5 d-flex min-w-0">
-        @if($transportMode === null)
+        @if($readOnly)
+            @if($transportMode === 'own')
+                <div class="w-100 h-100 d-flex flex-column rounded-3 p-2 transition-all logistics-trip-header-card">
+                    <label class="form-label small text-muted mb-1">Pojazd</label>
+                    <input type="text"
+                           class="form-control logistics-trip-header-control"
+                           value="{{ $vehicleLabel }}"
+                           disabled
+                           tabindex="-1">
+                    <div class="small text-muted mt-1 logistics-trip-header-hint">
+                        <i class="bi bi-lock me-1"></i>Auto wyjazdu bez zmian.
+                    </div>
+                </div>
+            @else
+                <div class="d-flex flex-column w-100 h-100 rounded-3 p-2 transition-all logistics-trip-header-card">
+                    <div class="row g-2 align-items-end flex-grow-1">
+                        <div class="col-12 col-sm-6 min-w-0">
+                            <label class="form-label small mb-1 text-muted">Start</label>
+                            <input type="text"
+                                   class="form-control w-100 logistics-trip-header-control"
+                                   value="{{ $startHubName }}"
+                                   disabled
+                                   tabindex="-1">
+                        </div>
+                        <div class="col-12 col-sm-6 min-w-0">
+                            <label class="form-label small mb-1 text-muted">Cel</label>
+                            <input type="text"
+                                   class="form-control w-100 logistics-trip-header-control"
+                                   value="{{ $endHubName }}"
+                                   disabled
+                                   tabindex="-1">
+                        </div>
+                        <div class="col-12">
+                            <div class="small text-muted logistics-trip-header-hint">
+                                <i class="bi bi-lock me-1"></i>Trasa bez zmian.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @elseif($transportMode === null)
             <div class="rounded-3 p-2 transition-all logistics-trip-header-card logistics-trip-header-card--invalid d-flex flex-column w-100"
                  style="justify-content: space-between;">
                 <label class="form-label small mb-1 text-danger fw-semibold">

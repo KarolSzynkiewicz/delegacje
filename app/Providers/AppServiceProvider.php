@@ -129,6 +129,7 @@ class AppServiceProvider extends ServiceProvider
             'procedure_run' => \App\Models\ProcedureRun::class,
             'work_item' => \App\Models\WorkItem::class,
             'approval_request' => \App\Models\ApprovalRequest::class,
+            'forum_post' => \App\Models\ForumPost::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

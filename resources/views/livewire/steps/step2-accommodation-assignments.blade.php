@@ -340,8 +340,13 @@
                     <div class="modal-body">
                         <p class="text-muted small mb-3">
                             Wybierz zakres dat zakwaterowania. Kliknij datę początkową, a następnie datę końcową.
-                            Wyszarzone dni są niedostępne (brak miejsc, koniec wynajmu).
+                            Wyszarzone dni są niedostępne (brak miejsc, poza okresem najmu).
+                            Zapis sprawdzi każdy dzień zakresu — nie tylko kliknięty początek i koniec.
                         </p>
+
+                        @if($assignmentModalError)
+                            <div class="alert alert-danger mb-3">{{ $assignmentModalError }}</div>
+                        @endif
                         
                         @if($selectedStartDate)
                             <div class="alert alert-info mb-3">

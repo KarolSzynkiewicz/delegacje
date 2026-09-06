@@ -228,6 +228,17 @@ class ViewTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('dashboard');
+        $response->assertSee('Tablica');
+        $response->assertSee('Nowy wątek');
+    }
+
+    public function test_dashboard_overview_renders(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->get(route('dashboard.overview'));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('dashboard.overview');
         $response->assertSee('Poznaj boty');
         $response->assertSee('Chrono');
         $response->assertSee('Argus');

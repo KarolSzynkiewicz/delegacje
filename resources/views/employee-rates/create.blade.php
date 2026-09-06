@@ -4,7 +4,7 @@
             <x-slot name="left">
                 <x-ui.button 
                     variant="ghost" 
-                    href="{{ route('employee-rates.index') }}"
+                    href="{{ $backUrl }}"
                     action="back"
                 >
                     Powrót
@@ -29,7 +29,7 @@
                         >
                             <option value="">Wybierz pracownika</option>
                             @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}" {{ old('employee_id') == $employee->id ? 'selected' : '' }}>
+                                <option value="{{ $employee->id }}" {{ (string) old('employee_id', $selectedEmployeeId) === (string) $employee->id ? 'selected' : '' }}>
                                     {{ $employee->full_name }} ({{ $employee->email }})
                                 </option>
                             @endforeach
@@ -108,7 +108,7 @@
                         </x-ui.button>
                         <x-ui.button 
                             variant="ghost" 
-                            href="{{ route('employee-rates.index') }}"
+                            href="{{ $backUrl }}"
                             action="cancel"
                         >
                             Anuluj

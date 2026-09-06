@@ -17,11 +17,11 @@ class DashboardController extends Controller
     ) {}
 
     /**
-     * Główny dashboard systemu (start).
+     * Stary przegląd snapów systemu (demo ekranów).
      */
-    public function home(): View
+    public function overview(): View
     {
-        return view('dashboard', [
+        return view('dashboard.overview', [
             'snaps' => DummyWorld::make()->toView(),
         ]);
     }

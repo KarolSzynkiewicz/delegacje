@@ -5,6 +5,7 @@ namespace App\Enums;
 use App\Models\Accommodation;
 use App\Models\ApprovalRequest;
 use App\Models\Employee;
+use App\Models\ForumPost;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
@@ -28,6 +29,7 @@ enum CommentableType: string
     case RECRUITMENT_CANDIDATE = 'recruitment_candidate';
     case SPRINT = 'sprint';
     case APPROVAL_REQUEST = 'approval_request';
+    case FORUM_POST = 'forum_post';
 
     public function modelClass(): string
     {
@@ -43,6 +45,7 @@ enum CommentableType: string
             self::RECRUITMENT_CANDIDATE => RecruitmentCandidate::class,
             self::SPRINT => Sprint::class,
             self::APPROVAL_REQUEST => ApprovalRequest::class,
+            self::FORUM_POST => ForumPost::class,
         };
     }
 
@@ -60,6 +63,7 @@ enum CommentableType: string
             RecruitmentCandidate::class => self::RECRUITMENT_CANDIDATE,
             Sprint::class => self::SPRINT,
             ApprovalRequest::class => self::APPROVAL_REQUEST,
+            ForumPost::class => self::FORUM_POST,
             default => throw new \InvalidArgumentException('Model '.$model::class.' is not commentable'),
         };
     }
