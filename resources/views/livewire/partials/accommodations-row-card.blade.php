@@ -1,9 +1,12 @@
-@props(['accommodation'])
+@props(['accommodation', 'checkDate' => null])
 
 @php
-    $currentCount = $accommodation->currentAssignments()->count();
+    $checkDate = $checkDate ?? now();
+    $coveringLease = $accommodation->leaseCoveringDate($checkDate);
+    $currentCount = $accommodation->occupied_count ?? $accommodation->getPeakOccupancy($checkDate, $checkDate);
     $isFull = $currentCount >= $accommodation->capacity;
     $isOverfilled = $currentCount > $accommodation->capacity;
+    $tenure = $accommodation->currentTenure($checkDate);
 @endphp
 
 <x-ui.card class="dt-card" wire:key="accommodation-card-{{ $accommodation->id }}">
@@ -34,6 +37,22 @@
     </div>
 
     <div class="dt-card__row">
+        <span class="dt-card__label">Najem</span>
+        <span class="dt-card__value">
+            @if($tenure === 'rented')
+                Najem
+                @if($coveringLease?->end_date)
+                    do {{ $coveringLease->end_date->format('d.m.Y') }}
+                @endif
+            @elseif($tenure === 'ended')
+                Najem zakończony
+            @else
+                Własny
+            @endif
+        </span>
+    </div>
+
+    <div class="dt-card__row">
         <span class="dt-card__label">Pojemność</span>
         <span class="dt-card__value {{ $isOverfilled ? 'text-danger' : '' }}">
             {{ $currentCount }} / {{ $accommodation->capacity }}
@@ -41,9 +60,11 @@
     </div>
 
     <div class="dt-card__row">
-        <span class="dt-card__label">Status</span>
+        <span class="dt-card__label">Obłożenie</span>
         <span class="dt-card__value">
-            @if($isOverfilled)
+            @if($tenure === 'ended')
+                <x-ui.badge variant="secondary">Poza użytkiem</x-ui.badge>
+            @elseif($isOverfilled)
                 <x-ui.badge variant="danger">Przepełnione</x-ui.badge>
             @elseif($isFull)
                 <x-ui.badge variant="warning">Pełne</x-ui.badge>

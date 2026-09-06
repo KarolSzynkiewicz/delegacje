@@ -1,9 +1,12 @@
-@props(['accommodation'])
+@props(['accommodation', 'checkDate' => null])
 
 @php
-    $currentCount = $accommodation->currentAssignments()->count();
+    $checkDate = $checkDate ?? now();
+    $coveringLease = $accommodation->leaseCoveringDate($checkDate);
+    $currentCount = $accommodation->occupied_count ?? $accommodation->getPeakOccupancy($checkDate, $checkDate);
     $isFull = $currentCount >= $accommodation->capacity;
     $isOverfilled = $currentCount > $accommodation->capacity;
+    $tenure = $accommodation->currentTenure($checkDate);
 @endphp
 
 <tr wire:key="accommodation-{{ $accommodation->id }}">
@@ -33,7 +36,7 @@
             <span class="text-muted">—</span>
         @endif
     </td>
-    <td>
+    <td class="d-none d-xl-table-cell">
         @if($accommodation->hasCoordinates())
             <a
                 href="https://www.openstreetmap.org/?mlat={{ floatval($accommodation->latitude) }}&mlon={{ floatval($accommodation->longitude) }}&zoom=15"
@@ -49,12 +52,26 @@
         @endif
     </td>
     <td>
+        @if($tenure === 'rented')
+            <x-ui.badge variant="info">Najem</x-ui.badge>
+            @if($coveringLease?->end_date)
+                <div class="small text-muted font-mono mt-1">do {{ $coveringLease->end_date->format('d.m.Y') }}</div>
+            @endif
+        @elseif($tenure === 'ended')
+            <x-ui.badge variant="warning">Najem zakończony</x-ui.badge>
+        @else
+            <x-ui.badge variant="secondary">Własny</x-ui.badge>
+        @endif
+    </td>
+    <td>
         <span class="small {{ $isOverfilled ? 'text-danger fw-bold' : ($isFull ? 'text-success fw-semibold' : 'text-muted') }}">
             {{ $currentCount }} / {{ $accommodation->capacity }} osób
         </span>
     </td>
     <td>
-        @if($isOverfilled)
+        @if($tenure === 'ended')
+            <x-ui.badge variant="secondary">Poza użytkiem</x-ui.badge>
+        @elseif($isOverfilled)
             <x-ui.badge variant="danger">Przepełnione</x-ui.badge>
         @elseif($isFull)
             <x-ui.badge variant="warning">Pełne</x-ui.badge>

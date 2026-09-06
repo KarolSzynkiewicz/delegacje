@@ -6,6 +6,7 @@ use App\Traits\HasComments;
 use App\Traits\HasEquipmentConsumptions;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -71,6 +72,84 @@ class Accommodation extends Model
         );
     }
 
+    /**
+     * Własne: nigdy nie miały umowy najmu.
+     */
+    public function scopeOwned(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('leases', fn (Builder $q) => $q->where('type', 'wynajmowany'));
+    }
+
+    /**
+     * Wynajmowane w danym dniu (domyślnie dziś).
+     */
+    public function scopeActivelyRented(Builder $query, CarbonInterface|string|null $date = null): Builder
+    {
+        $day = Carbon::parse($date ?? now())->toDateString();
+
+        return $query->whereHas('leases', fn (Builder $q) => $q
+            ->where('type', 'wynajmowany')
+            ->coveringDate($day));
+    }
+
+    /**
+     * Były wynajmowane, ale w danym dniu nie ma już umowy.
+     */
+    public function scopeEndedRental(Builder $query, CarbonInterface|string|null $date = null): Builder
+    {
+        $day = Carbon::parse($date ?? now())->toDateString();
+
+        return $query
+            ->whereDoesntHave('leases', fn (Builder $q) => $q->coveringDate($day))
+            ->whereHas('leases', fn (Builder $q) => $q
+                ->where('type', 'wynajmowany')
+                ->where(fn (Builder $inner) => $inner->whereNull('start_date')->orWhere('start_date', '<=', $day)));
+    }
+
+    /**
+     * Portfolio na dany dzień: własne albo z najmem pokrywającym ten dzień.
+     */
+    public function scopeCurrentlyHeld(Builder $query, CarbonInterface|string|null $date = null): Builder
+    {
+        $day = Carbon::parse($date ?? now())->toDateString();
+
+        return $query->where(function (Builder $q) use ($day) {
+            $q->whereDoesntHave('leases', fn (Builder $lease) => $lease->where('type', 'wynajmowany'))
+                ->orWhereHas('leases', fn (Builder $lease) => $lease
+                    ->where('type', 'wynajmowany')
+                    ->coveringDate($day));
+        });
+    }
+
+    /**
+     * owned | rented | ended — na wskazany dzień, niezależnie od wirtualnego type.
+     */
+    public function currentTenure(CarbonInterface|string|null $date = null): string
+    {
+        $day = Carbon::parse($date ?? now());
+        $lease = $this->leaseCoveringDate($day);
+
+        if ($lease) {
+            return $lease->type === 'wynajmowany' ? 'rented' : 'owned';
+        }
+
+        $hadRentalByThen = $this->relationLoaded('leases')
+            ? $this->leases->contains(function (AccommodationLease $lease) use ($day) {
+                if ($lease->type !== 'wynajmowany') {
+                    return false;
+                }
+                $start = $lease->start_date?->toDateString();
+
+                return ! $start || $start <= $day->toDateString();
+            })
+            : $this->leases()
+                ->where('type', 'wynajmowany')
+                ->where(fn (Builder $q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $day->toDateString()))
+                ->exists();
+
+        return $hadRentalByThen ? 'ended' : 'owned';
+    }
+
     // ── Wirtualne akcesory (kompatybilność wsteczna) ─────────────────────────
 
     public function getTypeAttribute(): string
@@ -126,6 +205,20 @@ class Accommodation extends Model
     {
         $start = Carbon::parse($startDate)->toDateString();
         $end = Carbon::parse($endDate)->toDateString();
+
+        if ($this->relationLoaded('leases')) {
+            return $this->leases
+                ->first(function (AccommodationLease $lease) use ($start, $end) {
+                    $leaseStart = $lease->start_date?->toDateString();
+                    $leaseEnd = $lease->end_date?->toDateString();
+
+                    if ($leaseStart && $leaseStart > $start) {
+                        return false;
+                    }
+
+                    return ! ($leaseEnd && $leaseEnd < $end);
+                });
+        }
 
         return $this->leases()
             ->where(function ($q) use ($start) {

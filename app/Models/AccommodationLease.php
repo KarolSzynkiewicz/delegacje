@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -28,6 +29,15 @@ class AccommodationLease extends Model
     public function accommodation(): BelongsTo
     {
         return $this->belongsTo(Accommodation::class);
+    }
+
+    public function scopeCoveringDate(Builder $query, CarbonInterface|string $date): Builder
+    {
+        $day = Carbon::parse($date)->toDateString();
+
+        return $query
+            ->where(fn (Builder $q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $day))
+            ->where(fn (Builder $q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $day));
     }
 
     public function isActive(): bool
