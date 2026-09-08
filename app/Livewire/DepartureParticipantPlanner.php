@@ -119,12 +119,7 @@ class DepartureParticipantPlanner extends Component
         }
 
         $departure = $this->departure();
-        $ids = $this->selectedEmployeeIds;
-        $names = Employee::query()
-            ->whereIn('id', $ids !== [] ? $ids : [0])
-            ->orderBy('last_name')
-            ->pluck('full_name')
-            ->implode(', ');
+        $names = Employee::fullNamesByIds($this->selectedEmployeeIds)->implode(', ');
 
         $message = $this->lockEmployeeId
             ? 'Zaktualizowano przypisania'.($names !== '' ? ': '.$names : '').'.'

@@ -127,7 +127,9 @@
                             <div class="s1-empty-state">
                                 <i class="bi bi-person-x s1-empty-state__icon"></i>
                                 <span class="s1-empty-state__text">
-                                    @if($forTransfer)
+                                    @if($participantPlannerEmbed)
+                                        Brak osoby do przeciągnięcia — wróć tu po zdjęciu z roli
+                                    @elseif($forTransfer)
                                         Brak uczestników
                                     @elseif($roleFilter || filled($employeeSearch))
                                         Brak wyników dla filtrów

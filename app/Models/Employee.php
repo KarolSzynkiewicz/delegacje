@@ -241,6 +241,27 @@ class Employee extends Model
     }
 
     /**
+     * Imię i nazwisko po id — bez SELECT full_name (tej kolumny nie ma w tabeli).
+     *
+     * @param  iterable<int|string|null>  $ids
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    public static function fullNamesByIds(iterable $ids): \Illuminate\Support\Collection
+    {
+        $ids = collect($ids)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return static::query()
+            ->whereIn('id', $ids)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->pluck('full_name', 'id');
+    }
+
+    /**
      * Get the image URL for the employee.
      */
     public function getImageUrlAttribute(): ?string

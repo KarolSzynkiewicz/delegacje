@@ -167,7 +167,7 @@ class DepartureController extends Controller
         );
         if ($groundLegTicketRows !== []) {
             $empIds = collect($groundLegTicketRows)->pluck('employee_id')->unique()->values()->all();
-            $empNames = Employee::whereIn('id', $empIds)->pluck('full_name', 'id');
+            $empNames = Employee::fullNamesByIds($empIds);
             $groundLegTicketRows = collect($groundLegTicketRows)->map(function (array $r) use ($empNames) {
                 $r['employee_name'] = $empNames[$r['employee_id']] ?? ('#'.$r['employee_id']);
 

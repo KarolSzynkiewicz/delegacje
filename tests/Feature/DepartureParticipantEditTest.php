@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
+use App\Livewire\DepartureParticipantPlanner;
+use App\Livewire\Steps\Step1ProjectAssignments;
 use App\Models\Accommodation;
 use App\Models\Employee;
 use App\Models\Location;
@@ -19,6 +21,7 @@ use App\Models\Vehicle;
 use App\Services\DepartureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class DepartureParticipantEditTest extends TestCase
@@ -208,6 +211,57 @@ class DepartureParticipantEditTest extends TestCase
             ->assertSee($bundle['employee']->full_name)
             ->assertSee('Krok 1: Przypisania do projektów')
             ->assertSee('Wybierz projekt i rolę');
+    }
+
+    public function test_saving_participant_edit_does_not_select_missing_full_name_column(): void
+    {
+        $departure = $this->makeDeparture();
+        $bundle = $this->seedAssignableEmployee('2026-07-01', '2026-07-31');
+        $this->addExistingParticipant($departure, $bundle['employee'], $bundle['role'], $bundle['project']);
+
+        Livewire::test(DepartureParticipantPlanner::class, [
+            'departureId' => $departure->id,
+            'employeeId' => $bundle['employee']->id,
+        ])
+            ->call('saveParticipant')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('departures.show', $departure));
+
+        $this->assertTrue(
+            session()->has('success')
+        );
+        $this->assertStringContainsString(
+            $bundle['employee']->full_name,
+            (string) session('success')
+        );
+    }
+
+    public function test_unassigned_edit_participant_returns_to_left_list_despite_vehicle_seat_and_search(): void
+    {
+        $bundle = $this->seedAssignableEmployee('2026-07-01', '2026-07-31');
+        $employee = $bundle['employee'];
+        $vehicle = Vehicle::factory()->create(['capacity' => 5]);
+
+        Livewire::test(Step1ProjectAssignments::class, [
+            'departureDate' => '2026-07-09',
+            'endDate' => '2026-07-10',
+            'vehicleId' => $vehicle->id,
+            'assignmentRanges' => [],
+            'vehicleSeats' => [
+                0 => [
+                    'employee_id' => $employee->id,
+                    'position' => 'driver',
+                    'external_driver' => false,
+                ],
+            ],
+            'forTransfer' => true,
+            'allowedEmployeeIds' => [$employee->id],
+            'alwaysAllowEmployeeIds' => [$employee->id],
+            'participantPlannerEmbed' => true,
+        ])
+            ->set('employeeSearch', 'grab')
+            ->assertSee($employee->full_name)
+            ->assertDontSee('Brak uczestników');
     }
 
     public function test_apply_planner_participants_adds_person_with_house(): void

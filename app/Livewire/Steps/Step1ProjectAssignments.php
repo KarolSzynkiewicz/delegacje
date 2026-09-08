@@ -704,7 +704,7 @@ class Step1ProjectAssignments extends Component
 
         // Filter from all available employees (not just current page)
         $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments, $notInBaseIds, $alwaysAllow) {
-            if (in_array($employee['id'], $assignedIds)) {
+            if (in_array((int) $employee['id'], $assignedIds, true)) {
                 return false;
             }
 
@@ -714,8 +714,13 @@ class Step1ProjectAssignments extends Component
                 return false;
             }
 
-            if (! $allowedDespiteState && in_array($employee['id'], $employeesWithDbAssignments)) {
+            if (! $allowedDespiteState && in_array((int) $employee['id'], array_map('intval', $employeesWithDbAssignments), true)) {
                 return false;
+            }
+
+            // Edycja jednej osoby: nie chowaj jej wyszukiwarką / filtrem roli.
+            if ($this->participantPlannerEmbed && $allowedDespiteState) {
+                return true;
             }
 
             // Apply role filter if set
@@ -784,7 +789,8 @@ class Step1ProjectAssignments extends Component
             foreach ($dayAssignments as $projectAssignments) {
                 foreach ($projectAssignments as $roleAssignments) {
                     foreach ($roleAssignments as $employeeId) {
-                        if (! in_array($employeeId, $employeeIds)) {
+                        $employeeId = (int) $employeeId;
+                        if ($employeeId > 0 && ! in_array($employeeId, $employeeIds, true)) {
                             $employeeIds[] = $employeeId;
                         }
                     }
@@ -794,15 +800,21 @@ class Step1ProjectAssignments extends Component
 
         // From range-based assignments
         foreach ($this->assignmentRanges as $range) {
-            if (! empty($range['employee_id']) && ! in_array($range['employee_id'], $employeeIds)) {
-                $employeeIds[] = $range['employee_id'];
+            if (! empty($range['employee_id']) && ! in_array((int) $range['employee_id'], $employeeIds, true)) {
+                $employeeIds[] = (int) $range['employee_id'];
             }
+        }
+
+        // W planerze dopisywania/edycji uczestnika miejsce w aucie nie może
+        // chować osoby z listy projektów — inaczej po zdjęciu z roli nie wraca na lewo.
+        if ($this->participantPlannerEmbed) {
+            return $employeeIds;
         }
 
         // From vehicle seats
         foreach ($this->vehicleSeats as $seat) {
-            if (! empty($seat['employee_id']) && ! in_array($seat['employee_id'], $employeeIds)) {
-                $employeeIds[] = $seat['employee_id'];
+            if (! empty($seat['employee_id']) && ! in_array((int) $seat['employee_id'], $employeeIds, true)) {
+                $employeeIds[] = (int) $seat['employee_id'];
             }
         }
 
