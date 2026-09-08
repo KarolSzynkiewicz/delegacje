@@ -67,6 +67,14 @@ class ForumBoardTest extends TestCase
             ->assertSee('bi-lightbulb', false);
     }
 
+    public function test_create_form_posts_image_uploads_to_a_same_origin_path(): void
+    {
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.create'))
+            ->assertOk()
+            ->assertSee('\/dashboard\/posts\/images', false);
+    }
+
     public function test_search_and_tag_filter(): void
     {
         $match = ForumPost::factory()->create([

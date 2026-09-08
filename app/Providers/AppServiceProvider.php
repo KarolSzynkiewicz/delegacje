@@ -64,6 +64,16 @@ class AppServiceProvider extends ServiceProvider
             config(['app.debug' => true]);
         }
 
+        // Railway (i inne reverse proxy) serwują inny host niż APP_URL
+        // (np. delegacje-production-b45f.up.railway.app vs wpisany w env).
+        // Absolute route() wtedy robi cross-origin fetch bez ciasteczka sesji → CSRF mismatch.
+        if (! $this->app->runningInConsole()) {
+            $request = request();
+            if ($request && $request->getHost()) {
+                \Illuminate\Support\Facades\URL::forceRootUrl($request->getSchemeAndHttpHost());
+            }
+        }
+
         // Force HTTPS for all URLs in production (Railway uses HTTPS)
         if (config('app.env') === 'production' || request()->isSecure()) {
             \Illuminate\Support\Facades\URL::forceScheme('https');

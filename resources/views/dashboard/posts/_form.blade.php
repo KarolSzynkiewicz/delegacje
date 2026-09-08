@@ -35,7 +35,7 @@
         title: @js($titleValue),
         tags: @js($tagsValue),
         blocks: @js($initialBlocks),
-        uploadUrl: @js(route('dashboard.posts.images')),
+        uploadUrl: @js(route('dashboard.posts.images', absolute: false)),
         csrf: @js(csrf_token()),
     })"
 >
@@ -210,6 +210,11 @@
             addText() {
                 this.blocks.push({ type: 'text', content: '', key: 'b-' + Date.now() });
             },
+            csrfToken() {
+                return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                    || this.csrf
+                    || '';
+            },
             pickImage() {
                 if (this.uploading || this.imageCount() >= 12) return;
                 this.$refs.file.value = '';
@@ -222,17 +227,25 @@
                 this.error = '';
                 this.uploading = true;
                 try {
+                    const token = this.csrfToken();
                     const body = new FormData();
+                    body.append('_token', token);
                     body.append('image', file);
                     const res = await fetch(this.uploadUrl, {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {
-                            'X-CSRF-TOKEN': this.csrf,
+                            'X-CSRF-TOKEN': token,
                             'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
                         },
                         body,
                     });
                     const data = await res.json().catch(() => ({}));
+                    if (res.status === 419) {
+                        this.error = 'Sesja wygasła — odśwież stronę i wgraj zdjęcie jeszcze raz.';
+                        return;
+                    }
                     if (!res.ok) {
                         this.error = (data.errors && data.errors.image && data.errors.image[0])
                             || data.message
