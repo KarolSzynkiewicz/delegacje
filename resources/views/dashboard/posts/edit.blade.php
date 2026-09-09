@@ -8,8 +8,8 @@
     </x-slot>
 
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <x-ui.card label="Edytuj wątek">
+        <div class="col-lg-9">
+            <x-ui.card class="forum-sheet-card">
                 <form method="POST" action="{{ route('dashboard.posts.update', $post) }}" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')

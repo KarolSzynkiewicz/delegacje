@@ -8,11 +8,13 @@ use App\Models\ApprovalRequest;
 use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\Employee;
+use App\Models\ForumPost;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\ProcedureRun;
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentProcess;
 use App\Models\Sprint;
 use App\Models\User;
@@ -112,8 +114,11 @@ class AttachmentPolicy
         if ($ctx instanceof Employee) {
             return $user->hasPermission('employees.view');
         }
-        if ($ctx instanceof RecruitmentProcess) {
+        if ($ctx instanceof RecruitmentProcess || $ctx instanceof RecruitmentCandidate) {
             return $user->hasPermission('recruitment-processes.view');
+        }
+        if ($ctx instanceof ForumPost) {
+            return true;
         }
         if ($ctx instanceof ApprovalRequest) {
             return $user->can('view', $ctx);

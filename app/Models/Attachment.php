@@ -72,6 +72,63 @@ class Attachment extends Model
         }
     }
 
+    public function extension(): string
+    {
+        $fromName = pathinfo((string) $this->original_name, PATHINFO_EXTENSION);
+        $fromPath = pathinfo((string) $this->file_path, PATHINFO_EXTENSION);
+        $ext = $fromName !== '' ? $fromName : $fromPath;
+
+        return strtolower($ext);
+    }
+
+    public function isImage(): bool
+    {
+        return in_array($this->extension(), ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+    }
+
+    public function isPdf(): bool
+    {
+        return $this->extension() === 'pdf';
+    }
+
+    public function isText(): bool
+    {
+        return $this->extension() === 'txt';
+    }
+
+    public function isPreviewable(): bool
+    {
+        return $this->isImage() || $this->isPdf() || $this->isText();
+    }
+
+    public function previewKind(): string
+    {
+        if ($this->isImage()) {
+            return 'image';
+        }
+        if ($this->isPdf()) {
+            return 'pdf';
+        }
+        if ($this->isText()) {
+            return 'text';
+        }
+
+        return 'file';
+    }
+
+    public function mimeType(): string
+    {
+        return match ($this->extension()) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'pdf' => 'application/pdf',
+            'txt' => 'text/plain; charset=UTF-8',
+            default => 'application/octet-stream',
+        };
+    }
+
     protected static function booted(): void
     {
         static::deleting(function (Attachment $attachment) {

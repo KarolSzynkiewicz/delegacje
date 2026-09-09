@@ -36,15 +36,19 @@ class UserMentionServiceTest extends TestCase
             ]
         );
 
-        $this->assertStringContainsString('<strong class="text-warning">@robert!</strong>', $html);
-        $this->assertStringContainsString('<strong class="text-primary">@anna</strong>', $html);
+        $this->assertStringContainsString('comment-chip--task', $html);
+        $this->assertStringContainsString('>robert</span>', $html);
+        $this->assertStringContainsString('comment-chip--notify', $html);
+        $this->assertStringContainsString('>anna</span>', $html);
     }
 
     public function test_highlight_everyone_bang_stays_warning(): void
     {
         $html = UserMentionService::highlightMentions(e('@wszyscy!'), []);
 
-        $this->assertStringContainsString('<strong class="text-warning">@wszyscy!</strong>', $html);
+        $this->assertStringContainsString('comment-chip--all', $html);
+        $this->assertStringContainsString('comment-chip--task', $html);
+        $this->assertStringContainsString('>wszyscy</span>', $html);
     }
 
     public function test_highlight_marks_mention_of_logged_in_user(): void
@@ -61,9 +65,10 @@ class UserMentionServiceTest extends TestCase
             ]
         );
 
-        $this->assertStringContainsString('class="mention-you text-warning"', $html);
-        $this->assertStringContainsString('>@karol</strong>', $html);
-        $this->assertStringContainsString('<strong class="text-warning">@robert!</strong>', $html);
+        $this->assertStringContainsString('comment-chip--you', $html);
+        $this->assertStringContainsString('>karol</span>', $html);
+        $this->assertStringContainsString('comment-chip--task', $html);
+        $this->assertStringContainsString('>robert</span>', $html);
     }
 
     public function test_strip_mention_tokens_leaves_the_actual_work(): void
@@ -100,8 +105,10 @@ class UserMentionServiceTest extends TestCase
             ]
         );
 
-        $this->assertStringContainsString('<strong class="text-warning">@robert?</strong>', $html);
-        $this->assertStringContainsString('<strong class="text-primary">@anna</strong>', $html);
+        $this->assertStringContainsString('comment-chip--approval', $html);
+        $this->assertStringContainsString('>robert</span>', $html);
+        $this->assertStringContainsString('comment-chip--notify', $html);
+        $this->assertStringContainsString('>anna</span>', $html);
     }
 
     public function test_approval_fields_split_title_and_description_on_double_slash(): void

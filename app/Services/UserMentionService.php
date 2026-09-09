@@ -84,6 +84,41 @@ class UserMentionService
     }
 
     /**
+     * Chip wzmianki: ikona rodzaju + nazwa (edytor i treść komentarza).
+     */
+    public static function mentionChipHtml(string $name, string $suffix = '', bool $isSelf = false, bool $isEveryone = false): string
+    {
+        $kind = match ($suffix) {
+            '!' => 'task',
+            '?' => 'approval',
+            default => 'notify',
+        };
+        $icon = match ($kind) {
+            'task' => 'bi-check2-square',
+            'approval' => 'bi-question-lg',
+            default => 'bi-at',
+        };
+        $title = match ($kind) {
+            'task' => 'Zadanie',
+            'approval' => 'Prośba o zatwierdzenie',
+            default => $isSelf ? 'Wzmianka o Tobie' : 'Wzmianka',
+        };
+        $classes = 'comment-chip comment-chip--'.$kind;
+        if ($isSelf) {
+            $classes .= ' comment-chip--you';
+        }
+        if ($isEveryone) {
+            $classes .= ' comment-chip--all';
+        }
+        $label = $isEveryone ? 'wszyscy' : $name;
+
+        return '<span class="'.$classes.'" title="'.e($title).'">'
+            .'<i class="bi '.$icon.'" aria-hidden="true"></i>'
+            .'<span class="comment-chip__name">'.e($label).'</span>'
+            .'</span>';
+    }
+
+    /**
      * Podświetla tylko te @wzmianki, które odpowiadają realnym użytkownikom.
      * Tekst musi być już przez e() (HTML-escaped) przed wywołaniem.
      *
@@ -96,13 +131,11 @@ class UserMentionService
         return preg_replace_callback(
             self::MENTION_REGEX,
             static function (array $m) use ($knownUsers, $selfName): string {
-                $handle = $m[1]; // część po @ (już po e() źródła)
-                $suffixChar = $m[2] ?? '';
-                $work = $suffixChar === '!' || $suffixChar === '?';
-                $suffix = $work ? $suffixChar : '';
+                $handle = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $suffix = ($m[2] ?? '') === '!' || ($m[2] ?? '') === '?' ? $m[2] : '';
 
                 if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
-                    return '<strong class="text-warning">@wszyscy'.$suffix.'</strong>';
+                    return self::mentionChipHtml('wszyscy', $suffix, false, true);
                 }
 
                 foreach ($knownUsers as $u) {
@@ -117,18 +150,10 @@ class UserMentionService
                     $isSelf = is_string($selfName)
                         && mb_strtolower($canonical, 'UTF-8') === mb_strtolower($selfName, 'UTF-8');
 
-                    if ($isSelf) {
-                        return '<strong class="mention-you text-warning" title="Wzmianka o Tobie"'
-                            .' style="background:rgba(245,158,11,.22);border-radius:.3rem;padding:.08em .38em;">'
-                            .'@'.e($canonical).$suffix.'</strong>';
-                    }
-
-                    $class = $work ? 'text-warning' : 'text-primary';
-
-                    return '<strong class="'.$class.'">@'.e($canonical).$suffix.'</strong>';
+                    return self::mentionChipHtml($canonical, $suffix, $isSelf);
                 }
 
-                return '@'.$handle.$suffix;
+                return '@'.e($handle).$suffix;
             },
             $escapedText
         ) ?? $escapedText;

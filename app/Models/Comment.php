@@ -28,6 +28,7 @@ class Comment extends Model implements TaskSubject
             $comment->mentions()->get()->each->delete();
             $comment->attachments->each->delete();
             $comment->likes()->delete();
+            $comment->views()->delete();
         });
     }
 
@@ -38,10 +39,12 @@ class Comment extends Model implements TaskSubject
         'parent_id',
         'procedure_run_id',
         'body',
+        'pinned',
     ];
 
     protected $casts = [
         'commentable_type' => CommentableType::class,
+        'pinned' => 'boolean',
     ];
 
     /**
@@ -78,6 +81,11 @@ class Comment extends Model implements TaskSubject
     public function likes(): HasMany
     {
         return $this->hasMany(CommentLike::class);
+    }
+
+    public function views(): HasMany
+    {
+        return $this->hasMany(CommentView::class);
     }
 
     public function tasks(): MorphMany

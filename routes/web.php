@@ -292,9 +292,13 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('comments.destroy');
         Route::post('comments/{comment}/like', [\App\Http\Controllers\CommentController::class, 'toggleLike'])
             ->name('comments.like');
+        Route::post('comments/{comment}/pin', [\App\Http\Controllers\CommentController::class, 'togglePin'])
+            ->name('comments.pin');
         Route::post('comments/{comment}/mention-task', [\App\Http\Controllers\CommentController::class, 'toggleMentionTask'])
             ->name('comments.mention-task.toggle');
 
+        Route::get('attachments/{attachment}/preview', [\App\Http\Controllers\AttachmentController::class, 'preview'])
+            ->name('attachments.preview');
         Route::get('attachments/{attachment}/download', [\App\Http\Controllers\AttachmentController::class, 'download'])
             ->name('attachments.download');
         Route::delete('attachments/{attachment}', [\App\Http\Controllers\AttachmentController::class, 'destroy'])

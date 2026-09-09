@@ -154,6 +154,18 @@ class CommentController extends Controller
     }
 
     /**
+     * Przypina / odcina komentarz na górze sekcji.
+     */
+    public function togglePin(Comment $comment): RedirectResponse
+    {
+        $comment->update(['pinned' => ! $comment->pinned]);
+
+        $message = $comment->pinned ? 'Komentarz przypięty na górze.' : 'Komentarz odpięty.';
+
+        return redirect()->back()->with('success', $message)->withFragment('comment-'.$comment->id);
+    }
+
+    /**
      * Odhacza / otwiera wzmiankę z `@nazwa!` przypisaną zalogowanemu.
      */
     public function toggleMentionTask(Comment $comment): RedirectResponse

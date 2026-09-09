@@ -22,6 +22,21 @@ class AttachmentController extends Controller
         return Storage::disk('public')->download($attachment->file_path, $name);
     }
 
+    public function preview(Attachment $attachment): StreamedResponse|RedirectResponse
+    {
+        $this->authorize('view', $attachment);
+
+        if (! $attachment->isPreviewable() || ! Storage::disk('public')->exists($attachment->file_path)) {
+            return redirect()->route('attachments.download', $attachment);
+        }
+
+        $name = str_replace(['"', "\r", "\n"], '', $attachment->original_name ?: basename($attachment->file_path));
+
+        return Storage::disk('public')->response($attachment->file_path, $name, [
+            'Content-Type' => $attachment->mimeType(),
+        ]);
+    }
+
     public function destroy(Attachment $attachment): RedirectResponse
     {
         $this->authorize('delete', $attachment);

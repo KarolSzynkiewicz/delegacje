@@ -8,8 +8,8 @@
     </x-slot>
 
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <x-ui.card label="Nowy wątek">
+        <div class="col-lg-9">
+            <x-ui.card class="forum-sheet-card">
                 <form method="POST" action="{{ route('dashboard.posts.store') }}" enctype="multipart/form-data">
                     @csrf
                     @include('dashboard.posts._form', ['suggestTags' => $tags])

@@ -4,6 +4,7 @@
     'autocompletePayload' => ['users' => [], 'subtasks' => []],
     'submitTitle' => 'Wyślij',
     'fileInputId' => null,
+    'value' => '',
 ])
 
 @php
@@ -11,23 +12,56 @@
     $accept = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*';
 @endphp
 
-<div class="comments-composer" x-data="commentBodyAutocomplete(@js($autocompletePayload))">
-    <textarea
-        name="body"
-        rows="{{ $rows }}"
-        class="comments-composer-input"
-        placeholder="{{ $placeholder }}"
-        x-ref="textarea"
-        @input="onInput()"
-        @keydown.escape="close()"
-        @keydown.arrow-down="if (show && results.length) { $event.preventDefault(); moveActive(1); }"
-        @keydown.arrow-up="if (show && results.length) { $event.preventDefault(); moveActive(-1); }"
-        @keydown.enter="if (show && results.length) { $event.preventDefault(); pickActive(); }"
-        @keydown.ctrl.enter="if (!show) $el.form.requestSubmit()"
-        @keydown.meta.enter="if (!show) $el.form.requestSubmit()"
-    ></textarea>
+<div class="comments-composer" x-data="commentBodyAutocomplete(@js($autocompletePayload))" x-init="boot()">
+    <input type="hidden" name="body" x-ref="body" value="{{ $value }}">
+    <div
+        class="comments-composer-input comments-composer-editor"
+        :class="{ 'is-empty': isEmpty }"
+        contenteditable="true"
+        role="textbox"
+        aria-label="Treść komentarza"
+        data-placeholder="{{ $placeholder }}"
+        style="min-height: {{ max(2, (int) $rows) * 1.45 }}rem"
+        x-ref="editor"
+        @input="onEditorInput()"
+        @keydown="onKeydown($event)"
+        @paste="onPaste($event)"
+        @blur="tryCommitMention(); syncBody()"
+    ></div>
 
     <div class="comments-composer-toolbar">
+        <div class="comments-composer-tools" role="toolbar" aria-label="Akcje komentarza">
+            <button
+                type="button"
+                class="comments-icon-btn"
+                :class="mentionMode === 'notify' ? 'is-mode' : ''"
+                title="Wzmianka — powiadom osobę (@imię)"
+                aria-label="Wzmianka"
+                x-on:click="startMention('notify')"
+            >
+                <i class="bi bi-at"></i>
+            </button>
+            <button
+                type="button"
+                class="comments-icon-btn"
+                :class="mentionMode === 'task' ? 'is-mode is-mode-work' : ''"
+                title="Zadanie z kontekstu (@imię!)"
+                aria-label="Zadanie z kontekstu"
+                x-on:click="startMention('task')"
+            >
+                <i class="bi bi-check2-square"></i>
+            </button>
+            <button
+                type="button"
+                class="comments-icon-btn"
+                :class="mentionMode === 'approval' ? 'is-mode is-mode-work' : ''"
+                title="Prośba o zatwierdzenie (@imię?)"
+                aria-label="Prośba o zatwierdzenie"
+                x-on:click="startMention('approval')"
+            >
+                <i class="bi bi-question-lg"></i>
+            </button>
+        </div>
         <span class="comments-composer-files" x-cloak x-show="files.length > 0" x-text="fileSummary()"></span>
         <label
             class="comments-icon-btn"
@@ -50,9 +84,11 @@
         <button type="submit" class="comments-icon-btn comments-send-btn" title="{{ $submitTitle }} (Ctrl+Enter)" aria-label="{{ $submitTitle }}">
             <i class="bi bi-arrow-return-left"></i>
         </button>
+        {{ $toolbar ?? '' }}
     </div>
 
     <ul
+        @mousedown.prevent
         x-show="show && results.length > 0"
         x-cloak
         class="dropdown-menu show list-unstyled position-absolute mb-0 py-1 comments-composer-suggest"
@@ -73,7 +109,7 @@
                             style="width:1.6rem;height:1.6rem;font-size:.62rem;"
                             x-text="item.initials"
                         ></span>
-                        <span class="small fw-medium text-truncate" x-text="item.isEveryone ? '@wszyscy — powiadomienie do wszystkich' : item.name"></span>
+                        <span class="small fw-medium text-truncate" x-text="item.isEveryone ? ('@wszyscy' + mentionSuffix + ' — powiadomienie do wszystkich') : ('@' + item.name + mentionSuffix)"></span>
                     </span>
                     <span x-show="item.kind === 'subtask'" class="d-flex align-items-center gap-2 w-100 min-w-0">
                         <span class="badge bg-secondary bg-opacity-50 text-body flex-shrink-0" x-text="'#' + item.num"></span>

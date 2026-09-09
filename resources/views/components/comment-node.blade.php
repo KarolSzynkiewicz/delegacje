@@ -24,6 +24,19 @@
     $likeButtonTitle = $likersForTooltip->isNotEmpty()
         ? 'Polubili: '.$likersForTooltip->pluck('name')->implode(', ').' — '.$likeActionHint
         : $likeActionHint;
+    $viewersForTooltip = collect();
+    if ($comment->relationLoaded('views')) {
+        $viewersForTooltip = $comment->views
+            ->map(fn ($view) => $view->user)
+            ->filter()
+            ->unique('id')
+            ->sortBy(fn ($u) => mb_strtolower($u->name))
+            ->values();
+    }
+    $viewCount = (int) ($comment->views_count ?? $viewersForTooltip->count());
+    $viewButtonTitle = $viewersForTooltip->isNotEmpty()
+        ? 'Widzieli: '.$viewersForTooltip->pluck('name')->implode(', ')
+        : 'Nikt jeszcze nie otworzył tego komentarza';
     $mention = $comment->mentionFor(auth()->id());
     $mentionDone = $mention?->isCompleted() ?? false;
     $approval = $comment->approvalFor(auth()->id());
@@ -33,7 +46,7 @@
 @endphp
 
 <article
-    class="comment-item"
+    class="comment-item {{ $comment->pinned ? 'comment-item--pinned' : '' }}"
     id="comment-{{ $comment->id }}"
     x-data="{ replyOpen: false }"
 >
@@ -43,6 +56,9 @@
             <div class="comment-item__meta">
                 <span class="comment-item__name">{{ $comment->user->name }}</span>
                 <span class="comment-item__time">{{ $comment->created_at->format('d.m.Y H:i') }}</span>
+                @if($comment->pinned)
+                    <span class="comment-item__pin"><i class="bi bi-pin-angle-fill"></i> Przypięty</span>
+                @endif
                 @if($procedureLink = $comment->procedureSourceCard())
                     <a href="{{ $procedureLink['url'] }}" class="comment-item__proc" title="Otwórz procedurę">
                         <i class="bi bi-diagram-3"></i>
@@ -87,6 +103,27 @@
                     @if((int) ($comment->likes_count ?? 0) > 0)
                         <span class="comment-like-count">{{ (int) $comment->likes_count }}</span>
                     @endif
+                </button>
+            </form>
+            <span
+                class="comments-icon-btn {{ $viewCount > 0 ? 'has-count' : '' }}"
+                title="{{ $viewButtonTitle }}"
+                aria-label="Kto widział"
+            >
+                <i class="bi bi-eye"></i>
+                @if($viewCount > 0)
+                    <span class="comment-like-count">{{ $viewCount }}</span>
+                @endif
+            </span>
+            <form action="{{ route('comments.pin', $comment) }}" method="POST" class="d-inline">
+                @csrf
+                <button
+                    type="submit"
+                    class="comments-icon-btn {{ $comment->pinned ? 'is-pin' : '' }}"
+                    title="{{ $comment->pinned ? 'Odepnij z góry sekcji' : 'Przypnij na górze sekcji' }}"
+                    aria-label="{{ $comment->pinned ? 'Odepnij' : 'Przypnij' }}"
+                >
+                    <i class="bi {{ $comment->pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle' }}"></i>
                 </button>
             </form>
             <button type="button" class="comments-icon-btn" title="Odpowiedz" aria-label="Odpowiedz" @click="replyOpen = !replyOpen">
@@ -135,28 +172,20 @@
         <form action="{{ route('comments.update', $comment) }}" method="POST" enctype="multipart/form-data">
             @csrf
             @method('PUT')
-            <div class="comments-composer">
-                <textarea name="body" rows="2" class="comments-composer-input">{{ $commentBodyForEdit }}</textarea>
-                <div class="comments-composer-toolbar">
-                    <label class="comments-icon-btn" for="comment-edit-files-{{ $comment->id }}" title="Dodaj załączniki">
-                        <i class="bi bi-paperclip"></i>
-                    </label>
-                    <input
-                        id="comment-edit-files-{{ $comment->id }}"
-                        type="file"
-                        name="attachments[]"
-                        class="comments-file-input"
-                        multiple
-                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*"
-                    >
-                    <button type="submit" class="comments-icon-btn comments-send-btn" title="Zapisz" aria-label="Zapisz">
-                        <i class="bi bi-check-lg"></i>
-                    </button>
+            <x-comment-composer
+                :value="$commentBodyForEdit"
+                :placeholder="$commentable instanceof \App\Models\ProjectTask ? '@osoba, #1 albo załącznik…' : '@osoba, @osoba! albo @osoba?…'"
+                :rows="2"
+                :autocomplete-payload="$commentAutocompletePayload"
+                submit-title="Zapisz"
+                :file-input-id="'comment-edit-files-'.$comment->id"
+            >
+                <x-slot:toolbar>
                     <button type="button" class="comments-icon-btn" title="Anuluj" aria-label="Anuluj" onclick="cancelEdit({{ $comment->id }})">
                         <i class="bi bi-x-lg"></i>
                     </button>
-                </div>
-            </div>
+                </x-slot:toolbar>
+            </x-comment-composer>
             <x-attachment-list :attachments="$comment->attachments" class="mt-2" />
         </form>
     </div>
@@ -169,7 +198,7 @@
             <input type="hidden" name="commentable_id" value="{{ $commentable->id }}">
             <input type="hidden" name="parent_id" value="{{ $comment->id }}">
             <x-comment-composer
-                :placeholder="$commentable instanceof \App\Models\ProjectTask ? '@osoba, #1 albo załącznik…' : 'Odpowiedź…'"
+                :placeholder="$commentable instanceof \App\Models\ProjectTask ? '@osoba, #1 albo załącznik…' : '@osoba, @osoba! albo @osoba?…'"
                 :rows="2"
                 :autocomplete-payload="$commentAutocompletePayload"
                 submit-title="Wyślij odpowiedź"

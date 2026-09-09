@@ -8,6 +8,7 @@ use App\Models\ForumTag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ForumBoardTest extends TestCase
@@ -72,7 +73,9 @@ class ForumBoardTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('dashboard.posts.create'))
             ->assertOk()
-            ->assertSee('\/dashboard\/posts\/images', false);
+            ->assertSee('\/dashboard\/posts\/images', false)
+            ->assertSee('forum-sheet', false)
+            ->assertSee('forum-sheet__toolbar', false);
     }
 
     public function test_search_and_tag_filter(): void
@@ -147,9 +150,31 @@ class ForumBoardTest extends TestCase
             ->get(route('dashboard.posts.show', $post))
             ->assertOk()
             ->assertSee('A bilet — waluta zawsze 3 znaki?')
-            ->assertSee('Jan Nowak');
+            ->assertSee('Jan Nowak')
+            ->assertSee("startMention('notify')", false)
+            ->assertSee("startMention('task')", false)
+            ->assertSee("startMention('approval')", false)
+            ->assertSee('bi-question-lg', false)
+            ->assertSee('comments-composer-editor', false)
+            ->assertSee('bi-eye', false);
 
         $this->assertSame(2, $post->fresh()->views()->count());
+
+        $comment = $post->comments()->first();
+        $this->assertNotNull($comment);
+        $this->assertSame(1, $comment->views()->count());
+        $this->assertTrue($comment->views()->where('user_id', $this->user->id)->exists());
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk();
+        $this->assertSame(1, $comment->fresh()->views()->count());
+
+        $this->actingAs($other)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk()
+            ->assertSee('Widzieli:', false);
+        $this->assertSame(2, $comment->fresh()->views()->count());
     }
 
     public function test_stranger_cannot_edit_someone_elses_post(): void
@@ -222,6 +247,87 @@ class ForumBoardTest extends TestCase
             ->assertSee('Potem nocleg.');
 
         \Illuminate\Support\Facades\Storage::disk('public')->delete($upload['path']);
+    }
+
+    public function test_pinning_a_comment_moves_it_to_the_top(): void
+    {
+        $post = ForumPost::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Wątek z komentarzami',
+            'body' => [
+                ['type' => 'text', 'content' => 'Treść.'],
+            ],
+        ]);
+
+        $older = $post->addComment('Starszy komentarz do przypiecia', $this->user);
+        $newer = $post->addComment('Nowszy komentarz luzny', $this->user);
+        $older->forceFill(['created_at' => now()->subHour()])->save();
+        $newer->forceFill(['created_at' => now()])->save();
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk()
+            ->assertSeeInOrder(['Nowszy komentarz luzny', 'Starszy komentarz do przypiecia']);
+
+        $this->actingAs($this->user)
+            ->from(route('dashboard.posts.show', $post))
+            ->post(route('comments.pin', $older))
+            ->assertRedirect();
+
+        $this->assertTrue($older->fresh()->pinned);
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk()
+            ->assertSee('Przypięty')
+            ->assertSee('comment-item--pinned', false)
+            ->assertSeeInOrder(['Starszy komentarz do przypiecia', 'Nowszy komentarz luzny']);
+    }
+
+    public function test_previewable_attachments_open_inline_and_others_download(): void
+    {
+        Storage::fake('public');
+
+        $post = ForumPost::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Wątek z załącznikiem',
+            'body' => [
+                ['type' => 'text', 'content' => 'Treść.'],
+            ],
+        ]);
+        $comment = $post->addComment('komentarz z plikami', $this->user);
+
+        Storage::disk('public')->put('attachments/comments/photo.png', 'png-bytes');
+        $image = $comment->attachments()->create([
+            'file_path' => 'attachments/comments/photo.png',
+            'original_name' => 'photo.png',
+            'uploaded_by' => $this->user->id,
+        ]);
+
+        Storage::disk('public')->put('attachments/comments/pack.zip', 'zip-bytes');
+        $zip = $comment->attachments()->create([
+            'file_path' => 'attachments/comments/pack.zip',
+            'original_name' => 'pack.zip',
+            'uploaded_by' => $this->user->id,
+        ]);
+
+        $preview = $this->actingAs($this->user)
+            ->get(route('attachments.preview', $image));
+        $preview->assertOk();
+        $this->assertStringContainsString('inline', (string) $preview->headers->get('content-disposition'));
+        $this->assertStringContainsString('photo.png', (string) $preview->headers->get('content-disposition'));
+        $this->assertStringContainsString('image/png', (string) $preview->headers->get('content-type'));
+
+        $this->actingAs($this->user)
+            ->get(route('attachments.preview', $zip))
+            ->assertRedirect(route('attachments.download', $zip));
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk()
+            ->assertSee('Podgląd: photo.png', false)
+            ->assertSee('Pobierz pack.zip', false)
+            ->assertDontSee('Podgląd: pack.zip', false);
     }
 
     protected function assignPlainRole(User $user): void
