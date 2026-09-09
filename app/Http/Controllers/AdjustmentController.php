@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreAdjustmentRequest;
+use App\Http\Requests\UpdateAdjustmentRequest;
 use App\Models\Adjustment;
 use App\Models\Employee;
 use App\Models\Payroll;
-use App\Http\Requests\StoreAdjustmentRequest;
-use App\Http\Requests\UpdateAdjustmentRequest;
-use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class AdjustmentController extends Controller
 {
@@ -20,11 +20,12 @@ class AdjustmentController extends Controller
     {
         $payrollFilter = $request->query('payroll', 'all'); // all|linked|unlinked
         $typeFilter = $request->query('type', 'all'); // all|bonus|penalty
+        $employeeSearch = trim((string) $request->query('employee', ''));
         $sort = $request->query('sort', 'date');
         $dir = $request->query('dir', 'desc');
 
         $allowedSorts = ['date', 'amount', 'created_at'];
-        if (!in_array($sort, $allowedSorts, true)) {
+        if (! in_array($sort, $allowedSorts, true)) {
             $sort = 'date';
         }
         $dir = $dir === 'asc' ? 'asc' : 'desc';
@@ -33,15 +34,25 @@ class AdjustmentController extends Controller
             ->with(['employee', 'payroll'])
             ->when($payrollFilter === 'linked', fn ($qq) => $qq->whereNotNull('payroll_id'))
             ->when($payrollFilter === 'unlinked', fn ($qq) => $qq->whereNull('payroll_id'))
-            ->when(in_array($typeFilter, ['bonus', 'penalty'], true), fn ($qq) => $qq->where('type', $typeFilter));
+            ->when(in_array($typeFilter, ['bonus', 'penalty'], true), fn ($qq) => $qq->where('type', $typeFilter))
+            ->when($employeeSearch !== '', function ($qq) use ($employeeSearch) {
+                $term = '%'.addcslashes($employeeSearch, '%_\\').'%';
+                $qq->whereHas('employee', function ($employees) use ($term) {
+                    $employees->where(function ($name) use ($term) {
+                        $name->where('first_name', 'like', $term)
+                            ->orWhere('last_name', 'like', $term)
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$term]);
+                    });
+                });
+            });
 
         // Stable ordering
         $q->orderBy($sort, $dir)->orderBy('created_at', 'desc');
 
         // Keep filters/sort in pagination links
         $adjustments = $q->paginate(20)->appends($request->query());
-        
-        return view('adjustments.index', compact('adjustments', 'payrollFilter', 'typeFilter', 'sort', 'dir'));
+
+        return view('adjustments.index', compact('adjustments', 'payrollFilter', 'typeFilter', 'employeeSearch', 'sort', 'dir'));
     }
 
     /**
@@ -66,14 +77,14 @@ class AdjustmentController extends Controller
     public function store(StoreAdjustmentRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        
+
         // Jeśli payroll wybrany — wymuś spójność employee_id
         $payroll = null;
-        if (!empty($validated['payroll_id'])) {
+        if (! empty($validated['payroll_id'])) {
             $payroll = Payroll::findOrFail($validated['payroll_id']);
             $validated['employee_id'] = $payroll->employee_id;
         }
-        
+
         Adjustment::create($validated);
 
         return redirect()->route('adjustments.index')
@@ -86,6 +97,7 @@ class AdjustmentController extends Controller
     public function show(Adjustment $adjustment): View
     {
         $adjustment->load('employee');
+
         return view('adjustments.show', compact('adjustment'));
     }
 
@@ -111,16 +123,16 @@ class AdjustmentController extends Controller
     public function update(UpdateAdjustmentRequest $request, Adjustment $adjustment): RedirectResponse
     {
         $validated = $request->validated();
-        
+
         $payroll = null;
-        if (!empty($validated['payroll_id'])) {
+        if (! empty($validated['payroll_id'])) {
             // Pobierz payroll i ustaw employee_id automatycznie
             $payroll = Payroll::findOrFail($validated['payroll_id']);
             $validated['employee_id'] = $payroll->employee_id;
         }
-        
+
         $adjustment->update($validated);
-        
+
         // Przelicz payroll jeśli jest w statusie draft/issued
         if ($payroll && $payroll->canBeRecalculated()) {
             $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);
@@ -139,7 +151,7 @@ class AdjustmentController extends Controller
     {
         $payroll = $adjustment->payroll;
         $adjustment->delete();
-        
+
         // Przelicz payroll jeśli jest w statusie draft/issued
         if ($payroll && $payroll->canBeRecalculated()) {
             $payroll->adjustments_amount = app(\App\Services\GeneratePayrollForEmployee::class)->calculateAdjustmentsAmountForPayroll($payroll);

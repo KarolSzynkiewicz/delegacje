@@ -22,34 +22,43 @@
 
     <x-ui.card class="mb-3">
         <form method="GET" action="{{ route('adjustments.index') }}" class="row g-3 align-items-end">
-            <div class="col-md-3">
+            <div class="col-lg-3">
+                <x-ui.input
+                    type="text"
+                    name="employee"
+                    label="Pracownik"
+                    placeholder="Imię lub nazwisko"
+                    :value="$employeeSearch ?? request('employee')"
+                />
+            </div>
+            <div class="col-lg-2">
                 <x-ui.input type="select" name="payroll" label="Payroll">
                     <option value="all" {{ ($payrollFilter ?? request('payroll', 'all')) === 'all' ? 'selected' : '' }}>Wszystkie</option>
                     <option value="linked" {{ ($payrollFilter ?? request('payroll', 'all')) === 'linked' ? 'selected' : '' }}>Z payrollem</option>
                     <option value="unlinked" {{ ($payrollFilter ?? request('payroll', 'all')) === 'unlinked' ? 'selected' : '' }}>Bez payrollu</option>
                 </x-ui.input>
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2">
                 <x-ui.input type="select" name="type" label="Typ">
                     <option value="all" {{ ($typeFilter ?? request('type', 'all')) === 'all' ? 'selected' : '' }}>Wszystkie</option>
                     <option value="penalty" {{ ($typeFilter ?? request('type', 'all')) === 'penalty' ? 'selected' : '' }}>Obciążenie</option>
                     <option value="bonus" {{ ($typeFilter ?? request('type', 'all')) === 'bonus' ? 'selected' : '' }}>Uznanie</option>
                 </x-ui.input>
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2">
                 <x-ui.input type="select" name="sort" label="Sortuj">
                     <option value="date" {{ ($sort ?? request('sort', 'date')) === 'date' ? 'selected' : '' }}>Data</option>
                     <option value="amount" {{ ($sort ?? request('sort', 'date')) === 'amount' ? 'selected' : '' }}>Kwota</option>
                     <option value="created_at" {{ ($sort ?? request('sort', 'date')) === 'created_at' ? 'selected' : '' }}>Utworzono</option>
                 </x-ui.input>
             </div>
-            <div class="col-md-2">
+            <div class="col-lg-2">
                 <x-ui.input type="select" name="dir" label="Kierunek">
                     <option value="desc" {{ ($dir ?? request('dir', 'desc')) === 'desc' ? 'selected' : '' }}>Malejąco</option>
                     <option value="asc" {{ ($dir ?? request('dir', 'desc')) === 'asc' ? 'selected' : '' }}>Rosnąco</option>
                 </x-ui.input>
             </div>
-            <div class="col-md-1 d-flex gap-2">
+            <div class="col-lg-1 d-flex gap-2">
                 <x-ui.button variant="primary" type="submit" class="btn-sm">Filtruj</x-ui.button>
             </div>
         </form>
