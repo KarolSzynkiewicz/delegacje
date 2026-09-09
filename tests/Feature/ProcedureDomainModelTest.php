@@ -209,8 +209,9 @@ class ProcedureDomainModelTest extends TestCase
             'name' => 'Zatrudnij',
             'action' => 'recruitment.hire',
         ], [
-            'subject_type' => 'recruitment_process',
-            'subject_id' => $process->id,
+            'subject_type' => 'recruitment_candidate',
+            'subject_id' => $candidate->id,
+            'recruitment_process_id' => $process->id,
         ]);
 
         app(ProcedureRunService::class)->advanceNode($run->fresh(), 'start-1');
@@ -235,6 +236,44 @@ class ProcedureDomainModelTest extends TestCase
         $this->assertNotNull($outcome);
         $this->assertStringContainsString('Zatrudnij kandydata', $outcome['text']);
         $this->assertStringContainsString('role: Monter', $outcome['text']);
+    }
+
+    public function test_hire_action_from_a_process_card_still_marks_the_process_zatrudniony(): void
+    {
+        $role = Role::factory()->create(['name' => 'Monter']);
+        $candidate = RecruitmentCandidate::query()->create([
+            'first_name' => 'Igor',
+            'last_name' => 'NowyZatrudniony',
+            'phone' => '600333444',
+        ]);
+        $lead = RecruitmentLead::query()->create(['candidate_id' => $candidate->id]);
+        $process = RecruitmentProcess::query()->create([
+            'lead_id' => $lead->id,
+            'candidate_id' => $candidate->id,
+            'status' => RecruitmentStatus::Onboarding,
+        ]);
+
+        $run = $this->startLinearRun([
+            'type' => 'action',
+            'name' => 'Zatrudnij',
+            'action' => 'recruitment.hire',
+        ], [
+            'subject_type' => 'recruitment_process',
+            'subject_id' => $process->id,
+            'slot_key' => 'recruitment_process.onboarding',
+            'recruitment_process_id' => $process->id,
+        ]);
+
+        app(ProcedureRunService::class)->advanceNode($run->fresh(), 'start-1');
+        app(ProcedureRunService::class)->advanceNode($run->fresh(), 'step-1', null, [
+            'roles' => [$role->id],
+        ]);
+
+        $process->refresh();
+        $this->assertSame(RecruitmentStatus::Zatrudniony, $process->status);
+        $this->assertNotNull($process->employee_id);
+        $this->assertSame('recruitment_candidate', $run->fresh()->subject_type);
+        $this->assertSame($candidate->id, $run->fresh()->subject_id);
     }
 
     public function test_decision_step_history_shows_chosen_option(): void

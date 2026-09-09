@@ -56,15 +56,14 @@
                     />
                 </div>
 
-                <div class="form-check d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <x-ui.input
-                            type="checkbox"
-                            name="remember"
-                            id="remember_me"
-                            label="Zapamiętaj mnie"
-                        />
-                    </div>
+                <div class="cl-landing-auth__persist mb-4">
+                    <x-ui.input
+                        type="checkbox"
+                        name="remember"
+                        id="remember_me"
+                        label="Nie wylogowuj mnie"
+                        :checked="(bool) old('remember')"
+                    />
                     @if (Route::has('password.request'))
                         <a href="{{ route('password.request') }}" class="cl-landing-auth__link">
                             Nie pamiętasz hasła?

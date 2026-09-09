@@ -44,6 +44,7 @@ class RecruitmentCommentsAndFormTest extends TestCase
             'last_name' => 'Nowak',
             'phone' => '48600123456',
             'email' => null,
+            'has_driving_license_b' => null,
         ]);
     }
 
@@ -96,6 +97,47 @@ class RecruitmentCommentsAndFormTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame('Komentarz autora', $comment->fresh()->body);
+    }
+
+    public function test_unassigned_recruiter_glows_red_until_someone_is_picked(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+        $process = $this->createProcess();
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
+            ->assertSeeHtml('rp-recruiter is-empty')
+            ->set('editAssignedRecruiterId', $admin->id)
+            ->assertDontSeeHtml('rp-recruiter is-empty');
+
+        $this->assertSame($admin->id, $process->fresh()->assigned_recruiter_id);
+    }
+
+    public function test_missing_contact_stage_fields_glow_until_filled_and_comments_sit_below(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+        $process = $this->createProcess();
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
+            ->assertSeeHtml('rp-attr is-empty')
+            ->assertSeeHtml('rp-profile__comments--below')
+            ->assertSee('uzupełnij')
+            ->assertSee('Komentarze o kandydacie')
+            ->assertSee('Prawko')
+            ->assertDontSee('Kategoria')
+            ->assertSeeHtml('rp-profile__meta-item is-empty')
+            ->assertSeeHtml('rp-profile__phone')
+            ->assertDontSeeHtml('rp-skill-chip--empty')
+            ->assertSee('Role')
+            ->set('editRate', '15')
+            ->assertSee('15.00 €/h')
+            ->call('setDrivingLicense', false)
+            ->assertDontSee('Prawko')
+            ->call('setDrivingLicense', true)
+            ->assertSee('Kat. B');
     }
 
     private function createProcess(): RecruitmentProcess

@@ -26,7 +26,7 @@ class HireCandidate extends AbstractAction
 
     public function subjectTypes(): array
     {
-        return ['recruitment_candidate', 'recruitment_process'];
+        return ['recruitment_candidate'];
     }
 
     public function fields(ProcedureRun $run): array

@@ -77,7 +77,56 @@ enum RecruitmentStatus: string
     public function pipelineIndex(): ?int
     {
         $idx = array_search($this, self::pipelineSteps(), true);
+
         return $idx === false ? null : $idx;
+    }
+
+    /** Side-exits (Odrzucony, Były pracownik) sit next to the flow, not on it. */
+    public function isPipelineExit(): bool
+    {
+        return $this->pipelineIndex() === null;
+    }
+
+    /**
+     * Stage the process moves to when it progresses. Side-exits re-enter the
+     * funnel at the contact stage instead of jumping to the end.
+     */
+    public function nextPipelineStatus(): ?self
+    {
+        $idx = $this->pipelineIndex();
+
+        if ($idx === null) {
+            return self::WTrakcieKontaktu;
+        }
+
+        return self::pipelineSteps()[$idx + 1] ?? null;
+    }
+
+    public function previousPipelineStatus(): ?self
+    {
+        $idx = $this->pipelineIndex();
+
+        return $idx === null || $idx === 0 ? null : self::pipelineSteps()[$idx - 1];
+    }
+
+    public function procedureSlotKey(): ?string
+    {
+        return match ($this) {
+            self::Zaakceptowany => 'recruitment_process.zaakceptowany',
+            self::Onboarding => 'recruitment_process.onboarding',
+            self::Zatrudniony => 'recruitment_process.zatrudniony',
+            default => null,
+        };
+    }
+
+    public function procedureSlotLabel(): ?string
+    {
+        return match ($this) {
+            self::Zaakceptowany => 'Procedura: Weryfikacja',
+            self::Onboarding => 'Procedura: Onboarding',
+            self::Zatrudniony => 'Procedura: Zatrudniony',
+            default => null,
+        };
     }
 
     public static function options(): array

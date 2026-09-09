@@ -8,10 +8,15 @@
                     <div class="fw-semibold small mb-1">{{ $label }}</div>
                 @endif
                 <div class="small text-muted">Ten punkt nie ma jeszcze przypisanej procedury.</div>
+                @if($isPreview)
+                    <div class="small text-muted mt-1">Podgląd — procedurę będzie można przypisać i uruchomić po dojściu procesu do tego etapu.</div>
+                @endif
             </div>
-            <x-ui.button variant="primary" class="btn-sm" wire:click="openBindModal">
-                <i class="bi bi-link-45deg me-1"></i> Przypisz procedurę
-            </x-ui.button>
+            @unless($isPreview)
+                <x-ui.button variant="primary" class="btn-sm" wire:click="openBindModal">
+                    <i class="bi bi-link-45deg me-1"></i> Przypisz procedurę
+                </x-ui.button>
+            @endunless
         </div>
     @elseif($activeRun || $lastRun)
         {{-- Bound + (running, or already finished/abandoned before): show the full runner
@@ -21,7 +26,7 @@
             <div class="fw-semibold small mb-2">{{ $label }}</div>
         @endif
         <livewire:procedure-run-stepper :run="$displayRun" :key="'procedure-slot-run-'.$displayRun->id" />
-        @if(!$activeRun)
+        @if(! $activeRun && ! $isPreview)
             <div class="d-flex align-items-center gap-2 mt-2">
                 <x-ui.button variant="primary" class="btn-sm" wire:click="start">
                     <i class="bi bi-arrow-repeat me-1"></i> Uruchom ponownie
@@ -43,15 +48,20 @@
                     <i class="bi bi-diagram-3 text-primary"></i>
                     <span class="fw-semibold">{{ $binding->template->name }}</span>
                 </div>
+                @if($isPreview)
+                    <div class="small text-muted mt-2">Podgląd — procedura uruchomi się, gdy proces dojdzie do tego etapu.</div>
+                @endif
             </div>
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                <x-ui.button variant="primary" class="btn-sm" wire:click="start">
-                    <i class="bi bi-play-fill me-1"></i> Uruchom
-                </x-ui.button>
-                <button type="button" class="btn btn-sm btn-link text-muted" wire:click="openBindModal">
-                    Zmień szablon
-                </button>
-            </div>
+            @unless($isPreview)
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <x-ui.button variant="primary" class="btn-sm" wire:click="start">
+                        <i class="bi bi-play-fill me-1"></i> Uruchom
+                    </x-ui.button>
+                    <button type="button" class="btn btn-sm btn-link text-muted" wire:click="openBindModal">
+                        Zmień szablon
+                    </button>
+                </div>
+            @endunless
         </div>
     @endif
 

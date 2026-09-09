@@ -30,7 +30,7 @@ class RecruitmentForm extends Component
 
     public string $city = '';
 
-    public bool $has_driving_license_b = false;
+    public ?bool $has_driving_license_b = null;
 
     public bool $speaks_english = false;
 
@@ -72,7 +72,7 @@ class RecruitmentForm extends Component
             'email' => 'nullable|email|max:255',
             'phone' => 'required|digits_between:9,15',
             'city' => 'nullable|string|max:100',
-            'has_driving_license_b' => 'boolean',
+            'has_driving_license_b' => 'nullable|boolean',
             'speaks_english' => 'boolean',
             'speaks_french' => 'boolean',
             'speaks_german' => 'boolean',
@@ -106,6 +106,11 @@ class RecruitmentForm extends Component
     public function updatedReferralSource(): void
     {
         $this->referral_source_detail = '';
+    }
+
+    public function setDrivingLicense(bool $hasLicense): void
+    {
+        $this->has_driving_license_b = $this->has_driving_license_b === $hasLicense ? null : $hasLicense;
     }
 
     public function roles(): Collection

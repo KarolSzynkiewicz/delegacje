@@ -13,6 +13,7 @@ use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
+use App\Models\RecruitmentProcess;
 use App\Models\User;
 use App\Notifications\ProcedureWaitElapsed;
 use App\Notifications\TaskAssigned;
@@ -43,6 +44,9 @@ class ProcedureRunService
      */
     public function startRun(ProcedureTemplate $template, array $params): ProcedureRun
     {
+        $requestedType = (string) ($params['subject_type'] ?? '');
+        $requestedId = (int) ($params['subject_id'] ?? 0);
+
         $bound = $this->bindSubject($template, $params);
         $params['subject_type'] = $bound['subject_type'];
         $params['subject_id'] = $bound['subject_id'];
@@ -50,6 +54,13 @@ class ProcedureRunService
             $template->name,
             $bound['subject_label'] ?: ($params['name_suffix'] ?? null),
         );
+
+        if ($requestedType === ProcedureSubjectType::RecruitmentProcess->value && $requestedId > 0) {
+            $params['recruitment_process_id'] = $params['recruitment_process_id'] ?? $requestedId;
+            $variables = is_array($params['variables'] ?? null) ? $params['variables'] : [];
+            $variables['recruitment_process_id'] = $variables['recruitment_process_id'] ?? $requestedId;
+            $params['variables'] = $variables;
+        }
 
         $version = $this->versions->resolveVersionForRun($template);
         $definition = $version->definition;
@@ -140,8 +151,17 @@ class ProcedureRunService
     {
         $required = ProcedureSubjectType::tryFrom((string) $template->subject_type);
         $requested = ProcedureSubjectType::tryFrom((string) ($params['subject_type'] ?? ''));
-        $type = $required ?? $requested;
         $id = (int) ($params['subject_id'] ?? 0);
+
+        // A slot already has a concrete card (e.g. recruitment process 12023).
+        // Do not re-interpret that id as the template's required type — a
+        // candidate-typed onboarding template would look up candidate 12023
+        // and throw "Nie znaleziono wybranego rekordu." After lookup, a
+        // recruitment process is stored as its candidate (same card).
+        $fromSlot = filled($params['slot_key'] ?? null);
+        $type = ($fromSlot && $requested !== null)
+            ? $requested
+            : ($required ?? $requested);
 
         if ($required !== null && $id <= 0) {
             throw new RuntimeException('Wybierz '.mb_strtolower($required->label()).'.');
@@ -158,6 +178,17 @@ class ProcedureRunService
         $model = $type->modelClass()::query()->find($id);
         if ($model === null) {
             throw new RuntimeException('Nie znaleziono wybranego rekordu.');
+        }
+
+        if ($type === ProcedureSubjectType::RecruitmentProcess && $model instanceof RecruitmentProcess) {
+            $model->loadMissing('candidate');
+            $candidate = $model->candidate;
+            if ($candidate === null) {
+                throw new RuntimeException('Nie znaleziono kandydata dla tego procesu.');
+            }
+            $type = ProcedureSubjectType::RecruitmentCandidate;
+            $id = (int) $candidate->getKey();
+            $model = $candidate;
         }
 
         return [
@@ -648,7 +679,7 @@ class ProcedureRunService
             }
             $visited[$nodeId] = true;
 
-            foreach ($run->outgoingEdges($nodeId) as $edge) {
+            foreach ($this->outgoingEdgesForReachability($run, $nodeId) as $edge) {
                 $to = (string) ($edge['to'] ?? '');
                 if ($to === '' || isset($visited[$to])) {
                     continue;
@@ -659,6 +690,44 @@ class ProcedureRunService
         }
 
         return array_values(array_unique($reachable));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function outgoingEdgesForReachability(ProcedureRun $run, string $nodeId): array
+    {
+        $outgoing = $run->outgoingEdges($nodeId);
+        $chosen = $this->takenDecisionOptionId($run, $nodeId);
+        if ($chosen === null) {
+            return $outgoing;
+        }
+
+        return array_values(array_filter(
+            $outgoing,
+            fn ($edge) => ($edge['optionId'] ?? null) === $chosen,
+        ));
+    }
+
+    protected function takenDecisionOptionId(ProcedureRun $run, string $nodeId): ?string
+    {
+        $definition = $run->definition();
+        $node = $this->findNodeById($definition, $nodeId);
+        if (! in_array($node['type'] ?? '', ['decision', 'approval'], true)) {
+            return null;
+        }
+
+        $step = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $nodeId)
+            ->whereNotNull('completed_at')
+            ->latest('completed_at')
+            ->first();
+
+        $data = $step?->data ?? [];
+        $chosen = $data['option_id'] ?? $data['approval_decision'] ?? null;
+
+        return is_string($chosen) && $chosen !== '' ? $chosen : null;
     }
 
     /**

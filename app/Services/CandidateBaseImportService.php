@@ -444,9 +444,23 @@ class CandidateBaseImportService
         return ['matched' => array_values(array_unique($matched)), 'unmatched' => array_values(array_unique($unmatched))];
     }
 
-    private function parseBool(?string $value): bool
+    private function parseBool(?string $value): ?bool
     {
-        return in_array(mb_strtolower(trim((string) $value)), ['tak', '1', 'true', 'yes'], true);
+        $normalized = mb_strtolower(trim((string) $value));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (in_array($normalized, ['tak', '1', 'true', 'yes'], true)) {
+            return true;
+        }
+
+        if (in_array($normalized, ['nie', '0', 'false', 'no'], true)) {
+            return false;
+        }
+
+        return null;
     }
 
     private function parseFloat(?string $value): ?float
@@ -804,8 +818,7 @@ class CandidateBaseImportService
             }
         }
 
-        // Booleans default to false (not nullable) — only ever upgrade false → true.
-        if ($row['has_driving_license_b'] && ! $candidate->has_driving_license_b) {
+        if ($row['has_driving_license_b'] === true && $candidate->has_driving_license_b !== true) {
             $updates['has_driving_license_b'] = true;
         }
 
@@ -873,6 +886,7 @@ class CandidateBaseImportService
                 auth()->id(),
                 $statusInfo['rejection_reason'],
                 $statusInfo['rejection_note'],
+                startBoundSlot: false,
             );
         }
     }

@@ -310,7 +310,7 @@ class ProcedureTemplatesIndex extends Component
         $this->validate([
             'newName' => ['required', 'string', 'max:255'],
             'newCategory' => ['nullable', 'string', 'max:100'],
-            'newSubjectType' => ['nullable', Rule::in(ProcedureSubjectType::values())],
+            'newSubjectType' => ['nullable', Rule::in(ProcedureSubjectType::formValues())],
             'newDescription' => ['nullable', 'string', 'max:1000'],
         ], [], [
             'newName' => 'nazwa',

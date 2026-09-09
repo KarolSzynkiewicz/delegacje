@@ -948,8 +948,12 @@ function renderWaitEditor(n){
   `;
 }
 
+function canonicalProcedureSubject(subject){
+  return subject === 'recruitment_process' ? 'recruitment_candidate' : subject;
+}
+
 function renderActionEditor(n){
-  const subject = state.currentProcess?.subject_type || '';
+  const subject = canonicalProcedureSubject(state.currentProcess?.subject_type || '');
   const actions = editorActions().filter(a => !subject || a.subject_types.includes(subject));
   const opts = [`<option value="">— wybierz akcję —</option>`]
     .concat(actions.map(a => `<option value="${esc(a.key)}" ${n.action===a.key?'selected':''}>${esc(a.label)}</option>`))

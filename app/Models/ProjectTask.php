@@ -193,6 +193,20 @@ class ProjectTask extends Model
             return (int) $this->procedureRun->subject_id;
         }
 
+        if ($this->procedureRun?->subject_type === 'recruitment_candidate' && $this->procedureRun->subject_id) {
+            $fromVariables = (int) data_get($this->procedureRun->variables, 'recruitment_process_id', 0);
+            if ($fromVariables > 0) {
+                return $fromVariables;
+            }
+
+            $processId = RecruitmentProcess::query()
+                ->where('candidate_id', $this->procedureRun->subject_id)
+                ->latest('id')
+                ->value('id');
+
+            return $processId ? (int) $processId : null;
+        }
+
         return null;
     }
 

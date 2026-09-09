@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureSlotBinding;
 use App\Models\ProcedureTemplate;
+use App\Models\RecruitmentProcess;
 use App\Services\ProcedureSlotService;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
@@ -74,6 +75,10 @@ class ProcedureSlot extends Component
 
     public function openBindModal(): void
     {
+        if ($this->isPreview()) {
+            return;
+        }
+
         unset($this->binding, $this->availableTemplates);
         $this->bindTemplateId = $this->binding?->procedure_template_id;
         $this->showBindModal = true;
@@ -87,6 +92,10 @@ class ProcedureSlot extends Component
 
     public function saveBinding(): void
     {
+        if ($this->isPreview()) {
+            return;
+        }
+
         $this->validate([
             'bindTemplateId' => ['required', 'integer', 'exists:procedure_templates,id'],
         ], [], ['bindTemplateId' => 'szablon procedury']);
@@ -99,6 +108,10 @@ class ProcedureSlot extends Component
 
     public function start(): void
     {
+        if ($this->isPreview()) {
+            return;
+        }
+
         app(ProcedureSlotService::class)->startOrGetRun(
             $this->slotKey,
             $this->subject,
@@ -107,6 +120,22 @@ class ProcedureSlot extends Component
         );
 
         unset($this->activeRun, $this->lastRun);
+    }
+
+    /**
+     * A recruitment slot can only be started on the process's current stage.
+     * Previewing a later stage (e.g. Onboarding while still Nowy) is read-only;
+     * transitionTo() starts the bound slot when the process actually arrives.
+     */
+    public function isPreview(): bool
+    {
+        if (! $this->subject instanceof RecruitmentProcess) {
+            return false;
+        }
+
+        $status = $this->subject->fresh()?->status;
+
+        return $status?->procedureSlotKey() !== $this->slotKey;
     }
 
     private function taskNameForRun(): string
@@ -121,10 +150,11 @@ class ProcedureSlot extends Component
     public function render()
     {
         return view('livewire.procedure-slot', [
-            'binding'            => $this->binding,
-            'activeRun'          => $this->activeRun,
-            'lastRun'            => $this->activeRun ? null : $this->lastRun,
+            'binding' => $this->binding,
+            'activeRun' => $this->activeRun,
+            'lastRun' => $this->activeRun ? null : $this->lastRun,
             'availableTemplates' => $this->availableTemplates,
+            'isPreview' => $this->isPreview(),
         ]);
     }
 }

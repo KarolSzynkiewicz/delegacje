@@ -46,9 +46,7 @@ class ProcedureSlotService
     /** The currently in-progress run for this slot + subject, if any. */
     public function findActiveRun(string $slotKey, Model $subject): ?ProcedureRun
     {
-        return ProcedureRun::where('slot_key', $slotKey)
-            ->where('subject_type', $subject->getMorphClass())
-            ->where('subject_id', $subject->getKey())
+        return $this->slotRunsQuery($slotKey, $subject)
             ->where('status', ProcedureRunStatus::IN_PROGRESS)
             ->first();
     }
@@ -60,11 +58,69 @@ class ProcedureSlotService
      */
     public function lastRun(string $slotKey, Model $subject): ?ProcedureRun
     {
-        return ProcedureRun::where('slot_key', $slotKey)
-            ->where('subject_type', $subject->getMorphClass())
-            ->where('subject_id', $subject->getKey())
+        return $this->slotRunsQuery($slotKey, $subject)
             ->latest('started_at')
             ->first();
+    }
+
+    private function slotRunsQuery(string $slotKey, Model $subject)
+    {
+        $query = ProcedureRun::query()->where('slot_key', $slotKey);
+
+        if ($subject instanceof RecruitmentProcess) {
+            $candidateId = $subject->candidate_id;
+
+            return $query->where(function ($q) use ($subject, $candidateId) {
+                $q->where(function ($q) use ($subject) {
+                    $q->where('subject_type', $subject->getMorphClass())
+                        ->where('subject_id', $subject->getKey());
+                });
+                if ($candidateId) {
+                    $q->orWhere(function ($q) use ($candidateId) {
+                        $q->where('subject_type', 'recruitment_candidate')
+                            ->where('subject_id', $candidateId);
+                    });
+                }
+            });
+        }
+
+        return $query
+            ->where('subject_type', $subject->getMorphClass())
+            ->where('subject_id', $subject->getKey());
+    }
+
+    /**
+     * Start the slot bound to this process's current status, but only when the
+     * slot has a template and has never been run for this process.
+     */
+    public function startIfNeverRunForProcess(RecruitmentProcess $process): ?ProcedureRun
+    {
+        $slotKey = $process->status?->procedureSlotKey();
+        if ($slotKey === null) {
+            return null;
+        }
+
+        if ($this->lastRun($slotKey, $process)) {
+            return null;
+        }
+
+        $binding = $this->binding($slotKey);
+        if (! $binding?->procedure_template_id) {
+            return null;
+        }
+
+        $process->loadMissing('candidate');
+        $name = $process->candidate?->full_name ?? 'Kandydat';
+
+        return $this->startOrGetRun(
+            $slotKey,
+            $process,
+            [
+                'candidate_name' => $process->candidate?->full_name,
+                'recruitment_process_id' => $process->id,
+            ],
+            ($binding->template?->name ?? 'Procedura').' — '.$name.' #'.$process->id,
+        );
     }
 
     /**

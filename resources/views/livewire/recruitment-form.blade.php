@@ -157,14 +157,22 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Uprawnienia i języki</label>
+                <label class="form-label">Prawko kat. B</label>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" wire:click="setDrivingLicense(true)"
+                            class="btn btn-sm {{ $has_driving_license_b === true ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        Mam kat. B
+                    </button>
+                    <button type="button" wire:click="setDrivingLicense(false)"
+                            class="btn btn-sm {{ $has_driving_license_b === false ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        Nie mam
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Języki</label>
                 <div class="d-flex flex-wrap gap-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="has_driving_license_b" wire:model="has_driving_license_b">
-                        <label class="form-check-label" for="has_driving_license_b">
-                            <i class="bi bi-car-front me-1"></i>Prawo jazdy kat.&nbsp;B
-                        </label>
-                    </div>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="speaks_english" wire:model="speaks_english">
                         <label class="form-check-label" for="speaks_english">🇬🇧 Angielski</label>

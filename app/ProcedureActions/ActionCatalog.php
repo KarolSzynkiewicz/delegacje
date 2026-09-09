@@ -2,6 +2,7 @@
 
 namespace App\ProcedureActions;
 
+use App\Enums\ProcedureSubjectType;
 use App\Models\ProcedureRun;
 use App\Models\User;
 use App\ProcedureActions\Contracts\ProcedureAction;
@@ -69,7 +70,7 @@ class ActionCatalog
     public function execute(string $key, ProcedureRun $run, array $payload, User $actor): array
     {
         $action = $this->find($key);
-        $subjectType = (string) $run->subject_type;
+        $subjectType = ProcedureSubjectType::canonicalize((string) $run->subject_type);
 
         if (! in_array($subjectType, $action->subjectTypes(), true)) {
             throw new RuntimeException('Akcja „'.$action->label().'” nie pasuje do tego, kogo dotyczy ta procedura.');

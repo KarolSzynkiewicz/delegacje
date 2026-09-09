@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ProcedureRunStatus;
 use App\Models\ProcedureTemplate;
-use App\Models\ProcedureTemplateVersion;
 use App\Models\User;
 use App\Services\ProcedureRunService;
 use App\Services\ProcedureTemplateVersionService;
@@ -150,6 +150,28 @@ class ProcedureVersioningAndParallelTest extends TestCase
 
         $service->advanceNode($run->fresh(), 'task-a');
         $this->assertSame(['merge-1'], $run->fresh()->activeNodeIds());
+    }
+
+    public function test_xor_join_follows_decision_edge_that_goes_straight_to_merge(): void
+    {
+        $this->actingAs($this->user);
+
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'XOR prosty nie',
+            'created_by' => $this->user->id,
+            'definition' => $this->xorMergeDefinition(),
+        ]);
+
+        $service = app(ProcedureRunService::class);
+        $run = $service->startRun($template, ['task_name' => 'XOR']);
+        $service->advanceNode($run->fresh(), 'start-1');
+        $service->advanceNode($run->fresh(), 'decision-1', 'e-no', [
+            'option_id' => 'opt-no',
+            'label' => 'Nie',
+        ]);
+
+        $this->assertSame(['merge-1'], $run->fresh()->activeNodeIds());
+        $this->assertSame(ProcedureRunStatus::IN_PROGRESS, $run->fresh()->status);
     }
 
     public function test_merge_node_appears_once_when_two_branches_reach_it(): void

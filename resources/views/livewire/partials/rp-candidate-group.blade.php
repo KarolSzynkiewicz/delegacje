@@ -44,6 +44,7 @@
         @else
             <button type="button"
                     wire:click="selectProcess({{ $proc->id }})"
+                    @click="if (window.innerWidth < 1280) listOpen = false"
                     wire:key="li-{{ $proc->id }}"
                     class="{{ $procClass }}">
                 <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>

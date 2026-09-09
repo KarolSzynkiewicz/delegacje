@@ -32,6 +32,14 @@ class ProcedureTemplateSubjectTest extends TestCase
         }
     }
 
+    public function test_subject_type_form_offers_candidate_but_not_recruitment_process(): void
+    {
+        $values = array_column(\App\Enums\ProcedureSubjectType::formOptions(), 'value');
+
+        $this->assertContains('recruitment_candidate', $values);
+        $this->assertNotContains('recruitment_process', $values);
+    }
+
     public function test_creating_a_template_stores_subject_type(): void
     {
         Livewire::actingAs($this->user)

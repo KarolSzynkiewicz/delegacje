@@ -155,13 +155,40 @@ enum ProcedureSubjectType: string
     }
 
     /**
+     * Types shown in template forms. Candidate and recruitment process are
+     * the same card in the app — keep only Kandydat.
+     *
+     * @return list<self>
+     */
+    public static function formCases(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            fn (self $type) => $type !== self::RecruitmentProcess,
+        ));
+    }
+
+    /** @return list<string> */
+    public static function formValues(): array
+    {
+        return array_column(self::formCases(), 'value');
+    }
+
+    /**
      * @return list<array{value: string, label: string}>
      */
     public static function formOptions(): array
     {
         return array_map(
             fn (self $type) => ['value' => $type->value, 'label' => $type->label()],
-            self::cases(),
+            self::formCases(),
         );
+    }
+
+    public static function canonicalize(string $value): string
+    {
+        return $value === self::RecruitmentProcess->value
+            ? self::RecruitmentCandidate->value
+            : $value;
     }
 }

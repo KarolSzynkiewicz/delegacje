@@ -8,7 +8,6 @@ use App\Enums\RecruitmentRejectionReason;
 use App\Enums\RecruitmentShipyardExperience;
 use App\Enums\RecruitmentStatus;
 use App\Enums\TaskStatus;
-use App\Models\Employee;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentConsent;
@@ -17,13 +16,11 @@ use App\Models\RecruitmentGridView;
 use App\Models\RecruitmentProcess;
 use App\Models\Role;
 use App\Models\User;
-use App\Services\EmployeeLifecycleService;
 use App\Support\PhoneNormalizer;
 use App\Support\RecruitmentBacklog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -199,7 +196,7 @@ class RecruitmentProcessesTable extends Component
 
     public string $editCity = '';
 
-    public bool $editDrivingLicense = false;
+    public ?bool $editDrivingLicense = null;
 
     public bool $editSpeaksEnglish = false;
 
@@ -217,8 +214,10 @@ class RecruitmentProcessesTable extends Component
 
     public bool $contactSaved = false;
 
-    /** @var array<int, int> */
-    public array $hireRoles = [];
+    /** Stage previewed on the card. Empty means "follow the process status". */
+    public string $reviewStage = '';
+
+    public bool $listMenuOpen = false;
 
     // Candidate identity edit (name / phone / email)
     public bool $editingCandidateIdentity = false;
@@ -326,6 +325,23 @@ class RecruitmentProcessesTable extends Component
 
     public function updatingFormerEmployee(): void
     {
+        $this->resetPage();
+    }
+
+    /** Pipeline status chip on the list — clicking the active status clears it. */
+    public function toggleStatus(string $status): void
+    {
+        $allowed = array_map(
+            fn (RecruitmentStatus $case) => $case->value,
+            RecruitmentStatus::pipelineSteps(),
+        );
+
+        if (! in_array($status, $allowed, true)) {
+            return;
+        }
+
+        $this->status = $this->status === $status ? '' : $status;
+        $this->draftStatus = $this->status;
         $this->resetPage();
     }
 
@@ -1288,14 +1304,13 @@ class RecruitmentProcessesTable extends Component
         $this->editRoles = $process->candidate->roles->pluck('id')->all();
         $this->editRate = $process->candidate->expected_rate_eur !== null ? (string) $process->candidate->expected_rate_eur : null;
         $this->editCity = $process->candidate->city ?? '';
-        $this->editDrivingLicense = (bool) $process->candidate->has_driving_license_b;
+        $this->editDrivingLicense = $process->candidate->has_driving_license_b;
         $this->editSpeaksEnglish = (bool) $process->candidate->speaks_english;
         $this->editSpeaksFrench = (bool) $process->candidate->speaks_french;
         $this->editSpeaksGerman = (bool) $process->candidate->speaks_german;
         $this->editShipyardExperience = $process->candidate->shipyard_experience?->value ?? '';
         $this->editAvailableFrom = $process->candidate->available_from?->format('Y-m-d') ?? '';
         $this->editAssignedRecruiterId = $process->assigned_recruiter_id;
-        $this->hireRoles = $this->editRoles;
         $this->editFirstName = $process->candidate->first_name;
         $this->editLastName = $process->candidate->last_name;
         $this->editEmail = $process->candidate->email ?? '';
@@ -1334,6 +1349,53 @@ class RecruitmentProcessesTable extends Component
         }
 
         $process->transitionTo(RecruitmentStatus::from($status), auth()->id());
+
+        if ($this->selectedId === $id) {
+            $this->reviewStage = '';
+        }
+    }
+
+    /**
+     * Open a stage on the card without touching the process status — the
+     * pipeline is a viewer; only the action bar moves the process.
+     */
+    public function previewStage(string $status): void
+    {
+        $stage = RecruitmentStatus::tryFrom($status);
+        $process = $this->getSelectedProcess();
+
+        if (! $stage || ! $process) {
+            return;
+        }
+
+        $this->reviewStage = $stage === $process->status || $stage->value === $this->reviewStage
+            ? ''
+            : $stage->value;
+    }
+
+    public function resetStageReview(): void
+    {
+        $this->reviewStage = '';
+    }
+
+    public function advanceStatus(): void
+    {
+        $process = $this->getSelectedProcess();
+        $next = $process?->status?->nextPipelineStatus();
+
+        if ($process && $next) {
+            $this->updateStatus($process->id, $next->value);
+        }
+    }
+
+    public function regressStatus(): void
+    {
+        $process = $this->getSelectedProcess();
+        $previous = $process?->status?->previousPipelineStatus();
+
+        if ($process && $previous) {
+            $this->updateStatus($process->id, $previous->value);
+        }
     }
 
     public function updateAssignedRecruiter(int $id, string $recruiterId = ''): void
@@ -1381,6 +1443,7 @@ class RecruitmentProcessesTable extends Component
 
     public function cancelRejection(): void
     {
+        $this->reviewStage = '';
         $this->showRejectionPrompt = false;
         $this->pendingRejectionId = null;
         $this->rejectionReason = '';
@@ -1498,6 +1561,7 @@ class RecruitmentProcessesTable extends Component
             'editRoles.*' => 'exists:roles,id',
             'editShipyardExperience' => ['nullable', 'in:'.implode(',', $validExperienceValues)],
             'editAvailableFrom' => 'nullable|date',
+            'editDrivingLicense' => 'nullable|boolean',
         ]);
 
         $process->candidate->update([
@@ -1512,6 +1576,12 @@ class RecruitmentProcessesTable extends Component
         $process->candidate->roles()->sync($this->editRoles);
 
         $this->skillsetSaved = true;
+    }
+
+    public function setDrivingLicense(bool $hasLicense): void
+    {
+        $this->editDrivingLicense = $this->editDrivingLicense === $hasLicense ? null : $hasLicense;
+        $this->saveSkillset();
     }
 
     public function toggleCandidateIdentityEdit(): void
@@ -1752,59 +1822,6 @@ class RecruitmentProcessesTable extends Component
         $task->status === TaskStatus::COMPLETED ? $task->markInProgress() : $task->markCompleted();
     }
 
-    public function convertToEmployee(): void
-    {
-        $process = $this->getSelectedProcess();
-        if (! $process || $process->employee_id || ! $process->candidate) {
-            return;
-        }
-
-        $this->validate([
-            'hireRoles' => 'required|array|min:1',
-            'hireRoles.*' => 'exists:roles,id',
-        ], [
-            'hireRoles.required' => 'Wybierz przynajmniej jedną rolę pracownika.',
-            'hireRoles.min' => 'Wybierz przynajmniej jedną rolę pracownika.',
-        ]);
-
-        $candidate = $process->candidate;
-
-        $imagePath = null;
-        if ($candidate->photo_path) {
-            $oldPath = $candidate->photo_path;
-            $filename = basename($oldPath);
-            $newPath = 'employees/'.$filename;
-
-            if (Storage::disk('public')->exists($oldPath)) {
-                Storage::disk('public')->copy($oldPath, $newPath);
-            }
-
-            $imagePath = $newPath;
-        }
-
-        $employee = Employee::create([
-            'first_name' => $candidate->first_name,
-            'last_name' => $candidate->last_name,
-            'email' => $candidate->email,
-            'phone' => $candidate->phone,
-            'notes' => null,
-            'image_path' => $imagePath,
-        ]);
-
-        $employee->roles()->attach($this->hireRoles);
-
-        $candidate->update(['employee_id' => $employee->id]);
-
-        $process->transitionTo(RecruitmentStatus::Zatrudniony, auth()->id());
-        $process->update(['employee_id' => $employee->id]);
-
-        app(EmployeeLifecycleService::class)->recordHire($employee, $process);
-
-        session()->flash('success', "Kandydat {$employee->full_name} został zatrudniony i dodany do bazy pracowników.");
-
-        $this->closeDrawer();
-    }
-
     protected function getSelectedProcess(): ?RecruitmentProcess
     {
         if (! $this->selectedId) {
@@ -1870,6 +1887,19 @@ class RecruitmentProcessesTable extends Component
         }
 
         return $entries->sortByDesc(fn ($item) => $item['created_at']->timestamp)->values()->all();
+    }
+
+    private function todayCallCount(): int
+    {
+        $userId = auth()->id();
+        if (! $userId) {
+            return 0;
+        }
+
+        return RecruitmentContactAttempt::query()
+            ->where('user_id', $userId)
+            ->whereDate('created_at', now()->toDateString())
+            ->count();
     }
 
     public function render()
@@ -2009,6 +2039,7 @@ class RecruitmentProcessesTable extends Component
             'activeFilterLabels' => $this->activeFilterLabels(),
             'savedViews' => $savedViews,
             'viewCounts' => $viewCounts,
+            'todayCallCount' => $this->todayCallCount(),
             'activeViewName' => $this->view !== ''
                 ? ($savedViews->firstWhere('slug', $this->view)?->name ?? $this->view)
                 : null,

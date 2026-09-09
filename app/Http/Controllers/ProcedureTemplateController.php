@@ -112,7 +112,7 @@ class ProcedureTemplateController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:100'],
-            'subject_type' => ['nullable', 'string', Rule::in(ProcedureSubjectType::values())],
+            'subject_type' => ['nullable', 'string', Rule::in(ProcedureSubjectType::formValues())],
             'description' => ['nullable', 'string', 'max:1000'],
             'tags' => ['nullable', 'array'],
             'definition' => ['nullable', 'array'],
@@ -133,7 +133,7 @@ class ProcedureTemplateController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:100'],
-            'subject_type' => ['nullable', 'string', Rule::in(ProcedureSubjectType::values())],
+            'subject_type' => ['nullable', 'string', Rule::in(ProcedureSubjectType::formValues())],
             'description' => ['nullable', 'string', 'max:1000'],
             'tags' => ['nullable', 'array'],
             'definition' => ['required', 'array'],

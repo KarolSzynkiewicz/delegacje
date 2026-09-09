@@ -277,6 +277,12 @@ class ProcedureRunStepper extends Component
 
     private function reloadRun(): void
     {
+        $wasDone = $this->run->status->isTerminal();
         $this->run->refresh()->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version', 'template']);
+
+        if (! $wasDone && $this->run->status->isTerminal()) {
+            $this->dispatch('procedure-run-updated', status: $this->run->status->value);
+            $this->js('window.location.reload()');
+        }
     }
 }

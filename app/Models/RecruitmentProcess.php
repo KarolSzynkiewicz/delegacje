@@ -5,12 +5,13 @@ namespace App\Models;
 use App\Enums\RecruitmentRejectionReason;
 use App\Enums\RecruitmentShipyardExperience;
 use App\Enums\RecruitmentStatus;
+use App\Services\ProcedureSlotService;
 use App\Traits\HasComments;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Throwable;
 
 class RecruitmentProcess extends Model
 {
@@ -87,12 +88,17 @@ class RecruitmentProcess extends Model
      * Change status and record the transition in recruitment_status_history.
      * The single entry point both the Livewire pipeline table and the plain admin
      * controller route go through, so history is recorded regardless of caller.
+     *
+     * When the new status has a bound procedure slot that has never been run
+     * for this process, the slot is started automatically. Pass
+     * $startBoundSlot = false for historical imports that should not spawn tasks.
      */
     public function transitionTo(
         RecruitmentStatus $status,
         ?int $changedBy = null,
         ?RecruitmentRejectionReason $rejectionReason = null,
-        ?string $rejectionReasonNote = null
+        ?string $rejectionReasonNote = null,
+        bool $startBoundSlot = true,
     ): void {
         if ($this->status === $status) {
             return;
@@ -113,6 +119,19 @@ class RecruitmentProcess extends Model
             'to_status' => $status->value,
             'changed_by' => $changedBy,
         ]);
+
+        if ($startBoundSlot) {
+            $this->startBoundSlotProcedure();
+        }
+    }
+
+    private function startBoundSlotProcedure(): void
+    {
+        try {
+            app(ProcedureSlotService::class)->startIfNeverRunForProcess($this);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -178,9 +197,9 @@ class RecruitmentProcess extends Model
         return $this->candidate?->city;
     }
 
-    public function getHasDrivingLicenseBAttribute(): bool
+    public function getHasDrivingLicenseBAttribute(): ?bool
     {
-        return (bool) $this->candidate?->has_driving_license_b;
+        return $this->candidate?->has_driving_license_b;
     }
 
     public function getSpeaksEnglishAttribute(): bool

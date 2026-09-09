@@ -43,6 +43,14 @@ abstract class AbstractAction implements ProcedureAction
 
     protected function process(ProcedureRun $run): RecruitmentProcess
     {
+        $processId = (int) data_get($run->variables, 'recruitment_process_id', 0);
+        if ($processId > 0) {
+            $process = RecruitmentProcess::query()->find($processId);
+            if ($process) {
+                return $process;
+            }
+        }
+
         $subject = $run->subject;
 
         if ($subject instanceof RecruitmentProcess) {

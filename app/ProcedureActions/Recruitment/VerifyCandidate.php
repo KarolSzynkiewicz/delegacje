@@ -21,7 +21,7 @@ class VerifyCandidate extends AbstractAction
 
     public function subjectTypes(): array
     {
-        return ['recruitment_candidate', 'recruitment_process'];
+        return ['recruitment_candidate'];
     }
 
     public function execute(ProcedureRun $run, array $payload, User $actor): array
