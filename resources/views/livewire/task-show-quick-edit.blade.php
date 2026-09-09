@@ -80,7 +80,7 @@
         <div class="col-md-6 task-show-meta">
             <div class="dt-card__title mb-1">Szczegóły</div>
 
-            @unless($task->isProcedure() || $task->isCallback())
+            @unless($task->isProcedure() || $task->isCallback() || $task->isMeeting())
                 @php
                     $badgeVariant = match($task->status) {
                         \App\Enums\TaskStatus::PENDING => 'warning',
@@ -169,7 +169,7 @@
                 </span>
             </div>
 
-            @unless($task->isProcedure() || $task->isCallback())
+            @unless($task->isProcedure() || $task->isCallback() || $task->isMeeting())
                 <div class="dt-card__row">
                     <span class="dt-card__label">Kategoria</span>
                     <span class="dt-card__value">

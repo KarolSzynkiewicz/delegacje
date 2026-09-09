@@ -12,6 +12,7 @@ class WorkItemCatalog
             WorkItemType::Task => app(TaskLikeHandler::class),
             WorkItemType::FollowUp => app(FollowUpHandler::class),
             WorkItemType::Callback => app(CheckboxTaskHandler::class),
+            WorkItemType::Meeting => app(CheckboxTaskHandler::class),
             WorkItemType::Subtask => app(SubtaskHandler::class),
             WorkItemType::ProcedureRun => app(ProcedureRunHandler::class),
             WorkItemType::Dispatch => app(DispatchHandler::class),

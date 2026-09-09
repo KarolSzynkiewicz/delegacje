@@ -99,7 +99,7 @@ class TasksGrid extends Component
      *
      * @var list<string>
      */
-    public array $selectedTypes = ['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up', 'approval'];
+    public array $selectedTypes = ['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up', 'meeting', 'approval'];
 
     /**
      * Zostawione pod zapisane widoki / stary query string. Między wymiarami
@@ -229,6 +229,15 @@ class TasksGrid extends Component
     public string $newProcedureSubjectId = '';
 
     public string $newProcedureNameSuffix = '';
+
+    public string $newMeetingDate = '';
+
+    public string $newMeetingStart = '';
+
+    public string $newMeetingEnd = '';
+
+    /** @var list<int|string> */
+    public array $newMeetingParticipantIds = [];
 
     // Inline add subtask
     public ?int $addingSubtaskForTask = null;
@@ -1172,30 +1181,31 @@ class TasksGrid extends Component
             $assignee?->notify(new TaskAssigned($task, auth()->user()));
         }
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
-        if ($this->isLockedToSprint()) {
-            $this->newTaskSprint = (string) $this->lockedSprintId;
-        }
-        $this->showAddRow = false;
-        $this->addKind = 'task';
+        $this->resetAddForm();
         $this->flash = 'Zadanie dodane.';
     }
 
     public function startAdd(string $kind): void
     {
-        if (! in_array($kind, ['task', 'procedure', 'approval'], true)) {
+        if (! in_array($kind, ['task', 'procedure', 'approval', 'meeting'], true)) {
             return;
         }
 
-        if (in_array($kind, ['procedure', 'approval'], true) && ! $this->usesWorkItems()) {
+        if (in_array($kind, ['procedure', 'approval', 'meeting'], true) && ! $this->usesWorkItems()) {
             return;
         }
 
         $this->addKind = $kind;
         $this->showAddRow = true;
-        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
+        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
+        }
+        if ($kind === 'meeting') {
+            $this->newMeetingDate = now()->addDay()->format('Y-m-d');
+            $this->newMeetingStart = '10:00';
+            $this->newMeetingEnd = '11:00';
+            $this->newMeetingParticipantIds = array_values(array_filter([auth()->id()]));
         }
         $this->resetErrorBag();
     }
@@ -1261,6 +1271,7 @@ class TasksGrid extends Component
         match ($this->addKind) {
             'procedure' => $this->startProcedureFromGrid(),
             'approval' => $this->addApproval(),
+            'meeting' => $this->addMeeting(),
             default => $this->addTask(),
         };
     }
@@ -1315,9 +1326,7 @@ class TasksGrid extends Component
             return;
         }
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
-        $this->showAddRow = false;
-        $this->addKind = 'task';
+        $this->resetAddForm();
         $this->flash = 'Procedura uruchomiona.';
     }
 
@@ -1353,13 +1362,85 @@ class TasksGrid extends Component
             'due_at' => $this->newTaskDueDate ?: null,
         ]);
 
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix']);
+        $this->resetAddForm();
+        $this->flash = 'Prośba o zatwierdzenie wysłana.';
+    }
+
+    public function addMeeting(): void
+    {
+        if (! $this->usesWorkItems()) {
+            return;
+        }
+
+        $this->newMeetingStart = ProjectTask::normalizeClock($this->newMeetingStart);
+        $this->newMeetingEnd = ProjectTask::normalizeClock($this->newMeetingEnd);
+
+        $this->validate([
+            'newTaskName' => 'required|string|max:255',
+            'newMeetingDate' => 'required|date',
+            'newMeetingStart' => 'required|date_format:H:i',
+            'newMeetingEnd' => 'required|date_format:H:i',
+            'newMeetingParticipantIds' => 'required|array|min:1',
+            'newMeetingParticipantIds.*' => 'integer|exists:users,id',
+            'newTaskSprint' => 'nullable|exists:sprints,id',
+            'newTaskPriority' => 'nullable|integer|min:1|max:5',
+            'newTaskCategory' => 'nullable|string|max:255',
+        ], [
+            'newTaskName.required' => 'Podaj temat spotkania.',
+            'newMeetingDate.required' => 'Podaj datę spotkania.',
+            'newMeetingStart.required' => 'Podaj godzinę rozpoczęcia.',
+            'newMeetingEnd.required' => 'Podaj godzinę zakończenia.',
+            'newMeetingParticipantIds.required' => 'Wybierz przynajmniej jednego uczestnika.',
+            'newMeetingParticipantIds.min' => 'Wybierz przynajmniej jednego uczestnika.',
+        ]);
+
+        $window = ProjectTask::meetingWindow(
+            $this->newMeetingDate,
+            $this->newMeetingStart,
+            $this->newMeetingEnd,
+            'newMeetingEnd'
+        );
+
+        $participantIds = collect($this->newMeetingParticipantIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $sprintId = $this->isLockedToSprint()
+            ? $this->lockedSprintId
+            : ($this->newTaskSprint ?: null);
+
+        ProjectTask::create([
+            'name' => $this->newTaskName,
+            'category' => $this->newTaskCategory ?: 'Spotkanie',
+            'status' => TaskStatus::PENDING,
+            'due_date' => $this->newMeetingDate,
+            'starts_at' => $window['starts_at'],
+            'ends_at' => $window['ends_at'],
+            'participant_ids' => $participantIds,
+            'assigned_to' => $participantIds[0] ?? auth()->id(),
+            'created_by' => auth()->id(),
+            'priority' => $this->newTaskPriority ?: null,
+            'sprint_id' => $sprintId,
+            'sprint_position' => $sprintId
+                ? (int) ProjectTask::query()->where('sprint_id', $sprintId)->max('sprint_position') + 1
+                : null,
+        ]);
+
+        $this->resetAddForm();
+        $this->flash = 'Spotkanie umówione.';
+    }
+
+    private function resetAddForm(): void
+    {
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }
         $this->showAddRow = false;
         $this->addKind = 'task';
-        $this->flash = 'Prośba o zatwierdzenie wysłana.';
     }
 
     public function startAddSubtask(int $taskId): void

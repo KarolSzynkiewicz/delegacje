@@ -85,7 +85,7 @@ class WorkItemSync
         $source = $item->source;
 
         return match ($item->type) {
-            WorkItemType::Task, WorkItemType::Callback => $source instanceof ProjectTask
+            WorkItemType::Task, WorkItemType::Callback, WorkItemType::Meeting => $source instanceof ProjectTask
                 ? route('tasks.show', $source)
                 : url('/tasks2'),
             WorkItemType::FollowUp => $source instanceof CommentMention
@@ -113,6 +113,7 @@ class WorkItemSync
             WorkItemType::Subtask,
             WorkItemType::FollowUp,
             WorkItemType::Callback,
+            WorkItemType::Meeting,
         ], true);
     }
 
@@ -260,7 +261,9 @@ class WorkItemSync
         }
 
         $type = WorkItemType::Task;
-        if ($task->isCallback()) {
+        if ($task->isMeeting()) {
+            $type = WorkItemType::Meeting;
+        } elseif ($task->isCallback()) {
             $type = WorkItemType::Callback;
         }
 
@@ -275,7 +278,7 @@ class WorkItemSync
             'assignee_id' => $task->assigned_to,
             'created_by_id' => $task->created_by,
             'sprint_id' => $task->sprint_id,
-            'due_at' => $task->due_date,
+            'due_at' => $task->starts_at?->toDateString() ?? $task->due_date,
         ];
     }
 

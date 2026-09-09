@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Validation\ValidationException;
 
 class ProjectTask extends Model
 {
@@ -35,6 +36,9 @@ class ProjectTask extends Model
         'category',
         'assigned_to',
         'due_date',
+        'starts_at',
+        'ends_at',
+        'participant_ids',
         'completed_at',
         'created_by',
         'procedure_run_id',
@@ -46,6 +50,9 @@ class ProjectTask extends Model
     protected $casts = [
         'status' => TaskStatus::class,
         'due_date' => 'date',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'participant_ids' => 'array',
         'completed_at' => 'datetime',
     ];
 
@@ -74,7 +81,7 @@ class ProjectTask extends Model
 
     public function isCallback(): bool
     {
-        if ($this->isProcedure() || $this->isMention()) {
+        if ($this->isProcedure() || $this->isMention() || $this->isMeeting()) {
             return false;
         }
 
@@ -84,6 +91,142 @@ class ProjectTask extends Model
         }
 
         return str_starts_with($name, 'Oddzwonić do ');
+    }
+
+    public function isMeeting(): bool
+    {
+        if ($this->isProcedure() || $this->isMention()) {
+            return false;
+        }
+
+        if ($this->starts_at !== null) {
+            return true;
+        }
+
+        return str_starts_with((string) $this->name, 'Spotkanie rekrutacyjne');
+    }
+
+    public function isOpenMeeting(): bool
+    {
+        return $this->isMeeting()
+            && ! in_array($this->status, [TaskStatus::COMPLETED, TaskStatus::CANCELLED], true);
+    }
+
+    public function meetingSlotLabel(): string
+    {
+        if ($this->starts_at) {
+            $label = $this->starts_at->format('d.m.Y · H:i');
+            if ($this->ends_at) {
+                $label .= '–'.$this->ends_at->format('H:i');
+            }
+
+            return $label;
+        }
+
+        return $this->due_date?->format('d.m.Y') ?? 'Spotkanie';
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public function meetingParticipants(): \Illuminate\Support\Collection
+    {
+        $ids = collect($this->participant_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $users = User::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+        return $ids->map(fn (int $id) => $users->get($id))->filter();
+    }
+
+    /**
+     * @return array{
+     *     author: string,
+     *     candidate: string,
+     *     contextLabel: string,
+     *     contextUrl: string|null,
+     *     startsAt: \Carbon\CarbonInterface|null,
+     *     endsAt: \Carbon\CarbonInterface|null,
+     *     participants: \Illuminate\Support\Collection<int, User>,
+     *     note: string
+     * }|null
+     */
+    public function meetingStory(): ?array
+    {
+        if (! $this->isMeeting()) {
+            return null;
+        }
+
+        $this->loadMissing(['createdBy', 'assignedTo', 'recruitmentProcess.candidate']);
+        $card = $this->sourceCard();
+        $process = $this->recruitmentProcess;
+        $candidate = trim((string) ($process?->full_name ?? ''));
+
+        return [
+            'author' => $this->createdBy?->name ?? 'Ktoś',
+            'candidate' => $candidate !== '' ? $candidate : 'kandydata',
+            'contextLabel' => $card['label'] ?? 'Karta kandydata',
+            'contextUrl' => $card['url'] ?? $this->recruitmentCardUrl(),
+            'startsAt' => $this->starts_at,
+            'endsAt' => $this->ends_at,
+            'participants' => $this->meetingParticipants(),
+            'note' => $this->plainDescription(),
+        ];
+    }
+
+    public static function meetingDescriptionFor(RecruitmentProcess $process, string $extra = ''): string
+    {
+        $name = trim($process->full_name) !== '' ? $process->full_name : 'kandydat';
+        $lines = [
+            'Kandydat: '.$name,
+            'Proces rekrutacji: '.route('recruitment-processes.show', $process),
+        ];
+
+        $extra = trim($extra);
+        if ($extra !== '') {
+            $lines[] = '';
+            $lines[] = $extra;
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public static function normalizeClock(string $time): string
+    {
+        if (preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', $time, $match)) {
+            return sprintf('%02d:%02d', (int) $match[1], (int) $match[2]);
+        }
+
+        return $time;
+    }
+
+    /**
+     * @return array{starts_at: Carbon, ends_at: Carbon}
+     */
+    public static function meetingWindow(string $date, string $start, string $end, string $endErrorKey = 'meetingEnd'): array
+    {
+        $start = self::normalizeClock($start);
+        $end = self::normalizeClock($end);
+        $startsAt = Carbon::parse($date.' '.$start);
+        $endsAt = Carbon::parse($date.' '.$end);
+
+        if ($endsAt->lte($startsAt)) {
+            throw ValidationException::withMessages([
+                $endErrorKey => 'Godzina zakończenia musi być po godzinie rozpoczęcia.',
+            ]);
+        }
+
+        return [
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ];
     }
 
     public function mentionSourceComment(): ?Comment

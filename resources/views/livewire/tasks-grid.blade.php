@@ -1108,6 +1108,13 @@
                                         <i class="bi bi-play-fill me-1"></i>Uruchom
                                     </button>
                                 </div>
+                            @elseif($addKind === 'meeting')
+                                @include('livewire.partials.tasks-grid-meeting-start-fields')
+                                <div class="d-flex gap-1 align-items-start">
+                                    <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
+                                        <i class="bi bi-calendar-plus me-1"></i>Umów
+                                    </button>
+                                </div>
                             @else
                             <div class="d-flex gap-1 align-items-start">
                                 <input type="text"
@@ -1137,6 +1144,7 @@
                     <td class="small text-muted" style="white-space:nowrap">
                         @if($addKind === 'procedure') Procedura
                         @elseif($addKind === 'approval') Zatwierdzenie
+                        @elseif($addKind === 'meeting') Spotkanie
                         @else Zadanie
                         @endif
                     </td>
@@ -1144,7 +1152,7 @@
 
                     @if(in_array('status', $visibleColumns))
                     <td style="padding:4px 6px">
-                        <span class="tg-add-status">{{ $addKind === 'procedure' ? 'W trakcie' : ($addKind === 'approval' ? 'Oczekuje' : 'Oczekujące') }}</span>
+                        <span class="tg-add-status">{{ $addKind === 'procedure' ? 'W trakcie' : ($addKind === 'approval' ? 'Oczekuje' : ($addKind === 'meeting' ? 'Umówione' : 'Oczekujące')) }}</span>
                     </td>
                     @endif
 
@@ -1168,12 +1176,14 @@
 
                     @if(in_array('assigned_to', $visibleColumns))
                     <td style="padding:4px 6px">
+                        @if($addKind !== 'meeting')
                         <select wire:model="newTaskAssignedTo" class="form-select form-select-sm" style="min-width:110px">
                             <option value="">{{ $addKind === 'approval' ? 'Zatwierdzający *' : 'Nieprzypisane' }}</option>
                             @foreach($allUsers as $u)
                                 <option value="{{ $u->id }}">{{ $u->name }}</option>
                             @endforeach
                         </select>
+                        @endif
                     </td>
                     @endif
 
@@ -1192,7 +1202,9 @@
 
                     @if(in_array('due_date', $visibleColumns))
                     <td style="padding:4px 6px">
+                        @if($addKind !== 'meeting')
                         <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
+                        @endif
                     </td>
                     @endif
 
@@ -1221,6 +1233,10 @@
                             <button type="button" wire:click="startAdd('approval')"
                                     class="btn btn-sm btn-link text-primary text-decoration-none p-0">
                                 <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
+                            </button>
+                            <button type="button" wire:click="startAdd('meeting')"
+                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
+                                <i class="bi bi-calendar-plus me-1"></i>Umów spotkanie
                             </button>
                             @endif
                         </div>
@@ -1280,6 +1296,7 @@
             <span>
                 @if($addKind === 'procedure') Uruchom procedurę
                 @elseif($addKind === 'approval') Poproś o zatwierdzenie
+                @elseif($addKind === 'meeting') Umów spotkanie
                 @else Nowe zadanie
                 @endif
             </span>
@@ -1290,9 +1307,11 @@
         <div class="d-flex flex-column gap-2">
             @if($addKind === 'procedure')
             @include('livewire.partials.tasks-grid-procedure-start-fields')
+            @elseif($addKind === 'meeting')
+            @include('livewire.partials.tasks-grid-meeting-start-fields')
             @endif
 
-            @if(in_array('name', $visibleColumns) && $addKind !== 'procedure')
+            @if(in_array('name', $visibleColumns) && $addKind !== 'procedure' && $addKind !== 'meeting')
             <div>
                 <input type="text"
                        wire:model="newTaskName"
@@ -1319,7 +1338,7 @@
             <input type="text" wire:model="newTaskCategory" class="form-control form-control-sm" placeholder="Kategoria…">
             @endif
 
-            @if(in_array('assigned_to', $visibleColumns) || $addKind === 'approval')
+            @if((in_array('assigned_to', $visibleColumns) || $addKind === 'approval') && $addKind !== 'meeting')
             <select wire:model="newTaskAssignedTo" class="form-select form-select-sm @error('newTaskAssignedTo') is-invalid @enderror">
                 <option value="">{{ $addKind === 'approval' ? 'Zatwierdzający *' : 'Nieprzypisane' }}</option>
                 @foreach($allUsers as $u)
@@ -1342,7 +1361,7 @@
             </select>
             @endif
 
-            @if(in_array('due_date', $visibleColumns))
+            @if(in_array('due_date', $visibleColumns) && $addKind !== 'meeting')
             <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
             @endif
 
@@ -1351,6 +1370,8 @@
                     <i class="bi bi-play-fill me-1"></i>Uruchom procedurę
                 @elseif($addKind === 'approval')
                     <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
+                @elseif($addKind === 'meeting')
+                    <i class="bi bi-calendar-plus me-1"></i>Umów spotkanie
                 @else
                     <i class="bi bi-plus-lg me-1"></i>Dodaj zadanie
                 @endif
@@ -1371,6 +1392,10 @@
         <button type="button" wire:click="startAdd('approval')" class="btn">
             <i class="bi bi-check2-circle" aria-hidden="true"></i>
             <span>Poproś o zatwierdzenie</span>
+        </button>
+        <button type="button" wire:click="startAdd('meeting')" class="btn">
+            <i class="bi bi-calendar-plus" aria-hidden="true"></i>
+            <span>Umów spotkanie</span>
         </button>
         @endif
     </div>

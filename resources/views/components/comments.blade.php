@@ -11,7 +11,8 @@
     
     $isTask = $commentable instanceof \App\Models\ProjectTask
         && ! $commentable->procedure_run_id
-        && ! $commentable->isCallback();
+        && ! $commentable->isCallback()
+        && ! $commentable->isMeeting();
     
     $cardLabel = $label ?? ($isTask ? 'Dziennik operacyjny' : 'Komentarze');
     $inputLabelText = $inputLabel ?? ($isTask ? 'Dodaj raport z działania' : 'Dodaj komentarz');

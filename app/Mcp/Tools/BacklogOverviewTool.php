@@ -147,7 +147,7 @@ class BacklogOverviewTool extends Tool
                 ->description('Zawęź do jednej kategorii (dokładne dopasowanie).'),
             'type' => $schema->string()
                 ->description('Zawęź do jednego typu pozycji.')
-                ->enum(['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up', 'callback', 'approval']),
+                ->enum(['task', 'subtask', 'procedure_run', 'dispatch', 'follow_up', 'callback', 'meeting', 'approval']),
         ];
     }
 }

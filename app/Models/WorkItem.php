@@ -168,7 +168,7 @@ class WorkItem extends Model
 
     public function sourceCard(): ?array
     {
-        if ($this->type === WorkItemType::Task) {
+        if (in_array($this->type, [WorkItemType::Task, WorkItemType::Callback, WorkItemType::Meeting], true)) {
             $source = $this->source;
 
             return $source instanceof ProjectTask ? $source->sourceCard() : null;

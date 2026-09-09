@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\RecruitmentRejectionReason;
 use App\Enums\RecruitmentShipyardExperience;
 use App\Enums\RecruitmentStatus;
+use App\Enums\TaskStatus;
 use App\Services\ProcedureSlotService;
 use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Collection;
@@ -71,6 +72,44 @@ class RecruitmentProcess extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(ProjectTask::class, 'recruitment_process_id');
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, ProjectTask>
+     */
+    public function openMeetings(): \Illuminate\Support\Collection
+    {
+        $this->loadMissing('tasks');
+
+        return $this->recruitmentMeetings()
+            ->filter(fn (ProjectTask $task) => $task->isOpenMeeting())
+            ->values();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, ProjectTask>
+     */
+    public function recruitmentMeetings(): \Illuminate\Support\Collection
+    {
+        $this->loadMissing('tasks');
+
+        return $this->tasks
+            ->filter(fn (ProjectTask $task) => $task->isMeeting() && $task->status !== TaskStatus::CANCELLED)
+            ->sortBy(fn (ProjectTask $task) => $task->starts_at?->getTimestamp() ?? PHP_INT_MAX)
+            ->values();
+    }
+
+    public function scheduledMeeting(): ?ProjectTask
+    {
+        return $this->openMeetings()->first();
+    }
+
+    public function displayMeeting(): ?ProjectTask
+    {
+        return $this->scheduledMeeting()
+            ?? $this->recruitmentMeetings()
+                ->sortByDesc(fn (ProjectTask $task) => $task->starts_at?->getTimestamp() ?? 0)
+                ->first();
     }
 
     protected static function booted(): void

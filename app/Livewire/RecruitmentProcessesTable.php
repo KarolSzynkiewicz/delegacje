@@ -259,6 +259,19 @@ class RecruitmentProcessesTable extends Component
 
     public string $taskDescription = '';
 
+    public bool $showMeetingModal = false;
+
+    public string $meetingDate = '';
+
+    public string $meetingStart = '';
+
+    public string $meetingEnd = '';
+
+    /** @var list<int|string> */
+    public array $meetingParticipantIds = [];
+
+    public string $meetingNote = '';
+
     // Inline edit of a single contact attempt (own attempts only)
     public ?int $editingAttemptId = null;
 
@@ -1805,6 +1818,102 @@ class RecruitmentProcessesTable extends Component
         $this->taskDueDate = '';
         $this->taskAssignedTo = null;
         $this->taskDescription = '';
+    }
+
+    public function openMeetingModal(): void
+    {
+        $process = $this->getSelectedProcess();
+        if (! $process || $process->status !== RecruitmentStatus::WTrakcieKontaktu || $process->displayMeeting()) {
+            return;
+        }
+
+        $participantIds = array_values(array_unique(array_filter(array_map(
+            fn ($id) => $id ? (string) $id : null,
+            [auth()->id(), $process->assigned_recruiter_id]
+        ))));
+
+        $this->showMeetingModal = true;
+        $this->meetingDate = now()->addDay()->format('Y-m-d');
+        $this->meetingStart = '10:00';
+        $this->meetingEnd = '11:00';
+        $this->meetingParticipantIds = $participantIds;
+        $this->meetingNote = '';
+        $this->resetErrorBag();
+    }
+
+    public function saveMeeting(): void
+    {
+        $process = $this->getSelectedProcess();
+        if (! $process) {
+            $this->closeMeetingModal();
+
+            return;
+        }
+
+        if ($process->status !== RecruitmentStatus::WTrakcieKontaktu || $process->displayMeeting()) {
+            $this->closeMeetingModal();
+
+            return;
+        }
+
+        $this->meetingStart = ProjectTask::normalizeClock($this->meetingStart);
+        $this->meetingEnd = ProjectTask::normalizeClock($this->meetingEnd);
+
+        $this->validate([
+            'meetingDate' => 'required|date',
+            'meetingStart' => 'required|date_format:H:i',
+            'meetingEnd' => 'required|date_format:H:i',
+            'meetingParticipantIds' => 'required|array|min:1',
+            'meetingParticipantIds.*' => 'integer|exists:users,id',
+            'meetingNote' => 'nullable|string|max:2000',
+        ], [
+            'meetingDate.required' => 'Podaj datę spotkania.',
+            'meetingStart.required' => 'Podaj godzinę rozpoczęcia.',
+            'meetingEnd.required' => 'Podaj godzinę zakończenia.',
+            'meetingParticipantIds.required' => 'Wybierz przynajmniej jednego uczestnika.',
+            'meetingParticipantIds.min' => 'Wybierz przynajmniej jednego uczestnika.',
+        ]);
+
+        $window = ProjectTask::meetingWindow($this->meetingDate, $this->meetingStart, $this->meetingEnd);
+
+        $participantIds = collect($this->meetingParticipantIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        ProjectTask::create([
+            'name' => 'Spotkanie rekrutacyjne: '.$process->full_name.' #'.$process->id,
+            'description' => ProjectTask::meetingDescriptionFor($process, $this->meetingNote),
+            'category' => 'Rekrutacja',
+            'status' => TaskStatus::PENDING->value,
+            'due_date' => $this->meetingDate,
+            'starts_at' => $window['starts_at'],
+            'ends_at' => $window['ends_at'],
+            'participant_ids' => $participantIds,
+            'assigned_to' => $participantIds[0] ?? auth()->id(),
+            'created_by' => auth()->id(),
+            'recruitment_process_id' => $process->id,
+        ]);
+
+        $process->transitionTo(RecruitmentStatus::Zaakceptowany, auth()->id());
+        $this->reviewStage = '';
+
+        session()->flash('success', 'Spotkanie rekrutacyjne zostało umówione. Proces przeszedł do weryfikacji.');
+
+        $this->closeMeetingModal();
+    }
+
+    public function closeMeetingModal(): void
+    {
+        $this->showMeetingModal = false;
+        $this->meetingDate = '';
+        $this->meetingStart = '';
+        $this->meetingEnd = '';
+        $this->meetingParticipantIds = [];
+        $this->meetingNote = '';
+        $this->resetErrorBag();
     }
 
     public function withdrawConsent(int $consentId): void

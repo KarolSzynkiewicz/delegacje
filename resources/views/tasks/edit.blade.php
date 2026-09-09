@@ -2,20 +2,23 @@
     @php
         $editTitle = match (true) {
             $task->isProcedure() => 'Edytuj procedurę: '.$task->name,
+            $task->isMeeting() => 'Edytuj spotkanie: '.$task->name,
             $task->isCallback() => 'Edytuj oddzwonienie: '.$task->name,
             default => 'Edytuj zadanie: '.$task->name,
         };
         $editCard = match (true) {
             $task->isProcedure() => 'Edytuj procedurę',
+            $task->isMeeting() => 'Edytuj spotkanie',
             $task->isCallback() => 'Edytuj oddzwonienie',
             default => 'Edytuj zadanie',
         };
         $nameLabel = match (true) {
             $task->isProcedure() => 'Nazwa procedury',
+            $task->isMeeting() => 'Nazwa spotkania',
             $task->isCallback() => 'Nazwa oddzwonienia',
             default => 'Nazwa zadania',
         };
-        $lockWorkflow = $task->isProcedure() || $task->isCallback();
+        $lockWorkflow = $task->isProcedure() || $task->isCallback() || $task->isMeeting();
     @endphp
     <x-slot name="header">
         <x-ui.page-header title="{{ $editTitle }}">
@@ -169,7 +172,7 @@
                             type="submit"
                             action="save"
                         >
-                            {{ $task->isCallback() ? 'Zapisz oddzwonienie' : ($task->isProcedure() ? 'Zapisz procedurę' : 'Zaktualizuj zadanie') }}
+                            {{ $task->isMeeting() ? 'Zapisz spotkanie' : ($task->isCallback() ? 'Zapisz oddzwonienie' : ($task->isProcedure() ? 'Zapisz procedurę' : 'Zaktualizuj zadanie')) }}
                         </x-ui.button>
                     </div>
                 </form>

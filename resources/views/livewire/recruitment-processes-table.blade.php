@@ -363,6 +363,9 @@
                             $nextStatus    = $currentStatus?->nextPipelineStatus();
                             $previousStatus = $currentStatus?->previousPipelineStatus();
                             $exitStatuses  = [RecruitmentStatus::Odrzucony, RecruitmentStatus::BylyPracownik];
+                            $scheduledMeeting = $selected->displayMeeting();
+                            $showMeetingAction = $currentStatus === RecruitmentStatus::WTrakcieKontaktu
+                                && $reviewStatus === RecruitmentStatus::WTrakcieKontaktu;
                         @endphp
 
                         {{-- Process rail stays pinned; the rest of the card scrolls. --}}
@@ -643,6 +646,19 @@
                                             <span>Zadzwoń</span>
                                         </button>
                                     </div>
+                                    @if($showMeetingAction)
+                                        @if($scheduledMeeting)
+                                            <a href="{{ route('tasks.show', $scheduledMeeting) }}" class="rp-action rp-action--meeting is-scheduled{{ $scheduledMeeting->isOpenMeeting() ? '' : ' is-done' }}">
+                                                <i class="bi bi-calendar-event{{ $scheduledMeeting->isOpenMeeting() ? '' : '-check' }}"></i>
+                                                <span>{{ $scheduledMeeting->meetingSlotLabel() }}</span>
+                                            </a>
+                                        @else
+                                            <button type="button" wire:click="openMeetingModal" class="rp-action rp-action--meeting">
+                                                <i class="bi bi-calendar-plus"></i>
+                                                <span>Umów spotkanie rekrutacyjne</span>
+                                            </button>
+                                        @endif
+                                    @endif
 
                                     @if($showBlacklistPrompt)
                                         <div class="mt-3">
@@ -784,6 +800,42 @@
                             </div>
                         @endif
 
+                        @if($reviewStatus === RecruitmentStatus::Zaakceptowany)
+                            @php $recruitmentMeetings = $selected->recruitmentMeetings(); @endphp
+                            @if($recruitmentMeetings->isNotEmpty())
+                                <div class="rp-doc-section rp-doc-section--meeting">
+                                    <div class="rp-field-label mb-2">
+                                        <i class="bi bi-calendar-event me-1"></i>Spotkanie rekrutacyjne
+                                    </div>
+                                    @foreach($recruitmentMeetings as $meeting)
+                                        @php $meetingOpen = $meeting->isOpenMeeting(); @endphp
+                                        <div class="rp-meeting-check{{ $meetingOpen ? '' : ' is-done' }}" wire:key="rp-meeting-{{ $meeting->id }}">
+                                            <button type="button"
+                                                    wire:click="toggleTaskDone({{ $meeting->id }})"
+                                                    class="rp-meeting-check__box"
+                                                    title="{{ $meetingOpen ? 'Oznacz jako odbyte' : 'Oznacz jako nieodbyte' }}">
+                                                <i class="bi bi-check2-square{{ $meetingOpen ? '' : '-fill' }}"></i>
+                                            </button>
+                                            <div class="rp-meeting-check__body">
+                                                <a href="{{ route('tasks.show', $meeting) }}" class="rp-meeting-check__title">{{ $meeting->meetingSlotLabel() }}</a>
+                                                <div class="rp-meeting-check__meta">
+                                                    {{ $meeting->name }}
+                                                    @if($meeting->assignedTo) · {{ $meeting->assignedTo->name }} @endif
+                                                </div>
+                                            </div>
+                                            @if($meetingOpen)
+                                                <button type="button" wire:click="toggleTaskDone({{ $meeting->id }})" class="btn btn-sm btn-outline-secondary flex-shrink-0">
+                                                    Odbyło się
+                                                </button>
+                                            @else
+                                                <span class="rp-meeting-check__done">Odbyte</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endif
+
                         @if($reviewSlotKey)
                             <div class="rp-doc-section rp-doc-section--slot">
                                 <div class="rp-section-title">{{ $reviewStatus->procedureSlotLabel() }}</div>
@@ -812,11 +864,15 @@
                                     <div class="min-width-0">
                                         <div style="{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'text-decoration:line-through;color:var(--text-muted);' : '' }}">{{ $task->name }}</div>
                                         <div style="color:var(--text-muted);font-size:.78rem;margin-top:.15rem;">
-                                            @if($task->due_date)<i class="bi bi-calendar-event me-1"></i>{{ $task->due_date->format('d.m.Y') }}@endif
+                                            @if($task->isMeeting())
+                                                <i class="bi bi-calendar-event me-1"></i>{{ $task->meetingSlotLabel() }}
+                                            @elseif($task->due_date)
+                                                <i class="bi bi-calendar-event me-1"></i>{{ $task->due_date->format('d.m.Y') }}
+                                            @endif
                                             @if($task->assignedTo) · {{ $task->assignedTo->name }} @endif
                                         </div>
                                     </div>
-                                    <button type="button" wire:click="toggleTaskDone({{ $task->id }})" class="btn btn-sm btn-outline-secondary flex-shrink-0" style="padding:2px 9px;font-size:.75rem;">
+                                    <button type="button" wire:click="toggleTaskDone({{ $task->id }})" class="btn btn-sm btn-outline-secondary flex-shrink-0" style="padding:2px 9px;font-size:.75rem;" title="{{ $task->isMeeting() ? ($task->status === \App\Enums\TaskStatus::COMPLETED ? 'Cofnij odbycie' : 'Odbyło się') : '' }}">
                                         <i class="bi bi-check2{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? '-square-fill' : '-square' }}"></i>
                                     </button>
                                 </div>
@@ -1015,6 +1071,62 @@
                     <div class="d-flex gap-2">
                         <button type="button" wire:click="saveFollowUpTask" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Dodaj zadanie</button>
                         <button type="button" wire:click="closeTaskModal" class="btn btn-outline-secondary btn-sm">Anuluj</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ════════════════════════════════════════════════════════
+         RECRUITMENT MEETING MODAL
+    ════════════════════════════════════════════════════════ --}}
+    @if($showMeetingModal)
+        <div class="rp-modal-backdrop" style="z-index:1060;" wire:click="closeMeetingModal"></div>
+        <div class="rp-modal-wrap" style="z-index:1061;align-items:center;justify-content:center;" role="dialog">
+            <div class="rp-modal" style="max-width:440px;width:100%;height:auto;">
+                <div class="rp-modal-topbar">
+                    <strong style="font-size:.9rem;"><i class="bi bi-calendar-plus me-1"></i>Umów spotkanie rekrutacyjne</strong>
+                    <button type="button" wire:click="closeMeetingModal" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="p-3">
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:.75rem;">Data <span class="text-danger">*</span></label>
+                        <input type="date" wire:model="meetingDate" class="form-control form-control-sm">
+                        @error('meetingDate') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size:.75rem;">Od <span class="text-danger">*</span></label>
+                            <input type="time" wire:model="meetingStart" class="form-control form-control-sm">
+                            @error('meetingStart') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" style="font-size:.75rem;">Do <span class="text-danger">*</span></label>
+                            <input type="time" wire:model="meetingEnd" class="form-control form-control-sm">
+                            @error('meetingEnd') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:.75rem;">Uczestnicy <span class="text-danger">*</span></label>
+                        <div class="rp-meeting-people">
+                            @foreach($recruiters as $recruiter)
+                                <label class="rp-meeting-person">
+                                    <input type="checkbox" wire:model="meetingParticipantIds" value="{{ $recruiter->id }}">
+                                    <span>{{ $recruiter->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('meetingParticipantIds') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                        @error('meetingParticipantIds.*') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.75rem;">Notatka (opcjonalnie)</label>
+                        <textarea wire:model="meetingNote" class="form-control form-control-sm" rows="2" style="resize:vertical;" placeholder="Dodatkowe informacje…"></textarea>
+                        <p class="mb-0 mt-1" style="font-size:.72rem;color:var(--text-muted);">W opisie zadania od razu pojawi się kandydat i link do tego procesu.</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" wire:click="saveMeeting" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Umów spotkanie</button>
+                        <button type="button" wire:click="closeMeetingModal" class="btn btn-outline-secondary btn-sm">Anuluj</button>
                     </div>
                 </div>
             </div>

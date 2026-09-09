@@ -257,6 +257,34 @@ class WorkItemBacklogTest extends TestCase
         $this->assertStringNotContainsString("toggleExpand({$item->id})", $html);
     }
 
+    public function test_meeting_task_is_typed_separately_and_visible_by_default(): void
+    {
+        $this->actingAs($this->user);
+
+        $starts = now()->addDay()->setTime(10, 0);
+        ProjectTask::query()->create([
+            'name' => 'Spotkanie rekrutacyjne: Jan Kowalski #12',
+            'category' => 'Rekrutacja',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+            'starts_at' => $starts,
+            'ends_at' => $starts->copy()->addHour(),
+            'participant_ids' => [$this->user->id],
+        ]);
+
+        $item = WorkItem::query()->first();
+        $this->assertSame(WorkItemType::Meeting, $item->type);
+        $this->assertFalse($item->expandable());
+        $this->assertSame(\App\WorkItems\StatusWidget::BinarySelect, $item->statusWidget());
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSee('Spotkanie rekrutacyjne: Jan Kowalski #12')
+            ->assertSee('Spotkanie')
+            ->assertSee('Oczekujące');
+    }
+
     public function test_callback_show_page_is_not_a_task_workspace(): void
     {
         $this->actingAs($this->user);

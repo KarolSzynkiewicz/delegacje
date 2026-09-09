@@ -1,6 +1,7 @@
 @php
     $isProcedure = $task->isProcedure();
     $isCallback = $task->isCallback();
+    $isMeeting = $task->isMeeting();
     $run = $task->procedureRun;
 @endphp
 
@@ -18,6 +19,11 @@
                 @if($isProcedure && $run)
                     <x-ui.badge variant="accent">Procedura</x-ui.badge>
                     <x-ui.badge variant="{{ $run->status->badgeVariant() }}">{{ $run->status->label() }}</x-ui.badge>
+                @elseif($isMeeting)
+                    <x-ui.badge variant="accent">Spotkanie</x-ui.badge>
+                    <x-ui.badge variant="{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'success' : 'warning' }}">
+                        {{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'Odbyte' : 'Umówione' }}
+                    </x-ui.badge>
                 @elseif($isCallback)
                     <x-ui.badge variant="accent">Oddzwonienie</x-ui.badge>
                     <x-ui.badge variant="{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'success' : 'warning' }}">
@@ -25,7 +31,7 @@
                     </x-ui.badge>
                 @endif
 
-                @if($isProcedure || $isCallback)
+                @if($isProcedure || $isCallback || $isMeeting)
                     <x-ui.button
                         variant="ghost"
                         href="{{ route('tasks.edit', $task) }}"
@@ -61,6 +67,8 @@
 
     @if($isProcedure)
         @include('tasks.partials.show-procedure')
+    @elseif($isMeeting)
+        @include('tasks.partials.show-meeting')
     @elseif($isCallback)
         @include('tasks.partials.show-callback')
     @else
