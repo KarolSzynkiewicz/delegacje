@@ -23,6 +23,15 @@
     <x-ui.card class="mb-3">
         <form method="GET" action="{{ route('advances.index') }}" class="row g-3 align-items-end">
             <div class="col-md-4">
+                <x-ui.input
+                    type="text"
+                    name="employee"
+                    label="Pracownik"
+                    placeholder="Imię lub nazwisko"
+                    :value="$employeeSearch ?? request('employee')"
+                />
+            </div>
+            <div class="col-md-4">
                 <x-ui.input type="select" name="payroll" label="Payroll">
                     <option value="all" {{ ($payrollFilter ?? request('payroll', 'all')) === 'all' ? 'selected' : '' }}>Wszystkie</option>
                     <option value="linked" {{ ($payrollFilter ?? request('payroll', 'all')) === 'linked' ? 'selected' : '' }}>Z payrollem</option>

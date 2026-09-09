@@ -1,7 +1,7 @@
 <div>
     <x-data-table-filters
         :count="$employees->total()"
-        :has-filters="(bool) ($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated || $hirePeriod)"
+        :has-filters="(bool) ($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated || $hirePeriod || $komornikFilter)"
         item-label="pracowników"
     >
         @if($statusDate || $showTerminated || $hirePeriod)
@@ -71,6 +71,14 @@
             </select>
         </div>
         <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-exclamation-octagon me-1"></i> Komornik</label>
+            <select wire:model.live="komornikFilter" class="form-select">
+                <option value="">Wszyscy</option>
+                <option value="yes">Z komornikiem</option>
+                <option value="no">Bez komornika</option>
+            </select>
+        </div>
+        <div class="dt-filter-field">
             <label class="form-label small"><i class="bi bi-building me-1"></i> Spółka</label>
             <select wire:model.live="companyFilter" class="form-select">
                 <option value="">Wszystkie spółki</option>
@@ -110,6 +118,9 @@
                         <x-employee-cell :employee="$employee" />
                         @if($employee->isTerminated())
                             <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                        @endif
+                        @if($employee->has_komornik)
+                            <x-ui.badge variant="warning">Komornik</x-ui.badge>
                         @endif
                     </div>
                     <x-ui.action-buttons>
@@ -227,6 +238,9 @@
                                     <x-employee-cell :employee="$employee"  />
                                     @if($employee->isTerminated())
                                         <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                                    @endif
+                                    @if($employee->has_komornik)
+                                        <x-ui.badge variant="warning">Komornik</x-ui.badge>
                                     @endif
                                 </div>
                             </td>

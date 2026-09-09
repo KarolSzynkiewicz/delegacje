@@ -2,37 +2,53 @@
 
 namespace App\Livewire;
 
-use App\Models\Payroll;
-use App\Models\Employee;
-use App\Models\EmployeeRate;
 use App\Models\Adjustment;
 use App\Models\Company;
-use Livewire\Component;
-use Livewire\WithPagination;
+use App\Models\EmployeeRate;
+use App\Models\Payroll;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Livewire\Component;
+use Livewire\WithPagination;
 
 class PayrollsTable extends Component
 {
     use WithPagination;
 
     public $search = '';
+
     public $statusFilter = '';
+
     public $companyFilter = '';
+
     public $dateFrom = '';
+
     public $dateTo = '';
+
+    /** '' | yes | no */
+    public string $komornikFilter = '';
+
     public $sortField = 'period_start';
+
     public $sortDirection = 'desc';
+
     public $bulkMode = false;
+
     public array $selectedPayrollIds = [];
+
     public bool $selectAllOnPage = false;
+
     public array $currentPagePayrollIds = [];
+
     public bool $showBulkWizard = false;
 
     public $bulkAmount = '';
+
     public $bulkDate = '';
+
     public $bulkCurrency = 'PLN';
+
     public $bulkDescription = '';
 
     protected $queryString = [
@@ -41,6 +57,7 @@ class PayrollsTable extends Component
         'companyFilter' => ['except' => ''],
         'dateFrom' => ['except' => ''],
         'dateTo' => ['except' => ''],
+        'komornikFilter' => ['except' => ''],
         'sortField' => ['except' => 'period_start'],
         'sortDirection' => ['except' => 'desc'],
         'bulkMode' => ['except' => false],
@@ -71,6 +88,11 @@ class PayrollsTable extends Component
         $this->resetPage();
     }
 
+    public function updatingKomornikFilter()
+    {
+        $this->resetPage();
+    }
+
     public function updatingBulkMode()
     {
         $this->resetSelection();
@@ -83,6 +105,7 @@ class PayrollsTable extends Component
         $this->companyFilter = '';
         $this->dateFrom = '';
         $this->dateTo = '';
+        $this->komornikFilter = '';
         $this->sortField = 'period_start';
         $this->sortDirection = 'desc';
         $this->resetPage();
@@ -109,6 +132,7 @@ class PayrollsTable extends Component
     {
         if (! $this->bulkMode) {
             $this->selectAllOnPage = false;
+
             return;
         }
 
@@ -147,6 +171,7 @@ class PayrollsTable extends Component
 
         if (count($this->selectedPayrollIds) < 1) {
             $this->addError('selectedPayrollIds', 'Wybierz przynajmniej jeden payroll.');
+
             return;
         }
 
@@ -181,6 +206,7 @@ class PayrollsTable extends Component
 
         if ($payrolls->isEmpty()) {
             $this->addError('selectedPayrollIds', 'Nie znaleziono wybranych payrolli.');
+
             return;
         }
 
@@ -241,40 +267,46 @@ class PayrollsTable extends Component
         $query = Payroll::with(['employee', 'adjustments', 'advances']);
 
         // Wyszukiwanie po pracowniku
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $searchTerm = trim($this->search);
             $query->whereHas('employee', function (Builder $q) use ($searchTerm) {
                 $q->where(function ($query) use ($searchTerm) {
-                    $query->where('first_name', 'like', '%' . $searchTerm . '%')
-                          ->orWhere('last_name', 'like', '%' . $searchTerm . '%')
-                          ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $searchTerm . '%']);
+                    $query->where('first_name', 'like', '%'.$searchTerm.'%')
+                        ->orWhere('last_name', 'like', '%'.$searchTerm.'%')
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%'.$searchTerm.'%']);
                 });
             });
         }
 
         // Filtrowanie po statusie
-        if (!empty($this->statusFilter)) {
+        if (! empty($this->statusFilter)) {
             $query->where('status', $this->statusFilter);
         }
 
         // Filtrowanie po spółce (przypisanie pracownika nakładające się na okres payrolla)
-        if (!empty($this->companyFilter)) {
+        if (! empty($this->companyFilter)) {
             $query->whereHas('employee.companyAssignments', function (Builder $q) {
                 $q->where('company_id', $this->companyFilter)
-                  ->whereColumn('company_assignments.start_date', '<=', 'payrolls.period_end')
-                  ->where(function (Builder $q2) {
-                      $q2->whereNull('company_assignments.end_date')
-                         ->orWhereColumn('company_assignments.end_date', '>=', 'payrolls.period_start');
-                  });
+                    ->whereColumn('company_assignments.start_date', '<=', 'payrolls.period_end')
+                    ->where(function (Builder $q2) {
+                        $q2->whereNull('company_assignments.end_date')
+                            ->orWhereColumn('company_assignments.end_date', '>=', 'payrolls.period_start');
+                    });
             });
         }
 
         // Filtrowanie po datach (payroll okres nachodzi na zakres)
-        if (!empty($this->dateFrom)) {
+        if (! empty($this->dateFrom)) {
             $query->whereDate('period_end', '>=', $this->dateFrom);
         }
-        if (!empty($this->dateTo)) {
+        if (! empty($this->dateTo)) {
             $query->whereDate('period_start', '<=', $this->dateTo);
+        }
+
+        if ($this->komornikFilter === 'yes') {
+            $query->whereHas('employee', fn (Builder $q) => $q->where('has_komornik', true));
+        } elseif ($this->komornikFilter === 'no') {
+            $query->whereHas('employee', fn (Builder $q) => $q->where('has_komornik', false));
         }
 
         // Sortowanie
@@ -294,7 +326,7 @@ class PayrollsTable extends Component
                 (string) $payroll->currency,
             ]);
 
-            if (!array_key_exists($key, $rateMemo)) {
+            if (! array_key_exists($key, $rateMemo)) {
                 $periodStart = Carbon::parse($payroll->period_start)->toDateString();
                 $periodEnd = Carbon::parse($payroll->period_end)->toDateString();
 

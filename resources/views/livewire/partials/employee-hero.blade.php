@@ -39,6 +39,11 @@
                         <span class="emp-hero__status-meta">od {{ $employee->hired_at->format('Y-m-d') }}</span>
                     @endif
                 @endif
+                @if($employee->has_komornik)
+                    <x-ui.badge variant="warning">
+                        <i class="bi bi-exclamation-octagon me-1"></i>Komornik
+                    </x-ui.badge>
+                @endif
                 <span class="emp-hero__id font-mono">#{{ $employee->id }}</span>
             </div>
 

@@ -30,6 +30,9 @@ class EmployeesTable extends Component
     /** '' | 7d | 30d — hired_at window */
     public string $hirePeriod = '';
 
+    /** '' | yes | no */
+    public string $komornikFilter = '';
+
     public $sortField = 'last_name';
 
     public $sortDirection = 'asc';
@@ -48,6 +51,7 @@ class EmployeesTable extends Component
         'statusDate' => ['except' => ''],
         'showTerminated' => ['except' => false],
         'hirePeriod' => ['except' => ''],
+        'komornikFilter' => ['except' => ''],
         'sortField' => ['except' => 'last_name'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -92,6 +96,11 @@ class EmployeesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingKomornikFilter()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->search = '';
@@ -102,6 +111,7 @@ class EmployeesTable extends Component
         $this->statusDate = '';
         $this->showTerminated = false;
         $this->hirePeriod = '';
+        $this->komornikFilter = '';
         $this->sortField = 'last_name';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -152,6 +162,12 @@ class EmployeesTable extends Component
             $query->where('hired_at', '>=', now()->subDays(7));
         } elseif ($this->hirePeriod === '30d') {
             $query->where('hired_at', '>=', now()->subDays(30));
+        }
+
+        if ($this->komornikFilter === 'yes') {
+            $query->where('has_komornik', true);
+        } elseif ($this->komornikFilter === 'no') {
+            $query->where('has_komornik', false);
         }
 
         // Filtrowanie po imieniu/nazwisku/emailu/telefonie

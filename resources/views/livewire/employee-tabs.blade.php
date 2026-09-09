@@ -248,6 +248,11 @@
                                 <x-ui.button variant="primary" href="{{ route('payrolls.create', ['employee_id' => $employee->id]) }}" class="btn-sm">Dodaj Payroll</x-ui.button>
                             </x-slot>
                         </x-ui.table-header>
+                        @if($employee->has_komornik)
+                            <x-ui.alert variant="warning" class="mb-3">
+                                Pracownik ma komornika — uwzględnij to przy wypłacie.
+                            </x-ui.alert>
+                        @endif
                         @if($tabData && $tabData->count() > 0)
                             <div class="table-responsive">
                                 <table class="table">

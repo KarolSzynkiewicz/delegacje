@@ -17,17 +17,28 @@ class AdvanceController extends Controller
     public function index(Request $request): View
     {
         $payrollFilter = $request->query('payroll', 'all');
+        $employeeSearch = trim((string) $request->query('employee', ''));
 
         $advances = Advance::query()
             ->with(['employee', 'payroll'])
             ->when($payrollFilter === 'linked', fn ($q) => $q->whereNotNull('payroll_id'))
             ->when($payrollFilter === 'unlinked', fn ($q) => $q->whereNull('payroll_id'))
+            ->when($employeeSearch !== '', function ($q) use ($employeeSearch) {
+                $term = '%'.addcslashes($employeeSearch, '%_\\').'%';
+                $q->whereHas('employee', function ($employees) use ($term) {
+                    $employees->where(function ($name) use ($term) {
+                        $name->where('first_name', 'like', $term)
+                            ->orWhere('last_name', 'like', $term)
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$term]);
+                    });
+                });
+            })
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->appends($request->query());
 
-        return view('advances.index', compact('advances', 'payrollFilter'));
+        return view('advances.index', compact('advances', 'payrollFilter', 'employeeSearch'));
     }
 
     public function create(): View

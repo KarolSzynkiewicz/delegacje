@@ -7,7 +7,7 @@
 
     <x-data-table-filters
         :count="$payrolls->total()"
-        :has-filters="(bool) (!empty($search) || !empty($statusFilter) || !empty($companyFilter) || !empty($dateFrom) || !empty($dateTo))"
+        :has-filters="(bool) (!empty($search) || !empty($statusFilter) || !empty($companyFilter) || !empty($dateFrom) || !empty($dateTo) || !empty($komornikFilter))"
         item-label="payrolli"
     >
         <x-slot:actions>
@@ -47,6 +47,17 @@
                 <option value="issued">Wystawiony</option>
                 <option value="approved">Zatwierdzony</option>
                 <option value="paid">Wypłacony</option>
+            </select>
+        </div>
+
+        <div class="dt-filter-field">
+            <label for="komornikFilter" class="form-label small">
+                <i class="bi bi-exclamation-octagon me-1"></i> Komornik
+            </label>
+            <select id="komornikFilter" wire:model.live="komornikFilter" class="form-select">
+                <option value="">Wszyscy</option>
+                <option value="yes">Z komornikiem</option>
+                <option value="no">Bez komornika</option>
             </select>
         </div>
 
@@ -136,7 +147,12 @@
                                     </td>
                                 @endif
                                 <td>
-                                    <x-employee-cell :employee="$payroll->employee" />
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <x-employee-cell :employee="$payroll->employee" />
+                                        @if($payroll->employee?->has_komornik)
+                                            <x-ui.badge variant="warning">Komornik</x-ui.badge>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column gap-1 lh-sm">

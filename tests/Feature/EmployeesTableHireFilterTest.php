@@ -62,4 +62,25 @@ class EmployeesTableHireFilterTest extends TestCase
             ->assertSee('Zatrudniony')
             ->assertSee($employee->hired_at->format('Y-m-d'));
     }
+
+    public function test_komornik_filter_keeps_garnished_employees_only(): void
+    {
+        Employee::factory()->create([
+            'first_name' => 'Z',
+            'last_name' => 'Komornikiem',
+            'has_komornik' => true,
+        ]);
+        Employee::factory()->create([
+            'first_name' => 'Bez',
+            'last_name' => 'Komornika',
+            'has_komornik' => false,
+        ]);
+
+        Livewire::test(EmployeesTable::class)
+            ->assertSee('Z Komornikiem')
+            ->assertSee('Bez Komornika')
+            ->set('komornikFilter', 'yes')
+            ->assertSee('Z Komornikiem')
+            ->assertDontSee('Bez Komornika');
+    }
 }
