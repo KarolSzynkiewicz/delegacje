@@ -1,11 +1,14 @@
 <div>
     <x-data-table-filters
         :count="$employees->total()"
-        :has-filters="(bool) ($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated)"
+        :has-filters="(bool) ($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated || $hirePeriod)"
         item-label="pracowników"
     >
-        @if($statusDate || $showTerminated)
+        @if($statusDate || $showTerminated || $hirePeriod)
             <x-slot:note>
+                @if($hirePeriod === '7d')zatrudnieni w ostatnich 7 dniach @endif
+                @if($hirePeriod === '30d')zatrudnieni w ostatnich 30 dniach @endif
+                @if($hirePeriod && ($statusDate || $showTerminated)), @endif
                 @if($statusDate){{ 'stan na '.\Carbon\Carbon::parse($statusDate)->format('d.m.Y') }}@endif
                 @if($statusDate && $showTerminated), @endif
                 @if($showTerminated)z uwzględnieniem zwolnionych @endif
@@ -28,6 +31,14 @@
         <div class="dt-filter-field dt-filter-field--wide">
             <label class="form-label small"><i class="bi bi-search me-1"></i> Szukaj</label>
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Imię, nazwisko, telefon..." class="form-control">
+        </div>
+        <div class="dt-filter-field">
+            <label class="form-label small"><i class="bi bi-person-plus me-1"></i> Zatrudniony</label>
+            <select wire:model.live="hirePeriod" class="form-select">
+                <option value="">Wszyscy</option>
+                <option value="7d">Ostatnie 7 dni</option>
+                <option value="30d">Ostatnie 30 dni</option>
+            </select>
         </div>
         <div class="dt-filter-field">
             <label class="form-label small"><i class="bi bi-calendar me-1"></i> Stan na dzień</label>
@@ -124,6 +135,9 @@
                     @if($companyAssignment && $companyAssignment->company)
                         <x-ui.badge variant="secondary">🏢 {{ $companyAssignment->company->name }}</x-ui.badge>
                     @endif
+                    @if($employee->hired_at)
+                        <span class="small text-muted">od {{ $employee->hired_at->format('d.m.Y') }}</span>
+                    @endif
                 </div>
                 @unless($inBaseOrTransit)
                     <div class="d-flex flex-wrap gap-1 small">
@@ -174,6 +188,9 @@
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
                             Pracownik
                         </x-livewire.sortable-header>
+                        <x-livewire.sortable-header field="hired_at" :sortField="$sortField" :sortDirection="$sortDirection" class="text-nowrap">
+                            Zatrudniony
+                        </x-livewire.sortable-header>
                         <th class="text-center" style="min-width: 120px;">Status</th>
                         <th class="text-center" style="min-width: 140px;">Dom</th>
                         <th class="text-center" style="min-width: 120px;">Auto</th>
@@ -212,6 +229,9 @@
                                         <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
                                     @endif
                                 </div>
+                            </td>
+                            <td class="text-nowrap font-mono small">
+                                {{ $employee->hired_at?->format('Y-m-d') ?? '—' }}
                             </td>
 
                             <!-- Status (Baza/W podróży/Poza bazą) -->
@@ -317,7 +337,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-4">
+                            <td colspan="10" class="text-center py-4">
                                 <x-ui.empty-state 
                                     icon="people"
                                     message="Brak pracowników do wyświetlenia"

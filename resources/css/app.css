@@ -12257,6 +12257,29 @@ body:has(.xuiv2-tasks.is-edi-review) .ui-page-header:not(.ui-page-header--has-le
     line-height: 1.45;
     color: #cbd5e1 !important;
 }
+.emp-lifecycle {
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--glass-border);
+}
+.emp-lifecycle__list {
+    list-style: none;
+    margin: 0.45rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.emp-lifecycle__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.65rem;
+    font-size: 0.85rem;
+}
+.emp-dossier__candidate {
+    margin-top: 0.85rem;
+}
 .emp-dossier {
     padding: 0.35rem 0.15rem !important;
 }

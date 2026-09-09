@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EmployeeLifecycleEventType;
 use App\Enums\EmployeeTerminationReason;
 use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -33,6 +34,7 @@ class Employee extends Model
         'image_path',
         'outside_base',
         'last_departure_id',
+        'hired_at',
         'terminated_at',
         'termination_reason',
         'termination_note',
@@ -46,9 +48,33 @@ class Employee extends Model
     protected $casts = [
         'outside_base' => 'boolean',
         'has_komornik' => 'boolean',
+        'hired_at' => 'datetime',
         'terminated_at' => 'datetime',
         'termination_reason' => EmployeeTerminationReason::class,
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Employee $employee) {
+            $employee->hired_at ??= now();
+        });
+
+        static::created(function (Employee $employee) {
+            if (EmployeeLifecycleEvent::query()
+                ->where('employee_id', $employee->id)
+                ->where('type', EmployeeLifecycleEventType::Hired)
+                ->exists()) {
+                return;
+            }
+
+            EmployeeLifecycleEvent::create([
+                'employee_id' => $employee->id,
+                'type' => EmployeeLifecycleEventType::Hired,
+                'occurred_at' => $employee->hired_at ?? $employee->created_at ?? now(),
+                'created_by' => auth()->id(),
+            ]);
+        });
+    }
 
     /**
      * The recruitment candidate identity linked to this employee, if any.
@@ -58,6 +84,15 @@ class Employee extends Model
     public function candidate(): HasOne
     {
         return $this->hasOne(RecruitmentCandidate::class, 'employee_id');
+    }
+
+    /**
+     * Append-only identity employment history. Current state is hired_at /
+     * terminated_at; this relation is the cycle (hire, terminate, reinstate).
+     */
+    public function lifecycleEvents(): HasMany
+    {
+        return $this->hasMany(EmployeeLifecycleEvent::class)->orderBy('occurred_at')->orderBy('id');
     }
 
     public function isTerminated(): bool

@@ -223,6 +223,13 @@ class ProcedureDomainModelTest extends TestCase
         $this->assertSame(RecruitmentStatus::Zatrudniony, $process->status);
         $this->assertSame($process->employee_id, $candidate->fresh()->employee_id);
         $this->assertTrue($process->employee->roles->contains('id', $role->id));
+        $this->assertNotNull($process->employee->hired_at);
+        $this->assertTrue(
+            $process->employee->lifecycleEvents()
+                ->where('type', \App\Enums\EmployeeLifecycleEventType::Hired)
+                ->where('recruitment_process_id', $process->id)
+                ->exists()
+        );
 
         $outcome = $run->fresh()->steps()->where('node_id', 'step-1')->first()?->historyOutcome();
         $this->assertNotNull($outcome);

@@ -8,6 +8,7 @@ use App\Models\ProcedureRun;
 use App\Models\Role;
 use App\Models\User;
 use App\ProcedureActions\AbstractAction;
+use App\Services\EmployeeLifecycleService;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -85,6 +86,8 @@ class HireCandidate extends AbstractAction
         $candidate->update(['employee_id' => $employee->id]);
         $process->transitionTo(RecruitmentStatus::Zatrudniony, $actor->id);
         $process->update(['employee_id' => $employee->id]);
+
+        app(EmployeeLifecycleService::class)->recordHire($employee, $process);
 
         return ['employee_id' => $employee->id];
     }

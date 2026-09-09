@@ -92,6 +92,8 @@ class ViewTest extends TestCase
         $response->assertSee('Konto bankowe');
         $response->assertSee('Rozmiar buta');
         $response->assertSee('Rozmiar spodni');
+        $response->assertSee('Zatrudniony');
+        $response->assertSee($employee->hired_at->format('Y-m-d'));
         $response->assertSee('Dodaj komentarz');
     }
 

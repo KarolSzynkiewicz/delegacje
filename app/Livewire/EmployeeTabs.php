@@ -167,8 +167,7 @@ class EmployeeTabs extends Component
             ]),
         ]);
 
-        // Load roles for info tab
-        $this->employee->load('roles');
+        $this->employee->load(['roles', 'lifecycleEvents.recruitmentProcess', 'candidate.processes']);
 
         // Load employee rates count manually
         $employeeRatesCount = \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->count();
@@ -221,6 +220,7 @@ class EmployeeTabs extends Component
             mb_substr((string) $this->employee->first_name, 0, 1).
             mb_substr((string) $this->employee->last_name, 0, 1)
         );
+        $lifecycleEvents = $this->employee->lifecycleEvents;
 
         return view('livewire.employee-tabs', compact(
             'tabData',
@@ -231,6 +231,7 @@ class EmployeeTabs extends Component
             'currentBankAccount',
             'locationStatus',
             'initials',
+            'lifecycleEvents',
         ));
     }
 }

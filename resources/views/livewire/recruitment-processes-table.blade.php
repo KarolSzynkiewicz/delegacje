@@ -341,9 +341,12 @@
                                            class="badge {{ $isFormerEmployee ? 'badge-warning' : 'badge-success' }} text-decoration-none"
                                            style="font-size:.68rem;padding:4px 9px;"
                                            title="{{ $isFormerEmployee
-                                               ? 'Zwolniony'.($linkedEmployee->terminated_at ? ' '.$linkedEmployee->terminated_at->format('d.m.Y') : '')
-                                               : 'Zatrudniony pracownik' }}">
+                                               ? 'Zwolniony'.($linkedEmployee->terminated_at ? ' '.$linkedEmployee->terminated_at->format('d.m.Y') : '').($linkedEmployee->hired_at ? ' · zatrudniony '.$linkedEmployee->hired_at->format('d.m.Y') : '')
+                                               : 'Zatrudniony'.($linkedEmployee->hired_at ? ' od '.$linkedEmployee->hired_at->format('d.m.Y') : '') }}">
                                             <i class="bi bi-person-{{ $isFormerEmployee ? 'x' : 'check' }} me-1"></i>{{ $isFormerEmployee ? 'Były pracownik' : 'Pracownik' }}
+                                            @if($linkedEmployee->hired_at && ! $isFormerEmployee)
+                                                <span class="ms-1" style="opacity:.8;font-weight:500;">{{ $linkedEmployee->hired_at->format('d.m.Y') }}</span>
+                                            @endif
                                             <i class="bi bi-box-arrow-up-right ms-1" style="font-size:.55rem;opacity:.75;"></i>
                                         </a>
                                     @endif
@@ -933,7 +936,10 @@
                         {{-- Inne procesy tego kandydata (bez bieżącego) --}}
                         @php
                             $siblingProcesses = $candidate
-                                ? $candidate->processes->where('id', '!=', $selected->id)->sortByDesc('created_at')
+                                ? $candidate->processes
+                                    ->where('id', '!=', $selected->id)
+                                    ->filter(fn ($proc) => $proc->lead?->referral_source !== \App\Enums\RecruitmentReferralSource::EmployeeLifecycle)
+                                    ->sortByDesc('created_at')
                                 : collect();
                         @endphp
                         @if($siblingProcesses->isNotEmpty())

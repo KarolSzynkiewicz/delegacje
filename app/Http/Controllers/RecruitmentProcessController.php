@@ -7,6 +7,7 @@ use App\Enums\RecruitmentStatus;
 use App\Http\Controllers\Concerns\HandlesImageUpload;
 use App\Models\Employee;
 use App\Models\RecruitmentProcess;
+use App\Services\EmployeeLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -101,6 +102,8 @@ class RecruitmentProcessController extends Controller
 
         $recruitmentProcess->transitionTo(RecruitmentStatus::Zatrudniony, auth()->id());
         $recruitmentProcess->update(['employee_id' => $employee->id]);
+
+        app(EmployeeLifecycleService::class)->recordHire($employee, $recruitmentProcess);
 
         return redirect()
             ->route('employees.show', $employee)

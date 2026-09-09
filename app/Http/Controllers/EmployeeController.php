@@ -50,9 +50,8 @@ class EmployeeController extends Controller
         $roles = $validated['roles'] ?? [];
         unset($validated['roles']);
 
-        // Jedna transakcja: jeśli zapis leada cyklu życia (recordHireOutsideProcess) się nie powiedzie,
-        // cofamy też utworzenie pracownika i ról — inaczej użytkownik widziałby błąd 500,
-        // mimo że pracownik już zostałby zapisany, i mógłby spróbować dodać go drugi raz.
+        // Jedna transakcja: jeśli powiązanie kandydata / zapis cyklu życia się nie powiedzie,
+        // cofamy też utworzenie pracownika i ról.
         $employee = DB::transaction(function () use ($validated, $roles) {
             $employee = Employee::create($validated);
             $employee->roles()->attach($roles);

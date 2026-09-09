@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Enums\RecruitmentStatus;
+use App\Enums\EmployeeLifecycleEventType;
 use App\Models\Employee;
 use App\Models\RecruitmentCandidate;
 use App\Services\EmployeeCandidateHireSyncService;
@@ -135,21 +135,14 @@ class EmployeeCandidateHireSyncServiceTest extends TestCase
         $createdCandidate = RecruitmentCandidate::where('phone', '48600100200')->first();
         $this->assertNotNull($createdCandidate);
         $this->assertSame($missing->id, $createdCandidate->employee_id);
+        $this->assertSame(0, $createdCandidate->processes()->count());
         $this->assertTrue(
-            $createdCandidate->processes()
-                ->where('status', RecruitmentStatus::Zatrudniony)
-                ->where('employee_id', $missing->id)
-                ->exists()
+            $missing->lifecycleEvents()->where('type', EmployeeLifecycleEventType::Hired)->exists()
         );
 
         $this->assertSame($unhiredEmployee->id, $unhiredCandidate->fresh()->employee_id);
         $this->assertSame('anna@example.com', $unhiredCandidate->fresh()->email);
-        $this->assertTrue(
-            $unhiredCandidate->processes()
-                ->where('status', RecruitmentStatus::Zatrudniony)
-                ->where('employee_id', $unhiredEmployee->id)
-                ->exists()
-        );
+        $this->assertSame(0, $unhiredCandidate->processes()->count());
 
         // Conflict candidate stays linked to the original owner — untouched.
         $this->assertSame(

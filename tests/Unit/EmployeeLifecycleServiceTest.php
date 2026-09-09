@@ -2,10 +2,11 @@
 
 namespace Tests\Unit;
 
+use App\Enums\EmployeeLifecycleEventType;
 use App\Enums\EmployeeTerminationReason;
-use App\Enums\RecruitmentReferralSource;
 use App\Enums\RecruitmentStatus;
 use App\Models\Employee;
+use App\Models\EmployeeLifecycleEvent;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentLead;
 use App\Models\RecruitmentProcess;
@@ -23,7 +24,20 @@ class EmployeeLifecycleServiceTest extends TestCase
         return new EmployeeLifecycleService;
     }
 
-    public function test_record_hire_outside_process_creates_candidate_lead_and_hired_process(): void
+    public function test_creating_an_employee_sets_hired_at_and_hired_event(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->assertNotNull($employee->hired_at);
+        $this->assertTrue(
+            $employee->lifecycleEvents()
+                ->where('type', EmployeeLifecycleEventType::Hired)
+                ->exists()
+        );
+        $this->assertSame(0, RecruitmentProcess::count());
+    }
+
+    public function test_record_hire_outside_process_creates_candidate_without_fake_process(): void
     {
         $role = Role::factory()->create();
         $employee = Employee::factory()->create([
@@ -38,17 +52,8 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertNotNull($candidate);
         $this->assertSame('48600100200', $candidate->phone);
         $this->assertTrue($candidate->roles->contains('id', $role->id));
-
-        $lead = $candidate->leads()->latest('id')->first();
-        $this->assertSame(RecruitmentReferralSource::EmployeeLifecycle, $lead->referral_source);
-        $this->assertStringStartsWith('Zatrudnienie poza procesem – ', $lead->referral_source_detail);
-
-        $this->assertTrue(
-            $candidate->processes()
-                ->where('status', RecruitmentStatus::Zatrudniony)
-                ->where('employee_id', $employee->id)
-                ->exists()
-        );
+        $this->assertSame(0, $candidate->processes()->count());
+        $this->assertSame(1, $employee->lifecycleEvents()->where('type', EmployeeLifecycleEventType::Hired)->count());
     }
 
     public function test_record_hire_outside_process_links_existing_unhired_candidate_by_phone(): void
@@ -66,10 +71,7 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertSame(1, RecruitmentCandidate::where('phone', '48501999888')->count());
         $this->assertSame($employee->id, $existing->fresh()->employee_id);
         $this->assertSame('anna@example.com', $existing->fresh()->email);
-        $this->assertStringStartsWith(
-            'Zatrudnienie poza procesem – ',
-            $existing->leads()->latest('id')->first()->referral_source_detail
-        );
+        $this->assertSame(0, $existing->processes()->count());
     }
 
     public function test_record_hire_outside_process_is_idempotent(): void
@@ -80,10 +82,11 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->service()->recordHireOutsideProcess($employee);
 
         $this->assertSame(1, RecruitmentCandidate::where('employee_id', $employee->id)->count());
-        $this->assertSame(1, RecruitmentProcess::where('employee_id', $employee->id)->count());
+        $this->assertSame(0, RecruitmentProcess::where('employee_id', $employee->id)->count());
+        $this->assertSame(1, EmployeeLifecycleEvent::where('employee_id', $employee->id)->where('type', EmployeeLifecycleEventType::Hired)->count());
     }
 
-    public function test_terminate_sets_fields_and_adds_audit_process_without_touching_history(): void
+    public function test_terminate_sets_fields_and_appends_event_without_touching_recruitment_history(): void
     {
         $employee = Employee::factory()->create();
         $candidate = RecruitmentCandidate::create([
@@ -110,18 +113,13 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertTrue($employee->isTerminated());
 
         $this->assertSame(RecruitmentStatus::Zatrudniony, $oldProcess->fresh()->status);
+        $this->assertSame(1, $candidate->processes()->count());
 
-        $this->assertSame(2, $candidate->processes()->count());
         $this->assertTrue(
-            $candidate->processes()
-                ->where('status', RecruitmentStatus::BylyPracownik)
-                ->where('employee_id', $employee->id)
+            $employee->lifecycleEvents()
+                ->where('type', EmployeeLifecycleEventType::Terminated)
                 ->exists()
         );
-
-        $terminationLead = $candidate->leads()->latest('id')->first();
-        $this->assertSame(RecruitmentReferralSource::EmployeeLifecycle, $terminationLead->referral_source);
-        $this->assertStringStartsWith('Zwolnienie pracownika – ', $terminationLead->referral_source_detail);
 
         $this->assertTrue($candidate->fresh()->isFormerEmployee());
         $this->assertFalse($candidate->fresh()->isHired());
@@ -137,9 +135,14 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertTrue($employee->isTerminated());
         $this->assertSame(EmployeeTerminationReason::ContractExpired, $employee->termination_reason);
         $this->assertSame(0, RecruitmentProcess::count());
+        $this->assertTrue(
+            $employee->lifecycleEvents()
+                ->where('type', EmployeeLifecycleEventType::Terminated)
+                ->exists()
+        );
     }
 
-    public function test_reinstate_clears_termination_fields_and_adds_audit_process(): void
+    public function test_reinstate_clears_termination_fields_and_appends_event(): void
     {
         $employee = Employee::factory()->create();
         $candidate = RecruitmentCandidate::create([
@@ -150,8 +153,7 @@ class EmployeeLifecycleServiceTest extends TestCase
         ]);
 
         $this->service()->terminate($employee, EmployeeTerminationReason::Other);
-        $formerProcess = $candidate->processes()->where('status', RecruitmentStatus::BylyPracownik)->first();
-        $this->assertNotNull($formerProcess);
+        $this->assertSame(0, $candidate->processes()->count());
 
         $this->service()->reinstate($employee->fresh());
 
@@ -160,20 +162,12 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertNull($employee->termination_reason);
         $this->assertNull($employee->termination_note);
 
-        // History is append-only — termination audit stays.
-        $this->assertSame(RecruitmentStatus::BylyPracownik, $formerProcess->fresh()->status);
-
-        $this->assertSame(2, $candidate->processes()->count());
+        $this->assertSame(0, $candidate->processes()->count());
         $this->assertTrue(
-            $candidate->processes()
-                ->where('status', RecruitmentStatus::Zatrudniony)
-                ->where('employee_id', $employee->id)
+            $employee->lifecycleEvents()
+                ->where('type', EmployeeLifecycleEventType::Reinstated)
                 ->exists()
         );
-
-        $reinstateLead = $candidate->leads()->latest('id')->first();
-        $this->assertSame(RecruitmentReferralSource::EmployeeLifecycle, $reinstateLead->referral_source);
-        $this->assertStringStartsWith('Przywrócenie pracownika – ', $reinstateLead->referral_source_detail);
 
         $this->assertTrue($candidate->fresh()->isHired());
         $this->assertFalse($candidate->fresh()->isFormerEmployee());
@@ -193,5 +187,35 @@ class EmployeeLifecycleServiceTest extends TestCase
         $this->assertNull($employee->termination_reason);
         $this->assertSame(0, RecruitmentProcess::count());
         $this->assertSame(0, RecruitmentLead::count());
+        $this->assertTrue(
+            $employee->lifecycleEvents()
+                ->where('type', EmployeeLifecycleEventType::Reinstated)
+                ->exists()
+        );
+    }
+
+    public function test_record_hire_attaches_recruitment_process_to_existing_hired_event(): void
+    {
+        $employee = Employee::factory()->create();
+        $candidate = RecruitmentCandidate::create([
+            'first_name' => $employee->first_name,
+            'last_name' => $employee->last_name,
+            'employee_id' => $employee->id,
+        ]);
+        $lead = RecruitmentLead::create(['candidate_id' => $candidate->id]);
+        $process = RecruitmentProcess::create([
+            'lead_id' => $lead->id,
+            'candidate_id' => $candidate->id,
+            'status' => RecruitmentStatus::Zatrudniony,
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->service()->recordHire($employee, $process);
+
+        $this->assertSame(1, $employee->lifecycleEvents()->where('type', EmployeeLifecycleEventType::Hired)->count());
+        $this->assertSame(
+            $process->id,
+            $employee->lifecycleEvents()->where('type', EmployeeLifecycleEventType::Hired)->first()->recruitment_process_id
+        );
     }
 }

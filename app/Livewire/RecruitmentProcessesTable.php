@@ -17,6 +17,7 @@ use App\Models\RecruitmentGridView;
 use App\Models\RecruitmentProcess;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\EmployeeLifecycleService;
 use App\Support\PhoneNormalizer;
 use App\Support\RecruitmentBacklog;
 use Illuminate\Database\Eloquent\Builder;
@@ -1796,6 +1797,8 @@ class RecruitmentProcessesTable extends Component
 
         $process->transitionTo(RecruitmentStatus::Zatrudniony, auth()->id());
         $process->update(['employee_id' => $employee->id]);
+
+        app(EmployeeLifecycleService::class)->recordHire($employee, $process);
 
         session()->flash('success', "Kandydat {$employee->full_name} został zatrudniony i dodany do bazy pracowników.");
 

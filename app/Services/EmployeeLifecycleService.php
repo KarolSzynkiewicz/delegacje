@@ -2,56 +2,72 @@
 
 namespace App\Services;
 
+use App\Enums\EmployeeLifecycleEventType;
 use App\Enums\EmployeeTerminationReason;
-use App\Enums\RecruitmentReferralSource;
-use App\Enums\RecruitmentStatus;
 use App\Models\Employee;
+use App\Models\EmployeeLifecycleEvent;
 use App\Models\RecruitmentCandidate;
-use App\Models\RecruitmentLead;
 use App\Models\RecruitmentProcess;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Employee lifecycle events that touch the recruitment domain:
- * hire outside the recruitment pipeline, terminate, reinstate.
- * History is append-only — existing leads/processes are never rewritten.
+ * Identity employment lifecycle lives on Employee (hired_at / terminated_at
+ * plus append-only employee_lifecycle_events). Recruitment stays a hiring
+ * pipeline: we may link a candidate identity, but we never append fake
+ * hire/terminate processes there.
  */
 class EmployeeLifecycleService
 {
     /**
+     * Record that this person became an employee. Idempotent for the first
+     * hire event. Optionally points at the recruitment process that produced
+     * the hire (pipeline outcome stays on that process).
+     */
+    public function recordHire(Employee $employee, ?RecruitmentProcess $process = null): void
+    {
+        $hiredAt = $employee->hired_at ?? $employee->created_at ?? now();
+
+        if ($employee->hired_at === null) {
+            $employee->update(['hired_at' => $hiredAt]);
+        }
+
+        $existing = EmployeeLifecycleEvent::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeLifecycleEventType::Hired)
+            ->first();
+
+        if ($existing) {
+            if ($process && $existing->recruitment_process_id === null) {
+                $existing->update(['recruitment_process_id' => $process->id]);
+            }
+
+            return;
+        }
+
+        $this->appendEvent(
+            $employee,
+            EmployeeLifecycleEventType::Hired,
+            $hiredAt,
+            recruitmentProcessId: $process?->id,
+        );
+    }
+
+    /**
      * After creating an employee via /employees/create: ensure a candidate
-     * identity exists, link employee_id, and append an audit lead + process
-     * (status Zatrudniony) with referral_source EmployeeLifecycle.
+     * identity exists and is linked, then record the hire on the employee.
      */
     public function recordHireOutsideProcess(Employee $employee): void
     {
         DB::transaction(function () use ($employee) {
-            if (RecruitmentCandidate::query()->where('employee_id', $employee->id)->exists()) {
-                return;
-            }
-
-            $candidate = $this->resolveOrCreateCandidateForHire($employee);
+            $candidate = $this->ensureCandidateLinked($employee);
 
             $roleIds = $employee->roles()->pluck('roles.id');
             if ($roleIds->isNotEmpty()) {
                 $candidate->roles()->syncWithoutDetaching($roleIds);
             }
 
-            $hiredAt = $employee->created_at ?? now();
-
-            $lead = RecruitmentLead::create([
-                'candidate_id' => $candidate->id,
-                'referral_source' => RecruitmentReferralSource::EmployeeLifecycle,
-                'referral_source_detail' => 'Zatrudnienie poza procesem – '.$hiredAt->format('d.m.Y'),
-            ]);
-
-            RecruitmentProcess::create([
-                'lead_id' => $lead->id,
-                'candidate_id' => $candidate->id,
-                'status' => RecruitmentStatus::Zatrudniony,
-                'employee_id' => $employee->id,
-            ]);
+            $this->recordHire($employee);
         });
     }
 
@@ -64,34 +80,19 @@ class EmployeeLifecycleService
                 'termination_note' => $note,
             ]);
 
-            $candidate = RecruitmentCandidate::query()->where('employee_id', $employee->id)->first();
-            if (! $candidate) {
-                // No linked candidate identity yet — nothing to annotate. The
-                // employee-candidate hire sync (system-actions) backfills this FK.
-                return;
-            }
-
-            $terminatedAt = $employee->terminated_at ?? now();
-
-            $lead = RecruitmentLead::create([
-                'candidate_id' => $candidate->id,
-                'referral_source' => RecruitmentReferralSource::EmployeeLifecycle,
-                'referral_source_detail' => 'Zwolnienie pracownika – '.$terminatedAt->format('d.m.Y'),
-            ]);
-
-            RecruitmentProcess::create([
-                'lead_id' => $lead->id,
-                'candidate_id' => $candidate->id,
-                'status' => RecruitmentStatus::BylyPracownik,
-                'employee_id' => $employee->id,
-            ]);
+            $this->appendEvent(
+                $employee,
+                EmployeeLifecycleEventType::Terminated,
+                $employee->terminated_at ?? now(),
+                reason: $reason,
+                note: $note,
+            );
         });
     }
 
     /**
-     * Undo a termination. Existing audit history (including the BylyPracownik
-     * process from terminate()) stays as-is; we only clear employee termination
-     * fields and append a new Zatrudniony audit lead+process.
+     * Undo a termination. Existing event history stays as-is; we only clear
+     * current-state termination fields and append a reinstated event.
      */
     public function reinstate(Employee $employee): void
     {
@@ -102,25 +103,11 @@ class EmployeeLifecycleService
                 'termination_note' => null,
             ]);
 
-            $candidate = RecruitmentCandidate::query()->where('employee_id', $employee->id)->first();
-            if (! $candidate) {
-                return;
-            }
-
-            $reinstatedAt = now();
-
-            $lead = RecruitmentLead::create([
-                'candidate_id' => $candidate->id,
-                'referral_source' => RecruitmentReferralSource::EmployeeLifecycle,
-                'referral_source_detail' => 'Przywrócenie pracownika – '.$reinstatedAt->format('d.m.Y'),
-            ]);
-
-            RecruitmentProcess::create([
-                'lead_id' => $lead->id,
-                'candidate_id' => $candidate->id,
-                'status' => RecruitmentStatus::Zatrudniony,
-                'employee_id' => $employee->id,
-            ]);
+            $this->appendEvent(
+                $employee,
+                EmployeeLifecycleEventType::Reinstated,
+                now(),
+            );
         });
     }
 
@@ -130,6 +117,16 @@ class EmployeeLifecycleService
      * employee), create a new candidate without that phone so we never steal
      * or duplicate a linked identity.
      */
+    private function ensureCandidateLinked(Employee $employee): RecruitmentCandidate
+    {
+        $existing = RecruitmentCandidate::query()->where('employee_id', $employee->id)->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        return $this->resolveOrCreateCandidateForHire($employee);
+    }
+
     private function resolveOrCreateCandidateForHire(Employee $employee): RecruitmentCandidate
     {
         $phone = PhoneNormalizer::normalize($employee->phone);
@@ -161,6 +158,25 @@ class EmployeeLifecycleService
             'email' => $employee->email ?: null,
             'phone' => $employee->phone,
             'employee_id' => $employee->id,
+        ]);
+    }
+
+    private function appendEvent(
+        Employee $employee,
+        EmployeeLifecycleEventType $type,
+        mixed $occurredAt,
+        ?EmployeeTerminationReason $reason = null,
+        ?string $note = null,
+        ?int $recruitmentProcessId = null,
+    ): void {
+        EmployeeLifecycleEvent::create([
+            'employee_id' => $employee->id,
+            'type' => $type,
+            'occurred_at' => $occurredAt,
+            'reason' => $reason,
+            'note' => $note,
+            'recruitment_process_id' => $recruitmentProcessId,
+            'created_by' => auth()->id(),
         ]);
     }
 }

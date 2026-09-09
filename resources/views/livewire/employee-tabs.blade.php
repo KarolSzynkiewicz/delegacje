@@ -44,6 +44,14 @@
                 <div class="card-body emp-dossier">
                     <div class="emp-facts">
                         <div class="emp-fact">
+                            <div class="emp-fact__label">Zatrudniony</div>
+                            <p class="emp-fact__value font-mono">{{ $employee->hired_at?->format('Y-m-d') ?: '-' }}</p>
+                        </div>
+                        <div class="emp-fact">
+                            <div class="emp-fact__label">Zwolniony</div>
+                            <p class="emp-fact__value font-mono">{{ $employee->terminated_at?->format('Y-m-d') ?: '-' }}</p>
+                        </div>
+                        <div class="emp-fact">
                             <div class="emp-fact__label">Rozmiar buta</div>
                             <p class="emp-fact__value">{{ $employee->shoe_size ?: '-' }}</p>
                         </div>
@@ -70,6 +78,40 @@
                             <p class="emp-fact__value emp-fact__value--notes">{{ $employee->notes ?: '-' }}</p>
                         </div>
                     </div>
+                    @if($lifecycleEvents->isNotEmpty())
+                        <div class="emp-lifecycle">
+                            <div class="emp-fact__label">Cykl życia</div>
+                            <ol class="emp-lifecycle__list">
+                                @foreach($lifecycleEvents as $event)
+                                    <li class="emp-lifecycle__item">
+                                        <x-ui.badge :variant="$event->type->variant()">{{ $event->type->label() }}</x-ui.badge>
+                                        <span class="font-mono">{{ $event->occurred_at->format('Y-m-d') }}</span>
+                                        @if($event->reason)
+                                            <span class="text-muted">{{ $event->reason->label() }}</span>
+                                        @endif
+                                        @if($event->note)
+                                            <span class="text-muted">{{ $event->note }}</span>
+                                        @endif
+                                        @if($event->recruitmentProcess)
+                                            <a href="{{ route('recruitment-processes.show', $event->recruitmentProcess) }}" class="small">proces #{{ $event->recruitment_process_id }}</a>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
+                    @endif
+                    @if($employee->candidate)
+                        @php
+                            $candidateProcess = $employee->candidate->processes->sortByDesc('id')->first();
+                        @endphp
+                        @if($candidateProcess)
+                            <div class="emp-dossier__candidate">
+                                <a href="{{ route('recruitment-processes.show', $candidateProcess) }}" class="small">
+                                    <i class="bi bi-person-badge me-1"></i>Karta kandydata
+                                </a>
+                            </div>
+                        @endif
+                    @endif
                     @if(auth()->user()->hasPermission('comments.view'))
                         <div class="emp-dossier__comments">
                             <x-comments embedded :commentable="$employee" />
@@ -667,7 +709,7 @@
                         <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
                         <div>
                             Ta akcja nie usuwa pracownika ani nie zmienia historii rekrutacji.
-                            Zapisuje tylko datę i powód zwolnienia oraz dodaje wpis audytowy do bazy kandydatów (status: <em>Były pracownik</em>).
+                            Zapisuje datę i powód zwolnienia w cyklu życia pracownika.
                         </div>
                     </div>
 

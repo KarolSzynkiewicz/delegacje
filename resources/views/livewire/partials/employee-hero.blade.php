@@ -25,6 +25,9 @@
                         {{ $employee->terminated_at->format('Y-m-d') }}
                         · {{ $employee->termination_reason?->label() ?? '-' }}
                     </span>
+                    @if($employee->hired_at)
+                        <span class="emp-hero__status-meta">Zatrudniony {{ $employee->hired_at->format('Y-m-d') }}</span>
+                    @endif
                     @if($employee->termination_note)
                         <span class="emp-hero__status-note">{{ $employee->termination_note }}</span>
                     @endif
@@ -32,6 +35,9 @@
                     <x-ui.badge variant="success">
                         <i class="bi bi-person-check me-1"></i>Zatrudniony
                     </x-ui.badge>
+                    @if($employee->hired_at)
+                        <span class="emp-hero__status-meta">od {{ $employee->hired_at->format('Y-m-d') }}</span>
+                    @endif
                 @endif
                 <span class="emp-hero__id font-mono">#{{ $employee->id }}</span>
             </div>

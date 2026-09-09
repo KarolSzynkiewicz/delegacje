@@ -27,6 +27,9 @@ class EmployeesTable extends Component
     /** When false (default), terminated employees are hidden from the list. */
     public bool $showTerminated = false;
 
+    /** '' | 7d | 30d — hired_at window */
+    public string $hirePeriod = '';
+
     public $sortField = 'last_name';
 
     public $sortDirection = 'asc';
@@ -44,6 +47,7 @@ class EmployeesTable extends Component
         'companyFilter' => ['except' => ''],
         'statusDate' => ['except' => ''],
         'showTerminated' => ['except' => false],
+        'hirePeriod' => ['except' => ''],
         'sortField' => ['except' => 'last_name'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -83,6 +87,11 @@ class EmployeesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingHirePeriod()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->search = '';
@@ -92,6 +101,7 @@ class EmployeesTable extends Component
         $this->companyFilter = '';
         $this->statusDate = '';
         $this->showTerminated = false;
+        $this->hirePeriod = '';
         $this->sortField = 'last_name';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -136,6 +146,12 @@ class EmployeesTable extends Component
         // Domyślnie ukrywaj zwolnionych; checkbox „Pokaż zwolnionych” pokazuje wszystkich
         if (! $this->showTerminated) {
             $query->whereNull('terminated_at');
+        }
+
+        if ($this->hirePeriod === '7d') {
+            $query->where('hired_at', '>=', now()->subDays(7));
+        } elseif ($this->hirePeriod === '30d') {
+            $query->where('hired_at', '>=', now()->subDays(30));
         }
 
         // Filtrowanie po imieniu/nazwisku/emailu/telefonie

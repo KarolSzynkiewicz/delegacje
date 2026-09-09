@@ -2,12 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\RecruitmentReferralSource;
-use App\Enums\RecruitmentStatus;
 use App\Models\Employee;
 use App\Models\RecruitmentCandidate;
-use App\Models\RecruitmentLead;
-use App\Models\RecruitmentProcess;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -15,9 +11,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Backfill `recruitment_candidates.employee_id` — the FK that is the source of
  * truth for "which candidate identity is this employee" — for every employee
- * with a phone number. Also creates an audit Lead + RecruitmentProcess (status
- * Zatrudniony) for traceability, mirroring the MBS import UX: inspect first,
- * then commit. RecruitmentProcess history itself is never mutated.
+ * with a phone number. Inspect first, then commit. RecruitmentProcess history
+ * itself is never mutated; hire events are recorded on the employee.
  */
 class EmployeeCandidateHireSyncService
 {
@@ -172,49 +167,15 @@ class EmployeeCandidateHireSyncService
 
         $candidate = RecruitmentCandidate::where('phone', $phone)->first();
 
-        if ($candidate) {
-            if ($candidate->employee_id !== null) {
-                return 'skipped'; // conflict — needs manual resolution
-            }
-
-            $candidate->update(['employee_id' => $employee->id]);
-            $this->createHiredProcess($candidate, $employee);
-
-            return 'marked';
+        if ($candidate && $candidate->employee_id !== null) {
+            return 'skipped'; // conflict — needs manual resolution
         }
 
-        $candidate = RecruitmentCandidate::create([
-            'first_name' => $employee->first_name,
-            'last_name' => $employee->last_name,
-            'email' => $employee->email ?: null,
-            'phone' => $employee->phone,
-            'employee_id' => $employee->id,
-        ]);
+        $wasExistingUnlinked = $candidate !== null;
 
-        $roleIds = $employee->roles()->pluck('roles.id');
-        if ($roleIds->isNotEmpty()) {
-            $candidate->roles()->sync($roleIds);
-        }
+        app(EmployeeLifecycleService::class)->recordHireOutsideProcess($employee);
 
-        $this->createHiredProcess($candidate, $employee);
-
-        return 'created';
-    }
-
-    private function createHiredProcess(RecruitmentCandidate $candidate, Employee $employee): void
-    {
-        $lead = RecruitmentLead::create([
-            'candidate_id' => $candidate->id,
-            'referral_source' => RecruitmentReferralSource::SystemBackfill,
-            'referral_source_detail' => 'Synchronizacja pracownik → kandydat (akcje systemowe)',
-        ]);
-
-        RecruitmentProcess::create([
-            'lead_id' => $lead->id,
-            'candidate_id' => $candidate->id,
-            'status' => RecruitmentStatus::Zatrudniony,
-            'employee_id' => $employee->id,
-        ]);
+        return $wasExistingUnlinked ? 'marked' : 'created';
     }
 
     /**

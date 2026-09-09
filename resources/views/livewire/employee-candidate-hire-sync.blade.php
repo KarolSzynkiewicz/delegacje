@@ -30,8 +30,8 @@
                             Porównuje pracowników z kandydatami po <strong>znormalizowanym numerze telefonu</strong>
                             (ten sam normalizer co w module rekrutacji). Ustawia FK <code>candidate.employee_id</code> —
                             to jest źródło prawdy o tym, kto jest zatrudniony, nie sam status procesu.<br>
-                            <strong>Brak w bazie kandydatów</strong> → utworzy kandydata, podlinkuje do pracownika i doda audytowy lead + proces <em>Zatrudniony</em>.<br>
-                            <strong>Kandydat niezatrudniony</strong> → podlinkuje istniejącego kandydata (bez nadpisywania jego danych) i doda audytowy proces <em>Zatrudniony</em>.<br>
+                            <strong>Brak w bazie kandydatów</strong> → utworzy kandydata i podlinkuje do pracownika (zatrudnienie zapisuje się w cyklu życia pracownika).<br>
+                            <strong>Kandydat niezatrudniony</strong> → podlinkuje istniejącego kandydata (bez nadpisywania jego danych).<br>
                             <strong>Już podlinkowany / bez telefonu</strong> → pominięte.<br>
                             <strong>Konflikt</strong> (telefon zgadza się, ale kandydat jest już podlinkowany do innego pracownika) → pominięte, wymaga ręcznego sprawdzenia.
                         </div>
