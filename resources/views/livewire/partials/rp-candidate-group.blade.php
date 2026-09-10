@@ -5,10 +5,10 @@
     $candHasActive = $cand->processes->contains(fn ($p) => $selectedId === $p->id);
     $isPinned = $isPinned ?? false;
 @endphp
-<div class="rp-cand-group {{ $candHasActive ? 'rp-cand-group--active' : '' }}" @unless($readonly) wire:key="lc-{{ $cand->id }}" @endunless>
+<div class="rp-cand-group {{ $candHasActive ? 'rp-cand-group--active' : '' }} {{ $isPinned ? 'is-pinned' : '' }}" @unless($readonly) wire:key="lc-{{ $cand->id }}" @endunless>
     <div class="rp-cand-group__head">
         <div class="position-relative flex-shrink-0">
-            <x-ui.avatar :image-url="$cand->photo_url" :initials="mb_strtoupper(mb_substr($cand->first_name,0,1).mb_substr($cand->last_name,0,1))" size="28px" shape="rounded" :border="false" />
+            <x-ui.avatar :image-url="$cand->photo_url" :initials="mb_strtoupper(mb_substr($cand->first_name,0,1).mb_substr($cand->last_name,0,1))" size="34px" shape="rounded" :border="false" />
             @if($cand->rating === RecruitmentCandidateFlag::Wartosciowy)
                 <i class="bi bi-star-fill position-absolute" style="font-size:.55rem;color:#f59e0b;bottom:-2px;right:-2px;"></i>
             @elseif($cand->rating === RecruitmentCandidateFlag::CzarnaLista)
@@ -17,7 +17,7 @@
         </div>
         <div class="flex-grow-1 min-width-0">
             <div class="rp-cand-group__name">{{ $cand->full_name }}</div>
-            <div class="rp-cand-group__meta">{{ $cand->phone ?? $cand->email }}</div>
+            <div class="rp-cand-group__meta">{{ implode(' · ', array_filter([$cand->phone, $cand->email])) }}</div>
         </div>
         @if($isPinned)
             <i class="bi bi-pin-angle-fill flex-shrink-0" style="font-size:.62rem;color:var(--primary);" title="Aktualnie otwarty"></i>
@@ -30,27 +30,31 @@
         @php
             $matchesFilter = ! ($status ?? null) || $proc->status?->value === $status;
             $variant = $proc->status?->variant() ?? 'secondary';
-        @endphp
-        @php
-            $procClass = 'rp-cand-proc '.($selectedId===$proc->id ? 'rp-cand-proc--active' : '').' '.($matchesFilter ? '' : 'rp-cand-proc--muted');
+            $when = $proc->last_contact_at ?? $proc->created_at;
+            $whenDate = $when ? \Carbon\Carbon::parse($when) : null;
+            $procClass = 'rp-cand-proc '.($selectedId === $proc->id ? 'rp-cand-proc--active' : '').' '.($matchesFilter ? '' : 'rp-cand-proc--muted');
         @endphp
         @if($readonly)
             <div class="{{ $procClass }}">
-                <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
-                <span class="rp-cand-proc__status is-{{ $variant }}">
-                    <span class="rp-status-dot"></span>{{ $proc->status?->label() ?? '—' }}
-                </span>
-            </div>
         @else
             <button type="button"
                     wire:click="selectProcess({{ $proc->id }})"
                     @click="if (window.innerWidth < 1280) listOpen = false"
                     wire:key="li-{{ $proc->id }}"
                     class="{{ $procClass }}">
-                <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
+        @endif
+            <span class="rp-cand-proc__id"><i class="bi bi-arrow-return-right"></i>#{{ $proc->id }}</span>
+            <span class="rp-cand-proc__end">
                 <span class="rp-cand-proc__status is-{{ $variant }}">
                     <span class="rp-status-dot"></span>{{ $proc->status?->label() ?? '—' }}
                 </span>
+                @if($whenDate)
+                    <span class="rp-cand-proc__date font-mono">{{ $whenDate->format('d.m.Y') }}</span>
+                @endif
+            </span>
+        @if($readonly)
+            </div>
+        @else
             </button>
         @endif
     @endforeach

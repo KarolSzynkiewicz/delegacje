@@ -39,6 +39,7 @@ class ProjectTask extends Model
         'starts_at',
         'ends_at',
         'participant_ids',
+        'location',
         'completed_at',
         'created_by',
         'procedure_run_id',
@@ -103,7 +104,10 @@ class ProjectTask extends Model
             return true;
         }
 
-        return str_starts_with((string) $this->name, 'Spotkanie rekrutacyjne');
+        $name = (string) $this->name;
+
+        return str_starts_with($name, 'Spotkanie rekrutacyjne')
+            || str_starts_with($name, 'Spotkanie:');
     }
 
     public function isOpenMeeting(): bool
@@ -154,6 +158,8 @@ class ProjectTask extends Model
      *     contextUrl: string|null,
      *     startsAt: \Carbon\CarbonInterface|null,
      *     endsAt: \Carbon\CarbonInterface|null,
+     *     location: string,
+     *     locationHref: string|null,
      *     participants: \Illuminate\Support\Collection<int, User>,
      *     note: string
      * }|null
@@ -176,9 +182,26 @@ class ProjectTask extends Model
             'contextUrl' => $card['url'] ?? $this->recruitmentCardUrl(),
             'startsAt' => $this->starts_at,
             'endsAt' => $this->ends_at,
+            'location' => $this->meetingLocation(),
+            'locationHref' => $this->meetingLocationHref(),
             'participants' => $this->meetingParticipants(),
             'note' => $this->plainDescription(),
         ];
+    }
+
+    public function meetingLocation(): string
+    {
+        return trim((string) $this->location);
+    }
+
+    public function meetingLocationHref(): ?string
+    {
+        $value = $this->meetingLocation();
+        if ($value === '' || preg_match('#^https?://\S+#i', $value) !== 1) {
+            return null;
+        }
+
+        return $value;
     }
 
     public static function meetingDescriptionFor(RecruitmentProcess $process, string $extra = ''): string

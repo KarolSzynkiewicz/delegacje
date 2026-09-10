@@ -217,8 +217,6 @@ class RecruitmentProcessesTable extends Component
     /** Stage previewed on the card. Empty means "follow the process status". */
     public string $reviewStage = '';
 
-    public bool $listMenuOpen = false;
-
     // Candidate identity edit (name / phone / email)
     public bool $editingCandidateIdentity = false;
 
@@ -271,6 +269,8 @@ class RecruitmentProcessesTable extends Component
     public array $meetingParticipantIds = [];
 
     public string $meetingNote = '';
+
+    public string $meetingLocation = '';
 
     // Inline edit of a single contact attempt (own attempts only)
     public ?int $editingAttemptId = null;
@@ -355,6 +355,30 @@ class RecruitmentProcessesTable extends Component
 
         $this->status = $this->status === $status ? '' : $status;
         $this->draftStatus = $this->status;
+        $this->resetPage();
+    }
+
+    public function setStatusFilter(string $status): void
+    {
+        if ($status === '') {
+            $this->status = '';
+            $this->draftStatus = '';
+            $this->resetPage();
+
+            return;
+        }
+
+        $allowed = array_map(
+            fn (RecruitmentStatus $case) => $case->value,
+            RecruitmentStatus::pipelineSteps(),
+        );
+
+        if (! in_array($status, $allowed, true)) {
+            return;
+        }
+
+        $this->status = $status;
+        $this->draftStatus = $status;
         $this->resetPage();
     }
 
@@ -1838,6 +1862,7 @@ class RecruitmentProcessesTable extends Component
         $this->meetingEnd = '11:00';
         $this->meetingParticipantIds = $participantIds;
         $this->meetingNote = '';
+        $this->meetingLocation = '';
         $this->resetErrorBag();
     }
 
@@ -1866,6 +1891,7 @@ class RecruitmentProcessesTable extends Component
             'meetingParticipantIds' => 'required|array|min:1',
             'meetingParticipantIds.*' => 'integer|exists:users,id',
             'meetingNote' => 'nullable|string|max:2000',
+            'meetingLocation' => 'nullable|string|max:4000',
         ], [
             'meetingDate.required' => 'Podaj datę spotkania.',
             'meetingStart.required' => 'Podaj godzinę rozpoczęcia.',
@@ -1884,7 +1910,7 @@ class RecruitmentProcessesTable extends Component
             ->all();
 
         ProjectTask::create([
-            'name' => 'Spotkanie rekrutacyjne: '.$process->full_name.' #'.$process->id,
+            'name' => 'Spotkanie: '.$process->full_name,
             'description' => ProjectTask::meetingDescriptionFor($process, $this->meetingNote),
             'category' => 'Rekrutacja',
             'status' => TaskStatus::PENDING->value,
@@ -1892,6 +1918,7 @@ class RecruitmentProcessesTable extends Component
             'starts_at' => $window['starts_at'],
             'ends_at' => $window['ends_at'],
             'participant_ids' => $participantIds,
+            'location' => trim($this->meetingLocation) !== '' ? trim($this->meetingLocation) : null,
             'assigned_to' => $participantIds[0] ?? auth()->id(),
             'created_by' => auth()->id(),
             'recruitment_process_id' => $process->id,
@@ -1900,7 +1927,7 @@ class RecruitmentProcessesTable extends Component
         $process->transitionTo(RecruitmentStatus::Zaakceptowany, auth()->id());
         $this->reviewStage = '';
 
-        session()->flash('success', 'Spotkanie rekrutacyjne zostało umówione. Proces przeszedł do weryfikacji.');
+        session()->flash('success', 'Spotkanie zostało umówione. Proces przeszedł do weryfikacji.');
 
         $this->closeMeetingModal();
     }
@@ -1913,6 +1940,7 @@ class RecruitmentProcessesTable extends Component
         $this->meetingEnd = '';
         $this->meetingParticipantIds = [];
         $this->meetingNote = '';
+        $this->meetingLocation = '';
         $this->resetErrorBag();
     }
 

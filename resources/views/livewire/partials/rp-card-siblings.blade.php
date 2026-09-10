@@ -3,7 +3,6 @@
     $siblingProcesses = $candidate
         ? $candidate->processes
             ->where('id', '!=', $selected->id)
-            ->filter(fn ($proc) => $proc->lead?->referral_source !== \App\Enums\RecruitmentReferralSource::EmployeeLifecycle)
             ->sortByDesc('created_at')
         : collect();
 @endphp

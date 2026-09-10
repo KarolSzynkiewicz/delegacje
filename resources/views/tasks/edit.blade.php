@@ -54,14 +54,28 @@
                     </div>
 
                     <div class="mb-3">
-                        <x-ui.input 
-                            type="textarea" 
-                            name="description" 
+                        <x-ui.input
+                            type="textarea"
+                            name="description"
                             label="Opis"
                             value="{{ old('description', $task->plainDescription()) }}"
                             rows="4"
                         />
                     </div>
+
+                    @if($task->isMeeting())
+                        <div class="mb-3">
+                            <x-ui.input
+                                type="textarea"
+                                name="location"
+                                label="Gdzie"
+                                value="{{ old('location', $task->location) }}"
+                                rows="3"
+                                placeholder="Sala, biuro albo wklej link do Teams…"
+                                class="meeting-where-input"
+                            />
+                        </div>
+                    @endif
 
                     <div class="row mb-3">
                         <div class="col-md-6 mb-3 mb-md-0">

@@ -91,26 +91,47 @@ class RecruitmentProcessesPipelinePillsTest extends TestCase
             ->assertViewHas('todayCallCount', 2);
     }
 
-    public function test_process_card_puts_search_in_the_list_and_status_filters_in_the_topbar(): void
+    public function test_process_card_splits_list_and_candidate_with_identity_bar(): void
     {
         $candidate = $this->createCandidateWithProcess('Ewa', 'KartUnikatOnboard', RecruitmentStatus::Onboarding);
+        $candidate->update(['available_from' => now()->addWeek()->toDateString()]);
         $processId = $candidate->processes()->first()->id;
+        $secondLead = RecruitmentLead::create(['candidate_id' => $candidate->id]);
+        $secondProcess = RecruitmentProcess::create([
+            'lead_id' => $secondLead->id,
+            'candidate_id' => $candidate->id,
+            'status' => RecruitmentStatus::Nowy,
+        ]);
+        RecruitmentContactAttempt::create([
+            'recruitment_process_id' => $processId,
+            'user_id' => $this->user->id,
+            'outcome' => RecruitmentContactOutcome::Odebrano,
+        ]);
 
         Livewire::actingAs($this->user)
             ->test(RecruitmentProcessesTable::class, ['processId' => $processId])
             ->assertSeeHtml('rp-modal-left__tools')
+            ->assertSeeHtml('rp-status-select')
             ->assertSeeHtml('rp-list-hamburger')
-            ->assertSeeHtml('rp-pipeline-pills--topbar')
+            ->assertSeeHtml('rp-modal-left__search')
+            ->assertSeeHtml('rp-cand-group')
+            ->assertSeeHtml('rp-cand-proc')
+            ->assertSee('#'.$processId)
+            ->assertSee('#'.$secondProcess->id)
+            ->assertSee('Inne procesy tego kandydata')
+            ->assertSeeHtml('rp-identity-bar')
+            ->assertSeeHtml('rp-modal-center__identity')
             ->assertSeeHtml('rp-modal-center__process')
-            ->assertDontSeeHtml('rp-list-menu')
-            ->set('listMenuOpen', true)
-            ->assertSeeHtml('rp-list-menu')
-            ->assertSeeHtml('rp-pipeline-pills--list')
+            ->assertSeeHtml('rp-list-filter-popover')
+            ->assertDontSeeHtml('rp-pipeline-pills--topbar')
             ->assertSee('Ost. kontakt')
             ->assertSee('Dodano')
             ->assertSee('Szukaj kandydata…')
-            ->call('toggleStatus', RecruitmentStatus::Onboarding->value)
-            ->assertSet('status', RecruitmentStatus::Onboarding->value);
+            ->assertSee('Wyświetlam')
+            ->call('setStatusFilter', RecruitmentStatus::Onboarding->value)
+            ->assertSet('status', RecruitmentStatus::Onboarding->value)
+            ->call('setStatusFilter', '')
+            ->assertSet('status', '');
     }
 
     private function createCandidateWithProcess(string $firstName, string $lastName, RecruitmentStatus $status): RecruitmentCandidate

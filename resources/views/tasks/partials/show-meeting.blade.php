@@ -9,21 +9,23 @@
         <x-ui.card>
             @if($story)
                 <p class="fs-5 mb-3" style="line-height:1.55">
-                    <strong>{{ $story['author'] }}</strong> umówił spotkanie rekrutacyjne.
+                    <strong>{{ $story['author'] }}</strong> umówił spotkanie.
                 </p>
 
-                <p class="mb-3" style="line-height:1.55">
-                    Kandydat
-                    @if($story['contextUrl'])
-                        <a href="{{ $story['contextUrl'] }}" class="text-decoration-none">
-                            <span class="badge bg-primary bg-opacity-25 text-primary align-middle">
-                                <i class="bi bi-person-badge me-1"></i>{{ $story['candidate'] }}
-                            </span>
-                        </a>
-                    @else
-                        <strong>{{ $story['candidate'] }}</strong>
-                    @endif
-                </p>
+                @if($process)
+                    <p class="mb-3" style="line-height:1.55">
+                        Kandydat
+                        @if($story['contextUrl'])
+                            <a href="{{ $story['contextUrl'] }}" class="text-decoration-none">
+                                <span class="badge bg-primary bg-opacity-25 text-primary align-middle">
+                                    <i class="bi bi-person-badge me-1"></i>{{ $story['candidate'] }}
+                                </span>
+                            </a>
+                        @else
+                            <strong>{{ $story['candidate'] }}</strong>
+                        @endif
+                    </p>
+                @endif
 
                 <p class="small text-muted mb-3">
                     <i class="bi bi-calendar-event me-1"></i>{{ $task->meetingSlotLabel() }}
@@ -52,14 +54,15 @@
         <x-ui.card label="Odhacz" class="mt-4">
             <form action="{{ route('tasks.toggle-done', $task) }}" method="POST">
                 @csrf
-                <label class="d-flex align-items-center gap-3 mb-0" style="cursor:pointer">
-                    <input type="checkbox"
-                           class="form-check-input m-0"
-                           style="width:1.25rem;height:1.25rem"
-                           @checked($done)
-                           onchange="this.form.submit()">
-                    <span class="fw-semibold">{{ $done ? 'Odbyte' : 'Oznacz jako odbyte' }}</span>
-                </label>
+                <x-ui.input
+                    type="checkbox"
+                    name="done"
+                    :id="'meeting-done-'.$task->id"
+                    :label="$done ? 'Odbyte' : 'Oznacz jako odbyte'"
+                    :checked="$done"
+                    onchange="this.form.submit()"
+                    class="mb-0"
+                />
             </form>
         </x-ui.card>
 

@@ -246,6 +246,27 @@
                 </span>
             </div>
 
+            @if($task->isMeeting())
+                <div class="dt-card__row">
+                    <span class="dt-card__label">Gdzie</span>
+                    <span class="dt-card__value meeting-where">
+                        @php
+                            $where = $task->meetingLocation();
+                            $href = $task->meetingLocationHref();
+                        @endphp
+                        @if($where !== '')
+                            @if($href)
+                                <a href="{{ $href }}" target="_blank" rel="noopener noreferrer">{{ $where }}</a>
+                            @else
+                                {{ $where }}
+                            @endif
+                        @else
+                            <span class="text-muted">Nie podano</span>
+                        @endif
+                    </span>
+                </div>
+            @endif
+
             <div class="dt-card__row">
                 <span class="dt-card__label">Sprint</span>
                 <span class="dt-card__value">

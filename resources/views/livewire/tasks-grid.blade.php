@@ -1099,7 +1099,7 @@
 
                     {{-- Name (always) --}}
                     @if(in_array('name', $visibleColumns))
-                    <td style="padding:4px 6px; min-width:220px">
+                    <td style="padding:4px 6px; min-width:{{ $addKind === 'meeting' ? '640px' : '220px' }}">
                         <div class="d-flex flex-column gap-1">
                             @if($addKind === 'procedure')
                                 @include('livewire.partials.tasks-grid-procedure-start-fields')
@@ -1109,12 +1109,7 @@
                                     </button>
                                 </div>
                             @elseif($addKind === 'meeting')
-                                @include('livewire.partials.tasks-grid-meeting-start-fields')
-                                <div class="d-flex gap-1 align-items-start">
-                                    <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
-                                        <i class="bi bi-calendar-plus me-1"></i>Umów
-                                    </button>
-                                </div>
+                                @include('livewire.partials.tasks-grid-meeting-start-fields', ['showSubmit' => true])
                             @else
                             <div class="d-flex gap-1 align-items-start">
                                 <input type="text"
@@ -1308,7 +1303,7 @@
             @if($addKind === 'procedure')
             @include('livewire.partials.tasks-grid-procedure-start-fields')
             @elseif($addKind === 'meeting')
-            @include('livewire.partials.tasks-grid-meeting-start-fields')
+            @include('livewire.partials.tasks-grid-meeting-start-fields', ['showSubmit' => false])
             @endif
 
             @if(in_array('name', $visibleColumns) && $addKind !== 'procedure' && $addKind !== 'meeting')

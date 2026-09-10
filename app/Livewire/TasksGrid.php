@@ -239,6 +239,8 @@ class TasksGrid extends Component
     /** @var list<int|string> */
     public array $newMeetingParticipantIds = [];
 
+    public string $newMeetingLocation = '';
+
     // Inline add subtask
     public ?int $addingSubtaskForTask = null;
 
@@ -1197,7 +1199,7 @@ class TasksGrid extends Component
 
         $this->addKind = $kind;
         $this->showAddRow = true;
-        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds']);
+        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds', 'newMeetingLocation']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }
@@ -1382,6 +1384,7 @@ class TasksGrid extends Component
             'newMeetingEnd' => 'required|date_format:H:i',
             'newMeetingParticipantIds' => 'required|array|min:1',
             'newMeetingParticipantIds.*' => 'integer|exists:users,id',
+            'newMeetingLocation' => 'nullable|string|max:4000',
             'newTaskSprint' => 'nullable|exists:sprints,id',
             'newTaskPriority' => 'nullable|integer|min:1|max:5',
             'newTaskCategory' => 'nullable|string|max:255',
@@ -1420,6 +1423,7 @@ class TasksGrid extends Component
             'starts_at' => $window['starts_at'],
             'ends_at' => $window['ends_at'],
             'participant_ids' => $participantIds,
+            'location' => trim($this->newMeetingLocation) !== '' ? trim($this->newMeetingLocation) : null,
             'assigned_to' => $participantIds[0] ?? auth()->id(),
             'created_by' => auth()->id(),
             'priority' => $this->newTaskPriority ?: null,
@@ -1435,7 +1439,7 @@ class TasksGrid extends Component
 
     private function resetAddForm(): void
     {
-        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds']);
+        $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds', 'newMeetingLocation']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
         }

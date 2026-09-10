@@ -180,7 +180,7 @@ class TaskController extends Controller
         $previousAssignee = $task->assigned_to;
 
         // Aktualizuj podstawowe pola
-        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'priority', 'category', 'sprint_id']));
+        $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'priority', 'category', 'sprint_id', 'location']));
 
         // Powiadomienie jeśli przypisano do nowego użytkownika
         $newAssignee = (int) $request->input('assigned_to');

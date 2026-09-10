@@ -42,13 +42,13 @@ class RecruitmentMeetingTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(RecruitmentProcessesTable::class, ['processId' => $contact->id])
-            ->assertSee('Umów spotkanie rekrutacyjne')
+            ->assertSee('Umów spotkanie')
             ->call('previewStage', RecruitmentStatus::Zaakceptowany->value)
-            ->assertDontSee('Umów spotkanie rekrutacyjne');
+            ->assertDontSee('Umów spotkanie');
 
         Livewire::actingAs($this->user)
             ->test(RecruitmentProcessesTable::class, ['processId' => $fresh->id])
-            ->assertDontSee('Umów spotkanie rekrutacyjne');
+            ->assertDontSee('Umów spotkanie');
     }
 
     public function test_scheduling_a_meeting_creates_a_meeting_work_item_and_replaces_the_button_with_the_date(): void
@@ -60,17 +60,18 @@ class RecruitmentMeetingTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
-            ->assertSee('Umów spotkanie rekrutacyjne')
+            ->assertSee('Umów spotkanie')
             ->call('openMeetingModal')
             ->assertSet('showMeetingModal', true)
             ->set('meetingDate', '2026-09-15')
             ->set('meetingStart', '10:00')
             ->set('meetingEnd', '11:30')
             ->set('meetingParticipantIds', [$this->user->id, $colleague->id])
+            ->set('meetingLocation', $this->teamsJoinUrl())
             ->set('meetingNote', 'Omówić stawkę')
             ->call('saveMeeting')
             ->assertSet('showMeetingModal', false)
-            ->assertDontSee('Umów spotkanie rekrutacyjne')
+            ->assertDontSee('Umów spotkanie')
             ->assertSee('15.09.2026')
             ->assertSee('10:00')
             ->assertSee('Odbyło się');
@@ -81,10 +82,11 @@ class RecruitmentMeetingTest extends TestCase
         $this->assertNotNull($task);
         $this->assertTrue($task->isMeeting());
         $this->assertFalse($task->isCallback());
-        $this->assertSame('Spotkanie rekrutacyjne: Eryk Eryk #'.$process->id, $task->name);
+        $this->assertSame('Spotkanie: Eryk Eryk', $task->name);
         $this->assertSame('2026-09-15 10:00:00', $task->starts_at?->format('Y-m-d H:i:s'));
         $this->assertSame('2026-09-15 11:30:00', $task->ends_at?->format('Y-m-d H:i:s'));
         $this->assertEqualsCanonicalizing([$this->user->id, $colleague->id], $task->participant_ids);
+        $this->assertSame($this->teamsJoinUrl(), $task->location);
         $this->assertStringContainsString('Kandydat: Eryk Eryk', (string) $task->description);
         $this->assertStringContainsString($cardUrl, (string) $task->description);
         $this->assertStringContainsString('Omówić stawkę', (string) $task->description);
@@ -96,14 +98,19 @@ class RecruitmentMeetingTest extends TestCase
         $this->get(route('tasks.show', $task))
             ->assertOk()
             ->assertSee('Spotkanie')
+            ->assertSee('umówił spotkanie')
+            ->assertDontSee('spotkanie rekrutacyjne')
             ->assertSee('Eryk Eryk')
             ->assertSee('Kolega Rekruter')
             ->assertSee($cardUrl)
-            ->assertDontSee('Dziennik operacyjny');
+            ->assertSee('Gdzie')
+            ->assertSee($this->teamsJoinUrl(), false)
+            ->assertDontSee('Dziennik operacyjny')
+            ->assertDontSee('Dodaj do kalendarza');
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSee('Spotkanie rekrutacyjne: Eryk Eryk')
+            ->assertSee('Spotkanie: Eryk Eryk')
             ->assertSee('Spotkanie');
     }
 
@@ -119,7 +126,7 @@ class RecruitmentMeetingTest extends TestCase
             ->set('meetingEnd', '11:00')
             ->set('meetingParticipantIds', [$this->user->id])
             ->call('saveMeeting')
-            ->assertDontSee('Umów spotkanie rekrutacyjne')
+            ->assertDontSee('Umów spotkanie')
             ->assertSee('15.09.2026');
 
         $task = ProjectTask::query()->where('recruitment_process_id', $process->id)->first();
@@ -130,7 +137,7 @@ class RecruitmentMeetingTest extends TestCase
             ->call('toggleTaskDone', $task->id)
             ->assertSee('15.09.2026')
             ->assertSee('Odbyte')
-            ->assertDontSee('Umów spotkanie rekrutacyjne');
+            ->assertDontSee('Umów spotkanie');
 
         $this->assertSame(TaskStatus::COMPLETED, $task->fresh()->status);
     }
@@ -156,7 +163,7 @@ class RecruitmentMeetingTest extends TestCase
             ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
             ->assertSee('Odbyło się')
             ->assertSee('18.09.2026')
-            ->assertDontSee('Umów spotkanie rekrutacyjne')
+            ->assertDontSee('Umów spotkanie')
             ->call('toggleTaskDone', $task->id)
             ->assertSee('18.09.2026')
             ->assertSee('Odbyte')
@@ -173,11 +180,14 @@ class RecruitmentMeetingTest extends TestCase
             ->assertSee('Umów spotkanie')
             ->call('startAdd', 'meeting')
             ->assertSet('addKind', 'meeting')
+            ->assertSee('Uczestnicy')
+            ->assertSee('Gdzie')
             ->set('newTaskName', 'Sync z zespołem')
             ->set('newMeetingDate', '2026-09-16')
             ->set('newMeetingStart', '09:00')
             ->set('newMeetingEnd', '10:00')
             ->set('newMeetingParticipantIds', [$this->user->id])
+            ->set('newMeetingLocation', 'Sala 2 / Gdańsk')
             ->call('submitAdd')
             ->assertSee('Sync z zespołem')
             ->assertSee('Spotkanie');
@@ -186,8 +196,22 @@ class RecruitmentMeetingTest extends TestCase
         $this->assertNotNull($task);
         $this->assertTrue($task->isMeeting());
         $this->assertSame('2026-09-16 09:00:00', $task->starts_at?->format('Y-m-d H:i:s'));
+        $this->assertSame('Sala 2 / Gdańsk', $task->location);
         $this->assertEqualsCanonicalizing([$this->user->id], $task->participant_ids);
         $this->assertSame(WorkItemType::Meeting, WorkItem::query()->where('source_id', $task->id)->first()?->type);
+
+        $this->get(route('tasks.show', $task))
+            ->assertOk()
+            ->assertSee('umówił spotkanie')
+            ->assertDontSee('Kandydat')
+            ->assertSee('Sala 2 / Gdańsk')
+            ->assertSee('Gdzie')
+            ->assertDontSee('Dodaj do kalendarza');
+    }
+
+    private function teamsJoinUrl(): string
+    {
+        return 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_abcdefghijklmnopqrstuvwxyz0123456789ABCDEF%40thread.v2/0?context=%7b%22Tid%22%3a%22aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee%22%2c%22Oid%22%3a%22ffffffff-1111-2222-3333-444444444444%22%7d';
     }
 
     private function createProcess(RecruitmentStatus $status, string $first, string $last): RecruitmentProcess

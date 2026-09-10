@@ -128,34 +128,10 @@
                                     </div>
                                 </td>
                                 <td colspan="7" style="padding:.6rem .75rem;">
-                                    <div class="d-flex align-items-center flex-wrap gap-2">
-                                        <div>
-                                            <span class="fw-semibold" style="font-size:.92rem;">{{ $candidate->full_name }}</span>
-                                            @if($candidate->rating)
-                                                <span class="badge badge-{{ $candidate->rating->variant() }} ms-1" style="font-size:.58rem;">{{ $candidate->rating->label() }}</span>
-                                            @endif
-                                            <div style="font-size:.75rem;color:var(--text-muted);">
-                                                @if($candidate->phone)<a href="tel:{{ $candidate->phone }}" class="text-decoration-none" style="color:var(--text-muted);">{{ $candidate->phone }}</a>@endif
-                                                @if($candidate->phone && $candidate->email) &nbsp;·&nbsp; @endif
-                                                @if($candidate->email)<span>{{ $candidate->email }}</span>@endif
-                                                @if($candidate->city) &nbsp;·&nbsp; <i class="bi bi-geo-alt"></i> {{ $candidate->city }}@endif
-                                            </div>
-                                        </div>
-                                        <div class="d-flex flex-wrap gap-1 ms-auto">
-                                            @foreach($candidate->roles as $candidateRole)
-                                                <span class="badge badge-info" style="font-size:.65rem;">{{ $candidateRole->name }}</span>
-                                            @endforeach
-                                            @if($candidate->shipyard_experience)
-                                                <span class="badge badge-secondary" style="font-size:.65rem;"><i class="bi bi-tools me-1"></i>{{ $candidate->shipyard_experience->label() }}</span>
-                                            @endif
-                                            @if($candidate->expected_rate_eur !== null)
-                                                <span class="badge badge-secondary" style="font-size:.65rem;">{{ number_format((float)$candidate->expected_rate_eur, 0) }} €/h</span>
-                                            @endif
-                                            @if($candidate->available_from)
-                                                <span class="badge badge-success" style="font-size:.65rem;"><i class="bi bi-calendar-check me-1"></i>Od {{ $candidate->available_from->format('d.m.Y') }}</span>
-                                            @endif
-                                        </div>
-                                    </div>
+                                    @include('livewire.partials.rp-candidate-identity-bar', [
+                                        'candidate' => $candidate,
+                                        'showAvatar' => false,
+                                    ])
                                 </td>
                             </tr>
 
@@ -236,66 +212,69 @@
                  x-init="$watch('listOpen', v => window.__rpListOpen = v)"
                  :class="{ 'rp-list-open': listOpen }">
 
-                {{-- Top bar --}}
-                <div class="rp-modal-topbar">
-                    <div class="rp-topbar-main">
-                        <div class="rp-topbar-row">
-                            <div class="rp-list-cluster">
-                                <button type="button" class="btn btn-sm btn-outline-secondary rp-list-toggle"
-                                        :class="listOpen && 'is-active'"
-                                        :aria-expanded="listOpen ? 'true' : 'false'"
-                                        :aria-label="listOpen ? 'Ukryj listę' : 'Lista i filtry'"
-                                        @click="listOpen = !listOpen; if (!listOpen) $wire.set('listMenuOpen', false)">
-                                    <i class="bi rp-list-toggle__icon rp-list-toggle__icon--desk" :class="listOpen ? 'bi-layout-sidebar-inset' : 'bi-people'"></i>
-                                    <i class="bi rp-list-toggle__icon rp-list-toggle__icon--menu" :class="listOpen ? 'bi-x-lg' : 'bi-list'"></i>
-                                    <span class="rp-list-toggle__label" x-text="listOpen ? 'Ukryj listę' : 'Lista'"></span>
-                                </button>
-                            </div>
-                            @include('livewire.partials.rp-status-filter-pills', [
-                                'pillsClass' => 'rp-pipeline-pills--topbar',
-                                'chipsClass' => '',
-                                'showWhenList' => true,
-                            ])
-                        </div>
-                    </div>
-                    <a href="{{ $this->listUrl() }}" class="rp-modal-close" title="Wróć do listy" aria-label="Wróć do listy">
-                        <i class="bi bi-x-lg"></i>
-                    </a>
-                </div>
-
-                {{-- Body --}}
                 <div class="rp-modal-body">
-                    <div class="rp-list-backdrop" x-show="listOpen" x-cloak @click="listOpen = false; $wire.set('listMenuOpen', false)"></div>
+                    <div class="rp-list-backdrop" x-show="listOpen" x-cloak @click="listOpen = false"></div>
 
-                    {{-- ── LEFT: candidate list (synced with main table page) ── --}}
+                    {{-- ── LEFT: candidate list ── --}}
                     <div class="rp-modal-left">
-                        <div class="rp-modal-left__tools" x-data @click.outside="$wire.set('listMenuOpen', false)">
+                        @php
+                            $statusLabel = $status !== ''
+                                ? \App\Enums\RecruitmentStatus::from($status)->label()
+                                : 'Wszystkie etapy';
+                        @endphp
+                        <div class="rp-modal-left__tools"
+                             x-data="{ open: false, top: 0, left: 0, openCandidate: false, openProcess: false, openLead: false, openOther: false }">
+                            <div class="rp-status-select" x-data="{ stageOpen: false, stageTop: 0, stageLeft: 0, stageWidth: 0 }">
+                                <button type="button"
+                                        class="rp-status-select__btn {{ $status !== '' ? 'is-active' : '' }}"
+                                        @click.stop="if (stageOpen) { stageOpen = false; return } const r = $el.getBoundingClientRect(); stageTop = r.bottom + 4; stageLeft = r.left; stageWidth = r.width; stageOpen = true"
+                                        aria-haspopup="listbox"
+                                        :aria-expanded="stageOpen ? 'true' : 'false'">
+                                    <span class="rp-status-select__dot" aria-hidden="true"></span>
+                                    <span class="rp-status-select__label">{{ $statusLabel }}</span>
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <template x-teleport="body">
+                                    <div class="rp-status-select__menu" x-show="stageOpen" x-cloak
+                                         @click.stop
+                                         @click.outside="stageOpen = false"
+                                         :style="`position:fixed;top:${stageTop}px;left:${stageLeft}px;width:${stageWidth}px;z-index:999991;`">
+                                        <button type="button"
+                                                class="rp-status-select__option {{ $status === '' ? 'is-active' : '' }}"
+                                                wire:click="setStatusFilter('')"
+                                                @click="stageOpen = false">
+                                            Wszystkie etapy
+                                        </button>
+                                        @foreach(\App\Enums\RecruitmentStatus::pipelineSteps() as $case)
+                                            <button type="button"
+                                                    class="rp-status-select__option {{ $status === $case->value ? 'is-active' : '' }}"
+                                                    wire:click="setStatusFilter('{{ $case->value }}')"
+                                                    @click="stageOpen = false">
+                                                <span>{{ $case->label() }}</span>
+                                                <span class="rp-status-select__count">{{ $counts[$case->value] ?? 0 }}</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </template>
+                            </div>
                             <button type="button"
-                                    class="btn btn-sm btn-outline-secondary rp-list-hamburger {{ $search !== '' || $status !== '' || $sortField !== 'created_at' || $sortDirection !== 'desc' || $listMenuOpen ? 'is-active' : '' }}"
-                                    wire:click="$toggle('listMenuOpen')"
-                                    aria-expanded="{{ $listMenuOpen ? 'true' : 'false' }}"
-                                    aria-label="Opcje listy: szukaj, filtruj, sortuj"
-                                    title="Szukaj, filtruj i sortuj">
-                                <i class="bi bi-search"></i>
-                                @if($search !== '' || $status !== '')
+                                    class="btn btn-sm btn-outline-secondary rp-list-hamburger {{ $activeFilterCount > 0 || $sortField !== 'created_at' || $sortDirection !== 'desc' ? 'is-active' : '' }}"
+                                    @click.stop="if (open) { open = false; $wire.syncDraftFilters(); return } $wire.syncDraftFilters(); const r = $el.getBoundingClientRect(); const pw = Math.min(600, window.innerWidth - 24); top = r.bottom + 4; left = Math.max(4, Math.min(r.left, window.innerWidth - pw - 4)); open = true"
+                                    :aria-expanded="open ? 'true' : 'false'"
+                                    aria-label="Filtry i sortowanie listy"
+                                    title="Filtry i sortowanie">
+                                <i class="bi bi-list"></i>
+                                @if($activeFilterCount > 0)
                                     <span class="rp-list-hamburger__dot" aria-hidden="true"></span>
                                 @endif
                             </button>
-                            <span class="rp-modal-left__tools-label">Kandydaci</span>
-                            @if($listMenuOpen)
-                                <div class="rp-list-menu">
-                                    <div class="rp-search rp-search--sm">
-                                        <i class="bi bi-search"></i>
-                                        <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" placeholder="Szukaj kandydata…">
-                                    </div>
-                                    <div class="rp-list-menu__label">Etap</div>
-                                    @include('livewire.partials.rp-status-filter-pills', [
-                                        'pillsClass' => 'rp-pipeline-pills--list',
-                                        'chipsClass' => 'rp-active-filters--list',
-                                        'showWhenList' => false,
-                                    ])
-                                    <div class="rp-list-menu__label">Sortuj</div>
-                                    <div class="rp-list-menu__sorts">
+                            <template x-teleport="body">
+                                <div x-show="open" x-cloak
+                                     @click.outside="open = false; $wire.syncDraftFilters()"
+                                     :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;`"
+                                     class="rp-filter-panel rp-list-filter-popover">
+                                    <div class="rp-list-menu__label px-3 pt-3 mb-0">Sortuj</div>
+                                    <div class="rp-list-menu__sorts px-3 pb-2">
                                         @foreach(['last_contact_at' => ['Ost. kontakt', 'bi-telephone'], 'created_at' => ['Dodano', 'bi-calendar-plus'], 'last_name' => ['Nazwisko', 'bi-person'], 'expected_rate_eur' => ['Stawka', 'bi-currency-euro']] as $field => [$label, $icon])
                                             <button type="button" wire:click="sortBy('{{ $field }}')"
                                                     class="btn btn-sm btn-outline-secondary rp-topbar-btn {{ $sortField===$field ? 'is-active' : '' }}">
@@ -304,8 +283,15 @@
                                             </button>
                                         @endforeach
                                     </div>
+                                    @include('livewire.partials.rp-filter-panel')
                                 </div>
-                            @endif
+                            </template>
+                        </div>
+                        <div class="rp-modal-left__search">
+                            <div class="rp-search rp-search--sm">
+                                <i class="bi bi-search"></i>
+                                <input type="text" wire:model.live.debounce.300ms="search" class="form-control form-control-sm" placeholder="Szukaj kandydata…">
+                            </div>
                         </div>
                         <div class="rp-modal-left__list">
                             @if($pinnedCandidate)
@@ -321,21 +307,23 @@
                                 @endunless
                             @endforelse
                         </div>
-                        @if($applications->hasPages())
-                            <div class="rp-modal-left__pager">
+                        <div class="rp-modal-left__pager">
+                            @if($applications->hasPages())
                                 <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:2px 8px;"
                                         wire:click="previousPage" @disabled($applications->onFirstPage()) title="Poprzednia strona">
                                     <i class="bi bi-chevron-left"></i>
                                 </button>
-                                <span style="font-size:.7rem;color:var(--text-muted);white-space:nowrap;">
-                                    {{ $applications->currentPage() }} / {{ $applications->lastPage() }}
-                                </span>
+                            @endif
+                            <span class="rp-modal-left__count">
+                                Wyświetlam {{ $applications->count() }} z {{ $applications->total() }} kandydatów
+                            </span>
+                            @if($applications->hasPages())
                                 <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:2px 8px;"
                                         wire:click="nextPage" @disabled(! $applications->hasMorePages()) title="Następna strona">
                                     <i class="bi bi-chevron-right"></i>
                                 </button>
-                            </div>
-                        @endif
+                            @endif
+                        </div>
                     </div>
 
                     {{-- ── CENTER: details + editing ───────────── --}}
@@ -367,6 +355,20 @@
                             $showMeetingAction = $currentStatus === RecruitmentStatus::WTrakcieKontaktu
                                 && $reviewStatus === RecruitmentStatus::WTrakcieKontaktu;
                         @endphp
+
+                        @if($candidate)
+                            <div class="rp-modal-center__identity">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary rp-identity-bar__list-btn"
+                                        :class="listOpen && 'is-active'"
+                                        @click="listOpen = !listOpen"
+                                        :aria-expanded="listOpen ? 'true' : 'false'"
+                                        aria-label="Lista kandydatów">
+                                    <i class="bi" :class="listOpen ? 'bi-x-lg' : 'bi-list'"></i>
+                                </button>
+                                @include('livewire.partials.rp-candidate-identity-bar', ['candidate' => $candidate])
+                            </div>
+                        @endif
 
                         {{-- Process rail stays pinned; the rest of the card scrolls. --}}
                         <div class="rp-modal-center__process">
@@ -655,7 +657,7 @@
                                         @else
                                             <button type="button" wire:click="openMeetingModal" class="rp-action rp-action--meeting">
                                                 <i class="bi bi-calendar-plus"></i>
-                                                <span>Umów spotkanie rekrutacyjne</span>
+                                                <span>Umów spotkanie</span>
                                             </button>
                                         @endif
                                     @endif
@@ -805,7 +807,7 @@
                             @if($recruitmentMeetings->isNotEmpty())
                                 <div class="rp-doc-section rp-doc-section--meeting">
                                     <div class="rp-field-label mb-2">
-                                        <i class="bi bi-calendar-event me-1"></i>Spotkanie rekrutacyjne
+                                        <i class="bi bi-calendar-event me-1"></i>{{ $recruitmentMeetings->count() === 1 ? 'Spotkanie' : 'Spotkania' }}
                                     </div>
                                     @foreach($recruitmentMeetings as $meeting)
                                         @php $meetingOpen = $meeting->isOpenMeeting(); @endphp
@@ -822,6 +824,7 @@
                                                     {{ $meeting->name }}
                                                     @if($meeting->assignedTo) · {{ $meeting->assignedTo->name }} @endif
                                                 </div>
+                                                @include('tasks.partials.meeting-where', ['task' => $meeting, 'class' => 'rp-meeting-check__where'])
                                             </div>
                                             @if($meetingOpen)
                                                 <button type="button" wire:click="toggleTaskDone({{ $meeting->id }})" class="btn btn-sm btn-outline-secondary flex-shrink-0">
@@ -938,7 +941,6 @@
                             $siblingProcesses = $candidate
                                 ? $candidate->processes
                                     ->where('id', '!=', $selected->id)
-                                    ->filter(fn ($proc) => $proc->lead?->referral_source !== \App\Enums\RecruitmentReferralSource::EmployeeLifecycle)
                                     ->sortByDesc('created_at')
                                 : collect();
                         @endphp
@@ -956,8 +958,12 @@
                                          wire:key="sibling-{{ $proc->id }}">
                                         <div class="flex-grow-1 min-width-0">
                                             <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <span class="font-mono" style="font-size:.75rem;color:var(--text-muted);">#{{ $proc->id }}</span>
                                                 @if($procStatus)
                                                     <span class="badge badge-{{ $procStatus->variant() }}" style="font-size:.68rem;">{{ $procStatus->label() }}</span>
+                                                @endif
+                                                @if($proc->lead?->referral_source_label)
+                                                    <span style="font-size:.78rem;color:var(--text-muted);">{{ $proc->lead->referral_source_label }}</span>
                                                 @endif
                                                 <span style="font-size:.8rem;color:var(--text-muted);"
                                                       title="{{ ($proc->lead?->created_at ?? $proc->created_at)->format('d.m.Y H:i') }}">
@@ -1085,7 +1091,7 @@
         <div class="rp-modal-wrap" style="z-index:1061;align-items:center;justify-content:center;" role="dialog">
             <div class="rp-modal" style="max-width:440px;width:100%;height:auto;">
                 <div class="rp-modal-topbar">
-                    <strong style="font-size:.9rem;"><i class="bi bi-calendar-plus me-1"></i>Umów spotkanie rekrutacyjne</strong>
+                    <strong style="font-size:.9rem;"><i class="bi bi-calendar-plus me-1"></i>Umów spotkanie</strong>
                     <button type="button" wire:click="closeMeetingModal" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <div class="p-3">
@@ -1118,6 +1124,11 @@
                         </div>
                         @error('meetingParticipantIds') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                         @error('meetingParticipantIds.*') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.75rem;">Gdzie</label>
+                        <textarea wire:model="meetingLocation" class="form-control form-control-sm meeting-where-input" rows="3" style="resize:vertical;" placeholder="Sala, biuro albo wklej link do Teams…"></textarea>
+                        @error('meetingLocation') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="font-size:.75rem;">Notatka (opcjonalnie)</label>
