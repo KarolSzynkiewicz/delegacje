@@ -4,9 +4,9 @@ namespace App\Mcp\Tools;
 
 use App\Enums\TaskStatus;
 use App\Mcp\Concerns\ActsAsConfiguredUser;
+use App\Mcp\Support\CategoryDictionary;
 use App\Models\ProjectTask;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -64,7 +64,12 @@ class TasksWithoutCategoryTool extends Tool
                 'total_without_category' => $total,
                 'includes_closed_tasks' => $includeClosed,
             ],
-            'known_categories' => $this->knownCategories(),
+            'known_categories' => collect(CategoryDictionary::all())
+                ->map(fn (array $row) => [
+                    'category' => $row['category'],
+                    'tasks' => $row['tasks'],
+                ])
+                ->all(),
             'tasks' => $tasks->map(fn (ProjectTask $task) => [
                 'id' => $task->id,
                 'name' => $task->name,
@@ -79,27 +84,6 @@ class TasksWithoutCategoryTool extends Tool
                 'subtask_names' => $task->subtasks->pluck('name')->all(),
             ])->values()->all(),
         ]);
-    }
-
-    /**
-     * Słownik kategorii używanych w systemie, od najczęstszej.
-     *
-     * @return array<int, array{category: string, tasks: int}>
-     */
-    private function knownCategories(): array
-    {
-        return ProjectTask::query()
-            ->select('category', DB::raw('COUNT(*) as tasks'))
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->groupBy('category')
-            ->orderByDesc('tasks')
-            ->get()
-            ->map(fn ($row) => [
-                'category' => (string) $row->category,
-                'tasks' => (int) $row->tasks,
-            ])
-            ->all();
     }
 
     /**

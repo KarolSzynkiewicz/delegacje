@@ -128,7 +128,16 @@ class McpHttpServerTest extends TestCase
         $this->assertContains('get_task_comments', $names);
         $this->assertContains('sprint_insights', $names);
         $this->assertContains('update_task', $names);
+        $this->assertContains('update_subtask', $names);
+        $this->assertContains('add_subtasks', $names);
+        $this->assertContains('list_categories', $names);
         $this->assertContains('add_comment', $names);
+        $this->assertContains('search_posts', $names);
+        $this->assertContains('get_post', $names);
+        $this->assertContains('get_post_comments', $names);
+        $this->assertContains('list_post_tags', $names);
+        $this->assertContains('create_post', $names);
+        $this->assertContains('update_post', $names);
     }
 
     public function test_pkce_token_response_includes_refresh_token_and_authorizes_mcp(): void

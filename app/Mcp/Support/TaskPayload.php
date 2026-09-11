@@ -63,15 +63,27 @@ class TaskPayload
                     ['id', 'asc'],
                 ])
                 ->values()
-                ->map(fn (TaskSubtask $st) => [
-                    'id' => $st->id,
-                    'name' => $st->name,
-                    'is_completed' => (bool) $st->is_completed,
-                    'completed_at' => $st->completed_at?->toIso8601String(),
-                    'assigned_to' => self::user($st->assignedTo),
-                ])
+                ->map(fn (TaskSubtask $st) => self::subtask($st))
                 ->all(),
             'recent_comments' => $recent->map(fn (Comment $comment) => self::comment($comment, true, 200))->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function subtask(TaskSubtask $subtask): array
+    {
+        $subtask->loadMissing(['assignedTo:id,name', 'task:id,name']);
+
+        return [
+            'id' => $subtask->id,
+            'task_id' => $subtask->task_id,
+            'name' => $subtask->name,
+            'is_completed' => (bool) $subtask->is_completed,
+            'completed_at' => $subtask->completed_at?->toIso8601String(),
+            'sort_order' => $subtask->sort_order,
+            'assigned_to' => self::user($subtask->assignedTo),
         ];
     }
 
@@ -82,15 +94,6 @@ class TaskPayload
     {
         $comment->loadMissing('user:id,name');
         $body = (string) ($comment->body ?? '');
-        $handles = UserMentionService::extractHandles($body);
-        $mentions = [];
-        foreach ($handles as $handle) {
-            $user = UserMentionService::resolveUserByMentionHandle($handle);
-            $mentions[] = [
-                'handle' => $handle,
-                'resolved_user' => self::user($user),
-            ];
-        }
 
         return [
             'id' => $comment->id,
@@ -99,7 +102,70 @@ class TaskPayload
             'created_at' => $comment->created_at?->toIso8601String(),
             'updated_at' => $comment->updated_at?->toIso8601String(),
             'author' => self::user($comment->user),
-            'mentions' => $mentions,
+            'mentions' => self::commentMentions($body),
+        ];
+    }
+
+    /**
+     * @return list<array{handle: string, kind: string, resolved_user: array{id: int, name: string}|null}>
+     */
+    public static function commentMentions(string $body): array
+    {
+        preg_match_all(UserMentionService::MENTION_REGEX, $body, $matches, PREG_SET_ORDER);
+        $mentions = [];
+        $seen = [];
+
+        foreach ($matches as $match) {
+            $handle = $match[1];
+            $kind = match ($match[2] ?? '') {
+                '!' => 'task',
+                '?' => 'approval',
+                default => 'notify',
+            };
+            $key = mb_strtolower($handle, 'UTF-8').':'.$kind;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $mentions[] = [
+                'handle' => $handle,
+                'kind' => $kind,
+                'resolved_user' => self::user(UserMentionService::resolveUserByMentionHandle($handle)),
+            ];
+        }
+
+        return $mentions;
+    }
+
+    /**
+     * @return array{task_mentions: list<array<string, mixed>>, approval_requests: list<array<string, mixed>>}
+     */
+    public static function commentSideEffects(Comment $comment): array
+    {
+        $comment->loadMissing([
+            'mentions.assignedTo:id,name',
+            'approvalRequests.approver:id,name',
+        ]);
+
+        return [
+            'task_mentions' => $comment->mentions
+                ->map(fn ($mention) => [
+                    'id' => $mention->id,
+                    'title' => $mention->title,
+                    'status' => $mention->status?->value,
+                    'assigned_to' => self::user($mention->assignedTo),
+                ])
+                ->values()
+                ->all(),
+            'approval_requests' => $comment->approvalRequests
+                ->map(fn ($approval) => [
+                    'id' => $approval->id,
+                    'name' => $approval->name,
+                    'approver' => self::user($approval->approver),
+                    'url' => route('approval-requests.show', $approval),
+                ])
+                ->values()
+                ->all(),
         ];
     }
 

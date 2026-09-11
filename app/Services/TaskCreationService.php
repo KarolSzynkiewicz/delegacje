@@ -66,4 +66,49 @@ class TaskCreationService
             return $task->fresh(['subtasks']);
         });
     }
+
+    /**
+     * Dokłada kroki checklisty na końcu istniejącego zadania.
+     *
+     * @param  array<int, string>  $names
+     * @return array<int, TaskSubtask>
+     */
+    public function addSubtasks(ProjectTask $task, array $names, User $creator): array
+    {
+        $names = collect($names)
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->values()
+            ->all();
+
+        return DB::transaction(function () use ($task, $names, $creator) {
+            $order = (int) $task->subtasks()->max('sort_order');
+            $created = [];
+
+            foreach ($names as $name) {
+                $order++;
+
+                $subtask = TaskSubtask::create([
+                    'task_id' => $task->id,
+                    'sort_order' => $order,
+                    'name' => $name,
+                    'is_completed' => false,
+                    'created_by' => $creator->id,
+                ]);
+
+                TaskSubtaskEvent::log($subtask, 'created', $creator->id);
+
+                app(UserMentionService::class)->notifySubtaskMentions(
+                    $task,
+                    $subtask,
+                    $name,
+                    $creator,
+                );
+
+                $created[] = $subtask;
+            }
+
+            return $created;
+        });
+    }
 }

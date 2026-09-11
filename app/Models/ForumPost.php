@@ -282,6 +282,29 @@ class ForumPost extends Model
         return mb_substr($text, 0, $max - 1).'…';
     }
 
+    /**
+     * Czysty tekst wątku (bez obrazków i HTML) – do MCP i cytowań.
+     */
+    public function plainBody(): string
+    {
+        $parts = [];
+        foreach ($this->blocks() as $block) {
+            if (($block['type'] ?? '') !== 'text') {
+                continue;
+            }
+            $html = $this->renderTextBlock((string) ($block['content'] ?? ''));
+            $html = preg_replace('/<(br|\/p|\/h[1-3]|\/li)\s*\/?>/i', "\n", $html) ?? $html;
+            $text = trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $text = preg_replace("/[ \t]+/u", ' ', $text) ?? $text;
+            $text = preg_replace("/\n{3,}/u", "\n\n", $text) ?? $text;
+            if ($text !== '') {
+                $parts[] = $text;
+            }
+        }
+
+        return implode("\n\n", $parts);
+    }
+
     public static function looksLikeHtml(string $content): bool
     {
         return (bool) preg_match('/<\/?(p|br|strong|b|em|i|u|ul|ol|li|span|div|h1|h2|h3)\b/i', $content);

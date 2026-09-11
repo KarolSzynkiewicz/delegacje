@@ -9,6 +9,7 @@ use App\Mcp\Support\TaskPayload;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
+use App\WorkItems\ProjectTaskFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -26,13 +27,16 @@ class UpdateTaskTool extends Tool
     protected string $name = 'update_task';
 
     protected string $description = <<<'MARKDOWN'
-        Aktualizuje jedno zadanie: status, przypisanie, termin albo priorytet.
+        Aktualizuje jedno zadanie: nazwę, opis, status, przypisanie, termin,
+        priorytet albo zdjęcie ze sprintu.
 
         Zasada obowiązkowa: pokaż użytkownikowi co się zmieni (ID, nazwa, pola)
         i poczekaj na zgodę. Dopiero wtedy wywołaj z `confirmed_by_user: true`.
 
-        Kategorie: `set_task_categories`. Sprint: `assign_tasks_to_sprint`.
-        Zdjęcie przypisania: `unassign: true`.
+        Kategorie: `set_task_categories`. Włożenie do sprintu:
+        `assign_tasks_to_sprint`. Zdjęcie osoby: `unassign: true`.
+        Zdjęcie ze sprintu: `unassign_sprint: true`.
+        Podzadania: `update_subtask` / `add_subtasks`.
     MARKDOWN;
 
     public function handle(Request $request): Response
@@ -48,9 +52,13 @@ class UpdateTaskTool extends Tool
         $validated = $request->validate([
             'confirmed_by_user' => ['required', 'boolean'],
             'task_id' => ['required'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'clear_description' => ['nullable', 'boolean'],
             'status' => ['nullable', 'string', 'in:pending,in_progress,completed,cancelled'],
             'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
             'unassign' => ['nullable', 'boolean'],
+            'unassign_sprint' => ['nullable', 'boolean'],
             'due_date' => ['nullable', 'date_format:Y-m-d'],
             'clear_due_date' => ['nullable', 'boolean'],
             'priority' => ['nullable', 'integer', 'min:1', 'max:5'],
@@ -74,9 +82,21 @@ class UpdateTaskTool extends Tool
             return Response::error("Nie znaleziono zadania #{$id}.");
         }
 
-        $hasChange = isset($validated['status'])
+        $newName = null;
+        if (array_key_exists('name', $validated) && $validated['name'] !== null) {
+            $newName = trim($validated['name']);
+            if ($newName === '') {
+                return Response::error('Nazwa zadania nie może być pusta.');
+            }
+        }
+
+        $hasChange = $newName !== null
+            || array_key_exists('description', $validated)
+            || ($validated['clear_description'] ?? false)
+            || isset($validated['status'])
             || array_key_exists('assigned_to', $validated)
             || ($validated['unassign'] ?? false)
+            || ($validated['unassign_sprint'] ?? false)
             || array_key_exists('due_date', $validated)
             || ($validated['clear_due_date'] ?? false)
             || array_key_exists('priority', $validated)
@@ -84,12 +104,32 @@ class UpdateTaskTool extends Tool
 
         if (! $hasChange) {
             return Response::error(
-                'Nic do zapisania: podaj status, assigned_to/unassign, due_date/clear_due_date albo priority/clear_priority.'
+                'Nic do zapisania: podaj name, description/clear_description, status, '
+                .'assigned_to/unassign, unassign_sprint, due_date/clear_due_date albo priority/clear_priority.'
             );
         }
 
-        $before = TaskPayload::listItem($task);
+        $before = $this->snapshot($task);
         $changed = [];
+
+        if ($newName !== null) {
+            $task->update(['name' => $newName]);
+            $changed[] = 'name';
+        }
+
+        if ($validated['clear_description'] ?? false) {
+            $task->update(['description' => null]);
+            $changed[] = 'description';
+        } elseif (array_key_exists('description', $validated) && $validated['description'] !== null) {
+            $description = trim($validated['description']);
+            $task->update(['description' => $description === '' ? null : $description]);
+            $changed[] = 'description';
+        }
+
+        if ($validated['unassign_sprint'] ?? false) {
+            app(ProjectTaskFields::class)->writeSprint($task, '');
+            $changed[] = 'sprint';
+        }
 
         if (isset($validated['status'])) {
             $this->applyStatus($task, TaskStatus::from($validated['status']));
@@ -134,8 +174,19 @@ class UpdateTaskTool extends Tool
                 'changed' => array_values(array_unique($changed)),
             ],
             'before' => $before,
-            'task' => TaskPayload::listItem($task),
+            'task' => $this->snapshot($task),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function snapshot(ProjectTask $task): array
+    {
+        return [
+            ...TaskPayload::listItem($task),
+            'description' => $task->plainDescription(),
+        ];
     }
 
     private function applyStatus(ProjectTask $task, TaskStatus $status): void
@@ -160,6 +211,12 @@ class UpdateTaskTool extends Tool
             'confirmed_by_user' => $schema->boolean()
                 ->description('True tylko po wyraźnej zgodzie użytkownika.')
                 ->required(),
+            'name' => $schema->string()
+                ->description('Nowa nazwa zadania.'),
+            'description' => $schema->string()
+                ->description('Nowy opis. Pusty string czyści opis – albo użyj clear_description.'),
+            'clear_description' => $schema->boolean()
+                ->description('Usuń opis.'),
             'status' => $schema->string()
                 ->description('Nowy status.')
                 ->enum(['pending', 'in_progress', 'completed', 'cancelled']),
@@ -167,6 +224,8 @@ class UpdateTaskTool extends Tool
                 ->description('ID użytkownika do przypisania (users.id).'),
             'unassign' => $schema->boolean()
                 ->description('Zdejmij przypisanie (assigned_to = null).'),
+            'unassign_sprint' => $schema->boolean()
+                ->description('Zdejmij zadanie ze sprintu (sprint_id = null).'),
             'due_date' => $schema->string()
                 ->description('Termin YYYY-MM-DD.'),
             'clear_due_date' => $schema->boolean()
