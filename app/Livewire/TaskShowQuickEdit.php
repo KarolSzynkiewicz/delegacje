@@ -41,12 +41,14 @@ class TaskShowQuickEdit extends Component
         $this->task = $this->task->fresh(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
         $this->descriptionDraft = $this->task->plainDescription();
         $this->quickEditFlash = 'Zapisano opis.';
+        $this->dispatch('task-history-changed')->to(TaskActivity::class);
     }
 
     protected function afterTaskQuickEditSaved(ProjectTask $task): void
     {
         $this->task = $task->loadMissing(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
         $this->descriptionDraft = $task->plainDescription();
+        $this->dispatch('task-history-changed')->to(TaskActivity::class);
     }
 
     public function render()

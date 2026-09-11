@@ -395,6 +395,7 @@ class TaskSubtasks extends Component
     {
         // Resetuj tylko id — Livewire bezpiecznie dehydratuje prosty model bez relacji
         $this->task = ProjectTask::findOrFail($this->task->id);
+        $this->dispatch('task-history-changed')->to(TaskActivity::class);
     }
 
     /**

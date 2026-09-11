@@ -641,17 +641,15 @@ final class SprintActivityFeed
             }
         }
 
-        if (array_key_exists('name', $changes)) {
-            return $this->entry(
-                $at,
-                $actor,
-                'zmienił nazwę zadania',
-                (string) ($changes['name']['after'] ?? $name),
+        if (array_key_exists('name', $changes) || array_key_exists('description', $changes)) {
+            return $this->contentEditEntry(
+                'zadania',
+                'task',
+                $changes,
+                $name,
                 $url,
-                'było: '.((string) ($changes['name']['before'] ?? '—')),
-                'pencil',
-                'muted',
-                'task.renamed'
+                $actor,
+                $at,
             );
         }
 
@@ -711,16 +709,14 @@ final class SprintActivityFeed
         }
 
         if (array_key_exists('name', $changes)) {
-            return $this->entry(
-                $at,
-                $actor,
-                'zmienił nazwę podzadania',
-                (string) ($changes['name']['after'] ?? $name),
+            return $this->contentEditEntry(
+                'podzadania',
+                'subtask',
+                $changes,
+                $name,
                 $url,
-                'było: '.((string) ($changes['name']['before'] ?? '—')),
-                'pencil',
-                'muted',
-                'subtask.renamed'
+                $actor,
+                $at,
             );
         }
 
@@ -1080,6 +1076,63 @@ final class SprintActivityFeed
 
     /**
      * @param  array<string, array{before: mixed, after: mixed}>  $changes
+     * @return ActivityEntry
+     */
+    private function contentEditEntry(
+        string $entity,
+        string $kindPrefix,
+        array $changes,
+        string $currentName,
+        ?string $url,
+        string $actor,
+        Carbon $at,
+    ): array {
+        $nameChanged = array_key_exists('name', $changes);
+        $descriptionChanged = array_key_exists('description', $changes);
+
+        $details = [];
+        if ($nameChanged) {
+            $details[] = 'nazwa: '.$this->plainExcerpt($changes['name']['before'])
+                .' → '.$this->plainExcerpt($changes['name']['after']);
+        }
+        if ($descriptionChanged) {
+            $details[] = 'opis: '.$this->plainExcerpt($changes['description']['before'])
+                .' → '.$this->plainExcerpt($changes['description']['after']);
+        }
+
+        $verb = match (true) {
+            $nameChanged && $descriptionChanged => 'zmienił treść '.$entity,
+            $nameChanged => 'zmienił nazwę '.$entity,
+            $this->plainExcerpt($changes['description']['before'] ?? null) === '—' => 'dodał opis '.$entity,
+            $this->plainExcerpt($changes['description']['after'] ?? null) === '—' => 'usunął opis '.$entity,
+            default => 'zmienił opis '.$entity,
+        };
+
+        $kind = match (true) {
+            $nameChanged && $descriptionChanged => $kindPrefix.'.content',
+            $nameChanged => $kindPrefix.'.renamed',
+            default => $kindPrefix.'.description',
+        };
+
+        $subject = $nameChanged
+            ? (string) ($changes['name']['after'] ?? $currentName)
+            : $currentName;
+
+        return $this->entry(
+            $at,
+            $actor,
+            $verb,
+            $subject,
+            $url,
+            implode("\n", $details),
+            'pencil',
+            'muted',
+            $kind,
+        );
+    }
+
+    /**
+     * @param  array<string, array{before: mixed, after: mixed}>  $changes
      */
     private function detailLines(array $changes): string
     {
@@ -1273,9 +1326,22 @@ final class SprintActivityFeed
             return null;
         }
 
-        $plain = trim(preg_replace('/\s+/', ' ', strip_tags($body)) ?? '');
+        $plain = $this->plainExcerpt($body, 160);
 
-        return mb_strlen($plain) > 160 ? mb_substr($plain, 0, 157).'…' : $plain;
+        return $plain === '—' ? null : $plain;
+    }
+
+    private function plainExcerpt(mixed $value, int $max = 140): string
+    {
+        $text = $this->stringVal($value) ?? '';
+        $text = trim(html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+
+        if ($text === '') {
+            return '—';
+        }
+
+        return mb_strlen($text) > $max ? mb_substr($text, 0, $max - 1).'…' : $text;
     }
 
     private function stringVal(mixed $value): ?string

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
 use App\Livewire\TaskActivity;
+use App\Livewire\TaskShowQuickEdit;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
@@ -75,5 +76,87 @@ class TaskActivityTest extends TestCase
             ->assertSee('Historia')
             ->assertSee('dodał zadanie')
             ->assertSee('dodał podzadanie');
+    }
+
+    public function test_activity_feed_records_task_and_subtask_content_edits(): void
+    {
+        $user = $this->admin();
+        $this->actingAs($user);
+
+        $task = ProjectTask::query()->create([
+            'name' => 'Stara nazwa',
+            'description' => 'Stary opis',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $user->id,
+        ]);
+        $subtask = TaskSubtask::query()->create([
+            'task_id' => $task->id,
+            'name' => 'Stary krok',
+            'created_by' => $user->id,
+        ]);
+
+        $task->update(['name' => 'Nowa nazwa']);
+        $task->update(['description' => 'Nowy opis zadania']);
+        $subtask->update(['name' => 'Nowy krok']);
+
+        $entries = app(SprintActivityFeed::class)->forTask($task->fresh());
+        $kinds = $entries->pluck('kind')->all();
+
+        $this->assertContains('task.renamed', $kinds);
+        $this->assertContains('task.description', $kinds);
+        $this->assertContains('subtask.renamed', $kinds);
+
+        $rename = $entries->firstWhere('kind', 'task.renamed');
+        $this->assertSame($user->name, $rename['actor']);
+        $this->assertSame('Nowa nazwa', $rename['subject']);
+        $this->assertStringContainsString('Stara nazwa', (string) $rename['detail']);
+
+        $desc = $entries->firstWhere('kind', 'task.description');
+        $this->assertSame($user->name, $desc['actor']);
+        $this->assertStringContainsString('Nowy opis zadania', (string) $desc['detail']);
+
+        Livewire::actingAs($user)
+            ->test(TaskActivity::class, ['task' => $task->fresh()])
+            ->assertSee('zmienił nazwę zadania')
+            ->assertSee('zmienił opis zadania')
+            ->assertSee('zmienił nazwę podzadania')
+            ->assertSee('Nowy krok');
+    }
+
+    public function test_saving_description_from_the_card_leaves_history(): void
+    {
+        $user = $this->admin();
+        $this->actingAs($user);
+
+        $task = ProjectTask::query()->create([
+            'name' => 'Karta z opisem',
+            'description' => null,
+            'status' => TaskStatus::PENDING,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TaskShowQuickEdit::class, ['task' => $task])
+            ->set('descriptionDraft', 'Pierwszy opis z karty')
+            ->call('saveDescription')
+            ->assertDispatched('task-history-changed');
+
+        $added = app(SprintActivityFeed::class)->forTask($task->fresh())
+            ->firstWhere('kind', 'task.description');
+        $this->assertNotNull($added);
+        $this->assertSame('dodał opis zadania', $added['verb']);
+        $this->assertSame($user->name, $added['actor']);
+        $this->assertStringContainsString('Pierwszy opis z karty', (string) $added['detail']);
+
+        Livewire::actingAs($user)
+            ->test(TaskShowQuickEdit::class, ['task' => $task->fresh()])
+            ->set('descriptionDraft', 'Poprawiony opis')
+            ->call('saveDescription');
+
+        $changed = app(SprintActivityFeed::class)->forTask($task->fresh())
+            ->first(fn (array $entry) => $entry['kind'] === 'task.description'
+                && $entry['verb'] === 'zmienił opis zadania');
+        $this->assertNotNull($changed);
+        $this->assertStringContainsString('Poprawiony opis', (string) $changed['detail']);
     }
 }
