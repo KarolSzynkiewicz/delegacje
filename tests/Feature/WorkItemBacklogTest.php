@@ -113,12 +113,7 @@ class WorkItemBacklogTest extends TestCase
         $template = ProcedureTemplate::query()->create([
             'name' => 'Onboarding',
             'created_by' => $this->user->id,
-            'definition' => [
-                'nodes' => [
-                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
-                ],
-                'edges' => [],
-            ],
+            'definition' => $this->linearProcedureDefinition(),
         ]);
 
         $run = app(ProcedureRunService::class)->startRun($template, [
@@ -145,12 +140,7 @@ class WorkItemBacklogTest extends TestCase
         $template = ProcedureTemplate::query()->create([
             'name' => 'Onboarding',
             'created_by' => $this->user->id,
-            'definition' => [
-                'nodes' => [
-                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
-                ],
-                'edges' => [],
-            ],
+            'definition' => $this->linearProcedureDefinition(),
         ]);
         app(ProcedureRunService::class)->startRun($template, [
             'name_suffix' => 'Jan',
@@ -815,5 +805,21 @@ class WorkItemBacklogTest extends TestCase
         $this->get(WorkItemListNavigator::itemUrl($item))
             ->assertOk()
             ->assertDontSee('Nawigacja po liście backlogu', false);
+    }
+
+    /** @return array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>} */
+    private function linearProcedureDefinition(): array
+    {
+        return [
+            'nodes' => [
+                ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                ['id' => 'step-1', 'type' => 'task', 'name' => 'Krok'],
+                ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
+            ],
+            'edges' => [
+                ['id' => 'e1', 'from' => 'start-1', 'to' => 'step-1'],
+                ['id' => 'e2', 'from' => 'step-1', 'to' => 'end-1'],
+            ],
+        ];
     }
 }

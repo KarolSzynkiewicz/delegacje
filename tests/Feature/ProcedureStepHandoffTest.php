@@ -56,10 +56,6 @@ class ProcedureStepHandoffTest extends TestCase
         ]);
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
-        $this->assertSame(0, $procedureTask->comments()->count());
-        $this->assertSame(0, CommentMention::query()->count());
-
-        $service->advance($run);
 
         $comment = $procedureTask->fresh()->comments()->first();
         $this->assertNotNull($comment);
@@ -93,7 +89,6 @@ class ProcedureStepHandoffTest extends TestCase
             'assigned_to' => $this->karol->id,
         ]);
 
-        $service->advance($run);
         $service->advance($run->fresh());
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
@@ -124,7 +119,6 @@ class ProcedureStepHandoffTest extends TestCase
             'assigned_to' => $this->karol->id,
         ]);
 
-        $service->advance($run);
         $service->goBack($run->fresh());
 
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
@@ -151,8 +145,6 @@ class ProcedureStepHandoffTest extends TestCase
             'assigned_to' => $this->karol->id,
         ]);
 
-        $service->advance($run);
-
         $procedureTask = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
         $this->assertSame(0, $procedureTask->comments()->count());
         $this->assertSame(0, CommentMention::query()->count());
@@ -178,8 +170,6 @@ class ProcedureStepHandoffTest extends TestCase
             'task_name' => 'Procedura Karola',
             'assigned_to' => $this->karol->id,
         ]);
-
-        $service->advance($run);
 
         $mention = CommentMention::query()->first();
         $this->assertSame(WorkItemStatus::Pending, $mention->status);

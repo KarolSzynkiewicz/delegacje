@@ -65,10 +65,35 @@ class ProcedureRun extends Model
     public function activeNodes(): array
     {
         return collect($this->activeNodeIds())
-            ->map(fn (string $id) => $this->findNodeById($id))
+            ->map(fn (string $id) => $this->findNodeById((string) $id))
             ->filter()
             ->values()
             ->all();
+    }
+
+    /** @return list<string> */
+    public function activeStartNodeIds(): array
+    {
+        return collect($this->activeNodes())
+            ->filter(fn (array $node) => ($node['type'] ?? '') === 'start')
+            ->map(fn (array $node) => (string) ($node['id'] ?? ''))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /** True when the run is in progress but still sitting on the Start node. */
+    public function isParkedOnStart(): bool
+    {
+        if ($this->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return false;
+        }
+
+        $active = $this->activeNodes();
+
+        return $active !== [] && collect($active)->every(
+            fn (array $node) => ($node['type'] ?? '') === 'start'
+        );
     }
 
     /** @return list<string> */

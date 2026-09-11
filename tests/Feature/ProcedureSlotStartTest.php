@@ -315,7 +315,6 @@ class ProcedureSlotStartTest extends TestCase
     public function test_finishing_the_stepper_dispatches_a_page_reload(): void
     {
         $run = $this->startShortRun();
-        app(ProcedureRunService::class)->advanceNode($run->fresh(), 'start-1');
 
         Livewire::actingAs($this->user)
             ->test(ProcedureRunStepper::class, ['run' => $run->fresh()])
@@ -327,14 +326,58 @@ class ProcedureSlotStartTest extends TestCase
 
     public function test_advancing_a_middle_step_does_not_reload_the_page(): void
     {
-        $run = $this->startShortRun();
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Dłuższa',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    ['id' => 'step-1', 'type' => 'task', 'name' => 'Krok 1'],
+                    ['id' => 'step-2', 'type' => 'task', 'name' => 'Krok 2'],
+                    ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
+                ],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'step-1'],
+                    ['id' => 'e2', 'from' => 'step-1', 'to' => 'step-2'],
+                    ['id' => 'e3', 'from' => 'step-2', 'to' => 'end-1'],
+                ],
+            ],
+        ]);
+        $run = app(ProcedureRunService::class)->startRun($template, ['task_name' => 'Dłuższa']);
 
         Livewire::actingAs($this->user)
             ->test(ProcedureRunStepper::class, ['run' => $run->fresh()])
-            ->call('advanceNode', 'start-1')
+            ->call('advanceNode', 'step-1')
             ->assertNotDispatched('procedure-run-updated');
 
+        $this->assertSame(['step-2'], $run->fresh()->activeNodeIds());
         $this->assertSame(ProcedureRunStatus::IN_PROGRESS, $run->fresh()->status);
+    }
+
+    public function test_start_run_skips_the_start_node(): void
+    {
+        $run = $this->startShortRun();
+
+        $this->assertSame(['step-1'], $run->activeNodeIds());
+        $this->assertFalse($run->isParkedOnStart());
+        $this->assertTrue(
+            $run->steps()->where('node_id', 'start-1')->whereNotNull('completed_at')->exists()
+        );
+    }
+
+    public function test_stepper_shows_begin_when_parked_on_start(): void
+    {
+        $run = $this->parkOnStart($this->startShortRun());
+
+        Livewire::actingAs($this->user)
+            ->test(ProcedureRunStepper::class, ['run' => $run])
+            ->assertSee('Rozpocznij')
+            ->assertDontSeeHtml('Oznacz jako wykonane')
+            ->call('begin')
+            ->assertDontSee('Rozpocznij');
+
+        $this->assertSame(['step-1'], $run->fresh()->activeNodeIds());
+        $this->assertFalse($run->fresh()->isParkedOnStart());
     }
 
     private function startShortRun(): ProcedureRun
@@ -383,9 +426,34 @@ class ProcedureSlotStartTest extends TestCase
             'definition' => [
                 'nodes' => [
                     ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    ['id' => 'step-1', 'type' => 'task', 'name' => 'Krok'],
+                    ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
                 ],
-                'edges' => [],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'step-1'],
+                    ['id' => 'e2', 'from' => 'step-1', 'to' => 'end-1'],
+                ],
             ],
         ]);
+    }
+
+    private function parkOnStart(ProcedureRun $run): ProcedureRun
+    {
+        $startId = collect($run->definition()['nodes'] ?? [])
+            ->first(fn (array $node) => ($node['type'] ?? '') === 'start')['id'] ?? 'start-1';
+
+        $run->steps()->where('node_id', '!=', $startId)->delete();
+        $run->steps()->where('node_id', $startId)->update(['completed_at' => null]);
+        $run->update([
+            'status' => ProcedureRunStatus::IN_PROGRESS,
+            'finished_at' => null,
+            'active_node_ids' => [$startId],
+            'path' => [$startId],
+            'join_tokens' => [],
+        ]);
+
+        $run->task?->markInProgress();
+
+        return $run->fresh()->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version']);
     }
 }

@@ -60,6 +60,22 @@ class ProcedureRunStepper extends Component
         }
     }
 
+    public function begin(): void
+    {
+        if ($this->run->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return;
+        }
+
+        if (! $this->run->isParkedOnStart()) {
+            return;
+        }
+
+        app(ProcedureRunService::class)->leaveStartNodes($this->run);
+
+        $this->reloadRun();
+        $this->initChecklistState();
+    }
+
     public function advanceNode(string $nodeId): void
     {
         if ($this->run->status !== ProcedureRunStatus::IN_PROGRESS) {

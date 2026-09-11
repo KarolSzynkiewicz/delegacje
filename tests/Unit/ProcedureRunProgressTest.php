@@ -69,7 +69,7 @@ class ProcedureRunProgressTest extends TestCase
 
         $run->setRelation('version', $version);
 
-        $run->setRelation('steps', Collection::make(array_map(function (array $step) use ($run) {
+        $run->setRelation('steps', Collection::make(array_map(function (array $step) {
             return ProcedureRunStep::make([
                 'procedure_run_id' => 1,
                 'node_id' => $step['node_id'],
@@ -138,5 +138,29 @@ class ProcedureRunProgressTest extends TestCase
         $this->assertSame(31, $allNodes);
         $this->assertLessThan(50, $legacyPercent);
         $this->assertSame(100, $run->progressMetrics()['percent']);
+    }
+
+    public function test_run_is_parked_on_start_only_while_start_is_the_active_node(): void
+    {
+        $onStart = $this->makeRun([
+            'active_node_ids' => ['start-1'],
+            'status' => ProcedureRunStatus::IN_PROGRESS,
+        ], [
+            ['node_id' => 'start-1', 'completed' => false],
+        ]);
+
+        $this->assertTrue($onStart->isParkedOnStart());
+        $this->assertSame(['start-1'], $onStart->activeStartNodeIds());
+
+        $onStep = $this->makeRun([
+            'active_node_ids' => ['step-5'],
+            'status' => ProcedureRunStatus::IN_PROGRESS,
+        ], [
+            ['node_id' => 'start-1', 'completed' => true],
+            ['node_id' => 'step-5', 'completed' => false],
+        ]);
+
+        $this->assertFalse($onStep->isParkedOnStart());
+        $this->assertSame([], $onStep->activeStartNodeIds());
     }
 }

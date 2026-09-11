@@ -65,10 +65,6 @@ class ProcedureVersioningAndParallelTest extends TestCase
         $service = app(ProcedureRunService::class);
         $run = $service->startRun($template, ['task_name' => 'Dom']);
 
-        $this->assertSame(['start-1'], $run->activeNodeIds());
-
-        $service->advanceNode($run->fresh(), 'start-1');
-
         $active = $run->fresh()->activeNodeIds();
         sort($active);
 

@@ -489,8 +489,13 @@ class ApprovalRequestTest extends TestCase
             'definition' => [
                 'nodes' => [
                     ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    ['id' => 'step-1', 'type' => 'task', 'name' => 'Krok'],
+                    ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
                 ],
-                'edges' => [],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'step-1'],
+                    ['id' => 'e2', 'from' => 'step-1', 'to' => 'end-1'],
+                ],
             ],
         ]);
 

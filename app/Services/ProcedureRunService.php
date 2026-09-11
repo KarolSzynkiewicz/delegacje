@@ -127,8 +127,22 @@ class ProcedureRunService
         }
 
         $this->dispatchStepEntered($run->load(['task', 'version']), $startNode, null);
+        $this->leaveStartNodes($run);
 
-        return $run;
+        return $run->fresh()->load(['task', 'version', 'steps']);
+    }
+
+    /**
+     * Start is a graph entry, not a user step. New runs skip it automatically;
+     * existing runs parked on start use the same path from the "Rozpocznij" CTA.
+     */
+    public function leaveStartNodes(ProcedureRun $run): void
+    {
+        $run->loadMissing('version');
+
+        foreach ($run->activeStartNodeIds() as $nodeId) {
+            $this->advanceNode($run->fresh(), $nodeId);
+        }
     }
 
     public static function composeTaskName(string $templateName, ?string $detail = null): string

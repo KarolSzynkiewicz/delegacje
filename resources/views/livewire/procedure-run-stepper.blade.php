@@ -93,6 +93,15 @@
                 <h5 class="fw-bold mb-1">Procedura porzucona</h5>
                 <p class="text-muted small mb-0">Przebieg został anulowany.</p>
             </div>
+        @elseif($run->isParkedOnStart())
+            <div class="rounded-3 p-4 text-center"
+                 style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.28);">
+                <h5 class="fw-bold mb-2">Procedura czeka na rozpoczęcie</h5>
+                <p class="text-muted small mb-3 mb-sm-4">Graf jest gotowy — kliknij, żeby wejść w pierwszy krok.</p>
+                <button type="button" class="btn btn-primary" wire:click="begin">
+                    <i class="bi bi-play-fill me-1"></i> Rozpocznij
+                </button>
+            </div>
         @elseif($activeNodes !== [])
             @if(count($activeNodes) > 1)
                 <div class="alert alert-info py-2 px-3 small mb-3">
