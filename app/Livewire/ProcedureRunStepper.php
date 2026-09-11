@@ -38,6 +38,7 @@ class ProcedureRunStepper extends Component
     {
         $this->run = $run->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version']);
         $this->catchUpWaits();
+        $this->recoverIfNeedsBegin();
         $this->initChecklistState();
     }
 
@@ -62,18 +63,22 @@ class ProcedureRunStepper extends Component
 
     public function begin(): void
     {
+        $this->recoverIfNeedsBegin();
+        $this->initChecklistState();
+    }
+
+    private function recoverIfNeedsBegin(): void
+    {
         if ($this->run->status !== ProcedureRunStatus::IN_PROGRESS) {
             return;
         }
 
-        if (! $this->run->isParkedOnStart()) {
+        if (! $this->run->needsBegin()) {
             return;
         }
 
-        app(ProcedureRunService::class)->leaveStartNodes($this->run);
-
-        $this->reloadRun();
-        $this->initChecklistState();
+        app(ProcedureRunService::class)->beginFromStart($this->run);
+        $this->run->refresh()->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version', 'template']);
     }
 
     public function advanceNode(string $nodeId): void

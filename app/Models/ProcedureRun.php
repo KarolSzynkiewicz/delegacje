@@ -96,6 +96,39 @@ class ProcedureRun extends Model
         );
     }
 
+    /**
+     * In-progress with no real step to click: parked on Start, empty tokens,
+     * or active ids that do not exist in this version's graph.
+     */
+    public function needsBegin(): bool
+    {
+        if ($this->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return false;
+        }
+
+        if ($this->isParkedOnStart()) {
+            return true;
+        }
+
+        if ($this->activeNodes() !== []) {
+            return false;
+        }
+
+        return ($this->flowHighlight()['waiting'] ?? []) === [];
+    }
+
+    /** @return array<string, mixed>|null */
+    public function startNode(): ?array
+    {
+        foreach ($this->definition()['nodes'] ?? [] as $node) {
+            if (($node['type'] ?? '') === 'start') {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
     /** @return list<string> */
     public function completedNodeIds(): array
     {
@@ -143,7 +176,7 @@ class ProcedureRun extends Model
     public function findNodeById(string $nodeId): ?array
     {
         foreach ($this->definition()['nodes'] ?? [] as $node) {
-            if (($node['id'] ?? null) === $nodeId) {
+            if ((string) ($node['id'] ?? '') === (string) $nodeId) {
                 return $node;
             }
         }

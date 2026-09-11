@@ -162,5 +162,28 @@ class ProcedureRunProgressTest extends TestCase
 
         $this->assertFalse($onStep->isParkedOnStart());
         $this->assertSame([], $onStep->activeStartNodeIds());
+        $this->assertFalse($onStep->needsBegin());
+    }
+
+    public function test_empty_active_nodes_need_begin_unless_waiting_on_a_join(): void
+    {
+        $stuck = $this->makeRun([
+            'active_node_ids' => [],
+            'join_tokens' => [],
+            'status' => ProcedureRunStatus::IN_PROGRESS,
+        ], []);
+
+        $this->assertTrue($stuck->needsBegin());
+
+        $waiting = $this->makeRun([
+            'active_node_ids' => [],
+            'join_tokens' => ['step-5' => ['step-3']],
+            'status' => ProcedureRunStatus::IN_PROGRESS,
+        ], [
+            ['node_id' => 'start-1', 'completed' => true],
+            ['node_id' => 'step-3', 'completed' => true],
+        ]);
+
+        $this->assertFalse($waiting->needsBegin());
     }
 }

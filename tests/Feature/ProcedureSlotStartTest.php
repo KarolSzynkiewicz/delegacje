@@ -365,19 +365,35 @@ class ProcedureSlotStartTest extends TestCase
         );
     }
 
-    public function test_stepper_shows_begin_when_parked_on_start(): void
+    public function test_stepper_leaves_start_when_parked_on_start(): void
     {
         $run = $this->parkOnStart($this->startShortRun());
 
+        $this->assertTrue($run->needsBegin());
+
         Livewire::actingAs($this->user)
             ->test(ProcedureRunStepper::class, ['run' => $run])
-            ->assertSee('Rozpocznij')
-            ->assertDontSeeHtml('Oznacz jako wykonane')
-            ->call('begin')
+            ->assertDontSee('Rozpocznij')
+            ->assertSee('Krok');
+
+        $this->assertSame(['step-1'], $run->fresh()->activeNodeIds());
+        $this->assertFalse($run->fresh()->needsBegin());
+    }
+
+    public function test_stepper_recovers_a_run_with_empty_active_nodes(): void
+    {
+        $run = $this->stripActiveNodes($this->startShortRun());
+
+        $this->assertTrue($run->needsBegin());
+        $this->assertSame([], $run->activeNodeIds());
+
+        Livewire::actingAs($this->user)
+            ->test(ProcedureRunStepper::class, ['run' => $run])
+            ->assertSee('Krok')
             ->assertDontSee('Rozpocznij');
 
         $this->assertSame(['step-1'], $run->fresh()->activeNodeIds());
-        $this->assertFalse($run->fresh()->isParkedOnStart());
+        $this->assertFalse($run->fresh()->needsBegin());
     }
 
     private function startShortRun(): ProcedureRun
@@ -453,6 +469,17 @@ class ProcedureSlotStartTest extends TestCase
         ]);
 
         $run->task?->markInProgress();
+
+        return $run->fresh()->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version']);
+    }
+
+    private function stripActiveNodes(ProcedureRun $run): ProcedureRun
+    {
+        $run->steps()->whereNull('completed_at')->delete();
+        $run->update([
+            'active_node_ids' => [],
+            'join_tokens' => [],
+        ]);
 
         return $run->fresh()->load(['steps.approvalRequest.approver', 'steps.performedBy', 'task', 'subject', 'version']);
     }

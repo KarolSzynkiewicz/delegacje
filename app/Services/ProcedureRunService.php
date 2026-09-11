@@ -134,7 +134,8 @@ class ProcedureRunService
 
     /**
      * Start is a graph entry, not a user step. New runs skip it automatically;
-     * existing runs parked on start use the same path from the "Rozpocznij" CTA.
+     * existing stuck runs (parked on Start or with empty active tokens) use
+     * the same path from the "Rozpocznij" CTA.
      */
     public function leaveStartNodes(ProcedureRun $run): void
     {
@@ -143,6 +144,60 @@ class ProcedureRunService
         foreach ($run->activeStartNodeIds() as $nodeId) {
             $this->advanceNode($run->fresh(), $nodeId);
         }
+    }
+
+    /** Re-enter Start if the run has no clickable step, then leave it. */
+    public function beginFromStart(ProcedureRun $run): void
+    {
+        $run->loadMissing('version');
+
+        if ($run->status !== ProcedureRunStatus::IN_PROGRESS) {
+            return;
+        }
+
+        if (! $run->isParkedOnStart()) {
+            $this->restoreStartNode($run);
+        }
+
+        $this->leaveStartNodes($run->fresh());
+    }
+
+    protected function restoreStartNode(ProcedureRun $run): void
+    {
+        $start = $run->startNode();
+        if ($start === null) {
+            return;
+        }
+
+        $startId = (string) $start['id'];
+
+        $run->update([
+            'active_node_ids' => [$startId],
+            'join_tokens' => [],
+            'status' => ProcedureRunStatus::IN_PROGRESS,
+            'finished_at' => null,
+        ]);
+
+        $open = ProcedureRunStep::query()
+            ->where('procedure_run_id', $run->id)
+            ->where('node_id', $startId)
+            ->whereNull('completed_at')
+            ->exists();
+
+        if ($open) {
+            return;
+        }
+
+        ProcedureRunStep::create([
+            'procedure_run_id' => $run->id,
+            'node_id' => $startId,
+            'node_name' => $start['name'] ?? 'Start',
+            'node_type' => 'start',
+            'entered_at' => now(),
+            'completed_at' => null,
+            'performed_by' => Auth::id() ?? $run->started_by,
+            'data' => null,
+        ]);
     }
 
     public static function composeTaskName(string $templateName, ?string $detail = null): string
