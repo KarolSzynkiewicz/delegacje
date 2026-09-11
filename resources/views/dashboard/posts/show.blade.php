@@ -27,15 +27,22 @@
         </x-ui.page-header>
     </x-slot>
 
+    <div x-data>
     @if(session('success'))
         <x-ui.alert variant="success" dismissible class="mb-4">{{ session('success') }}</x-ui.alert>
     @endif
 
     <article class="forum-post forum-post--open mb-4">
         @if($post->cover_url)
-            <div class="forum-post__cover">
+            <button
+                type="button"
+                class="forum-post__cover forum-post__cover--zoom"
+                style="{{ $post->coverPositionStyle('thread') }}"
+                title="Pokaż okładkę"
+                @click="$store.forumLightbox.show(@js($post->cover_url))"
+            >
                 <img src="{{ $post->cover_url }}" alt="">
-            </div>
+            </button>
         @endif
 
         <div class="forum-post__topline">
@@ -67,7 +74,14 @@
             @foreach($post->blocks() as $block)
                 @if(($block['type'] ?? '') === 'image')
                     <figure class="forum-post__figure">
-                        <img src="{{ asset('storage/'.$block['path']) }}" alt="">
+                        <button
+                            type="button"
+                            class="forum-post__zoom"
+                            title="Pokaż zdjęcie"
+                            @click="$store.forumLightbox.show(@js(asset('storage/'.$block['path'])))"
+                        >
+                            <img src="{{ asset('storage/'.$block['path']) }}" alt="">
+                        </button>
                     </figure>
                 @else
                     <div class="forum-post__prose">
@@ -117,4 +131,6 @@
     </article>
 
     <x-comments :commentable="$post" />
+        @include('dashboard.posts._lightbox')
+    </div>
 </x-app-layout>

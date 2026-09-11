@@ -69,6 +69,10 @@ class ForumPostController extends Controller
             'title' => $validated['title'],
             'body' => ForumPost::normalizeBlocks($validated['blocks']),
             'image_path' => $imagePath,
+            'cover_focal_x' => ForumPost::clampFocal($validated['cover_focal_x'] ?? 50),
+            'cover_focal_y' => ForumPost::clampFocal($validated['cover_focal_y'] ?? 50),
+            'cover_thread_x' => ForumPost::clampFocal($validated['cover_thread_x'] ?? $validated['cover_focal_x'] ?? 50),
+            'cover_thread_y' => ForumPost::clampFocal($validated['cover_thread_y'] ?? $validated['cover_focal_y'] ?? 50),
             'pinned' => $request->boolean('pinned'),
         ]);
         $post->syncTagsFromString($validated['tags'] ?? '');
@@ -147,6 +151,18 @@ class ForumPostController extends Controller
             'title' => $validated['title'],
             'body' => ForumPost::normalizeBlocks($validated['blocks']),
             'image_path' => $imagePath,
+            'cover_focal_x' => $imagePath
+                ? ForumPost::clampFocal($validated['cover_focal_x'] ?? $forumPost->cover_focal_x ?? 50)
+                : 50,
+            'cover_focal_y' => $imagePath
+                ? ForumPost::clampFocal($validated['cover_focal_y'] ?? $forumPost->cover_focal_y ?? 50)
+                : 50,
+            'cover_thread_x' => $imagePath
+                ? ForumPost::clampFocal($validated['cover_thread_x'] ?? $forumPost->cover_thread_x ?? $forumPost->cover_focal_x ?? 50)
+                : 50,
+            'cover_thread_y' => $imagePath
+                ? ForumPost::clampFocal($validated['cover_thread_y'] ?? $forumPost->cover_thread_y ?? $forumPost->cover_focal_y ?? 50)
+                : 50,
             'pinned' => $request->boolean('pinned'),
         ]);
         $forumPost->syncTagsFromString($validated['tags'] ?? '');

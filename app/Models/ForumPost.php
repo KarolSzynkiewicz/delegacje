@@ -22,14 +22,36 @@ class ForumPost extends Model
         'title',
         'body',
         'image_path',
+        'cover_focal_x',
+        'cover_focal_y',
+        'cover_thread_x',
+        'cover_thread_y',
         'pinned',
     ];
 
     public const IMAGE_DIR = 'forum-posts';
 
+    public const RICH_TEXT_CLASSES = [
+        'forum-size-sm',
+        'forum-size-md',
+        'forum-size-lg',
+        'forum-size-xl',
+        'forum-color-muted',
+        'forum-color-main',
+        'forum-color-primary',
+        'forum-color-accent',
+        'forum-color-warning',
+        'forum-color-danger',
+        'forum-color-success',
+    ];
+
     protected $casts = [
         'pinned' => 'boolean',
         'body' => 'array',
+        'cover_focal_x' => 'integer',
+        'cover_focal_y' => 'integer',
+        'cover_thread_x' => 'integer',
+        'cover_thread_y' => 'integer',
     ];
 
     protected static function booted(): void
@@ -76,6 +98,26 @@ class ForumPost extends Model
         return asset('storage/'.$this->image_path);
     }
 
+    public static function clampFocal(mixed $value): int
+    {
+        return max(0, min(100, (int) $value));
+    }
+
+    public function coverObjectPosition(string $frame = 'list'): string
+    {
+        if ($frame === 'thread') {
+            return self::clampFocal($this->cover_thread_x ?? $this->cover_focal_x ?? 50).'% '
+                .self::clampFocal($this->cover_thread_y ?? $this->cover_focal_y ?? 50).'%';
+        }
+
+        return self::clampFocal($this->cover_focal_x ?? 50).'% '.self::clampFocal($this->cover_focal_y ?? 50).'%';
+    }
+
+    public function coverPositionStyle(string $frame = 'list'): string
+    {
+        return '--forum-cover-pos: '.$this->coverObjectPosition($frame);
+    }
+
     /**
      * @return list<array{type: string, content?: string, path?: string}>
      */
@@ -101,7 +143,10 @@ class ForumPost extends Model
             $type = (string) ($item['type'] ?? '');
             if ($type === 'text') {
                 $content = trim((string) ($item['content'] ?? ''));
-                if ($content === '') {
+                if ($content !== '' && self::looksLikeHtml($content)) {
+                    $content = self::sanitizeRichText($content);
+                }
+                if (self::isBlankRichText($content)) {
                     continue;
                 }
                 if (mb_strlen($content) > 20000) {
@@ -151,6 +196,8 @@ class ForumPost extends Model
         $blocks = collect($this->blocks())->map(function (array $block) {
             if (($block['type'] ?? '') === 'image') {
                 $block['url'] = asset('storage/'.$block['path']);
+            } elseif (($block['type'] ?? '') === 'text') {
+                $block['content'] = $this->editorHtml((string) ($block['content'] ?? ''));
             }
 
             return $block;
@@ -188,10 +235,24 @@ class ForumPost extends Model
 
     public function renderTextBlock(string $content): string
     {
+        if (self::looksLikeHtml($content)) {
+            return self::sanitizeRichText($content);
+        }
+
         return Str::markdown($content, [
             'html_input' => 'strip',
             'allow_unsafe_links' => false,
         ]);
+    }
+
+    public function editorHtml(string $content): string
+    {
+        $content = trim($content);
+        if ($content === '') {
+            return '';
+        }
+
+        return $this->renderTextBlock($content);
     }
 
     public function excerpt(int $max = 220): string
@@ -201,7 +262,12 @@ class ForumPost extends Model
             if (($block['type'] ?? '') !== 'text') {
                 continue;
             }
-            $text = trim(preg_replace('/\s+/u', ' ', (string) ($block['content'] ?? '')) ?? '');
+            $rendered = $this->renderTextBlock((string) ($block['content'] ?? ''));
+            $text = trim(preg_replace(
+                '/\s+/u',
+                ' ',
+                html_entity_decode(strip_tags($rendered), ENT_QUOTES | ENT_HTML5, 'UTF-8')
+            ) ?? '');
             if ($text !== '') {
                 break;
             }
@@ -214,6 +280,142 @@ class ForumPost extends Model
         }
 
         return mb_substr($text, 0, $max - 1).'…';
+    }
+
+    public static function looksLikeHtml(string $content): bool
+    {
+        return (bool) preg_match('/<\/?(p|br|strong|b|em|i|u|ul|ol|li|span|div|h1|h2|h3)\b/i', $content);
+    }
+
+    public static function isBlankRichText(string $content): bool
+    {
+        $plain = html_entity_decode(strip_tags(str_replace("\xc2\xa0", ' ', $content)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim($plain) === '';
+    }
+
+    public static function sanitizeRichText(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '' || self::isBlankRichText($html)) {
+            return '';
+        }
+
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        libxml_use_internal_errors(true);
+        $wrapped = '<div id="forum-rich-root">'.$html.'</div>';
+        $loaded = $dom->loadHTML('<?xml encoding="UTF-8">'.$wrapped, LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        if (! $loaded) {
+            return htmlspecialchars(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        $root = $dom->getElementById('forum-rich-root');
+        if (! $root) {
+            return '';
+        }
+
+        self::scrubNode($root);
+
+        $out = '';
+        foreach ($root->childNodes as $child) {
+            $out .= $dom->saveHTML($child);
+        }
+        $out = trim($out);
+
+        return self::isBlankRichText($out) ? '' : $out;
+    }
+
+    private static function scrubNode(\DOMNode $node): void
+    {
+        $allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'span', 'h1', 'h2', 'h3'];
+        $blocked = ['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'form', 'input', 'button', 'textarea'];
+
+        $children = [];
+        foreach ($node->childNodes as $child) {
+            $children[] = $child;
+        }
+
+        foreach ($children as $child) {
+            if ($child instanceof \DOMText) {
+                continue;
+            }
+            if (! $child instanceof \DOMElement) {
+                $child->parentNode?->removeChild($child);
+
+                continue;
+            }
+
+            $tag = strtolower($child->tagName);
+            if (in_array($tag, $blocked, true)) {
+                $child->parentNode?->removeChild($child);
+
+                continue;
+            }
+
+            self::scrubNode($child);
+
+            if ($tag === 'div') {
+                $p = $child->ownerDocument->createElement('p');
+                while ($child->firstChild) {
+                    $p->appendChild($child->firstChild);
+                }
+                $child->parentNode?->replaceChild($p, $child);
+                $child = $p;
+                $tag = 'p';
+            }
+
+            if (! in_array($tag, $allowedTags, true)) {
+                $parent = $child->parentNode;
+                if ($parent) {
+                    while ($child->firstChild) {
+                        $parent->insertBefore($child->firstChild, $child);
+                    }
+                    $parent->removeChild($child);
+                }
+
+                continue;
+            }
+
+            self::scrubAttributes($child, $tag);
+        }
+    }
+
+    private static function scrubAttributes(\DOMElement $el, string $tag): void
+    {
+        $class = $el->getAttribute('class');
+        $names = [];
+        foreach ($el->attributes as $attr) {
+            $names[] = $attr->name;
+        }
+        foreach ($names as $name) {
+            $el->removeAttribute($name);
+        }
+
+        if ($tag !== 'span') {
+            return;
+        }
+
+        $kept = [];
+        foreach (preg_split('/\s+/', $class) ?: [] as $part) {
+            if (in_array($part, self::RICH_TEXT_CLASSES, true)) {
+                $kept[] = $part;
+            }
+        }
+        $kept = array_values(array_unique($kept));
+        if ($kept === []) {
+            $parent = $el->parentNode;
+            if ($parent) {
+                while ($el->firstChild) {
+                    $parent->insertBefore($el->firstChild, $el);
+                }
+                $parent->removeChild($el);
+            }
+
+            return;
+        }
+
+        $el->setAttribute('class', implode(' ', $kept));
     }
 
     public function tagsInput(): string

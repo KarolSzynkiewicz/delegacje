@@ -35,16 +35,22 @@
     x-data="forumComposer({
         title: @js($titleValue),
         tags: @js($tagsValue),
+        pinned: @js((bool) $pinnedValue),
         blocks: @js($initialBlocks),
         uploadUrl: @js(route('dashboard.posts.images', absolute: false)),
         csrf: @js(csrf_token()),
+        coverUrl: @js($isEdit ? ($post->cover_url ?? '') : ''),
+        coverFocalX: @js((int) old('cover_focal_x', $isEdit ? ($post->cover_focal_x ?? 50) : 50)),
+        coverFocalY: @js((int) old('cover_focal_y', $isEdit ? ($post->cover_focal_y ?? 50) : 50)),
+        coverThreadX: @js((int) old('cover_thread_x', $isEdit ? ($post->cover_thread_x ?? $post->cover_focal_x ?? 50) : 50)),
+        coverThreadY: @js((int) old('cover_thread_y', $isEdit ? ($post->cover_thread_y ?? $post->cover_focal_y ?? 50) : 50)),
     })"
     x-init="boot()"
     x-on:keydown.ctrl.b.prevent="format('bold')"
     x-on:keydown.meta.b.prevent="format('bold')"
     x-on:keydown.ctrl.i.prevent="format('italic')"
     x-on:keydown.meta.i.prevent="format('italic')"
-    x-on:dragenter.prevent="onDragEnter()"
+    x-on:dragenter.prevent="onDragEnter($event)"
     x-on:dragover.prevent
     x-on:dragleave="onDragLeave()"
     x-on:drop.prevent="onDrop($event)"
@@ -53,7 +59,7 @@
     <x-ui.errors />
 
     <div class="forum-sheet__toolbar" role="toolbar" aria-label="Formatowanie treści">
-        <div class="forum-sheet__formats">
+        <div class="forum-sheet__formats" @mousedown.prevent>
             <button type="button" class="forum-sheet__tool" title="Pogrubienie (Ctrl+B)" x-on:click="format('bold', true)">
                 <strong>B</strong>
             </button>
@@ -63,6 +69,45 @@
             <button type="button" class="forum-sheet__tool" title="Lista" x-on:click="format('list', true)">
                 <i class="bi bi-list-ul"></i>
             </button>
+            <button type="button" class="forum-sheet__tool forum-sheet__heading" title="Wyróżnienie H1" x-on:click="applyHeading('h1')">H1</button>
+            <button type="button" class="forum-sheet__tool forum-sheet__heading" title="Wyróżnienie H2" x-on:click="applyHeading('h2')">H2</button>
+            <button type="button" class="forum-sheet__tool forum-sheet__heading" title="Wyróżnienie H3" x-on:click="applyHeading('h3')">H3</button>
+            <div class="forum-emoji" @click.outside="colorOpen = false">
+                <button
+                    type="button"
+                    class="forum-sheet__tool"
+                    title="Kolor czcionki"
+                    x-on:click="toggleColor()"
+                    :aria-expanded="colorOpen ? 'true' : 'false'"
+                >
+                    <i class="bi bi-palette"></i>
+                </button>
+                <div class="forum-emoji__menu forum-color-menu" x-show="colorOpen" x-cloak>
+                    <button type="button" class="forum-color-swatch is-muted" title="Szary" x-on:click="applyColor('')"></button>
+                    <button type="button" class="forum-color-swatch is-main" title="Biały" x-on:click="applyColor('forum-color-main')"></button>
+                    <button type="button" class="forum-color-swatch is-primary" title="Niebieski" x-on:click="applyColor('forum-color-primary')"></button>
+                    <button type="button" class="forum-color-swatch is-accent" title="Fiolet" x-on:click="applyColor('forum-color-accent')"></button>
+                    <button type="button" class="forum-color-swatch is-warning" title="Żółty" x-on:click="applyColor('forum-color-warning')"></button>
+                    <button type="button" class="forum-color-swatch is-danger" title="Czerwony" x-on:click="applyColor('forum-color-danger')"></button>
+                    <button type="button" class="forum-color-swatch is-success" title="Zielony" x-on:click="applyColor('forum-color-success')"></button>
+                </div>
+            </div>
+            <div class="forum-emoji" @click.outside="emojiOpen = false">
+                <button
+                    type="button"
+                    class="forum-sheet__tool"
+                    title="Emotka"
+                    x-on:click="colorOpen = false; emojiOpen = !emojiOpen"
+                    :aria-expanded="emojiOpen ? 'true' : 'false'"
+                >
+                    <span aria-hidden="true">😊</span>
+                </button>
+                <div class="forum-emoji__menu" x-show="emojiOpen" x-cloak>
+                    <template x-for="emoji in emojis" :key="emoji">
+                        <button type="button" class="forum-emoji__item" x-text="emoji" x-on:click="insertEmoji(emoji)"></button>
+                    </template>
+                </div>
+            </div>
             <span class="forum-sheet__sep"></span>
             <button
                 type="button"
@@ -75,10 +120,10 @@
             </button>
             <span class="forum-sheet__hint font-mono" x-show="uploading" x-cloak>Wgrywam…</span>
         </div>
-        <label class="forum-sheet__pin">
-            <input type="checkbox" name="pinned" value="1" {{ $pinnedValue ? 'checked' : '' }}>
-            <i class="bi bi-pin-angle"></i>
-            Przypnij
+        <label class="forum-sheet__pin" :class="{ 'is-on': pinned }">
+            <input type="checkbox" name="pinned" value="1" class="visually-hidden" x-model="pinned">
+            <i class="bi" :class="pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'"></i>
+            <span x-text="pinned ? 'Przypięte' : 'Przypnij'">{{ $pinnedValue ? 'Przypięte' : 'Przypnij' }}</span>
         </label>
     </div>
 
@@ -100,8 +145,17 @@
 
     <div class="forum-sheet__body">
         <template x-for="(block, index) in blocks" :key="block.key || index">
-            <div class="forum-block" :class="'is-' + block.type">
+            <div class="forum-block"
+                 :class="'is-' + block.type + (reorderOver === index && reorderFrom !== null && reorderFrom !== index ? ' is-drop-target' : '')"
+                 draggable="true"
+                 x-on:dragstart="onBlockDragStart($event, index)"
+                 x-on:dragover="onBlockDragOver($event, index)"
+                 x-on:drop="onBlockDrop($event, index)"
+                 x-on:dragend="onBlockDragEnd()">
                 <div class="forum-block__rail">
+                    <span class="forum-block__grip" title="Przeciągnij, żeby zmienić kolejność" aria-hidden="true">
+                        <i class="bi bi-grip-vertical"></i>
+                    </span>
                     <button type="button" class="forum-block__icon" title="Wyżej" x-on:click="move(index, -1)" :disabled="index === 0">
                         <i class="bi bi-chevron-up"></i>
                     </button>
@@ -113,20 +167,22 @@
                     </button>
                 </div>
 
-                <textarea
-                    class="forum-block__text"
-                    rows="3"
-                    placeholder="Zacznij pisać, albo upuść zdjęcie…"
+                <div
+                    class="forum-block__editor forum-post__prose"
+                    contenteditable="true"
+                    role="textbox"
+                    aria-label="Treść bloku"
+                    data-placeholder="Zacznij pisać, albo upuść zdjęcie…"
                     :data-forum-block="index"
                     x-show="block.type === 'text'"
-                    x-model="block.content"
+                    x-init="mountEditor($el, index)"
                     x-on:focus="focusBlock(index)"
-                    x-on:input="grow($event.target)"
-                    x-on:paste="onPaste($event)"
-                ></textarea>
+                    x-on:input="onEditorInput($event, index)"
+                    x-on:paste="onEditorPaste($event, index)"
+                ></div>
 
                 <figure class="forum-block__figure" x-show="block.type === 'image'" x-cloak x-on:click="focusBlock(index)">
-                    <img :src="block.url" alt="" x-show="block.url">
+                    <img :src="block.url" alt="" x-show="block.url" draggable="false">
                     <p class="text-muted small mb-0" x-show="!block.url">Brak podglądu</p>
                 </figure>
             </div>
@@ -144,7 +200,7 @@
         </button>
         <input type="file" class="d-none" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp" x-ref="file" x-on:change="onFile($event)">
     </div>
-    <p class="forum-sheet__drop-hint">Ctrl+B pogrubia, Ctrl+I kursywa. Zdjęcie można wkleić albo upuścić na ten obszar.</p>
+    <p class="forum-sheet__drop-hint">W edytorze widać gotowy tekst. Ctrl+B pogrubia, Ctrl+I kursywa. H1–H3 to wyróżnienia. Zdjęcie wklejasz albo upuszczasz. Klocki przeciągasz za uchwyt.</p>
     <p class="text-danger small mb-0 mt-2" x-show="error" x-cloak x-text="error"></p>
 
     <div class="forum-sheet__meta">
@@ -173,32 +229,77 @@
         </div>
 
         <div class="forum-cover">
+            <input type="hidden" name="cover_focal_x" :value="coverFocalX">
+            <input type="hidden" name="cover_focal_y" :value="coverFocalY">
+            <input type="hidden" name="cover_thread_x" :value="coverThreadX">
+            <input type="hidden" name="cover_thread_y" :value="coverThreadY">
             <label class="forum-cover__hit" for="forum_image">
-                <span class="forum-cover__slot">
-                    @if($isEdit && $post->cover_url)
-                        <img src="{{ $post->cover_url }}" alt="">
-                    @else
+                <span class="forum-cover__slot" :style="coverStyle('list')">
+                    <template x-if="coverUrl && !removeCover">
+                        <img :src="coverUrl" alt="" draggable="false">
+                    </template>
+                    <template x-if="!coverUrl || removeCover">
                         <i class="bi bi-card-image"></i>
-                    @endif
+                    </template>
                 </span>
                 <span class="forum-cover__copy">
                     <span class="forum-cover__label">Okładka karty</span>
-                    <span class="forum-cover__hint">Opcjonalnie · JPEG, PNG, WEBP · max 2 MB. Osobno od zdjęć w treści.</span>
+                    <span class="forum-cover__hint">Opcjonalnie · JPEG, PNG, WEBP · max 2 MB. Osobno od zdjęć w treści. Kadr listy i wątku ustawiasz na mapie.</span>
                     <input
                         type="file"
                         name="image"
                         id="forum_image"
                         class="forum-cover__file"
                         accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                        x-on:change="onCoverFile($event)"
+                        x-ref="coverFile"
                     >
                 </span>
             </label>
-            @if($isEdit && $post->cover_url)
-                <label class="forum-cover__remove" for="remove_image">
-                    <input type="checkbox" name="remove_image" id="remove_image" value="1">
-                    Usuń okładkę
-                </label>
-            @endif
+            <label class="forum-cover__remove" for="remove_image" x-show="coverUrl" x-cloak>
+                <input type="checkbox" name="remove_image" id="remove_image" value="1" x-model="removeCover"
+                       x-on:change="if (removeCover && $refs.coverFile) $refs.coverFile.value = ''">
+                Usuń okładkę
+            </label>
+        </div>
+
+        <div class="forum-cover-framer" x-show="coverUrl && !removeCover" x-cloak @resize.window="coverMapTick++">
+            <p class="forum-cover-framer__hint">Przeciągnij ramki po zdjęciu — lista i wątek osobno, w tym góra–dół.</p>
+            <div class="forum-cover-map" x-ref="coverMap">
+                <img
+                    :src="coverUrl"
+                    alt=""
+                    x-ref="coverMapImg"
+                    draggable="false"
+                    @load="coverMapTick++"
+                >
+                <button
+                    type="button"
+                    class="forum-cover-map__rect is-list"
+                    :style="mapRectStyle('list')"
+                    @pointerdown="startMapRect($event, 'list')"
+                >Lista</button>
+                <button
+                    type="button"
+                    class="forum-cover-map__rect is-thread"
+                    :style="mapRectStyle('thread')"
+                    @pointerdown="startMapRect($event, 'thread')"
+                >Wątek</button>
+            </div>
+            <div class="forum-cover-crops">
+                <div>
+                    <div class="forum-cover-crop forum-cover-crop--tile" :style="coverStyle('list')" aria-hidden="true">
+                        <img :src="coverUrl" alt="" draggable="false">
+                    </div>
+                    <span class="forum-cover-crop__label">Lista</span>
+                </div>
+                <div class="forum-cover-crop__banner-wrap">
+                    <div class="forum-cover-crop forum-cover-crop--banner" :style="coverStyle('thread')" aria-hidden="true">
+                        <img :src="coverUrl" alt="" draggable="false">
+                    </div>
+                    <span class="forum-cover-crop__label">Wątek</span>
+                </div>
+            </div>
         </div>
     </div>
 

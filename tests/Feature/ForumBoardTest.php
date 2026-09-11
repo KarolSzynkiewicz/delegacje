@@ -75,7 +75,15 @@ class ForumBoardTest extends TestCase
             ->assertOk()
             ->assertSee('\/dashboard\/posts\/images', false)
             ->assertSee('forum-sheet', false)
-            ->assertSee('forum-sheet__toolbar', false);
+            ->assertSee('forum-sheet__toolbar', false)
+            ->assertSee('forum-emoji', false)
+            ->assertSee('forum-sheet__heading', false)
+            ->assertSee('forum-color-menu', false)
+            ->assertSee('forum-block__editor', false)
+            ->assertSee('contenteditable', false)
+            ->assertSee('forum-block__grip', false)
+            ->assertSee('forum-cover-map', false)
+            ->assertSee('forum-cover-crops', false);
     }
 
     public function test_search_and_tag_filter(): void
@@ -199,14 +207,34 @@ class ForumBoardTest extends TestCase
                     ['type' => 'text', 'content' => 'Ma zdjęcie.'],
                 ],
                 'image' => $file,
+                'cover_focal_x' => 20,
+                'cover_focal_y' => 80,
+                'cover_thread_x' => 70,
+                'cover_thread_y' => 15,
             ])
             ->assertRedirect();
 
         $post = ForumPost::query()->first();
         $this->assertNotNull($post?->image_path);
+        $this->assertSame(20, $post->cover_focal_x);
+        $this->assertSame(80, $post->cover_focal_y);
+        $this->assertSame(70, $post->cover_thread_x);
+        $this->assertSame(15, $post->cover_thread_y);
         $this->assertTrue(
             \Illuminate\Support\Facades\Storage::disk('public')->exists($post->image_path)
         );
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk()
+            ->assertSee('--forum-cover-pos: 70% 15%', false)
+            ->assertSee('forum-lightbox', false);
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('--forum-cover-pos: 20% 80%', false);
+
         \Illuminate\Support\Facades\Storage::disk('public')->delete($post->image_path);
     }
 
@@ -244,9 +272,33 @@ class ForumBoardTest extends TestCase
             ->assertOk()
             ->assertSee('Najpierw', false)
             ->assertSee('<strong>role</strong>', false)
-            ->assertSee('Potem nocleg.');
+            ->assertSee('Potem nocleg.')
+            ->assertSee('forum-post__zoom', false)
+            ->assertSee('forum-lightbox', false);
 
         \Illuminate\Support\Facades\Storage::disk('public')->delete($upload['path']);
+    }
+
+    public function test_post_html_keeps_size_and_color_and_strips_scripts(): void
+    {
+        $this->actingAs($this->user)
+            ->post(route('dashboard.posts.store'), [
+                'title' => 'Formatowanie treści',
+                'blocks' => [
+                    ['type' => 'text', 'content' => '<p>Jakiś <strong>ważny</strong> <span class="forum-size-lg forum-color-accent">akcent</span><script>alert(1)</script></p>'],
+                ],
+            ])
+            ->assertRedirect();
+
+        $post = ForumPost::query()->first();
+        $this->assertNotNull($post);
+        $this->assertSame('Jakiś ważny akcent', $post->excerpt());
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.posts.show', $post))
+            ->assertOk()
+            ->assertSee('<p>Jakiś <strong>ważny</strong> <span class="forum-size-lg forum-color-accent">akcent</span></p>', false)
+            ->assertDontSee('alert(1)', false);
     }
 
     public function test_pinning_a_comment_moves_it_to_the_top(): void

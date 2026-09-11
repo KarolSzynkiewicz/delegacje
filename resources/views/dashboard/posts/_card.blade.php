@@ -55,9 +55,15 @@
     </div>
 
     @if($post->cover_url)
-        <div class="forum-post__cover" aria-hidden="true">
+        <button
+            type="button"
+            class="forum-post__cover forum-post__cover--zoom"
+            style="{{ $post->coverPositionStyle('list') }}"
+            title="Pokaż okładkę"
+            @click="$store.forumLightbox.show(@js($post->cover_url))"
+        >
             <img src="{{ $post->cover_url }}" alt="">
-        </div>
+        </button>
     @else
         <div class="forum-post__cover forum-post__cover--empty" aria-hidden="true">
             <i class="bi bi-lightbulb"></i>

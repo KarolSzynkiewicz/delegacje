@@ -35,6 +35,10 @@ class StoreForumPostRequest extends FormRequest
             'blocks.*.path' => ['nullable', 'string', 'max:255'],
             'tags' => ['nullable', 'string', 'max:240'],
             'image' => ['nullable', 'image', 'max:2048', 'mimes:jpeg,jpg,png,gif,webp'],
+            'cover_focal_x' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'cover_focal_y' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'cover_thread_x' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'cover_thread_y' => ['nullable', 'integer', 'min:0', 'max:100'],
             'pinned' => ['sometimes', 'boolean'],
         ];
     }
