@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Models\ProjectTask;
+use App\Support\EntityLinks;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -89,6 +90,7 @@ class SetTaskCategoriesTool extends Tool
                     'task_id' => $taskId,
                     'reason' => 'Zadanie ma już tę kategorię.',
                     'category' => $current,
+                    'url' => EntityLinks::task($task),
                 ];
 
                 continue;
@@ -100,6 +102,7 @@ class SetTaskCategoriesTool extends Tool
                     'reason' => 'Zadanie ma już kategorię – nadpisanie wymaga overwrite=true.',
                     'current_category' => $current,
                     'proposed_category' => $newCategory,
+                    'url' => EntityLinks::task($task),
                 ];
 
                 continue;
@@ -110,6 +113,7 @@ class SetTaskCategoriesTool extends Tool
             $updated[] = [
                 'task_id' => $taskId,
                 'name' => $task->name,
+                'url' => EntityLinks::task($task),
                 'from' => $current !== '' ? $current : null,
                 'to' => $newCategory,
             ];

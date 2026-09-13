@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Services\SprintAssignmentService;
+use App\Support\EntityLinks;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -67,6 +68,7 @@ class AssignTasksToSprintTool extends Tool
                 'applied_at' => now()->toIso8601String(),
                 'applied_by' => $user->name,
                 'sprint_id' => (int) $validated['sprint_id'],
+                'sprint_url' => EntityLinks::sprint((int) $validated['sprint_id']),
             ],
             'counts' => [
                 'assigned' => count($result['assigned']),

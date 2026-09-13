@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Models\Sprint;
 use App\Services\SprintInsights;
+use App\Support\EntityLinks;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -50,7 +51,7 @@ class SprintInsightsTool extends Tool
                 'start_date' => $sprint->start_date?->toDateString(),
                 'end_date' => $sprint->end_date?->toDateString(),
                 'status' => $sprint->statusLabel(),
-                'url' => route('sprints.show', $sprint),
+                'url' => EntityLinks::sprint($sprint),
             ],
             'insights' => $insights,
         ]);

@@ -79,7 +79,7 @@ Wyzwalacze: „zaplanuj sprint”, „co wziąć z backlogu”, „wypadnie ze s
 1. Propozycja (nazwa, opis, kategoria ze słownika, priorytet, termin, osoba,
    podzadania). `list_users` gdy przypisujesz. `list_categories` po nazwę.
 2. Pokaż pełną kartę. Nic nie twórz w tle.
-3. `create_task` z `confirmed_by_user: true`. Podaj `task.url`.
+3. `create_task` z `confirmed_by_user: true`. Podaj `task.url` jako markdown.
 
 ## Playbook: checklista / podzadania
 
@@ -126,3 +126,5 @@ Bez załączników.
   (`Bug / UI` vs `UI / Bug`).
 - `update_task` nie zmienia kategorii ani nie wkłada do sprintu
   (`set_task_categories` / `assign_tasks_to_sprint`).
+- Zadanie, post i sprint mają `url`. W odpowiedzi zawsze markdown
+  `[#ID Nazwa](url)` – nigdy gołe „zadanie 727”.

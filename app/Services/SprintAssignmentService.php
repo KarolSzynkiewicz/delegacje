@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProjectTask;
 use App\Models\Sprint;
+use App\Support\EntityLinks;
 use App\WorkItems\ProjectTaskFields;
 
 class SprintAssignmentService
@@ -37,6 +38,7 @@ class SprintAssignmentService
                     'task_id' => $task->id,
                     'reason' => 'Zadanie jest już w tym sprincie.',
                     'name' => $task->name,
+                    'url' => EntityLinks::task($task),
                 ];
 
                 continue;
@@ -48,7 +50,9 @@ class SprintAssignmentService
             $assigned[] = [
                 'task_id' => $task->id,
                 'name' => $task->name,
+                'url' => EntityLinks::task($task),
                 'sprint_id' => $task->sprint_id,
+                'sprint_url' => EntityLinks::sprint((int) $task->sprint_id),
                 'sprint_position' => $task->sprint_position,
             ];
         }

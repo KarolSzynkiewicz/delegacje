@@ -32,7 +32,7 @@ class TasksServer extends Server
 {
     protected string $name = 'ChronoLogic Tasks';
 
-    protected string $version = '0.5.0';
+    protected string $version = '0.6.0';
 
     protected string $instructions = <<<'MARKDOWN'
         Serwer daje dostęp do zadań, sprintów, backlogu i tablicy ChronoLogic.
@@ -98,10 +98,17 @@ class TasksServer extends Server
         `confirmed_by_user` z własnej inicjatywy. Nie mutuj przez tinker,
         shell ani SQL. Tablica przez MCP bez załączników.
 
+        # Linki
+
+        Każde zadanie, wątek tablicy i sprint w odpowiedzi narzędzi ma `url`.
+        Gdy o nich mówisz, ZAWSZE wstaw markdown `[#ID Nazwa](url)` z tego pola.
+        Nie pisz gołego „zadanie 727” ani samego ID. To samo dla postów
+        i sprintów. Przykład: [#727 Rotacje](https://app/tasks/727).
+
         # Język
 
         Odpowiadaj po polsku. Nazwy zadań, postów i kategorii cytuj
-        oryginalnie i z ID.
+        oryginalnie i z ID, zawsze jako link.
     MARKDOWN;
 
     /**

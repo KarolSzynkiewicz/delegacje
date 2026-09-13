@@ -5,6 +5,7 @@ namespace App\Services\PromptEngine;
 use App\Models\Comment;
 use App\Models\ProjectTask;
 use App\Services\UserMentionService;
+use App\Support\EntityLinks;
 use Carbon\Carbon;
 
 class TaskPromptBundleService
@@ -96,6 +97,7 @@ class TaskPromptBundleService
         return [
             'id' => $task->id,
             'name' => $task->name,
+            'url' => EntityLinks::task($task),
             'description' => $task->plainDescription(),
             'status' => $task->status?->value,
             'status_label' => $task->status?->label(),

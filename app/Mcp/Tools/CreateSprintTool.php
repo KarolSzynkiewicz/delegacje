@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Services\SprintCreationService;
+use App\Support\EntityLinks;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -76,7 +77,7 @@ class CreateSprintTool extends Tool
                 'definition_of_done' => $sprint->definition_of_done,
                 'start_date' => $sprint->start_date?->toDateString(),
                 'end_date' => $sprint->end_date?->toDateString(),
-                'url' => route('sprints.show', $sprint),
+                'url' => EntityLinks::sprint($sprint),
             ],
         ]);
     }

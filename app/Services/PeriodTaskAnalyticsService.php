@@ -8,6 +8,7 @@ use App\Models\Comment;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
+use App\Support\EntityLinks;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -119,6 +120,7 @@ class PeriodTaskAnalyticsService
                 return [
                     'id' => $task->id,
                     'name' => $task->name,
+                    'url' => EntityLinks::task($task),
                     'comments_in_period' => $inPeriod->count(),
                     'comments_total' => $all->count(),
                     'last_comment_at' => $last?->created_at?->toIso8601String(),
@@ -144,6 +146,7 @@ class PeriodTaskAnalyticsService
                 return [
                     'id' => $task->id,
                     'name' => $task->name,
+                    'url' => EntityLinks::task($task),
                     'status' => $task->status?->value,
                     'assigned_to' => $task->assignedTo?->name,
                     'days_since_activity' => $days,

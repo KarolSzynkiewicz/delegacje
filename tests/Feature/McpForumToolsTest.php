@@ -58,6 +58,7 @@ class McpForumToolsTest extends TestCase
         $this->assertSame('Nowe wyjazdy', $created['post']['title']);
         $this->assertSame('Wyjazd to jeden rekord.', $created['post']['body']);
         $this->assertSame('logistyka', $created['post']['tags'][0]['name']);
+        $this->assertSame(route('dashboard.posts.show', $created['post']['id']), $created['post']['url']);
         $this->assertArrayNotHasKey('image_path', $created['post']);
         $this->assertArrayNotHasKey('cover_url', $created['post']);
 
@@ -66,6 +67,7 @@ class McpForumToolsTest extends TestCase
         $search = $this->toolJson(SearchPostsTool::class, ['tag' => 'logistyka']);
         $this->assertSame(1, $search['meta']['total_matching']);
         $this->assertSame($postId, $search['posts'][0]['id']);
+        $this->assertSame(route('dashboard.posts.show', $postId), $search['posts'][0]['url']);
         $this->assertArrayNotHasKey('body', $search['posts'][0]);
 
         $tags = $this->toolJson(ListPostTagsTool::class, ['q' => 'logi']);
@@ -105,6 +107,7 @@ class McpForumToolsTest extends TestCase
 
         $card = $this->toolJson(GetPostTool::class, ['post_id' => '#'.$post->id]);
         $this->assertSame('Trzeba ułożyć rotacje.', $card['post']['body']);
+        $this->assertSame(route('dashboard.posts.show', $post), $card['post']['url']);
 
         TasksServer::actingAs($this->admin)
             ->tool(AddCommentTool::class, [

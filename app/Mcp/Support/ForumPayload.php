@@ -4,6 +4,7 @@ namespace App\Mcp\Support;
 
 use App\Models\ForumPost;
 use App\Models\ForumTag;
+use App\Support\EntityLinks;
 
 class ForumPayload
 {
@@ -26,7 +27,7 @@ class ForumPayload
             'updated_at' => $post->updated_at?->toIso8601String(),
             'author' => TaskPayload::user($post->user),
             'tags' => self::tags($post),
-            'url' => route('dashboard.posts.show', $post),
+            'url' => EntityLinks::post($post),
         ];
     }
 

@@ -4,8 +4,10 @@ namespace App\Mcp\Support;
 
 use App\Models\Comment;
 use App\Models\ProjectTask;
+use App\Models\Sprint;
 use App\Models\TaskSubtask;
 use App\Services\UserMentionService;
+use App\Support\EntityLinks;
 
 class TaskPayload
 {
@@ -31,11 +33,8 @@ class TaskPayload
             'subtasks_progress_percent' => self::progress($task),
             'assigned_to' => self::user($task->assignedTo),
             'created_by' => self::user($task->createdBy),
-            'sprint' => $task->sprint ? [
-                'id' => $task->sprint->id,
-                'name' => $task->sprint->name,
-            ] : null,
-            'url' => route('tasks.show', $task),
+            'sprint' => self::sprint($task->sprint),
+            'url' => EntityLinks::task($task),
         ];
     }
 
@@ -166,6 +165,22 @@ class TaskPayload
                 ])
                 ->values()
                 ->all(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, url: string}|null
+     */
+    public static function sprint(?Sprint $sprint): ?array
+    {
+        if (! $sprint) {
+            return null;
+        }
+
+        return [
+            'id' => $sprint->id,
+            'name' => $sprint->name,
+            'url' => EntityLinks::sprint($sprint),
         ];
     }
 

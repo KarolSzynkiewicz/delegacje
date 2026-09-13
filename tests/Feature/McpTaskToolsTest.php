@@ -6,6 +6,7 @@ use App\Enums\TaskStatus;
 use App\Mcp\Servers\TasksServer;
 use App\Mcp\Tools\AddCommentTool;
 use App\Mcp\Tools\AddSubtasksTool;
+use App\Mcp\Tools\BacklogOverviewTool;
 use App\Mcp\Tools\CreateSprintTool;
 use App\Mcp\Tools\GetTaskCommentsTool;
 use App\Mcp\Tools\GetTaskTool;
@@ -80,6 +81,7 @@ class McpTaskToolsTest extends TestCase
         $this->assertSame(1, $payload['meta']['total_matching']);
         $this->assertSame($annaTask->id, $payload['tasks'][0]['id']);
         $this->assertSame('Anna', $payload['tasks'][0]['assigned_to']['name']);
+        $this->assertSame(route('tasks.show', $annaTask), $payload['tasks'][0]['url']);
         $this->assertArrayNotHasKey('description', $payload['tasks'][0]);
     }
 
@@ -124,6 +126,7 @@ class McpTaskToolsTest extends TestCase
 
         $card = $this->toolJson(GetTaskTool::class, ['task_id' => '#'.$task->id]);
         $this->assertSame('Ułożyć grafiki wyjazdów.', $card['task']['description']);
+        $this->assertSame(route('tasks.show', $task), $card['task']['url']);
         $this->assertCount(2, $card['task']['recent_comments']);
 
         $thread = $this->toolJson(GetTaskCommentsTool::class, ['task_id' => $task->id]);
@@ -169,6 +172,8 @@ class McpTaskToolsTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $payload['kpis']['tasks']);
         $this->assertContains($hot->id, $payload['pointers']['hottest_task_ids']);
         $this->assertContains($quiet->id, $payload['pointers']['stale_task_ids']);
+        $this->assertSame(route('tasks.show', $hot), collect($payload['hottest_threads'])->firstWhere('id', $hot->id)['url']);
+        $this->assertSame(route('tasks.show', $quiet), collect($payload['stale'])->firstWhere('id', $quiet->id)['url']);
         $this->assertNotEmpty($payload['collaboration']['comments']);
         $this->assertSame(
             $this->admin->name,
@@ -199,6 +204,7 @@ class McpTaskToolsTest extends TestCase
         $this->assertFalse($first['meta']['reused']);
         $this->assertTrue($second['meta']['reused']);
         $this->assertSame($first['sprint']['id'], $second['sprint']['id']);
+        $this->assertSame(route('sprints.show', $first['sprint']['id']), $first['sprint']['url']);
         $this->assertSame(1, Sprint::query()->where('name', 'Sprint MCP')->count());
     }
 
@@ -218,8 +224,17 @@ class McpTaskToolsTest extends TestCase
 
         $insights = $this->toolJson(SprintInsightsTool::class, ['sprint_id' => $sprint->id]);
         $this->assertSame('Sprint testowy', $insights['sprint']['name']);
+        $this->assertSame(route('sprints.show', $sprint), $insights['sprint']['url']);
         $this->assertArrayHasKey('velocity', $insights['insights']);
         $this->assertArrayHasKey('burndown', $insights['insights']);
+
+        $inSprint = $this->toolJson(SearchTasksTool::class, ['sprint_id' => $sprint->id]);
+        $this->assertSame(route('tasks.show', $inSprint['tasks'][0]['id']), $inSprint['tasks'][0]['url']);
+        $this->assertSame(route('sprints.show', $sprint), $inSprint['tasks'][0]['sprint']['url']);
+
+        $overview = $this->toolJson(BacklogOverviewTool::class, []);
+        $sprintRow = collect($overview['sprints'])->firstWhere('id', $sprint->id);
+        $this->assertSame(route('sprints.show', $sprint), $sprintRow['url']);
 
         $users = $this->toolJson(ListUsersTool::class, ['q' => 'Ann']);
         $this->assertSame('Anna', $users['users'][0]['name']);

@@ -6,6 +6,7 @@ use App\Enums\WorkItemStatus;
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Models\Sprint;
 use App\Models\WorkItem;
+use App\Support\EntityLinks;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -85,6 +86,7 @@ class BacklogOverviewTool extends Tool
                 'source_type' => $item->source_type,
                 'source_id' => $item->source_id,
                 'task_id' => $item->type->value === 'task' ? $item->source_id : null,
+                'url' => EntityLinks::workItem($item),
                 'title' => $item->title,
                 'description' => $item->plainDescription(),
                 'category' => $item->category,
@@ -116,6 +118,7 @@ class BacklogOverviewTool extends Tool
                 'start_date' => $sprint->start_date?->toDateString(),
                 'end_date' => $sprint->end_date?->toDateString(),
                 'tasks_count' => $sprint->tasks_count,
+                'url' => EntityLinks::sprint($sprint),
             ])
             ->all();
     }

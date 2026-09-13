@@ -6,6 +6,7 @@ use App\Enums\TaskStatus;
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Mcp\Support\CategoryDictionary;
 use App\Models\ProjectTask;
+use App\Support\EntityLinks;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -73,6 +74,7 @@ class TasksWithoutCategoryTool extends Tool
             'tasks' => $tasks->map(fn (ProjectTask $task) => [
                 'id' => $task->id,
                 'name' => $task->name,
+                'url' => EntityLinks::task($task),
                 'description' => $task->plainDescription(),
                 'status' => $task->status?->value,
                 'priority' => $task->priority,
