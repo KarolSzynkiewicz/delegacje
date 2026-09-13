@@ -9,6 +9,7 @@ use App\Mcp\Support\TaskPayload;
 use App\Models\Comment;
 use App\Models\ForumPost;
 use App\Models\ProjectTask;
+use App\Models\Sprint;
 use App\Models\User;
 use App\Notifications\TaskCommentAdded;
 use App\Services\UserMentionService;
@@ -27,8 +28,8 @@ class AddCommentTool extends Tool
     protected string $name = 'add_comment';
 
     protected string $description = <<<'MARKDOWN'
-        Dodaje komentarz do zadania (`task_id`) albo wątku tablicy (`post_id`).
-        Podaj dokładnie jedno z nich. Bez załączników.
+        Dodaje komentarz do zadania (`task_id`), wątku tablicy (`post_id`)
+        albo sprintu (`sprint_id`). Podaj dokładnie jedno. Bez załączników.
 
         Składnia jak w UI (można mieszać w jednym body):
         - `@Anna` – wzmianka / powiadomienie
@@ -52,6 +53,7 @@ class AddCommentTool extends Tool
             'confirmed_by_user' => ['required', 'boolean'],
             'task_id' => ['nullable'],
             'post_id' => ['nullable'],
+            'sprint_id' => ['nullable'],
             'body' => ['required', 'string', 'max:5000'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
             'mentions' => ['nullable', 'array', 'max:10'],
@@ -69,8 +71,9 @@ class AddCommentTool extends Tool
 
         $hasTask = filled($validated['task_id'] ?? null);
         $hasPost = filled($validated['post_id'] ?? null);
-        if ($hasTask === $hasPost) {
-            return Response::error('Podaj dokładnie jedno: `task_id` albo `post_id`.');
+        $hasSprint = filled($validated['sprint_id'] ?? null);
+        if ((int) $hasTask + (int) $hasPost + (int) $hasSprint !== 1) {
+            return Response::error('Podaj dokładnie jedno: `task_id`, `post_id` albo `sprint_id`.');
         }
 
         $body = $this->applyMentionTokens(trim($validated['body']), $validated['mentions'] ?? []);
@@ -82,7 +85,11 @@ class AddCommentTool extends Tool
             return $this->commentOnTask($user, $validated, $body);
         }
 
-        return $this->commentOnPost($user, $validated, $body);
+        if ($hasPost) {
+            return $this->commentOnPost($user, $validated, $body);
+        }
+
+        return $this->commentOnSprint($user, $validated, $body);
     }
 
     /**
@@ -231,6 +238,57 @@ class AddCommentTool extends Tool
     }
 
     /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function commentOnSprint(User $user, array $validated, string $body): Response
+    {
+        if (! $user->isAdmin() && ! $user->hasPermission('tasks.view')) {
+            return Response::error(
+                "Użytkownik {$user->name} nie ma dostępu do modułu zadań – komentarz odrzucony."
+            );
+        }
+
+        $id = $this->parseTaskId($validated['sprint_id']);
+        if (! $id) {
+            return Response::error('Podaj prawidłowe `sprint_id` (liczba albo #12).');
+        }
+
+        $sprint = Sprint::query()->find($id);
+        if (! $sprint) {
+            return Response::error("Nie znaleziono sprintu #{$id}.");
+        }
+
+        $parent = $this->resolveParent(
+            $validated['parent_id'] ?? null,
+            CommentableType::SPRINT,
+            $sprint->id,
+        );
+        if ($parent instanceof Response) {
+            return $parent;
+        }
+
+        $comment = $sprint->addComment($body, $user, $parent);
+        app(UserMentionService::class)->notifyCommentMentions($comment, $user);
+
+        $comment = $comment->fresh('user');
+
+        return Response::json([
+            'meta' => [
+                'applied_at' => now()->toIso8601String(),
+                'applied_by' => $user->name,
+                'target' => 'sprint',
+            ],
+            'comment' => TaskPayload::comment($comment),
+            'effects' => TaskPayload::commentSideEffects($comment),
+            'sprint' => [
+                'id' => $sprint->id,
+                'name' => $sprint->name,
+                'url' => route('sprints.show', $sprint),
+            ],
+        ]);
+    }
+
+    /**
      * @param  list<int>  $mentionNotifiedIds
      */
     private function notifyAssignee(ProjectTask $task, Comment $comment, User $author, array $mentionNotifiedIds): void
@@ -255,9 +313,11 @@ class AddCommentTool extends Tool
     {
         return [
             'task_id' => $schema->string()
-                ->description('ID zadania albo "#12". Wzajemnie wyklucza się z post_id.'),
+                ->description('ID zadania albo "#12". Wzajemnie wyklucza się z post_id i sprint_id.'),
             'post_id' => $schema->string()
-                ->description('ID wątku tablicy albo "#12". Wzajemnie wyklucza się z task_id.'),
+                ->description('ID wątku tablicy albo "#12". Wzajemnie wyklucza się z task_id i sprint_id.'),
+            'sprint_id' => $schema->string()
+                ->description('ID sprintu albo "#12". Wzajemnie wyklucza się z task_id i post_id.'),
             'body' => $schema->string()
                 ->description('Treść. @Anna powiadamia, @Anna! robi zadanie, @Anna? wniosek o zatwierdzenie.')
                 ->required(),

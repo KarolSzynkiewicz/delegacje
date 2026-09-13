@@ -124,6 +124,7 @@ class McpHttpServerTest extends TestCase
         $this->assertContains('tasks_in_period', $names);
         $this->assertContains('period_analytics', $names);
         $this->assertContains('search_tasks', $names);
+        $this->assertContains('search_work_items', $names);
         $this->assertContains('get_task', $names);
         $this->assertContains('get_task_comments', $names);
         $this->assertContains('sprint_insights', $names);

@@ -22,12 +22,12 @@ class BacklogOverviewTool extends Tool
 
     protected string $description = <<<'MARKDOWN'
         Zwraca otwarty backlog, czyli pozycje pracy nieprzypisane do żadnego sprintu,
-        razem z listą sprintów (cel, DoR, DoD, kamienie, daty) i rozkładem pozycji
+        razem z listą sprintów (cel, warunki startu, warunki ukończenia, kamienie, daty) i rozkładem pozycji
         po kategoriach i typach.
 
         Backlog to wspólny indeks: zadania, podzadania, procedury, kompletacje,
-        wzmianki i zatwierdzenia. Służy do planowania sprintu – szukania pozycji,
-        które łączy wspólny temat albo cel.
+        wzmianki, spotkania i zatwierdzenia – ale tylko otwarte i poza sprintem.
+        Szukanie po osobie / sprincie / typie: `search_work_items`.
 
         To narzędzie tylko czyta i niczego nie przypisuje do sprintu.
     MARKDOWN;

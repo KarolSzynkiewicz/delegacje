@@ -19,11 +19,14 @@ class CreateSprintTool extends Tool
     protected string $name = 'create_sprint';
 
     protected string $description = <<<'MARKDOWN'
-        Tworzy nowy sprint (nazwa, cel, DoR, DoD, daty).
+        Tworzy nowy sprint (nazwa, cel, warunki startu, warunki ukończenia, daty).
 
-        DoR i DoD to zwykłe checklisty checkboxów na sprincie
-        (`definition_of_ready` / `definition_of_done` – lista stringów).
-        Kamienie milowe to osobna, też płaska lista (`milestones`).
+        Checklisty na tablicy:
+        - `definition_of_ready` – co musi być, by w ogóle zacząć pracę
+        - `definition_of_done` – kiedy uznamy, że zrobione (tekst albo lista stringów)
+        Kamienie milowe (`milestones`) to osobna lista przełomów.
+
+        Po starcie odhaczaj je przez `update_sprint_checklist_item`.
 
         Zasada obowiązkowa: najpierw pokaż użytkownikowi pełną propozycję sprintu
         i poczekaj na wyraźną zgodę. Dopiero wtedy wywołaj z `confirmed_by_user: true`.
@@ -114,10 +117,10 @@ class CreateSprintTool extends Tool
             'goal' => $schema->string()
                 ->description('Cel sprintu – po co go robimy.'),
             'definition_of_ready' => $schema->array()
-                ->description('DoR – checklista tego, co musi być, żeby zacząć.')
+                ->description('Co musi być, by w ogóle zacząć pracę – lista zdań.')
                 ->items($schema->string()),
             'definition_of_done' => $schema->string()
-                ->description('DoD – tekst albo lista checkboxów na sprincie.'),
+                ->description('Kiedy uznamy, że zrobione – zdanie albo lista (w JSON-ie tablica stringów też przechodzi).'),
             'start_date' => $schema->string()
                 ->description('Data rozpoczęcia YYYY-MM-DD.')
                 ->required(),

@@ -5,18 +5,28 @@ namespace Tests\Feature;
 use App\Enums\TaskStatus;
 use App\Mcp\Servers\TasksServer;
 use App\Mcp\Tools\AddCommentTool;
+use App\Mcp\Tools\AddSprintChecklistItemTool;
 use App\Mcp\Tools\AddSubtasksTool;
+use App\Mcp\Tools\AdvanceProcedureTool;
 use App\Mcp\Tools\BacklogOverviewTool;
 use App\Mcp\Tools\CreateSprintTool;
+use App\Mcp\Tools\CreateTaskTool;
+use App\Mcp\Tools\GetProcedureRunTool;
 use App\Mcp\Tools\GetTaskCommentsTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListCategoriesTool;
+use App\Mcp\Tools\ListProcedureRunsTool;
+use App\Mcp\Tools\ListProcedureTemplatesTool;
 use App\Mcp\Tools\ListUsersTool;
 use App\Mcp\Tools\PeriodAnalyticsTool;
 use App\Mcp\Tools\SearchTasksTool;
+use App\Mcp\Tools\SearchWorkItemsTool;
 use App\Mcp\Tools\SprintInsightsTool;
+use App\Mcp\Tools\StartProcedureTool;
+use App\Mcp\Tools\UpdateSprintChecklistItemTool;
 use App\Mcp\Tools\UpdateSubtaskTool;
 use App\Mcp\Tools\UpdateTaskTool;
+use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
 use App\Models\TaskSubtask;
@@ -109,6 +119,90 @@ class McpTaskToolsTest extends TestCase
         $this->assertSame(1, $payload['meta']['total_matching']);
         $this->assertNull($payload['tasks'][0]['assigned_to']);
         $this->assertNull($payload['tasks'][0]['category']);
+    }
+
+    public function test_search_work_items_filters_by_assignee_type_and_sprint(): void
+    {
+        $sprint = Sprint::factory()->create([
+            'name' => 'Sprint WI',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $task = ProjectTask::query()->create([
+            'name' => 'Karta Ani',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->anna->id,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $meeting = ProjectTask::query()->create([
+            'name' => 'Sync z Anią',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->anna->id,
+            'created_by' => $this->admin->id,
+            'starts_at' => '2026-09-14 10:00',
+        ]);
+
+        $inSprint = ProjectTask::query()->create([
+            'name' => 'W sprincie Ani',
+            'status' => TaskStatus::PENDING,
+            'sprint_id' => $sprint->id,
+            'assigned_to' => $this->anna->id,
+            'created_by' => $this->admin->id,
+        ]);
+
+        ProjectTask::query()->create([
+            'name' => 'Karta Karola',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->admin->id,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $annaItems = $this->toolJson(SearchWorkItemsTool::class, [
+            'assignee_name' => 'Anna',
+        ]);
+        $this->assertSame(3, $annaItems['meta']['total_matching']);
+        $this->assertEqualsCanonicalizing(
+            [$task->id, $meeting->id, $inSprint->id],
+            collect($annaItems['items'])->pluck('task_id')->all()
+        );
+
+        $meetings = $this->toolJson(SearchWorkItemsTool::class, [
+            'assignee_name' => 'Anna',
+            'type' => 'meeting',
+        ]);
+        $this->assertSame(1, $meetings['meta']['total_matching']);
+        $this->assertSame('meeting', $meetings['items'][0]['type']);
+        $this->assertSame($meeting->id, $meetings['items'][0]['task_id']);
+        $this->assertSame('get_task', $meetings['items'][0]['next']['tool']);
+        $this->assertSame(route('tasks.show', $meeting), $meetings['items'][0]['url']);
+
+        $mine = $this->toolJson(SearchWorkItemsTool::class, [
+            'assigned_to_me' => true,
+        ]);
+        $this->assertSame(1, $mine['meta']['total_matching']);
+        $this->assertSame('Karol', $mine['items'][0]['assignee']);
+
+        $outsideSprint = $this->toolJson(SearchWorkItemsTool::class, [
+            'assignee_name' => 'Anna',
+            'no_sprint' => true,
+        ]);
+        $this->assertSame(2, $outsideSprint['meta']['total_matching']);
+        $this->assertEqualsCanonicalizing(
+            [$task->id, $meeting->id],
+            collect($outsideSprint['items'])->pluck('task_id')->all()
+        );
+
+        $inSprintItems = $this->toolJson(SearchWorkItemsTool::class, [
+            'sprint_id' => $sprint->id,
+        ]);
+        $this->assertSame(1, $inSprintItems['meta']['total_matching']);
+        $this->assertSame($inSprint->id, $inSprintItems['items'][0]['task_id']);
+        $this->assertSame(route('sprints.show', $sprint), $inSprintItems['items'][0]['sprint']['url']);
+
+        TasksServer::actingAs($this->admin)
+            ->tool(SearchWorkItemsTool::class, ['type' => 'bogus'])
+            ->assertHasErrors(['Nieznany']);
     }
 
     public function test_get_task_and_comments_return_human_content(): void
@@ -491,6 +585,115 @@ class McpTaskToolsTest extends TestCase
             'approver_id' => $this->anna->id,
             'created_by' => $this->admin->id,
         ]);
+    }
+
+    public function test_sprint_checklist_item_can_be_added_and_toggled(): void
+    {
+        $sprint = Sprint::factory()->create(['created_by' => $this->admin->id]);
+
+        TasksServer::actingAs($this->admin)
+            ->tool(AddSprintChecklistItemTool::class, [
+                'sprint_id' => $sprint->id,
+                'list' => 'done',
+                'name' => 'Na produkcji',
+                'confirmed_by_user' => false,
+            ])
+            ->assertHasErrors(['potwierdzenia']);
+
+        $added = $this->toolJson(AddSprintChecklistItemTool::class, [
+            'sprint_id' => '#'.$sprint->id,
+            'list' => 'done',
+            'name' => 'Na produkcji',
+            'confirmed_by_user' => true,
+        ]);
+
+        $this->assertSame('Na produkcji', $added['item']['name']);
+        $this->assertFalse($added['item']['done']);
+        $itemId = $added['item']['id'];
+
+        $toggled = $this->toolJson(UpdateSprintChecklistItemTool::class, [
+            'sprint_id' => $sprint->id,
+            'list' => 'done',
+            'item_id' => $itemId,
+            'done' => true,
+            'confirmed_by_user' => true,
+        ]);
+
+        $this->assertTrue($toggled['item']['done']);
+        $this->assertNotNull($sprint->doneItems()->first()->completed_at);
+    }
+
+    public function test_add_comment_on_sprint_and_create_meeting_task(): void
+    {
+        $sprint = Sprint::factory()->create(['created_by' => $this->admin->id]);
+
+        $comment = $this->toolJson(AddCommentTool::class, [
+            'sprint_id' => $sprint->id,
+            'body' => 'Trzymamy scope @Anna?',
+            'confirmed_by_user' => true,
+        ]);
+
+        $this->assertSame('sprint', $comment['meta']['target']);
+        $this->assertSame('approval', $comment['comment']['mentions'][0]['kind']);
+
+        $meeting = $this->toolJson(CreateTaskTool::class, [
+            'name' => 'Sync z Anią',
+            'starts_at' => '2026-09-14 10:00',
+            'ends_at' => '2026-09-14 10:30',
+            'location' => 'Meet',
+            'participant_ids' => [$this->anna->id],
+            'confirmed_by_user' => true,
+        ]);
+
+        $this->assertTrue($meeting['task']['is_meeting']);
+        $this->assertSame('Meet', $meeting['task']['location']);
+    }
+
+    public function test_procedure_templates_start_and_advance(): void
+    {
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Onboarding MCP',
+            'created_by' => $this->admin->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    ['id' => 'task-1', 'type' => 'task', 'name' => 'Konto'],
+                    ['id' => 'end-1', 'type' => 'end', 'name' => 'Koniec'],
+                ],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'task-1'],
+                    ['id' => 'e2', 'from' => 'task-1', 'to' => 'end-1'],
+                ],
+            ],
+        ]);
+
+        $catalog = $this->toolJson(ListProcedureTemplatesTool::class, ['q' => 'Onboarding MCP']);
+        $this->assertSame(0, $catalog['templates'][0]['runs']['in_progress']);
+
+        $started = $this->toolJson(StartProcedureTool::class, [
+            'template_id' => $template->id,
+            'name_suffix' => 'Jan',
+            'confirmed_by_user' => true,
+        ]);
+
+        $runId = $started['run']['id'];
+        $this->assertStringContainsString('Konto', $started['run']['prompt']);
+
+        $listed = $this->toolJson(ListProcedureRunsTool::class, [
+            'template_id' => $template->id,
+        ]);
+        $this->assertSame(1, $listed['meta']['returned']);
+        $this->assertSame($runId, $listed['runs'][0]['id']);
+
+        $detail = $this->toolJson(GetProcedureRunTool::class, ['run_id' => $runId]);
+        $this->assertSame('task-1', $detail['run']['active_steps'][0]['node_id']);
+
+        $advanced = $this->toolJson(AdvanceProcedureTool::class, [
+            'run_id' => $runId,
+            'confirmed_by_user' => true,
+        ]);
+
+        $this->assertContains($advanced['run']['status'], ['finished', 'in_progress']);
     }
 
     /**

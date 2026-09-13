@@ -20,6 +20,10 @@ class TaskCreationService
      *     due_date?: string|null,
      *     assigned_to?: int|null,
      *     sprint_id?: int|null,
+     *     starts_at?: string|null,
+     *     ends_at?: string|null,
+     *     location?: string|null,
+     *     participant_ids?: array<int, int>|null,
      *     subtasks?: array<int, string>
      * }  $data
      */
@@ -27,6 +31,11 @@ class TaskCreationService
     {
         return DB::transaction(function () use ($data, $creator) {
             $sprintId = $data['sprint_id'] ?? null;
+            $startsAt = $data['starts_at'] ?? null;
+            $dueDate = $data['due_date'] ?? null;
+            if ($dueDate === null && $startsAt) {
+                $dueDate = \Illuminate\Support\Carbon::parse($startsAt)->toDateString();
+            }
 
             $task = ProjectTask::create([
                 'name' => $data['name'],
@@ -34,7 +43,11 @@ class TaskCreationService
                 'status' => TaskStatus::PENDING,
                 'category' => $data['category'] ?? null,
                 'priority' => $data['priority'] ?? null,
-                'due_date' => $data['due_date'] ?? null,
+                'due_date' => $dueDate,
+                'starts_at' => $startsAt,
+                'ends_at' => $data['ends_at'] ?? null,
+                'location' => $data['location'] ?? null,
+                'participant_ids' => $data['participant_ids'] ?? null,
                 'assigned_to' => $data['assigned_to'] ?? null,
                 'sprint_id' => $sprintId,
                 'sprint_position' => $sprintId

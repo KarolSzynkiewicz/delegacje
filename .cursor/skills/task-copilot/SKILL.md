@@ -12,14 +12,16 @@ pobieraj narzędziami, nigdy nie zgaduj stanu zadań z pamięci ani z kodu.
 
 ## Narzędzia
 
-Czytające: `period_analytics`, `search_tasks`, `get_task`, `get_task_comments`,
+Czytające: `period_analytics`, `search_work_items`, `search_tasks`, `get_task`, `get_task_comments`,
 `search_posts`, `get_post`, `get_post_comments`, `list_post_tags`,
 `list_users`, `list_categories`, `sprint_insights`, `tasks_without_category`,
-`backlog_overview`, `tasks_in_period` (dump – unikaj na rzecz analityki).
+`backlog_overview`, `list_procedure_templates`, `list_procedure_runs`,
+`get_procedure_run`, `tasks_in_period` (dump – unikaj na rzecz analityki).
 
 Zapisujące (HITL): `set_task_categories`, `update_task`, `update_subtask`,
 `add_subtasks`, `add_comment`, `create_post`, `update_post`, `create_task`,
-`create_sprint`, `assign_tasks_to_sprint`.
+`create_sprint`, `add_sprint_checklist_item`, `update_sprint_checklist_item`,
+`assign_tasks_to_sprint`, `start_procedure`, `advance_procedure`.
 
 ## Zasada nadrzędna
 
@@ -57,27 +59,43 @@ Nie wołaj `tasks_in_period` do raportu – za duży JSON.
 
 ## Playbook: taski osoby / kategorii
 
-Wyzwalacze: „co ma Karol”, „Bug / UI”, „otwarte u Ani”.
+Wyzwalacze: „co ma Karol”, „Bug / UI”, „otwarte u Ani”, „moje spotkania”.
 
-`list_categories` gdy nie znasz dokładnej nazwy. Potem `search_tasks` z
-`assignee_name` / `assigned_to` / `created_by_name` / `category` / `status`.
-Ewentualnie `get_task` na konkretne ID.
+Mieszane typy (jak siatka): `search_work_items` z `assignee_name` /
+`assigned_to_me` / `type` (`meeting`, `approval`, `procedure_run`, …) /
+`sprint_id`. Potem `next.tool` (`get_task` / `get_procedure_run`).
+
+Same karty `project_tasks`: `search_tasks`. Słownik kategorii: `list_categories`.
 
 ## Playbook: planowanie sprintu
 
 Wyzwalacze: „zaplanuj sprint”, „co wziąć z backlogu”, „wypadnie ze sprintu”.
 
 1. `backlog_overview`.
-2. Propozycja: nazwa, cel, DoD, daty, lista zadań (i co wypada).
+2. Propozycja: nazwa, cel, co trzeba by zacząć, kiedy zrobione, kamienie, daty, lista zadań (i co wypada).
 3. Po zgodzie: `create_sprint` → `create_task` z `sprint_id` albo
    `assign_tasks_to_sprint`. Odpinanie: `update_task` z `unassign_sprint: true`
    (jedno zadanie na wywołanie).
-4. W trakcie sprintu: `sprint_insights`.
+4. W trakcie sprintu: `sprint_insights`. Odhaczanie list:
+   `update_sprint_checklist_item` (`list`: ready / done / milestone).
+   Komentarz do sprintu: `add_comment` z `sprint_id`.
+
+## Playbook: procedura głosem
+
+Wyzwalacze: „odpal procedurę”, „co leci z onboardingu”, „następny krok”.
+
+1. `list_procedure_templates` – które SOP-y i ile mają aktywnych runów.
+2. `list_procedure_runs` z `template_id` – czy już coś jest w trakcie.
+3. Nowy przebieg (po zgodzie): `start_procedure`.
+4. Wejście w krok: `get_procedure_run` – przeczytaj `prompt`.
+5. Po zgodzie: `advance_procedure` (`begin`, `edge_id`, `checklist`, `back`).
+   Kroku approval nie domykaj – musi zatwierdzający.
 
 ## Playbook: tworzenie zadania
 
 1. Propozycja (nazwa, opis, kategoria ze słownika, priorytet, termin, osoba,
-   podzadania). `list_users` gdy przypisujesz. `list_categories` po nazwę.
+   podzadania). Spotkanie: `starts_at` / `ends_at` / `location` / `participant_ids`.
+   `list_users` gdy przypisujesz. `list_categories` po nazwę.
 2. Pokaż pełną kartę. Nic nie twórz w tle.
 3. `create_task` z `confirmed_by_user: true`. Podaj `task.url` jako markdown.
 
@@ -105,7 +123,7 @@ Wyzwalacze: „co na tablicy”, „post o logistyce”, „dopisz wątek”, �
 
 Wyzwalacze: „pingnij”, „zrób z tego zadanie”, „poproś o zatwierdzenie”.
 
-Cel: `task_id` albo `post_id` – dokładnie jedno.
+Cel: `task_id`, `post_id` albo `sprint_id` – dokładnie jedno.
 
 W `body` (jak w UI):
 - `@Anna` – wzmianka

@@ -18,7 +18,10 @@ class CreateTaskTool extends Tool
     protected string $name = 'create_task';
 
     protected string $description = <<<'MARKDOWN'
-        Tworzy nowe zadanie z opcjonalnymi podzadaniami.
+        Tworzy nowe zadanie, opcjonalnie ze spotkaniem i podzadaniami.
+
+        Spotkanie: podaj `starts_at` (i zwykle `ends_at`, `location`,
+        `participant_ids`) — karta ląduje jako typ „Spotkanie”.
 
         Zasada obowiązkowa: najpierw pokaż użytkownikowi pełną propozycję
         (nazwa, opis, kategoria, priorytet, termin, przypisanie, lista podzadań
@@ -51,6 +54,11 @@ class CreateTaskTool extends Tool
             'due_date' => ['nullable', 'date', 'after_or_equal:today'],
             'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
             'sprint_id' => ['nullable', 'integer', 'exists:sprints,id'],
+            'starts_at' => ['nullable', 'date'],
+            'ends_at' => ['nullable', 'date', 'after:starts_at'],
+            'location' => ['nullable', 'string', 'max:4000'],
+            'participant_ids' => ['nullable', 'array', 'max:30'],
+            'participant_ids.*' => ['integer', 'exists:users,id'],
             'subtasks' => ['nullable', 'array', "max:{$maxSubtasks}"],
             'subtasks.*' => ['required', 'string', 'max:255'],
         ]);
@@ -76,6 +84,10 @@ class CreateTaskTool extends Tool
             'due_date' => $validated['due_date'] ?? null,
             'assigned_to' => $validated['assigned_to'] ?? null,
             'sprint_id' => $validated['sprint_id'] ?? null,
+            'starts_at' => $validated['starts_at'] ?? null,
+            'ends_at' => $validated['ends_at'] ?? null,
+            'location' => isset($validated['location']) ? trim($validated['location']) : null,
+            'participant_ids' => $validated['participant_ids'] ?? null,
             'subtasks' => $subtasks,
         ], $user);
 
@@ -96,6 +108,10 @@ class CreateTaskTool extends Tool
                 'due_date' => $task->due_date?->toDateString(),
                 'assigned_to' => $task->assignedTo?->name,
                 'sprint' => $task->sprint?->name,
+                'starts_at' => $task->starts_at?->toIso8601String(),
+                'ends_at' => $task->ends_at?->toIso8601String(),
+                'location' => $task->location,
+                'is_meeting' => $task->isMeeting(),
                 'url' => route('tasks.show', $task),
                 'subtasks' => $task->subtasks
                     ->sortBy('sort_order')
@@ -133,6 +149,15 @@ class CreateTaskTool extends Tool
                 ->description('ID użytkownika (users.id), któremu przypisać zadanie.'),
             'sprint_id' => $schema->integer()
                 ->description('ID sprintu (sprints.id), jeśli zadanie ma trafić na tablicę.'),
+            'starts_at' => $schema->string()
+                ->description('Start spotkania (ISO albo YYYY-MM-DD HH:MM). Samo to pole robi ze zadania spotkanie.'),
+            'ends_at' => $schema->string()
+                ->description('Koniec spotkania. Wymaga starts_at.'),
+            'location' => $schema->string()
+                ->description('Miejsce / link do spotkania.'),
+            'participant_ids' => $schema->array()
+                ->description('users.id uczestników spotkania.')
+                ->items($schema->integer()),
             'subtasks' => $schema->array()
                 ->description('Lista podzadań w kolejności wykonania – każdy element to nazwa kroku.')
                 ->items($schema->string()),
