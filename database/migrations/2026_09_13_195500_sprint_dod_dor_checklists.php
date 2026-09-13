@@ -9,45 +9,66 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('sprint_readiness_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('sprint_id')->constrained('sprints')->cascadeOnDelete();
-            $table->string('name');
-            $table->timestamp('completed_at')->nullable();
-            $table->unsignedInteger('position')->default(0);
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamps();
+        if (! Schema::hasTable('sprint_readiness_items')) {
+            Schema::create('sprint_readiness_items', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('sprint_id')->constrained('sprints')->cascadeOnDelete();
+                $table->text('name');
+                $table->timestamp('completed_at')->nullable();
+                $table->unsignedInteger('position')->default(0);
+                $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
 
-            $table->index(['sprint_id', 'position']);
-        });
+                $table->index(['sprint_id', 'position']);
+            });
+        }
 
-        Schema::create('sprint_dod_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('sprint_id')->constrained('sprints')->cascadeOnDelete();
-            $table->string('name');
-            $table->timestamp('completed_at')->nullable();
-            $table->unsignedInteger('position')->default(0);
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamps();
+        if (! Schema::hasTable('sprint_dod_items')) {
+            Schema::create('sprint_dod_items', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('sprint_id')->constrained('sprints')->cascadeOnDelete();
+                $table->text('name');
+                $table->timestamp('completed_at')->nullable();
+                $table->unsignedInteger('position')->default(0);
+                $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
 
-            $table->index(['sprint_id', 'position']);
-        });
+                $table->index(['sprint_id', 'position']);
+            });
+        }
 
-        $this->migrateLegacyDefinitionOfDone();
+        $this->widenNameColumns();
 
-        Schema::table('sprints', function (Blueprint $table) {
-            $table->dropColumn('definition_of_done');
-        });
+        if (Schema::hasColumn('sprints', 'definition_of_done')) {
+            $this->migrateLegacyDefinitionOfDone();
+
+            Schema::table('sprints', function (Blueprint $table) {
+                $table->dropColumn('definition_of_done');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('sprints', function (Blueprint $table) {
-            $table->text('definition_of_done')->nullable()->after('goal');
-        });
+        if (Schema::hasTable('sprints') && ! Schema::hasColumn('sprints', 'definition_of_done')) {
+            Schema::table('sprints', function (Blueprint $table) {
+                $table->text('definition_of_done')->nullable()->after('goal');
+            });
+        }
 
         Schema::dropIfExists('sprint_dod_items');
         Schema::dropIfExists('sprint_readiness_items');
+    }
+
+    private function widenNameColumns(): void
+    {
+        foreach (['sprint_readiness_items', 'sprint_dod_items'] as $table) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            DB::statement("ALTER TABLE {$table} MODIFY name TEXT NOT NULL");
+        }
     }
 
     private function migrateLegacyDefinitionOfDone(): void
@@ -58,6 +79,10 @@ return new class extends Migration
             ->get(['id', 'definition_of_done']);
 
         foreach ($sprints as $sprint) {
+            if (DB::table('sprint_dod_items')->where('sprint_id', $sprint->id)->exists()) {
+                continue;
+            }
+
             $lines = $this->lines((string) $sprint->definition_of_done);
             foreach ($lines as $index => $line) {
                 DB::table('sprint_dod_items')->insert([
