@@ -33,7 +33,7 @@ class SprintController extends Controller
 
     public function store(StoreSprintRequest $request, SprintCreationService $sprints): RedirectResponse
     {
-        $sprint = $sprints->create($request->safe()->except('attachments'), $request->user());
+        $sprint = $sprints->create($request->safe()->except(['attachments']), $request->user());
 
         if ($sprint->wasRecentlyCreated) {
             $uploads = $request->file('attachments', []);

@@ -67,7 +67,7 @@ final class ChronoAssistCatalog
                 'hint' => 'Task, sprint, SOP',
                 'children' => [
                     ['key' => 'create-task', 'label' => 'Zadanie + podzadania', 'hint' => 'Z kontekstu filtra', 'icon' => 'bi-check2-square'],
-                    ['key' => 'create-sprint', 'label' => 'Sprint', 'hint' => 'Cel, DoD, scope', 'icon' => 'bi-flag'],
+                    ['key' => 'create-sprint', 'label' => 'Sprint', 'hint' => 'Cel, DoR, DoD, scope', 'icon' => 'bi-flag'],
                     ['key' => 'create-procedure', 'label' => 'Procedura', 'hint' => 'Flow z kroków', 'icon' => 'bi-diagram-3'],
                 ],
             ],

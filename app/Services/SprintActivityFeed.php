@@ -8,7 +8,9 @@ use App\Models\AuditLog;
 use App\Models\Comment;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
+use App\Models\SprintDodItem;
 use App\Models\SprintMilestone;
+use App\Models\SprintReadinessItem;
 use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
 use App\Models\User;
@@ -83,6 +85,12 @@ final class SprintActivityFeed
 
     /** @var Collection<int, SprintMilestone> */
     private Collection $relatedMilestones;
+
+    /** @var Collection<int, SprintReadinessItem> */
+    private Collection $relatedReadinessItems;
+
+    /** @var Collection<int, SprintDodItem> */
+    private Collection $relatedDodItems;
 
     /**
      * @return Collection<int, ActivityEntry>
@@ -440,10 +448,16 @@ final class SprintActivityFeed
             ->get();
 
         $this->relatedMilestones = $sprint->milestones()->get();
+        $milestoneIds = $this->relatedMilestones->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $this->relatedReadinessItems = $sprint->readinessItems()->get();
+        $readinessItemIds = $this->relatedReadinessItems->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $this->relatedDodItems = $sprint->doneItems()->get();
+        $dodItemIds = $this->relatedDodItems->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         $commentIds = $this->relatedComments->pluck('id')->map(fn ($id) => (int) $id)->all();
         $subtaskIds = $this->relatedSubtasks->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $milestoneIds = $this->relatedMilestones->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         $attachmentIds = Attachment::query()
             ->where(function ($query) use ($sprint, $taskIds, $commentIds) {
@@ -474,6 +488,8 @@ final class SprintActivityFeed
             ->merge($this->relatedSubtasks->pluck('created_by'))
             ->merge($this->relatedComments->pluck('user_id'))
             ->merge($this->relatedMilestones->pluck('created_by'))
+            ->merge($this->relatedReadinessItems->pluck('created_by'))
+            ->merge($this->relatedDodItems->pluck('created_by'))
             ->filter()
             ->unique()
             ->all();
@@ -485,6 +501,8 @@ final class SprintActivityFeed
             'subtaskIds' => $subtaskIds,
             'commentIds' => $commentIds,
             'milestoneIds' => $milestoneIds,
+            'readinessItemIds' => $readinessItemIds,
+            'dodItemIds' => $dodItemIds,
             'attachmentIds' => array_map('intval', $attachmentIds),
         ];
     }
@@ -530,6 +548,20 @@ final class SprintActivityFeed
                     });
                 }
 
+                if (($related['readinessItemIds'] ?? []) !== []) {
+                    $query->orWhere(function ($inner) use ($related) {
+                        $inner->where('auditable_type', SprintReadinessItem::class)
+                            ->whereIn('auditable_id', $related['readinessItemIds']);
+                    });
+                }
+
+                if (($related['dodItemIds'] ?? []) !== []) {
+                    $query->orWhere(function ($inner) use ($related) {
+                        $inner->where('auditable_type', SprintDodItem::class)
+                            ->whereIn('auditable_id', $related['dodItemIds']);
+                    });
+                }
+
                 if ($related['attachmentIds'] !== []) {
                     $query->orWhere(function ($inner) use ($related) {
                         $inner->where('auditable_type', Attachment::class)
@@ -558,6 +590,8 @@ final class SprintActivityFeed
                 ? $this->fromSprintAudit($log, $actor, $at, $sprint)
                 : null,
             SprintMilestone::class => $this->fromMilestoneAudit($log, $actor, $at),
+            SprintReadinessItem::class => $this->fromReadinessAudit($log, $actor, $at),
+            SprintDodItem::class => $this->fromDodItemAudit($log, $actor, $at),
             Attachment::class => $this->fromAttachmentAudit($log, $actor, $at),
             default => null,
         };
@@ -803,6 +837,60 @@ final class SprintActivityFeed
         }
 
         return $this->entry($at, $actor, 'zaktualizował kamień milowy', $name, null, $this->detailLines($interesting), 'pencil', 'muted', 'milestone.updated');
+    }
+
+    /**
+     * @return ActivityEntry|null
+     */
+    private function fromReadinessAudit(AuditLog $log, string $actor, Carbon $at): ?array
+    {
+        $name = $this->stringVal($log->new_values['name'] ?? $log->old_values['name'] ?? null) ?? 'warunek startu';
+
+        if ($log->event === 'created') {
+            return $this->entry($at, $actor, 'dodał warunek startu', $name, null, null, 'list-check', 'primary', 'dor.created');
+        }
+
+        if ($log->event === 'deleted') {
+            return $this->entry($at, $actor, 'usunął warunek startu', $name, null, null, 'trash', 'danger', 'dor.deleted');
+        }
+
+        $changes = $this->changed($log);
+        if (array_key_exists('completed_at', $changes)) {
+            $done = $this->stringVal($changes['completed_at']['after'] ?? null) !== null;
+
+            return $done
+                ? $this->entry($at, $actor, 'odhaczył warunek startu', $name, null, null, 'check-circle', 'success', 'dor.completed')
+                : $this->entry($at, $actor, 'odznaczył warunek startu', $name, null, null, 'arrow-counterclockwise', 'warning', 'dor.reopened');
+        }
+
+        return null;
+    }
+
+    /**
+     * @return ActivityEntry|null
+     */
+    private function fromDodItemAudit(AuditLog $log, string $actor, Carbon $at): ?array
+    {
+        $name = $this->stringVal($log->new_values['name'] ?? $log->old_values['name'] ?? null) ?? 'warunek ukończenia';
+
+        if ($log->event === 'created') {
+            return $this->entry($at, $actor, 'dodał warunek ukończenia', $name, null, null, 'check2-square', 'primary', 'dod-item.created');
+        }
+
+        if ($log->event === 'deleted') {
+            return $this->entry($at, $actor, 'usunął warunek ukończenia', $name, null, null, 'trash', 'danger', 'dod-item.deleted');
+        }
+
+        $changes = $this->changed($log);
+        if (array_key_exists('completed_at', $changes)) {
+            $done = $this->stringVal($changes['completed_at']['after'] ?? null) !== null;
+
+            return $done
+                ? $this->entry($at, $actor, 'odhaczył warunek ukończenia', $name, null, null, 'check-circle', 'success', 'dod-item.completed')
+                : $this->entry($at, $actor, 'odznaczył warunek ukończenia', $name, null, null, 'arrow-counterclockwise', 'warning', 'dod-item.reopened');
+        }
+
+        return null;
     }
 
     /**

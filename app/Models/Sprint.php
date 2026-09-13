@@ -17,7 +17,6 @@ class Sprint extends Model
     protected $fillable = [
         'name',
         'goal',
-        'definition_of_done',
         'start_date',
         'end_date',
         'created_by',
@@ -59,6 +58,20 @@ class Sprint extends Model
             ->orderBy('id');
     }
 
+    public function readinessItems(): HasMany
+    {
+        return $this->hasMany(SprintReadinessItem::class)
+            ->orderBy('position')
+            ->orderBy('id');
+    }
+
+    public function doneItems(): HasMany
+    {
+        return $this->hasMany(SprintDodItem::class)
+            ->orderBy('position')
+            ->orderBy('id');
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');
@@ -77,6 +90,58 @@ class Sprint extends Model
     public function nextMilestonePosition(): int
     {
         return (int) $this->milestones()->max('position') + 1;
+    }
+
+    public function nextReadinessPosition(): int
+    {
+        return (int) $this->readinessItems()->max('position') + 1;
+    }
+
+    public function nextDonePosition(): int
+    {
+        return (int) $this->doneItems()->max('position') + 1;
+    }
+
+    /**
+     * @return array{
+     *     readiness: list<array{id: int, name: string, done: bool}>,
+     *     done: list<array{id: int, name: string, done: bool}>,
+     *     milestones: list<array{id: int, name: string, due_date: string|null, completed: bool}>
+     * }
+     */
+    public function checklists(): array
+    {
+        $this->loadMissing(['readinessItems', 'doneItems', 'milestones']);
+
+        return [
+            'readiness' => $this->mapChecklist($this->readinessItems),
+            'done' => $this->mapChecklist($this->doneItems),
+            'milestones' => $this->milestones
+                ->map(fn (SprintMilestone $milestone) => [
+                    'id' => $milestone->id,
+                    'name' => $milestone->name,
+                    'due_date' => $milestone->due_date?->toDateString(),
+                    'completed' => $milestone->isCompleted(),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, SprintReadinessItem|SprintDodItem>  $items
+     * @return list<array{id: int, name: string, done: bool}>
+     */
+    private function mapChecklist($items): array
+    {
+        return $items
+            ->map(fn ($item) => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'done' => $item->isCompleted(),
+            ])
+            ->values()
+            ->all();
     }
 
     public function label(): string

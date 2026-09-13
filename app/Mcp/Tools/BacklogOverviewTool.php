@@ -22,7 +22,7 @@ class BacklogOverviewTool extends Tool
 
     protected string $description = <<<'MARKDOWN'
         Zwraca otwarty backlog, czyli pozycje pracy nieprzypisane do żadnego sprintu,
-        razem z listą sprintów (cel, definition of done, daty) i rozkładem pozycji
+        razem z listą sprintów (cel, DoR, DoD, kamienie, daty) i rozkładem pozycji
         po kategoriach i typach.
 
         Backlog to wspólny indeks: zadania, podzadania, procedury, kompletacje,
@@ -105,21 +105,28 @@ class BacklogOverviewTool extends Tool
     private function sprints(): array
     {
         return Sprint::query()
+            ->with(['readinessItems', 'doneItems', 'milestones'])
             ->withCount('tasks')
             ->orderByDesc('start_date')
             ->limit(10)
             ->get()
-            ->map(fn (Sprint $sprint) => [
-                'id' => $sprint->id,
-                'name' => $sprint->name,
-                'status' => $sprint->statusLabel(),
-                'goal' => $sprint->goal,
-                'definition_of_done' => $sprint->definition_of_done,
-                'start_date' => $sprint->start_date?->toDateString(),
-                'end_date' => $sprint->end_date?->toDateString(),
-                'tasks_count' => $sprint->tasks_count,
-                'url' => EntityLinks::sprint($sprint),
-            ])
+            ->map(function (Sprint $sprint) {
+                $lists = $sprint->checklists();
+
+                return [
+                    'id' => $sprint->id,
+                    'name' => $sprint->name,
+                    'status' => $sprint->statusLabel(),
+                    'goal' => $sprint->goal,
+                    'definition_of_ready' => $lists['readiness'],
+                    'definition_of_done' => $lists['done'],
+                    'milestones' => $lists['milestones'],
+                    'start_date' => $sprint->start_date?->toDateString(),
+                    'end_date' => $sprint->end_date?->toDateString(),
+                    'tasks_count' => $sprint->tasks_count,
+                    'url' => EntityLinks::sprint($sprint),
+                ];
+            })
             ->all();
     }
 

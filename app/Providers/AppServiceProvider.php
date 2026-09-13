@@ -21,7 +21,9 @@ use App\Models\ProjectAssignment;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\Sprint;
+use App\Models\SprintDodItem;
 use App\Models\SprintMilestone;
+use App\Models\SprintReadinessItem;
 use App\Models\TaskSubtask;
 use App\Models\TransportCost;
 use App\Models\User;
@@ -102,6 +104,8 @@ class AppServiceProvider extends ServiceProvider
         Comment::observe(AuditableModelObserver::class);
         Sprint::observe(AuditableModelObserver::class);
         SprintMilestone::observe(AuditableModelObserver::class);
+        SprintReadinessItem::observe(AuditableModelObserver::class);
+        SprintDodItem::observe(AuditableModelObserver::class);
         Attachment::observe(AuditableModelObserver::class);
 
         ProcedureTemplate::observe(ProcedureTemplateObserver::class);

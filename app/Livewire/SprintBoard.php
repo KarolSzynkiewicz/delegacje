@@ -4,7 +4,9 @@ namespace App\Livewire;
 
 use App\Models\Attachment;
 use App\Models\Sprint;
+use App\Models\SprintDodItem;
 use App\Models\SprintMilestone;
+use App\Models\SprintReadinessItem;
 use App\Services\SprintInsights;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -18,6 +20,10 @@ class SprintBoard extends Component
     public string $newMilestoneName = '';
 
     public string $newMilestoneDue = '';
+
+    public string $newReadinessName = '';
+
+    public string $newDoneName = '';
 
     /** @var array<int, mixed> */
     public array $uploads = [];
@@ -74,6 +80,66 @@ class SprintBoard extends Component
         $this->refreshSprint();
     }
 
+    public function addReadinessItem(): void
+    {
+        $this->authorizeMutate();
+        $this->validate([
+            'newReadinessName' => 'required|string|max:255',
+        ]);
+
+        SprintReadinessItem::query()->create([
+            'sprint_id' => $this->sprint->id,
+            'name' => trim($this->newReadinessName),
+            'position' => $this->sprint->nextReadinessPosition(),
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->newReadinessName = '';
+        $this->refreshSprint();
+    }
+
+    public function toggleReadinessItem(int $itemId): void
+    {
+        $this->toggleItem($this->sprint->readinessItems(), $itemId);
+    }
+
+    public function deleteReadinessItem(int $itemId): void
+    {
+        $this->authorizeMutate();
+        $this->sprint->readinessItems()->whereKey($itemId)->delete();
+        $this->refreshSprint();
+    }
+
+    public function addDoneItem(): void
+    {
+        $this->authorizeMutate();
+        $this->validate([
+            'newDoneName' => 'required|string|max:255',
+        ]);
+
+        SprintDodItem::query()->create([
+            'sprint_id' => $this->sprint->id,
+            'name' => trim($this->newDoneName),
+            'position' => $this->sprint->nextDonePosition(),
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->newDoneName = '';
+        $this->refreshSprint();
+    }
+
+    public function toggleDoneItem(int $itemId): void
+    {
+        $this->toggleItem($this->sprint->doneItems(), $itemId);
+    }
+
+    public function deleteDoneItem(int $itemId): void
+    {
+        $this->authorizeMutate();
+        $this->sprint->doneItems()->whereKey($itemId)->delete();
+        $this->refreshSprint();
+    }
+
     public function saveUploads(): void
     {
         $this->authorizeMutate();
@@ -100,13 +166,7 @@ class SprintBoard extends Component
 
     public function render()
     {
-        $this->sprint->load([
-            'createdBy',
-            'attachments.uploader',
-            'milestones',
-            'orderedTasks.assignedTo',
-        ]);
-        $this->sprint->setRelation('tasks', $this->sprint->orderedTasks);
+        $this->loadBoard();
 
         $insights = app(SprintInsights::class)->for($this->sprint);
 
@@ -114,6 +174,21 @@ class SprintBoard extends Component
             'insights' => $insights,
             'canMutate' => $this->canMutate(),
         ]);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Relations\HasMany  $relation
+     */
+    private function toggleItem($relation, int $itemId): void
+    {
+        $this->authorizeMutate();
+        $item = $relation->whereKey($itemId)->first();
+        if (! $item) {
+            return;
+        }
+
+        $item->toggleCompleted();
+        $this->refreshSprint();
     }
 
     private function authorizeMutate(): void
@@ -126,9 +201,16 @@ class SprintBoard extends Component
     private function refreshSprint(): void
     {
         $this->sprint->refresh();
+        $this->loadBoard();
+    }
+
+    private function loadBoard(): void
+    {
         $this->sprint->load([
             'createdBy',
             'attachments.uploader',
+            'readinessItems',
+            'doneItems',
             'milestones',
             'orderedTasks.assignedTo',
         ]);

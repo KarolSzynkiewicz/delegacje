@@ -22,27 +22,17 @@
 
     <x-ui.card class="mb-3">
         <div class="sb-hero">
-            <div class="sb-ring">
-                <svg width="110" height="110" viewBox="0 0 110 110">
-                    <circle cx="55" cy="55" r="42" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
-                    <circle cx="55" cy="55" r="42" fill="none" stroke="url(#sbGrad)" stroke-width="8"
-                            stroke-linecap="round"
-                            stroke-dasharray="{{ $ring }}"
-                            stroke-dashoffset="{{ $dash }}"/>
-                    <defs>
-                        <linearGradient id="sbGrad" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stop-color="#3b82f6"/>
-                            <stop offset="100%" stop-color="#a855f7"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <div class="sb-ring-label">
-                    <strong style="font-size:1.35rem; letter-spacing:-.04em">{{ $insights['progress'] }}%</strong>
-                    <span class="small text-muted">done</span>
-                </div>
+            <div class="sb-goal-icon" aria-hidden="true">
+                <i class="bi bi-bullseye"></i>
             </div>
 
             <div>
+                <div class="sb-goal-kicker">Cel sprintu</div>
+                @if($sprint->goal)
+                    <p class="sb-goal-text">{{ $sprint->goal }}</p>
+                @else
+                    <p class="sb-goal-text is-empty">Brak celu — dopisz, po co ten sprint istnieje.</p>
+                @endif
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <x-ui.badge :variant="$statusVariant">{{ $sprint->statusLabel() }}</x-ui.badge>
                     <x-ui.badge :variant="$healthMeta['variant']">
@@ -53,20 +43,34 @@
                         · {{ $insights['days_total'] }} dni
                     </span>
                 </div>
-                @if($sprint->goal)
-                    <p class="mb-2 fs-5" style="letter-spacing:-.02em">{{ $sprint->goal }}</p>
-                @else
-                    <p class="text-muted mb-2">Brak celu — dopisz, po co ten sprint istnieje.</p>
-                @endif
                 <p class="mb-0 text-muted small">{{ $insights['coach'] }}</p>
             </div>
 
             <div class="text-end">
+                <div class="sb-ring mx-auto mb-2">
+                    <svg width="110" height="110" viewBox="0 0 110 110">
+                        <circle cx="55" cy="55" r="42" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
+                        <circle cx="55" cy="55" r="42" fill="none" stroke="url(#sbGrad)" stroke-width="8"
+                                stroke-linecap="round"
+                                stroke-dasharray="{{ $ring }}"
+                                stroke-dashoffset="{{ $dash }}"/>
+                        <defs>
+                            <linearGradient id="sbGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#3b82f6"/>
+                                <stop offset="100%" stop-color="#a855f7"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="sb-ring-label">
+                        <strong style="font-size:1.35rem; letter-spacing:-.04em">{{ $insights['progress'] }}%</strong>
+                        <span class="small text-muted">zrobione</span>
+                    </div>
+                </div>
                 @if($sprint->isScheduled())
                     <div class="v" style="font-size:1.8rem; font-weight:700; letter-spacing:-.04em">{{ $insights['starts_in'] }}</div>
                     <div class="small text-muted">dni do startu</div>
                 @elseif($sprint->isCurrentlyActive())
-                    <div style="font-size:1.8rem; font-weight:700; letter-spacing:-.04em">{{ $insights['days_left'] }}</div>
+                    <div style="font-size:1.5rem; font-weight:700; letter-spacing:-.04em">{{ $insights['days_left'] }}</div>
                     <div class="small text-muted">dni do końca</div>
                     <div class="small text-muted mt-1">dzień {{ $insights['days_elapsed'] }}/{{ $insights['days_total'] }}</div>
                 @else
@@ -81,6 +85,122 @@
             </div>
         </div>
     </x-ui.card>
+
+    <div class="row g-3 mb-3 align-items-stretch">
+        <div class="col-lg-4 d-flex">
+            <x-ui.card class="h-100 w-100 sb-list-card">
+                @include('livewire.partials.sprint-list-head', [
+                    'icon' => 'play-circle',
+                    'title' => 'Co potrzeba, by zacząć pracę?',
+                    'hint' => 'Co musi być, byśmy mogli w ogóle zacząć nad tym pracować.',
+                    'items' => $sprint->readinessItems,
+                ])
+                @include('livewire.partials.sprint-checkbox-list', [
+                    'items' => $sprint->readinessItems,
+                    'canMutate' => $canMutate,
+                    'empty' => 'Brak warunków startu — dopisz, bez czego nie ruszamy.',
+                    'placeholder' => 'np. Design zatwierdzony',
+                    'addMethod' => 'addReadinessItem',
+                    'toggleMethod' => 'toggleReadinessItem',
+                    'deleteMethod' => 'deleteReadinessItem',
+                    'newName' => 'newReadinessName',
+                    'keyPrefix' => 'dor',
+                ])
+            </x-ui.card>
+        </div>
+        <div class="col-lg-4 d-flex">
+            <x-ui.card class="h-100 w-100 sb-list-card">
+                @include('livewire.partials.sprint-list-head', [
+                    'icon' => 'check2-all',
+                    'title' => 'Kiedy uznamy, że zrobione?',
+                    'hint' => 'Warunki, bez których zadanie nie schodzi z tablicy.',
+                    'items' => $sprint->doneItems,
+                ])
+                @include('livewire.partials.sprint-checkbox-list', [
+                    'items' => $sprint->doneItems,
+                    'canMutate' => $canMutate,
+                    'empty' => 'Brak warunków ukończenia — dopisz, kiedy „done” znaczy done.',
+                    'placeholder' => 'np. Na produkcji',
+                    'addMethod' => 'addDoneItem',
+                    'toggleMethod' => 'toggleDoneItem',
+                    'deleteMethod' => 'deleteDoneItem',
+                    'newName' => 'newDoneName',
+                    'keyPrefix' => 'dod',
+                ])
+            </x-ui.card>
+        </div>
+        <div class="col-lg-4 d-flex">
+            <x-ui.card class="h-100 w-100 sb-list-card">
+                @include('livewire.partials.sprint-list-head', [
+                    'icon' => 'flag',
+                    'title' => 'Przełomowe osiągnięcia',
+                    'hint' => 'Kamienie milowe — demo, freeze, wdrożenie.',
+                    'items' => $sprint->milestones,
+                ])
+                <div class="sb-stack">
+                    <div class="sb-stack-body">
+                        @if($sprint->milestones->isEmpty())
+                            <div class="text-muted small">Brak kamieni — dodaj np. „Demo”, „Freeze kodu”, „Wdrożenie”.</div>
+                        @else
+                            <div class="sb-runway">
+                                @php
+                                    $span = max(1, $sprint->start_date->diffInDays($sprint->end_date));
+                                    $todayPct = min(100, max(0, $sprint->start_date->diffInDays(now()) / $span * 100));
+                                    if (now()->lt($sprint->start_date)) $todayPct = 0;
+                                    if (now()->gt($sprint->end_date)) $todayPct = 100;
+                                @endphp
+                                <div class="sb-runway-track">
+                                    <div class="sb-runway-fill" style="width: {{ $todayPct }}%"></div>
+                                </div>
+                                @foreach($sprint->milestones as $ms)
+                                    @php
+                                        $pct = min(96, max(4, $sprint->start_date->diffInDays($ms->due_date) / $span * 100));
+                                        $dot = $ms->isCompleted() ? 'var(--success)' : ($ms->isOverdue() ? 'var(--danger)' : 'var(--primary)');
+                                    @endphp
+                                    <div class="sb-ms" style="left: {{ $pct }}%" title="{{ $ms->name }} · {{ $ms->due_date->format('d.m') }}">
+                                        <div class="sb-ms-dot" style="background:{{ $dot }}"></div>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @foreach($sprint->milestones as $ms)
+                                <div class="sb-ms-row" wire:key="ms-{{ $ms->id }}-{{ $ms->isCompleted() ? '1' : '0' }}">
+                                    <label class="sb-check {{ $ms->isCompleted() ? 'is-done' : '' }}">
+                                        @if($canMutate)
+                                            <input type="checkbox" @checked($ms->isCompleted()) wire:click.prevent="toggleMilestone({{ $ms->id }})">
+                                        @else
+                                            <input type="checkbox" @checked($ms->isCompleted()) disabled>
+                                        @endif
+                                        <span>{{ $ms->name }}</span>
+                                    </label>
+                                    <div class="sb-ms-meta">
+                                        <span class="small text-muted font-mono">{{ $ms->due_date->format('d.m') }}</span>
+                                        @if($ms->isOverdue())
+                                            <x-ui.badge variant="danger">po terminie</x-ui.badge>
+                                        @endif
+                                        @if($canMutate)
+                                            <button type="button" class="btn btn-sm btn-link sb-ghost p-0" wire:click="deleteMilestone({{ $ms->id }})" wire:confirm="Usunąć kamień milowy?">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
+                    @if($canMutate)
+                        <div class="sb-add-wrap">
+                            <div class="sb-add sb-add--ms">
+                                <input type="text" class="form-control form-control-sm" placeholder="np. Demo, freeze…" wire:model="newMilestoneName" wire:keydown.enter="addMilestone">
+                                <input type="date" class="form-control form-control-sm" wire:model="newMilestoneDue">
+                                <button type="button" class="btn btn-sm btn-outline-primary" wire:click="addMilestone">Dodaj</button>
+                            </div>
+                            @error('newMilestoneName') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                        </div>
+                    @endif
+                </div>
+            </x-ui.card>
+        </div>
+    </div>
 
     <div class="sb-kpis mb-3">
         <div class="sb-kpi">
@@ -119,75 +239,9 @@
         </div>
     </div>
 
-    <x-ui.card label="Kamienie milowe" class="mb-3">
-        @if($sprint->milestones->isEmpty())
-            <div class="text-muted small mb-3">Brak kamieni — dodaj np. „Demo”, „Freeze kodu”, „Wdrożenie”.</div>
-        @else
-            <div class="sb-runway mb-3">
-                @php
-                    $span = max(1, $sprint->start_date->diffInDays($sprint->end_date));
-                    $todayPct = min(100, max(0, $sprint->start_date->diffInDays(now()) / $span * 100));
-                    if (now()->lt($sprint->start_date)) $todayPct = 0;
-                    if (now()->gt($sprint->end_date)) $todayPct = 100;
-                @endphp
-                <div class="sb-runway-track">
-                    <div class="sb-runway-fill" style="width: {{ $todayPct }}%"></div>
-                </div>
-                @foreach($sprint->milestones as $ms)
-                    @php
-                        $pct = min(96, max(4, $sprint->start_date->diffInDays($ms->due_date) / $span * 100));
-                        $dot = $ms->isCompleted() ? 'var(--success)' : ($ms->isOverdue() ? 'var(--danger)' : 'var(--primary)');
-                    @endphp
-                    <div class="sb-ms" style="left: {{ $pct }}%">
-                        <div class="sb-ms-dot" style="background:{{ $dot }}"></div>
-                        <div class="small" style="font-size:.68rem; line-height:1.2">{{ $ms->name }}</div>
-                    </div>
-                @endforeach
-            </div>
-            <div class="d-flex flex-column gap-2">
-                @foreach($sprint->milestones as $ms)
-                    <div class="d-flex align-items-center gap-2" wire:key="ms-{{ $ms->id }}">
-                        @if($canMutate)
-                            <button type="button" class="btn btn-sm btn-link p-0" wire:click="toggleMilestone({{ $ms->id }})" title="Oznacz">
-                                <i class="bi {{ $ms->isCompleted() ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted' }}"></i>
-                            </button>
-                        @endif
-                        <div class="flex-grow-1 {{ $ms->isCompleted() ? 'text-decoration-line-through text-muted' : '' }}">
-                            {{ $ms->name }}
-                            <span class="small text-muted ms-1">{{ $ms->due_date->format('d.m') }}</span>
-                            @if($ms->isOverdue())
-                                <x-ui.badge variant="danger" class="ms-1">po terminie</x-ui.badge>
-                            @endif
-                        </div>
-                        @if($canMutate)
-                            <button type="button" class="btn btn-sm btn-link text-danger p-0" wire:click="deleteMilestone({{ $ms->id }})" wire:confirm="Usunąć kamień milowy?">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        @endif
-
-        @if($canMutate)
-            <div class="row g-2 mt-3">
-                <div class="col-md-6">
-                    <input type="text" class="form-control form-control-sm" placeholder="Nazwa kamienia…" wire:model="newMilestoneName" wire:keydown.enter="addMilestone">
-                    @error('newMilestoneName') <div class="text-danger small">{{ $message }}</div> @enderror
-                </div>
-                <div class="col-md-4">
-                    <input type="date" class="form-control form-control-sm" wire:model="newMilestoneDue">
-                </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-sm btn-primary w-100" wire:click="addMilestone">Dodaj</button>
-                </div>
-            </div>
-        @endif
-    </x-ui.card>
-
-    <div class="row g-3">
-        <div class="col-lg-4">
-            <x-ui.card label="Obciążenie">
+    <div class="row g-3 mb-3">
+        <div class="col-lg-8">
+            <x-ui.card label="Obciążenie" class="h-100">
                 @forelse($insights['workload'] as $row)
                     <div class="sb-work">
                         <div class="small" style="width:110px" title="{{ $row['name'] }}">{{ \Illuminate\Support\Str::limit($row['name'], 14) }}</div>
@@ -205,15 +259,6 @@
                         @if($insights['unassigned']) {{ $insights['unassigned'] }} bez osoby. @endif
                         @if($insights['scope_added']) +{{ $insights['scope_added'] }} doszło po starcie. @endif
                     </div>
-                @endif
-            </x-ui.card>
-        </div>
-        <div class="col-lg-4">
-            <x-ui.card label="Definition of Done">
-                @if($sprint->definition_of_done)
-                    <div style="white-space:pre-wrap" class="small">{{ $sprint->definition_of_done }}</div>
-                @else
-                    <div class="text-muted small">Nie ustawiono — dopisz przy edycji sprintu, żeby zespół wiedział kiedy „done” znaczy done.</div>
                 @endif
             </x-ui.card>
         </div>

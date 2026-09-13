@@ -206,6 +206,7 @@ class McpTaskToolsTest extends TestCase
         $this->assertSame($first['sprint']['id'], $second['sprint']['id']);
         $this->assertSame(route('sprints.show', $first['sprint']['id']), $first['sprint']['url']);
         $this->assertSame(1, Sprint::query()->where('name', 'Sprint MCP')->count());
+        $this->assertSame('Na produkcji', $first['sprint']['definition_of_done'][0]['name']);
     }
 
     public function test_sprint_insights_and_list_users(): void

@@ -47,16 +47,48 @@
     />
 </div>
 
-<div class="mb-3">
-    <x-ui.input
-        type="textarea"
-        name="definition_of_done"
-        label="Definition of Done"
-        value="{{ old('definition_of_done', $sprint?->definition_of_done) }}"
-        rows="4"
-        placeholder="Kiedy zadanie jest uznane za zrobione?"
-    />
-</div>
+@if(! $sprint)
+    @php
+        $seedList = function (string $key) {
+            $items = old($key, ['']);
+            if (! is_array($items) || $items === []) {
+                $items = [''];
+            }
+
+            return array_values($items);
+        };
+    @endphp
+    <div class="row">
+        <div class="col-md-6 mb-3"
+             x-data="{ items: {{ json_encode($seedList('readiness_items'), JSON_UNESCAPED_UNICODE) }} }">
+            <label class="form-label">Co potrzeba, by zacząć pracę?</label>
+            <p class="small text-muted mb-2">Co musi być, byśmy mogli w ogóle zacząć nad tym pracować.</p>
+            <template x-for="(item, index) in items" :key="index">
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" class="form-control" name="readiness_items[]" x-model="items[index]" placeholder="np. Design zatwierdzony">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="if (items.length > 1) items.splice(index, 1)" x-show="items.length > 1">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            </template>
+            <button type="button" class="btn btn-sm btn-outline-primary" @click="items.push('')">Dodaj</button>
+        </div>
+        <div class="col-md-6 mb-3"
+             x-data="{ items: {{ json_encode($seedList('done_items'), JSON_UNESCAPED_UNICODE) }} }">
+            <label class="form-label">Kiedy uznamy, że zrobione?</label>
+            <p class="small text-muted mb-2">Warunki, bez których zadanie nie schodzi z tablicy.</p>
+            <template x-for="(item, index) in items" :key="index">
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" class="form-control" name="done_items[]" x-model="items[index]" placeholder="np. Na produkcji">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="if (items.length > 1) items.splice(index, 1)" x-show="items.length > 1">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            </template>
+            <button type="button" class="btn btn-sm btn-outline-primary" @click="items.push('')">Dodaj</button>
+        </div>
+    </div>
+@endif
 
 <div class="mb-3">
     <label class="form-label">Załączniki</label>

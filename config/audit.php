@@ -19,6 +19,8 @@ return [
         \App\Models\Comment::class => 'Komentarz',
         \App\Models\Sprint::class => 'Sprint',
         \App\Models\SprintMilestone::class => 'Kamień milowy',
+        \App\Models\SprintReadinessItem::class => 'Warunek startu',
+        \App\Models\SprintDodItem::class => 'Warunek ukończenia',
         \App\Models\Attachment::class => 'Załącznik',
     ],
 
@@ -80,7 +82,6 @@ return [
         'task_id' => 'Zadanie nadrzędne',
         'body' => 'Treść',
         'goal' => 'Cel',
-        'definition_of_done' => 'Definition of Done',
         'original_name' => 'Nazwa pliku',
         'parent_id' => 'Odpowiedź na',
     ],

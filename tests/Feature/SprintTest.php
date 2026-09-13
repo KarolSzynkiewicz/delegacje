@@ -42,7 +42,6 @@ class SprintTest extends TestCase
         $sprint = Sprint::factory()->create([
             'name' => 'Sprint 1',
             'goal' => 'Dowieźć onboarding',
-            'definition_of_done' => 'Zmergowane i na produkcji',
         ]);
 
         $taskA = $this->makeTask('Zadanie A', ['sprint_id' => $sprint->id]);
@@ -51,10 +50,12 @@ class SprintTest extends TestCase
         $this->assertCount(2, $sprint->tasks);
         $this->assertTrue($taskA->fresh()->sprint->is($sprint));
         $this->assertSame('Dowieźć onboarding', $sprint->goal);
-        $this->assertSame('Zmergowane i na produkcji', $sprint->definition_of_done);
         $this->assertTrue($sprint->end_date->gte($sprint->start_date));
         $this->assertSame($sprint->id, $taskB->fresh()->sprint_id);
-        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('sprints', 'definition_of_ready'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasTable('sprint_readiness_items'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasTable('sprint_dod_items'));
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('sprint_definitions_of_done'));
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('sprints', 'definition_of_done'));
     }
 
     public function test_sprint_board_page_renders(): void
@@ -71,7 +72,10 @@ class SprintTest extends TestCase
             ->assertSee('Backlog sprintu')
             ->assertSee('Komentarze')
             ->assertSee('Historia')
-            ->assertDontSee('Definition of Ready');
+            ->assertSee('Cel sprintu')
+            ->assertSee('Co potrzeba, by zacząć pracę?')
+            ->assertSee('Kiedy uznamy, że zrobione?')
+            ->assertSee('Przełomowe osiągnięcia');
     }
 
     public function test_deleting_sprint_unassigns_tasks(): void
@@ -91,18 +95,20 @@ class SprintTest extends TestCase
             ->post(route('sprints.store'), [
                 'name' => 'Sprint 12',
                 'goal' => 'Wdrożyć sprints',
-                'definition_of_done' => 'Code review + testy',
+                'readiness_items' => ['Design zatwierdzony', 'Dostęp do staging'],
                 'start_date' => '2026-08-24',
                 'end_date' => '2026-09-06',
             ])
             ->assertRedirect();
 
-        $this->assertDatabaseHas('sprints', [
-            'name' => 'Sprint 12',
-            'goal' => 'Wdrożyć sprints',
-            'definition_of_done' => 'Code review + testy',
-            'created_by' => $this->user->id,
-        ]);
+        $sprint = Sprint::query()->where('name', 'Sprint 12')->first();
+        $this->assertNotNull($sprint);
+        $this->assertSame('Wdrożyć sprints', $sprint->goal);
+        $this->assertSame($this->user->id, $sprint->created_by);
+        $this->assertEquals(
+            ['Design zatwierdzony', 'Dostęp do staging'],
+            $sprint->readinessItems()->orderBy('position')->pluck('name')->all()
+        );
     }
 
     public function test_double_http_create_does_not_duplicate_sprint(): void
@@ -110,7 +116,7 @@ class SprintTest extends TestCase
         $payload = [
             'name' => 'Sprint 12',
             'goal' => 'Wdrożyć sprints',
-            'definition_of_done' => 'Code review + testy',
+            'readiness_items' => ['Code review'],
             'start_date' => '2026-08-24',
             'end_date' => '2026-09-06',
         ];
@@ -131,6 +137,7 @@ class SprintTest extends TestCase
         $payload = [
             'name' => 'Sprint HQ',
             'goal' => 'Cel',
+            'definition_of_ready' => ['Dostęp do API'],
             'definition_of_done' => 'DoD',
             'start_date' => '2026-08-24',
             'end_date' => '2026-09-06',
@@ -143,6 +150,8 @@ class SprintTest extends TestCase
         $this->assertTrue($first->is($second));
         $this->assertFalse($second->wasRecentlyCreated);
         $this->assertSame(1, Sprint::query()->where('name', 'Sprint HQ')->count());
+        $this->assertSame(['Dostęp do API'], $first->readinessItems()->pluck('name')->all());
+        $this->assertSame(['DoD'], $first->doneItems()->pluck('name')->all());
     }
 
     public function test_create_service_allows_same_name_after_dedupe_window(): void
@@ -272,6 +281,42 @@ class SprintTest extends TestCase
             ->call('toggleMilestone', $milestone->id);
 
         $this->assertNotNull($milestone->fresh()->completed_at);
+    }
+
+    public function test_board_dod_and_dor_are_plain_checklists(): void
+    {
+        $sprint = Sprint::factory()->create();
+
+        Livewire::actingAs($this->user)
+            ->test(SprintBoard::class, ['sprint' => $sprint])
+            ->set('newReadinessName', 'Design zatwierdzony')
+            ->call('addReadinessItem')
+            ->set('newDoneName', 'Na produkcji')
+            ->call('addDoneItem')
+            ->assertSee('Design zatwierdzony')
+            ->assertSee('Na produkcji');
+
+        $readiness = $sprint->readinessItems()->first();
+        $done = $sprint->doneItems()->first();
+        $this->assertNotNull($readiness);
+        $this->assertNotNull($done);
+        $this->assertNull($readiness->completed_at);
+        $this->assertNull($done->completed_at);
+
+        Livewire::actingAs($this->user)
+            ->test(SprintBoard::class, ['sprint' => $sprint])
+            ->call('toggleReadinessItem', $readiness->id)
+            ->call('toggleDoneItem', $done->id);
+
+        $this->assertNotNull($readiness->fresh()->completed_at);
+        $this->assertNotNull($done->fresh()->completed_at);
+
+        Livewire::actingAs($this->user)
+            ->test(SprintBoard::class, ['sprint' => $sprint])
+            ->assertSeeHtml('dor-'.$readiness->id.'-1')
+            ->assertSeeHtml('dod-'.$done->id.'-1')
+            ->call('toggleDoneItem', $done->id)
+            ->assertSeeHtml('dod-'.$done->id.'-0');
     }
 
     public function test_sprint_accepts_attachments(): void

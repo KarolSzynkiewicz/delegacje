@@ -96,7 +96,7 @@ class SprintInsights
         );
 
         $milestones = $sprint->milestones;
-        $milestoneDone = $milestones->filter(fn ($m) => $m->completed_at !== null)->count();
+        $milestoneDone = $milestones->filter(fn ($m) => $m->isCompleted())->count();
 
         $payload = [
             'total' => $tasks->count(),

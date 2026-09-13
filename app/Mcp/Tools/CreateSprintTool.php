@@ -19,7 +19,11 @@ class CreateSprintTool extends Tool
     protected string $name = 'create_sprint';
 
     protected string $description = <<<'MARKDOWN'
-        Tworzy nowy sprint (nazwa, cel, definition of done, daty).
+        Tworzy nowy sprint (nazwa, cel, DoR, DoD, daty).
+
+        DoR i DoD to zwykłe checklisty checkboxów na sprincie
+        (`definition_of_ready` / `definition_of_done` – lista stringów).
+        Kamienie milowe to osobna, też płaska lista (`milestones`).
 
         Zasada obowiązkowa: najpierw pokaż użytkownikowi pełną propozycję sprintu
         i poczekaj na wyraźną zgodę. Dopiero wtedy wywołaj z `confirmed_by_user: true`.
@@ -44,7 +48,12 @@ class CreateSprintTool extends Tool
             'confirmed_by_user' => ['required', 'boolean'],
             'name' => ['required', 'string', 'max:255'],
             'goal' => ['nullable', 'string', 'max:10000'],
-            'definition_of_done' => ['nullable', 'string', 'max:10000'],
+            'definition_of_ready' => ['nullable', 'array', 'max:50'],
+            'definition_of_ready.*' => ['string', 'max:255'],
+            'definition_of_done' => ['nullable'],
+            'milestones' => ['nullable', 'array', 'max:20'],
+            'milestones.*.name' => ['required_with:milestones', 'string', 'max:255'],
+            'milestones.*.due_date' => ['nullable', 'date_format:Y-m-d'],
             'start_date' => ['required', 'date_format:Y-m-d'],
             'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
@@ -56,13 +65,22 @@ class CreateSprintTool extends Tool
             );
         }
 
+        $done = $validated['definition_of_done'] ?? null;
+        if (! (is_string($done) || is_array($done) || $done === null)) {
+            return Response::error('`definition_of_done` musi być tekstem albo listą kryteriów.');
+        }
+
         $sprint = app(SprintCreationService::class)->create([
             'name' => trim($validated['name']),
             'goal' => isset($validated['goal']) ? trim($validated['goal']) : null,
-            'definition_of_done' => isset($validated['definition_of_done']) ? trim($validated['definition_of_done']) : null,
+            'definition_of_ready' => $validated['definition_of_ready'] ?? null,
+            'definition_of_done' => $done,
+            'milestones' => $validated['milestones'] ?? null,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
         ], $user);
+
+        $lists = $sprint->checklists();
 
         return Response::json([
             'meta' => [
@@ -74,7 +92,9 @@ class CreateSprintTool extends Tool
                 'id' => $sprint->id,
                 'name' => $sprint->name,
                 'goal' => $sprint->goal,
-                'definition_of_done' => $sprint->definition_of_done,
+                'definition_of_ready' => $lists['readiness'],
+                'definition_of_done' => $lists['done'],
+                'milestones' => $lists['milestones'],
                 'start_date' => $sprint->start_date?->toDateString(),
                 'end_date' => $sprint->end_date?->toDateString(),
                 'url' => EntityLinks::sprint($sprint),
@@ -93,8 +113,11 @@ class CreateSprintTool extends Tool
                 ->required(),
             'goal' => $schema->string()
                 ->description('Cel sprintu – po co go robimy.'),
+            'definition_of_ready' => $schema->array()
+                ->description('DoR – checklista tego, co musi być, żeby zacząć.')
+                ->items($schema->string()),
             'definition_of_done' => $schema->string()
-                ->description('Definition of done – kiedy sprint uznajemy za zamknięty.'),
+                ->description('DoD – tekst albo lista checkboxów na sprincie.'),
             'start_date' => $schema->string()
                 ->description('Data rozpoczęcia YYYY-MM-DD.')
                 ->required(),

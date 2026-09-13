@@ -22,7 +22,7 @@ class SprintInsightsTool extends Tool
     protected string $description = <<<'MARKDOWN'
         Zdrowie sprintu – ten sam JSON co tablica sprintu: progress vs linia
         idealna, velocity, burndown, forecast, overdue, unassigned, workload,
-        milestony i tekst coacha.
+        milestony, DoD, DoR i tekst coacha.
 
         Wejście: `sprint_id`. Listę sprintów daje `backlog_overview`.
     MARKDOWN;
@@ -41,13 +41,16 @@ class SprintInsightsTool extends Tool
         }
 
         $insights = app(SprintInsights::class)->for($sprint);
+        $lists = $sprint->checklists();
 
         return Response::json([
             'sprint' => [
                 'id' => $sprint->id,
                 'name' => $sprint->name,
                 'goal' => $sprint->goal,
-                'definition_of_done' => $sprint->definition_of_done,
+                'definition_of_ready' => $lists['readiness'],
+                'definition_of_done' => $lists['done'],
+                'milestones' => $lists['milestones'],
                 'start_date' => $sprint->start_date?->toDateString(),
                 'end_date' => $sprint->end_date?->toDateString(),
                 'status' => $sprint->statusLabel(),
