@@ -807,6 +807,97 @@ class WorkItemBacklogTest extends TestCase
             ->assertDontSee('Nawigacja po liście backlogu', false);
     }
 
+    public function test_grid_moves_subtask_when_drop_target_is_a_work_item_id(): void
+    {
+        $this->actingAs($this->user);
+
+        $padding = ProjectTask::query()->create([
+            'name' => 'Padding',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+        TaskSubtask::query()->create([
+            'task_id' => $padding->id,
+            'name' => 'Osobne WI',
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $source = ProjectTask::query()->create([
+            'name' => 'Źródło',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+        $target = ProjectTask::query()->create([
+            'name' => 'Cel',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+        $subtask = TaskSubtask::query()->create([
+            'task_id' => $source->id,
+            'name' => 'Przenieś mnie',
+            'created_by' => $this->user->id,
+        ]);
+
+        $targetItem = WorkItem::query()
+            ->where('source_type', $target->getMorphClass())
+            ->where('source_id', $target->id)
+            ->first();
+
+        $this->assertNotNull($targetItem);
+        $this->assertNotSame($target->id, $targetItem->id);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('moveSubtask', $subtask->id, $targetItem->id)
+            ->assertHasNoErrors()
+            ->assertSet('flash', 'Podzadanie przeniesione.');
+
+        $this->assertSame($target->id, $subtask->fresh()->task_id);
+        $this->assertDatabaseHas('task_subtask_events', [
+            'subtask_id' => $subtask->id,
+            'event' => 'moved',
+        ]);
+    }
+
+    public function test_grid_does_not_move_subtask_onto_a_procedure_row(): void
+    {
+        $this->actingAs($this->user);
+
+        $source = ProjectTask::query()->create([
+            'name' => 'Źródło',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+        $subtask = TaskSubtask::query()->create([
+            'task_id' => $source->id,
+            'name' => 'Nie na procedurę',
+            'created_by' => $this->user->id,
+        ]);
+
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Onboarding',
+            'created_by' => $this->user->id,
+            'definition' => $this->linearProcedureDefinition(),
+        ]);
+        $run = app(ProcedureRunService::class)->startRun($template, [
+            'name_suffix' => 'Jan',
+            'assigned_to' => $this->user->id,
+        ]);
+        $procedureItem = WorkItem::query()->where('type', WorkItemType::ProcedureRun)->first();
+
+        $this->assertNotNull($procedureItem);
+        $this->assertNotNull($run->task);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('moveSubtask', $subtask->id, $procedureItem->id)
+            ->assertSet('flash', 'Podzadania można przenosić tylko na zadania.');
+
+        $this->assertSame($source->id, $subtask->fresh()->task_id);
+        $this->assertSame(0, $run->task->subtasks()->count());
+    }
+
     /** @return array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>} */
     private function linearProcedureDefinition(): array
     {

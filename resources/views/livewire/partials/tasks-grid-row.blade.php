@@ -3,6 +3,7 @@
     $openUrl      = $this->itemOpenUrl($task);
     $sprintUrl    = $task->sprint ? route('sprints.show', $task->sprint) : null;
     $canAddSubtask = $this->rowSupports($task, 'subtasks');
+    $acceptsSubDrop = $canAddSubtask ? 'true' : 'false';
     $canExpand   = $this->rowExpandable($task);
     $isExpanded  = $canExpand && in_array($task->id, $expandedTasks);
     $canDrag     = $this->rowCanDrag($task);
@@ -74,10 +75,11 @@
     class="tg-task-row {{ $isExpanded ? 'tg-expanded' : '' }}"
     style="border-left:3px solid {{ $borderColor }}"
     x-data="{ subOver: false, taskOver: false, gv: String(@js($groupValue)) }"
-    @dragover="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { subOver = true; $event.preventDefault(); }
+    @dragover="if (window._tgSubDrag && {{ $acceptsSubDrop }} && window._tgSubDrag.fromTask !== {{ $task->id }}) { subOver = true; $event.preventDefault(); }
                else if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $event.preventDefault(); taskOver = true; $event.dataTransfer.dropEffect = 'move' }"
     @dragleave="if (!$el.contains($event.relatedTarget)) { subOver = false; taskOver = false }"
-    @drop.prevent="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}); window._tgSubDrag = null; subOver = false }
+    @drop.prevent="if (window._tgSubDrag && {{ $acceptsSubDrop }} && window._tgSubDrag.fromTask !== {{ $task->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}); window._tgSubDrag = null; subOver = false }
+                   else if (window._tgSubDrag) { window._tgSubDrag = null; subOver = false }
                    else if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $wire.moveTaskToGroup(window._tgTaskDrag.id, gv); window._tgTaskDrag = null; taskOver = false }"
     :class="{ 'tg-row-sub-drop': subOver, 'tg-group-drop': taskOver }">
 

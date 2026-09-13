@@ -1479,6 +1479,12 @@ class TasksGrid extends Component
             return;
         }
 
+        if (! $this->acceptsDroppedSubtasks($this->addingSubtaskForTask)) {
+            $this->addingSubtaskForTask = null;
+
+            return;
+        }
+
         $parent = $this->resolveProjectTask($this->addingSubtaskForTask);
         if (! $parent) {
             $this->addingSubtaskForTask = null;
@@ -3217,6 +3223,20 @@ class TasksGrid extends Component
         return $task ? app(ProjectTaskPolicy::class)->updateStatus($user, $task) : false;
     }
 
+    /**
+     * Podzadania wiszą tylko na kartach-zadaniach. Procedura / kompletacja / wzmianka
+     * mogą mieć ukryty project_task, ale nie pokazują checklisty — drop tam gubi wiersz.
+     */
+    protected function acceptsDroppedSubtasks(int $rowId): bool
+    {
+        $item = $this->resolveWorkItem($rowId);
+        if ($item) {
+            return $item->supports(GridField::Subtasks);
+        }
+
+        return $this->resolveProjectTask($rowId) !== null;
+    }
+
     public function rowSupports(ProjectTask|WorkItem $row, string $field): bool
     {
         if ($row instanceof WorkItem) {
@@ -3481,14 +3501,25 @@ class TasksGrid extends Component
     public function moveSubtask(int $subtaskId, int $targetTaskId, ?int $afterSubtaskId = null): void
     {
         $subtask = TaskSubtask::find($subtaskId);
+        if (! $subtask) {
+            return;
+        }
+
+        if (! $this->acceptsDroppedSubtasks($targetTaskId)) {
+            $this->flash = 'Podzadania można przenosić tylko na zadania.';
+
+            return;
+        }
+
         $targetTask = $this->resolveProjectTask($targetTaskId);
 
-        if (! $subtask || ! $targetTask || ! $this->canEditTask($targetTask)) {
+        if (! $targetTask || ! $this->canEditTask($targetTask)) {
             return;
         }
 
         $sourceTaskId = $subtask->task_id;
-        $isCrossTask = $sourceTaskId !== $targetTaskId;
+        $resolvedTargetId = $targetTask->id;
+        $isCrossTask = $sourceTaskId !== $resolvedTargetId;
 
         // #N references in comments are computed from created_at/id order, independent of
         // sort_order — capture the "before" numbering of the source task so we can reconcile
@@ -3497,15 +3528,15 @@ class TasksGrid extends Component
         $oldSourceMap = $sourceTask?->subtaskDisplayNumbers() ?? [];
         $oldNumber = $oldSourceMap[$subtaskId] ?? null;
 
-        // Move to target task
-        $subtask->update(['task_id' => $targetTaskId]);
+        // Grid rows pass work_item ids; the FK on task_subtasks.task_id is project_tasks.id.
+        $subtask->update(['task_id' => $resolvedTargetId]);
 
         if ($isCrossTask) {
             TaskSubtaskEvent::log($subtask, 'moved', auth()->id());
         }
 
         // Re-compute sort_order within the target task
-        $siblings = TaskSubtask::where('task_id', $targetTaskId)
+        $siblings = TaskSubtask::where('task_id', $resolvedTargetId)
             ->where('id', '!=', $subtaskId)
             ->orderBy('sort_order')
             ->orderBy('created_at')
