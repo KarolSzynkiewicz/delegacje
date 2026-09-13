@@ -128,6 +128,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('departures/{departure}/prepare-cancellation', [\App\Http\Controllers\DepartureController::class, 'prepareCancellation'])
             ->name('departures.prepare-cancellation')
             ->defaults('resource', 'departures');
+        Route::get('departures/{departure}/change-vehicle', [\App\Http\Controllers\DepartureController::class, 'changeVehicle'])
+            ->name('departures.change-vehicle')
+            ->defaults('resource', 'departures');
         Route::post('departures/{departure}/participants/{employee}/remove', [\App\Http\Controllers\DepartureController::class, 'removeParticipant'])
             ->name('departures.participants.remove')
             ->defaults('resource', 'departures');

@@ -21,6 +21,15 @@
                             Dopisz uczestnika
                         </x-ui.button>
                     @endif
+                    @if(!empty($canSwapVehicle))
+                        <x-ui.button
+                            variant="ghost"
+                            href="{{ route('departures.change-vehicle', $departure) }}"
+                            action="edit"
+                        >
+                            Zmień auto
+                        </x-ui.button>
+                    @endif
                     <x-ui.button 
                         variant="danger" 
                         href="{{ route('departures.prepare-cancellation', $departure) }}"

@@ -17,6 +17,7 @@ use App\Models\Vehicle;
 use App\Services\AccommodationAssignmentService;
 use App\Services\AssignmentQueryService;
 use App\Services\DepartureService;
+use App\Services\DepartureVehicleSwapService;
 use App\Services\ProjectAssignmentService;
 use App\Services\VehicleAssignmentService;
 use App\Services\VehicleValidationService;
@@ -42,7 +43,8 @@ class DepartureController extends Controller
         protected ProjectAssignmentService $projectAssignmentService,
         protected VehicleAssignmentService $vehicleAssignmentService,
         protected AccommodationAssignmentService $accommodationAssignmentService,
-        protected VehicleValidationService $vehicleValidationService
+        protected VehicleValidationService $vehicleValidationService,
+        protected DepartureVehicleSwapService $departureVehicleSwapService
     ) {}
 
     /**
@@ -206,6 +208,8 @@ class DepartureController extends Controller
             }
         }
 
+        $canSwapVehicle = $this->departureVehicleSwapService->canSwap($departure);
+
         return view('departures.show', [
             'departure' => $departure,
             'transfer' => $transfer,
@@ -215,6 +219,21 @@ class DepartureController extends Controller
             'canRemoveParticipants' => $canRemoveParticipants,
             'canMutateParticipants' => $canMutateParticipants,
             'participantRemovalBlocks' => $participantRemovalBlocks,
+            'canSwapVehicle' => $canSwapVehicle,
+        ]);
+    }
+
+    /**
+     * Formularz podmiany pojazdu na istniejącym wyjeździe.
+     */
+    public function changeVehicle(LogisticsEvent $departure): View
+    {
+        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+            abort(404);
+        }
+
+        return view('departures.change-vehicle', [
+            'departure' => $departure,
         ]);
     }
 
