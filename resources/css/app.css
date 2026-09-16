@@ -9989,6 +9989,16 @@ span.eq-wh-card {
 .comment-chip--you {
     box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
 }
+.comment-chip--subtask {
+    border-color: rgba(148, 163, 184, 0.4);
+    background: rgba(148, 163, 184, 0.16);
+    color: #e2e8f0;
+}
+.comment-chip__num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    opacity: 0.92;
+}
 .comments-composer-toolbar {
     display: flex;
     align-items: center;

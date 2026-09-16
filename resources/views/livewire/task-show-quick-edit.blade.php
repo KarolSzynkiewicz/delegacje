@@ -80,6 +80,33 @@
         <div class="col-md-6 task-show-meta">
             <div class="dt-card__title mb-1">Szczegóły</div>
 
+            <div class="dt-card__row">
+                <span class="dt-card__label">Tytuł</span>
+                <span class="dt-card__value">
+                    <div class="tg-facet">
+                        @if($canEdit)
+                            <button type="button"
+                                    class="tg-facet__value text-break"
+                                    title="Edytuj tytuł"
+                                    x-data
+                                    @click.prevent.stop="$wire.openQuickEdit({{ $task->id }}, 'name', $event.clientX, $event.clientY)">
+                                {{ $task->name }}
+                            </button>
+                            <button type="button"
+                                    class="tg-facet__edit"
+                                    title="Edytuj tytuł"
+                                    aria-label="Edytuj tytuł"
+                                    x-data
+                                    @click.prevent.stop="$wire.openQuickEdit({{ $task->id }}, 'name', $event.clientX, $event.clientY)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        @else
+                            <span>{{ $task->name }}</span>
+                        @endif
+                    </div>
+                </span>
+            </div>
+
             @unless($task->isProcedure() || $task->isCallback() || $task->isMeeting())
                 @php
                     $badgeVariant = match($task->status) {

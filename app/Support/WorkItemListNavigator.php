@@ -32,6 +32,23 @@ class WorkItemListNavigator
     public static function forget(): void
     {
         session()->forget(self::sessionKey());
+        session()->forget(self::sessionKey().'.fp');
+    }
+
+    public static function isCurrent(string $fingerprint): bool
+    {
+        return $fingerprint !== ''
+            && session(self::sessionKey().'.fp') === $fingerprint
+            && is_array(session(self::sessionKey()));
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    public static function rememberWithFingerprint(string $fingerprint, array $ids): void
+    {
+        self::remember($ids);
+        session([self::sessionKey().'.fp' => $fingerprint]);
     }
 
     /**

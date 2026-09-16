@@ -3,7 +3,6 @@
     $openUrl      = $this->itemOpenUrl($task);
     $sprintUrl    = $task->sprint ? route('sprints.show', $task->sprint) : null;
     $canAddSubtask = $this->rowSupports($task, 'subtasks');
-    $acceptsSubDrop = $canAddSubtask ? 'true' : 'false';
     $canExpand   = $this->rowExpandable($task);
     $isExpanded  = $canExpand && in_array($task->id, $expandedTasks);
     $canDrag     = $this->rowCanDrag($task);
@@ -12,9 +11,7 @@
     $statusWidget = $this->rowStatusWidget($task);
     $statusLabel = $this->rowStatusLabel($task);
 
-    $subtasksAll  = $task->subtasks->sortBy(['sort_order', 'created_at']);
-    $subtaskTotal = $subtasksAll->count();
-    $subtaskDone  = $subtasksAll->where('is_completed', true)->count();
+    [$subtasksAll, $subtaskTotal, $subtaskDone] = $this->rowSubtaskStats($task, $isExpanded);
     $commentsCount = (int) ($task->comments_count ?? ($task->relationLoaded('comments') ? $task->comments->count() : 0));
 
     $statusMap = [
@@ -74,23 +71,21 @@
 <tr wire:key="tg-row-{{ $task->id }}"
     class="tg-task-row {{ $isExpanded ? 'tg-expanded' : '' }}"
     style="border-left:3px solid {{ $borderColor }}"
-    x-data="{ subOver: false, taskOver: false, gv: String(@js($groupValue)) }"
-    @dragover="if (window._tgSubDrag && {{ $acceptsSubDrop }} && window._tgSubDrag.fromTask !== {{ $task->id }}) { subOver = true; $event.preventDefault(); }
-               else if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $event.preventDefault(); taskOver = true; $event.dataTransfer.dropEffect = 'move' }"
-    @dragleave="if (!$el.contains($event.relatedTarget)) { subOver = false; taskOver = false }"
-    @drop.prevent="if (window._tgSubDrag && {{ $acceptsSubDrop }} && window._tgSubDrag.fromTask !== {{ $task->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}); window._tgSubDrag = null; subOver = false }
-                   else if (window._tgSubDrag) { window._tgSubDrag = null; subOver = false }
-                   else if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $wire.moveTaskToGroup(window._tgTaskDrag.id, gv); window._tgTaskDrag = null; taskOver = false }"
-    :class="{ 'tg-row-sub-drop': subOver, 'tg-group-drop': taskOver }">
+    data-tg-drop-task="{{ $task->id }}"
+    data-tg-drop-group="{{ $groupValue }}"
+    data-tg-accepts-sub="{{ $canAddSubtask ? '1' : '0' }}">
 
     {{-- Expand toggle --}}
     <td style="width:36px; padding:5px 4px !important; text-align:center">
         @if($canExpand)
-        <button wire:click="toggleExpand({{ $task->id }})"
-                class="btn btn-sm btn-link p-0"
+        <button type="button"
+                wire:click="toggleExpand({{ $task->id }})"
+                class="btn btn-sm btn-link p-0 tg-expand-btn{{ $isExpanded ? ' is-open' : '' }}"
+                data-tg-expand="{{ $task->id }}"
+                aria-expanded="{{ $isExpanded ? 'true' : 'false' }}"
                 style="color:rgba(255,255,255,0.4); line-height:1"
                 title="{{ $isExpanded ? 'Zwiń' : 'Rozwiń' }}">
-            <i class="bi bi-chevron-{{ $isExpanded ? 'down' : 'right' }}" style="font-size:0.75rem"></i>
+            <i class="bi bi-chevron-right" style="font-size:0.75rem"></i>
         </button>
         @endif
     </td>
@@ -106,13 +101,11 @@
         <div class="d-flex align-items-center gap-1" style="min-width:0">
                 @if($canDrag)
                     <i class="bi bi-grip-vertical tg-task-grip flex-shrink-0"
-                       draggable="true"
-                       title="Przenieś do innej grupy"
-                       @dragstart.stop="window._tgSubDrag = null; window._tgTaskDrag = { id: {{ $task->id }}, fromGroup: gv }; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', '{{ $task->id }}')"
-                       @dragend="window._tgTaskDrag = null"></i>
+                       title="Przenieś do innej grupy"></i>
                 @endif
                 @if($canAddSubtask && $subtaskTotal > 0)
                     <span class="badge rounded-pill tg-mono flex-shrink-0"
+                          data-tg-sub-stats="{{ $task->id }}"
                           style="font-size:0.6rem; min-width:32px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)"
                           title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                         {{ $subtaskDone }}/{{ $subtaskTotal }}
@@ -120,13 +113,29 @@
                 @endif
                 @if($ediName)
                     @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediName, 'rowId' => $task->id, 'field' => 'name'])
+                @elseif($isEditing && $editingField === 'name')
+                    <input type="text" wire:model="editingValue" class="form-control form-control-sm"
+                           wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
+                           x-data x-init="$el.focus(); $el.select()"
+                           style="min-width:0; flex:1">
                 @else
-                <a href="{{ $openUrl }}"
-                   class="text-decoration-none"
-                   style="padding:2px 4px; border-radius:3px; display:block; min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main,#f1f5f9)"
-                   title="{{ $task->name }}">
-                        {{ $task->name }}
-                </a>
+                    <div class="tg-facet" style="flex:1; min-width:0">
+                        <a href="{{ $openUrl }}"
+                           class="tg-facet__value text-decoration-none"
+                           style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main,#f1f5f9); padding:2px 4px"
+                           title="{{ $task->name }}">
+                            {{ $task->name }}
+                        </a>
+                        @if($this->rowWritable($task, 'name'))
+                            <button type="button"
+                                    class="tg-facet__edit"
+                                    wire:click.stop="startEdit({{ $task->id }}, 'name')"
+                                    title="Edytuj tytuł"
+                                    aria-label="Edytuj tytuł">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        @endif
+                    </div>
                 @endif
                 @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
                     <x-ui.approval-decision :decision="$approvalDecision" size="sm" />
@@ -408,9 +417,9 @@
         @if($subtaskTotal > 0)
             <div class="d-flex align-items-center gap-1">
                 <div class="progress flex-shrink-0" style="width:46px; height:4px; border-radius:2px; background:rgba(255,255,255,0.1)">
-                    <div style="width:{{ $subtaskTotal > 0 ? round(($subtaskDone/$subtaskTotal)*100) : 0 }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#a855f7' }}"></div>
+                    <div data-tg-sub-bar="{{ $task->id }}" style="width:{{ $subtaskTotal > 0 ? round(($subtaskDone/$subtaskTotal)*100) : 0 }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#a855f7' }}"></div>
                 </div>
-                <span class="tg-mono" style="font-size:0.7rem; color:var(--text-muted,#94a3b8)">{{ $subtaskDone }}/{{ $subtaskTotal }}</span>
+                <span class="tg-mono" data-tg-sub-stats="{{ $task->id }}" style="font-size:0.7rem; color:var(--text-muted,#94a3b8)">{{ $subtaskDone }}/{{ $subtaskTotal }}</span>
             </div>
         @else
             <span style="color:rgba(255,255,255,0.2); font-size:0.82rem">—</span>
@@ -455,156 +464,5 @@
 {{-- EXPANDED DETAIL ROW                                         --}}
 {{-- ════════════════════════════════════════════════════════════ --}}
 @if($isExpanded)
-<tr wire:key="tg-expanded-{{ $task->id }}" class="tg-expand-row">
-    <td style="width:36px; border-left:3px solid {{ $borderColor }}; padding:0 !important; background:rgba(10,15,29,0.6) !important"></td>
-    <td colspan="{{ count($visibleColumns) }}">
-        <div class="row g-4">
-
-            {{-- ── Description ── --}}
-            <div class="col-lg-5">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="tg-mono" style="font-size:0.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted,#94a3b8)">
-                        <i class="bi bi-card-text me-1"></i>Opis
-                    </span>
-                    @if($this->rowWritable($task, 'description') && !($isEditing && $editingField === 'description'))
-                    <button wire:click="startEdit({{ $task->id }}, 'description')"
-                            class="btn btn-link btn-sm p-0"
-                            style="font-size:0.72rem; color:rgba(255,255,255,0.3); text-decoration:none; line-height:1"
-                            title="Edytuj opis">
-                        <i class="bi bi-pencil-square"></i>
-                    </button>
-                    @endif
-                </div>
-
-                @if($isEditing && $editingField === 'description')
-                    <textarea wire:model="editingValue"
-                              class="form-control form-control-sm"
-                              rows="5"
-                              placeholder="Opis zadania…"
-                              wire:keydown.escape="cancelEdit"
-                              x-data x-init="$el.focus()"></textarea>
-                    <div class="d-flex gap-1 mt-2">
-                        <button wire:click="saveEdit" class="btn btn-sm btn-primary">
-                            <i class="bi bi-floppy me-1"></i>Zapisz
-                        </button>
-                        <button wire:click="cancelEdit" class="btn btn-sm btn-outline-secondary">Anuluj</button>
-                    </div>
-                @else
-                    @php
-                        $descText = $task->plainDescription();
-                        $ediDesc = $this->ediCell($task, 'description');
-                    @endphp
-                    @if($ediDesc)
-                        <div class="tg-edi tg-edi--{{ $ediDesc['kind'] }} p-2 rounded">
-                            @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediDesc, 'rowId' => $task->id, 'field' => 'description'])
-                        </div>
-                    @elseif($descText)
-                        <div style="white-space:pre-wrap; max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:10px 12px; font-size:0.82rem; line-height:1.55; color:var(--text-main,#f1f5f9)">{{ $descText }}</div>
-                    @else
-                        <div style="font-size:0.82rem; font-style:italic; color:rgba(255,255,255,0.25)">
-                            Brak opisu.
-                            @if($this->rowWritable($task, 'description'))
-                                <button wire:click="startEdit({{ $task->id }}, 'description')"
-                                        class="btn btn-link btn-sm p-0 ms-1"
-                                        style="font-size:0.8rem">Dodaj opis</button>
-                            @endif
-                        </div>
-                    @endif
-                    @if($sourceCard = $task->sourceCard())
-                        <div class="mt-2">
-                            <a href="{{ $sourceCard['url'] }}"
-                               class="btn btn-sm btn-outline-primary"
-                               style="font-size:0.75rem">
-                                <i class="bi {{ $sourceCard['icon'] }} me-1"></i>{{ $sourceCard['label'] }}
-                            </a>
-                        </div>
-                    @endif
-                @endif
-            </div>
-
-            {{-- ── Subtasks ── --}}
-            @if($canAddSubtask || $subtaskTotal > 0)
-            <div class="col-lg-7">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="tg-mono" style="font-size:0.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted,#94a3b8)">
-                        <i class="bi bi-list-check me-1"></i>Podzadania
-                    </span>
-                    @if($subtaskTotal > 0)
-                        <span class="badge tg-mono" style="font-size:0.62rem; border-radius:8px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)">
-                            {{ $subtaskDone }}/{{ $subtaskTotal }}
-                        </span>
-                        <div class="progress flex-grow-1" style="height:4px; max-width:70px; border-radius:2px; background:rgba(255,255,255,0.08)">
-                            <div style="width:{{ round(($subtaskDone/$subtaskTotal)*100) }}%; height:100%; border-radius:2px; background:{{ $subtaskDone === $subtaskTotal ? '#10b981' : '#a855f7' }}"></div>
-                        </div>
-                    @endif
-                    @if($canAddSubtask)
-                    <button wire:click="startAddSubtask({{ $task->id }})"
-                            class="btn btn-link btn-sm p-0 ms-1"
-                            style="font-size:0.72rem; text-decoration:none; color:rgba(16,185,129,0.8)">
-                        <i class="bi bi-plus-circle me-1"></i>Dodaj podzadanie
-                    </button>
-                    @endif
-                </div>
-
-                @if($subtaskTotal > 0)
-                <div style="max-height:220px; overflow-y:auto"
-                     @dragover.prevent
-                     @drop.prevent="if (window._tgSubDrag && window._tgSubDrag.fromTask !== {{ $task->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}); window._tgSubDrag = null }">
-                    @foreach($subtasksAll as $subtask)
-                    <div class="d-flex align-items-center gap-2 py-1 px-1 tg-subtask-item"
-                         style="border-bottom:1px solid rgba(255,255,255,0.05); border-radius:4px"
-                         draggable="true"
-                         wire:key="tg-st-{{ $subtask->id }}"
-                         @dragstart="window._tgTaskDrag = null; window._tgSubDrag = { id: {{ $subtask->id }}, fromTask: {{ $task->id }} }; $event.dataTransfer.effectAllowed = 'move'"
-                         @dragend="window._tgSubDrag = null"
-                         @dragover.prevent.stop
-                         @drop.prevent.stop="if (window._tgSubDrag && window._tgSubDrag.id !== {{ $subtask->id }}) { $wire.moveSubtask(window._tgSubDrag.id, {{ $task->id }}, {{ $subtask->id }}); window._tgSubDrag = null }">
-                        <i class="bi bi-grip-vertical tg-subtask-grip flex-shrink-0" style="font-size:0.78rem; cursor:grab; color:rgba(255,255,255,0.2)"></i>
-                        <x-ui.input type="checkbox"
-                                    :id="'tg-st-chk-' . $subtask->id"
-                                    :value="$subtask->is_completed"
-                                    :checked="$subtask->is_completed"
-                                    wire:change="toggleSubtask({{ $subtask->id }})"
-                                    class="flex-shrink-0 mb-0" />
-                        <span class="flex-grow-1" style="font-size:0.83rem; {{ $subtask->is_completed ? 'text-decoration:line-through; color:rgba(255,255,255,0.3)' : 'color:var(--text-main,#f1f5f9)' }}">
-                            {{ $subtask->name }}
-                        </span>
-                        @if($subtask->is_completed && $subtask->completed_at)
-                            <span style="font-size:0.68rem; color:rgba(255,255,255,0.25); flex-shrink:0; white-space:nowrap">
-                                {{ $subtask->completed_at->format('d.m H:i') }}
-                            </span>
-                        @endif
-                    </div>
-                    @endforeach
-                </div>
-                @elseif($addingSubtaskForTask !== $task->id)
-                    <div style="font-size:0.82rem; font-style:italic; color:rgba(255,255,255,0.25)">Brak podzadań.</div>
-                @endif
-
-                @if($addingSubtaskForTask === $task->id)
-                <div class="d-flex gap-1 mt-2">
-                    <input type="text"
-                           wire:model="newSubtaskName"
-                           class="form-control form-control-sm"
-                           placeholder="Nazwa podzadania…"
-                           wire:keydown.enter="saveSubtask"
-                           wire:keydown.escape="cancelAddSubtask"
-                           x-data x-init="$el.focus()">
-                    <button wire:click="saveSubtask" class="btn btn-sm btn-success flex-shrink-0">
-                        <i class="bi bi-plus-lg"></i>
-                    </button>
-                    <button wire:click="cancelAddSubtask" class="btn btn-sm btn-outline-secondary flex-shrink-0">
-                        <i class="bi bi-x"></i>
-                    </button>
-                </div>
-                <div style="font-size:0.7rem; margin-top:4px; color:rgba(255,255,255,0.3)">
-                    <kbd>Enter</kbd> aby dodać &nbsp;·&nbsp; <kbd>Esc</kbd> aby anulować
-                </div>
-                @endif
-            </div>
-            @endif
-
-        </div>
-    </td>
-</tr>
+    @include('livewire.partials.tasks-grid-expand-row')
 @endif

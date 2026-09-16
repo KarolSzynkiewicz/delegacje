@@ -26,7 +26,7 @@
         @input="onEditorInput()"
         @keydown="onKeydown($event)"
         @paste="onPaste($event)"
-        @blur="tryCommitMention(); syncBody()"
+        @blur="tryCommitMention(); tryCommitSubtask(); syncBody()"
     ></div>
 
     <div class="comments-composer-toolbar">
@@ -67,7 +67,7 @@
             class="comments-icon-btn"
             :class="files.length > 0 ? 'is-attached' : ''"
             for="{{ $fileInputId }}"
-            :title="files.length > 0 ? fileSummary() + ' — kliknij aby zmienić' : 'Dodaj załącznik'"
+            :title="files.length > 0 ? fileSummary() + ' — kliknij aby zmienić' : 'Dodaj załącznik albo wklej zrzut ze schowka'"
         >
             <i class="bi bi-paperclip"></i>
             <span class="comments-attach-count" x-cloak x-show="files.length > 1" x-text="files.length"></span>
@@ -79,6 +79,7 @@
             class="comments-file-input"
             multiple
             accept="{{ $accept }}"
+            x-ref="files"
             @change="onFiles($event)"
         >
         <button type="submit" class="comments-icon-btn comments-send-btn" title="{{ $submitTitle }} (Ctrl+Enter)" aria-label="{{ $submitTitle }}">

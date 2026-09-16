@@ -36,12 +36,15 @@ use App\WorkItems\ProjectTaskFields;
 use App\WorkItems\StatusWidget;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -153,6 +156,17 @@ class TasksGrid extends Component
 
     // Expanded rows (task IDs)
     public array $expandedTasks = [];
+
+    /**
+     * Liczby na pigułkach widoków. Publiczne, żeby przetrwać skip-refresh
+     * przy expand/collapse (inaczej każdy chevron robi N zapytań COUNT).
+     *
+     * @var array<int, int>
+     */
+    public array $viewCountsCache = [];
+
+    /** table | cards — jedna siatka w HTML, druga tylko po zmianie viewportu. */
+    public string $layout = 'table';
 
     // Chrono: podsumowanie filtra / import zadań w kontekście widoku
     public bool $showChronoModal = false;
@@ -305,6 +319,13 @@ class TasksGrid extends Component
 
     public function mount(): void
     {
+        $cookieLayout = request()->cookie('tg_layout');
+        if ($cookieLayout === 'cards' || $cookieLayout === 'table') {
+            $this->layout = $cookieLayout;
+        } elseif ($this->requestLooksLikeMobile()) {
+            $this->layout = 'cards';
+        }
+
         if ($this->isLockedToSprint()) {
             $this->status = 'all';
             $this->selectedStatuses = $this->allStatusValues();
@@ -328,6 +349,34 @@ class TasksGrid extends Component
         }
 
         $this->hideGroupedColumn();
+    }
+
+    public function setLayout(string $layout): void
+    {
+        if ($layout !== 'table' && $layout !== 'cards') {
+            $this->skipRender();
+
+            return;
+        }
+
+        if ($this->layout === $layout) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->layout = $layout;
+    }
+
+    protected function requestLooksLikeMobile(): bool
+    {
+        if (request()->header('Sec-CH-UA-Mobile') === '?1') {
+            return true;
+        }
+
+        $ua = strtolower((string) request()->userAgent());
+
+        return $ua !== '' && preg_match('/mobile|android|iphone|ipad|ipod/', $ua) === 1;
     }
 
     public function isLockedToSprint(): bool
@@ -520,8 +569,14 @@ class TasksGrid extends Component
             return;
         }
 
+        $fingerprint = md5((string) json_encode($this->currentQueryParams()));
+        if (WorkItemListNavigator::isCurrent($fingerprint)) {
+            return;
+        }
+
         if ($groupedTasks instanceof Collection) {
-            WorkItemListNavigator::remember(
+            WorkItemListNavigator::rememberWithFingerprint(
+                $fingerprint,
                 $groupedTasks->flatten(1)->pluck('id')->map(fn ($id) => (int) $id)->take(500)->all()
             );
 
@@ -531,7 +586,8 @@ class TasksGrid extends Component
         if ($tasks instanceof Paginator) {
             $idQuery = $this->filteredTasksQuery();
             $this->applyWorkItemSorting($idQuery);
-            WorkItemListNavigator::remember(
+            WorkItemListNavigator::rememberWithFingerprint(
+                $fingerprint,
                 $idQuery->limit(500)->pluck('work_items.id')->map(fn ($id) => (int) $id)->all()
             );
 
@@ -539,7 +595,8 @@ class TasksGrid extends Component
         }
 
         if ($tasks instanceof Collection) {
-            WorkItemListNavigator::remember(
+            WorkItemListNavigator::rememberWithFingerprint(
+                $fingerprint,
                 $tasks->pluck('id')->map(fn ($id) => (int) $id)->take(500)->all()
             );
 
@@ -661,14 +718,15 @@ class TasksGrid extends Component
     /**
      * @return list<array{key: string, label: string}>
      */
-    public function activeFilterChips(): array
+    public function activeFilterChips(?string $activeViewName = null): array
     {
         $chips = [];
 
         if ($this->view !== '') {
-            $viewName = $this->activeViewId
-                ? (TaskGridView::query()->visibleTo(auth()->user())->whereKey($this->activeViewId)->value('name') ?? $this->view)
-                : (TaskGridView::findVisibleTo(auth()->user(), $this->view)?->name ?? $this->view);
+            $viewName = $activeViewName
+                ?? ($this->activeViewId
+                    ? (TaskGridView::query()->visibleTo(auth()->user())->whereKey($this->activeViewId)->value('name') ?? $this->view)
+                    : (TaskGridView::findVisibleTo(auth()->user(), $this->view)?->name ?? $this->view));
             $chips[] = ['key' => 'view', 'label' => 'Widok: '.$viewName];
         }
 
@@ -878,14 +936,95 @@ class TasksGrid extends Component
 
     public function sortBy(string $field): void
     {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
+        $this->sortColumn($field, $this->sortField === $field && $this->sortDirection === 'asc' ? 'desc' : 'asc');
+    }
+
+    public function sortColumn(string $field, string $direction): void
+    {
+        if (! ($this->availableColumns[$field]['sortable'] ?? false)) {
+            return;
         }
+
+        $this->sortField = $field;
+        $this->sortDirection = $direction === 'desc' ? 'desc' : 'asc';
         $this->resetPage();
         $this->detachActiveView();
+    }
+
+    public function visibleColumnCount(): int
+    {
+        return count($this->visibleColumns);
+    }
+
+    /**
+     * Kolejność w pickerze = kolejność na liście (przeciąganie / zapisany widok),
+     * potem wyłączone kolumny z katalogu.
+     *
+     * @return list<string>
+     */
+    public function columnPickerKeys(): array
+    {
+        $available = array_keys($this->availableColumns);
+        $visible = array_values(array_filter(
+            $this->visibleColumns,
+            fn (string $key) => in_array($key, $available, true)
+        ));
+        $rest = array_values(array_diff($available, $visible));
+
+        return array_merge($visible, $rest);
+    }
+
+    /**
+     * Chip keys that belong to a grid column — same Livewire state as the
+     * toolbar Filtry panel, so both UIs stay in sync.
+     *
+     * @return list<string>
+     */
+    public function columnFilterChipKeys(string $colKey): array
+    {
+        return match ($colKey) {
+            'name' => ['searchTask'],
+            'category' => ['searchCategory'],
+            'type' => ['selectedTypes'],
+            'status' => ['status'],
+            'assigned_to' => ['assignedFilter', 'searchAssignedTo'],
+            'created_by' => ['createdByFilter'],
+            'priority' => ['filterPriority'],
+            'due_date' => ['filterDueDate'],
+            default => [],
+        };
+    }
+
+    public function columnIsFilterable(string $colKey): bool
+    {
+        if ($this->columnFilterChipKeys($colKey) === []) {
+            return false;
+        }
+
+        if ($colKey === 'type' && ! $this->usesWorkItems()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function columnHasActiveFilter(string $colKey): bool
+    {
+        $keys = $this->columnFilterChipKeys($colKey);
+        if ($keys === []) {
+            return false;
+        }
+
+        $active = array_column($this->activeFilterChips(), 'key');
+
+        return array_intersect($keys, $active) !== [];
+    }
+
+    public function clearColumnFilter(string $colKey): void
+    {
+        foreach ($this->columnFilterChipKeys($colKey) as $key) {
+            $this->clearFilter($key);
+        }
     }
 
     public function setGroupBy(string $field): void
@@ -981,19 +1120,156 @@ class TasksGrid extends Component
         $this->detachActiveView();
     }
 
-    public function toggleExpand(int $taskId): void
+    #[Renderless]
+    public function toggleExpand(int $taskId, bool $clientManaged = false, bool $needsHtml = false, ?bool $wantOpen = null): mixed
     {
         if (! $this->rowExpandable($taskId)) {
-            $this->expandedTasks = array_values(array_filter($this->expandedTasks, fn ($id) => $id !== $taskId));
+            $this->setTaskExpanded($taskId, false);
+
+            return $this->pushExpandFragment($taskId, false);
+        }
+
+        $open = $wantOpen ?? ! $this->taskIsExpanded($taskId);
+        $this->setTaskExpanded($taskId, $open);
+
+        if (! $open) {
+            return $this->pushExpandFragment($taskId, false);
+        }
+
+        $withHtml = $needsHtml || ! $clientManaged;
+
+        return $this->pushExpandFragment($taskId, true, $withHtml);
+    }
+
+    protected function taskIsExpanded(int $taskId): bool
+    {
+        return in_array($taskId, array_map('intval', $this->expandedTasks), true);
+    }
+
+    protected function setTaskExpanded(int $taskId, bool $open): void
+    {
+        if ($open && ! $this->taskIsExpanded($taskId)) {
+            $this->expandedTasks[] = $taskId;
 
             return;
         }
 
-        if (in_array($taskId, $this->expandedTasks)) {
-            $this->expandedTasks = array_values(array_filter($this->expandedTasks, fn ($id) => $id !== $taskId));
-        } else {
-            $this->expandedTasks[] = $taskId;
+        if (! $open) {
+            $this->expandedTasks = array_values(array_filter(
+                $this->expandedTasks,
+                fn ($id) => (int) $id !== $taskId
+            ));
         }
+    }
+
+    /**
+     * Dokleja / chowa tylko panel rozwinięcia — bez renderu całej siatki.
+     */
+    protected function pushExpandFragment(int $rowId, bool $open, bool $withHtml = true): ?string
+    {
+        $html = '';
+        $subDone = null;
+        $subTotal = null;
+
+        if ($open && $withHtml) {
+            [$html, $subDone, $subTotal] = $this->expandPanelPayload($rowId);
+        }
+
+        $payload = [
+            'id' => $rowId,
+            'open' => $open,
+            'html' => $html,
+        ];
+        if ($subDone !== null) {
+            $payload['subDone'] = $subDone;
+            $payload['subTotal'] = $subTotal;
+        }
+
+        $this->js('window.tgApplyExpand && window.tgApplyExpand('.Js::from($payload).')');
+
+        return $html !== '' ? $html : null;
+    }
+
+    /**
+     * @return array{0: string, 1: int, 2: int}
+     */
+    protected function expandPanelPayload(int $taskId): array
+    {
+        $task = $this->usesWorkItems()
+            ? $this->resolveWorkItem($taskId)
+            : ProjectTask::query()->find($taskId);
+
+        if (! $task) {
+            return ['', 0, 0];
+        }
+
+        $src = $task instanceof WorkItem
+            ? ($task->source instanceof ProjectTask ? $task->source : null)
+            : $task;
+        if ($src) {
+            $src->loadMissing('subtasks');
+        }
+
+        [$subtasksAll, $subtaskTotal, $subtaskDone] = $this->rowSubtaskStats($task, true);
+
+        $borderColor = [
+            'pending' => '#f59e0b',
+            'in_progress' => '#a855f7',
+            'completed' => '#10b981',
+            'cancelled' => '#ef4444',
+        ][$task->status->value] ?? 'rgba(255,255,255,0.1)';
+
+        $viewName = $this->layout === 'cards'
+            ? 'livewire.partials.tasks-grid-expand-card'
+            : 'livewire.partials.tasks-grid-expand-row';
+
+        $extend = app(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::class);
+        $extend->startLivewireRendering($this);
+        $revertLivewire = \Livewire\Drawer\Utils::shareWithViews('__livewire', $this);
+        $revertInstance = \Livewire\Drawer\Utils::shareWithViews('_instance', $this);
+
+        try {
+            $html = view($viewName, [
+                'task' => $task,
+                'canAddSubtask' => $this->rowSupports($task, 'subtasks'),
+                'isEditing' => $this->editingTaskId === $task->id,
+                'editingField' => $this->editingField,
+                'borderColor' => $borderColor,
+                'visibleColumns' => $this->visibleColumns,
+                'subtasksAll' => $subtasksAll,
+                'subtaskTotal' => $subtaskTotal,
+                'subtaskDone' => $subtaskDone,
+                'addingSubtaskForTask' => $this->addingSubtaskForTask,
+            ])->render();
+        } finally {
+            $revertLivewire();
+            $revertInstance();
+            $extend->endLivewireRendering();
+        }
+
+        return [$html, $subtaskDone, $subtaskTotal];
+    }
+
+    protected function expandRowIdForSubtask(TaskSubtask $subtask): int
+    {
+        $projectTaskId = (int) $subtask->task_id;
+        $expanded = array_map('intval', $this->expandedTasks);
+
+        if (in_array($projectTaskId, $expanded, true)) {
+            return $projectTaskId;
+        }
+
+        if ($this->usesWorkItems()) {
+            $itemId = WorkItem::query()
+                ->where('source_type', 'project_task')
+                ->where('source_id', $projectTaskId)
+                ->value('id');
+            if ($itemId) {
+                return (int) $itemId;
+            }
+        }
+
+        return $expanded[0] ?? $projectTaskId;
     }
 
     public function startEdit(int $taskId, string $field): void
@@ -1069,6 +1345,7 @@ class TasksGrid extends Component
             }
 
             $item->handler()->write($item, $field, $this->editingValue);
+            $this->invalidateViewCounts();
             $this->flash = 'Zapisano.';
             $this->cancelEdit();
 
@@ -1094,6 +1371,7 @@ class TasksGrid extends Component
             default => null,
         };
 
+        $this->invalidateViewCounts();
         $this->flash = 'Zapisano.';
         $this->cancelEdit();
     }
@@ -1136,6 +1414,7 @@ class TasksGrid extends Component
                 return;
             }
             $item->handler()->write($item, GridField::Status, $status);
+            $this->invalidateViewCounts();
             $this->flash = 'Status zaktualizowany.';
 
             return;
@@ -1146,6 +1425,7 @@ class TasksGrid extends Component
             return;
         }
         $this->applyStatusChange($task, $status);
+        $this->invalidateViewCounts();
         $this->flash = 'Status zaktualizowany.';
     }
 
@@ -1439,6 +1719,7 @@ class TasksGrid extends Component
 
     private function resetAddForm(): void
     {
+        $this->invalidateViewCounts();
         $this->reset(['newTaskName', 'newTaskSprint', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds', 'newMeetingLocation']);
         if ($this->isLockedToSprint()) {
             $this->newTaskSprint = (string) $this->lockedSprintId;
@@ -1447,6 +1728,7 @@ class TasksGrid extends Component
         $this->addKind = 'task';
     }
 
+    #[Renderless]
     public function startAddSubtask(int $taskId): void
     {
         $item = $this->resolveWorkItem($taskId);
@@ -1461,26 +1743,29 @@ class TasksGrid extends Component
 
         $this->addingSubtaskForTask = $taskId;
         $this->newSubtaskName = '';
-        if (! in_array($taskId, $this->expandedTasks)) {
-            $this->expandedTasks[] = $taskId;
-        }
+        $this->setTaskExpanded($taskId, true);
+        $this->pushExpandFragment($taskId, true);
     }
 
+    #[Renderless]
     public function saveSubtask(): void
     {
         if (! $this->addingSubtaskForTask) {
             return;
         }
 
+        $rowId = (int) $this->addingSubtaskForTask;
         $name = trim($this->newSubtaskName);
         if (! $name) {
             $this->addingSubtaskForTask = null;
+            $this->pushExpandFragment($rowId, true);
 
             return;
         }
 
         if (! $this->acceptsDroppedSubtasks($this->addingSubtaskForTask)) {
             $this->addingSubtaskForTask = null;
+            $this->pushExpandFragment($rowId, true);
 
             return;
         }
@@ -1488,6 +1773,7 @@ class TasksGrid extends Component
         $parent = $this->resolveProjectTask($this->addingSubtaskForTask);
         if (! $parent) {
             $this->addingSubtaskForTask = null;
+            $this->pushExpandFragment($rowId, true);
 
             return;
         }
@@ -1512,14 +1798,21 @@ class TasksGrid extends Component
         $this->newSubtaskName = '';
         $this->addingSubtaskForTask = null;
         $this->flash = 'Podzadanie dodane.';
+        $this->pushExpandFragment($rowId, true);
     }
 
+    #[Renderless]
     public function cancelAddSubtask(): void
     {
+        $rowId = $this->addingSubtaskForTask ? (int) $this->addingSubtaskForTask : null;
         $this->addingSubtaskForTask = null;
         $this->newSubtaskName = '';
+        if ($rowId) {
+            $this->pushExpandFragment($rowId, true);
+        }
     }
 
+    #[Renderless]
     public function toggleSubtask(int $subtaskId): void
     {
         $subtask = TaskSubtask::find($subtaskId);
@@ -1534,6 +1827,8 @@ class TasksGrid extends Component
             $subtask->markCompleted();
             TaskSubtaskEvent::log($subtask, 'completed', auth()->id());
         }
+
+        $this->pushExpandFragment($this->expandRowIdForSubtask($subtask), true);
     }
 
     public function saveView(): void
@@ -1885,6 +2180,7 @@ class TasksGrid extends Component
         }
 
         $this->discardEdiChanges();
+        $this->invalidateViewCounts();
         $this->flash = $applied === 1
             ? 'Zastosowano 1 zmianę Ediego.'
             : "Zastosowano {$applied} zmian Ediego.";
@@ -1911,6 +2207,7 @@ class TasksGrid extends Component
 
         $this->writeEdiChange($this->ediChanges[$index]);
         $this->pullEdiChange($index);
+        $this->invalidateViewCounts();
 
         if ($this->ediChanges === []) {
             $this->discardEdiChanges();
@@ -2263,6 +2560,9 @@ class TasksGrid extends Component
         }
 
         $this->closeChronoModal();
+        if ($created > 0) {
+            $this->invalidateViewCounts();
+        }
         $this->flash = $created === 1
             ? 'Utworzono 1 zadanie z importu.'
             : "Utworzono {$created} zadań z importu.";
@@ -2634,6 +2934,79 @@ class TasksGrid extends Component
         static $exists = null;
 
         return $exists ??= Schema::hasTable('task_grid_views');
+    }
+
+    protected function invalidateViewCounts(): void
+    {
+        $this->viewCountsCache = [];
+        WorkItemListNavigator::forget();
+    }
+
+    /**
+     * @return array{0: Collection<int, TaskSubtask>, 1: int, 2: int}
+     */
+    public function rowSubtaskStats(ProjectTask|WorkItem $task, bool $expanded): array
+    {
+        $src = $task instanceof WorkItem
+            ? ($task->source instanceof ProjectTask ? $task->source : null)
+            : $task;
+
+        if (! $src) {
+            return [collect(), 0, 0];
+        }
+
+        if ($expanded && $src->relationLoaded('subtasks')) {
+            $all = $src->subtasks->sortBy(['sort_order', 'created_at']);
+
+            return [$all, $all->count(), $all->where('is_completed', true)->count()];
+        }
+
+        return [
+            collect(),
+            (int) ($src->subtasks_count ?? 0),
+            (int) ($src->subtasks_completed_count ?? 0),
+        ];
+    }
+
+    protected function hydrateExpandedSubtasks(mixed $tasks, mixed $groupedTasks): void
+    {
+        if ($this->expandedTasks === []) {
+            return;
+        }
+
+        $expanded = array_map('intval', $this->expandedTasks);
+
+        if ($groupedTasks instanceof Collection) {
+            $rows = $groupedTasks->flatten();
+        } elseif ($tasks instanceof Paginator) {
+            $rows = collect($tasks->items());
+        } elseif ($tasks instanceof Collection) {
+            $rows = $tasks;
+        } else {
+            return;
+        }
+
+        $projectTasks = $rows
+            ->map(function ($row) use ($expanded) {
+                if (! in_array((int) $row->id, $expanded, true)) {
+                    return null;
+                }
+                if ($row instanceof ProjectTask) {
+                    return $row;
+                }
+                if ($row instanceof WorkItem && $row->source instanceof ProjectTask) {
+                    return $row->source;
+                }
+
+                return null;
+            })
+            ->filter()
+            ->unique(fn (ProjectTask $task) => $task->id)
+            ->values();
+
+        if ($projectTasks->isNotEmpty()) {
+            (new EloquentCollection($projectTasks->all()))->load(['subtasks']);
+        }
     }
 
     protected function countForSavedView(TaskGridView $view): int
@@ -3400,6 +3773,7 @@ class TasksGrid extends Component
             }
 
             $item->handler()->write($item, $field, $groupValue);
+            $this->invalidateViewCounts();
             $this->flash = 'Zadanie przeniesione.';
 
             return;
@@ -3423,6 +3797,7 @@ class TasksGrid extends Component
             default => null,
         };
 
+        $this->invalidateViewCounts();
         $this->flash = 'Zadanie przeniesione.';
     }
 
@@ -3684,11 +4059,13 @@ class TasksGrid extends Component
         array_splice($order, $toIdx, 0, [$from]);
         $this->visibleColumns = array_values($order);
         $this->detachActiveView();
+        $this->skipRender();
     }
 
     public function setColumnWidth(string $col, int $width): void
     {
         $this->columnWidths[$col] = max(50, min(1200, $width));
+        $this->skipRender();
     }
 
     public function paginationView(): string
@@ -3917,7 +4294,7 @@ class TasksGrid extends Component
     {
         $this->sanitizeRemovedProjectField();
 
-        $savedViews = $this->gridViewsTableExists()
+        $savedViews = (! $this->isLockedToSprint() && $this->gridViewsTableExists())
             ? TaskGridView::query()
                 ->visibleTo(auth()->user())
                 ->orderByDesc('is_global')
@@ -3925,12 +4302,24 @@ class TasksGrid extends Component
                 ->get()
             : collect();
 
-        $viewCounts = [];
-        foreach ($savedViews as $savedView) {
-            $viewCounts[$savedView->id] = $this->countForSavedView($savedView);
+        $savedViewIds = $savedViews->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $cachedViewIds = collect($this->viewCountsCache)->keys()->map(fn ($id) => (int) $id)->sort()->values()->all();
+        if ($this->viewCountsCache === [] || $savedViewIds !== $cachedViewIds) {
+            $viewCounts = [];
+            foreach ($savedViews as $savedView) {
+                $viewCounts[$savedView->id] = $this->countForSavedView($savedView);
+            }
+            $this->viewCountsCache = $viewCounts;
+        } else {
+            $viewCounts = $this->viewCountsCache;
         }
 
         $query = $this->filteredTasksQuery();
+
+        $subtaskCounts = [
+            'subtasks',
+            'subtasks as subtasks_completed_count' => fn ($q) => $q->where('is_completed', true),
+        ];
 
         if ($this->usesWorkItems()) {
             $this->applyWorkItemSorting($query);
@@ -3938,16 +4327,16 @@ class TasksGrid extends Component
                 'assignedTo',
                 'createdBy',
                 'sprint',
-                'source' => function (MorphTo $morphTo) {
+                'source' => function (MorphTo $morphTo) use ($subtaskCounts) {
                     $morphTo->morphWith([
-                        ProjectTask::class => ['subtasks', 'procedureRun.subject', 'recruitmentProcess', 'subject', 'createdBy', 'sprint', 'assignedTo'],
+                        ProjectTask::class => ['procedureRun.subject', 'recruitmentProcess', 'subject'],
                         TaskSubtask::class => ['task', 'assignedTo'],
                         CommentMention::class => ['comment.commentable', 'assignedTo'],
                         \App\Models\ProcedureRun::class => ['task', 'template'],
                         \App\Models\WarehouseDispatch::class => ['tasks'],
                         \App\Models\ApprovalRequest::class => ['approver', 'decidedBy'],
                     ])->morphWithCount([
-                        ProjectTask::class => ['comments'],
+                        ProjectTask::class => array_merge(['comments'], $subtaskCounts),
                     ]);
                 },
             ]);
@@ -3966,12 +4355,12 @@ class TasksGrid extends Component
                 $query->orderBy('project_tasks.created_at', 'desc');
             }
 
-            $eager = ['assignedTo', 'createdBy', 'subtasks', 'procedureRun.subject', 'recruitmentProcess', 'subject'];
+            $eager = ['assignedTo', 'createdBy', 'procedureRun.subject', 'recruitmentProcess', 'subject'];
             if (! $this->isLockedToSprint()) {
                 $eager[] = 'sprint';
             }
 
-            $query->with($eager)->withCount('comments');
+            $query->with($eager)->withCount(array_merge(['comments'], $subtaskCounts));
         }
 
         $ediIds = $this->ediReviewRowIds();
@@ -3992,38 +4381,52 @@ class TasksGrid extends Component
         }
 
         $this->rememberWorkItemList($tasks, $groupedTasks);
+        $this->hydrateExpandedSubtasks($tasks, $groupedTasks);
+
+        $needsSprintOptions = $this->showAddRow || $this->editingField === 'sprint';
+        $needsProcedureTemplates = $this->usesWorkItems() && $this->showAddRow && $this->addKind === 'procedure';
+        $activeViewName = $this->activeViewId
+            ? ($savedViews->firstWhere('id', $this->activeViewId)?->name ?? $this->view)
+            : null;
+        $filterChips = $this->activeFilterChips($activeViewName);
+        $chronoOpen = $this->showChronoModal;
 
         return view('livewire.tasks-grid', [
             'tasks' => $tasks,
             'groupedTasks' => $groupedTasks,
-            'allSprints' => $this->isLockedToSprint()
+            'allSprints' => $this->isLockedToSprint() || ! $needsSprintOptions
                 ? collect()
                 : Sprint::query()->orderByDesc('start_date')->get(),
             'allUsers' => User::orderedDirectory(),
-            'procedureTemplates' => $this->usesWorkItems()
+            'procedureTemplates' => $needsProcedureTemplates
                 ? ProcedureTemplate::query()->orderBy('name')->get(['id', 'name', 'subject_type'])
                 : collect(),
             'availableColumns' => $this->availableColumns,
             'savedViews' => $savedViews,
             'viewCounts' => $viewCounts,
-            'activeViewName' => $this->activeViewId
-                ? ($savedViews->firstWhere('id', $this->activeViewId)?->name ?? $this->view)
-                : null,
+            'filterChips' => $filterChips,
+            'activeViewName' => $activeViewName,
             'isMenuDefaultView' => auth()->user()?->usesGridAsDefaultTasksView($this->currentQueryParams()) ?? false,
-            'llmConfigured' => app(LlmClient::class)->isConfigured(),
-            'importFormatExample' => json_encode(
-                TasksFilterImportService::importFormatExample(),
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
-            ),
-            'chronoFilterLabels' => array_map(
-                fn (array $chip) => $chip['label'],
-                $this->activeFilterChips(),
-            ),
-            'chronoImportDefaults' => $this->chronoImportDefaults(),
-            'chronoImportDefaultsHint' => $this->chronoImportDefaultsHint(),
+            'llmConfigured' => $chronoOpen && app(LlmClient::class)->isConfigured(),
+            'importFormatExample' => ($chronoOpen && $this->chronoMode === 'import')
+                ? json_encode(
+                    TasksFilterImportService::importFormatExample(),
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+                )
+                : '',
+            'chronoFilterLabels' => $chronoOpen
+                ? array_map(fn (array $chip) => $chip['label'], $filterChips)
+                : [],
+            'chronoImportDefaults' => $chronoOpen ? $this->chronoImportDefaults() : [
+                'category' => null,
+                'assigned_to' => null,
+                'sprint_id' => null,
+                'assignee_label' => null,
+            ],
+            'chronoImportDefaultsHint' => $chronoOpen ? $this->chronoImportDefaultsHint() : '',
             'chronoItemCount' => $tasks instanceof \Illuminate\Contracts\Pagination\Paginator
                 ? $tasks->total()
-                : ($tasks?->count() ?? $groupedTasks?->flatten()->count()),
+                : ($tasks?->count() ?? $groupedTasks?->flatten(1)->count()),
         ]);
     }
 

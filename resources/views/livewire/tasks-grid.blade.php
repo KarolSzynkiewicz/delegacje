@@ -1,4 +1,47 @@
-<div class="xuiv2-tasks{{ $this->isEdiReviewing() ? ' is-edi-review' : '' }}" id="xuiv2Tasks">
+<div class="xuiv2-tasks{{ $this->isEdiReviewing() ? ' is-edi-review' : '' }}" id="xuiv2Tasks"
+     x-data="{
+         filterOpen: false,
+         filterMode: 'all',
+         filterTop: 0,
+         filterLeft: 0,
+         filterWidth: 600,
+         openStatus: false,
+         openVisibility: false,
+         openType: false,
+         openSearch: false,
+         openMore: false,
+         openGroup: false,
+         filterLabels: @js(collect($availableColumns)->mapWithKeys(fn ($col, $key) => [$key => $col['label']])->all()),
+         closeFilters() {
+             this.filterOpen = false;
+             this.filterMode = 'all';
+         },
+         toggleAllFilters(el) {
+             this.$dispatch('tg-close-col-menu');
+             if (this.filterOpen && this.filterMode === 'all') {
+                 this.closeFilters();
+                 return;
+             }
+             const r = el.getBoundingClientRect();
+             const pw = Math.min(600, window.innerWidth - 24);
+             this.filterTop = r.bottom + 4;
+             this.filterLeft = Math.max(4, Math.min(r.left, window.innerWidth - pw - 4));
+             this.filterWidth = pw;
+             this.filterMode = 'all';
+             this.filterOpen = true;
+         },
+         openColumnFilter(detail) {
+             const pw = Math.min(360, window.innerWidth - 24);
+             this.filterTop = detail.top;
+             this.filterLeft = Math.max(4, Math.min(detail.left, window.innerWidth - pw - 4));
+             this.filterWidth = pw;
+             this.filterMode = detail.key;
+             this.filterOpen = true;
+         }
+     }"
+     @tg-open-col-filter.window="openColumnFilter($event.detail)"
+     @tg-close-filters.window="closeFilters()"
+     @keydown.escape.window="closeFilters()">
 <style>
     /* ══════════════════════════════════════════════════════════
        xuiv2 — probka z /2, oryginalnie testowana na /tasks2. Fonty
@@ -57,14 +100,6 @@
     }
     /* Nagłówek strony ("Backlog" + Sprinty/Widok kart) żyje poza tym komponentem
        (x-app-layout). Mono-font na przyciskach w headerze jest globalny. */
-
-    /* Magnetyczne CTA — zostaje lokalne (opt-in przez klasę),
-       bo odpalanie tego na WSZYSTKICH .btn-primary w gęstych tabelach CRUD (dziesiątki
-       przycisków akcji per wiersz) odtworzyłoby ten sam problem z wydajnością, który
-       naprawiliśmy przy /tasks2 (patrz commit o N+1 / mousemove). Globalna poświata
-       kursora (.cl-cursor-glow) jest tania — jeden element — więc jest już globalna. */
-    .xuiv2-magnetic { will-change: transform; transition: transform .15s cubic-bezier(.2,.8,.2,1); }
-    @media (prefers-reduced-motion: reduce) { .xuiv2-magnetic { display: none !important; } }
 
     /* Focus ring: fiolet (--accent) zamiast niebieskiego */
     .xuiv2-tasks .form-control:focus,
@@ -149,6 +184,41 @@
         border-color: rgba(168,85,247,0.55) !important;
         box-shadow: 0 0 0 2px rgba(168,85,247,0.2) !important;
     }
+    .tg-col-menu {
+        display: none !important;
+        min-width: 200px;
+        z-index: 1000002 !important;
+        pointer-events: auto;
+    }
+    .tg-col-menu.is-open {
+        display: block !important;
+    }
+    .tg-filter-panel--column {
+        width: min(360px, calc(100vw - 24px)) !important;
+        min-width: 260px !important;
+    }
+    .tg-col-filter-mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.15rem;
+        height: 1.15rem;
+        margin-left: .15rem;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        background: rgba(168, 85, 247, 0.2);
+        color: #ddd6fe;
+        font-size: .62rem;
+        line-height: 1;
+        vertical-align: middle;
+        cursor: pointer;
+        pointer-events: auto;
+    }
+    .tg-col-filter-mark:hover {
+        background: rgba(168, 85, 247, 0.38);
+        color: #fff;
+    }
 
     /* All text inside any dropdown rendered by this component must be light */
     .dropdown-menu { color: var(--text-main, #f1f5f9) !important; }
@@ -203,6 +273,16 @@
     }
     .tg-toolbar .input-group .form-control { border-radius: 0 8px 8px 0 !important; }
     .tg-toolbar .input-group .input-group-text:first-child { border-radius: 8px 0 0 8px !important; }
+    .tg-toolbar__controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    .tg-toolbar__chrono .ac-trigger__hint {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-variant-numeric: tabular-nums;
+    }
 
     /* ── Compact grid: reset global table spacing ── */
     .tg-table {
@@ -395,6 +475,63 @@
         border-bottom: 2px solid rgba(168,85,247,0.3) !important;
         padding: 14px 16px 18px !important;
     }
+    .tg-expand-btn {
+        position: relative;
+    }
+    .tg-expand-btn i {
+        display: inline-block;
+        transform-origin: 50% 50%;
+        transition: transform .15s cubic-bezier(.22,.7,.2,1);
+    }
+    .tg-expand-btn.is-open i,
+    .tg-expand-btn.is-opening i { transform: rotate(90deg); }
+    [data-tg-expand-for][hidden] { display: none !important; }
+    .tg-expand-body {
+        overflow: visible;
+    }
+    .tg-expand-skel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 72px;
+        padding: 4px 0 8px;
+        color: var(--text-muted, #94a3b8);
+        font-size: 0.78rem;
+    }
+    .tg-expand-skel__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .tg-expand-spinner {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid rgba(168,85,247,.25);
+        border-top-color: #c084fc;
+        animation: tg-expand-spin .7s linear infinite;
+        flex-shrink: 0;
+    }
+    .tg-expand-skel__line {
+        display: block;
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(168,85,247,.18), rgba(59,130,246,.12), rgba(255,255,255,.04));
+        background-size: 180% 100%;
+        animation: tg-expand-shimmer 1.4s ease-in-out infinite;
+    }
+    .tg-expand-skel__line:nth-child(2) { width: 72%; }
+    .tg-expand-skel__line:nth-child(3) { width: 54%; }
+    .tg-expand-skel__line:nth-child(4) { width: 63%; }
+    @keyframes tg-expand-spin { to { transform: rotate(360deg); } }
+    @keyframes tg-expand-shimmer {
+        0% { background-position: 100% 0; }
+        100% { background-position: -80% 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .tg-expand-btn i { transition: none; }
+        .tg-expand-spinner, .tg-expand-skel__line { animation: none; }
+    }
 
     /* ── Footer / add-task rows ── */
     .tg-footer-row > td {
@@ -447,22 +584,26 @@
         white-space: nowrap;
     }
 
-    /* ── Subtask drag-and-drop ── */
-    .tg-subtask-item { transition: background .1s; }
+    /* ── Subtask drag-and-drop (pointer events, not HTML5) ── */
+    .tg-subtask-item { transition: background .1s; -webkit-user-drag: none; user-select: none; }
     .tg-subtask-item:hover { background: rgba(255,255,255,0.04); }
-    .tg-subtask-item[draggable="true"]:active .tg-subtask-grip { color: rgba(255,255,255,.6) !important; }
+    .tg-subtask-item .tg-subtask-grip { cursor: grab; touch-action: none; }
     .tg-subtask-item .form-check { margin-bottom: 0 !important; }
+    .tg-subtask-item.tg-row-sub-drop {
+        background: rgba(16,185,129,.12) !important;
+        box-shadow: inset 0 0 0 2px rgba(16,185,129,.45);
+    }
 
-    /* Drop target on a collapsed task row */
-    .tg-task-row.tg-row-sub-drop > td {
+    /* Drop target on a collapsed task row or expanded detail */
+    .tg-task-row.tg-row-sub-drop > td,
+    .tg-expand-row.tg-row-sub-drop > td {
         background: rgba(16,185,129,.08) !important;
         box-shadow: inset 0 0 0 2px rgba(16,185,129,.4);
     }
 
     /* ── Task drag between groups (Kanban) ── */
-    .tg-task-grip { cursor: grab; color: rgba(255,255,255,0.22); font-size: 0.95rem; padding: 2px 4px; user-select: none; }
+    .tg-task-grip { cursor: grab; color: rgba(255,255,255,0.22); font-size: 0.95rem; padding: 2px 4px; user-select: none; touch-action: none; }
     .tg-task-grip:hover { color: rgba(255,255,255,0.6); }
-    .tg-task-grip:active { cursor: grabbing; color: rgba(255,255,255,0.75); }
     .tg-group-header.tg-group-drop > td,
     .tg-task-row.tg-group-drop > td {
         background: rgba(16,185,129,.10) !important;
@@ -470,8 +611,31 @@
     }
 
     /* ── Column drag-to-reorder ── */
-    .tg-table th[draggable="true"] { cursor: grab; }
-    .tg-table th[draggable="true"]:active { cursor: grabbing; }
+    .tg-table th[data-col] { cursor: grab; }
+    html.tg-pointer-hold,
+    html.tg-pointer-hold *,
+    html.tg-pointer-drag,
+    html.tg-pointer-drag * { cursor: grabbing !important; }
+    html.tg-pointer-drag { user-select: none !important; }
+    .tg-drag-ghost {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 1000005;
+        pointer-events: none;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-family: 'Space Grotesk', sans-serif;
+        color: #f1f5f9;
+        background: rgba(13, 18, 30, 0.94);
+        border: 1px solid rgba(168, 85, 247, 0.5);
+        box-shadow: 0 8px 24px rgba(0,0,0,.45);
+        white-space: nowrap;
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     .tg-col-drag-over {
         background: rgba(168,85,247,.18) !important;
         outline: 2px dashed rgba(168,85,247,.6) !important;
@@ -495,51 +659,85 @@
     .tg-resizing * { cursor: col-resize !important; user-select: none !important; }
 
     /* ══════════════════════════════════════════════════════════
-       MOBILE (< 768px): karty zamiast tabeli
+       MOBILE (< 768px): karty zamiast tabeli (HTML wybiera layout)
        ══════════════════════════════════════════════════════════ */
-    .tg-cards { display: none; }
+    .tg-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
 
     @media (max-width: 767.98px) {
-        /* Tabela znika, karty przejmują ── */
-        .tg-table-wrap { display: none !important; }
-        .tg-cards {
-            display: flex !important;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        /* Jeden zwarty rząd: widok + filtry + liczba (badge grupowania tylko na md+). */
         .tg-toolbar__row {
-            flex-wrap: nowrap;
-            align-items: center;
-            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: stretch;
+            gap: 0.45rem;
         }
         .tg-toolbar__search,
         .tg-toolbar__views,
         .tg-toolbar__home {
             display: none !important;
         }
-        .tg-toolbar__chrono .ac-trigger__text {
-            display: none !important;
+        .tg-toolbar__controls {
+            flex: 1 1 100%;
+            width: 100%;
+            display: flex;
+            gap: 0.4rem;
+        }
+        .tg-toolbar__filters,
+        .tg-toolbar__columns {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+        .tg-toolbar__filters .btn,
+        .tg-toolbar__columns .btn {
+            width: 100%;
+            justify-content: center;
         }
         .tg-toolbar__chrono {
-            padding: 4px 6px !important;
+            padding: 4px 10px 4px 5px !important;
+            gap: 0.4rem !important;
+        }
+        .tg-toolbar__chrono .ac-trigger__text {
+            display: flex !important;
+        }
+        .tg-toolbar__chrono .ac-trigger__name {
+            display: none !important;
         }
         .tg-toolbar__meta {
+            flex: 1 1 100%;
+            width: 100%;
             margin-left: 0 !important;
-            flex: 1 1 auto;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 0.4rem;
+        }
+        .tg-toolbar__view-menu,
+        .tg-toolbar__chrono {
+            flex: 1 1 0;
             min-width: 0;
-            justify-content: flex-end;
+        }
+        .tg-toolbar__view-menu > .btn,
+        .tg-toolbar__chrono.ac-trigger {
+            width: 100%;
+            height: 100%;
+            justify-content: center;
+            box-sizing: border-box;
+            overflow: hidden;
         }
         .tg-toolbar__view-label {
-            display: inline !important;
-            max-width: 38vw;
+            display: inline-block !important;
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
             vertical-align: bottom;
         }
-        .tg-toolbar__view-icon { display: none !important; }
+        .tg-toolbar__view-icon {
+            display: inline !important;
+        }
         .tg-toolbar .btn { padding: 4px 8px !important; font-size: 0.72rem !important; }
         .tg-group-badge { display: none !important; }
 
@@ -766,6 +964,10 @@
 {{-- Szukaj + jeden przycisk „Filtry” (pogrupowany panel) zamiast --}}
 {{-- rzędu osobnych przełączników.                                --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
+@php
+    $filteredTaskCount = (int) ($chronoItemCount ?? 0);
+    $filteredTaskHint = $filteredTaskCount === 1 ? '1 zadanie' : $filteredTaskCount.' zadań';
+@endphp
 <div class="card mb-2 border-0 shadow-sm">
     <div class="card-body py-2 px-3 tg-toolbar">
         <div class="d-flex align-items-center gap-2 flex-wrap tg-toolbar__row">
@@ -780,25 +982,36 @@
                        class="form-control">
             </div>
 
+            <div class="tg-toolbar__controls">
             {{-- Filtry: jeden przycisk, panel z pogrupowanymi sekcjami (SharePoint-style, jak w rekrutacji) --}}
-            <div class="tg-toolbar__filters" x-data="{ open: false, top: 0, left: 0, openStatus: false, openVisibility: false, openType: false, openSearch: false, openGroup: false, openColumns: false }">
+            <div class="tg-toolbar__filters">
                 <button type="button"
-                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); const pw=Math.min(600, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.left, window.innerWidth-pw-4)); open=true"
-                        class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ count($this->activeFilterChips()) > 0 ? 'is-on' : '' }}">
+                        @click.stop="toggleAllFilters($el)"
+                        class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ count($filterChips) > 0 ? 'is-on' : '' }}">
                     <i class="bi bi-sliders me-1"></i>Filtry
-                    @if(count($this->activeFilterChips()) > 0)
-                        <span class="tg-quiet-count">{{ count($this->activeFilterChips()) }}</span>
+                    @if(count($filterChips) > 0)
+                        <span class="tg-quiet-count">{{ count($filterChips) }}</span>
                     @endif
                     <i class="bi bi-chevron-down ms-1 d-none d-md-inline" style="font-size:.6rem"></i>
+                </button>
+            </div>
+
+            <div class="tg-toolbar__columns" x-data="{ open: false, top: 0, left: 0 }">
+                <button type="button"
+                        @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); const pw=Math.min(360, window.innerWidth-24); top=r.bottom+4; left=Math.max(4, Math.min(r.left, window.innerWidth-pw-4)); open=true"
+                        class="btn btn-sm btn-outline-secondary tg-quiet-btn">
+                    <i class="bi bi-layout-three-columns me-1"></i>Kolumny
+                    <span class="tg-quiet-count">{{ $this->visibleColumnCount() }}</span>
                 </button>
                 <template x-teleport="body">
                     <div x-show="open" x-cloak
                          @click.outside="open = false"
-                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;`"
+                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;width:min(360px, calc(100vw - 24px));`"
                          class="rp-filter-panel tg-filter-panel-teal">
-                        @include('livewire.partials.tg-filter-panel')
+                        @include('livewire.partials.tg-columns-panel')
                     </div>
                 </template>
+            </div>
             </div>
 
             {{-- Zapisane widoki (pigułki) — na mobile tylko aktualny, w menu zakładki --}}
@@ -816,8 +1029,9 @@
                 </div>
             @endunless
 
-            {{-- Loading spinner --}}
-            <div wire:loading>
+            {{-- Spinner tylko przy przebudowie listy, nie przy doklejaniu panelu / podzadaniu --}}
+            <div wire:loading
+                 wire:target.except="toggleExpand,toggleSubtask,startAddSubtask,saveSubtask,cancelAddSubtask,setColumnWidth,reorderColumns,moveTaskToGroup,moveSubtask">
                 <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:14px;height:14px">
                     <span class="visually-hidden">Ładowanie…</span>
                 </div>
@@ -832,7 +1046,7 @@
                                 class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ $activeViewId ? 'is-on' : '' }}"
                                 title="Zapisz i zarządzaj widokami">
                             <i class="bi bi-bookmark{{ $view ? '-fill' : '' }} tg-toolbar__view-icon"></i>
-                            <span class="tg-toolbar__view-label d-none">{{ $activeViewName ?: 'Domyślny' }}</span>
+                            <span class="tg-toolbar__view-label d-md-none">{{ $activeViewName ?: 'Domyślny' }}</span>
                         </button>
                         <template x-teleport="body">
                             <div x-show="open" x-cloak
@@ -923,34 +1137,27 @@
                     class="tg-toolbar__chrono"
                     :size="28"
                     label="Chrono Assist"
-                    hint="Filtr"
+                    :hint="$filteredTaskHint"
                     hint-loading="Otwieram…"
-                    title="Chrono Assist — Argus podsumuje, Impek zaimportuje, Chrono utworzy, Edi poprawi"
+                    title="Chrono Assist — {{ $filteredTaskHint }} w bieżącym filtrze. Argus podsumuje, Impek zaimportuje, Chrono utworzy, Edi poprawi"
                 />
 
-                {{-- Task count --}}
-                <span class="tg-mono" style="font-size:0.76rem;color:var(--text-muted,#94a3b8);white-space:nowrap">
-                    @if($tasks)
-                        {{ $tasks->total() }} zadań
-                    @elseif($groupedTasks)
-                        {{ $groupedTasks->flatten()->count() }} zadań
-                    @endif
-                    @if($groupBy)
-                        <span class="ms-1 badge tg-group-badge d-none d-md-inline-block"
-                              title="Przeciągnij zadanie (uchwyt ⋮⋮) na inną grupę, żeby zmienić: {{ $availableColumns[$groupBy]['label'] ?? '' }}"
-                              style="font-size:0.65rem;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.25)">grupowanie</span>
-                    @endif
-                </span>
+                {{-- Liczba zadań jest w chipie Chrono Assist --}}
+                @if($groupBy)
+                    <span class="ms-1 badge tg-group-badge d-none d-md-inline-block"
+                          title="Przeciągnij zadanie (uchwyt ⋮⋮) na inną grupę, żeby zmienić: {{ $availableColumns[$groupBy]['label'] ?? '' }}"
+                          style="font-size:0.65rem;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.25)">grupowanie</span>
+                @endif
             </div>
         </div>
     </div>
 </div>
 
-@if(count($this->activeFilterChips()) > 0)
+@if(count($filterChips) > 0)
     <div class="rp-active-filters tg-active-filters mb-2 px-1">
         <span class="rp-active-filters__label">Filtry:</span>
         <div class="tg-active-filters__chips">
-            @foreach($this->activeFilterChips() as $chip)
+            @foreach($filterChips as $chip)
                 <span class="rp-active-filters__chip">
                     <span class="rp-active-filters__chip-text">{{ $chip['label'] }}</span>
                     <button type="button"
@@ -967,41 +1174,120 @@
 @endif
 @endunless
 
+<template x-teleport="body">
+    <div x-show="filterOpen" x-cloak
+         @click.outside="if (!$event.target.closest('.tg-toolbar__filters, .tg-col-filter-mark, .tg-col-menu')) closeFilters()"
+         :style="`position:fixed;top:${filterTop}px;left:${filterLeft}px;z-index:1000002;width:${filterWidth}px;max-width:calc(100vw - 24px)`"
+         :class="{ 'tg-filter-panel--column': filterMode !== 'all' }"
+         class="rp-filter-panel tg-filter-panel-teal">
+        @include('livewire.partials.tg-filter-panel')
+    </div>
+</template>
+
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- GRID TABLE                                                  --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
 @php
     $colCount = count($visibleColumns) + 1; // expand col
+    $colHeaderMeta = [];
+    foreach ($visibleColumns as $metaKey) {
+        $metaCol = $availableColumns[$metaKey] ?? null;
+        if (! $metaCol) {
+            continue;
+        }
+        $colHeaderMeta[$metaKey] = [
+            'label' => $metaCol['label'],
+            'sortable' => (bool) ($metaCol['sortable'] ?? false),
+            'filterable' => $this->columnIsFilterable($metaKey),
+            'canHide' => ! ($metaCol['always'] ?? false)
+                && ! ($groupBy !== '' && $metaKey === $groupBy)
+                && ! ($this->isLockedToSprint() && $metaKey === 'sprint')
+                && ! ((! $this->usesWorkItems()) && $metaKey === 'type'),
+        ];
+    }
 @endphp
 
-<div class="card border-0 shadow-sm tg-table-wrap d-none d-md-block"
+@if($layout !== 'cards')
+<div class="card border-0 shadow-sm tg-table-wrap"
      x-data="{
-         dragFrom: null,
-         dragOver: null,
          resizing: null,
          startX: 0,
          startW: 0,
+         colMenu: null,
+         colMenuMode: 'actions',
+         colMenuT: 0,
+         colMenuL: 0,
+         colPointerX: 0,
+         colPointerY: 0,
+         colMeta: @js($colHeaderMeta),
          colWidths: @js($columnWidths),
+         closeColPopovers() {
+             this.colMenu = null;
+             this.colMenuMode = 'actions';
+         },
          startResize(e, col) {
              this.resizing = col;
              this.startX   = e.clientX;
              this.startW   = e.target.closest('th').offsetWidth;
+             this._pendingW = this.startW;
              document.documentElement.classList.add('tg-resizing');
          },
          doResize(e) {
              if (!this.resizing) return;
              const w = Math.max(50, this.startW + e.clientX - this.startX);
-             this.colWidths = { ...this.colWidths, [this.resizing]: w };
+             this._pendingW = w;
+             const col = this.$el.querySelector('col[data-col=' + this.resizing + ']');
+             if (col) {
+                 col.style.width = w + 'px';
+                 col.style.minWidth = w + 'px';
+             }
          },
          endResize() {
              if (!this.resizing) return;
-             $wire.setColumnWidth(this.resizing, this.colWidths[this.resizing]);
+             const w = this._pendingW != null ? this._pendingW : this.colWidths[this.resizing];
+             this.colWidths = { ...this.colWidths, [this.resizing]: w };
+             $wire.setColumnWidth(this.resizing, w);
              this.resizing = null;
+             this._pendingW = null;
              document.documentElement.classList.remove('tg-resizing');
+         },
+         openColMenu(e, key) {
+             if (window._tgColDragging || this.resizing) return;
+             const dx = e.clientX - this.colPointerX;
+             const dy = e.clientY - this.colPointerY;
+             if ((dx * dx + dy * dy) >= 37) return;
+             e.stopPropagation();
+             this.$dispatch('tg-close-filters');
+             if (this.colMenu === key && this.colMenuMode === 'actions') {
+                 this.closeColPopovers();
+                 return;
+             }
+             const r = e.currentTarget.getBoundingClientRect();
+             this.colMenuT = r.bottom + 4;
+             this.colMenuL = Math.max(4, Math.min(r.left, window.innerWidth - 230));
+             this.colMenuMode = 'actions';
+             this.$nextTick(() => { this.colMenu = key; });
+         },
+         emitColFilter(key, top, left) {
+             this.closeColPopovers();
+             this.$nextTick(() => this.$dispatch('tg-open-col-filter', { key, top, left }));
+         },
+         openColFilter(e, key) {
+             if (window._tgColDragging || this.resizing) return;
+             e.stopPropagation();
+             const th = e.currentTarget.closest('th') || e.currentTarget;
+             const r = th.getBoundingClientRect();
+             this.emitColFilter(key, r.bottom + 4, r.left);
+         },
+         openColFilterFromMenu() {
+             this.emitColFilter(this.colMenu, this.colMenuT, this.colMenuL);
          }
      }"
-     @mousemove.window="doResize($event)"
-     @mouseup.window="endResize()">
+     @mousemove.window="resizing && doResize($event)"
+     @mouseup.window="endResize()"
+     @keydown.escape.window="closeColPopovers()"
+     @tg-close-col-menu.window="closeColPopovers()">
+
     <div class="tg-scroll-container" style="overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 268px)">
         <table class="table table-sm tg-table mb-0" style="min-width:640px; border-collapse:separate; border-spacing:0">
 
@@ -1009,7 +1295,7 @@
             <colgroup>
                 <col style="width:36px; min-width:36px">
                 @foreach($visibleColumns as $colKey)
-                <col :style="colWidths['{{ $colKey }}'] ? `width:${colWidths['{{ $colKey }}']}px;min-width:${colWidths['{{ $colKey }}']}px` : ''">
+                <col data-col="{{ $colKey }}" :style="colWidths['{{ $colKey }}'] ? `width:${colWidths['{{ $colKey }}']}px;min-width:${colWidths['{{ $colKey }}']}px` : ''">
                 @endforeach
             </colgroup>
 
@@ -1018,19 +1304,20 @@
                 <tr>
                     <th style="width:36px; padding:8px 4px; border-bottom:none"></th>
 
+                    @php $activeChipKeys = array_column($filterChips, 'key'); @endphp
                     @foreach($visibleColumns as $colKey)
-                    @php $col = $availableColumns[$colKey] ?? null @endphp
+                    @php
+                        $col = $availableColumns[$colKey] ?? null;
+                        $colMetaRow = $colHeaderMeta[$colKey] ?? null;
+                        $colFilterable = (bool) ($colMetaRow['filterable'] ?? false);
+                        $colFiltered = $colFilterable && array_intersect($this->columnFilterChipKeys($colKey), $activeChipKeys) !== [];
+                    @endphp
                     @if($col)
-                    <th draggable="true"
+                    <th data-col="{{ $colKey }}"
                         style="position:relative; padding:8px 20px 8px 8px; border-bottom:none; white-space:nowrap"
-                        :class="{ 'tg-col-drag-over': dragOver === '{{ $colKey }}' }"
-                        @class(['sortable' => $col['sortable'] ?? false])
-                        @dragstart.self="dragFrom = '{{ $colKey }}'"
-                        @dragover.prevent="dragOver = '{{ $colKey }}'"
-                        @dragleave="if (!$el.contains($event.relatedTarget)) dragOver = null"
-                        @drop.prevent="if (dragFrom && dragFrom !== '{{ $colKey }}') $wire.reorderColumns(dragFrom, '{{ $colKey }}'); dragFrom = null; dragOver = null"
-                        @dragend="dragFrom = null; dragOver = null"
-                        @click="if (!dragFrom) {{ ($col['sortable'] ?? false) ? "\$wire.sortBy('{$colKey}')" : '' }}">
+                        @class(['sortable' => $col['sortable'] ?? false, 'tg-col--filtered' => $colFiltered])
+                        @mousedown="colPointerX = $event.clientX; colPointerY = $event.clientY"
+                        @click="openColMenu($event, '{{ $colKey }}')">
                         <span style="pointer-events:none; user-select:none">
                             {{ $col['label'] }}
                             @if(($col['sortable'] ?? false) && $sortField === $colKey)
@@ -1039,6 +1326,15 @@
                                 <i class="bi bi-arrow-down-up ms-1 opacity-25" style="font-size:0.65rem"></i>
                             @endif
                         </span>
+                        @if($colFiltered)
+                            <button type="button"
+                                    class="tg-col-filter-mark"
+                                    title="Filtr aktywny — kliknij, aby zmienić"
+                                    aria-label="Filtr kolumny {{ $col['label'] }}"
+                                    @click.stop="openColFilter($event, '{{ $colKey }}')">
+                                <i class="bi bi-funnel-fill" aria-hidden="true"></i>
+                            </button>
+                        @endif
                         <div class="tg-resize-handle"
                              @mousedown.stop.prevent="startResize($event, '{{ $colKey }}')"
                              @click.stop></div>
@@ -1245,6 +1541,39 @@
         </table>
     </div>
 
+    <template x-teleport="body">
+        <div x-cloak
+             class="dropdown-menu py-1 shadow-lg tg-col-menu"
+             :class="{ 'is-open': colMenu, 'tg-col-menu--filter': colMenuMode === 'filter' }"
+             @click.outside="closeColPopovers()"
+             @click.stop
+             :style="`position:fixed;top:${colMenuT}px;left:${colMenuL}px`">
+            <div x-show="colMenuMode === 'actions'">
+                <button type="button" class="dropdown-item py-2"
+                        x-show="colMenu && colMeta[colMenu] && colMeta[colMenu].sortable"
+                        @click="$wire.sortColumn(colMenu, 'asc'); closeColPopovers()">
+                    Sortuj A → Z
+                </button>
+                <button type="button" class="dropdown-item py-2"
+                        x-show="colMenu && colMeta[colMenu] && colMeta[colMenu].sortable"
+                        @click="$wire.sortColumn(colMenu, 'desc'); closeColPopovers()">
+                    Sortuj Z → A
+                </button>
+                <button type="button" class="dropdown-item py-2"
+                        x-show="colMenu && colMeta[colMenu] && colMeta[colMenu].filterable"
+                        @click.stop="openColFilterFromMenu()">
+                    Filtruj…
+                </button>
+                <button type="button" class="dropdown-item py-2 d-flex align-items-center justify-content-between gap-2"
+                        x-show="colMenu && colMeta[colMenu] && colMeta[colMenu].canHide"
+                        @click="$wire.toggleColumn(colMenu); closeColPopovers()">
+                    <span>Ukryj kolumnę</span>
+                    <i class="bi bi-eye" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </template>
+
     {{-- Pagination (only in flat view) --}}
     @if($tasks instanceof \Illuminate\Contracts\Pagination\Paginator && $tasks->hasPages())
     <div class="card-footer border-top py-2 px-3 bg-white">
@@ -1252,11 +1581,13 @@
     </div>
     @endif
 </div>
+@endif
 
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- MOBILE CARD LIST (< 768px) — zastępuje tabelę powyżej        --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
-<div class="tg-cards d-md-none">
+@if($layout === 'cards')
+<div class="tg-cards">
     @if($groupedTasks)
         @foreach($groupedTasks as $groupValue => $groupItems)
             @include('livewire.partials.tasks-grid-group-header-card', [
@@ -1403,55 +1734,548 @@
     </div>
     @endif
 </div>
+@endif
 
 <script>
     (function () {
-        const root = document.getElementById('xuiv2Tasks');
-        if (!root || root.dataset.xuiv2Bound) return;
-        root.dataset.xuiv2Bound = '1';
+        if (window._tgDndAbort) {
+            try { window._tgDndAbort.abort(); } catch (e) {}
+        }
+        window._tgDndAbort = new AbortController();
+        const signal = window._tgDndAbort.signal;
+        const opts = { capture: true, signal, passive: false };
 
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches
-            || !window.matchMedia('(pointer: fine)').matches) return;
+        function tgWire() {
+            const el = document.getElementById('xuiv2Tasks');
+            if (!el || !window.Livewire) return null;
+            const id = el.getAttribute('wire:id');
+            return id ? window.Livewire.find(id) : null;
+        }
 
-        // Cache buttons once; Livewire re-renders morph the DOM but the buttons
-        // keep stable wire:key-less identity for this simple case, so a light
-        // re-scan on click is enough — no need to query on every mousemove.
-        let magneticBtns = Array.from(document.querySelectorAll('.xuiv2-magnetic'));
-        const rescan = () => { magneticBtns = Array.from(document.querySelectorAll('.xuiv2-magnetic')); };
-        document.addEventListener('click', rescan, { passive: true, capture: true });
-        document.addEventListener('livewire:morphed', rescan, { passive: true });
+        function hitAt(x, y, selector) {
+            const stack = document.elementsFromPoint(x, y);
+            for (let i = 0; i < stack.length; i++) {
+                const n = stack[i];
+                if (!n || n.nodeType !== 1) continue;
+                if (n.classList && n.classList.contains('tg-drag-ghost')) continue;
+                if (n.matches && n.matches(selector)) return n;
+                if (n.closest) {
+                    const f = n.closest(selector);
+                    if (f) return f;
+                }
+            }
+            return null;
+        }
 
-        let mouseX = 0;
-        let mouseY = 0;
-        let ticking = false;
+        let drag = null;
+        let ghost = null;
+        let lastEl = null;
+        let moveRaf = 0;
+        let lastX = 0;
+        let lastY = 0;
 
-        function onFrame() {
-            ticking = false;
-            for (const btn of magneticBtns) {
-                const r = btn.getBoundingClientRect();
-                const cx = r.left + r.width / 2;
-                const cy = r.top + r.height / 2;
-                const dx = mouseX - cx;
-                const dy = mouseY - cy;
-                const dist = Math.hypot(dx, dy);
-                const radius = 70;
-                if (dist < radius) {
-                    const pull = (1 - dist / radius) * 0.35;
-                    btn.style.transform = `translate(${dx * pull}px, ${dy * pull}px)`;
-                } else if (btn.style.transform) {
-                    btn.style.transform = '';
+        function clearMark() {
+            if (!lastEl) return;
+            lastEl.classList.remove('tg-col-drag-over', 'tg-group-drop', 'tg-row-sub-drop');
+            lastEl = null;
+        }
+        function mark(el, cls) {
+            if (lastEl === el) return;
+            clearMark();
+            lastEl = el;
+            if (el) el.classList.add(cls);
+        }
+
+        function ghostLabel(d) {
+            if (d.type === 'col') return (d.el.textContent || d.col || '').replace(/\s+/g, ' ').trim();
+            if (d.type === 'sub') {
+                const span = d.el.querySelector('span.flex-grow-1');
+                return (span && span.textContent ? span.textContent : 'Podzadanie').trim();
+            }
+            const row = d.el.closest('tr');
+            const a = row && row.querySelector('.tg-facet__value');
+            return (a && a.textContent ? a.textContent : 'Zadanie').trim();
+        }
+
+        function placeGhost(x, y) {
+            if (!ghost) return;
+            ghost.style.transform = 'translate(' + (x + 14) + 'px,' + (y + 14) + 'px)';
+        }
+
+        function arm() {
+            if (!drag || drag.armed) return;
+            drag.armed = true;
+            window._tgColDragging = drag.type === 'col';
+            document.documentElement.classList.add('tg-pointer-drag');
+            window.dispatchEvent(new CustomEvent('tg-close-col-menu'));
+            window.dispatchEvent(new CustomEvent('tg-close-filters'));
+            ghost = document.createElement('div');
+            ghost.className = 'tg-drag-ghost';
+            ghost.textContent = ghostLabel(drag);
+            document.body.appendChild(ghost);
+            placeGhost(lastX, lastY);
+        }
+
+        function cleanup() {
+            const d = drag;
+            drag = null;
+            if (moveRaf) {
+                cancelAnimationFrame(moveRaf);
+                moveRaf = 0;
+            }
+            clearMark();
+            if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+            ghost = null;
+            document.documentElement.classList.remove('tg-pointer-hold', 'tg-pointer-drag');
+            const cap = (d && d.capEl) || (d && d.el);
+            if (cap) {
+                try {
+                    if (cap.hasPointerCapture && cap.hasPointerCapture(d.pointerId)) {
+                        cap.releasePointerCapture(d.pointerId);
+                    }
+                } catch (e) {}
+            }
+            window._tgColDrag = null;
+            window._tgTaskDrag = null;
+            window._tgSubDrag = null;
+            if (d && d.armed) {
+                window._tgSuppressClick = true;
+                setTimeout(function () {
+                    window._tgSuppressClick = false;
+                    window._tgColDragging = false;
+                }, 0);
+            } else {
+                window._tgColDragging = false;
+            }
+        }
+
+        function updateMarks() {
+            moveRaf = 0;
+            if (!drag || !drag.armed) return;
+            if (drag.type === 'col') {
+                const th = hitAt(lastX, lastY, '.tg-table th[data-col]');
+                mark(th && th.dataset.col !== drag.col ? th : null, 'tg-col-drag-over');
+                return;
+            }
+            if (drag.type === 'sub') {
+                const sub = hitAt(lastX, lastY, '[data-tg-sub-id]');
+                const row = hitAt(lastX, lastY, 'tr[data-tg-drop-task]');
+                if (sub && Number(sub.dataset.tgSubId) !== drag.id) {
+                    mark(sub, 'tg-row-sub-drop');
+                } else if (row && row.dataset.tgAcceptsSub === '1') {
+                    mark(row, 'tg-row-sub-drop');
+                } else {
+                    mark(null, '');
+                }
+                return;
+            }
+            const row = hitAt(lastX, lastY, 'tr[data-tg-drop-group]');
+            if (row && String(row.dataset.tgDropGroup) !== String(drag.fromGroup)) {
+                mark(row, 'tg-group-drop');
+            } else {
+                mark(null, '');
+            }
+        }
+
+        function reorderDomCols(from, to) {
+            const table = document.querySelector('#xuiv2Tasks .tg-table');
+            if (!table || from === to) return;
+            const esc = (window.CSS && CSS.escape) ? CSS.escape : function (s) { return s; };
+            const ths = Array.from(table.querySelectorAll('thead th[data-col]'));
+            const iFrom = ths.findIndex(function (th) { return th.dataset.col === from; });
+            const iTo = ths.findIndex(function (th) { return th.dataset.col === to; });
+            if (iFrom < 0 || iTo < 0) return;
+            const after = iFrom < iTo;
+            function move(a, b) {
+                if (!a || !b || !a.parentNode) return;
+                if (after) b.parentNode.insertBefore(a, b.nextSibling);
+                else b.parentNode.insertBefore(a, b);
+            }
+            move(ths[iFrom], ths[iTo]);
+            const fromCol = table.querySelector('col[data-col="' + esc(from) + '"]');
+            const toCol = table.querySelector('col[data-col="' + esc(to) + '"]');
+            move(fromCol, toCol);
+            table.querySelectorAll('tr.tg-task-row, tr.tg-add-row').forEach(function (tr) {
+                const cells = tr.children;
+                move(cells[iFrom + 1], cells[iTo + 1]);
+            });
+        }
+
+        function commitDrop() {
+            if (!drag || !drag.armed || drag.dropped) return;
+            drag.dropped = true;
+            const wire = tgWire();
+            if (!wire) return;
+            if (drag.type === 'col') {
+                const th = hitAt(lastX, lastY, '.tg-table th[data-col]');
+                if (th && th.dataset.col && th.dataset.col !== drag.col) {
+                    reorderDomCols(drag.col, th.dataset.col);
+                    wire.reorderColumns(drag.col, th.dataset.col);
+                }
+                return;
+            }
+            if (drag.type === 'sub') {
+                const sub = hitAt(lastX, lastY, '[data-tg-sub-id]');
+                const row = hitAt(lastX, lastY, 'tr[data-tg-drop-task]');
+                if (sub && row && Number(sub.dataset.tgSubId) !== drag.id) {
+                    wire.moveSubtask(drag.id, Number(row.dataset.tgDropTask), Number(sub.dataset.tgSubId));
+                } else if (row && row.dataset.tgAcceptsSub === '1' && row.dataset.tgDropTask !== String(drag.fromTask)) {
+                    wire.moveSubtask(drag.id, Number(row.dataset.tgDropTask));
+                }
+                return;
+            }
+            const row = hitAt(lastX, lastY, 'tr[data-tg-drop-group]');
+            if (row && String(row.dataset.tgDropGroup) !== String(drag.fromGroup)) {
+                wire.moveTaskToGroup(drag.id, row.dataset.tgDropGroup);
+            }
+        }
+
+        document.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0 || drag) return;
+            const src = e.target;
+            if (!src || !src.closest) return;
+            if (src.closest('.tg-resize-handle, .tg-col-filter-mark, a, button, input, select, textarea, label, .form-check')) return;
+
+            let next = null;
+            const th = src.closest('.tg-table th[data-col]');
+            const grip = src.closest('.tg-task-grip');
+            const sub = src.closest('[data-tg-sub-id]');
+            if (th) {
+                next = { type: 'col', col: th.dataset.col, el: th };
+            } else if (grip) {
+                const row = grip.closest('tr[data-tg-drop-task]');
+                if (!row) return;
+                next = {
+                    type: 'task',
+                    id: Number(row.dataset.tgDropTask),
+                    fromGroup: row.dataset.tgDropGroup,
+                    el: grip,
+                };
+            } else if (sub) {
+                const row = sub.closest('tr[data-tg-drop-task]');
+                next = {
+                    type: 'sub',
+                    id: Number(sub.dataset.tgSubId),
+                    fromTask: row ? row.dataset.tgDropTask : '',
+                    el: sub,
+                };
+            } else {
+                return;
+            }
+
+            lastX = e.clientX;
+            lastY = e.clientY;
+            const capEl = (src.nodeType === 1 ? src : src.parentElement) || next.el;
+            drag = Object.assign(next, {
+                x0: e.clientX,
+                y0: e.clientY,
+                pointerId: e.pointerId,
+                armed: false,
+                dropped: false,
+                capEl: capEl,
+            });
+            document.documentElement.classList.add('tg-pointer-hold');
+            if (next.type !== 'col' && e.cancelable) e.preventDefault();
+            try { capEl.setPointerCapture(e.pointerId); } catch (err) {}
+        }, opts);
+
+        document.addEventListener('pointermove', function (e) {
+            if (!drag || e.pointerId !== drag.pointerId) return;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            const dx = lastX - drag.x0;
+            const dy = lastY - drag.y0;
+            if (!drag.armed && (dx * dx + dy * dy) >= 36) {
+                arm();
+            }
+            if (!drag.armed) return;
+            if (e.cancelable) e.preventDefault();
+            placeGhost(lastX, lastY);
+            if (!moveRaf) moveRaf = requestAnimationFrame(updateMarks);
+        }, opts);
+
+        document.addEventListener('pointerup', function (e) {
+            if (!drag || e.pointerId !== drag.pointerId) return;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            if (drag.armed) {
+                if (e.cancelable) e.preventDefault();
+                commitDrop();
+            }
+            cleanup();
+        }, opts);
+
+        document.addEventListener('pointercancel', function (e) {
+            if (!drag || e.pointerId !== drag.pointerId) return;
+            cleanup();
+        }, opts);
+
+        document.addEventListener('lostpointercapture', function (e) {
+            if (!drag || e.pointerId !== drag.pointerId) return;
+            if (drag.armed) commitDrop();
+            cleanup();
+        }, opts);
+
+        window.addEventListener('blur', function () {
+            if (drag) cleanup();
+        }, { signal: signal });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && drag) cleanup();
+        }, opts);
+
+        document.addEventListener('click', function (e) {
+            if (!window._tgSuppressClick) return;
+            e.preventDefault();
+            e.stopPropagation();
+        }, opts);
+
+        document.addEventListener('dragstart', function (e) {
+            const t = e.target;
+            if (t && t.closest && t.closest('.tg-table, .tg-subtask-item, .tg-task-grip')) {
+                e.preventDefault();
+            }
+        }, opts);
+    })();
+
+    (function () {
+        const mq = window.matchMedia('(max-width: 767.98px)');
+        function desired() { return mq.matches ? 'cards' : 'table'; }
+        function persist(layout) {
+            document.cookie = 'tg_layout=' + layout + ';path=/;max-age=31536000;SameSite=Lax';
+        }
+        function sync() {
+            const layout = desired();
+            persist(layout);
+            const wire = (function () {
+                const el = document.getElementById('xuiv2Tasks');
+                if (!el || !window.Livewire) return null;
+                const id = el.getAttribute('wire:id');
+                return id ? window.Livewire.find(id) : null;
+            })();
+            if (!wire) return;
+            const current = typeof wire.get === 'function' ? wire.get('layout') : wire.layout;
+            if (current === layout) return;
+            wire.setLayout(layout);
+        }
+        persist(desired());
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', sync);
+        } else {
+            queueMicrotask(sync);
+        }
+        if (mq.addEventListener) mq.addEventListener('change', sync);
+        else mq.addListener(sync);
+    })();
+
+    (function () {
+        const pending = new Map();
+
+        function tgRoot() {
+            return document.getElementById('xuiv2Tasks');
+        }
+
+        function tgWire() {
+            const el = tgRoot();
+            if (!el || !window.Livewire) return null;
+            const id = el.getAttribute('wire:id');
+            return id ? window.Livewire.find(id) : null;
+        }
+
+        function skelHtml() {
+            return '<div class="tg-expand-skel" aria-busy="true">'
+                + '<div class="tg-expand-skel__head">'
+                + '<span class="tg-expand-spinner" aria-hidden="true"><\/span>'
+                + '<span>Wczytuję szczegóły…<\/span>'
+                + '<\/div>'
+                + '<i class="tg-expand-skel__line"></i>'
+                + '<i class="tg-expand-skel__line"></i>'
+                + '<i class="tg-expand-skel__line"></i>'
+                + '<\/div>';
+        }
+
+        function panel(id) {
+            const root = tgRoot();
+            return root ? root.querySelector('[data-tg-expand-for="' + id + '"]') : null;
+        }
+
+        function expandBtn(id) {
+            const root = tgRoot();
+            return root ? root.querySelector('.tg-expand-btn[data-tg-expand="' + id + '"]') : null;
+        }
+
+        function setOpenUi(btn, id, open) {
+            if (!btn) btn = expandBtn(id);
+            if (!btn) return;
+            btn.classList.toggle('is-open', open);
+            btn.classList.toggle('is-opening', !open ? false : btn.classList.contains('is-opening'));
+            if (!open) btn.classList.remove('is-opening');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.title = open ? 'Zwiń' : 'Rozwiń';
+            const row = btn.closest('tr.tg-task-row');
+            if (row) row.classList.toggle('tg-expanded', open);
+            const card = btn.closest('.tg-dt-card, .dt-card');
+            if (card) card.classList.toggle('is-expanded', open);
+        }
+
+        function applyCounts(id, done, total) {
+            if (done == null || total == null) return;
+            const root = tgRoot();
+            if (!root) return;
+            root.querySelectorAll('[data-tg-sub-stats="' + id + '"]').forEach(function (el) {
+                el.textContent = done + '/' + total;
+                el.setAttribute('title', done + '/' + total + ' podzadań');
+            });
+            root.querySelectorAll('[data-tg-sub-bar="' + id + '"]').forEach(function (el) {
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                el.style.width = pct + '%';
+                el.style.background = (total > 0 && done === total) ? '#10b981' : '#a855f7';
+            });
+        }
+
+        function insertPending(btn, id) {
+            const row = btn && btn.closest('tr.tg-task-row');
+            if (row) {
+                const tr = document.createElement('tr');
+                tr.className = 'tg-expand-row tg-expand-pending';
+                tr.setAttribute('data-tg-expand-for', String(id));
+                const spacer = document.createElement('td');
+                spacer.style.cssText = 'width:36px;padding:0 !important;background:rgba(10,15,29,0.6) !important';
+                const cell = document.createElement('td');
+                cell.colSpan = Math.max(1, row.cells.length - 1);
+                cell.innerHTML = '<div class="tg-expand-body">' + skelHtml() + '<\/div>';
+                tr.appendChild(spacer);
+                tr.appendChild(cell);
+                row.after(tr);
+                return tr;
+            }
+            const card = btn && btn.closest('.tg-dt-card, .dt-card');
+            if (card) {
+                const box = document.createElement('div');
+                box.className = 'tg-card-expand tg-expand-body tg-expand-pending';
+                box.setAttribute('data-tg-expand-for', String(id));
+                box.innerHTML = skelHtml();
+                card.appendChild(box);
+                return box;
+            }
+            return null;
+        }
+
+        function hostFor(btn, id) {
+            if (btn) {
+                return {
+                    row: btn.closest('tr.tg-task-row'),
+                    card: btn.closest('.tg-dt-card, .dt-card'),
+                };
+            }
+            const fallback = expandBtn(id);
+            return {
+                row: fallback ? fallback.closest('tr.tg-task-row') : null,
+                card: fallback ? fallback.closest('.tg-dt-card, .dt-card') : null,
+            };
+        }
+
+        function mountHtml(btn, id, html) {
+            html = (html || '').trim();
+            if (!html) return;
+            const existing = panel(id);
+            if (existing) {
+                existing.outerHTML = html;
+            } else {
+                const host = hostFor(btn, id);
+                if (host.row) host.row.insertAdjacentHTML('afterend', html);
+                else if (host.card) host.card.insertAdjacentHTML('beforeend', html);
+            }
+            const mounted = panel(id);
+            if (mounted) {
+                mounted.hidden = false;
+                mounted.classList.remove('tg-expand-pending');
+                if (window.Alpine && typeof Alpine.initTree === 'function') {
+                    Alpine.initTree(mounted);
                 }
             }
         }
 
-        document.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            if (!ticking) {
-                ticking = true;
-                requestAnimationFrame(onFrame);
+        window.tgApplyExpand = function (p) {
+            if (!p || p.id == null) return;
+            const id = Number(p.id);
+            const btn = expandBtn(id);
+            if (p.open === false) {
+                const el = panel(id);
+                if (el) {
+                    if (el.classList.contains('tg-expand-pending')) el.remove();
+                    else el.hidden = true;
+                }
+                setOpenUi(btn, id, false);
+                pending.delete(id);
+                return;
             }
-        }, { passive: true });
+            setOpenUi(btn, id, true);
+            if (p.html) {
+                mountHtml(btn, id, p.html);
+                pending.delete(id);
+                if (btn) btn.classList.remove('is-opening');
+            } else {
+                const el = panel(id);
+                if (el) el.hidden = false;
+            }
+            applyCounts(id, p.subDone, p.subTotal);
+        };
+
+        document.addEventListener('click', function (e) {
+            const btn = e.target && e.target.closest && e.target.closest('#xuiv2Tasks .tg-expand-btn');
+            if (!btn) return;
+            const id = Number(btn.getAttribute('data-tg-expand'));
+            if (!id) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const wire = tgWire();
+            if (!wire) return;
+
+            const opening = btn.getAttribute('aria-expanded') !== 'true' && !btn.classList.contains('is-open');
+            const el = panel(id);
+
+            if (!opening) {
+                if (el) {
+                    if (el.classList.contains('tg-expand-pending')) el.remove();
+                    else el.hidden = true;
+                }
+                setOpenUi(btn, id, false);
+                pending.delete(id);
+                wire.toggleExpand(id, true, false, false);
+                return;
+            }
+
+            setOpenUi(btn, id, true);
+            if (el && !el.classList.contains('tg-expand-pending')) {
+                el.hidden = false;
+                wire.toggleExpand(id, true, false, true);
+                return;
+            }
+
+            if (!el) insertPending(btn, id);
+            else el.hidden = false;
+            const token = {};
+            pending.set(id, token);
+            btn.classList.add('is-opening');
+            wire.toggleExpand(id, true, true, true).then(function (html) {
+                if (pending.get(id) !== token) return;
+                pending.delete(id);
+                btn.classList.remove('is-opening');
+                if (html) mountHtml(btn, id, html);
+                else {
+                    const sk = panel(id);
+                    if (sk && sk.classList.contains('tg-expand-pending')) sk.remove();
+                }
+            }).catch(function () {
+                if (pending.get(id) !== token) return;
+                pending.delete(id);
+                btn.classList.remove('is-opening');
+                setOpenUi(btn, id, false);
+                const sk = panel(id);
+                if (sk && sk.classList.contains('tg-expand-pending')) sk.remove();
+            });
+        }, true);
     })();
 </script>
 

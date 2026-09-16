@@ -498,7 +498,7 @@ class WorkItemBacklogTest extends TestCase
             ->test(TasksGrid::class)
             ->assertSeeHtml('href="'.e(route('sprints.show', $sprint)).'"')
             ->assertSee('Sprint HQ')
-            ->assertDontSeeHtml("startEdit({$item->id}, 'name'")
+            ->assertSeeHtml("startEdit({$item->id}, 'name'")
             ->assertDontSeeHtml("startEdit({$item->id}, 'sprint'");
     }
 

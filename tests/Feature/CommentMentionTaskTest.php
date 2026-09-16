@@ -2,19 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
 use App\Models\Comment;
 use App\Models\CommentMention;
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\TaskSubtask;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\WorkItem;
 use App\Notifications\CommentMentioned;
 use App\Notifications\TaskAssigned;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CommentMentionTaskTest extends TestCase
@@ -275,5 +279,71 @@ class CommentMentionTaskTest extends TestCase
         $this->actingAs($this->user)
             ->post(route('comments.mention-task.toggle', $comment))
             ->assertNotFound();
+    }
+
+    public function test_hash_subtask_ref_is_stored_plain_and_rendered_as_card(): void
+    {
+        $task = ProjectTask::query()->create([
+            'name' => 'Montaż',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+        TaskSubtask::query()->create([
+            'task_id' => $task->id,
+            'name' => 'Pierwszy krok',
+            'created_by' => $this->user->id,
+            'sort_order' => 1,
+        ]);
+        TaskSubtask::query()->create([
+            'task_id' => $task->id,
+            'name' => 'Wkleić uszczelkę',
+            'created_by' => $this->user->id,
+            'sort_order' => 2,
+        ]);
+
+        $this->actingAs($this->user)
+            ->post(route('comments.store'), [
+                'commentable_type' => 'project_task',
+                'commentable_id' => $task->id,
+                'body' => '#2 zrobione',
+            ])
+            ->assertRedirect();
+
+        $comment = Comment::query()->where('commentable_id', $task->id)->first();
+        $this->assertNotNull($comment);
+        $this->assertSame('#2 zrobione', $comment->body);
+
+        $this->actingAs($this->user)
+            ->get(route('tasks.show', $task))
+            ->assertOk()
+            ->assertSee('subtask-ref-card', false)
+            ->assertSee('Wkleić uszczelkę')
+            ->assertSee('#2', false);
+    }
+
+    public function test_comment_accepts_image_attachment_without_body(): void
+    {
+        Storage::fake('public');
+
+        $task = ProjectTask::query()->create([
+            'name' => 'Montaż',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->post(route('comments.store'), [
+                'commentable_type' => 'project_task',
+                'commentable_id' => $task->id,
+                'body' => '',
+                'attachments' => [UploadedFile::fake()->image('zrzut-2026-09-16.png')],
+            ])
+            ->assertRedirect();
+
+        $comment = Comment::query()->where('commentable_id', $task->id)->first();
+        $this->assertNotNull($comment);
+        $this->assertNull($comment->body);
+        $this->assertSame(1, $comment->attachments()->count());
+        $this->assertSame('zrzut-2026-09-16.png', $comment->attachments()->first()->original_name);
     }
 }

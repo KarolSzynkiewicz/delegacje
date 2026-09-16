@@ -59,7 +59,28 @@ class TaskShowFacetFilterTest extends TestCase
             ->assertSeeHtml('href="'.e($dueUrl).'"')
             ->assertSeeHtml("openQuickEdit({$task->id}, 'category'")
             ->assertSeeHtml("openQuickEdit({$task->id}, 'priority'")
-            ->assertSeeHtml("openQuickEdit({$task->id}, 'due_date'");
+            ->assertSeeHtml("openQuickEdit({$task->id}, 'due_date'")
+            ->assertSeeHtml("openQuickEdit({$task->id}, 'name'")
+            ->assertSee('Tytuł');
+    }
+
+    public function test_title_can_be_renamed_from_the_details_card(): void
+    {
+        $task = ProjectTask::query()->create([
+            'name' => 'Stary tytuł',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(TaskShowQuickEdit::class, ['task' => $task])
+            ->call('openQuickEdit', $task->id, 'name')
+            ->set('qeName', 'Nowy tytuł karty')
+            ->call('saveQuickEdit')
+            ->assertHasNoErrors()
+            ->assertDispatched('task-title-updated');
+
+        $this->assertSame('Nowy tytuł karty', $task->fresh()->name);
     }
 
     public function test_empty_category_priority_and_due_date_are_not_filter_links(): void

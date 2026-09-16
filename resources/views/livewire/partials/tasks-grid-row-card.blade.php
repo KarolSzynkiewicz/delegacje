@@ -9,9 +9,7 @@
     $statusWidget = $this->rowStatusWidget($task);
     $statusLabel = $this->rowStatusLabel($task);
 
-    $subtasksAll  = $task->subtasks->sortBy(['sort_order', 'created_at']);
-    $subtaskTotal = $subtasksAll->count();
-    $subtaskDone  = $subtasksAll->where('is_completed', true)->count();
+    [$subtasksAll, $subtaskTotal, $subtaskDone] = $this->rowSubtaskStats($task, $isExpanded);
     $commentsCount = (int) ($task->comments_count ?? ($task->relationLoaded('comments') ? $task->comments->count() : 0));
 
     $statusMap = [
@@ -80,13 +78,15 @@
             @if($canExpand)
                 <button type="button"
                         wire:click="toggleExpand({{ $task->id }})"
-                        class="tg-card-expand-btn tg-dt-hit"
+                        class="tg-card-expand-btn tg-dt-hit tg-expand-btn{{ $isExpanded ? ' is-open' : '' }}"
+                        data-tg-expand="{{ $task->id }}"
+                        aria-expanded="{{ $isExpanded ? 'true' : 'false' }}"
                         title="{{ $isExpanded ? 'Zwiń' : 'Rozwiń' }}">
-                    <i class="bi bi-chevron-{{ $isExpanded ? 'down' : 'right' }}" style="font-size:0.75rem"></i>
+                    <i class="bi bi-chevron-right" style="font-size:0.75rem"></i>
                 </button>
             @endif
             @if($canAddSubtask && $subtaskTotal > 0)
-                <span class="tg-card-subtask-badge" title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
+                <span class="tg-card-subtask-badge" data-tg-sub-stats="{{ $task->id }}" title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                     {{ $subtaskDone }}/{{ $subtaskTotal }}
                 </span>
             @endif
@@ -94,10 +94,23 @@
                 <span class="tg-dt-card__name tg-edi tg-edi--{{ $ediName['kind'] }}">
                     @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediName, 'rowId' => $task->id, 'field' => 'name'])
                 </span>
+            @elseif($isEditing && $editingField === 'name')
+                <input type="text" wire:model="editingValue" class="form-control form-control-sm tg-dt-hit"
+                       wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
+                       x-data x-init="$el.focus(); $el.select()">
             @else
                 <a href="{{ $openUrl }}" class="stretched-link tg-dt-card__name" title="{{ $task->name }}">
                     {{ $task->name }}
                 </a>
+                @if($this->rowWritable($task, 'name'))
+                    <button type="button"
+                            class="tg-facet__edit tg-dt-hit"
+                            wire:click.stop="startEdit({{ $task->id }}, 'name')"
+                            title="Edytuj tytuł"
+                            aria-label="Edytuj tytuł">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                @endif
             @endif
             @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
                 <span class="tg-dt-hit"><x-ui.approval-decision :decision="$approvalDecision" size="sm" /></span>
@@ -435,63 +448,6 @@
     @endunless
 
     @if($isExpanded)
-    <div class="tg-card-expand">
-        @if($canAddSubtask || $subtaskTotal > 0)
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                <span class="dt-card__label" style="border:0;padding:0">
-                    <i class="bi bi-list-check me-1"></i>Podzadania
-                </span>
-                @if($subtaskTotal > 0)
-                    <span class="badge" style="font-size:0.6rem; border-radius:8px; background:rgba(255,255,255,0.1); color:var(--text-muted,#94a3b8)">
-                        {{ $subtaskDone }}/{{ $subtaskTotal }}
-                    </span>
-                @endif
-                @if($canAddSubtask)
-                <button wire:click="startAddSubtask({{ $task->id }})"
-                        class="btn btn-link btn-sm p-0 ms-1 tg-dt-hit"
-                        style="font-size:0.7rem; text-decoration:none; color:rgba(16,185,129,0.8)">
-                    <i class="bi bi-plus-circle me-1"></i>Dodaj
-                </button>
-                @endif
-            </div>
-
-            @if($subtaskTotal > 0)
-                @foreach($subtasksAll as $subtask)
-                <div class="d-flex align-items-center gap-2 py-1" wire:key="tg-card-st-{{ $subtask->id }}">
-                    <x-ui.input type="checkbox"
-                                :id="'tg-card-st-chk-' . $subtask->id"
-                                :value="$subtask->is_completed"
-                                :checked="$subtask->is_completed"
-                                wire:change="toggleSubtask({{ $subtask->id }})"
-                                class="flex-shrink-0 mb-0" />
-                    <span class="flex-grow-1" style="font-size:0.82rem; {{ $subtask->is_completed ? 'text-decoration:line-through; color:rgba(255,255,255,0.3)' : 'color:var(--text-main,#f1f5f9)' }}">
-                        {{ $subtask->name }}
-                    </span>
-                </div>
-                @endforeach
-            @elseif($addingSubtaskForTask !== $task->id)
-                <div class="text-muted" style="font-size:0.8rem; font-style:italic">Brak podzadań.</div>
-            @endif
-
-            @if($addingSubtaskForTask === $task->id)
-            <div class="d-flex gap-1 mt-2">
-                <input type="text"
-                       wire:model="newSubtaskName"
-                       class="form-control form-control-sm"
-                       placeholder="Nazwa podzadania…"
-                       wire:keydown.enter="saveSubtask"
-                       wire:keydown.escape="cancelAddSubtask">
-                <button wire:click="saveSubtask" class="btn btn-sm btn-success flex-shrink-0">
-                    <i class="bi bi-plus-lg"></i>
-                </button>
-                <button wire:click="cancelAddSubtask" class="btn btn-sm btn-outline-secondary flex-shrink-0">
-                    <i class="bi bi-x"></i>
-                </button>
-            </div>
-            @endif
-        </div>
-        @endif
-    </div>
+        @include('livewire.partials.tasks-grid-expand-card')
     @endif
 </x-ui.card>

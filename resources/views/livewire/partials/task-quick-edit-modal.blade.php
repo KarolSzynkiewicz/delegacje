@@ -57,7 +57,9 @@
             x-ref="qePanel"
         >
             <h6 class="mb-3 fw-semibold">
-                @if($quickEditField === 'category')
+                @if($quickEditField === 'name')
+                    Tytuł
+                @elseif($quickEditField === 'category')
                     Kategoria
                 @elseif($quickEditField === 'assigned_to')
                     Przypisany
@@ -69,7 +71,13 @@
                     Termin wykonania
                 @endif
             </h6>
-            @if($quickEditField === 'category')
+            @if($quickEditField === 'name')
+                <div class="mb-3">
+                    <label class="form-label small text-muted mb-1">Nazwa zadania</label>
+                    <input type="text" class="form-control form-control-sm" wire:model="qeName" maxlength="255" data-quick-focus wire:keydown.enter="saveQuickEdit">
+                    @error('qeName') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                </div>
+            @elseif($quickEditField === 'category')
                 <div class="mb-3">
                     <label class="form-label small text-muted mb-1">Nazwa kategorii</label>
                     <input type="text" class="form-control form-control-sm" wire:model="qeCategory" placeholder="Opcjonalnie" maxlength="255" data-quick-focus>

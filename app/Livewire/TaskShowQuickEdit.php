@@ -49,6 +49,7 @@ class TaskShowQuickEdit extends Component
         $this->task = $task->loadMissing(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
         $this->descriptionDraft = $task->plainDescription();
         $this->dispatch('task-history-changed')->to(TaskActivity::class);
+        $this->dispatch('task-title-updated', name: $task->name);
     }
 
     public function render()

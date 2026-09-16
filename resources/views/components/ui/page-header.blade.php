@@ -29,8 +29,8 @@
     @endif
 >
     <div class="ui-page-header__bar">
-        <div class="ui-page-header__title">
-            <h2 class="ui-page-header__heading mb-0">{{ $title }}</h2>
+        <div class="ui-page-header__title" x-data="{ heading: @js($title) }" @task-title-updated.window="heading = $event.detail.name ?? $event.detail[0] ?? heading">
+            <h2 class="ui-page-header__heading mb-0" x-text="heading">{{ $title }}</h2>
         </div>
 
         @if($hasActions)

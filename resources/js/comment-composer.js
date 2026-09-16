@@ -1,7 +1,10 @@
 window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
     const allUsers = payload.users || [];
     const subtasks = payload.subtasks || [];
-    const mentionRe = /@([\p{L}\p{N}_.@-]+)([!?])?/gu;
+    const tokenRe = /@([\p{L}\p{N}_.@-]+)([!?])?|(?<!\w)#(\d+)\b/gu;
+    const maxFiles = 15;
+    const maxBytes = 15360 * 1024;
+    const imageTypeRe = /^image\/(png|jpe?g|gif|webp)$/i;
 
     const kindOf = (suffix) => (suffix === '!' ? 'task' : (suffix === '?' ? 'approval' : 'notify'));
     const iconOf = (kind) => {
@@ -39,6 +42,7 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             this.syncBody();
             this.$el.closest('form')?.addEventListener('submit', () => {
                 this.tryCommitMention();
+                this.tryCommitSubtask();
                 this.syncBody();
             });
         },
@@ -59,6 +63,67 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             return n + (n < 5 ? ' pliki' : ' plików');
         },
 
+        namedScreenshot(file) {
+            const generic = !file.name || /^image\.(png|jpe?g|gif|webp)$/i.test(file.name);
+            if (!generic) {
+                return file;
+            }
+            const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+            return new File([file], 'zrzut-' + stamp + '.' + ext, {
+                type: file.type,
+                lastModified: file.lastModified || Date.now(),
+            });
+        },
+
+        clipboardImages(clipboardData) {
+            if (!clipboardData) {
+                return [];
+            }
+            const out = [];
+            const seen = new Set();
+            const push = (file) => {
+                if (!file || !file.type || !imageTypeRe.test(file.type) || file.size > maxBytes) {
+                    return;
+                }
+                const key = file.type + ':' + file.size + ':' + (file.lastModified || 0);
+                if (seen.has(key)) {
+                    return;
+                }
+                seen.add(key);
+                out.push(this.namedScreenshot(file));
+            };
+            Array.from(clipboardData.files || []).forEach(push);
+            Array.from(clipboardData.items || []).forEach((item) => {
+                if (item.kind === 'file') {
+                    push(item.getAsFile());
+                }
+            });
+
+            return out;
+        },
+
+        addFiles(incoming) {
+            const input = this.$refs.files;
+            const current = input ? Array.from(input.files || []) : this.files.slice();
+            const next = current.slice();
+            incoming.forEach((file) => {
+                if (next.length >= maxFiles) {
+                    return;
+                }
+                next.push(file);
+            });
+            if (input && typeof DataTransfer !== 'undefined') {
+                const dt = new DataTransfer();
+                next.forEach((file) => dt.items.add(file));
+                input.files = dt.files;
+                this.files = Array.from(input.files);
+            } else {
+                this.files = next;
+            }
+        },
+
         resolveHandle(handle) {
             const q = String(handle || '').toLowerCase();
             if (q === 'wszyscy') {
@@ -67,6 +132,12 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             const user = allUsers.find((u) => u.name.toLowerCase() === q);
 
             return user ? { name: user.name } : null;
+        },
+
+        resolveSubtask(num) {
+            const n = Number(num);
+
+            return subtasks.find((s) => Number(s.num) === n) || null;
         },
 
         createChip(name, suffix) {
@@ -88,6 +159,27 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             return span;
         },
 
+        createSubtaskChip(num, name) {
+            const span = document.createElement('span');
+            span.className = 'comment-chip comment-chip--subtask';
+            span.contentEditable = 'false';
+            span.dataset.kind = 'subtask';
+            span.dataset.num = String(num);
+            span.title = 'Podzadanie #' + num;
+            const badge = document.createElement('span');
+            badge.className = 'comment-chip__num';
+            badge.textContent = '#' + num;
+            span.append(badge);
+            if (name) {
+                const label = document.createElement('span');
+                label.className = 'comment-chip__name';
+                label.textContent = name;
+                span.append(label);
+            }
+
+            return span;
+        },
+
         serialize(root) {
             let out = '';
             const walk = (node) => {
@@ -99,6 +191,10 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
                     return;
                 }
                 if (node.classList?.contains('comment-chip')) {
+                    if (node.dataset.kind === 'subtask') {
+                        out += '#' + (node.dataset.num || '');
+                        return;
+                    }
                     out += '@' + (node.dataset.handle || '') + (node.dataset.suffix || '');
                     return;
                 }
@@ -131,10 +227,22 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             }
             editor.innerHTML = '';
             const raw = String(text || '');
-            mentionRe.lastIndex = 0;
+            tokenRe.lastIndex = 0;
             let last = 0;
             let match;
-            while ((match = mentionRe.exec(raw))) {
+            while ((match = tokenRe.exec(raw))) {
+                if (match[3] !== undefined) {
+                    const known = this.resolveSubtask(match[3]);
+                    if (!known) {
+                        continue;
+                    }
+                    if (match.index > last) {
+                        editor.appendChild(document.createTextNode(raw.slice(last, match.index)));
+                    }
+                    editor.appendChild(this.createSubtaskChip(known.num, known.name));
+                    last = match.index + match[0].length;
+                    continue;
+                }
                 const known = this.resolveHandle(match[1]);
                 if (!known) {
                     continue;
@@ -202,20 +310,27 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             sel.addRange(range);
         },
 
-        insertChipAtCaret(name, suffix) {
-            const chip = this.createChip(name, suffix || '');
+        insertNodeAtCaret(node) {
             const sel = window.getSelection();
             if (!sel || sel.rangeCount === 0) {
-                this.$refs.editor.appendChild(chip);
-                this.placeCaretAfter(chip);
-                return chip;
+                this.$refs.editor.appendChild(node);
+                this.placeCaretAfter(node);
+                return node;
             }
             const range = sel.getRangeAt(0);
             range.deleteContents();
-            range.insertNode(chip);
-            this.placeCaretAfter(chip);
+            range.insertNode(node);
+            this.placeCaretAfter(node);
 
-            return chip;
+            return node;
+        },
+
+        insertChipAtCaret(name, suffix) {
+            return this.insertNodeAtCaret(this.createChip(name, suffix || ''));
+        },
+
+        insertSubtaskChipAtCaret(num, name) {
+            return this.insertNodeAtCaret(this.createSubtaskChip(num, name));
         },
 
         insertText(text) {
@@ -236,11 +351,16 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             if (!node) {
                 return false;
             }
-            const match = before.match(/(^|\s)@(\S*)$/u);
-            if (!match) {
+            const hashMatch = before.match(/(^|\s)#(\d*)$/u);
+            const atMatch = before.match(/(^|\s)@(\S*)$/u);
+            let atPos = -1;
+            if (hashMatch) {
+                atPos = before.lastIndexOf('#');
+            } else if (atMatch) {
+                atPos = before.lastIndexOf('@');
+            } else {
                 return false;
             }
-            const atPos = before.lastIndexOf('@');
             node.textContent = before.slice(0, atPos) + (node.textContent || '').slice(offset);
             this.placeCaret(node, atPos);
 
@@ -267,6 +387,29 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             this.insertChipAtCaret(known.name, suffix);
             this.mentionMode = null;
             this.mentionSuffix = '';
+            this.closeSuggest();
+            this.syncBody();
+
+            return true;
+        },
+
+        tryCommitSubtask() {
+            const { node, offset, before } = this.caretText();
+            if (!node) {
+                return false;
+            }
+            const match = before.match(/(?:^|(?<=\s))#(\d+)$/u);
+            if (!match) {
+                return false;
+            }
+            const known = this.resolveSubtask(match[1]);
+            if (!known) {
+                return false;
+            }
+            const atPos = before.lastIndexOf('#');
+            node.textContent = before.slice(0, atPos) + (node.textContent || '').slice(offset);
+            this.placeCaret(node, atPos);
+            this.insertSubtaskChipAtCaret(known.num, known.name);
             this.closeSuggest();
             this.syncBody();
 
@@ -316,6 +459,7 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
                 this.tryCommitMention();
+                this.tryCommitSubtask();
                 this.syncBody();
                 this.$el.closest('form')?.requestSubmit();
                 return;
@@ -323,6 +467,7 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 this.tryCommitMention();
+                this.tryCommitSubtask();
                 this.insertText('\n');
                 this.syncBody();
                 return;
@@ -332,16 +477,15 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
                     event.preventDefault();
                     this.insertText(event.key === ',' ? ', ' : ' ');
                     this.syncBody();
+                } else if (event.key === ' ' && this.tryCommitSubtask()) {
+                    event.preventDefault();
+                    this.insertText(' ');
+                    this.syncBody();
                 }
             }
         },
 
-        onPaste(event) {
-            event.preventDefault();
-            const text = event.clipboardData?.getData('text/plain') || '';
-            if (!text) {
-                return;
-            }
+        insertPastedText(text) {
             const before = this.textBeforeCaret();
             const full = this.serialize(this.$refs.editor);
             const after = full.slice(before.length);
@@ -356,6 +500,24 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
                     this.placeCaretAfter(editor.lastChild);
                 }
             }
+        },
+
+        onPaste(event) {
+            const images = this.clipboardImages(event.clipboardData);
+            const text = event.clipboardData?.getData('text/plain') || '';
+            if (images.length > 0) {
+                event.preventDefault();
+                this.addFiles(images);
+                if (text) {
+                    this.insertPastedText(text);
+                }
+                return;
+            }
+            event.preventDefault();
+            if (!text) {
+                return;
+            }
+            this.insertPastedText(text);
         },
 
         onInput() {
@@ -415,7 +577,8 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
                 this.insertChipAtCaret(item.name, this.mentionSuffix);
                 this.insertText(' ');
             } else {
-                this.insertText('#' + item.num + ' ');
+                this.insertSubtaskChipAtCaret(item.num, item.name);
+                this.insertText(' ');
             }
             this.$refs.editor.focus();
             this.close();

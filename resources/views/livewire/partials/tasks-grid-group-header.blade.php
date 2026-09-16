@@ -5,11 +5,7 @@
 
 <tr wire:key="tg-group-{{ $groupKey }}"
     class="tg-group-header {{ $isCollapsed ? 'tg-group-collapsed' : '' }}"
-    x-data="{ taskOver: false, gv: String(@js((string) $groupValue)) }"
-    :class="{ 'tg-group-drop': taskOver }"
-    @dragover="if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $event.preventDefault(); taskOver = true; $event.dataTransfer.dropEffect = 'move' }"
-    @dragleave="if (!$el.contains($event.relatedTarget)) taskOver = false"
-    @drop.prevent="if (window._tgTaskDrag && String(window._tgTaskDrag.fromGroup) !== gv) { $wire.moveTaskToGroup(window._tgTaskDrag.id, gv); window._tgTaskDrag = null; taskOver = false }">
+    data-tg-drop-group="{{ $groupValue }}">
     {{-- Ten sam chevron co przy wierszu zadania --}}
     <td style="width:36px; padding:5px 4px !important; text-align:center">
         <button type="button"
